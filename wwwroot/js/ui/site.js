@@ -593,12 +593,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.state.radioModel = data.radioModel;
                 updatePowerSliderMax();
             }
-            if (data && data.radioModel === 'FTDX3000') {
-                const splitBtn      = document.getElementById('splitBtn');
-                const quickSplitBtn = document.getElementById('quickSplitBtn');
-                if (splitBtn)      splitBtn.style.display      = 'none';
-                if (quickSplitBtn) quickSplitBtn.style.display = 'none';
-            }
         });
 
     // Update powerValue label live as slider moves (outer/global version)

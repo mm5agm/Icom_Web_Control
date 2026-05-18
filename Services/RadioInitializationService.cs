@@ -254,17 +254,14 @@ namespace FTdx101_WebApp.Services
                     }
                 }
 
-                // Query Split mode (ST0=off, ST1=on, ST2=on+5kHz) — FTDX3000 has no ST command
-                if (settings.RadioModel != "FTDX3000")
+                // Query Split mode (ST0=off, ST1=on, ST2=on+5kHz)
+                var stResponse = await multiplexer.SendCommandAsync("ST;", "Initialization", stoppingToken);
+                if (!string.IsNullOrWhiteSpace(stResponse) && stResponse.StartsWith("ST"))
                 {
-                    var stResponse = await multiplexer.SendCommandAsync("ST;", "Initialization", stoppingToken);
-                    if (!string.IsNullOrWhiteSpace(stResponse) && stResponse.StartsWith("ST"))
+                    if (int.TryParse(stResponse.Substring(2, 1), out int splitMode))
                     {
-                        if (int.TryParse(stResponse.Substring(2, 1), out int splitMode))
-                        {
-                            radioStateService.SplitMode = splitMode;
-                            logger.LogInformation("[RadioInitializationService] Split mode: {SplitMode}", splitMode);
-                        }
+                        radioStateService.SplitMode = splitMode;
+                        logger.LogInformation("[RadioInitializationService] Split mode: {SplitMode}", splitMode);
                     }
                 }
 

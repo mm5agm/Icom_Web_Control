@@ -1156,10 +1156,6 @@ namespace FTdx101_WebApp.Controllers
             if (mode < 0 || mode > 2)
                 return BadRequest(new { error = "Split mode must be 0 (off), 1 (on), or 2 (quick split +5 kHz)" });
 
-            var splitSettings = await _settingsService.GetSettingsAsync();
-            if (splitSettings.RadioModel == "FTDX3000")
-                return BadRequest(new { error = "FTDX3000 does not support the ST split command" });
-
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
