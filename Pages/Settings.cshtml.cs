@@ -96,6 +96,19 @@ namespace FTdx101_WebApp.Pages
                         .Concat(optionalSelected.Where(f => f is "4" or "5"))
                         .Distinct().ToList();
                 }
+                else if (Settings.RadioModel == "FT-710")
+                {
+                    current.InstalledRoofingFilters = new List<string>();
+                }
+                else if (Settings.RadioModel == "FTDX3000")
+                {
+                    // Standard: 0=Auto, 1=15kHz, 2=6kHz, 3=3kHz always present.
+                    // Optional: 4=600Hz (YH-77SDE), 5=300Hz (YH-77SDE narrow).
+                    var optionalSelected = Settings.InstalledRoofingFilters ?? new List<string>();
+                    current.InstalledRoofingFilters = new List<string> { "0", "1", "2", "3" }
+                        .Concat(optionalSelected.Where(f => f is "4" or "5"))
+                        .Distinct().ToList();
+                }
                 await _settingsService.SaveSettingsAsync(current);
 
                 // Reset initialization status so app will try again

@@ -585,13 +585,19 @@ async function checkRadioPowerStatus() {
 document.addEventListener('DOMContentLoaded', function() {
     checkRadioPowerStatus();
     checkTxStatus();
-    // Fetch radio status and update slider max
+    // Fetch radio status and update slider max / model-dependent UI
     fetch('/api/cat/status')
         .then(response => response.json())
         .then(data => {
             if (data && data.radioModel && window.state) {
                 window.state.radioModel = data.radioModel;
                 updatePowerSliderMax();
+            }
+            if (data && data.radioModel === 'FTDX3000') {
+                const splitBtn      = document.getElementById('splitBtn');
+                const quickSplitBtn = document.getElementById('quickSplitBtn');
+                if (splitBtn)      splitBtn.style.display      = 'none';
+                if (quickSplitBtn) quickSplitBtn.style.display = 'none';
             }
         });
 

@@ -507,6 +507,13 @@ namespace FTdx101_WebApp.Controllers
             { "3", "3 kHz" }
         };
 
+        // FTDX3000 roofing filter display names (RF0x code -> display name)
+        private static readonly Dictionary<string, string> Ftdx3000RoofingFilterNames = new()
+        {
+            { "0", "Auto" }, { "1", "15 kHz" }, { "2", "6 kHz" },
+            { "3", "3 kHz" }, { "4", "600 Hz" }, { "5", "300 Hz" }
+        };
+
         [HttpPost("roofingfilter/a")]
         public async Task<IActionResult> SetRoofingFilterA([FromBody] RoofingFilterRequest request)
         {
@@ -518,10 +525,25 @@ namespace FTdx101_WebApp.Controllers
                 await EnsureConnectedAsync();
 
                 var settings = await _settingsService.GetSettingsAsync();
-                bool isFtdx10 = settings.RadioModel == "FTdx10";
+                bool isFtdx10  = settings.RadioModel == "FTdx10";
+                bool isFt710   = settings.RadioModel == "FT-710";
+                bool isFtdx3000 = settings.RadioModel == "FTDX3000";
 
-                if (isFtdx10)
-                    return Ok(new { message = "FTdx10 roofing filter is selected automatically by the radio" });
+                if (isFtdx10 || isFt710)
+                    return Ok(new { message = "Roofing filter is selected automatically by the radio" });
+
+                if (isFtdx3000)
+                {
+                    // FTDX3000: P1 is always 0 (single receiver); code is the filter number directly
+                    await _catClient.SendCommandAsync($"RF0{request.Filter};", "WebUI", CancellationToken.None);
+                    await Task.Delay(100);
+                    var readback = await _catClient.SendCommandAsync("RF0;", "WebUI", CancellationToken.None);
+                    var actualCode = readback?.Length >= 4 ? readback[3].ToString() : request.Filter;
+                    var displayName = Ftdx3000RoofingFilterNames.GetValueOrDefault(actualCode, actualCode);
+                    _radioStateService.RoofingFilterA = actualCode;
+                    _logger.LogInformation("Set Main roofing filter (FTDX3000) to {Filter}", displayName);
+                    return Ok(new { message = $"Roofing filter set to {displayName}", filter = actualCode, filterName = displayName });
+                }
 
                 // FTdx101MP/D: RF command with set code conversion
                 if (!RoofingFilterSetCodes.TryGetValue(request.Filter, out var setCode))
@@ -579,10 +601,25 @@ namespace FTdx101_WebApp.Controllers
                 await EnsureConnectedAsync();
 
                 var settings = await _settingsService.GetSettingsAsync();
-                bool isFtdx10 = settings.RadioModel == "FTdx10";
+                bool isFtdx10  = settings.RadioModel == "FTdx10";
+                bool isFt710   = settings.RadioModel == "FT-710";
+                bool isFtdx3000 = settings.RadioModel == "FTDX3000";
 
-                if (isFtdx10)
-                    return Ok(new { message = "FTdx10 roofing filter is selected automatically by the radio" });
+                if (isFtdx10 || isFt710)
+                    return Ok(new { message = "Roofing filter is selected automatically by the radio" });
+
+                if (isFtdx3000)
+                {
+                    // FTDX3000 has a single receiver — P1 is always 0; VFO B shares the same filter
+                    await _catClient.SendCommandAsync($"RF0{request.Filter};", "WebUI", CancellationToken.None);
+                    await Task.Delay(100);
+                    var readback = await _catClient.SendCommandAsync("RF0;", "WebUI", CancellationToken.None);
+                    var actualCode = readback?.Length >= 4 ? readback[3].ToString() : request.Filter;
+                    var displayName = Ftdx3000RoofingFilterNames.GetValueOrDefault(actualCode, actualCode);
+                    _radioStateService.RoofingFilterB = actualCode;
+                    _logger.LogInformation("Set Sub roofing filter (FTDX3000) to {Filter}", displayName);
+                    return Ok(new { message = $"Roofing filter set to {displayName}", filter = actualCode, filterName = displayName });
+                }
 
                 // FTdx101MP/D: RF command with set code conversion
                 if (!RoofingFilterSetCodes.TryGetValue(request.Filter, out var setCode))
@@ -1063,8 +1100,8 @@ namespace FTdx101_WebApp.Controllers
         [HttpPost("ifwidth/{receiver}")]
         public async Task<IActionResult> SetIfWidth(string receiver, [FromBody] IfWidthRequest request)
         {
-            var validCodes = new[] { "0","1","2","3","4","5","6","7","8" };
-            if (!validCodes.Contains(request.Code))
+            // Codes 0-25 cover all supported models (FTdx101=0-8, FTdx10=0-15, FT-710=0-22, FTDX3000=1-25)
+            if (!int.TryParse(request.Code, out int codeNum) || codeNum < 0 || codeNum > 25)
                 return BadRequest(new { error = $"Invalid IF Width code: {request.Code}" });
 
             if (!await _requestSemaphore.WaitAsync(2000))
@@ -1118,6 +1155,10 @@ namespace FTdx101_WebApp.Controllers
         {
             if (mode < 0 || mode > 2)
                 return BadRequest(new { error = "Split mode must be 0 (off), 1 (on), or 2 (quick split +5 kHz)" });
+
+            var splitSettings = await _settingsService.GetSettingsAsync();
+            if (splitSettings.RadioModel == "FTDX3000")
+                return BadRequest(new { error = "FTDX3000 does not support the ST split command" });
 
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });

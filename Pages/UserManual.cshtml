@@ -83,12 +83,12 @@
                     <h5 class="mb-0">1. Introduction</h5>
                 </div>
                 <div class="card-body">
-                    <p>FTdx101 WebApp is a web-based control panel for Yaesu transceivers especially the FTdx101MP and FTdx101D but also works with the FTdx10. It runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.</p>
+                    <p>FTdx101 WebApp is a web-based control panel for Yaesu transceivers. It is primarily designed for the FTdx101MP and FTdx101D but also supports the FTdx10, FT-710, and FTDX3000. It runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.</p>
                     <p>The application was written for operators who find the physical controls on the FTdx101 difficult to read or use, and for those who want a large, clean touchscreen-friendly display alongside their existing logging software.</p>
                     <h6 class="mt-3">Key features</h6>
                     <ul>
                         <li>Large, readable frequency displays with digit-by-digit mouse-wheel tuning</li>
-                        <li>Full dual-receiver control for FTdx101MP and FTdx101D (VFO A and VFO B received simultaneously); VFO A and VFO B panels also shown for FTdx10 for split and memory operation</li>
+                        <li>Full dual-receiver control for FTdx101MP and FTdx101D (VFO A and VFO B received simultaneously); VFO A and VFO B panels also shown for FTdx10, FT-710, and FTDX3000 for split and memory operation</li>
                         <li>Live S-meter, power, SWR, ALC, temperature, IDD, VDD, and compression meters</li>
                         <li>Real-time two-way sync — changes on the radio front panel appear immediately in the app, and vice versa</li>
                         <li>Band and segment selectors for fast QSY to CW, FT8, SSB, or RTTY</li>
@@ -128,7 +128,7 @@
                     <ol>
                         <li>Open a browser and go to <code>http://localhost:8080</code></li>
                         <li>Click <strong>Settings</strong> in the navigation bar.</li>
-                        <li>Set <strong>Radio Model</strong> to your transceiver: <strong>FTdx101MP</strong> (200 W, dual receiver), <strong>FTdx101D</strong> (100 W, dual receiver), or <strong>FTdx10</strong> (100 W, single receiver).</li>
+                        <li>Set <strong>Radio Model</strong> to your transceiver: <strong>FTdx101MP</strong> (200 W, dual receiver), <strong>FTdx101D</strong> (100 W, dual receiver), <strong>FTdx10</strong> (100 W, single receiver), <strong>FT-710</strong> (100 W, single receiver), or <strong>FTDX3000</strong> (100 W, single receiver, SDR IF output available).</li>
                         <li>Set <strong>Serial Port</strong> to the COM port your radio is connected to. If you are unsure, go to <strong>Diagnostics → Ports</strong> to see a list of available ports, or check Windows Device Manager.</li>
                         <li>Set <strong>Baud Rate</strong> to match the radio's CAT baud rate. The factory default on the FTdx101 is <strong>38400</strong>. You can verify or change this on the radio under <strong>Menu → CAT Rate</strong>.</li>
                         <li>Select your <strong>Band Plan</strong> (UK or USA).</li>
@@ -269,6 +269,8 @@
                                 <tr><td>Roofing Filter (FTdx101MP)</td><td>12 kHz, 3 kHz, 1.2 kHz, 600 Hz, 300 Hz (all fitted as standard)</td></tr>
                                 <tr><td>Roofing Filter (FTdx101D)</td><td>12 kHz, 3 kHz, 600 Hz always shown; 1.2 kHz and 300 Hz shown only if ticked as installed in Settings</td></tr>
                                 <tr><td>Roofing Filter (FTdx10)</td><td>3 kHz, 6 kHz, 15 kHz standard; optional 1.2 kHz (YF-130CN) and 300 Hz (YF-130CW). Selected automatically by the radio based on DSP bandwidth and mode — no manual control or CAT command involved.</td></tr>
+                                <tr><td>Roofing Filter (FT-710)</td><td>No CAT command — the radio selects its filter automatically. No roofing filter dropdown is shown.</td></tr>
+                                <tr><td>Roofing Filter (FTDX3000)</td><td>AUTO, 15 kHz, 6 kHz, 3 kHz always shown; 600 Hz and 300 Hz shown only if ticked as installed in Settings (optional YH-77SDE filters).</td></tr>
                                 <tr><td>AGC</td><td>OFF, FAST, MID, SLOW, AUTO</td></tr>
                                 <tr>
                                     <td>IPO/AMP</td>
@@ -295,6 +297,8 @@
                         <ul>
                             <li><strong>FTdx101MP/D:</strong> 200 Hz, 400 Hz, 600 Hz, 850 Hz, 1.2 kHz, 1.4 kHz, 1.8 kHz, 2.4 kHz, 3.0 kHz</li>
                             <li><strong>FTdx10:</strong> 400 Hz, 600 Hz, 800 Hz, 1.0 kHz, 1.2 kHz, 1.4 kHz, 1.6 kHz, 1.8 kHz, 2.0 kHz, 2.2 kHz, 2.4 kHz, 2.6 kHz, 2.8 kHz, 3.0 kHz, 3.2 kHz, 3.4 kHz</li>
+                            <li><strong>FT-710:</strong> 300 Hz, 600 Hz, 850 Hz, 1.2 kHz, 1.65 kHz, 1.95 kHz, 2.4 kHz, 2.7 kHz, 3.0 kHz, 3.2 kHz, 3.5 kHz, 4.0 kHz</li>
+                            <li><strong>FTDX3000:</strong> 200 Hz, 400 Hz, 600 Hz, 850 Hz, 1.35 kHz, 1.5 kHz, 1.8 kHz, 2.2 kHz, 2.4 kHz, 2.6 kHz, 2.8 kHz, 3.0 kHz, 3.4 kHz, 4.0 kHz</li>
                         </ul>
                         <p>This setting is persisted and restored on startup.</p>
                         <p><strong>Reset button</strong> (next to IF Width) — Resets IF Width to its widest bandwidth in one click.</p>
@@ -359,8 +363,12 @@
                             <li>Call the DX station. Your radio transmits on VFO B and listens on VFO A.</li>
                             <li>Click <strong>Split</strong> (now showing Split ON) to turn split off when you are done.</li>
                         </ol>
-                        <div class="alert alert-info py-2 mb-0">
-                            <strong>Terminology note:</strong> The FTdx101MP and FTdx101D manuals refer to VFO A as the <em>MAIN band</em> and VFO B as the <em>SUB band</em>. The FTdx10 manual uses VFO A and VFO B. The buttons work identically on all models. The FTdx10 has a single receiver — in split mode it receives on VFO A and transmits on VFO B, but cannot decode both frequencies simultaneously.
+                        <div class="alert alert-info py-2 mb-2">
+                            <strong>Terminology note:</strong> The FTdx101MP and FTdx101D manuals refer to VFO A as the <em>MAIN band</em> and VFO B as the <em>SUB band</em>. The FTdx10 and FT-710 manuals use VFO A and VFO B. Single-receiver models (FTdx10, FT-710) receive on VFO A and transmit on VFO B in split mode, but cannot decode both frequencies simultaneously.
+                        </div>
+                        <div class="alert alert-warning py-2 mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            <strong>FTDX3000:</strong> The FTDX3000 does not support the CAT ST command for split operation. The Split and +5k buttons are hidden when FTDX3000 is selected. The A&#8596;B Swap button (SV command) is still available.
                         </div>
                     </div>
 
@@ -379,7 +387,7 @@
                     <table class="table table-sm table-bordered mb-4">
                         <thead class="table-light"><tr><th>Setting</th><th>Description</th></tr></thead>
                         <tbody>
-                            <tr><td>Radio Model</td><td><strong>FTdx101MP</strong> (200 W, dual RX), <strong>FTdx101D</strong> (100 W, dual RX), or <strong>FTdx10</strong> (100 W, single RX)</td></tr>
+                            <tr><td>Radio Model</td><td><strong>FTdx101MP</strong> (200 W, dual RX), <strong>FTdx101D</strong> (100 W, dual RX), <strong>FTdx10</strong> (100 W, single RX), <strong>FT-710</strong> (100 W, single RX), <strong>FTDX3000</strong> (100 W, single RX, 9 MHz IF output)</td></tr>
                             <tr><td>Serial Port</td><td>COM port the radio is connected to (e.g., COM3). Check Device Manager or Diagnostics → Ports if unsure.</td></tr>
                             <tr><td>Baud Rate</td><td>Must match the radio's CAT Rate setting. Factory default: <strong>38400</strong>.</td></tr>
                             <tr><td>Band Plan</td><td>UK or USA. Affects which bands and segment frequencies appear.</td></tr>
@@ -387,7 +395,7 @@
                     </table>
                     <p>After changing the serial port or baud rate, click <strong>Test Connection</strong> to verify the radio responds.</p>
 
-                    <h6>6.2 Optional Roofing Filters (FTdx101D only)</h6>
+                    <h6>6.2 Roofing Filter Settings</h6>
                     <p>The roofing filter dropdown in the VFO panels only shows filters that are actually fitted in your radio. The standard fitment differs by model:</p>
                     <table class="table table-sm table-bordered mb-3">
                         <thead class="table-light"><tr><th>Model</th><th>Standard (always shown)</th><th>Optional (tick if fitted)</th></tr></thead>
@@ -395,9 +403,11 @@
                             <tr><td>FTdx101MP</td><td>12 kHz, 3 kHz, 1.2 kHz, 600 Hz, 300 Hz</td><td>— (fully loaded as standard)</td></tr>
                             <tr><td>FTdx101D</td><td>12 kHz, 3 kHz, 600 Hz</td><td>1.2 kHz, 300 Hz</td></tr>
                             <tr><td>FTdx10</td><td>3 kHz, 6 kHz, 15 kHz</td><td>1.2 kHz (YF-130CN), 300 Hz (YF-130CW) — selected automatically by the radio, no CAT control</td></tr>
+                            <tr><td>FT-710</td><td colspan="2">No roofing filter CAT command — radio selects automatically. No filter dropdown is shown.</td></tr>
+                            <tr><td>FTDX3000</td><td>AUTO, 15 kHz, 6 kHz, 3 kHz</td><td>600 Hz, 300 Hz (optional YH-77SDE filters)</td></tr>
                         </tbody>
                     </table>
-                    <p>The optional filter checkboxes only appear on this page when <strong>FTdx101D</strong> is selected. Tick any optional filters you have installed, then click <strong>Save Settings</strong>.</p>
+                    <p>Optional filter checkboxes appear in Settings when <strong>FTdx101D</strong> or <strong>FTDX3000</strong> is selected. Tick any optional filters you have installed, then click <strong>Save Settings</strong>.</p>
 
                     <h6>6.3 Web Server Settings</h6>
                     <table class="table table-sm table-bordered mb-3">
@@ -411,16 +421,16 @@
                     </div>
 
                     <h6>6.4 SDR Spectrum Display</h6>
-                    <p>The spectrum display requires an SDR receiver. On the FTdx101MP and FTdx101D the SDR is connected to the radio's 9 MHz IF output (rear panel RCA socket labelled <strong>IF OUT</strong>), giving a VFO-centred panoramic view of the band.</p>
+                    <p>The spectrum display requires an SDR receiver. On the FTdx101MP, FTdx101D, and FTDX3000 the SDR is connected to the radio's 9 MHz IF output (rear panel RCA socket labelled <strong>IF OUT</strong>), giving a VFO-centred panoramic view of the band.</p>
                     <div class="alert alert-warning py-2 mb-3">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>FTdx10 users:</strong> The FTdx10 has no rear-panel IF output. You can still use an SDR for spectrum display by connecting it to an antenna port, but the spectrum will show absolute RF frequencies rather than a view centred on your VFO frequency. The IF Frequency setting has no effect when used this way.
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>FTdx10 and FT-710 users:</strong> These radios do not have a rear-panel IF output. You can still use an SDR for spectrum display by connecting it to an antenna port, but the spectrum will show absolute RF frequencies rather than a view centred on your VFO frequency. The IF Frequency setting has no effect when used this way.
                     </div>
                     <p><strong>Supported hardware:</strong></p>
                     <ul>
                         <li><strong>SDRplay RSP1 and RSP series</strong> — requires the <a href="https://www.sdrplay.com/downloads/" target="_blank">SDRplay API v3 <i class="bi bi-box-arrow-up-right"></i></a> to be installed separately.</li>
                         <li><strong>RTL-SDR, Airspy, HackRF</strong> — drivers are included in the app installer; no separate installation needed.</li>
                     </ul>
-                    <p><strong>Setting up the SDR (FTdx101MP / FTdx101D):</strong></p>
+                    <p><strong>Setting up the SDR (FTdx101MP / FTdx101D / FTDX3000):</strong></p>
                     <ol>
                         <li>Connect the SDR to the 9 MHz IF output using an RCA-to-SMA adapter and a short coax cable.</li>
                         <li>Go to Settings and click <strong>Scan</strong> in the SDR section.</li>

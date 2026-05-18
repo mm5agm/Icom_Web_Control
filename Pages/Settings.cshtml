@@ -137,11 +137,15 @@
                                 <option value="FTdx101MP">FTdx101MP</option>
                                 <option value="FTdx101D">FTdx101D</option>
                                 <option value="FTdx10">FTdx10</option>
+                                <option value="FT-710">FT-710</option>
+                                <option value="FTDX3000">FTDX3000</option>
                             </select>
                             <div class="form-text">
                                 <strong>FTdx101MP:</strong> 200W output, dual receivers (VFO A + VFO B shown by default)<br />
                                 <strong>FTdx101D:</strong> 100W output, dual receivers (VFO A + VFO B shown by default)<br />
-                                <strong>FTdx10:</strong> 100W output, dual receivers (VFO A + VFO B shown by default)
+                                <strong>FTdx10:</strong> 100W output, single receiver (VFO B for split/memory)<br />
+                                <strong>FT-710:</strong> 100W output, single receiver (VFO B for split/memory)<br />
+                                <strong>FTDX3000:</strong> 100W output, single receiver, SDR IF output available (9 MHz)
                             </div>
                             <span asp-validation-for="Settings.RadioModel" class="text-danger"></span>
                         </div>
@@ -187,6 +191,29 @@
                                            @(Model.Settings.InstalledRoofingFilters.Contains("5") ? "checked" : "") />
                                     <label class="form-check-label" for="filter5">300 Hz installed (optional — YF-130CW)</label>
                                 </div>
+                            </div>
+                            <div id="filtersFt710Section" style="display:@(Model.Settings.RadioModel == "FT-710" ? "block" : "none")">
+                                <div class="alert alert-info py-2 mb-0">
+                                    The FT-710 has no roofing filter CAT command — the radio selects its filter
+                                    automatically based on DSP bandwidth and mode. No configuration is needed.
+                                </div>
+                            </div>
+                            <div id="filtersFtdx3000Section" style="display:@(Model.Settings.RadioModel == "FTDX3000" ? "block" : "none")">
+                                <div class="form-text mb-2">
+                                    The FTDX3000 roofing filters are selectable via CAT. AUTO, 15 kHz, 6 kHz, and 3 kHz
+                                    are fitted as standard. Tick any optional filters you have installed.
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="filter3k4" name="Settings.InstalledRoofingFilters" value="4"
+                                           @(Model.Settings.InstalledRoofingFilters.Contains("4") ? "checked" : "") />
+                                    <label class="form-check-label" for="filter3k4">600 Hz (optional — YH-77SDE)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="filter3k5" name="Settings.InstalledRoofingFilters" value="5"
+                                           @(Model.Settings.InstalledRoofingFilters.Contains("5") ? "checked" : "") />
+                                    <label class="form-check-label" for="filter3k5">300 Hz (optional — YH-77SDE narrow)</label>
+                                </div>
+                                <div class="form-text text-muted mt-1">AUTO, 15 kHz, 6 kHz, and 3 kHz are always shown.</div>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -278,11 +305,11 @@
                 Connect your radio's <strong>IF output (RCA)</strong> to an SDR receiver. The spectrum
                 display shows the band around your current VFO frequency in real time.
             </p>
-            @if (Model.Settings.RadioModel == "FTdx10")
+            @if (Model.Settings.RadioModel == "FTdx10" || Model.Settings.RadioModel == "FT-710")
             {
                 <div class="alert alert-warning" role="alert">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <strong>FTdx10:</strong> This radio does not have a rear-panel IF output.
+                    <strong>@Model.Settings.RadioModel:</strong> This radio does not have a rear-panel IF output.
                     SDR spectrum display will show absolute RF frequencies from the connected antenna
                     rather than a VFO-centred view. The IF Frequency setting has no effect.
                 </div>
@@ -659,16 +686,20 @@ window.clearSdrDevice = function () {
     </script>
     <script>
         (function () {
-            const modelSelect  = document.getElementById('Settings_RadioModel');
-            const mpNote       = document.getElementById('filtersMpNote');
-            const dSection     = document.getElementById('filtersDSection');
-            const ftdx10Section = document.getElementById('filtersFtdx10Section');
+            const modelSelect     = document.getElementById('Settings_RadioModel');
+            const mpNote          = document.getElementById('filtersMpNote');
+            const dSection        = document.getElementById('filtersDSection');
+            const ftdx10Section   = document.getElementById('filtersFtdx10Section');
+            const ft710Section    = document.getElementById('filtersFt710Section');
+            const ftdx3000Section = document.getElementById('filtersFtdx3000Section');
             if (!modelSelect) return;
             modelSelect.addEventListener('change', function () {
                 const v = this.value;
-                if (mpNote)        mpNote.style.display        = v === 'FTdx101MP' ? 'block' : 'none';
-                if (dSection)      dSection.style.display      = v === 'FTdx101D'  ? 'block' : 'none';
-                if (ftdx10Section) ftdx10Section.style.display = v === 'FTdx10'    ? 'block' : 'none';
+                if (mpNote)          mpNote.style.display          = v === 'FTdx101MP' ? 'block' : 'none';
+                if (dSection)        dSection.style.display        = v === 'FTdx101D'  ? 'block' : 'none';
+                if (ftdx10Section)   ftdx10Section.style.display   = v === 'FTdx10'    ? 'block' : 'none';
+                if (ft710Section)    ft710Section.style.display    = v === 'FT-710'    ? 'block' : 'none';
+                if (ftdx3000Section) ftdx3000Section.style.display = v === 'FTDX3000'  ? 'block' : 'none';
             });
         })();
     </script>

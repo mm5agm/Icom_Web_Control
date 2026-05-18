@@ -11,7 +11,9 @@
     // Display label shown in the dropdown — value stays as the CAT mode string.
     string ModeLabel(string m) => m == "DATA-FM-N" ? "D-FM-N" : m;
 
-    bool isFtdx10 = Model.RadioModel == "FTdx10";
+    bool isFtdx10  = Model.RadioModel == "FTdx10";
+    bool isFt710   = Model.RadioModel == "FT-710";
+    bool isFtdx3000 = Model.RadioModel == "FTDX3000";
 
     // IF Width options differ by model. Values match the SH command code sent to the radio.
     var ifWidthOptions = isFtdx10
@@ -22,20 +24,42 @@
             ("8","2.0 kHz"), ("9","2.2 kHz"), ("10","2.4 kHz"), ("11","2.6 kHz"),
             ("12","2.8 kHz"), ("13","3.0 kHz"), ("14","3.2 kHz"), ("15","3.4 kHz")
         }
+        : isFt710
+        ? new (string Value, string Label)[]
+        {
+            ("0","300 Hz"), ("2","600 Hz"), ("3","850 Hz"), ("5","1.2 kHz"),
+            ("7","1.65 kHz"), ("9","1.95 kHz"), ("12","2.4 kHz"), ("16","2.7 kHz"),
+            ("19","3.0 kHz"), ("20","3.2 kHz"), ("21","3.5 kHz"), ("22","4.0 kHz")
+        }
+        : isFtdx3000
+        ? new (string Value, string Label)[]
+        {
+            ("1","200 Hz"), ("2","400 Hz"), ("3","600 Hz"), ("4","850 Hz"),
+            ("6","1.35 kHz"), ("7","1.5 kHz"), ("9","1.8 kHz"), ("12","2.2 kHz"),
+            ("14","2.4 kHz"), ("16","2.6 kHz"), ("18","2.8 kHz"), ("20","3.0 kHz"),
+            ("22","3.4 kHz"), ("25","4.0 kHz")
+        }
         : new (string Value, string Label)[]
         {
             ("0","200 Hz"), ("1","400 Hz"), ("2","600 Hz"), ("3","850 Hz"),
             ("4","1.2 kHz"), ("5","1.4 kHz"), ("6","1.8 kHz"), ("7","2.4 kHz"),
             ("8","3.0 kHz")
         };
-    string ifWidthDefaultA = isFtdx10 ? "13" : "8";
-    string ifWidthDefaultB = isFtdx10 ? "13" : "8";
+    string ifWidthDefaultA = isFtdx10 ? "13" : isFt710 ? "12" : isFtdx3000 ? "14" : "8";
+    string ifWidthDefaultB = isFtdx10 ? "13" : isFt710 ? "12" : isFtdx3000 ? "14" : "8";
 
-    // Roofing filter options (FTdx101MP/D only — FTdx10 selects its filter automatically, no CAT control).
+    // Roofing filter options: FTdx101MP/D only (FTdx10 and FT-710 have no CAT roofing filter control).
     // RF command codes 6-A, filtered to only fitted filters per Settings.
     var roofingOptions = new (string Value, string Label)[]
             { ("A","300 Hz"), ("9","600 Hz"), ("8","1.2 kHz"), ("7","3 kHz"), ("6","12 kHz") }
             .Where(o => Model.InstalledRoofingFilters.Contains(o.Value))
+            .ToArray();
+
+    // FTDX3000 roofing filter options (codes 0-5; always show standard 0-3, optional 4-5 if fitted).
+    var roofingOptions3000 = new (string Value, string Label)[]
+            { ("0","Auto"), ("1","15 kHz"), ("2","6 kHz"), ("3","3 kHz"), ("4","600 Hz"), ("5","300 Hz") }
+            .Where(o => o.Value == "0" || o.Value == "1" || o.Value == "2" || o.Value == "3"
+                     || Model.InstalledRoofingFilters.Contains(o.Value))
             .ToArray();
 }
 
@@ -402,7 +426,7 @@
                                 title="Keyboard — enter VFO A frequency">
                             <i class="bi bi-123" aria-hidden="true"></i>
                         </button>
-                        @if (!isFtdx10)
+                        @if (!isFtdx10 && !isFt710)
                         {
                         <label class="mb-0 text-nowrap ms-1 fw-bold">Roofing:</label>
                         <select class="form-select form-select-sm fw-bold flex-shrink-0" id="roofingFilterSelectA"
@@ -410,9 +434,19 @@
                                 title="VFO A roofing filter"
                                 style="width: auto;"
                                 onchange="window.radioControl.setRoofingFilter('A', this.value)">
-                            @foreach (var opt in roofingOptions)
+                            @if (isFtdx3000)
                             {
-                                <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterA==opt.Value ? "selected" : null)">@opt.Label</option>
+                                @foreach (var opt in roofingOptions3000)
+                                {
+                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterA==opt.Value ? "selected" : null)">@opt.Label</option>
+                                }
+                            }
+                            else
+                            {
+                                @foreach (var opt in roofingOptions)
+                                {
+                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterA==opt.Value ? "selected" : null)">@opt.Label</option>
+                                }
                             }
                         </select>
                         }
@@ -633,7 +667,7 @@
                                 title="Keyboard — enter VFO B frequency">
                             <i class="bi bi-123" aria-hidden="true"></i>
                         </button>
-                        @if (!isFtdx10)
+                        @if (!isFtdx10 && !isFt710)
                         {
                         <label class="mb-0 text-nowrap ms-1 fw-bold">Roofing:</label>
                         <select class="form-select form-select-sm fw-bold flex-shrink-0" id="roofingFilterSelectB"
@@ -641,9 +675,19 @@
                                 title="VFO B roofing filter"
                                 style="width: auto;"
                                 onchange="window.radioControl.setRoofingFilter('B', this.value)">
-                            @foreach (var opt in roofingOptions)
+                            @if (isFtdx3000)
                             {
-                                <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterB==opt.Value ? "selected" : null)">@opt.Label</option>
+                                @foreach (var opt in roofingOptions3000)
+                                {
+                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterB==opt.Value ? "selected" : null)">@opt.Label</option>
+                                }
+                            }
+                            else
+                            {
+                                @foreach (var opt in roofingOptions)
+                                {
+                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterB==opt.Value ? "selected" : null)">@opt.Label</option>
+                                }
                             }
                         </select>
                         }
