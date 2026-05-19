@@ -1402,17 +1402,25 @@ async function setClarifierOffset(offsetHz) {
 window.setClarifierOffset = setClarifierOffset;
 
 async function resetClarifier() {
-    rxClarOn = true;
-    txClarOn = false;
     clarOffsets[clarVfo] = 0;
     const slider = document.getElementById('clarOffsetSlider');
     const label  = document.getElementById('clarOffsetValue');
-    const sel    = document.getElementById('clarModeSelect');
     if (slider) slider.value = 0;
     if (label)  label.textContent = '0';
-    if (sel)    sel.value = 'rx';
-    await _setClarifier(clarVfo, true, false, 0);
+    await _setClarifier(clarVfo, rxClarOn, txClarOn, 0);
 }
+
+function nudgeClarifier(deltaHz) {
+    let newOffset = Math.round(((clarOffsets[clarVfo] || 0) + deltaHz) / 10) * 10;
+    newOffset = Math.max(-9990, Math.min(9990, newOffset));
+    clarOffsets[clarVfo] = newOffset;
+    const slider = document.getElementById('clarOffsetSlider');
+    const label  = document.getElementById('clarOffsetValue');
+    if (slider) slider.value = newOffset;
+    if (label)  label.textContent = newOffset;
+    _setClarifier(clarVfo, rxClarOn, txClarOn, newOffset);
+}
+window.nudgeClarifier = nudgeClarifier;
 window.resetClarifier = resetClarifier;
 
 async function _setClarifier(vfo, rxOn, txOn, offsetHz) {

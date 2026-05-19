@@ -942,15 +942,16 @@ fieldset.calibration-card {
     width: clamp(320px, 60vw, 700px);
     max-height: 80vh;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
     background: #1e1e2e;
     color: #e0e0e0;
     z-index: 9998;
     font-family: sans-serif;
 }
 
-.mem-dialog[open] { display: flex; }
+.mem-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
 
 .mem-header {
     display: flex;

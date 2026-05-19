@@ -768,16 +768,20 @@
                     <label class="mb-0 fw-bold text-nowrap ms-1">Offset:
                         <span id="clarOffsetValue">@Model.RadioState.ClarifierOffsetA</span> Hz
                     </label>
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 px-2"
+                            onclick="nudgeClarifier(-10)" title="−10 Hz">−</button>
                     <input type="range" id="clarOffsetSlider"
                            min="-9990" max="9990" step="10"
                            value="@Model.RadioState.ClarifierOffsetA"
-                           style="width: clamp(100px,15vw,200px); height:18px;"
+                           style="width: clamp(80px,12vw,180px); height:18px;"
                            oninput="document.getElementById('clarOffsetValue').textContent = this.value"
                            onchange="setClarifierOffset(parseInt(this.value))"
                            aria-label="Clarifier offset">
+                    <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 px-2"
+                            onclick="nudgeClarifier(10)" title="+10 Hz">+</button>
                     <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                             onclick="resetClarifier()"
-                            title="Set offset to 0 Hz and enable RX clarifier">Reset</button>
+                            title="Reset offset to 0 Hz (mode unchanged)">Reset</button>
                 </div>
             </div>
         </div>
