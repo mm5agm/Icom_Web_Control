@@ -1132,7 +1132,7 @@
             }
         }
 
-        if (!isFtdx10) {
+        if (!@(isFtdx10 ? "true" : "false")) {
             document.getElementById('vfoBToggleBtn')?.addEventListener('click', function () {
                 const newVisible = !getVisible();
                 localStorage.setItem(STORAGE_KEY, String(newVisible));
