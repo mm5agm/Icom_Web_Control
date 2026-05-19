@@ -2487,7 +2487,7 @@ pollInitStatus();
         const banner = document.getElementById('viewportWarning');
         if (!banner) return;
         if (localStorage.getItem(STORAGE_KEY) === '1') return;
-        if (window.innerWidth < THRESHOLD) banner.style.display = '';
+        banner.style.display = window.innerWidth < THRESHOLD ? '' : 'none';
     }
 
     window.dismissViewportWarning = function () {
@@ -2495,6 +2495,12 @@ pollInitStatus();
         if (banner) banner.style.display = 'none';
         localStorage.setItem(STORAGE_KEY, '1');
     };
+
+    let _resizeTimer;
+    window.addEventListener('resize', function () {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(check, 200);
+    });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', check);
