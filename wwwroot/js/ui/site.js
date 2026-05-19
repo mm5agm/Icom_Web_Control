@@ -2480,8 +2480,8 @@ pollInitStatus();
 
 // ── Viewport width warning ────────────────────────────────────────────────
 (function () {
-    const STORAGE_KEY = 'viewportWarningDismissed';
-    const THRESHOLD   = 1400; // CSS px — below this gauges are likely to wrap
+    const STORAGE_KEY = 'viewportWarningDismissed2'; // bumped to re-show after threshold change
+    const THRESHOLD   = 1280; // CSS px — below this gauges are likely to wrap
 
     function check() {
         const banner = document.getElementById('viewportWarning');
