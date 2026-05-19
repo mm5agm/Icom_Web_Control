@@ -1158,6 +1158,12 @@ namespace FTdx101_WebApp.Controllers
             public int OffsetHz { get; set; }
         }
 
+        public class ClarifierNudgeRequest
+        {
+            public string Vfo { get; set; } = "A";
+            public int DeltaHz { get; set; }
+        }
+
         [HttpPost("clarifier")]
         public async Task<IActionResult> SetClarifier([FromBody] ClarifierRequest request)
         {
@@ -1202,6 +1208,51 @@ namespace FTdx101_WebApp.Controllers
             {
                 _logger.LogError(ex, "Error setting clarifier");
                 return StatusCode(500, new { error = "Failed to set clarifier" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("clarifier/nudge")]
+        public async Task<IActionResult> NudgeClarifier([FromBody] ClarifierNudgeRequest request)
+        {
+            int absHz = Math.Abs(request.DeltaHz);
+            if (absHz == 0 || absHz > 9990)
+                return BadRequest(new { error = "DeltaHz must be 1–9990 Hz" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var settings = await _settingsService.GetSettingsAsync();
+                bool useCf = settings.RadioModel is "FTdx10" or "FT-710";
+                string p1 = request.Vfo == "B" ? "1" : "0";
+
+                int currentOffset = request.Vfo == "B" ? _radioStateService.ClarifierOffsetB : _radioStateService.ClarifierOffsetA;
+                int newOffset = Math.Max(-9990, Math.Min(9990, currentOffset + request.DeltaHz));
+
+                if (useCf)
+                {
+                    string sign = newOffset >= 0 ? "+" : "-";
+                    await _catClient.SendCommandAsync($"CF{p1}01{sign}{Math.Abs(newOffset):D4};", "WebUI", CancellationToken.None);
+                }
+                else
+                {
+                    // RU/RD are incremental — send only the delta, no RC clear
+                    if (request.DeltaHz > 0)
+                        await _catClient.SendCommandAsync($"RU{absHz:D4};", "WebUI", CancellationToken.None);
+                    else
+                        await _catClient.SendCommandAsync($"RD{absHz:D4};", "WebUI", CancellationToken.None);
+                }
+
+                if (request.Vfo == "B") _radioStateService.ClarifierOffsetB = newOffset;
+                else                     _radioStateService.ClarifierOffsetA = newOffset;
+                return Ok(new { offsetHz = newOffset });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error nudging clarifier");
+                return StatusCode(500, new { error = "Failed to nudge clarifier" });
             }
             finally { _requestSemaphore.Release(); }
         }

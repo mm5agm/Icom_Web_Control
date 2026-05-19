@@ -1410,15 +1410,24 @@ async function resetClarifier() {
     await _setClarifier(clarVfo, rxClarOn, txClarOn, 0);
 }
 
-function nudgeClarifier(deltaHz) {
-    let newOffset = Math.round(((clarOffsets[clarVfo] || 0) + deltaHz) / 10) * 10;
+async function nudgeClarifier(deltaHz) {
+    const vfo = clarVfo;
+    let newOffset = Math.round(((clarOffsets[vfo] || 0) + deltaHz) / 10) * 10;
     newOffset = Math.max(-9990, Math.min(9990, newOffset));
-    clarOffsets[clarVfo] = newOffset;
+    clarOffsets[vfo] = newOffset;
     const slider = document.getElementById('clarOffsetSlider');
     const label  = document.getElementById('clarOffsetValue');
     if (slider) slider.value = newOffset;
     if (label)  label.textContent = newOffset;
-    _setClarifier(clarVfo, rxClarOn, txClarOn, newOffset);
+    try {
+        await fetch('/api/cat/clarifier/nudge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vfo, deltaHz })
+        });
+    } catch (e) {
+        console.error('Clarifier nudge failed:', e);
+    }
 }
 window.nudgeClarifier = nudgeClarifier;
 window.resetClarifier = resetClarifier;
