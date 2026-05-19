@@ -126,6 +126,12 @@ namespace FTdx101_WebApp.Services
         public int IfShiftB { get; set; } = 0;
 
         /// <summary>
+        /// Clarifier (RIT/XIT) offset per VFO in Hz (-9990 to +9990)
+        /// </summary>
+        public int ClarifierOffsetA { get; set; } = 0;
+        public int ClarifierOffsetB { get; set; } = 0;
+
+        /// <summary>
         /// Additional controls and settings (for future expansion)
         /// </summary>
         public Dictionary<string, object> Controls { get; set; } = new();

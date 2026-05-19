@@ -614,6 +614,11 @@ let isTransmitting = false;
 let txVfo = 0; // 0 = VFO A, 1 = VFO B
 let splitMode = 0; // 0 = OFF, 1 = ON (VFO A=RX / VFO B=TX), 2 = ON+5kHz Quick Split
 
+let clarVfo = 'A';
+let clarOffsets = { A: 0, B: 0 };
+let rxClarOn = false;
+let txClarOn = false;
+
 async function toggleTx() {
     const newTxState = !isTransmitting;
 
@@ -973,6 +978,36 @@ connection.on("RadioStateUpdate", function (update) {
         if (label) label.textContent = update.value;
     }
 
+    // --- CLARIFIER ---
+    if (update.property === "RxClarOn") {
+        rxClarOn = update.value === true || update.value === 'true' || update.value === 1;
+        const sel = document.getElementById('clarModeSelect');
+        if (sel) sel.value = rxClarOn && txClarOn ? 'rxtx' : rxClarOn ? 'rx' : txClarOn ? 'tx' : 'off';
+    }
+    if (update.property === "TxClarOn") {
+        txClarOn = update.value === true || update.value === 'true' || update.value === 1;
+        const sel = document.getElementById('clarModeSelect');
+        if (sel) sel.value = rxClarOn && txClarOn ? 'rxtx' : rxClarOn ? 'rx' : txClarOn ? 'tx' : 'off';
+    }
+    if (update.property === "ClarifierOffsetA") {
+        clarOffsets.A = parseInt(update.value) || 0;
+        if (clarVfo === 'A') {
+            const slider = document.getElementById('clarOffsetSlider');
+            const label  = document.getElementById('clarOffsetValue');
+            if (slider) slider.value = clarOffsets.A;
+            if (label)  label.textContent = clarOffsets.A;
+        }
+    }
+    if (update.property === "ClarifierOffsetB") {
+        clarOffsets.B = parseInt(update.value) || 0;
+        if (clarVfo === 'B') {
+            const slider = document.getElementById('clarOffsetSlider');
+            const label  = document.getElementById('clarOffsetValue');
+            if (slider) slider.value = clarOffsets.B;
+            if (label)  label.textContent = clarOffsets.B;
+        }
+    }
+
     // --- MANUAL NOTCH ---
     if (update.property === "ManualNotchA") {
         const el = document.getElementById('manualNotchSelectA');
@@ -1213,6 +1248,16 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('quickSplitBtn')?.addEventListener('click', () => setSplit(2));
     document.getElementById('swapVfoBtn')?.addEventListener('click', swapVfo);
 
+    // Clarifier: seed JS state from server-rendered HTML values
+    const clarSlider = document.getElementById('clarOffsetSlider');
+    if (clarSlider) clarOffsets.A = parseInt(clarSlider.value) || 0;
+    const clarSel = document.getElementById('clarModeSelect');
+    if (clarSel) {
+        const initMode = clarSel.value || 'off';
+        rxClarOn = initMode === 'rx' || initMode === 'rxtx';
+        txClarOn = initMode === 'tx' || initMode === 'rxtx';
+    }
+
     // Event delegation for band button changes
     document.addEventListener('change', function(e) {
         if (e.target.type === 'radio' && e.target.name && e.target.name.startsWith('band-')) {
@@ -1330,6 +1375,57 @@ function resetIfShift(receiver) {
     if (window.radioControl) window.radioControl.setIfShift(receiver, 0);
 }
 window.resetIfShift = resetIfShift;
+
+function selectClarVfo(vfo) {
+    clarVfo = vfo;
+    document.getElementById('clarVfoABtn')?.classList.toggle('active', vfo === 'A');
+    document.getElementById('clarVfoBBtn')?.classList.toggle('active', vfo === 'B');
+    const offset = clarOffsets[vfo];
+    const slider = document.getElementById('clarOffsetSlider');
+    const label  = document.getElementById('clarOffsetValue');
+    if (slider) slider.value = offset;
+    if (label)  label.textContent = offset;
+}
+window.selectClarVfo = selectClarVfo;
+
+async function setClarifierMode(mode) {
+    rxClarOn = mode === 'rx' || mode === 'rxtx';
+    txClarOn = mode === 'tx' || mode === 'rxtx';
+    await _setClarifier(clarVfo, rxClarOn, txClarOn, clarOffsets[clarVfo]);
+}
+window.setClarifierMode = setClarifierMode;
+
+async function setClarifierOffset(offsetHz) {
+    clarOffsets[clarVfo] = offsetHz;
+    await _setClarifier(clarVfo, rxClarOn, txClarOn, offsetHz);
+}
+window.setClarifierOffset = setClarifierOffset;
+
+async function resetClarifier() {
+    rxClarOn = true;
+    txClarOn = false;
+    clarOffsets[clarVfo] = 0;
+    const slider = document.getElementById('clarOffsetSlider');
+    const label  = document.getElementById('clarOffsetValue');
+    const sel    = document.getElementById('clarModeSelect');
+    if (slider) slider.value = 0;
+    if (label)  label.textContent = '0';
+    if (sel)    sel.value = 'rx';
+    await _setClarifier(clarVfo, true, false, 0);
+}
+window.resetClarifier = resetClarifier;
+
+async function _setClarifier(vfo, rxOn, txOn, offsetHz) {
+    try {
+        await fetch('/api/cat/clarifier', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vfo, rxOn, txOn, offsetHz })
+        });
+    } catch (e) {
+        console.error('Clarifier update failed:', e);
+    }
+}
 
 function resetIfWidth(receiver) {
     const select = document.getElementById(`ifWidthSelect${receiver}`);

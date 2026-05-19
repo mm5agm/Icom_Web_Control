@@ -15,6 +15,14 @@
     bool isFt710   = Model.RadioModel == "FT-710";
     bool isFtdx3000 = Model.RadioModel == "FTDX3000";
 
+    string clarModeInit = (Model.RadioState.RxClarOn, Model.RadioState.TxClarOn) switch
+    {
+        (true, true)  => "rxtx",
+        (true, false) => "rx",
+        (false, true) => "tx",
+        _             => "off"
+    };
+
     // IF Width options differ by model. Values match the SH command code sent to the radio.
     var ifWidthOptions = isFtdx10
         ? new (string Value, string Label)[]
@@ -732,6 +740,46 @@
                             </div>
                         </div>
                     </div>
+<!-- Clarifier (RIT/XIT) strip -->
+<div class="row mt-2" id="clarifierRow">
+    <div class="col-12">
+        <div class="card border-secondary">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-bold text-nowrap">Clarifier</span>
+                    <div class="btn-group btn-group-sm" id="clarVfoGroup">
+                        <button type="button" class="btn btn-outline-primary active" id="clarVfoABtn"
+                                onclick="selectClarVfo('A')" title="Apply clarifier to VFO A">VFO A</button>
+                        <button type="button" class="btn btn-outline-primary" id="clarVfoBBtn"
+                                onclick="selectClarVfo('B')" title="Apply clarifier to VFO B">VFO B</button>
+                    </div>
+                    <label class="mb-0 fw-bold text-nowrap ms-1">Mode:</label>
+                    <select class="form-select form-select-sm fw-bold flex-shrink-0" id="clarModeSelect"
+                            style="width:auto;" onchange="setClarifierMode(this.value)">
+                        <option value="off"  selected="@(clarModeInit=="off"  ? "selected" : null)">OFF</option>
+                        <option value="rx"   selected="@(clarModeInit=="rx"   ? "selected" : null)">RX</option>
+                        <option value="tx"   selected="@(clarModeInit=="tx"   ? "selected" : null)">TX</option>
+                        <option value="rxtx" selected="@(clarModeInit=="rxtx" ? "selected" : null)">RX+TX</option>
+                    </select>
+                    <label class="mb-0 fw-bold text-nowrap ms-1">Offset:
+                        <span id="clarOffsetValue">@Model.RadioState.ClarifierOffsetA</span> Hz
+                    </label>
+                    <input type="range" id="clarOffsetSlider"
+                           min="-9990" max="9990" step="10"
+                           value="@Model.RadioState.ClarifierOffsetA"
+                           style="width: clamp(100px,15vw,200px); height:18px;"
+                           oninput="document.getElementById('clarOffsetValue').textContent = this.value"
+                           onchange="setClarifierOffset(parseInt(this.value))"
+                           aria-label="Clarifier offset">
+                    <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
+                            onclick="resetClarifier()"
+                            title="Set offset to 0 Hz and enable RX clarifier">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Frequency Keyboard Dialog — shared for VFO A and VFO B -->
 <dialog id="freqKeyboardDialog" class="fkb-dialog" aria-labelledby="freqKeyboardTitle" aria-modal="true">
     <div class="fkb-header" id="freqKeyboardHeader">

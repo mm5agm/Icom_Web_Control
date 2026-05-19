@@ -251,6 +251,15 @@ namespace FTdx101_WebApp.Services
         private int _ifShiftB = 0;
         public int IfShiftB { get => _ifShiftB; set => SetField(ref _ifShiftB, value); }
 
+        private int _clarifierOffsetA = 0;
+        public int ClarifierOffsetA { get => _clarifierOffsetA; set => SetField(ref _clarifierOffsetA, value); }
+        private int _clarifierOffsetB = 0;
+        public int ClarifierOffsetB { get => _clarifierOffsetB; set => SetField(ref _clarifierOffsetB, value); }
+        private bool _rxClarOn = false;
+        public bool RxClarOn { get => _rxClarOn; set => SetField(ref _rxClarOn, value); }
+        private bool _txClarOn = false;
+        public bool TxClarOn { get => _txClarOn; set => SetField(ref _txClarOn, value); }
+
         private string _bandA = "20m";
         public string BandA { get => _bandA; set => SetField(ref _bandA, value); }
 
@@ -499,6 +508,8 @@ namespace FTdx101_WebApp.Services
             IfWidthB = state.IfWidthB ?? "8";
             IfShiftA = state.IfShiftA;
             IfShiftB = state.IfShiftB;
+            ClarifierOffsetA = state.ClarifierOffsetA;
+            ClarifierOffsetB = state.ClarifierOffsetB;
         }
 
         public RadioState ToRadioState()
@@ -534,7 +545,9 @@ namespace FTdx101_WebApp.Services
                 IfWidthA = IfWidthA,
                 IfWidthB = IfWidthB,
                 IfShiftA = IfShiftA,
-                IfShiftB = IfShiftB
+                IfShiftB = IfShiftB,
+                ClarifierOffsetA = ClarifierOffsetA,
+                ClarifierOffsetB = ClarifierOffsetB
             };
         }
     }

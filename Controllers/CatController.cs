@@ -1150,6 +1150,71 @@ namespace FTdx101_WebApp.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        public class ClarifierRequest
+        {
+            public string Vfo { get; set; } = "A";
+            public bool RxOn { get; set; }
+            public bool TxOn { get; set; }
+            public int OffsetHz { get; set; }
+        }
+
+        [HttpPost("clarifier")]
+        public async Task<IActionResult> SetClarifier([FromBody] ClarifierRequest request)
+        {
+            if (request.OffsetHz < -9990 || request.OffsetHz > 9990)
+                return BadRequest(new { error = "Clarifier offset must be -9990 to +9990 Hz" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var settings = await _settingsService.GetSettingsAsync();
+                bool useCf = settings.RadioModel is "FTdx10" or "FT-710";
+                string p1 = request.Vfo == "B" ? "1" : "0";
+
+                if (useCf)
+                {
+                    int rxBit = request.RxOn ? 1 : 0;
+                    int txBit = request.TxOn ? 1 : 0;
+                    await _catClient.SendCommandAsync($"CF{p1}00{rxBit}{txBit}000;", "WebUI", CancellationToken.None);
+                    string sign = request.OffsetHz >= 0 ? "+" : "-";
+                    await _catClient.SendCommandAsync($"CF{p1}01{sign}{Math.Abs(request.OffsetHz):D4};", "WebUI", CancellationToken.None);
+                }
+                else
+                {
+                    await _catClient.SendCommandAsync($"RT{(request.RxOn ? 1 : 0)};", "WebUI", CancellationToken.None);
+                    await _catClient.SendCommandAsync($"XT{(request.TxOn ? 1 : 0)};", "WebUI", CancellationToken.None);
+                    await _catClient.SendCommandAsync("RC;", "WebUI", CancellationToken.None);
+                    if (request.OffsetHz > 0)
+                        await _catClient.SendCommandAsync($"RU{request.OffsetHz:D4};", "WebUI", CancellationToken.None);
+                    else if (request.OffsetHz < 0)
+                        await _catClient.SendCommandAsync($"RD{Math.Abs(request.OffsetHz):D4};", "WebUI", CancellationToken.None);
+                }
+
+                if (request.Vfo == "B") _radioStateService.ClarifierOffsetB = request.OffsetHz;
+                else                     _radioStateService.ClarifierOffsetA = request.OffsetHz;
+                _radioStateService.RxClarOn = request.RxOn;
+                _radioStateService.TxClarOn = request.TxOn;
+                return Ok(new { message = "Clarifier updated" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting clarifier");
+                return StatusCode(500, new { error = "Failed to set clarifier" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("clarifier/reset")]
+        public async Task<IActionResult> ResetClarifier([FromBody] ClarifierRequest request)
+        {
+            request.RxOn = true;
+            request.TxOn = false;
+            request.OffsetHz = 0;
+            return await SetClarifier(request);
+        }
+
         [HttpPost("split/{mode}")]
         public async Task<IActionResult> SetSplit(int mode)
         {

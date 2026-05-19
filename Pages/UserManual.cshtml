@@ -44,6 +44,7 @@
                                 <li><a href="#band-segment">Band &amp; Segment Selection</a></li>
                                 <li><a href="#tx-controls">Transmit Controls</a></li>
                                 <li><a href="#split-swap">Split Frequency &amp; VFO Swap</a></li>
+                                <li><a href="#clarifier">Clarifier (RIT/XIT)</a></li>
                             </ol>
                         </li>
                         <li><a href="#settings">Settings Page</a></li>
@@ -365,6 +366,46 @@
                         </ol>
                         <div class="alert alert-info py-2 mb-2">
                             <strong>Terminology note:</strong> The FTdx101MP and FTdx101D manuals refer to VFO A as the <em>MAIN band</em> and VFO B as the <em>SUB band</em>. The FTdx10 and FT-710 manuals use VFO A and VFO B. Single-receiver models (FTdx10, FT-710) receive on VFO A and transmit on VFO B in split mode, but cannot decode both frequencies simultaneously.
+                        </div>
+                    </div>
+
+                    <!-- 5.12 Clarifier -->
+                    <div class="p-3 section-anchor" id="clarifier">
+                        <h6 class="text-primary fw-bold">5.12 Clarifier (RIT/XIT)</h6>
+                        <p>
+                            The Clarifier strip appears below the VFO panels. It lets you shift the receive (RIT),
+                            transmit (XIT), or both frequencies by a small offset without retuning the VFO —
+                            useful for finding the exact pitch of a signal in SSB or CW without moving the displayed frequency.
+                        </p>
+                        <table class="table table-sm table-bordered mb-3">
+                            <thead class="table-light"><tr><th>Control</th><th>Description</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>VFO A / VFO B</strong></td>
+                                    <td>Selects which VFO the clarifier offset applies to. Each VFO stores its own offset value independently.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Mode</strong></td>
+                                    <td>
+                                        <strong>OFF</strong> — Clarifier disabled.<br>
+                                        <strong>RX</strong> — RIT active: receive frequency is shifted by the offset; transmit stays on the VFO frequency.<br>
+                                        <strong>TX</strong> — XIT active: transmit frequency is shifted; receive stays on the VFO frequency.<br>
+                                        <strong>RX+TX</strong> — Both RIT and XIT active.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Offset slider</strong></td>
+                                    <td>Sets the offset in Hz for the selected VFO. Range ±9,990 Hz in 10 Hz steps. The current value is shown next to the slider. The CAT command is sent when you release the slider.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Reset</strong></td>
+                                    <td>Sets the offset to 0 Hz and switches the mode to RX for the currently selected VFO.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="alert alert-info py-2 mb-0">
+                            <strong>Persistence:</strong> The clarifier offset for each VFO is saved to disk and restored when the app restarts.
+                            The on/off mode (RX/TX/OFF) is always read from the radio at startup.
                         </div>
                     </div>
 

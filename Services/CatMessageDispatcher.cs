@@ -243,6 +243,36 @@ namespace FTdx101_WebApp.Services
                             }
                         }
                         break;
+                    case "RT":
+                        // RT{P1}; — 0=RX clarifier OFF, 1=ON
+                        if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int rtVal))
+                            _stateService.RxClarOn = rtVal == 1;
+                        break;
+                    case "XT":
+                        // XT{P1}; — 0=TX clarifier OFF, 1=ON
+                        if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int xtVal))
+                            _stateService.TxClarOn = xtVal == 1;
+                        break;
+                    case "CF":
+                        // FTdx10/FT-710: CF{P1}0{P3}...; (11 chars total)
+                        // P1=0=VFO A, 1=VFO B; P3=0 → pos5=RXon, pos6=TXon; P3=1 → pos5=sign, pos6-9=Hz
+                        if (message.Length >= 11)
+                        {
+                            char cfVfo = message[2];
+                            char p3    = message[4];
+                            if (p3 == '0')
+                            {
+                                _stateService.RxClarOn = message[5] == '1';
+                                _stateService.TxClarOn = message[6] == '1';
+                            }
+                            else if (p3 == '1' && int.TryParse(message.Substring(6, 4), out int offsetAbs))
+                            {
+                                int offset = message[5] == '-' ? -offsetAbs : offsetAbs;
+                                if (cfVfo == '0') _stateService.ClarifierOffsetA = offset;
+                                else               _stateService.ClarifierOffsetB = offset;
+                            }
+                        }
+                        break;
                     case "ST":
                         // ST{mode}; — 0=OFF, 1=ON (VFO A=RX / VFO B=TX), 2=ON+5kHz Quick Split
                         if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int splitMode))
