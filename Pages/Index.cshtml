@@ -102,6 +102,15 @@
     </div>
 </div>
 
+<!-- Viewport too-narrow warning (shown once, dismissible) -->
+<div id="viewportWarning" class="alert alert-warning alert-dismissible mb-1 py-1 px-3" role="alert" style="display:none; font-size:0.85rem;">
+    <strong>Display settings may need attention.</strong>
+    Your browser viewport appears narrow — meter gauges may wrap to a second row.
+    Check <strong>Windows Display Settings</strong>: ensure resolution is set to native and scaling is correct for your monitor
+    (recommended: <strong>150%</strong> for 4K, <strong>125%</strong> for 1440p, <strong>100%</strong> for 1080p).
+    <button type="button" class="btn-close btn-sm py-2" onclick="dismissViewportWarning()" aria-label="Dismiss"></button>
+</div>
+
 <div class="row mb-1" style="padding-top: 2px; padding-bottom: 2px;">
         @if (Model.ShowApp1Button)
         {

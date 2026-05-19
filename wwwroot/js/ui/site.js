@@ -2477,3 +2477,28 @@ pollInitStatus();
     // No mouseout handler — resetting lastLabel in the mouseover null-el branch is sufficient
     // and avoids the aggressive clearing that mouseout on every child element causes.
 })();
+
+// ── Viewport width warning ────────────────────────────────────────────────
+(function () {
+    const STORAGE_KEY = 'viewportWarningDismissed';
+    const THRESHOLD   = 1400; // CSS px — below this gauges are likely to wrap
+
+    function check() {
+        const banner = document.getElementById('viewportWarning');
+        if (!banner) return;
+        if (localStorage.getItem(STORAGE_KEY) === '1') return;
+        if (window.innerWidth < THRESHOLD) banner.style.display = '';
+    }
+
+    window.dismissViewportWarning = function () {
+        const banner = document.getElementById('viewportWarning');
+        if (banner) banner.style.display = 'none';
+        localStorage.setItem(STORAGE_KEY, '1');
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', check);
+    } else {
+        check();
+    }
+})()
