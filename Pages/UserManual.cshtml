@@ -45,6 +45,7 @@
                                 <li><a href="#tx-controls">Transmit Controls</a></li>
                                 <li><a href="#split-swap">Split Frequency &amp; VFO Swap</a></li>
                                 <li><a href="#clarifier">Clarifier (RIT/XIT)</a></li>
+                                <li><a href="#memories">Radio Memories</a></li>
                             </ol>
                         </li>
                         <li><a href="#settings">Settings Page</a></li>
@@ -406,6 +407,68 @@
                         <div class="alert alert-info py-2 mb-0">
                             <strong>Persistence:</strong> The clarifier offset for each VFO is saved to disk and restored when the app restarts.
                             The on/off mode (RX/TX/OFF) is always read from the radio at startup.
+                        </div>
+                    </div>
+
+                    <!-- 5.13 Memories -->
+                    <div class="p-3 section-anchor" id="memories">
+                        <h6 class="text-primary fw-bold">5.13 Radio Memories</h6>
+                        <p>
+                            Radio Memories let you save up to 99 frequency/mode/clarifier presets and recall them
+                            instantly with a single click. Memories live in the app (not in the radio's built-in
+                            channels), so they are independent of the radio model.
+                        </p>
+
+                        <h6>Floating Memory Panel</h6>
+                        <p>
+                            Click the <strong>Mem</strong> button in the toolbar to open the floating panel.
+                            The panel shows all saved memories as tiles. Click any tile to instantly tune VFO A to
+                            that frequency and mode, and restore the clarifier settings stored with it.
+                            The panel is non-modal — you can interact with all other controls while it is open.
+                            Drag the header to reposition it; its position is saved between page loads.
+                        </p>
+                        <p>
+                            The <strong>Edit</strong> link in the panel header opens the <a href="/Memories">Memories editor</a> in a new tab.
+                        </p>
+
+                        <h6>Memories Editor Page</h6>
+                        <p>
+                            Navigate to <strong>Memories</strong> in the navigation bar to open the full editor.
+                            Click <strong>Pop Out</strong> to open it in a separate browser window — useful on a
+                            second monitor, tablet, or phone on the same network.
+                        </p>
+                        <table class="table table-sm table-bordered mb-3">
+                            <thead class="table-light"><tr><th>Column</th><th>Description</th></tr></thead>
+                            <tbody>
+                                <tr><td><strong>Label</strong></td><td>Up to 12 characters. Used as the tile name in the panel and as the channel tag when exporting to the radio.</td></tr>
+                                <tr><td><strong>Frequency (MHz)</strong></td><td>Enter the frequency in Hz (e.g. <code>14074000</code> for 14.074 MHz).</td></tr>
+                                <tr><td><strong>Mode</strong></td><td>Operating mode: LSB, USB, CW-U, etc.</td></tr>
+                                <tr><td><strong>Clarifier (Hz)</strong></td><td>RIT/XIT offset stored with this memory (−9990 to +9990 Hz).</td></tr>
+                                <tr><td><strong>RX Clar / TX Clar</strong></td><td>Whether RIT / XIT is active when this memory is recalled.</td></tr>
+                            </tbody>
+                        </table>
+                        <p>Click <strong>Add Memory</strong> to append a new row. Click <strong>Save</strong> to persist all changes.</p>
+
+                        <h6>Import from Radio</h6>
+                        <p>
+                            <strong>Import (Replace)</strong> reads channels 001–099 from the radio and replaces all
+                            app memories. <strong>Import (Add)</strong> merges the radio channels into the existing
+                            list. Import reads both the channel data (frequency, mode, clarifier) and the channel
+                            tag/label where supported (not available on FTDX3000). Import may take up to 30 seconds
+                            as each channel is queried individually.
+                        </p>
+
+                        <h6>Export to Radio</h6>
+                        <p>
+                            <strong>Export to Radio</strong> writes app memories to radio channels 001 onwards,
+                            overwriting existing radio memory channels. The label is written as the channel tag on
+                            models that support it (not FTDX3000).
+                        </p>
+
+                        <div class="alert alert-info py-2 mb-0">
+                            <strong>Persistence:</strong> Memories are saved to
+                            <code>%APPDATA%\MM5AGM\FTdx101 WebApp\memories.json</code>.
+                            You can back this file up or copy it between PCs.
                         </div>
                     </div>
 

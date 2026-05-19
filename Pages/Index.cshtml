@@ -136,6 +136,10 @@
                class="btn btn-warning btn-sm" style="padding-top: 1px; padding-bottom: 1px;" title="Support this project via PayPal">
                 <i class="bi bi-cup-hot-fill" aria-hidden="true"></i> Buy Me a Coffee
             </a>
+            <button id="memBtn" class="btn btn-sm btn-outline-info"
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Open memories panel">
+                Mem
+            </button>
             <button id="vfoBToggleBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B">
                 VFO-B
@@ -780,6 +784,22 @@
     </div>
 </div>
 
+<!-- Memories Panel Dialog -->
+<dialog id="memoriesDialog" class="mem-dialog" aria-labelledby="memoriesTitle" aria-label="Radio memories panel">
+    <div class="mem-header" id="memoriesHeader">
+        <span class="mem-title" id="memoriesTitle">Memories</span>
+        <div class="d-flex align-items-center gap-2">
+            <a href="/Memories" target="_blank" rel="noopener" class="mem-edit-link" title="Open full memories editor in new tab">
+                <i class="bi bi-pencil-square"></i> Edit
+            </a>
+            <button class="mem-close" id="memoriesClose" aria-label="Close memories panel" title="Close">✕</button>
+        </div>
+    </div>
+    <div class="mem-tiles" id="memoriesTiles">
+        <div class="text-muted small p-2">Loading…</div>
+    </div>
+</dialog>
+
 <!-- Frequency Keyboard Dialog — shared for VFO A and VFO B -->
 <dialog id="freqKeyboardDialog" class="fkb-dialog" aria-labelledby="freqKeyboardTitle" aria-modal="true">
     <div class="fkb-header" id="freqKeyboardHeader">
@@ -821,11 +841,13 @@
         import { BAND_PLANS, getSegments } from "/js/ui/band-plan.js?v=1";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=11";
+        import { initMemoriesPanel }   from "/js/ui/memories.js?v=1";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         loadLabels();
         window.addEventListener('focus', loadLabels);
         initFreqKeyboard();
+        initMemoriesPanel();
         document.addEventListener('DOMContentLoaded', function () {
             window.meterPanel = new MeterPanel({
                 smeterA:     { type: 'smeter', canvasId: 'sMeterCanvasA' },

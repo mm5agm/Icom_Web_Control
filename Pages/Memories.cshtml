@@ -1,0 +1,234 @@
+@page
+@model FTdx101_WebApp.Pages.MemoriesModel
+@{
+    ViewData["Title"] = "Radio Memories";
+
+    var allModes = new[] {
+        "LSB", "USB", "CW-U", "CW-L", "FM", "FM-N", "AM", "AM-N",
+        "RTTY-L", "RTTY-U", "DATA-L", "DATA-U", "DATA-FM", "DATA-FM-N", "PSK"
+    };
+}
+
+<div class="mt-4">
+
+    <div class="d-flex align-items-baseline gap-3 mb-2 flex-wrap">
+        <h2 class="mb-0">Radio Memories</h2>
+        <a href="/Memories" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Open in new tab for use on a second monitor or tablet">
+            <i class="bi bi-box-arrow-up-right"></i> Pop Out
+        </a>
+    </div>
+
+    <p class="text-muted mb-3">
+        Edit memory labels, frequencies, and modes here, then click <strong>Save</strong>.
+        On the main page, click <strong>Mem</strong> to open the floating memory panel and tune the radio to any memory.
+    </p>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert @(Model.StatusMessage.Contains("✓") ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div id="importExportStatus" class="alert d-none" role="alert"></div>
+
+    <!-- Import / Export bar -->
+    <div class="card mb-3 border-secondary">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold me-1">Radio Channels:</span>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="importReplaceBtn"
+                        onclick="importFromRadio('replace')"
+                        title="Read channels 001–099 from radio and replace all app memories">
+                    <i class="bi bi-cloud-download"></i> Import (Replace)
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="importMergeBtn"
+                        onclick="importFromRadio('merge')"
+                        title="Read channels 001–099 from radio and add to existing app memories">
+                    <i class="bi bi-cloud-download"></i> Import (Add)
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-warning" id="exportBtn"
+                        onclick="exportToRadio()"
+                        title="Write app memories to radio channels 001 onwards">
+                    <i class="bi bi-cloud-upload"></i> Export to Radio
+                </button>
+                <span id="radioProgress" class="text-muted small ms-2" style="display:none;">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span id="radioProgressText">Working…</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memory editor form -->
+    <form method="post">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover mb-3" id="memoriesTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width:40px">#</th>
+                        <th style="min-width:140px">Label</th>
+                        <th style="min-width:130px">Frequency (MHz)</th>
+                        <th style="min-width:100px">Mode</th>
+                        <th style="min-width:100px">Clarifier (Hz)</th>
+                        <th style="width:70px">RX Clar</th>
+                        <th style="width:70px">TX Clar</th>
+                        <th style="width:60px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < Model.Memories.Count; i++)
+                    {
+                        var m = Model.Memories[i];
+                        <tr>
+                            <td class="align-middle text-muted small">@(i + 1)</td>
+                            <td>
+                                <input type="hidden" name="Memories[@i].Id" value="@m.Id" />
+                                <input type="hidden" name="Memories[@i].SortOrder" value="@m.SortOrder" />
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].Label"
+                                       value="@m.Label"
+                                       maxlength="12"
+                                       placeholder="e.g. 20m FT8" />
+                            </td>
+                            <td>
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].FrequencyHz"
+                                       type="number"
+                                       value="@m.FrequencyHz"
+                                       min="1"
+                                       step="10"
+                                       placeholder="Hz" />
+                            </td>
+                            <td>
+                                <select class="form-select form-select-sm" name="Memories[@i].Mode">
+                                    @foreach (var mode in allModes)
+                                    {
+                                        <option value="@mode" selected="@(m.Mode == mode ? "selected" : null)">@mode</option>
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].ClarifierOffsetHz"
+                                       type="number"
+                                       value="@m.ClarifierOffsetHz"
+                                       min="-9990" max="9990" step="10" />
+                            </td>
+                            <td class="text-center align-middle">
+                                <input class="form-check-input" type="checkbox"
+                                       name="Memories[@i].RxClarOn"
+                                       value="true"
+                                       @(m.RxClarOn ? "checked" : "") />
+                                <input type="hidden" name="Memories[@i].RxClarOn" value="false" />
+                            </td>
+                            <td class="text-center align-middle">
+                                <input class="form-check-input" type="checkbox"
+                                       name="Memories[@i].TxClarOn"
+                                       value="true"
+                                       @(m.TxClarOn ? "checked" : "") />
+                                <input type="hidden" name="Memories[@i].TxClarOn" value="false" />
+                            </td>
+                            <td>
+                                <button type="submit" asp-page-handler="Delete"
+                                        asp-route-id="@m.Id"
+                                        class="btn btn-sm btn-outline-danger"
+                                        title="Delete this memory"
+                                        onclick="return confirm('Delete this memory?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex gap-2 mb-4 flex-wrap">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Save
+            </button>
+            <button type="submit" asp-page-handler="Add" class="btn btn-outline-success">
+                <i class="bi bi-plus-lg"></i> Add Memory
+            </button>
+        </div>
+    </form>
+
+</div>
+
+@section Scripts {
+<script>
+    async function importFromRadio(mode) {
+        const btns = ['importReplaceBtn','importMergeBtn','exportBtn'].map(id => document.getElementById(id));
+        btns.forEach(b => b && (b.disabled = true));
+        const progress = document.getElementById('radioProgress');
+        const progressText = document.getElementById('radioProgressText');
+        if (progress) progress.style.display = 'inline';
+        if (progressText) progressText.textContent = 'Reading radio channels…';
+
+        const statusEl = document.getElementById('importExportStatus');
+        statusEl.className = 'alert alert-info';
+        statusEl.textContent = 'Reading channels 001–099 from radio. This may take up to 30 seconds…';
+        statusEl.classList.remove('d-none');
+
+        try {
+            const resp = await fetch('/api/memory/import-radio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                statusEl.className = 'alert alert-success';
+                statusEl.textContent = `✓ Imported ${data.imported} memories from radio (${mode === 'replace' ? 'replaced existing' : 'merged'}). Reloading…`;
+                setTimeout(() => location.reload(), 1200);
+            } else {
+                statusEl.className = 'alert alert-danger';
+                statusEl.textContent = 'Import failed. Check that the radio is connected.';
+            }
+        } catch (e) {
+            statusEl.className = 'alert alert-danger';
+            statusEl.textContent = 'Import error: ' + e.message;
+        } finally {
+            btns.forEach(b => b && (b.disabled = false));
+            if (progress) progress.style.display = 'none';
+        }
+    }
+
+    async function exportToRadio() {
+        if (!confirm('Write app memories to radio channels 001 onwards? Existing radio memories will be overwritten.'))
+            return;
+
+        const btns = ['importReplaceBtn','importMergeBtn','exportBtn'].map(id => document.getElementById(id));
+        btns.forEach(b => b && (b.disabled = true));
+        const progress = document.getElementById('radioProgress');
+        const progressText = document.getElementById('radioProgressText');
+        if (progress) progress.style.display = 'inline';
+        if (progressText) progressText.textContent = 'Writing to radio…';
+
+        const statusEl = document.getElementById('importExportStatus');
+        statusEl.className = 'alert alert-info';
+        statusEl.textContent = 'Writing memories to radio…';
+        statusEl.classList.remove('d-none');
+
+        try {
+            const resp = await fetch('/api/memory/export-radio', { method: 'POST' });
+            if (resp.ok) {
+                const data = await resp.json();
+                statusEl.className = 'alert alert-success';
+                statusEl.textContent = `✓ Wrote ${data.written} memories to radio channels.`;
+            } else {
+                statusEl.className = 'alert alert-danger';
+                statusEl.textContent = 'Export failed. Check that the radio is connected.';
+            }
+        } catch (e) {
+            statusEl.className = 'alert alert-danger';
+            statusEl.textContent = 'Export error: ' + e.message;
+        } finally {
+            btns.forEach(b => b && (b.disabled = false));
+            if (progress) progress.style.display = 'none';
+        }
+    }
+</script>
+}

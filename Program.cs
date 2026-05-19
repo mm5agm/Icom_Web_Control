@@ -152,6 +152,9 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<WsjtxUdpService>()
 // Register process status cache service for efficient process lookups
 builder.Services.AddSingleton<ProcessStatusCacheService>();
 
+// Register radio memories service
+builder.Services.AddSingleton<FTdx101_WebApp.Services.MemoryService>();
+
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddFilter((category, level) =>
