@@ -932,8 +932,7 @@ fieldset.calibration-card {
 .mem-dialog {
     position: fixed;
     top: 80px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: calc(50% - clamp(160px, 30vw, 350px));
     margin: 0;
     padding: 0;
     border: 2px solid #444;
@@ -992,6 +991,40 @@ fieldset.calibration-card {
     text-decoration: none;
 }
 .mem-edit-link:hover { color: #adf; text-decoration: underline; }
+
+.mem-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 8px;
+    background: #232335;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.mem-tool-btn {
+    background: #2d2d44;
+    border: 1px solid #555;
+    color: #ccc;
+    font-size: 0.72rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mem-tool-btn:hover { background: #3a3a58; border-color: #88aaff; color: #fff; }
+.mem-tool-btn:disabled { opacity: 0.5; cursor: default; }
+
+.mem-tool-status {
+    font-size: 0.72rem;
+    color: #aaa;
+    margin-left: 4px;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .mem-tiles {
     overflow-y: auto;

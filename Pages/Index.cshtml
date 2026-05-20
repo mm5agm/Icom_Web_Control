@@ -808,6 +808,21 @@
             <button class="mem-close" id="memoriesClose" aria-label="Close memories panel" title="Close">✕</button>
         </div>
     </div>
+    <div class="mem-toolbar" id="memoriesToolbar">
+        <button type="button" class="mem-tool-btn" id="memImportReplaceBtn"
+                onclick="window.importMemories('replace')" title="Read radio channels and replace all app memories">
+            <i class="bi bi-cloud-download"></i> Import (Replace)
+        </button>
+        <button type="button" class="mem-tool-btn" id="memImportAddBtn"
+                onclick="window.importMemories('merge')" title="Read radio channels and add to existing memories">
+            <i class="bi bi-cloud-download"></i> Import (Add)
+        </button>
+        <button type="button" class="mem-tool-btn" id="memExportBtn"
+                onclick="window.exportMemories()" title="Write app memories to radio channels">
+            <i class="bi bi-cloud-upload"></i> Export to Rig
+        </button>
+        <span class="mem-tool-status" id="memToolbarStatus"></span>
+    </div>
     <div class="mem-tiles" id="memoriesTiles">
         <div class="text-muted small p-2">Loading…</div>
     </div>
@@ -854,7 +869,7 @@
         import { BAND_PLANS, getSegments } from "/js/ui/band-plan.js?v=1";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=11";
-        import { initMemoriesPanel }   from "/js/ui/memories.js?v=2";
+        import { initMemoriesPanel }   from "/js/ui/memories.js?v=3";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         loadLabels();

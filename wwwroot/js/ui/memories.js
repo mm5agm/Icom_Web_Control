@@ -131,9 +131,10 @@ function _makeDraggable(dialog, handle) {
         // Clamp inside viewport
         newLeft = Math.max(0, Math.min(window.innerWidth  - dialog.offsetWidth,  newLeft));
         newTop  = Math.max(0, Math.min(window.innerHeight - dialog.offsetHeight, newTop));
-        dialog.style.left = newLeft + 'px';
-        dialog.style.top  = newTop  + 'px';
-        dialog.style.margin = '0';
+        dialog.style.left      = newLeft + 'px';
+        dialog.style.top       = newTop  + 'px';
+        dialog.style.margin    = '0';
+        dialog.style.transform = 'none';
     }
 
     function onEnd() {
@@ -174,13 +175,70 @@ function _savePosition(dialog) {
         JSON.stringify({ left: r.left, top: r.top }));
 }
 
+// ── Import / Export ──────────────────────────────────────────────────────────
+
+function _setToolbarBusy(busy, status) {
+    ['memImportReplaceBtn', 'memImportAddBtn', 'memExportBtn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = busy;
+    });
+    const s = document.getElementById('memToolbarStatus');
+    if (s) s.textContent = status || '';
+}
+
+window.importMemories = async function (mode) {
+    if (!confirm(mode === 'replace'
+        ? 'Replace ALL app memories with channels from the radio?'
+        : 'Add radio channels to existing app memories?')) return;
+    _setToolbarBusy(true, 'Reading radio…');
+    try {
+        const resp = await fetch('/api/memory/import-radio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode })
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            _setToolbarBusy(false, `✓ Imported ${data.imported}`);
+            await _loadAndRender();
+        } else {
+            _setToolbarBusy(false, '✗ Import failed');
+        }
+    } catch (e) {
+        _setToolbarBusy(false, '✗ Error');
+        console.error('Memory import failed:', e);
+    }
+};
+
+window.exportMemories = async function () {
+    if (!confirm('Write app memories to radio channels? Existing radio channels will be overwritten.')) return;
+    _setToolbarBusy(true, 'Writing to rig…');
+    try {
+        const resp = await fetch('/api/memory/export-radio', { method: 'POST' });
+        if (resp.ok) {
+            const data = await resp.json();
+            _setToolbarBusy(false, `✓ Wrote ${data.written}`);
+        } else {
+            _setToolbarBusy(false, '✗ Export failed');
+        }
+    } catch (e) {
+        _setToolbarBusy(false, '✗ Error');
+        console.error('Memory export failed:', e);
+    }
+};
+
+// ── Position persistence ──────────────────────────────────────────────────────
+
 function _restorePosition(dialog) {
     try {
         const saved = localStorage.getItem(MEM_PANEL_KEY + '_pos');
         if (!saved) return;
         const { left, top } = JSON.parse(saved);
-        dialog.style.left   = Math.max(0, Math.min(window.innerWidth  - 320, left)) + 'px';
-        dialog.style.top    = Math.max(0, Math.min(window.innerHeight - 200, top))  + 'px';
-        dialog.style.margin = '0';
+        // Discard saved position if it would put the dialog mostly off-screen
+        if (left < 0 || left > window.innerWidth - 100) return;
+        dialog.style.left      = Math.max(0, Math.min(window.innerWidth  - 320, left)) + 'px';
+        dialog.style.top       = Math.max(0, Math.min(window.innerHeight - 200, top))  + 'px';
+        dialog.style.margin    = '0';
+        dialog.style.transform = 'none';
     } catch { /* ignore */ }
 }
