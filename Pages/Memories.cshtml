@@ -170,8 +170,39 @@
         if (hidden) hidden.value = isNaN(mhz) ? '' : Math.round(mhz * 1_000_000);
     }
 
+    function pageConfirm(message) {
+        return new Promise(resolve => {
+            const dlg = document.createElement('dialog');
+            dlg.style.cssText = 'border-radius:8px;border:1px solid #aaa;padding:20px 24px;max-width:420px;width:90vw;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,0.3)';
+            dlg.innerHTML =
+                `<p style="margin:0 0 18px;white-space:pre-wrap;font-size:0.9rem;line-height:1.5">${message}</p>` +
+                `<div style="display:flex;justify-content:flex-end;gap:8px">` +
+                `<button data-r="0" class="btn btn-secondary btn-sm">Cancel</button>` +
+                `<button data-r="1" class="btn btn-primary btn-sm">OK</button>` +
+                `</div>`;
+            document.body.appendChild(dlg);
+            dlg.showModal();
+            function finish(v) { dlg.close(); dlg.remove(); resolve(v); }
+            dlg.querySelectorAll('button').forEach(b =>
+                b.addEventListener('click', () => finish(b.dataset.r === '1')));
+            dlg.addEventListener('cancel', () => finish(false));
+        });
+    }
+
+    function _reloadLink() {
+        return ' <a href="/Memories" style="font-weight:bold">Reload page to see updated list</a>';
+    }
+
+    const _allBtns = () => ['importReplaceBtn','importMergeBtn','exportBtn']
+        .map(id => document.getElementById(id));
+
     async function importFromRadio(mode) {
-        const btns = ['importReplaceBtn','importMergeBtn','exportBtn'].map(id => document.getElementById(id));
+        const msg = mode === 'replace'
+            ? 'Load from Rig (Replace all):\n\nThis will replace ALL app memories with channels read from the radio. Your current app memories will be lost.\n\nContinue?'
+            : 'Load from Rig (Add new):\n\nThis will add radio channels to your existing app memories. Nothing will be deleted.\n\nContinue?';
+        if (!await pageConfirm(msg)) return;
+
+        const btns = _allBtns();
         btns.forEach(b => b && (b.disabled = true));
         const progress = document.getElementById('radioProgress');
         const progressText = document.getElementById('radioProgressText');
@@ -192,15 +223,14 @@
             if (resp.ok) {
                 const data = await resp.json();
                 statusEl.className = 'alert alert-success';
-                statusEl.textContent = `✓ Imported ${data.imported} memories from radio (${mode === 'replace' ? 'replaced existing' : 'merged'}). Reloading…`;
-                setTimeout(() => location.reload(), 1200);
+                statusEl.innerHTML = `✓ Loaded ${data.imported} from rig.` + _reloadLink();
             } else {
                 statusEl.className = 'alert alert-danger';
-                statusEl.textContent = 'Import failed. Check that the radio is connected.';
+                statusEl.textContent = 'Load failed. Check that the radio is connected.';
             }
         } catch (e) {
             statusEl.className = 'alert alert-danger';
-            statusEl.textContent = 'Import error: ' + e.message;
+            statusEl.textContent = 'Load error: ' + e.message;
         } finally {
             btns.forEach(b => b && (b.disabled = false));
             if (progress) progress.style.display = 'none';
@@ -208,10 +238,12 @@
     }
 
     async function exportToRadio() {
-        if (!confirm('Write app memories to radio channels 001 onwards? Existing radio memories will be overwritten.'))
+        const count = document.querySelectorAll('#memoriesTable tbody tr').length;
+        if (!await pageConfirm(
+            `Save to Rig (Replace all):\n\nThis will write ${count} app ${count === 1 ? 'memory' : 'memories'} to the radio, replacing ALL existing radio channels.\n\nAny memories on the rig that are not in the app will be lost.\n\nContinue?`))
             return;
 
-        const btns = ['importReplaceBtn','importMergeBtn','exportBtn'].map(id => document.getElementById(id));
+        const btns = _allBtns();
         btns.forEach(b => b && (b.disabled = true));
         const progress = document.getElementById('radioProgress');
         const progressText = document.getElementById('radioProgressText');
@@ -228,10 +260,10 @@
             if (resp.ok) {
                 const data = await resp.json();
                 statusEl.className = 'alert alert-success';
-                statusEl.textContent = `✓ Wrote ${data.written} memories to radio channels.`;
+                statusEl.textContent = `✓ Saved ${data.written} to rig.`;
             } else {
                 statusEl.className = 'alert alert-danger';
-                statusEl.textContent = 'Export failed. Check that the radio is connected.';
+                statusEl.textContent = 'Save failed. Check that the radio is connected.';
             }
         } catch (e) {
             statusEl.className = 'alert alert-danger';
