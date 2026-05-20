@@ -210,42 +210,73 @@ namespace FTdx101_WebApp.Controllers
         public async Task<IActionResult> ExportToRadio(CancellationToken cancellationToken)
         {
             var settings = await _settingsService.GetSettingsAsync();
-            bool isFtdx3000 = settings.RadioModel == "FTDX3000";
-            bool hasMt = !isFtdx3000;
-
+            bool hasMt = settings.RadioModel != "FTDX3000";
             var memories = _memoryService.GetAll();
             int written = 0;
-
             for (int i = 0; i < Math.Min(memories.Count, 99); i++)
             {
                 if (cancellationToken.IsCancellationRequested) break;
+                await WriteMemoryToChannel(memories[i], i + 1, hasMt, cancellationToken);
+                written++;
+            }
+            return Ok(new { written });
+        }
 
-                var mem = memories[i];
-                int channel = i + 1;
-                string ch = channel.ToString("D3");
-                string freq = mem.FrequencyHz.ToString("D9");
-                string clarDir = mem.ClarifierOffsetHz >= 0 ? "+" : "-";
-                string clarOff = Math.Abs(mem.ClarifierOffsetHz).ToString("D4");
-                int rxBit = mem.RxClarOn ? 1 : 0;
-                int txBit = mem.TxClarOn ? 1 : 0;
-                char modeCode = ModeToCode.TryGetValue(mem.Mode, out char mc) ? mc : '2';
+        [HttpPost("export-radio-add")]
+        public async Task<IActionResult> ExportToRadioAdd(CancellationToken cancellationToken)
+        {
+            var settings = await _settingsService.GetSettingsAsync();
+            bool hasMt = settings.RadioModel != "FTDX3000";
 
-                // MW{ch3}{freq9}{clardir1}{claroffset4}{rxclar1}{txclar1}{mode1}{0}{ctcss0}{00}{shift0}
-                string mwCmd = $"MW{ch}{freq}{clarDir}{clarOff}{rxBit}{txBit}{modeCode}000000;";
-                await _catClient.SendCommandAsync(mwCmd, "MemExport", cancellationToken);
+            // Scan rig to find empty channels
+            var emptyChannels = new List<int>();
+            for (int ch = 1; ch <= 99; ch++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return Ok(new { written = 0, noRoom = 0, cancelled = true });
 
-                if (hasMt)
-                {
-                    // MT same as MW plus fixed 0 + 12-char tag (space-padded)
-                    string tag = mem.Label.Length > 12 ? mem.Label[..12] : mem.Label.PadRight(12);
-                    string mtCmd = $"MT{ch}{freq}{clarDir}{clarOff}{rxBit}{txBit}{modeCode}000000{0}{tag};";
-                    await _catClient.SendCommandAsync(mtCmd, "MemExport", cancellationToken);
-                }
+                var mrResp = await _catClient.SendCommandAsync($"MR{ch:D3}0;", "MemExportAdd", cancellationToken);
+                bool isEmpty = string.IsNullOrWhiteSpace(mrResp)
+                    || mrResp.Length < 14
+                    || !long.TryParse(mrResp.Substring(5, 9), out long f)
+                    || f == 0;
+                if (isEmpty) emptyChannels.Add(ch);
+            }
 
+            var memories = _memoryService.GetAll();
+            int written = 0, noRoom = 0;
+
+            for (int i = 0; i < memories.Count; i++)
+            {
+                if (cancellationToken.IsCancellationRequested) break;
+                if (i >= emptyChannels.Count) { noRoom++; continue; }
+                await WriteMemoryToChannel(memories[i], emptyChannels[i], hasMt, cancellationToken);
                 written++;
             }
 
-            return Ok(new { written });
+            return Ok(new { written, noRoom, totalEmpty = emptyChannels.Count });
+        }
+
+        private async Task WriteMemoryToChannel(
+            AppMemory mem, int channel, bool hasMt, CancellationToken cancellationToken)
+        {
+            string ch      = channel.ToString("D3");
+            string freq    = mem.FrequencyHz.ToString("D9");
+            string clarDir = mem.ClarifierOffsetHz >= 0 ? "+" : "-";
+            string clarOff = Math.Abs(mem.ClarifierOffsetHz).ToString("D4");
+            int rxBit      = mem.RxClarOn ? 1 : 0;
+            int txBit      = mem.TxClarOn ? 1 : 0;
+            char modeCode  = ModeToCode.TryGetValue(mem.Mode, out char mc) ? mc : '2';
+
+            await _catClient.SendCommandAsync(
+                $"MW{ch}{freq}{clarDir}{clarOff}{rxBit}{txBit}{modeCode}000000;", "MemExport", cancellationToken);
+
+            if (hasMt)
+            {
+                string tag = mem.Label.Length > 12 ? mem.Label[..12] : mem.Label.PadRight(12);
+                await _catClient.SendCommandAsync(
+                    $"MT{ch}{freq}{clarDir}{clarOff}{rxBit}{txBit}{modeCode}000000{0}{tag};", "MemExport", cancellationToken);
+            }
         }
     }
 }

@@ -811,15 +811,19 @@
     <div class="mem-toolbar" id="memoriesToolbar">
         <button type="button" class="mem-tool-btn" id="memImportReplaceBtn"
                 onclick="window.importMemories('replace')" title="Read radio channels and replace all app memories">
-            <i class="bi bi-cloud-download"></i> Import (Replace)
+            <i class="bi bi-cloud-download"></i> Load from Rig (Replace all)
         </button>
         <button type="button" class="mem-tool-btn" id="memImportAddBtn"
-                onclick="window.importMemories('merge')" title="Read radio channels and add to existing memories">
-            <i class="bi bi-cloud-download"></i> Import (Add)
+                onclick="window.importMemories('merge')" title="Read radio channels and add to existing app memories">
+            <i class="bi bi-cloud-download"></i> Load from Rig (Add new)
         </button>
-        <button type="button" class="mem-tool-btn" id="memExportBtn"
-                onclick="window.exportMemories()" title="Write app memories to radio channels">
-            <i class="bi bi-cloud-upload"></i> Export to Rig
+        <button type="button" class="mem-tool-btn" id="memExportReplaceBtn"
+                onclick="window.exportMemories('replace')" title="Write app memories to radio, replacing all radio channels">
+            <i class="bi bi-cloud-upload"></i> Save to Rig (Replace all)
+        </button>
+        <button type="button" class="mem-tool-btn" id="memExportAddBtn"
+                onclick="window.exportMemories('add')" title="Write app memories only to empty radio channels">
+            <i class="bi bi-cloud-upload"></i> Save to Rig (Add new)
         </button>
         <span class="mem-tool-status" id="memToolbarStatus"></span>
     </div>
@@ -869,7 +873,7 @@
         import { BAND_PLANS, getSegments } from "/js/ui/band-plan.js?v=1";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=11";
-        import { initMemoriesPanel }   from "/js/ui/memories.js?v=3";
+        import { initMemoriesPanel }   from "/js/ui/memories.js?v=4";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         loadLabels();

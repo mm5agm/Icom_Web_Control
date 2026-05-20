@@ -177,8 +177,10 @@ function _savePosition(dialog) {
 
 // ── Import / Export ──────────────────────────────────────────────────────────
 
+const _TOOLBAR_BTNS = ['memImportReplaceBtn', 'memImportAddBtn', 'memExportReplaceBtn', 'memExportAddBtn'];
+
 function _setToolbarBusy(busy, status) {
-    ['memImportReplaceBtn', 'memImportAddBtn', 'memExportBtn'].forEach(id => {
+    _TOOLBAR_BTNS.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = busy;
     });
@@ -187,10 +189,11 @@ function _setToolbarBusy(busy, status) {
 }
 
 window.importMemories = async function (mode) {
-    if (!confirm(mode === 'replace'
-        ? 'Replace ALL app memories with channels from the radio?'
-        : 'Add radio channels to existing app memories?')) return;
-    _setToolbarBusy(true, 'Reading radio…');
+    const msg = mode === 'replace'
+        ? 'Load from Rig (Replace all):\n\nThis will replace ALL app memories with channels read from the radio. Your current app memories will be lost.\n\nContinue?'
+        : 'Load from Rig (Add new):\n\nThis will add radio channels to your existing app memories. Nothing will be deleted.\n\nContinue?';
+    if (!confirm(msg)) return;
+    _setToolbarBusy(true, 'Reading rig — this may take up to 30 s…');
     try {
         const resp = await fetch('/api/memory/import-radio', {
             method: 'POST',
@@ -199,10 +202,10 @@ window.importMemories = async function (mode) {
         });
         if (resp.ok) {
             const data = await resp.json();
-            _setToolbarBusy(false, `✓ Imported ${data.imported}`);
+            _setToolbarBusy(false, `✓ Loaded ${data.imported} from rig`);
             await _loadAndRender();
         } else {
-            _setToolbarBusy(false, '✗ Import failed');
+            _setToolbarBusy(false, '✗ Load failed — is the radio connected?');
         }
     } catch (e) {
         _setToolbarBusy(false, '✗ Error');
@@ -210,20 +213,49 @@ window.importMemories = async function (mode) {
     }
 };
 
-window.exportMemories = async function () {
-    if (!confirm('Write app memories to radio channels? Existing radio channels will be overwritten.')) return;
-    _setToolbarBusy(true, 'Writing to rig…');
-    try {
-        const resp = await fetch('/api/memory/export-radio', { method: 'POST' });
-        if (resp.ok) {
-            const data = await resp.json();
-            _setToolbarBusy(false, `✓ Wrote ${data.written}`);
-        } else {
-            _setToolbarBusy(false, '✗ Export failed');
+window.exportMemories = async function (mode) {
+    if (mode === 'replace') {
+        const count = _memories.length;
+        const msg = `Save to Rig (Replace all):\n\nThis will write your ${count} app ${count === 1 ? 'memory' : 'memories'} to the radio, replacing ALL existing radio channels.\n\nAny memories stored on the rig that are not in the app will be lost.\n\nContinue?`;
+        if (!confirm(msg)) return;
+        _setToolbarBusy(true, 'Writing to rig…');
+        try {
+            const resp = await fetch('/api/memory/export-radio', { method: 'POST' });
+            if (resp.ok) {
+                const data = await resp.json();
+                _setToolbarBusy(false, `✓ Saved ${data.written} to rig`);
+            } else {
+                _setToolbarBusy(false, '✗ Save failed — is the radio connected?');
+            }
+        } catch (e) {
+            _setToolbarBusy(false, '✗ Error');
+            console.error('Memory export failed:', e);
         }
-    } catch (e) {
-        _setToolbarBusy(false, '✗ Error');
-        console.error('Memory export failed:', e);
+    } else {
+        const count = _memories.length;
+        const msg = `Save to Rig (Add new):\n\nThis will write your ${count} app ${count === 1 ? 'memory' : 'memories'} into empty channels on the rig.\n\nExisting rig channels will not be touched.\n\nContinue?`;
+        if (!confirm(msg)) return;
+        _setToolbarBusy(true, 'Scanning rig for empty channels…');
+        try {
+            const resp = await fetch('/api/memory/export-radio-add', { method: 'POST' });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.written === 0 && data.noRoom > 0) {
+                    _setToolbarBusy(false,
+                        `Rig is full — no empty channels available. Use "Save to Rig (Replace all)" or free up some channels first.`);
+                } else if (data.noRoom > 0) {
+                    _setToolbarBusy(false,
+                        `✓ Saved ${data.written} to rig. ${data.noRoom} couldn't fit — rig is full.`);
+                } else {
+                    _setToolbarBusy(false, `✓ Saved ${data.written} to rig`);
+                }
+            } else {
+                _setToolbarBusy(false, '✗ Save failed — is the radio connected?');
+            }
+        } catch (e) {
+            _setToolbarBusy(false, '✗ Error');
+            console.error('Memory export-add failed:', e);
+        }
     }
 };
 
