@@ -1432,6 +1432,43 @@ async function nudgeClarifier(deltaHz) {
 window.nudgeClarifier = nudgeClarifier;
 window.resetClarifier = resetClarifier;
 
+async function saveVfoToMemory(vfo) {
+    const btn    = document.getElementById('saveMemBtn' + vfo);
+    const freqHz = (state.lastBackendFreq && state.lastBackendFreq[vfo]) || 0;
+    const mode   = document.getElementById('modeSelect' + vfo)?.value || 'USB';
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = '…'; }
+        const resp = await fetch('/api/memory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                frequencyHz:       freqHz,
+                mode:              mode,
+                clarifierOffsetHz: clarOffsets[vfo] || 0,
+                rxClarOn:          rxClarOn,
+                txClarOn:          txClarOn
+            })
+        });
+        if (resp.ok) {
+            if (btn) {
+                btn.textContent = '✓ Saved';
+                btn.classList.replace('btn-outline-secondary', 'btn-success');
+                setTimeout(() => {
+                    btn.textContent = 'Save to Mem';
+                    btn.classList.replace('btn-success', 'btn-outline-secondary');
+                    btn.disabled = false;
+                }, 1500);
+            }
+        } else {
+            if (btn) { btn.textContent = '✗ Failed'; btn.disabled = false; }
+        }
+    } catch (e) {
+        if (btn) { btn.textContent = '✗ Error'; btn.disabled = false; }
+        console.error('Save to memory failed:', e);
+    }
+}
+window.saveVfoToMemory = saveVfoToMemory;
+
 async function _setClarifier(vfo, rxOn, txOn, offsetHz) {
     try {
         await fetch('/api/cat/clarifier', {

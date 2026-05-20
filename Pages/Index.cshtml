@@ -293,6 +293,13 @@
                             <div class="analog-meter-container">
                                 <canvas id="sMeterCanvasA" role="img" aria-hidden="true" aria-label="S meter, VFO A" data-a11y-key="meters.smeterA"></canvas>
                             </div>
+                            <button id="saveMemBtnA" type="button"
+                                    class="btn btn-outline-secondary btn-sm w-100 mt-1"
+                                    style="font-size:0.7rem; padding:1px 4px;"
+                                    onclick="saveVfoToMemory('A')"
+                                    title="Save VFO A frequency, mode and clarifier to app memories">
+                                Save to Mem
+                            </button>
                         </div>
                         <!-- Middle: Band buttons + Mode/Antenna below -->
                         <div class="flex-grow-1 d-flex flex-column gap-1">
@@ -534,6 +541,13 @@
                             <div class="analog-meter-container">
                                 <canvas id="sMeterCanvasB" role="img" aria-hidden="true" aria-label="S meter, VFO B" data-a11y-key="meters.smeterB"></canvas>
                             </div>
+                            <button id="saveMemBtnB" type="button"
+                                    class="btn btn-outline-secondary btn-sm w-100 mt-1"
+                                    style="font-size:0.7rem; padding:1px 4px;"
+                                    onclick="saveVfoToMemory('B')"
+                                    title="Save VFO B frequency, mode and clarifier to app memories">
+                                Save to Mem
+                            </button>
                         </div>
                         <!-- Middle: Band buttons + Mode/Antenna below -->
                         <div class="flex-grow-1 band-buttons-shifted d-flex flex-column gap-1">
