@@ -136,11 +136,10 @@
                                 <input type="hidden" name="Memories[@i].TxClarOn" value="false" />
                             </td>
                             <td>
-                                <button type="submit" asp-page-handler="Delete"
-                                        asp-route-id="@m.Id"
+                                <button type="button"
                                         class="btn btn-sm btn-outline-danger"
                                         title="Delete this memory"
-                                        onclick="return confirm('Delete this memory?')">
+                                        onclick="confirmDelete('@Url.Page(null, "Delete", new { id = m.Id })')">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </td>
@@ -187,6 +186,17 @@
                 b.addEventListener('click', () => finish(b.dataset.r === '1')));
             dlg.addEventListener('cancel', () => finish(false));
         });
+    }
+
+    async function confirmDelete(url) {
+        if (!await pageConfirm('Delete this memory?\n\nThis cannot be undone.')) return;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        const token = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (token) form.appendChild(token.cloneNode(true));
+        document.body.appendChild(form);
+        form.submit();
     }
 
     function _spinner(text) {
