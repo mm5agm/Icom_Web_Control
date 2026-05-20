@@ -94,12 +94,17 @@
                             </td>
                             <td>
                                 <input class="form-control form-control-sm"
-                                       name="Memories[@i].FrequencyHz"
                                        type="number"
-                                       value="@m.FrequencyHz"
-                                       min="1"
-                                       step="10"
-                                       placeholder="Hz" />
+                                       value="@(m.FrequencyHz > 0 ? (m.FrequencyHz / 1_000_000.0).ToString("F3", System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                       min="0.03"
+                                       max="75"
+                                       step="0.001"
+                                       placeholder="e.g. 14.074"
+                                       oninput="updateFreqHz(this, @i)" />
+                                <input type="hidden"
+                                       id="freqHz_@i"
+                                       name="Memories[@i].FrequencyHz"
+                                       value="@m.FrequencyHz" />
                             </td>
                             <td>
                                 <select class="form-select form-select-sm" name="Memories[@i].Mode">
@@ -159,6 +164,12 @@
 
 @section Scripts {
 <script>
+    function updateFreqHz(input, index) {
+        const mhz = parseFloat(input.value);
+        const hidden = document.getElementById('freqHz_' + index);
+        if (hidden) hidden.value = isNaN(mhz) ? '' : Math.round(mhz * 1_000_000);
+    }
+
     async function importFromRadio(mode) {
         const btns = ['importReplaceBtn','importMergeBtn','exportBtn'].map(id => document.getElementById(id));
         btns.forEach(b => b && (b.disabled = true));
