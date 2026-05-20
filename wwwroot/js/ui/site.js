@@ -1434,7 +1434,7 @@ window.resetClarifier = resetClarifier;
 
 async function saveVfoToMemory(vfo) {
     const btn    = document.getElementById('saveMemBtn' + vfo);
-    const freqHz = (state.lastBackendFreq && state.lastBackendFreq[vfo]) || 0;
+    const freqHz = window.radioControl?._state?.lastBackendFreq?.[vfo] || 0;
     const mode   = document.getElementById('modeSelect' + vfo)?.value || 'USB';
     try {
         if (btn) { btn.disabled = true; btn.textContent = '…'; }
