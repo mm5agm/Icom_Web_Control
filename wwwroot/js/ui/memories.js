@@ -149,6 +149,7 @@ function _makeDraggable(dialog, handle) {
 
     handle.addEventListener('mousedown', e => {
         if (e.button !== 0) return;
+        if (e.target.closest('a, button')) return;
         startX = e.clientX; startY = e.clientY;
         const r = dialog.getBoundingClientRect();
         origLeft = r.left; origTop = r.top;
@@ -158,6 +159,7 @@ function _makeDraggable(dialog, handle) {
     });
 
     handle.addEventListener('touchstart', e => {
+        if (e.target.closest('a, button')) return;
         startX = e.touches[0].clientX; startY = e.touches[0].clientY;
         const r = dialog.getBoundingClientRect();
         origLeft = r.left; origTop = r.top;
