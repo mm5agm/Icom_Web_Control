@@ -50,12 +50,7 @@ namespace FTdx101_WebApp.Pages
 
         public async Task<IActionResult> OnPostAddAsync()
         {
-            await _memoryService.AddAsync(new AppMemory
-            {
-                Label = "New Memory",
-                FrequencyHz = 14074000,
-                Mode = "USB"
-            });
+            await _memoryService.AddAsync(new AppMemory());
             return RedirectToPage();
         }
     }
