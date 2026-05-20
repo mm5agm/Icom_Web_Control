@@ -876,6 +876,20 @@
                             </div>
                         </div>
 
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ts9">
+                                    Meter gauges are wrapping to a second row
+                                </button>
+                            </h2>
+                            <div id="ts9" class="accordion-collapse collapse" data-bs-parent="#troubleshootAccordion">
+                                <div class="accordion-body">
+                                    <p>This is almost always a browser zoom issue. Browsers remember the zoom level <strong>per domain</strong>, so if you accidentally pressed <kbd>Ctrl</kbd>+<kbd>+</kbd> while the app was open, the zoom will have increased for <code>localhost:8080</code> only — leaving all other websites unaffected.</p>
+                                    <p class="mb-0">Press <kbd>Ctrl</kbd>+<kbd>0</kbd> while the app is in focus to reset the zoom to 100%, and the gauges will return to a single row. Use <kbd>Ctrl</kbd>+<kbd>+</kbd> and <kbd>Ctrl</kbd>+<kbd>-</kbd> to adjust zoom to your preference.</p>
+                                </div>
+                            </div>
+                        </div>
+
                     </div><!-- /accordion -->
                 </div>
             </div>
