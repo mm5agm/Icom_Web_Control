@@ -241,8 +241,12 @@ window.importMemories = async function (mode) {
         });
         if (resp.ok) {
             const data = await resp.json();
-            _setToolbarBusy(false, `✓ Loaded ${data.imported} from rig`);
-            await _loadAndRender();
+            if (data.warning) {
+                _setToolbarBusy(false, `⚠ ${data.warning}`);
+            } else {
+                _setToolbarBusy(false, `✓ Loaded ${data.imported} from rig`);
+                await _loadAndRender();
+            }
         } else {
             _setToolbarBusy(false, '✗ Load failed — is the radio connected?');
         }

@@ -136,10 +136,11 @@
                                 <input type="hidden" name="Memories[@i].TxClarOn" value="false" />
                             </td>
                             <td>
-                                <button type="button"
+                                <button type="submit" asp-page-handler="Delete"
+                                        asp-route-id="@m.Id"
                                         class="btn btn-sm btn-outline-danger"
                                         title="Delete this memory"
-                                        onclick="confirmDelete('@Url.Page(null, "Delete", new { id = m.Id })')">
+                                        onclick="event.preventDefault(); confirmDelete(this)">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </td>
@@ -188,15 +189,9 @@
         });
     }
 
-    async function confirmDelete(url) {
+    async function confirmDelete(btn) {
         if (!await pageConfirm('Delete this memory?\n\nThis cannot be undone.')) return;
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = url;
-        const token = document.querySelector('input[name="__RequestVerificationToken"]');
-        if (token) form.appendChild(token.cloneNode(true));
-        document.body.appendChild(form);
-        form.submit();
+        btn.form.requestSubmit(btn);
     }
 
     function _spinner(text) {
@@ -232,8 +227,13 @@
             });
             if (resp.ok) {
                 const data = await resp.json();
-                statusEl.className = 'alert alert-success';
-                statusEl.innerHTML = `✓ Loaded ${data.imported} from rig.` + _reloadLink();
+                if (data.warning) {
+                    statusEl.className = 'alert alert-warning';
+                    statusEl.textContent = `⚠ ${data.warning}`;
+                } else {
+                    statusEl.className = 'alert alert-success';
+                    statusEl.innerHTML = `✓ Loaded ${data.imported} from rig.` + _reloadLink();
+                }
             } else {
                 statusEl.className = 'alert alert-danger';
                 statusEl.textContent = 'Load failed. Check that the radio is connected.';

@@ -196,6 +196,9 @@ namespace FTdx101_WebApp.Controllers
                 });
             }
 
+            if (imported.Count == 0)
+                return Ok(new { imported = 0, mode = request.Mode, warning = "No channels found on radio — existing app memories were not changed." });
+
             if (request.Mode == "replace")
                 await _memoryService.ReplaceAllAsync(imported);
             else
