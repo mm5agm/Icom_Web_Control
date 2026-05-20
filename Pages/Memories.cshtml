@@ -189,6 +189,10 @@
         });
     }
 
+    function _spinner(text) {
+        return `<span class="spinner-border spinner-border-sm me-2 align-middle" role="status" aria-hidden="true"></span>${text}`;
+    }
+
     function _reloadLink() {
         return ' <a href="/Memories" style="font-weight:bold">Reload page to see updated list</a>';
     }
@@ -204,14 +208,10 @@
 
         const btns = _allBtns();
         btns.forEach(b => b && (b.disabled = true));
-        const progress = document.getElementById('radioProgress');
-        const progressText = document.getElementById('radioProgressText');
-        if (progress) progress.style.display = 'inline';
-        if (progressText) progressText.textContent = 'Reading radio channels…';
 
         const statusEl = document.getElementById('importExportStatus');
         statusEl.className = 'alert alert-info';
-        statusEl.textContent = 'Reading channels 001–099 from radio. This may take up to 30 seconds…';
+        statusEl.innerHTML = _spinner('Reading channels 001–099 from radio. This may take up to 30 seconds…');
         statusEl.classList.remove('d-none');
 
         try {
@@ -233,7 +233,6 @@
             statusEl.textContent = 'Load error: ' + e.message;
         } finally {
             btns.forEach(b => b && (b.disabled = false));
-            if (progress) progress.style.display = 'none';
         }
     }
 
@@ -245,14 +244,10 @@
 
         const btns = _allBtns();
         btns.forEach(b => b && (b.disabled = true));
-        const progress = document.getElementById('radioProgress');
-        const progressText = document.getElementById('radioProgressText');
-        if (progress) progress.style.display = 'inline';
-        if (progressText) progressText.textContent = 'Writing to radio…';
 
         const statusEl = document.getElementById('importExportStatus');
         statusEl.className = 'alert alert-info';
-        statusEl.textContent = 'Writing memories to radio…';
+        statusEl.innerHTML = _spinner('Writing memories to radio…');
         statusEl.classList.remove('d-none');
 
         try {
@@ -270,7 +265,6 @@
             statusEl.textContent = 'Export error: ' + e.message;
         } finally {
             btns.forEach(b => b && (b.disabled = false));
-            if (progress) progress.style.display = 'none';
         }
     }
 </script>

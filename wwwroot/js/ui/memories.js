@@ -211,7 +211,12 @@ function _setToolbarBusy(busy, status) {
         if (el) el.disabled = busy;
     });
     const s = document.getElementById('memToolbarStatus');
-    if (s) s.textContent = status || '';
+    if (!s) return;
+    if (busy) {
+        s.innerHTML = '<span class="spinner-border spinner-border-sm me-1 align-middle" role="status" aria-hidden="true"></span>' + (status || '');
+    } else {
+        s.textContent = status || '';
+    }
 }
 
 window.importMemories = async function (mode) {
