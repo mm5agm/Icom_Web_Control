@@ -2,6 +2,32 @@
 
 const MEM_PANEL_KEY = 'memoriesPanel';
 
+// Replaces native confirm() to avoid the "localhost:8080 says" browser header.
+function _memConfirm(message) {
+    return new Promise(resolve => {
+        const dlg = document.createElement('dialog');
+        dlg.style.cssText = [
+            'border-radius:10px', 'border:2px solid #555', 'background:#1e1e2e',
+            'color:#e0e0e0', 'padding:20px 24px', 'max-width:420px', 'width:90vw',
+            'z-index:10001', 'box-shadow:0 10px 40px rgba(0,0,0,0.7)'
+        ].join(';');
+        dlg.innerHTML =
+            `<p style="margin:0 0 18px;white-space:pre-wrap;font-size:0.88rem;line-height:1.5">${
+                _esc(message)
+            }</p>` +
+            `<div style="display:flex;justify-content:flex-end;gap:8px">` +
+            `<button data-r="0" style="padding:4px 14px;border-radius:5px;border:1px solid #666;background:#2d2d44;color:#ccc;cursor:pointer;font-size:0.85rem">Cancel</button>` +
+            `<button data-r="1" style="padding:4px 14px;border-radius:5px;border:1px solid #4a9;background:#2a5a3a;color:#cfe;cursor:pointer;font-size:0.85rem">OK</button>` +
+            `</div>`;
+        document.body.appendChild(dlg);
+        dlg.showModal();
+        function finish(v) { dlg.close(); dlg.remove(); resolve(v); }
+        dlg.querySelectorAll('button').forEach(b =>
+            b.addEventListener('click', () => finish(b.dataset.r === '1')));
+        dlg.addEventListener('cancel', () => finish(false));
+    });
+}
+
 let _memories = [];
 let _panelOpen = false;
 
@@ -192,7 +218,7 @@ window.importMemories = async function (mode) {
     const msg = mode === 'replace'
         ? 'Load from Rig (Replace all):\n\nThis will replace ALL app memories with channels read from the radio. Your current app memories will be lost.\n\nContinue?'
         : 'Load from Rig (Add new):\n\nThis will add radio channels to your existing app memories. Nothing will be deleted.\n\nContinue?';
-    if (!confirm(msg)) return;
+    if (!await _memConfirm(msg)) return;
     _setToolbarBusy(true, 'Reading rig — this may take up to 30 s…');
     try {
         const resp = await fetch('/api/memory/import-radio', {
@@ -217,7 +243,7 @@ window.exportMemories = async function (mode) {
     if (mode === 'replace') {
         const count = _memories.length;
         const msg = `Save to Rig (Replace all):\n\nThis will write your ${count} app ${count === 1 ? 'memory' : 'memories'} to the radio, replacing ALL existing radio channels.\n\nAny memories stored on the rig that are not in the app will be lost.\n\nContinue?`;
-        if (!confirm(msg)) return;
+        if (!await _memConfirm(msg)) return;
         _setToolbarBusy(true, 'Writing to rig…');
         try {
             const resp = await fetch('/api/memory/export-radio', { method: 'POST' });
@@ -234,7 +260,7 @@ window.exportMemories = async function (mode) {
     } else {
         const count = _memories.length;
         const msg = `Save to Rig (Add new):\n\nThis will write your ${count} app ${count === 1 ? 'memory' : 'memories'} into empty channels on the rig.\n\nExisting rig channels will not be touched.\n\nContinue?`;
-        if (!confirm(msg)) return;
+        if (!await _memConfirm(msg)) return;
         _setToolbarBusy(true, 'Scanning rig for empty channels…');
         try {
             const resp = await fetch('/api/memory/export-radio-add', { method: 'POST' });
