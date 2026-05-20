@@ -973,7 +973,8 @@ fieldset.calibration-card {
     color: #c0c8ff;
 }
 
-.mem-close {
+.mem-close,
+.mem-refresh {
     background: none;
     border: none;
     color: #aaa;
@@ -983,7 +984,8 @@ fieldset.calibration-card {
     padding: 2px 6px;
     border-radius: 4px;
 }
-.mem-close:hover { background: #c0392b; color: #fff; }
+.mem-close:hover  { background: #c0392b; color: #fff; }
+.mem-refresh:hover { background: #2d4a2d; color: #8f8; }
 
 .mem-edit-link {
     color: #8bd;

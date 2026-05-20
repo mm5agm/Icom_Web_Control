@@ -45,12 +45,20 @@ export function initMemoriesPanel() {
     // Close button
     document.getElementById('memoriesClose')?.addEventListener('click', closeMemoriesPanel);
 
+    // Refresh button
+    document.getElementById('memoriesRefresh')?.addEventListener('click', _loadAndRender);
+
     // Open button (toolbar)
     document.getElementById('memBtn')?.addEventListener('click', openMemoriesPanel);
 
     // Reload when dialog opened
     dialog.addEventListener('toggle', () => {
         if (dialog.open) _loadAndRender();
+    });
+
+    // Refresh when the user returns to this tab (e.g. after editing in /Memories)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && dialog.open) _loadAndRender();
     });
 }
 

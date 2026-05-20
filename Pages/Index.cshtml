@@ -802,7 +802,8 @@
     <div class="mem-header" id="memoriesHeader">
         <span class="mem-title" id="memoriesTitle">Memories</span>
         <div class="d-flex align-items-center gap-2">
-            <a href="/Memories" target="_blank" rel="noopener" class="mem-edit-link" title="Open full memories editor in new tab">
+            <button class="mem-refresh" id="memoriesRefresh" title="Refresh list">↻</button>
+            <a href="/Memories" class="mem-edit-link" title="Open full memories editor">
                 <i class="bi bi-pencil-square"></i> Edit
             </a>
             <button class="mem-close" id="memoriesClose" aria-label="Close memories panel" title="Close">✕</button>
@@ -873,7 +874,7 @@
         import { BAND_PLANS, getSegments } from "/js/ui/band-plan.js?v=1";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=11";
-        import { initMemoriesPanel }   from "/js/ui/memories.js?v=6";
+        import { initMemoriesPanel }   from "/js/ui/memories.js?v=7";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         loadLabels();
