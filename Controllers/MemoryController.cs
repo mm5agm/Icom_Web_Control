@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
-using FTdx101_WebApp.Services;
+﻿using Microsoft.AspNetCore.Mvc;
+using Yaesu_Web_Control.Services;
 
-namespace FTdx101_WebApp.Controllers
+namespace Yaesu_Web_Control.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -140,60 +140,71 @@ namespace FTdx101_WebApp.Controllers
             bool isFtdx3000 = settings.RadioModel == "FTDX3000";
             bool hasMt = !isFtdx3000;
 
+            // Disable Auto-Information so responses are direct query replies,
+            // not unsolicited AI updates that would bypass _pendingResponses.
+            await _catClient.SendCommandAsync("AI0;", "MemImport", cancellationToken);
+            await Task.Delay(50, cancellationToken);
+
             var imported = new List<AppMemory>();
 
-            for (int ch = 1; ch <= 99; ch++)
+            try
             {
-                if (cancellationToken.IsCancellationRequested) break;
+                for (int ch = 1; ch <= 99; ch++)
+                {
+                    if (cancellationToken.IsCancellationRequested) break;
 
-                string channel = ch.ToString("D3");
+                    string channel = ch.ToString("D3");
 
-                // Read memory data
-                var mrResp = await _catClient.SendCommandAsync($"MR{channel}0;", "MemImport", cancellationToken);
-                if (string.IsNullOrWhiteSpace(mrResp) || !mrResp.StartsWith("MR") || mrResp.Length < 27)
-                    continue;
+                    // MR{ch}; queries memory data without recalling to VFO.
+                    // Format: MR{ch3}{freq9}{clardir1}{claroff4}{rx1}{tx1}{mode1}... (27 chars)
+                    // Note: MR{ch}0; is the RECALL command (no response); MR{ch}; is the READ command.
+                    var mrResp = await _catClient.SendCommandAsync($"MR{channel};", "MemImport", cancellationToken, timeoutMs: 500);
+                    if (string.IsNullOrWhiteSpace(mrResp) || !mrResp.StartsWith("MR") || mrResp.Length < 22)
+                        continue;
 
-                // Parse MR response:
-                // MR{ch3}{freq9}{clardir1}{claroffset4}{rxclar1}{txclar1}{mode1}...
-                if (!long.TryParse(mrResp.Substring(5, 9), out long freqHz) || freqHz == 0)
-                    continue;
+                    if (!long.TryParse(mrResp.Substring(5, 9), out long freqHz) || freqHz == 0)
+                        continue;
 
-                char clarDir = mrResp[14];
-                int clarOffset = 0;
-                if (int.TryParse(mrResp.Substring(15, 4), out int clarAbs))
-                    clarOffset = clarDir == '-' ? -clarAbs : clarAbs;
+                    char clarDir = mrResp[14];
+                    int clarOffset = 0;
+                    if (int.TryParse(mrResp.Substring(15, 4), out int clarAbs))
+                        clarOffset = clarDir == '-' ? -clarAbs : clarAbs;
 
-                bool rxClar = mrResp[19] == '1';
-                bool txClar = mrResp[20] == '1';
+                    bool rxClar = mrResp[19] == '1';
+                    bool txClar = mrResp[20] == '1';
 
-                string mode = "USB";
-                if (mrResp.Length > 21)
+                    string mode = "USB";
                     CodeToMode.TryGetValue(char.ToUpper(mrResp[21]), out mode!);
-                mode ??= "USB";
+                    mode ??= "USB";
 
-                // Read label via MT (not available on FTDX3000)
-                string label = $"CH{channel}";
-                if (hasMt)
-                {
-                    var mtResp = await _catClient.SendCommandAsync($"MT{channel};", "MemImport", cancellationToken);
-                    if (!string.IsNullOrWhiteSpace(mtResp) && mtResp.StartsWith("MT") && mtResp.Length >= 40)
+                    // Read label via MT{ch}; — only available on non-FTDX3000 radios.
+                    // The label sits at position 28 of the 40-char MT response.
+                    string label = $"CH{channel}";
+                    if (hasMt)
                     {
-                        // MT response: MT{ch3}{freq9}{clardir1}{claroffset4}{rxclar1}{txclar1}{mode1}{p7}{ctcss1}{tone2}{shift1}{p11}{tag12}
-                        // Tag starts at position 28
-                        label = mtResp.Substring(28, Math.Min(12, mtResp.Length - 29)).TrimEnd();
-                        if (string.IsNullOrWhiteSpace(label)) label = $"CH{channel}";
+                        var mtResp = await _catClient.SendCommandAsync($"MT{channel};", "MemImport", cancellationToken, timeoutMs: 500);
+                        if (!string.IsNullOrWhiteSpace(mtResp) && mtResp.Length >= 40)
+                        {
+                            label = mtResp.Substring(28, Math.Min(12, mtResp.Length - 29)).TrimEnd();
+                            if (string.IsNullOrWhiteSpace(label)) label = $"CH{channel}";
+                        }
                     }
-                }
 
-                imported.Add(new AppMemory
-                {
-                    Label            = label,
-                    FrequencyHz      = freqHz,
-                    Mode             = mode,
-                    ClarifierOffsetHz = clarOffset,
-                    RxClarOn         = rxClar,
-                    TxClarOn         = txClar
-                });
+                    imported.Add(new AppMemory
+                    {
+                        Label             = label,
+                        FrequencyHz       = freqHz,
+                        Mode              = mode,
+                        ClarifierOffsetHz = clarOffset,
+                        RxClarOn          = rxClar,
+                        TxClarOn          = txClar
+                    });
+                }
+            }
+            finally
+            {
+                // Always re-enable Auto-Information, even if import was cancelled or failed
+                await _catClient.SendCommandAsync("AI1;", "MemImport", CancellationToken.None);
             }
 
             if (imported.Count == 0)

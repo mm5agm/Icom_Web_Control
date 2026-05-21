@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using FTdx101_WebApp.Services;
+using Yaesu_Web_Control.Services;
 using System.Text.Json;
 using System.Threading;
 
-namespace FTdx101_WebApp.Controllers
+namespace Yaesu_Web_Control.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -677,7 +677,8 @@ namespace FTdx101_WebApp.Controllers
                 await EnsureConnectedAsync();
                 string displayMode = CatCodeToMode.TryGetValue(request.Mode, out var modeName) ? modeName : request.Mode;
 
-                if (receiver.ToUpper() == "A")
+                bool vfoIsA = receiver.ToUpper() == "A";
+                if (vfoIsA)
                 {
                     await _catClient.SendCommandAsync($"MD0{request.Mode};", "User");
                     _radioStateService.ModeA = displayMode;
@@ -692,7 +693,50 @@ namespace FTdx101_WebApp.Controllers
                     return BadRequest(new { error = "Invalid receiver specified" });
                 }
 
-                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", receiver.ToUpper() == "A" ? "0" : "1", request.Mode, receiver);
+                // Re-apply Contour and APF state — mode changes on the FTdx101 cause the
+                // radio to restore its per-mode Contour/APF settings, overriding what we have set.
+                var modeSettings = await _settingsService.GetSettingsAsync();
+                bool isFtdx3000 = modeSettings.RadioModel == "FTDX3000";
+                string p1 = (!isFtdx3000 && !vfoIsA) ? "1" : "0";
+
+                if (isFtdx3000)
+                {
+                    bool cOn = _radioStateService.ContourOnA;
+                    bool aOn = _radioStateService.ApfOnA;
+                    if (cOn)
+                    {
+                        await _catClient.SendCommandAsync("CO0001;", "User");
+                        int vv = Math.Max(1, Math.Min(40, _radioStateService.ContourFreqA / 100));
+                        await _catClient.SendCommandAsync($"CO01{vv:D2};", "User");
+                    }
+                    else if (aOn)
+                    {
+                        await _catClient.SendCommandAsync("CO0002;", "User");
+                        int vv = Math.Max(0, Math.Min(20, (_radioStateService.ApfFreqA / 25) + 10));
+                        await _catClient.SendCommandAsync($"CO02{vv:D2};", "User");
+                    }
+                    else
+                    {
+                        await _catClient.SendCommandAsync("CO0000;", "User");
+                    }
+                }
+                else
+                {
+                    bool contourOn  = vfoIsA ? _radioStateService.ContourOnA  : _radioStateService.ContourOnB;
+                    int  contourHz  = vfoIsA ? _radioStateService.ContourFreqA : _radioStateService.ContourFreqB;
+                    bool apfOn      = vfoIsA ? _radioStateService.ApfOnA       : _radioStateService.ApfOnB;
+                    int  apfHz      = vfoIsA ? _radioStateService.ApfFreqA     : _radioStateService.ApfFreqB;
+
+                    int  cFreq = Math.Max(100, Math.Min(3200, contourHz));
+                    await _catClient.SendCommandAsync($"CO{p1}0000{(contourOn ? 1 : 0)};", "User");
+                    await _catClient.SendCommandAsync($"CO{p1}1{cFreq:D4};", "User");
+
+                    int  aVvvv = Math.Max(0, Math.Min(50, (apfHz / 10) + 25));
+                    await _catClient.SendCommandAsync($"CO{p1}2000{(apfOn ? 1 : 0)};", "User");
+                    await _catClient.SendCommandAsync($"CO{p1}3{aVvvv:D4};", "User");
+                }
+
+                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", vfoIsA ? "0" : "1", request.Mode, receiver);
                 return Ok(new { message = $"Mode {displayMode} selected for Receiver {receiver}" });
             }
             catch (Exception ex)
@@ -1150,6 +1194,18 @@ namespace FTdx101_WebApp.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        public class ContourRequest
+        {
+            public bool On { get; set; }
+            public int FreqHz { get; set; } = 800;
+        }
+
+        public class ApfRequest
+        {
+            public bool On { get; set; }
+            public int FreqHz { get; set; } = 0;
+        }
+
         public class ClarifierRequest
         {
             public string Vfo { get; set; } = "A";
@@ -1162,6 +1218,97 @@ namespace FTdx101_WebApp.Controllers
         {
             public string Vfo { get; set; } = "A";
             public int DeltaHz { get; set; }
+        }
+
+        [HttpPost("contour/{receiver}")]
+        public async Task<IActionResult> SetContour(string receiver, [FromBody] ContourRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var settings = await _settingsService.GetSettingsAsync();
+                bool isFtdx3000 = settings.RadioModel == "FTDX3000";
+                string p1 = (!isFtdx3000 && receiver.ToUpper() == "B") ? "1" : "0";
+
+                if (isFtdx3000)
+                {
+                    // Mode: 00=off, 01=contour on, 02=APF on
+                    string mode = request.On ? "01" : "00";
+                    await _catClient.SendCommandAsync($"CO00{mode};", "WebUI", CancellationToken.None);
+                    int vv = Math.Max(1, Math.Min(40, request.FreqHz / 100));
+                    await _catClient.SendCommandAsync($"CO01{vv:D2};", "WebUI", CancellationToken.None);
+                }
+                else
+                {
+                    int freq = Math.Max(100, Math.Min(3200, request.FreqHz));
+                    await _catClient.SendCommandAsync($"CO{p1}0000{(request.On ? 1 : 0)};", "WebUI", CancellationToken.None);
+                    await _catClient.SendCommandAsync($"CO{p1}1{freq:D4};", "WebUI", CancellationToken.None);
+                }
+
+                if (receiver.ToUpper() == "B") { _radioStateService.ContourOnB = request.On; _radioStateService.ContourFreqB = request.FreqHz; }
+                else                           { _radioStateService.ContourOnA = request.On; _radioStateService.ContourFreqA = request.FreqHz; }
+
+                if (isFtdx3000 && request.On)
+                {
+                    _radioStateService.ApfOnA = false;
+                    _radioStateService.ApfOnB = false;
+                }
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting Contour");
+                return StatusCode(500, new { error = "Failed to set Contour" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("apf/{receiver}")]
+        public async Task<IActionResult> SetApf(string receiver, [FromBody] ApfRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var settings = await _settingsService.GetSettingsAsync();
+                bool isFtdx3000 = settings.RadioModel == "FTDX3000";
+                string p1 = (!isFtdx3000 && receiver.ToUpper() == "B") ? "1" : "0";
+
+                if (isFtdx3000)
+                {
+                    string mode = request.On ? "02" : "00";
+                    await _catClient.SendCommandAsync($"CO00{mode};", "WebUI", CancellationToken.None);
+                    int vv = Math.Max(0, Math.Min(20, (request.FreqHz / 25) + 10));
+                    await _catClient.SendCommandAsync($"CO02{vv:D2};", "WebUI", CancellationToken.None);
+                }
+                else
+                {
+                    int vvvv = Math.Max(0, Math.Min(50, (request.FreqHz / 10) + 25));
+                    await _catClient.SendCommandAsync($"CO{p1}2000{(request.On ? 1 : 0)};", "WebUI", CancellationToken.None);
+                    await _catClient.SendCommandAsync($"CO{p1}3{vvvv:D4};", "WebUI", CancellationToken.None);
+                }
+
+                if (receiver.ToUpper() == "B") { _radioStateService.ApfOnB = request.On; _radioStateService.ApfFreqB = request.FreqHz; }
+                else                           { _radioStateService.ApfOnA = request.On; _radioStateService.ApfFreqA = request.FreqHz; }
+
+                if (isFtdx3000 && request.On)
+                {
+                    _radioStateService.ContourOnA = false;
+                    _radioStateService.ContourOnB = false;
+                }
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting APF");
+                return StatusCode(500, new { error = "Failed to set APF" });
+            }
+            finally { _requestSemaphore.Release(); }
         }
 
         [HttpPost("clarifier")]

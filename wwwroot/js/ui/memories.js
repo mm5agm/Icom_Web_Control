@@ -60,6 +60,11 @@ export function initMemoriesPanel() {
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && dialog.open) _loadAndRender();
     });
+
+    // Allow non-module scripts (e.g. site.js) to trigger a refresh after saving
+    window.refreshMemoriesPanel = () => {
+        if (dialog.open) _loadAndRender();
+    };
 }
 
 export function openMemoriesPanel() {
@@ -88,14 +93,15 @@ async function _loadAndRender() {
 
     try {
         const resp = await fetch('/api/memory');
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok) throw new Error(`Server returned HTTP ${resp.status}`);
         _memories = await resp.json();
+        _renderTiles(container);
     } catch (e) {
-        container.innerHTML = `<div class="text-danger small p-2">Failed to load memories: ${e.message}</div>`;
-        return;
+        const msg = e instanceof TypeError
+            ? 'Server not responding — is Yaesu Web Control still running?'
+            : `Failed to load memories: ${e.message}`;
+        container.innerHTML = `<div class="text-danger small p-2">${msg}</div>`;
     }
-
-    _renderTiles(container);
 }
 
 function _renderTiles(container) {
@@ -108,23 +114,29 @@ function _renderTiles(container) {
 
     const frag = document.createDocumentFragment();
     for (const mem of _memories) {
+        const item = document.createElement('div');
+        item.setAttribute('role', 'listitem');
+
         const tile = document.createElement('button');
         tile.type = 'button';
         tile.className = 'mem-tile';
-        tile.title = `Recall: ${mem.label || 'Memory ' + mem.id}`;
+        const label = mem.label || ('Mem ' + mem.id);
+        tile.title = `Recall: ${label}`;
         tile.dataset.memId = mem.id;
 
         const mhz = mem.frequencyHz >= 1000
             ? (mem.frequencyHz / 1e6).toFixed(mem.frequencyHz % 1000 === 0 ? 3 : 6).replace(/\.?0+$/, '')
             : (mem.frequencyHz / 1e6).toFixed(6);
 
+        tile.setAttribute('aria-label', `Recall ${label}, ${mhz} MHz, ${mem.mode}`);
         tile.innerHTML =
-            `<span class="mem-tile-label">${_esc(mem.label || ('Mem ' + mem.id))}</span>` +
-            `<span class="mem-tile-freq">${mhz} MHz</span>` +
-            `<span class="mem-tile-mode">${_esc(mem.mode)}</span>`;
+            `<span class="mem-tile-label" aria-hidden="true">${_esc(label)}</span>` +
+            `<span class="mem-tile-freq" aria-hidden="true">${mhz} MHz</span>` +
+            `<span class="mem-tile-mode" aria-hidden="true">${_esc(mem.mode)}</span>`;
 
         tile.addEventListener('click', () => _recallMemory(mem.id));
-        frag.appendChild(tile);
+        item.appendChild(tile);
+        frag.appendChild(item);
     }
 
     container.innerHTML = '';

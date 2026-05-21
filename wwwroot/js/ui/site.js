@@ -619,6 +619,9 @@ let clarOffsets = { A: 0, B: 0 };
 let rxClarOn = false;
 let txClarOn = false;
 
+let contourState = { A: { on: false, freqHz: 800 }, B: { on: false, freqHz: 800 } };
+let apfState     = { A: { on: false, freqHz: 0   }, B: { on: false, freqHz: 0   } };
+
 async function toggleTx() {
     const newTxState = !isTransmitting;
 
@@ -1008,6 +1011,54 @@ connection.on("RadioStateUpdate", function (update) {
         }
     }
 
+    // --- CONTOUR ---
+    if (update.property === "ContourOnA") {
+        contourState.A.on = update.value === true || update.value === 'true' || update.value === 1;
+        _updateContourBtn('A');
+    }
+    if (update.property === "ContourOnB") {
+        contourState.B.on = update.value === true || update.value === 'true' || update.value === 1;
+        _updateContourBtn('B');
+    }
+    if (update.property === "ContourFreqA") {
+        contourState.A.freqHz = parseInt(update.value) || 800;
+        const slider = document.getElementById('contourFreqSliderA');
+        const label  = document.getElementById('contourFreqValueA');
+        if (slider) slider.value = contourState.A.freqHz;
+        if (label)  label.textContent = contourState.A.freqHz + ' Hz';
+    }
+    if (update.property === "ContourFreqB") {
+        contourState.B.freqHz = parseInt(update.value) || 800;
+        const slider = document.getElementById('contourFreqSliderB');
+        const label  = document.getElementById('contourFreqValueB');
+        if (slider) slider.value = contourState.B.freqHz;
+        if (label)  label.textContent = contourState.B.freqHz + ' Hz';
+    }
+
+    // --- APF ---
+    if (update.property === "ApfOnA") {
+        apfState.A.on = update.value === true || update.value === 'true' || update.value === 1;
+        _updateApfBtn('A');
+    }
+    if (update.property === "ApfOnB") {
+        apfState.B.on = update.value === true || update.value === 'true' || update.value === 1;
+        _updateApfBtn('B');
+    }
+    if (update.property === "ApfFreqA") {
+        apfState.A.freqHz = parseInt(update.value) || 0;
+        const slider = document.getElementById('apfFreqSliderA');
+        const label  = document.getElementById('apfFreqValueA');
+        if (slider) slider.value = apfState.A.freqHz;
+        if (label)  label.textContent = apfState.A.freqHz + ' Hz';
+    }
+    if (update.property === "ApfFreqB") {
+        apfState.B.freqHz = parseInt(update.value) || 0;
+        const slider = document.getElementById('apfFreqSliderB');
+        const label  = document.getElementById('apfFreqValueB');
+        if (slider) slider.value = apfState.B.freqHz;
+        if (label)  label.textContent = apfState.B.freqHz + ' Hz';
+    }
+
     // --- MANUAL NOTCH ---
     if (update.property === "ManualNotchA") {
         const el = document.getElementById('manualNotchSelectA');
@@ -1258,6 +1309,18 @@ window.addEventListener('DOMContentLoaded', () => {
         txClarOn = initMode === 'tx' || initMode === 'rxtx';
     }
 
+    // Contour/APF: seed JS state from server-rendered HTML values
+    for (const vfo of ['A', 'B']) {
+        const cBtn = document.getElementById(`contourBtn${vfo}`);
+        if (cBtn) contourState[vfo].on = cBtn.classList.contains('btn-success');
+        const cSlider = document.getElementById(`contourFreqSlider${vfo}`);
+        if (cSlider) contourState[vfo].freqHz = parseInt(cSlider.value) || 800;
+        const aBtn = document.getElementById(`apfBtn${vfo}`);
+        if (aBtn) apfState[vfo].on = aBtn.classList.contains('btn-success');
+        const aSlider = document.getElementById(`apfFreqSlider${vfo}`);
+        if (aSlider) apfState[vfo].freqHz = parseInt(aSlider.value) || 0;
+    }
+
     // Event delegation for band button changes
     document.addEventListener('change', function(e) {
         if (e.target.type === 'radio' && e.target.name && e.target.name.startsWith('band-')) {
@@ -1434,10 +1497,12 @@ window.resetClarifier = resetClarifier;
 
 async function saveVfoToMemory(vfo) {
     const btn    = document.getElementById('saveMemBtn' + vfo);
+    const status = document.getElementById('saveMemStatus' + vfo);
     const freqHz = window.radioControl?._state?.lastBackendFreq?.[vfo] || 0;
     const mode   = document.getElementById('modeSelect' + vfo)?.value || 'USB';
     try {
         if (btn) { btn.disabled = true; btn.textContent = '…'; }
+        if (status) status.textContent = '';
         const resp = await fetch('/api/memory', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1450,6 +1515,8 @@ async function saveVfoToMemory(vfo) {
             })
         });
         if (resp.ok) {
+            if (status) status.textContent = `VFO ${vfo} saved to memories`;
+            window.refreshMemoriesPanel?.();
             if (btn) {
                 btn.textContent = '✓ Saved';
                 btn.classList.replace('btn-outline-secondary', 'btn-success');
@@ -1460,9 +1527,11 @@ async function saveVfoToMemory(vfo) {
                 }, 1500);
             }
         } else {
+            if (status) status.textContent = `Failed to save VFO ${vfo}`;
             if (btn) { btn.textContent = '✗ Failed'; btn.disabled = false; }
         }
     } catch (e) {
+        if (status) status.textContent = `Error saving VFO ${vfo}`;
         if (btn) { btn.textContent = '✗ Error'; btn.disabled = false; }
         console.error('Save to memory failed:', e);
     }
@@ -1491,6 +1560,76 @@ function resetIfWidth(receiver) {
     if (window.radioControl) window.radioControl.setIfWidth(receiver, defaultOpt.value);
 }
 window.resetIfWidth = resetIfWidth;
+
+function _updateContourBtn(vfo) {
+    const btn = document.getElementById(`contourBtn${vfo}`);
+    if (!btn) return;
+    const on = contourState[vfo].on;
+    btn.textContent = on ? 'Contour On' : 'Contour Off';
+    btn.className = btn.className.replace(/btn-success|btn-outline-secondary/g, '').trim();
+    btn.classList.add(on ? 'btn-success' : 'btn-outline-secondary');
+}
+
+function _updateApfBtn(vfo) {
+    const btn = document.getElementById(`apfBtn${vfo}`);
+    if (!btn) return;
+    const on = apfState[vfo].on;
+    btn.textContent = on ? 'APF On' : 'APF Off';
+    btn.className = btn.className.replace(/btn-success|btn-outline-secondary/g, '').trim();
+    btn.classList.add(on ? 'btn-success' : 'btn-outline-secondary');
+}
+
+async function toggleContour(vfo) {
+    const newOn = !contourState[vfo].on;
+    contourState[vfo].on = newOn;
+    _updateContourBtn(vfo);
+    try {
+        await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: newOn, freqHz: contourState[vfo].freqHz })
+        });
+    } catch (e) { console.error('Contour toggle failed:', e); }
+}
+window.toggleContour = toggleContour;
+
+async function setContourFreq(vfo, hz) {
+    contourState[vfo].freqHz = hz;
+    try {
+        await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: contourState[vfo].on, freqHz: hz })
+        });
+    } catch (e) { console.error('Contour freq failed:', e); }
+}
+window.setContourFreq = setContourFreq;
+
+async function toggleApf(vfo) {
+    const newOn = !apfState[vfo].on;
+    apfState[vfo].on = newOn;
+    _updateApfBtn(vfo);
+    try {
+        await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: newOn, freqHz: apfState[vfo].freqHz })
+        });
+    } catch (e) { console.error('APF toggle failed:', e); }
+}
+window.toggleApf = toggleApf;
+
+async function setApfFreq(vfo, hz) {
+    apfState[vfo].freqHz = hz;
+    try {
+        await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: apfState[vfo].on, freqHz: hz })
+        });
+    } catch (e) { console.error('APF freq failed:', e); }
+}
+window.setApfFreq = setApfFreq;
 
 document.addEventListener('DOMContentLoaded', function() {
     setupIfShiftSlider('A');
@@ -2253,7 +2392,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!segments) {
             const opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = '-- Segment --';
+            opt.textContent = '--';
             select.appendChild(opt);
             select.disabled = true;
             return;
@@ -2262,7 +2401,7 @@ document.addEventListener('DOMContentLoaded', function() {
         select.disabled = false;
         const placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = '-- Segment --';
+        placeholder.textContent = '--';
         select.appendChild(placeholder);
 
         for (const [key, seg] of Object.entries(segments)) {

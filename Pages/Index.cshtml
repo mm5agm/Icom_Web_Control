@@ -1,5 +1,5 @@
 ﻿@page
-@model FTdx101_WebApp.Pages.IndexModel
+@model Yaesu_Web_Control.Pages.IndexModel
 @{
     ViewData["Title"]     = "FT-dx101 Series Control";
     ViewData["BodyRole"]  = "application";
@@ -22,6 +22,10 @@
         (false, true) => "tx",
         _             => "off"
     };
+
+    int contourMaxFreq = isFtdx3000 ? 4000 : 3200;
+    int contourStep    = isFtdx3000 ? 100  : 10;
+    int apfStep        = isFtdx3000 ? 25   : 10;
 
     // IF Width options differ by model. Values match the SH command code sent to the radio.
     var ifWidthOptions = isFtdx10
@@ -72,8 +76,11 @@
 }
 
 <!-- Cache-busted CSS reference -->
-<link rel="stylesheet" href="~/css/site.css?v=20260406a" />
+<link rel="stylesheet" href="~/css/site.css?v=20260520a" />
 <link rel="stylesheet" href="~/css/closer-to-raw-power.css?v=20260226n" />
+<style>
+    #saveMemBtnA, #saveMemBtnB { font-weight: 700 !important; font-size: 0.85rem !important; color: #212529 !important; }
+</style>
 
 <!-- Message Box Modal (Windows-style) -->
 <div class="modal fade" id="messageBoxModal" tabindex="-1" aria-labelledby="messageBoxTitle" aria-hidden="true">
@@ -294,12 +301,14 @@
                                 <canvas id="sMeterCanvasA" role="img" aria-hidden="true" aria-label="S meter, VFO A" data-a11y-key="meters.smeterA"></canvas>
                             </div>
                             <button id="saveMemBtnA" type="button"
-                                    class="btn btn-outline-secondary btn-sm w-100 mt-1"
-                                    style="font-size:0.7rem; padding:1px 4px; font-weight:bold;"
+                                    class="btn btn-outline-secondary btn-sm mt-1"
+                                    style="padding:1px 4px;"
                                     onclick="saveVfoToMemory('A')"
+                                    aria-label="Save VFO A to memories"
                                     title="Save VFO A frequency, mode and clarifier to app memories">
                                 Save to Mem
                             </button>
+                            <span id="saveMemStatusA" class="visually-hidden" role="status" aria-live="polite"></span>
                         </div>
                         <!-- Middle: Band buttons + Mode/Antenna below -->
                         <div class="flex-grow-1 d-flex flex-column gap-1">
@@ -428,8 +437,8 @@
                         </div>
                     </div>
 
-                    <!-- Segment selector — left-aligned, above frequency digits -->
-                    <div class="d-flex align-items-center gap-1 mb-1" style="margin-top: 2px;">
+                    <!-- Segment selector + Contour/APF controls on one row -->
+                    <div class="d-flex align-items-center gap-1 mb-1 flex-wrap" style="margin-top: 2px;">
                         <span class="fw-bold" style="font-size: 0.8rem; white-space: nowrap;">Segment</span>
                         <select class="form-select form-select-sm segment-select" id="segmentSelectA"
                                 aria-label="VFO A band segment"
@@ -437,6 +446,32 @@
                                 onchange="window.onSegmentChange && window.onSegmentChange('A', this.value)">
                             <option value="">--</option>
                         </select>
+                        <button type="button" id="contourBtnA"
+                                class="btn btn-sm @(Model.RadioState.ContourOnA ? "btn-success" : "btn-outline-secondary") flex-shrink-0"
+                                style="color: black; font-weight: bold;"
+                                aria-label="VFO A Contour filter" title="Toggle Contour audio peak filter"
+                                onclick="toggleContour('A')">@(Model.RadioState.ContourOnA ? "Contour On" : "Contour Off")</button>
+                        <input type="range" id="contourFreqSliderA"
+                               min="100" max="@contourMaxFreq" step="@contourStep"
+                               value="@Model.RadioState.ContourFreqA"
+                               style="width: clamp(60px, 8vw, 110px); height: 16px;"
+                               oninput="document.getElementById('contourFreqValueA').textContent = this.value + ' Hz'"
+                               onchange="setContourFreq('A', parseInt(this.value))"
+                               aria-label="VFO A Contour frequency">
+                        <span id="contourFreqValueA" style="font-size: 0.8rem; white-space: nowrap; min-width: 46px;">@(Model.RadioState.ContourFreqA) Hz</span>
+                        <button type="button" id="apfBtnA"
+                                class="btn btn-sm @(Model.RadioState.ApfOnA ? "btn-success" : "btn-outline-secondary") flex-shrink-0"
+                                style="color: black; font-weight: bold;"
+                                aria-label="VFO A APF filter" title="Toggle APF audio peak filter (CW)"
+                                onclick="toggleApf('A')">@(Model.RadioState.ApfOnA ? "APF On" : "APF Off")</button>
+                        <input type="range" id="apfFreqSliderA"
+                               min="-250" max="250" step="@apfStep"
+                               value="@Model.RadioState.ApfFreqA"
+                               style="width: clamp(60px, 8vw, 110px); height: 16px;"
+                               oninput="document.getElementById('apfFreqValueA').textContent = this.value + ' Hz'"
+                               onchange="setApfFreq('A', parseInt(this.value))"
+                               aria-label="VFO A APF frequency">
+                        <span id="apfFreqValueA" style="font-size: 0.8rem; white-space: nowrap; min-width: 46px;">@(Model.RadioState.ApfFreqA) Hz</span>
                     </div>
 
                     <!-- Frequency + Roofing + AF Gain on one row -->
@@ -452,7 +487,7 @@
                                 aria-label="Keyboard — enter VFO A frequency"
                                 data-a11y-key="keyboard.openA"
                                 title="Keyboard — enter VFO A frequency">
-                            <i class="bi bi-123" aria-hidden="true"></i>
+                            <strong>123</strong>
                         </button>
                         @if (!isFtdx10 && !isFt710)
                         {
@@ -502,8 +537,6 @@
                                 <option value="@opt.Value" selected="@(Model.RadioState.IfWidthA==opt.Value||isDefault ? "selected" : null)">@opt.Label</option>
                             }
                         </select>
-                        <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
-                                onclick="resetIfWidth('A')" title="Reset IF Width to default" aria-label="VFO A reset IF width">Reset</button>
                         <label class="mb-0 text-nowrap ms-1 fw-bold">IF Shift: <span id="ifShiftValueA" class="fw-bold">@Model.RadioState.IfShiftA</span></label>
                         <input type="range" class="form-range ifshift-slider flex-shrink-0"
                                id="ifShiftSliderA"
@@ -542,12 +575,14 @@
                                 <canvas id="sMeterCanvasB" role="img" aria-hidden="true" aria-label="S meter, VFO B" data-a11y-key="meters.smeterB"></canvas>
                             </div>
                             <button id="saveMemBtnB" type="button"
-                                    class="btn btn-outline-secondary btn-sm w-100 mt-1"
-                                    style="font-size:0.7rem; padding:1px 4px; font-weight:bold;"
+                                    class="btn btn-outline-secondary btn-sm mt-1"
+                                    style="padding:1px 4px;"
                                     onclick="saveVfoToMemory('B')"
+                                    aria-label="Save VFO B to memories"
                                     title="Save VFO B frequency, mode and clarifier to app memories">
                                 Save to Mem
                             </button>
+                            <span id="saveMemStatusB" class="visually-hidden" role="status" aria-live="polite"></span>
                         </div>
                         <!-- Middle: Band buttons + Mode/Antenna below -->
                         <div class="flex-grow-1 band-buttons-shifted d-flex flex-column gap-1">
@@ -676,8 +711,8 @@
                         </div>
                     </div>
 
-                    <!-- Segment selector — left-aligned, above frequency digits -->
-                    <div class="d-flex align-items-center gap-1 mb-1" style="margin-top: 2px;">
+                    <!-- Segment selector + Contour/APF controls on one row -->
+                    <div class="d-flex align-items-center gap-1 mb-1 flex-wrap" style="margin-top: 2px;">
                         <span class="fw-bold" style="font-size: 0.8rem; white-space: nowrap;">Segment</span>
                         <select class="form-select form-select-sm segment-select" id="segmentSelectB"
                                 aria-label="VFO B band segment"
@@ -685,6 +720,32 @@
                                 onchange="window.onSegmentChange && window.onSegmentChange('B', this.value)">
                             <option value="">--</option>
                         </select>
+                        <button type="button" id="contourBtnB"
+                                class="btn btn-sm @(Model.RadioState.ContourOnB ? "btn-success" : "btn-outline-secondary") flex-shrink-0"
+                                style="color: black; font-weight: bold;"
+                                aria-label="VFO B Contour filter" title="Toggle Contour audio peak filter"
+                                onclick="toggleContour('B')">@(Model.RadioState.ContourOnB ? "Contour On" : "Contour Off")</button>
+                        <input type="range" id="contourFreqSliderB"
+                               min="100" max="@contourMaxFreq" step="@contourStep"
+                               value="@Model.RadioState.ContourFreqB"
+                               style="width: clamp(60px, 8vw, 110px); height: 16px;"
+                               oninput="document.getElementById('contourFreqValueB').textContent = this.value + ' Hz'"
+                               onchange="setContourFreq('B', parseInt(this.value))"
+                               aria-label="VFO B Contour frequency">
+                        <span id="contourFreqValueB" style="font-size: 0.8rem; white-space: nowrap; min-width: 46px;">@(Model.RadioState.ContourFreqB) Hz</span>
+                        <button type="button" id="apfBtnB"
+                                class="btn btn-sm @(Model.RadioState.ApfOnB ? "btn-success" : "btn-outline-secondary") flex-shrink-0"
+                                style="color: black; font-weight: bold;"
+                                aria-label="VFO B APF filter" title="Toggle APF audio peak filter (CW)"
+                                onclick="toggleApf('B')">@(Model.RadioState.ApfOnB ? "APF On" : "APF Off")</button>
+                        <input type="range" id="apfFreqSliderB"
+                               min="-250" max="250" step="@apfStep"
+                               value="@Model.RadioState.ApfFreqB"
+                               style="width: clamp(60px, 8vw, 110px); height: 16px;"
+                               oninput="document.getElementById('apfFreqValueB').textContent = this.value + ' Hz'"
+                               onchange="setApfFreq('B', parseInt(this.value))"
+                               aria-label="VFO B APF frequency">
+                        <span id="apfFreqValueB" style="font-size: 0.8rem; white-space: nowrap; min-width: 46px;">@(Model.RadioState.ApfFreqB) Hz</span>
                     </div>
 
                     <!-- Frequency + Roofing + AF Gain on one row -->
@@ -700,7 +761,7 @@
                                 aria-label="Keyboard — enter VFO B frequency"
                                 data-a11y-key="keyboard.openB"
                                 title="Keyboard — enter VFO B frequency">
-                            <i class="bi bi-123" aria-hidden="true"></i>
+                            <strong>123</strong>
                         </button>
                         @if (!isFtdx10 && !isFt710)
                         {
@@ -750,8 +811,6 @@
                                 <option value="@opt.Value" selected="@(Model.RadioState.IfWidthB==opt.Value||isDefault ? "selected" : null)">@opt.Label</option>
                             }
                         </select>
-                        <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
-                                onclick="resetIfWidth('B')" title="Reset IF Width to default" aria-label="VFO B reset IF width">Reset</button>
                         <label class="mb-0 text-nowrap ms-1 fw-bold">IF Shift: <span id="ifShiftValueB" class="fw-bold">@Model.RadioState.IfShiftB</span></label>
                         <input type="range" class="form-range ifshift-slider flex-shrink-0"
                                id="ifShiftSliderB"
@@ -816,9 +875,9 @@
     <div class="mem-header" id="memoriesHeader">
         <span class="mem-title" id="memoriesTitle">Memories</span>
         <div class="d-flex align-items-center gap-2">
-            <button class="mem-refresh" id="memoriesRefresh" title="Refresh list">↻</button>
+            <button class="mem-refresh" id="memoriesRefresh" aria-label="Refresh memories list" title="Refresh list"><span aria-hidden="true">↻</span></button>
             <a href="/Memories" class="mem-edit-link" title="Open full memories editor">
-                <i class="bi bi-pencil-square"></i> Edit
+                <i class="bi bi-pencil-square" aria-hidden="true"></i> Edit
             </a>
             <button class="mem-close" id="memoriesClose" aria-label="Close memories panel" title="Close">✕</button>
         </div>
@@ -826,23 +885,23 @@
     <div class="mem-toolbar" id="memoriesToolbar">
         <button type="button" class="mem-tool-btn" id="memImportReplaceBtn"
                 onclick="window.importMemories('replace')" title="Read radio channels and replace all app memories">
-            <i class="bi bi-cloud-download"></i> Load from Rig (Replace all)
+            <i class="bi bi-cloud-download" aria-hidden="true"></i> Load from Rig (Replace all)
         </button>
         <button type="button" class="mem-tool-btn" id="memImportAddBtn"
                 onclick="window.importMemories('merge')" title="Read radio channels and add to existing app memories">
-            <i class="bi bi-cloud-download"></i> Load from Rig (Add new)
+            <i class="bi bi-cloud-download" aria-hidden="true"></i> Load from Rig (Add new)
         </button>
         <button type="button" class="mem-tool-btn" id="memExportReplaceBtn"
                 onclick="window.exportMemories('replace')" title="Write app memories to radio, replacing all radio channels">
-            <i class="bi bi-cloud-upload"></i> Save to Rig (Replace all)
+            <i class="bi bi-cloud-upload" aria-hidden="true"></i> Save to Rig (Replace all)
         </button>
         <button type="button" class="mem-tool-btn" id="memExportAddBtn"
                 onclick="window.exportMemories('add')" title="Write app memories only to empty radio channels">
-            <i class="bi bi-cloud-upload"></i> Save to Rig (Add new)
+            <i class="bi bi-cloud-upload" aria-hidden="true"></i> Save to Rig (Add new)
         </button>
-        <span class="mem-tool-status" id="memToolbarStatus"></span>
+        <span class="mem-tool-status" id="memToolbarStatus" role="status" aria-live="polite"></span>
     </div>
-    <div class="mem-tiles" id="memoriesTiles">
+    <div class="mem-tiles" id="memoriesTiles" role="list" aria-label="Saved memories">
         <div class="text-muted small p-2">Loading…</div>
     </div>
 </dialog>
@@ -887,15 +946,15 @@
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
         import { BAND_PLANS, getSegments } from "/js/ui/band-plan.js?v=1";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
-        import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=11";
-        import { initMemoriesPanel }   from "/js/ui/memories.js?v=8";
+        import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
+        import { initMemoriesPanel }   from "/js/ui/memories.js?v=10";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         loadLabels();
         window.addEventListener('focus', loadLabels);
-        initFreqKeyboard();
-        initMemoriesPanel();
         document.addEventListener('DOMContentLoaded', function () {
+            initFreqKeyboard();
+            initMemoriesPanel();
             window.meterPanel = new MeterPanel({
                 smeterA:     { type: 'smeter', canvasId: 'sMeterCanvasA' },
                 smeterB:     { type: 'smeter', canvasId: 'sMeterCanvasB' },
