@@ -5,6 +5,16 @@
 
 This is a continuation of my FTdx101_WebApp with more Yaesu transceivers added and more controls.
 
+**Supported transceivers:**
+
+| Transceiver | Power | Receivers | Notes |
+|-------------|-------|-----------|-------|
+| FTdx101MP | 200 W | Dual | All features supported |
+| FTdx101D | 100 W | Dual | All features supported |
+| FTdx10 | 100 W | Single | Two VFOs; no rear-panel IF output for spectrum |
+| FT-710 | 100 W | Single | Two VFOs; no rear-panel IF output for spectrum |
+| FTDX3000 | 100 W | Single | Two VFOs; no memory tag (MT) command |
+
 ## Main Page
 ![Yaesu Web Control Main Page](pictures/DevelopScreen.png)
 
