@@ -1,17 +1,15 @@
 
-##  I would appreciate feedback and bug/layout reports. I have only tested the spectrum display with the SDRplay V1
+# Yaesu Web Control
 
-## FTdx101 WebApp Main Page
-![FTdx101 WebApp Main Page](pictures/DevelopScreen.png)
+> I would appreciate feedback and bug/layout reports. I have only tested on the FTdx101MP and the spectrum display with the SDRplay RSP1B.
+
+This is a continuation of my FTdx101_WebApp with more Yaesu transceivers added and more controls.
+
+## Main Page
+![Yaesu Web Control Main Page](pictures/DevelopScreen.png)
 
 ## Calibration Page
 ![Calibration Page](pictures/Calibration.png)
-
-
-## Windows Smart App Control Example
-![Smart App Control Screenshot](pictures/SmartAppControl.png)
-
-# FTdx101 WebApp
 
 ## ⚠️ Warning
 
@@ -20,9 +18,9 @@ This software interacts with radio hardware. I have used only the official Yaesu
 ---
 
 ## 📖 Why This Application Exists
-I wrote this application because I can't see the FTdx101MP controls without using a magnifying glass. As a ham who uses WSJT-X, JTAlert, and Log4OM, there are many controls on the radio that I simply never touch. This web-based interface gives me a clean, large, easy-to-read control panel for the functions I actually use day-to-day.
+I wrote this application because I can't see the FTdx101MP controls without using a magnifying glass. I've added support for partially sighted users by utilising NVDA and windows narrator. As a ham who uses WSJT-X, JTAlert, and Log4OM, I thought it would be nice to add buttons to start them from the app as it saves openning up the individual programs. I've added memory channel banks and functions to read and save etc. You don't need to save to the transceiver unless you specifically want them on it, taking your transceiver to another location for example. Please read the settings carefully as you can overwrite the transceivers memories.  
 
-I also use this application on my tablet, which provides a portable control panel in the shack. The large buttons and readable display work great on touchscreens, though the digit-by-digit frequency tuning feature (click digit + mouse wheel) hasn't been implemented for touch devices yet.
+Tablet testing has been limited — feedback from tablet users is particularly welcome.
 
 ---
 
@@ -30,7 +28,7 @@ I also use this application on my tablet, which provides a portable control pane
 
 Join the discussion group for announcements, bug reports, and feedback:
 
-- **Groups.io:** [ftdx101-webapp](https://groups.io/g/ftdx101-webapp/topics)
+- **Groups.io:** [Yaesu-Web-Control](https://groups.io/g/Yaesu-Web-Control/topics)
 
 ---
 
@@ -70,7 +68,7 @@ These are one-time steps — once the app is installed you won't see them again.
 
 ## 📡 Spectrum Display
 
-The application includes a real-time spectrum display and waterfall, intended for use with a Software Defined Radio (SDR) connected to the FTdx101MP's 9 MHz IF output on the rear panel.
+The application includes a real-time spectrum display and waterfall, intended for use with a Software Defined Radio (SDR) connected to the transceivers 9 MHz IF output on the rear panel if it has one.
 
 **Supported SDR devices:**
 
@@ -93,7 +91,7 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 - **Roofing filters per model (Settings)** — the Settings page now shows the correct roofing filter information for each radio. The FTdx101MP comes fully loaded with all five filters as standard (12 kHz, 3 kHz, 1.2 kHz, 600 Hz, 300 Hz) — no configuration needed. The FTdx101D has 12 kHz, 3 kHz, and 600 Hz as standard, with checkboxes to tick the optional 1.2 kHz and 300 Hz filters if installed. The FTdx10 section explains that its roofing filter is selected automatically by the radio based on DSP bandwidth and mode, with informational checkboxes for the optional YF-130CN (1.2 kHz) and YF-130CW (300 Hz) filters.
 - **VFO-B show/hide toggle** — the **VFO-B** button in the toolbar now works: click it to collapse or reveal the VFO B panel. The last state is remembered across sessions.
-- **IF Width Reset button** — a **Reset** button next to the IF Width dropdown (for both VFO A and VFO B) resets IF Width to the widest bandwidth in one click, matching the Zero button that already exists for IF Shift.
+- **IF Width Reset button** — a **Reset** button next to the IF Width dropdown (for both VFO A and VFO B) resets IF Width to the widest bandwidth in one click, matching the Zero button that already exists for IF Shift. *(Subsequently removed — the dropdown already provides direct access to every option including the default.)*
 - **FTdx10 IF Width options** — the FTdx10 now shows the correct IF Width options (400 Hz – 3.4 kHz, 16 steps), replacing the FTdx101 values that were shown previously.
 
 ### Fixed
@@ -113,7 +111,7 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 ### Fixed
 
-- **FTdx10 Settings badge** — the Current Configuration panel on the Settings page was showing "100W · Single RX" for the FTdx10. It now shows "100W · Single RX" correctly, as the FTdx10 is a single-receiver radio.
+- **FTdx10 Settings badge** — the Current Configuration panel on the Settings page was showing an incorrect configuration for the FTdx10. It now correctly shows "100W · Single RX". The FTdx10 has two VFOs (used for split operation and easy frequency switching) but only a single receiver — it cannot receive on two frequencies simultaneously.
 
 ---
 
@@ -175,8 +173,8 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 ### Fixed
 
-- **Calibration data location** — calibration.user.json was being written to the wrong AppData subfolder (`MM5AGM\FTdx101\WebApp\` instead of `MM5AGM\FTdx101 WebApp\`). It now lands in the correct folder alongside appsettings.user.json and radio_state.json.
-- **Labels file** — labels.json is now copied to `%APPDATA%\MM5AGM\FTdx101 WebApp\` on first run so users can easily locate and edit it.
+- **Calibration data location** — calibration.user.json was being written to the wrong AppData subfolder (`MM5AGM\FTdx101\WebApp\` instead of `MM5AGM\Yaesu Web Control\`). It now lands in the correct folder alongside appsettings.user.json and radio_state.json.
+- **Labels file** — labels.json is now copied to `%APPDATA%\MM5AGM\Yaesu Web Control\` on first run so users can easily locate and edit it.
 
 ---
 
@@ -278,14 +276,7 @@ This is a release candidate for what may be the final major release. Please test
 ### Changed
 
 - Minor fixes and improvements
-
 - Ctrl + F goes to full screen, ESC to get back to normal
-
-
-## 2026-04-06 - v0.7.6
-
-### Changed
-
 - Updated main page screenshot to reflect new VFO controls layout.
 
 ## 2026-04-06 - v0.7.5
@@ -372,8 +363,4 @@ This release marks a near-complete rewrite of the application.
 - Compression/ALC behavior aligned to TX state to reduce idle-mode jumping.
 - AF Gain confirmation tolerance and timeout adjusted to reduce false revert alerts.
 
-## Next Up
-
-- Address any issues reported against v0.9.0 RC1.
-- v1.0.0 final release if no critical issues are found.
 
