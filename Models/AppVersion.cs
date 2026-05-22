@@ -1,6 +1,6 @@
-namespace FTdx101_WebApp;
+﻿namespace Yaesu_Web_Control;
 
 public static class AppVersion
 {
-    public const string Current = "1.4.0";
+    public const string Current = "1.5.0";
 }

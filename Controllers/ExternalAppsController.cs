@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.Mvc;
-using FTdx101_WebApp.Services;
+﻿using Microsoft.AspNetCore.Mvc;
+using Yaesu_Web_Control.Services;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace FTdx101_WebApp.Controllers
+namespace Yaesu_Web_Control.Controllers
 {
     [ApiController]
     [Route("api")]

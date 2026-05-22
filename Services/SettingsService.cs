@@ -1,7 +1,7 @@
-using System.Text.Json;
-using FTdx101_WebApp.Models;
+﻿using System.Text.Json;
+using Yaesu_Web_Control.Models;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public class SettingsService : ISettingsService
     {
@@ -14,7 +14,8 @@ namespace FTdx101_WebApp.Services
         {
             var appData = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MM5AGM", "FTdx101 WebApp");
+                "MM5AGM", "Yaesu Web Control");
+            MigrateAppDataIfNeeded(appData);
             Directory.CreateDirectory(appData);
             _settingsFilePath = Path.Combine(appData, "appsettings.user.json");
             _logger = logger;
@@ -95,6 +96,18 @@ namespace FTdx101_WebApp.Services
             {
                 _semaphore.Release();
             }
+        }
+
+        private static void MigrateAppDataIfNeeded(string newFolder)
+        {
+            if (Directory.Exists(newFolder)) return;
+            var oldFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "MM5AGM", "FTdx101 WebApp");
+            if (!Directory.Exists(oldFolder)) return;
+            Directory.CreateDirectory(newFolder);
+            foreach (var file in Directory.GetFiles(oldFolder))
+                File.Copy(file, Path.Combine(newFolder, Path.GetFileName(file)), overwrite: false);
         }
     }
 }

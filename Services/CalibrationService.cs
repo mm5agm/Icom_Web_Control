@@ -1,6 +1,6 @@
-using FTdx101_WebApp.Models.Calibration;
+﻿using Yaesu_Web_Control.Models.Calibration;
 
-namespace FTdx101_WebApp.Services;
+namespace Yaesu_Web_Control.Services;
 
 public interface ICalibrationService
 {

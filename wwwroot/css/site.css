@@ -18,6 +18,11 @@
     user-select: none;
     white-space: nowrap;
 }
+/* Save-to-memory buttons under S-meters */
+#saveMemBtnA, #saveMemBtnB {
+    font-weight: 700 !important;
+}
+
 /* Ensure analog meter containers allow overlays to position absolutely */
 .analog-meter-container {
     position: relative;
@@ -426,11 +431,11 @@ pre, code { tab-size: 4; }
 /* Band segment dropdown — narrow, bold text */
 .segment-select {
     width: fit-content;
-    min-width: 6rem;
-    max-width: 10rem;
+    min-width: 3.5rem;
+    max-width: 5.8rem;
     font-weight: bold;
     font-size: 0.8rem;
-    padding-right: 1.5rem;
+    padding-right: 2.25rem;
 }
 
 /* Maximize usable width for receiver panels */
@@ -756,6 +761,7 @@ fieldset.calibration-card {
 
 .fkb-dialog {
     position: fixed;
+    inset: 0;
     margin: auto;
     padding: 0;
     border: 2px solid #444;
@@ -925,4 +931,157 @@ fieldset.calibration-card {
 .fkb-open-btn {
     padding: 1px 6px;
     font-size: 0.9rem;
+    color: #000 !important;
+}
+
+/* ── Memories Panel Dialog ───────────────────────────────────────────────── */
+
+.mem-dialog {
+    position: fixed;
+    top: 80px;
+    left: calc(50% - clamp(160px, 30vw, 350px));
+    margin: 0;
+    padding: 0;
+    border: 2px solid #444;
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    width: clamp(320px, 60vw, 700px);
+    max-height: 80vh;
+    overflow: hidden;
+    background: #1e1e2e;
+    color: #e0e0e0;
+    z-index: 9998;
+    font-family: sans-serif;
+}
+
+.mem-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.mem-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    background: #2d2d44;
+    border-radius: 8px 8px 0 0;
+    cursor: grab;
+    user-select: none;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+}
+
+.mem-header:active { cursor: grabbing; }
+
+.mem-title {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #c0c8ff;
+}
+
+.mem-close,
+.mem-refresh {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.mem-close:hover  { background: #c0392b; color: #fff; }
+.mem-refresh:hover { background: #2d4a2d; color: #8f8; }
+
+.mem-edit-link {
+    color: #8bd;
+    font-size: 0.8rem;
+    text-decoration: none;
+}
+.mem-edit-link:hover { color: #adf; text-decoration: underline; }
+
+.mem-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 8px;
+    background: #232335;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.mem-tool-btn {
+    background: #2d2d44;
+    border: 1px solid #555;
+    color: #ccc;
+    font-size: 0.72rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mem-tool-btn:hover { background: #3a3a58; border-color: #88aaff; color: #fff; }
+.mem-tool-btn:disabled { opacity: 0.5; cursor: default; }
+
+.mem-tool-status {
+    font-size: 0.72rem;
+    color: #aaa;
+    margin-left: 4px;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mem-tiles {
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-content: flex-start;
+}
+
+.mem-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 120px;
+    min-height: 64px;
+    background: #2a2a3e;
+    border: 1px solid #555;
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 6px 4px;
+    text-align: center;
+    transition: background 0.15s, border-color 0.15s;
+    color: #e0e0e0;
+}
+.mem-tile:hover { background: #3a3a58; border-color: #88aaff; }
+
+.mem-tile-active { background: #1a4a1a !important; border-color: #88ff88 !important; }
+
+.mem-tile-label {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #c0c8ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 108px;
+}
+
+.mem-tile-freq {
+    font-size: 0.8rem;
+    font-family: 'Consolas', 'Courier New', monospace;
+    color: #88ff88;
+    white-space: nowrap;
+}
+
+.mem-tile-mode {
+    font-size: 0.7rem;
+    color: #aaa;
 }

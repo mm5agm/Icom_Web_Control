@@ -3,7 +3,5 @@
     <Platform Name="Any CPU" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="FTdx101_WebApp.csproj">
-    <Platform Solution="*|x86" Project="x86" />
-  </Project>
+  <Project Path="Yaesu_Web_Control.csproj" />
 </Solution>

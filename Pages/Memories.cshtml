@@ -1,0 +1,444 @@
+﻿@page
+@model Yaesu_Web_Control.Pages.MemoriesModel
+@{
+    ViewData["Title"] = "Radio Memories";
+
+    var allModes = new[] {
+        "LSB", "USB", "CW-U", "CW-L", "FM", "FM-N", "AM", "AM-N",
+        "RTTY-L", "RTTY-U", "DATA-L", "DATA-U", "DATA-FM", "DATA-FM-N", "PSK"
+    };
+}
+
+<div class="mt-4">
+
+    <div class="d-flex align-items-baseline gap-3 mb-2 flex-wrap">
+        <h2 class="mb-0">Radio Memories</h2>
+        <a href="/Memories" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Open in new tab for use on a second monitor or tablet">
+            <i class="bi bi-box-arrow-up-right"></i> Pop Out
+        </a>
+    </div>
+
+    <p class="text-muted mb-3">
+        Edit memory labels, frequencies, and modes here, then click <strong>Save</strong>.
+        On the main page, click <strong>Mem</strong> to open the floating memory panel and tune the radio to any memory.
+    </p>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert @(Model.StatusMessage.Contains("✓") ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div id="importExportStatus" class="alert d-none" role="status" aria-live="polite"></div>
+
+    <!-- Memory Banks -->
+    <div class="card mb-3 border-secondary">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold me-1">Memory Banks:</span>
+                <select id="bankSelect" class="form-select form-select-sm" style="width:auto;min-width:160px"
+                        onchange="updateBankButtons()">
+                    <option value="">-- Select bank --</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="loadBankBtn"
+                        onclick="loadBank()" disabled
+                        title="Replace current app memories with this bank">
+                    <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Load
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-success"
+                        onclick="saveBankAs()"
+                        title="Save current app memories as a named bank">
+                    <i class="bi bi-floppy" aria-hidden="true"></i> Save As…
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="deleteBankBtn"
+                        onclick="deleteBank()" disabled
+                        title="Delete this bank">
+                    <i class="bi bi-trash" aria-hidden="true"></i> Delete
+                </button>
+                <span id="bankStatus" class="text-muted small ms-2"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import / Export bar -->
+    <div class="card mb-3 border-secondary">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold me-1">Radio Channels:</span>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="importReplaceBtn"
+                        onclick="importFromRadio('replace')"
+                        title="Read channels 001–099 from radio and replace all app memories">
+                    <i class="bi bi-cloud-download" aria-hidden="true"></i> Import (Replace)
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="importMergeBtn"
+                        onclick="importFromRadio('merge')"
+                        title="Read channels 001–099 from radio and add to existing app memories">
+                    <i class="bi bi-cloud-download" aria-hidden="true"></i> Import (Add)
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-warning" id="exportBtn"
+                        onclick="exportToRadio()"
+                        title="Write app memories to radio channels 001 onwards">
+                    <i class="bi bi-cloud-upload" aria-hidden="true"></i> Export to Radio
+                </button>
+                <span id="radioProgress" class="text-muted small ms-2" style="display:none;">
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    <span id="radioProgressText">Working…</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memory editor form -->
+    <form method="post">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover mb-3" id="memoriesTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width:40px">#</th>
+                        <th style="min-width:140px">Label</th>
+                        <th style="min-width:130px">Frequency (MHz)</th>
+                        <th style="min-width:100px">Mode</th>
+                        <th style="min-width:100px">Clarifier (Hz)</th>
+                        <th style="width:70px">RX Clar</th>
+                        <th style="width:70px">TX Clar</th>
+                        <th style="width:60px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < Model.Memories.Count; i++)
+                    {
+                        var m = Model.Memories[i];
+                        <tr>
+                            <td class="align-middle text-muted small">@(i + 1)</td>
+                            <td>
+                                <input type="hidden" name="Memories[@i].Id" value="@m.Id" />
+                                <input type="hidden" name="Memories[@i].SortOrder" value="@m.SortOrder" />
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].Label"
+                                       value="@m.Label"
+                                       maxlength="12"
+                                       autocomplete="off"
+                                       placeholder="e.g. 20m FT8" />
+                            </td>
+                            <td>
+                                <input class="form-control form-control-sm"
+                                       type="number"
+                                       value="@(m.FrequencyHz > 0 ? (m.FrequencyHz / 1_000_000.0).ToString("F3", System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                       min="0.03"
+                                       max="75"
+                                       step="0.001"
+                                       placeholder="e.g. 14.074"
+                                       oninput="updateFreqHz(this, @i)" />
+                                <input type="hidden"
+                                       id="freqHz_@i"
+                                       name="Memories[@i].FrequencyHz"
+                                       value="@m.FrequencyHz" />
+                            </td>
+                            <td>
+                                <select class="form-select form-select-sm" name="Memories[@i].Mode">
+                                    @foreach (var mode in allModes)
+                                    {
+                                        <option value="@mode" selected="@(m.Mode == mode ? "selected" : null)">@mode</option>
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].ClarifierOffsetHz"
+                                       type="number"
+                                       value="@m.ClarifierOffsetHz"
+                                       min="-9990" max="9990" step="10" />
+                            </td>
+                            <td class="text-center align-middle">
+                                <input class="form-check-input" type="checkbox"
+                                       name="Memories[@i].RxClarOn"
+                                       value="true"
+                                       @(m.RxClarOn ? "checked" : "") />
+                                <input type="hidden" name="Memories[@i].RxClarOn" value="false" />
+                            </td>
+                            <td class="text-center align-middle">
+                                <input class="form-check-input" type="checkbox"
+                                       name="Memories[@i].TxClarOn"
+                                       value="true"
+                                       @(m.TxClarOn ? "checked" : "") />
+                                <input type="hidden" name="Memories[@i].TxClarOn" value="false" />
+                            </td>
+                            <td>
+                                <button type="submit" asp-page-handler="Delete"
+                                        asp-route-id="@m.Id"
+                                        class="btn btn-sm btn-outline-danger"
+                                        aria-label="Delete memory @(i + 1)"
+                                        title="Delete this memory"
+                                        onclick="event.preventDefault(); confirmDelete(this)">
+                                    <i class="bi bi-trash" aria-hidden="true"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex gap-2 mb-4 flex-wrap">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg" aria-hidden="true"></i> Save
+            </button>
+            <button type="submit" asp-page-handler="Add" class="btn btn-outline-success">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Memory
+            </button>
+        </div>
+    </form>
+
+</div>
+
+@section Scripts {
+<script>
+    function updateFreqHz(input, index) {
+        const mhz = parseFloat(input.value);
+        const hidden = document.getElementById('freqHz_' + index);
+        if (hidden) hidden.value = isNaN(mhz) ? '' : Math.round(mhz * 1_000_000);
+    }
+
+    function pageConfirm(message) {
+        return new Promise(resolve => {
+            const dlg = document.createElement('dialog');
+            dlg.style.cssText = 'border-radius:8px;border:1px solid #aaa;padding:20px 24px;max-width:420px;width:90vw;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,0.3)';
+            dlg.innerHTML =
+                `<p style="margin:0 0 18px;white-space:pre-wrap;font-size:0.9rem;line-height:1.5">${message}</p>` +
+                `<div style="display:flex;justify-content:flex-end;gap:8px">` +
+                `<button data-r="0" class="btn btn-secondary btn-sm">Cancel</button>` +
+                `<button data-r="1" class="btn btn-primary btn-sm">OK</button>` +
+                `</div>`;
+            document.body.appendChild(dlg);
+            dlg.showModal();
+            function finish(v) { dlg.close(); dlg.remove(); resolve(v); }
+            dlg.querySelectorAll('button').forEach(b =>
+                b.addEventListener('click', () => finish(b.dataset.r === '1')));
+            dlg.addEventListener('cancel', () => finish(false));
+        });
+    }
+
+    async function confirmDelete(btn) {
+        if (!await pageConfirm('Delete this memory?\n\nThis cannot be undone.')) return;
+        btn.form.requestSubmit(btn);
+    }
+
+    function _spinner(text) {
+        return `<span class="spinner-border spinner-border-sm me-2 align-middle" role="status" aria-hidden="true"></span>${text}`;
+    }
+
+    function _reloadLink() {
+        return ' <a href="/Memories" style="font-weight:bold">Reload page to see updated list</a>';
+    }
+
+    // ── Memory Banks ──────────────────────────────────────────────────────────
+
+    function escHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function pagePrompt(message, defaultValue) {
+        return new Promise(resolve => {
+            const dlg = document.createElement('dialog');
+            dlg.style.cssText = 'border-radius:8px;border:1px solid #aaa;padding:20px 24px;max-width:420px;width:90vw;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,0.3)';
+            dlg.innerHTML =
+                `<p style="margin:0 0 12px;font-size:0.9rem">${escHtml(message)}</p>` +
+                `<input type="text" id="dlgInput" class="form-control form-control-sm mb-3" ` +
+                `value="${escHtml(defaultValue || '')}" maxlength="50" autocomplete="off" />` +
+                `<div style="display:flex;justify-content:flex-end;gap:8px">` +
+                `<button data-r="0" class="btn btn-secondary btn-sm">Cancel</button>` +
+                `<button data-r="1" class="btn btn-primary btn-sm">OK</button>` +
+                `</div>`;
+            document.body.appendChild(dlg);
+            dlg.showModal();
+            const input = dlg.querySelector('#dlgInput');
+            input.focus(); input.select();
+            function finish(v) { dlg.close(); dlg.remove(); resolve(v); }
+            dlg.querySelector('[data-r="1"]').addEventListener('click', () => finish(input.value));
+            dlg.querySelector('[data-r="0"]').addEventListener('click', () => finish(null));
+            dlg.addEventListener('cancel', () => finish(null));
+            input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') finish(input.value);
+                if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+            });
+        });
+    }
+
+    function updateBankButtons() {
+        const sel = document.getElementById('bankSelect');
+        const has = sel && sel.value !== '';
+        const load = document.getElementById('loadBankBtn');
+        const del  = document.getElementById('deleteBankBtn');
+        if (load) load.disabled = !has;
+        if (del)  del.disabled  = !has;
+    }
+
+    async function loadBanks(selectName) {
+        const sel = document.getElementById('bankSelect');
+        if (!sel) return;
+        try {
+            const resp = await fetch('/api/memorybank');
+            const names = await resp.json();
+            const current = selectName !== undefined ? selectName : sel.value;
+            sel.innerHTML = '<option value="">-- Select bank --</option>' +
+                names.map(n => `<option value="${escHtml(n)}"${n === current ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
+            updateBankButtons();
+        } catch {}
+    }
+
+    async function loadBank() {
+        const sel = document.getElementById('bankSelect');
+        const name = sel?.value;
+        if (!name) return;
+        if (!await pageConfirm(
+            `Load bank "${name}"?\n\nThis will replace your current app memories. Any unsaved changes will be lost.\n\nContinue?`)) return;
+
+        const statusEl = document.getElementById('bankStatus');
+        statusEl.textContent = 'Loading…';
+        try {
+            const resp = await fetch(`/api/memorybank/${encodeURIComponent(name)}/load`, { method: 'POST' });
+            if (resp.ok) {
+                location.reload();
+            } else {
+                statusEl.textContent = '✗ Load failed';
+            }
+        } catch {
+            statusEl.textContent = '✗ Error';
+        }
+    }
+
+    async function saveBankAs() {
+        const sel = document.getElementById('bankSelect');
+        const name = await pagePrompt('Save current memories as bank:', sel?.value || '');
+        if (name === null || name.trim() === '') return;
+        const trimmed = name.trim();
+
+        const r0 = await fetch('/api/memorybank');
+        const existing = await r0.json();
+        if (existing.includes(trimmed)) {
+            if (!await pageConfirm(`Bank "${trimmed}" already exists.\n\nOverwrite it with the current memories?`)) return;
+        }
+
+        const statusEl = document.getElementById('bankStatus');
+        statusEl.textContent = 'Saving…';
+        try {
+            const resp = await fetch('/api/memorybank/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: trimmed })
+            });
+            if (resp.ok) {
+                await loadBanks(trimmed);
+                statusEl.textContent = `✓ Saved as "${trimmed}"`;
+            } else {
+                statusEl.textContent = '✗ Save failed';
+            }
+        } catch {
+            statusEl.textContent = '✗ Error';
+        }
+    }
+
+    async function deleteBank() {
+        const sel = document.getElementById('bankSelect');
+        const name = sel?.value;
+        if (!name) return;
+        if (!await pageConfirm(`Delete bank "${name}"?\n\nThis cannot be undone.`)) return;
+
+        const statusEl = document.getElementById('bankStatus');
+        statusEl.textContent = 'Deleting…';
+        try {
+            const resp = await fetch(`/api/memorybank/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            if (resp.ok) {
+                await loadBanks('');
+                statusEl.textContent = `✓ Bank "${name}" deleted`;
+            } else {
+                statusEl.textContent = '✗ Delete failed';
+            }
+        } catch {
+            statusEl.textContent = '✗ Error';
+        }
+    }
+
+    loadBanks();
+
+    const _allBtns = () => ['importReplaceBtn','importMergeBtn','exportBtn']
+        .map(id => document.getElementById(id));
+
+    async function importFromRadio(mode) {
+        const msg = mode === 'replace'
+            ? 'Load from Rig (Replace all):\n\nThis will replace ALL app memories with channels read from the radio. Your current app memories will be lost.\n\nContinue?'
+            : 'Load from Rig (Add new):\n\nThis will add radio channels to your existing app memories. Nothing will be deleted.\n\nContinue?';
+        if (!await pageConfirm(msg)) return;
+
+        const btns = _allBtns();
+        btns.forEach(b => b && (b.disabled = true));
+
+        const statusEl = document.getElementById('importExportStatus');
+        statusEl.className = 'alert alert-info';
+        statusEl.innerHTML = _spinner('Reading channels 001–099 from radio. This may take up to 30 seconds…');
+        statusEl.classList.remove('d-none');
+
+        try {
+            const resp = await fetch('/api/memory/import-radio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.warning) {
+                    statusEl.className = 'alert alert-warning';
+                    statusEl.textContent = `⚠ ${data.warning}`;
+                } else {
+                    statusEl.className = 'alert alert-success';
+                    statusEl.innerHTML = `✓ Loaded ${data.imported} from rig.` + _reloadLink();
+                }
+            } else {
+                statusEl.className = 'alert alert-danger';
+                statusEl.textContent = 'Load failed. Check that the radio is connected.';
+            }
+        } catch (e) {
+            statusEl.className = 'alert alert-danger';
+            statusEl.textContent = 'Load error: ' + e.message;
+        } finally {
+            btns.forEach(b => b && (b.disabled = false));
+        }
+    }
+
+    async function exportToRadio() {
+        const count = document.querySelectorAll('#memoriesTable tbody tr').length;
+        if (!await pageConfirm(
+            `Save to Rig (Replace all):\n\nThis will write ${count} app ${count === 1 ? 'memory' : 'memories'} to the radio, replacing ALL existing radio channels.\n\nAny memories on the rig that are not in the app will be lost.\n\nContinue?`))
+            return;
+
+        const btns = _allBtns();
+        btns.forEach(b => b && (b.disabled = true));
+
+        const statusEl = document.getElementById('importExportStatus');
+        statusEl.className = 'alert alert-info';
+        statusEl.innerHTML = _spinner('Writing memories to radio…');
+        statusEl.classList.remove('d-none');
+
+        try {
+            const resp = await fetch('/api/memory/export-radio', { method: 'POST' });
+            if (resp.ok) {
+                const data = await resp.json();
+                statusEl.className = 'alert alert-success';
+                statusEl.textContent = `✓ Saved ${data.written} to rig.`;
+            } else {
+                statusEl.className = 'alert alert-danger';
+                statusEl.textContent = 'Save failed. Check that the radio is connected.';
+            }
+        } catch (e) {
+            statusEl.className = 'alert alert-danger';
+            statusEl.textContent = 'Export error: ' + e.message;
+        } finally {
+            btns.forEach(b => b && (b.disabled = false));
+        }
+    }
+</script>
+}

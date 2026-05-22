@@ -1,4 +1,4 @@
-namespace FTdx101_WebApp.Services
+﻿namespace Yaesu_Web_Control.Services
 {
     public interface IRadioStateService
     {

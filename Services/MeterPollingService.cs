@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     /// <summary>
     /// Background service that polls S-meters, power, and SWR independently of AI mode

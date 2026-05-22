@@ -585,7 +585,7 @@ async function checkRadioPowerStatus() {
 document.addEventListener('DOMContentLoaded', function() {
     checkRadioPowerStatus();
     checkTxStatus();
-    // Fetch radio status and update slider max
+    // Fetch radio status and update slider max / model-dependent UI
     fetch('/api/cat/status')
         .then(response => response.json())
         .then(data => {
@@ -612,6 +612,15 @@ document.addEventListener('DOMContentLoaded', function() {
 // ---------------------------------------------------------------------------
 let isTransmitting = false;
 let txVfo = 0; // 0 = VFO A, 1 = VFO B
+let splitMode = 0; // 0 = OFF, 1 = ON (VFO A=RX / VFO B=TX), 2 = ON+5kHz Quick Split
+
+let clarVfo = 'A';
+let clarOffsets = { A: 0, B: 0 };
+let rxClarOn = false;
+let txClarOn = false;
+
+let contourState = { A: { on: false, freqHz: 800 }, B: { on: false, freqHz: 800 } };
+let apfState     = { A: { on: false, freqHz: 0   }, B: { on: false, freqHz: 0   } };
 
 async function toggleTx() {
     const newTxState = !isTransmitting;
@@ -658,6 +667,43 @@ function updateTxButton() {
             activeBtn.title = 'Click to transmit';
         }
     }
+}
+
+function updateSplitButton() {
+    const btn     = document.getElementById('splitBtn');
+    const badge   = document.getElementById('splitTxBadge');
+    const vfoBCard = document.querySelector('#vfoBCol .card');
+    const active  = splitMode > 0;
+
+    if (btn) {
+        btn.className = active ? 'btn btn-sm btn-danger' : 'btn btn-sm btn-outline-secondary';
+        btn.style.paddingTop    = '1px';
+        btn.style.paddingBottom = '1px';
+        btn.textContent = active ? 'Split ON' : 'Split';
+    }
+    if (badge)    badge.style.display = active ? 'inline-block' : 'none';
+    if (vfoBCard) {
+        vfoBCard.classList.toggle('border-danger',  active);
+        vfoBCard.classList.toggle('border-success', !active);
+    }
+}
+
+async function setSplit(mode) {
+    try {
+        const r = await fetch(`/api/cat/split/${mode}`, { method: 'POST' });
+        if (r.ok) {
+            const data = await r.json();
+            splitMode = data.splitMode;
+            updateSplitButton();
+        }
+    } catch {}
+}
+
+async function swapVfo() {
+    try {
+        await fetch('/api/cat/swap-vfo', { method: 'POST' });
+        // FrequencyA/B updates arrive via SignalR; the endpoint also broadcasts immediately
+    } catch {}
 }
 
 async function checkTxStatus() {
@@ -809,6 +855,12 @@ connection.on("RadioStateUpdate", function (update) {
         updateTxButton();
     }
 
+    // --- SPLIT MODE ---
+    if (update.property === "SplitMode") {
+        splitMode = update.value;
+        updateSplitButton();
+    }
+
     // --- METER UPDATES ---
     if (window.ftdx101Meters) {
         // PowerMeter is sent as { value, isTransmitting } — unpack it and sync TX state.
@@ -927,6 +979,84 @@ connection.on("RadioStateUpdate", function (update) {
         const label = document.getElementById('ifShiftValueB');
         if (slider) slider.value = update.value;
         if (label) label.textContent = update.value;
+    }
+
+    // --- CLARIFIER ---
+    if (update.property === "RxClarOn") {
+        rxClarOn = update.value === true || update.value === 'true' || update.value === 1;
+        const sel = document.getElementById('clarModeSelect');
+        if (sel) sel.value = rxClarOn && txClarOn ? 'rxtx' : rxClarOn ? 'rx' : txClarOn ? 'tx' : 'off';
+    }
+    if (update.property === "TxClarOn") {
+        txClarOn = update.value === true || update.value === 'true' || update.value === 1;
+        const sel = document.getElementById('clarModeSelect');
+        if (sel) sel.value = rxClarOn && txClarOn ? 'rxtx' : rxClarOn ? 'rx' : txClarOn ? 'tx' : 'off';
+    }
+    if (update.property === "ClarifierOffsetA") {
+        clarOffsets.A = parseInt(update.value) || 0;
+        if (clarVfo === 'A') {
+            const slider = document.getElementById('clarOffsetSlider');
+            const label  = document.getElementById('clarOffsetValue');
+            if (slider) slider.value = clarOffsets.A;
+            if (label)  label.textContent = clarOffsets.A;
+        }
+    }
+    if (update.property === "ClarifierOffsetB") {
+        clarOffsets.B = parseInt(update.value) || 0;
+        if (clarVfo === 'B') {
+            const slider = document.getElementById('clarOffsetSlider');
+            const label  = document.getElementById('clarOffsetValue');
+            if (slider) slider.value = clarOffsets.B;
+            if (label)  label.textContent = clarOffsets.B;
+        }
+    }
+
+    // --- CONTOUR ---
+    if (update.property === "ContourOnA") {
+        contourState.A.on = update.value === true || update.value === 'true' || update.value === 1;
+        _updateContourBtn('A');
+    }
+    if (update.property === "ContourOnB") {
+        contourState.B.on = update.value === true || update.value === 'true' || update.value === 1;
+        _updateContourBtn('B');
+    }
+    if (update.property === "ContourFreqA") {
+        contourState.A.freqHz = parseInt(update.value) || 800;
+        const slider = document.getElementById('contourFreqSliderA');
+        const label  = document.getElementById('contourFreqValueA');
+        if (slider) slider.value = contourState.A.freqHz;
+        if (label)  label.textContent = contourState.A.freqHz + ' Hz';
+    }
+    if (update.property === "ContourFreqB") {
+        contourState.B.freqHz = parseInt(update.value) || 800;
+        const slider = document.getElementById('contourFreqSliderB');
+        const label  = document.getElementById('contourFreqValueB');
+        if (slider) slider.value = contourState.B.freqHz;
+        if (label)  label.textContent = contourState.B.freqHz + ' Hz';
+    }
+
+    // --- APF ---
+    if (update.property === "ApfOnA") {
+        apfState.A.on = update.value === true || update.value === 'true' || update.value === 1;
+        _updateApfBtn('A');
+    }
+    if (update.property === "ApfOnB") {
+        apfState.B.on = update.value === true || update.value === 'true' || update.value === 1;
+        _updateApfBtn('B');
+    }
+    if (update.property === "ApfFreqA") {
+        apfState.A.freqHz = parseInt(update.value) || 0;
+        const slider = document.getElementById('apfFreqSliderA');
+        const label  = document.getElementById('apfFreqValueA');
+        if (slider) slider.value = apfState.A.freqHz;
+        if (label)  label.textContent = apfState.A.freqHz + ' Hz';
+    }
+    if (update.property === "ApfFreqB") {
+        apfState.B.freqHz = parseInt(update.value) || 0;
+        const slider = document.getElementById('apfFreqSliderB');
+        const label  = document.getElementById('apfFreqValueB');
+        if (slider) slider.value = apfState.B.freqHz;
+        if (label)  label.textContent = apfState.B.freqHz + ' Hz';
     }
 
     // --- MANUAL NOTCH ---
@@ -1164,6 +1294,33 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Split / Swap VFO button handlers
+    document.getElementById('splitBtn')?.addEventListener('click', () => setSplit(splitMode > 0 ? 0 : 1));
+    document.getElementById('quickSplitBtn')?.addEventListener('click', () => setSplit(2));
+    document.getElementById('swapVfoBtn')?.addEventListener('click', swapVfo);
+
+    // Clarifier: seed JS state from server-rendered HTML values
+    const clarSlider = document.getElementById('clarOffsetSlider');
+    if (clarSlider) clarOffsets.A = parseInt(clarSlider.value) || 0;
+    const clarSel = document.getElementById('clarModeSelect');
+    if (clarSel) {
+        const initMode = clarSel.value || 'off';
+        rxClarOn = initMode === 'rx' || initMode === 'rxtx';
+        txClarOn = initMode === 'tx' || initMode === 'rxtx';
+    }
+
+    // Contour/APF: seed JS state from server-rendered HTML values
+    for (const vfo of ['A', 'B']) {
+        const cBtn = document.getElementById(`contourBtn${vfo}`);
+        if (cBtn) contourState[vfo].on = cBtn.classList.contains('btn-success');
+        const cSlider = document.getElementById(`contourFreqSlider${vfo}`);
+        if (cSlider) contourState[vfo].freqHz = parseInt(cSlider.value) || 800;
+        const aBtn = document.getElementById(`apfBtn${vfo}`);
+        if (aBtn) apfState[vfo].on = aBtn.classList.contains('btn-success');
+        const aSlider = document.getElementById(`apfFreqSlider${vfo}`);
+        if (aSlider) apfState[vfo].freqHz = parseInt(aSlider.value) || 0;
+    }
+
     // Event delegation for band button changes
     document.addEventListener('change', function(e) {
         if (e.target.type === 'radio' && e.target.name && e.target.name.startsWith('band-')) {
@@ -1282,6 +1439,117 @@ function resetIfShift(receiver) {
 }
 window.resetIfShift = resetIfShift;
 
+function selectClarVfo(vfo) {
+    clarVfo = vfo;
+    document.getElementById('clarVfoABtn')?.classList.toggle('active', vfo === 'A');
+    document.getElementById('clarVfoBBtn')?.classList.toggle('active', vfo === 'B');
+    const offset = clarOffsets[vfo];
+    const slider = document.getElementById('clarOffsetSlider');
+    const label  = document.getElementById('clarOffsetValue');
+    if (slider) slider.value = offset;
+    if (label)  label.textContent = offset;
+}
+window.selectClarVfo = selectClarVfo;
+
+async function setClarifierMode(mode) {
+    rxClarOn = mode === 'rx' || mode === 'rxtx';
+    txClarOn = mode === 'tx' || mode === 'rxtx';
+    await _setClarifier(clarVfo, rxClarOn, txClarOn, clarOffsets[clarVfo]);
+}
+window.setClarifierMode = setClarifierMode;
+
+async function setClarifierOffset(offsetHz) {
+    clarOffsets[clarVfo] = offsetHz;
+    await _setClarifier(clarVfo, rxClarOn, txClarOn, offsetHz);
+}
+window.setClarifierOffset = setClarifierOffset;
+
+async function resetClarifier() {
+    clarOffsets[clarVfo] = 0;
+    const slider = document.getElementById('clarOffsetSlider');
+    const label  = document.getElementById('clarOffsetValue');
+    if (slider) slider.value = 0;
+    if (label)  label.textContent = '0';
+    await _setClarifier(clarVfo, rxClarOn, txClarOn, 0);
+}
+
+async function nudgeClarifier(deltaHz) {
+    const vfo = clarVfo;
+    let newOffset = Math.round(((clarOffsets[vfo] || 0) + deltaHz) / 10) * 10;
+    newOffset = Math.max(-9990, Math.min(9990, newOffset));
+    clarOffsets[vfo] = newOffset;
+    const slider = document.getElementById('clarOffsetSlider');
+    const label  = document.getElementById('clarOffsetValue');
+    if (slider) slider.value = newOffset;
+    if (label)  label.textContent = newOffset;
+    try {
+        await fetch('/api/cat/clarifier/nudge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vfo, deltaHz })
+        });
+    } catch (e) {
+        console.error('Clarifier nudge failed:', e);
+    }
+}
+window.nudgeClarifier = nudgeClarifier;
+window.resetClarifier = resetClarifier;
+
+async function saveVfoToMemory(vfo) {
+    const btn    = document.getElementById('saveMemBtn' + vfo);
+    const status = document.getElementById('saveMemStatus' + vfo);
+    const freqHz = window.radioControl?._state?.lastBackendFreq?.[vfo] || 0;
+    const mode   = document.getElementById('modeSelect' + vfo)?.value || 'USB';
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = '…'; }
+        if (status) status.textContent = '';
+        const resp = await fetch('/api/memory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                frequencyHz:       freqHz,
+                mode:              mode,
+                clarifierOffsetHz: clarOffsets[vfo] || 0,
+                rxClarOn:          rxClarOn,
+                txClarOn:          txClarOn
+            })
+        });
+        if (resp.ok) {
+            if (status) status.textContent = `VFO ${vfo} saved to memories`;
+            window.refreshMemoriesPanel?.();
+            if (btn) {
+                btn.textContent = '✓ Saved';
+                btn.classList.replace('btn-outline-secondary', 'btn-success');
+                setTimeout(() => {
+                    btn.textContent = 'Save to Mem';
+                    btn.classList.replace('btn-success', 'btn-outline-secondary');
+                    btn.disabled = false;
+                }, 1500);
+            }
+        } else {
+            if (status) status.textContent = `Failed to save VFO ${vfo}`;
+            if (btn) { btn.textContent = '✗ Failed'; btn.disabled = false; }
+        }
+    } catch (e) {
+        if (status) status.textContent = `Error saving VFO ${vfo}`;
+        if (btn) { btn.textContent = '✗ Error'; btn.disabled = false; }
+        console.error('Save to memory failed:', e);
+    }
+}
+window.saveVfoToMemory = saveVfoToMemory;
+
+async function _setClarifier(vfo, rxOn, txOn, offsetHz) {
+    try {
+        await fetch('/api/cat/clarifier', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vfo, rxOn, txOn, offsetHz })
+        });
+    } catch (e) {
+        console.error('Clarifier update failed:', e);
+    }
+}
+
 function resetIfWidth(receiver) {
     const select = document.getElementById(`ifWidthSelect${receiver}`);
     if (!select) return;
@@ -1292,6 +1560,76 @@ function resetIfWidth(receiver) {
     if (window.radioControl) window.radioControl.setIfWidth(receiver, defaultOpt.value);
 }
 window.resetIfWidth = resetIfWidth;
+
+function _updateContourBtn(vfo) {
+    const btn = document.getElementById(`contourBtn${vfo}`);
+    if (!btn) return;
+    const on = contourState[vfo].on;
+    btn.textContent = on ? 'Contour On' : 'Contour Off';
+    btn.className = btn.className.replace(/btn-success|btn-outline-secondary/g, '').trim();
+    btn.classList.add(on ? 'btn-success' : 'btn-outline-secondary');
+}
+
+function _updateApfBtn(vfo) {
+    const btn = document.getElementById(`apfBtn${vfo}`);
+    if (!btn) return;
+    const on = apfState[vfo].on;
+    btn.textContent = on ? 'APF On' : 'APF Off';
+    btn.className = btn.className.replace(/btn-success|btn-outline-secondary/g, '').trim();
+    btn.classList.add(on ? 'btn-success' : 'btn-outline-secondary');
+}
+
+async function toggleContour(vfo) {
+    const newOn = !contourState[vfo].on;
+    contourState[vfo].on = newOn;
+    _updateContourBtn(vfo);
+    try {
+        await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: newOn, freqHz: contourState[vfo].freqHz })
+        });
+    } catch (e) { console.error('Contour toggle failed:', e); }
+}
+window.toggleContour = toggleContour;
+
+async function setContourFreq(vfo, hz) {
+    contourState[vfo].freqHz = hz;
+    try {
+        await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: contourState[vfo].on, freqHz: hz })
+        });
+    } catch (e) { console.error('Contour freq failed:', e); }
+}
+window.setContourFreq = setContourFreq;
+
+async function toggleApf(vfo) {
+    const newOn = !apfState[vfo].on;
+    apfState[vfo].on = newOn;
+    _updateApfBtn(vfo);
+    try {
+        await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: newOn, freqHz: apfState[vfo].freqHz })
+        });
+    } catch (e) { console.error('APF toggle failed:', e); }
+}
+window.toggleApf = toggleApf;
+
+async function setApfFreq(vfo, hz) {
+    apfState[vfo].freqHz = hz;
+    try {
+        await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: apfState[vfo].on, freqHz: hz })
+        });
+    } catch (e) { console.error('APF freq failed:', e); }
+}
+window.setApfFreq = setApfFreq;
 
 document.addEventListener('DOMContentLoaded', function() {
     setupIfShiftSlider('A');
@@ -2054,7 +2392,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!segments) {
             const opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = '-- Segment --';
+            opt.textContent = '--';
             select.appendChild(opt);
             select.disabled = true;
             return;
@@ -2063,7 +2401,7 @@ document.addEventListener('DOMContentLoaded', function() {
         select.disabled = false;
         const placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = '-- Segment --';
+        placeholder.textContent = '--';
         select.appendChild(placeholder);
 
         for (const [key, seg] of Object.entries(segments)) {
@@ -2315,3 +2653,34 @@ pollInitStatus();
     // No mouseout handler — resetting lastLabel in the mouseover null-el branch is sufficient
     // and avoids the aggressive clearing that mouseout on every child element causes.
 })();
+
+// ── Viewport width warning ────────────────────────────────────────────────
+(function () {
+    const STORAGE_KEY = 'viewportWarningDismissed2'; // bumped to re-show after threshold change
+    const THRESHOLD   = 1280; // CSS px — below this gauges are likely to wrap
+
+    function check() {
+        const banner = document.getElementById('viewportWarning');
+        if (!banner) return;
+        if (localStorage.getItem(STORAGE_KEY) === '1') return;
+        banner.style.display = window.innerWidth < THRESHOLD ? '' : 'none';
+    }
+
+    window.dismissViewportWarning = function () {
+        const banner = document.getElementById('viewportWarning');
+        if (banner) banner.style.display = 'none';
+        localStorage.setItem(STORAGE_KEY, '1');
+    };
+
+    let _resizeTimer;
+    window.addEventListener('resize', function () {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(check, 200);
+    });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', check);
+    } else {
+        check();
+    }
+})()

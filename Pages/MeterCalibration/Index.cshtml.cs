@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Mvc.RazorPages;
+﻿using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace FTdx101_WebApp.Pages.MeterCalibration
+namespace Yaesu_Web_Control.Pages.MeterCalibration
 {
     public class IndexModel : PageModel
     {

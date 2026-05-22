@@ -1,6 +1,6 @@
-using FTdx101_WebApp.Models;
+﻿using Yaesu_Web_Control.Models;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public interface ISettingsService
     {

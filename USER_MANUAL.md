@@ -1,4 +1,4 @@
-# FTdx101 WebApp — User Manual
+# Yaesu Web Control — User Manual
 
 ## Table of Contents
 
@@ -17,6 +17,7 @@
    - 5.8 [IF Width, IF Shift, and AF Gain](#58-if-width-if-shift-and-af-gain)
    - 5.9 [Band and Segment Selection](#59-band-and-segment-selection)
    - 5.10 [Transmit Controls](#510-transmit-controls)
+   - 5.11 [Memory Panel](#511-memory-panel)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -24,21 +25,26 @@
 7. [Application Setup](#7-application-setup)
    - 7.1 [External App Buttons](#71-external-app-buttons)
    - 7.2 [WSJT-X UDP Settings](#72-wsjt-x-udp-settings)
-8. [External Applications](#8-external-applications)
-   - 8.1 [WSJT-X](#81-wsjt-x)
-   - 8.2 [JTAlert](#82-jtalert)
-   - 8.3 [Log4OM](#83-log4om)
-9. [Meter Calibration](#9-meter-calibration)
-10. [Diagnostics](#10-diagnostics)
-11. [Using the App on a Tablet or Phone](#11-using-the-app-on-a-tablet-or-phone)
-12. [Keyboard Shortcuts](#12-keyboard-shortcuts)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Accessibility and Screen Readers](#14-accessibility-and-screen-readers)
-    - 14.1 [Windows High Contrast Mode](#141-windows-high-contrast-mode)
-    - 14.2 [Screen Reader Support](#142-screen-reader-support)
-    - 14.3 [NVDA](#143-nvda)
-    - 14.4 [Windows Narrator](#144-windows-narrator)
-    - 14.5 [Customising Accessible Labels](#145-customising-screen-reader-labels)
+8. [Radio Memories](#8-radio-memories)
+   - 8.1 [Memories Editor](#81-memories-editor)
+   - 8.2 [Importing from the Radio](#82-importing-from-the-radio)
+   - 8.3 [Exporting to the Radio](#83-exporting-to-the-radio)
+   - 8.4 [Memory Banks](#84-memory-banks)
+9. [External Applications](#9-external-applications)
+   - 9.1 [WSJT-X](#91-wsjt-x)
+   - 9.2 [JTAlert](#92-jtalert)
+   - 9.3 [Log4OM](#93-log4om)
+10. [Meter Calibration](#10-meter-calibration)
+11. [Diagnostics](#11-diagnostics)
+12. [Using the App on a Tablet or Phone](#12-using-the-app-on-a-tablet-or-phone)
+13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
+14. [Troubleshooting](#14-troubleshooting)
+15. [Accessibility and Screen Readers](#15-accessibility-and-screen-readers)
+    - 15.1 [Windows High Contrast Mode](#151-windows-high-contrast-mode)
+    - 15.2 [Screen Reader Support](#152-screen-reader-support)
+    - 15.3 [NVDA](#153-nvda)
+    - 15.4 [Windows Narrator](#154-windows-narrator)
+    - 15.5 [Customising Accessible Labels](#155-customising-screen-reader-labels)
 
 ---
 
@@ -48,7 +54,7 @@
 
 ## 1. Introduction
 
-FTdx101 WebApp is a web-based control panel for Yaesu transceivers especially the FTdx101MP and FTdx101D but also works with the FTdx10. It runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.
+Yaesu Web Control is a web-based control panel for Yaesu transceivers — the FTdx101MP, FTdx101D, and FTdx10. It runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.
 
 The application was written for operators who find the physical controls on the FTdx101 difficult to read or use, and for those who want a large, clean touchscreen-friendly display alongside their existing logging software.
 
@@ -59,6 +65,7 @@ The application was written for operators who find the physical controls on the 
 - Live S-meter, power, SWR, ALC, temperature, IDD, VDD, and compression meters
 - Real-time two-way sync — changes on the radio front panel appear immediately in the app, and vice versa
 - Band and segment selectors for fast QSY to CW, FT8, SSB, or RTTY
+- Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Optional real-time spectrum display and waterfall (requires an SDR connected to the 9 MHz IF output)
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
@@ -71,7 +78,7 @@ The application was written for operators who find the physical controls on the 
 
 ## 2. Installation
 
-1. Download the installer from the [GitHub Releases page](https://github.com/mm5agm/FTdx101_WebApp/releases).
+1. Download the installer from the [GitHub Releases page](https://github.com/mm5agm/Yaesu_Web_Control/releases).
 2. Run the installer. .NET 10 is bundled — you do not need to install it separately.
 3. A desktop shortcut and a Start Menu entry are created automatically.
 4. The first time you run the app, Windows may show a **Smart App Control** or **Unknown Publisher** warning. Click **More info → Run anyway** to proceed. This warning appears because the installer is not signed with a commercial certificate.
@@ -84,7 +91,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 
 1. Open a browser and go to **http://localhost:8080**
 2. Click the **Settings** link in the navigation bar.
-3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), or **FTdx10** (100 W, dual receiver).
+3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), or **FTdx10** (100 W, single receiver — two VFOs but one receiver).
 4. Set **Serial Port** to the COM port your radio is connected to. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
 5. Set **Baud Rate** to match the radio's CAT baud rate. The factory default on the FTdx101 is **38400**. You can verify or change this on the radio under **Menu → CAT Rate**.
 6. Select your **Band Plan** (UK or USA).
@@ -96,7 +103,7 @@ If you see a red cross, double-check the COM port number and baud rate, then try
 
 ## 4. Starting the Application
 
-Double-click the **FTdx101 WebApp** shortcut on your desktop. A small window opens confirming the server has started. The window must remain open while you use the app.
+Double-click the **Yaesu Web Control** shortcut on your desktop. A small window opens confirming the server has started. The window must remain open while you use the app.
 
 Open your browser and go to:
 
@@ -116,7 +123,7 @@ The main control panel loads. If the radio is powered on and the serial connecti
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **FTdx101_WebApp v1.3.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Yaesu_Web_Control v1.3.0**) are shown in the top-left corner.
 
 **External app buttons** (WSJT-X, JTAlert, Log4OM) appear if they are enabled in Application Setup. The colour of each button indicates status:
 
@@ -308,6 +315,18 @@ The last segment you used on each band is remembered, so when you return to a ba
 
 ---
 
+### 5.11 Memory Panel
+
+The **Mem** button in the toolbar opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. Click a tile to instantly tune VFO A to that frequency and mode.
+
+The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions.
+
+**Save to Mem button** — A **Save to Mem** button appears below the S-meter on both the VFO A and VFO B panels. Click it to save the current VFO frequency and mode as a new memory. A label input box appears — type a name (up to 12 characters) and press Enter or click Save. The new memory appears immediately in the floating panel.
+
+For full memory management — editing labels and frequencies, reordering, importing from and exporting to the radio, and memory banks — see Section 8.
+
+---
+
 ## 6. Settings Page
 
 Access Settings from the navigation bar or by clicking the settings icon. Changes take effect only after clicking **Save Settings**.
@@ -316,7 +335,7 @@ Access Settings from the navigation bar or by clicking the settings icon. Change
 
 | Setting | Description |
 |---------|-------------|
-| Radio Model | **FTdx101MP** (200 W, dual RX), **FTdx101D** (100 W, dual RX), or **FTdx10** (100 W, dual RX) |
+| Radio Model | **FTdx101MP** (200 W, dual RX), **FTdx101D** (100 W, dual RX), or **FTdx10** (100 W, single RX) |
 | Serial Port | COM port the radio's USB/serial cable is connected to (e.g., COM3) |
 | Baud Rate | Must match the radio's CAT Rate setting. Default: 38400 |
 | Band Plan | UK or USA. Affects which bands and segment frequencies are shown |
@@ -398,13 +417,96 @@ Adjust these to match where you have installed each program.
 | UDP Address | 239.255.0.1 | Multicast address WSJT-X sends status packets to |
 | UDP Port | 2237 | UDP port number |
 
-These must match WSJT-X's **Settings → Reporting → UDP Server** settings. See Section 8.1 for full WSJT-X setup instructions.
+These must match WSJT-X's **Settings → Reporting → UDP Server** settings. See Section 9.1 for full WSJT-X setup instructions.
 
 ---
 
-## 8. External Applications
+## 8. Radio Memories
 
-### 8.1 WSJT-X
+The app maintains its own list of memory channels, independent of the radio's built-in memories. You can store as many channels as you like, organised with labels, and recall any of them at a click from the floating Mem panel (see Section 5.11).
+
+### 8.1 Memories Editor
+
+Access the full memories editor from **Memories** in the navigation bar.
+
+The editor shows all your saved memories in a table. For each memory you can edit:
+
+| Field | Description |
+|-------|-------------|
+| Label | Name shown on the memory tile (up to 12 characters) |
+| Frequency (MHz) | Frequency in MHz, e.g. 14.074 |
+| Mode | Operating mode (LSB, USB, CW-U, DATA-U, FM, etc.) |
+| Clarifier (Hz) | Clarifier offset in Hz |
+| RX Clar | Whether the RX clarifier is enabled |
+| TX Clar | Whether the TX clarifier is enabled |
+
+Click **Save** to save all changes. Click **Add Memory** to append a blank row. Click the **trash** icon on any row to delete that memory.
+
+The **Pop Out** button opens the Memories page in a new browser tab — useful if you want to edit memories on a second monitor while the main control panel is open in the first.
+
+---
+
+### 8.2 Importing from the Radio
+
+The radio's built-in memory channels can be read into the app using the **Import** buttons at the top of the Memories page.
+
+| Button | What it does |
+|--------|-------------|
+| **Import (Replace)** | Reads channels 001–099 from the radio and replaces ALL app memories with what is found. Your existing app memories are lost. |
+| **Import (Add)** | Reads channels 001–099 from the radio and adds them to your existing app memories without deleting anything. |
+
+Import reads up to 99 channels and takes up to 30 seconds. A progress indicator is shown while it runs. Channels that are empty on the radio are skipped automatically.
+
+> **Note:** Importing does not affect the radio — it only reads from it.
+
+---
+
+### 8.3 Exporting to the Radio
+
+| Button | What it does |
+|--------|-------------|
+| **Export to Radio** | Writes your app memories to the radio starting at channel 001, overwriting ALL existing radio channels. |
+| **Export to Radio (Add)** | Scans the radio for empty channels and writes your app memories into those slots only. Existing radio channels are not touched. |
+
+> **Warning:** Export to Radio (Replace) overwrites all 99 radio memory channels. Make sure you have imported or backed up anything you want to keep first.
+
+---
+
+### 8.4 Memory Banks
+
+Memory banks let you save the current memory list under a name and reload it later. This is useful if you use different sets of memories for different operating scenarios — for example a "Daily" bank for regular operating and a "Contest" bank with contest-specific frequencies.
+
+The **Memory Banks** bar appears at the top of the Memories page.
+
+**Saving a bank:**
+
+1. Set up your memories as you want them (add, edit, import from radio, etc.) and click **Save** on the editor form.
+2. Click **Save As…** in the Memory Banks bar.
+3. Type a name for the bank (e.g. "Contest") and click OK.
+4. If a bank with that name already exists, you are asked to confirm overwrite.
+
+The bank is saved immediately. Your current working memories are unchanged.
+
+**Loading a bank:**
+
+1. Select a bank from the dropdown.
+2. Click **Load**.
+3. Confirm the prompt — the current memory list is replaced with the bank contents and the page reloads.
+
+**Deleting a bank:**
+
+1. Select the bank from the dropdown.
+2. Click **Delete** and confirm.
+
+Deleting a bank does not affect your current working memories.
+
+Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and are not affected by importing from or exporting to the radio.
+
+---
+
+## 9. External Applications
+
+### 9.1 WSJT-X
 
 The app integrates with WSJT-X in two ways:
 
@@ -443,7 +545,7 @@ These settings are saved in the WebApp profile and used every time WSJT-X is lau
 
 ---
 
-### 8.2 JTAlert
+### 9.2 JTAlert
 
 JTAlert does not use UDP. It reads WSJT-X log files directly. No configuration is required in this app for JTAlert to work.
 
@@ -451,7 +553,7 @@ The JTAlert button in the top bar launches JTAlert and shows green when it is ru
 
 ---
 
-### 8.3 Log4OM
+### 9.3 Log4OM
 
 Configure Log4OM to receive WSJT-X decodes:
 
@@ -465,7 +567,7 @@ Note: Log4OM uses port 2236, which is different from WSJT-X's UDP port (2237). B
 
 ---
 
-## 9. Meter Calibration
+## 10. Meter Calibration
 
 The calibration page lets you adjust the scale of each meter gauge to match your radio's actual output. This is useful if the meter readings seem inaccurate.
 
@@ -490,11 +592,11 @@ The gauge interpolates between points to produce smooth readings.
 4. Click **Save Calibration** when finished.
 5. Click **Reload From File** to discard unsaved changes.
 
-Calibration is saved to `%APPDATA%\MM5AGM\FTdx101 WebApp\calibration.user.json`.
+Calibration is saved to `%APPDATA%\MM5AGM\Yaesu Web Control\calibration.user.json`.
 
 ---
 
-## 10. Diagnostics
+## 11. Diagnostics
 
 Access the Diagnostics page from the navigation bar. It is primarily used when something is not working as expected.
 
@@ -508,7 +610,7 @@ Access the Diagnostics page from the navigation bar. It is primarily used when s
 
 ---
 
-## 11. Using the App on a Tablet or Phone
+## 12. Using the App on a Tablet or Phone
 
 The app is designed to work well on tablets and phones.
 
@@ -523,7 +625,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 ---
 
-## 12. Keyboard Shortcuts
+## 13. Keyboard Shortcuts
 
 | Key / Action | Result |
 |---|---|
@@ -545,7 +647,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 **App shows "Initialising…" and never clears**
 
@@ -600,9 +702,9 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 ---
 
-## 14. Accessibility and Screen Readers
+## 15. Accessibility and Screen Readers
 
-### 14.1 Windows High Contrast Mode
+### 15.1 Windows High Contrast Mode
 
 When a Windows High Contrast theme is active, the gauge displays automatically adjust:
 
@@ -613,7 +715,7 @@ To enable a High Contrast theme: **Windows Settings → Accessibility → Contra
 
 ---
 
-### 14.2 Screen Reader Support
+### 15.2 Screen Reader Support
 
 All interactive controls in the app have accessible labels that screen readers announce when you hover over or focus on them:
 
@@ -627,7 +729,7 @@ All interactive controls in the app have accessible labels that screen readers a
 
 ---
 
-### 14.3 NVDA
+### 15.3 NVDA
 
 NVDA (NonVisual Desktop Access) is a free, open-source screen reader for Windows.
 
@@ -669,7 +771,7 @@ When the app loads, NVDA does not automatically read through the page. Two desig
 
 ---
 
-### 14.4 Windows Narrator
+### 15.4 Windows Narrator
 
 Narrator is the screen reader built into Windows 11 — no download required.
 
@@ -683,7 +785,7 @@ Once running, Narrator reads aloud the element that has keyboard focus. To navig
 
 ---
 
-### 14.5 Customising Screen Reader Labels
+### 15.5 Customising Screen Reader Labels
 
 Every control in the app — band buttons, meters, VFO controls, the on-screen frequency keyboard, spectrum span buttons, and the navigation bar home link — has a text label that screen readers announce. You can change any of these labels through the built-in **Accessibility Labels** editor.
 
@@ -834,4 +936,4 @@ On the Accessibility Labels page, replace each label value with the French equiv
 
 ---
 
-*FTdx101 WebApp is written and maintained by mm5agm@outlook.com. For bug reports and feedback, please use the [Groups.io discussion group](https://groups.io/g/ftdx101-webapp/topics) or the [GitHub issues page](https://github.com/mm5agm/FTdx101_WebApp/issues).*
+*Yaesu Web Control is written and maintained by mm5agm@outlook.com. For bug reports and feedback, please use the [Groups.io discussion group](https://groups.io/g/Yaesu-Web-Control/topics) or the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues).*

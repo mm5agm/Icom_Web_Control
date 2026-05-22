@@ -1,9 +1,9 @@
-// FTdx101 WebApp – SDR Device Abstraction
+﻿// Yaesu Web Control – SDR Device Abstraction
 // Hardware-agnostic interface so SdrBackgroundService is not coupled to any specific SDK.
 // Implementations are responsible for bridging any callback-based native APIs
 // to the pull-based TryReadIqFrameAsync consumer model.
 
-namespace FTdx101_WebApp.Services.Sdr
+namespace Yaesu_Web_Control.Services.Sdr
 {
     /// <summary>
     /// Represents a single SDR receiver capable of delivering IQ samples.

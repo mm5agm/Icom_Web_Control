@@ -1,14 +1,14 @@
-// FTdx101 WebApp – SDR REST Controller
+﻿// Yaesu Web Control – SDR REST Controller
 // Provides device enumeration for the Settings page dropdown.
 // No UI logic, no SignalR, no calibration.
 //
 // Response shape: { devices: [...], notes: ["..."] }
 // 'notes' contains plain-English installation guidance when drivers are missing.
 
-using FTdx101_WebApp.Services.Sdr;
+using Yaesu_Web_Control.Services.Sdr;
 using Microsoft.AspNetCore.Mvc;
 
-namespace FTdx101_WebApp.Controllers
+namespace Yaesu_Web_Control.Controllers
 {
     [ApiController]
     [Route("api/sdr")]

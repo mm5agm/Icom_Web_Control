@@ -1,8 +1,8 @@
-using System.Text.Json;
-using FTdx101_WebApp.Models.Calibration;
+﻿using System.Text.Json;
+using Yaesu_Web_Control.Models.Calibration;
 using Microsoft.Extensions.Hosting;
 
-namespace FTdx101_WebApp.Services;
+namespace Yaesu_Web_Control.Services;
 
 public class CalibrationStorage
 {
@@ -27,7 +27,7 @@ public class CalibrationStorage
         _userPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "MM5AGM",
-            "FTdx101 WebApp",
+            "Yaesu Web Control",
             "calibration.user.json");
     }
 

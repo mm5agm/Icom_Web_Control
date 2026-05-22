@@ -5,10 +5,10 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using FTdx101_WebApp.Hubs;
+using Yaesu_Web_Control.Hubs;
 using System.Diagnostics; // Place at the top of the file if not already present
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public class RadioInitializationService : BackgroundService
     {
@@ -252,6 +252,38 @@ namespace FTdx101_WebApp.Services
                         radioStateService.TxVfo = txVfo;
                         logger.LogInformation("[RadioInitializationService] TX VFO: {TxVfo} ({VfoName})", txVfo, txVfo == 0 ? "VFO A" : "VFO B");
                     }
+                }
+
+                // Query Split mode (ST0=off, ST1=on, ST2=on+5kHz)
+                var stResponse = await multiplexer.SendCommandAsync("ST;", "Initialization", stoppingToken);
+                if (!string.IsNullOrWhiteSpace(stResponse) && stResponse.StartsWith("ST"))
+                {
+                    if (int.TryParse(stResponse.Substring(2, 1), out int splitMode))
+                    {
+                        radioStateService.SplitMode = splitMode;
+                        logger.LogInformation("[RadioInitializationService] Split mode: {SplitMode}", splitMode);
+                    }
+                }
+
+                // Query RX/TX clarifier on/off state (all models)
+                var rtResponse = await multiplexer.SendCommandAsync("RT;", "Initialization", stoppingToken);
+                if (!string.IsNullOrWhiteSpace(rtResponse) && rtResponse.StartsWith("RT"))
+                {
+                    if (int.TryParse(rtResponse.Substring(2, 1), out int rtVal))
+                        radioStateService.RxClarOn = rtVal == 1;
+                }
+                var xtResponse = await multiplexer.SendCommandAsync("XT;", "Initialization", stoppingToken);
+                if (!string.IsNullOrWhiteSpace(xtResponse) && xtResponse.StartsWith("XT"))
+                {
+                    if (int.TryParse(xtResponse.Substring(2, 1), out int xtVal))
+                        radioStateService.TxClarOn = xtVal == 1;
+                }
+
+                // For FTdx10/FT-710: read per-VFO offsets via CF (dispatcher updates state)
+                if (settings.RadioModel is "FTdx10" or "FT-710")
+                {
+                    await multiplexer.SendCommandAsync("CF001;", "Initialization", stoppingToken);
+                    await multiplexer.SendCommandAsync("CF011;", "Initialization", stoppingToken);
                 }
 
                 // 5. Set IsInitialized = true FIRST to allow property changes to be persisted and broadcast

@@ -1,6 +1,6 @@
-
+﻿
 using System.Text.Json.Serialization;
-namespace FTdx101_WebApp.Models.Calibration;
+namespace Yaesu_Web_Control.Models.Calibration;
 
 public class CalibrationFile
 {

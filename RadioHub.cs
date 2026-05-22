@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Hosting;
-using FTdx101_WebApp.Services;
+using Yaesu_Web_Control.Services;
 
-namespace FTdx101_WebApp.Hubs
+namespace Yaesu_Web_Control.Hubs
 {
     public class RadioHub : Hub
     {

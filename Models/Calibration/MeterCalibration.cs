@@ -1,8 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json.Serialization;
 
-namespace FTdx101_WebApp.Models.Calibration
+namespace Yaesu_Web_Control.Models.Calibration
 {
     // Represents a single calibration point for a meter
     public class CalibrationPoint

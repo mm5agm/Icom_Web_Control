@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using FTdx101_WebApp.Services;
+using Yaesu_Web_Control.Services;
 using System.Text.Json;
 using System.Threading;
 
-namespace FTdx101_WebApp.Controllers
+namespace Yaesu_Web_Control.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -507,6 +507,13 @@ namespace FTdx101_WebApp.Controllers
             { "3", "3 kHz" }
         };
 
+        // FTDX3000 roofing filter display names (RF0x code -> display name)
+        private static readonly Dictionary<string, string> Ftdx3000RoofingFilterNames = new()
+        {
+            { "0", "Auto" }, { "1", "15 kHz" }, { "2", "6 kHz" },
+            { "3", "3 kHz" }, { "4", "600 Hz" }, { "5", "300 Hz" }
+        };
+
         [HttpPost("roofingfilter/a")]
         public async Task<IActionResult> SetRoofingFilterA([FromBody] RoofingFilterRequest request)
         {
@@ -518,10 +525,25 @@ namespace FTdx101_WebApp.Controllers
                 await EnsureConnectedAsync();
 
                 var settings = await _settingsService.GetSettingsAsync();
-                bool isFtdx10 = settings.RadioModel == "FTdx10";
+                bool isFtdx10  = settings.RadioModel == "FTdx10";
+                bool isFt710   = settings.RadioModel == "FT-710";
+                bool isFtdx3000 = settings.RadioModel == "FTDX3000";
 
-                if (isFtdx10)
-                    return Ok(new { message = "FTdx10 roofing filter is selected automatically by the radio" });
+                if (isFtdx10 || isFt710)
+                    return Ok(new { message = "Roofing filter is selected automatically by the radio" });
+
+                if (isFtdx3000)
+                {
+                    // FTDX3000: P1 is always 0 (single receiver); code is the filter number directly
+                    await _catClient.SendCommandAsync($"RF0{request.Filter};", "WebUI", CancellationToken.None);
+                    await Task.Delay(100);
+                    var readback = await _catClient.SendCommandAsync("RF0;", "WebUI", CancellationToken.None);
+                    var actualCode = readback?.Length >= 4 ? readback[3].ToString() : request.Filter;
+                    var displayName = Ftdx3000RoofingFilterNames.GetValueOrDefault(actualCode, actualCode);
+                    _radioStateService.RoofingFilterA = actualCode;
+                    _logger.LogInformation("Set Main roofing filter (FTDX3000) to {Filter}", displayName);
+                    return Ok(new { message = $"Roofing filter set to {displayName}", filter = actualCode, filterName = displayName });
+                }
 
                 // FTdx101MP/D: RF command with set code conversion
                 if (!RoofingFilterSetCodes.TryGetValue(request.Filter, out var setCode))
@@ -579,10 +601,25 @@ namespace FTdx101_WebApp.Controllers
                 await EnsureConnectedAsync();
 
                 var settings = await _settingsService.GetSettingsAsync();
-                bool isFtdx10 = settings.RadioModel == "FTdx10";
+                bool isFtdx10  = settings.RadioModel == "FTdx10";
+                bool isFt710   = settings.RadioModel == "FT-710";
+                bool isFtdx3000 = settings.RadioModel == "FTDX3000";
 
-                if (isFtdx10)
-                    return Ok(new { message = "FTdx10 roofing filter is selected automatically by the radio" });
+                if (isFtdx10 || isFt710)
+                    return Ok(new { message = "Roofing filter is selected automatically by the radio" });
+
+                if (isFtdx3000)
+                {
+                    // FTDX3000 has a single receiver — P1 is always 0; VFO B shares the same filter
+                    await _catClient.SendCommandAsync($"RF0{request.Filter};", "WebUI", CancellationToken.None);
+                    await Task.Delay(100);
+                    var readback = await _catClient.SendCommandAsync("RF0;", "WebUI", CancellationToken.None);
+                    var actualCode = readback?.Length >= 4 ? readback[3].ToString() : request.Filter;
+                    var displayName = Ftdx3000RoofingFilterNames.GetValueOrDefault(actualCode, actualCode);
+                    _radioStateService.RoofingFilterB = actualCode;
+                    _logger.LogInformation("Set Sub roofing filter (FTDX3000) to {Filter}", displayName);
+                    return Ok(new { message = $"Roofing filter set to {displayName}", filter = actualCode, filterName = displayName });
+                }
 
                 // FTdx101MP/D: RF command with set code conversion
                 if (!RoofingFilterSetCodes.TryGetValue(request.Filter, out var setCode))
@@ -640,7 +677,8 @@ namespace FTdx101_WebApp.Controllers
                 await EnsureConnectedAsync();
                 string displayMode = CatCodeToMode.TryGetValue(request.Mode, out var modeName) ? modeName : request.Mode;
 
-                if (receiver.ToUpper() == "A")
+                bool vfoIsA = receiver.ToUpper() == "A";
+                if (vfoIsA)
                 {
                     await _catClient.SendCommandAsync($"MD0{request.Mode};", "User");
                     _radioStateService.ModeA = displayMode;
@@ -655,7 +693,50 @@ namespace FTdx101_WebApp.Controllers
                     return BadRequest(new { error = "Invalid receiver specified" });
                 }
 
-                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", receiver.ToUpper() == "A" ? "0" : "1", request.Mode, receiver);
+                // Re-apply Contour and APF state — mode changes on the FTdx101 cause the
+                // radio to restore its per-mode Contour/APF settings, overriding what we have set.
+                var modeSettings = await _settingsService.GetSettingsAsync();
+                bool isFtdx3000 = modeSettings.RadioModel == "FTDX3000";
+                string p1 = (!isFtdx3000 && !vfoIsA) ? "1" : "0";
+
+                if (isFtdx3000)
+                {
+                    bool cOn = _radioStateService.ContourOnA;
+                    bool aOn = _radioStateService.ApfOnA;
+                    if (cOn)
+                    {
+                        await _catClient.SendCommandAsync("CO0001;", "User");
+                        int vv = Math.Max(1, Math.Min(40, _radioStateService.ContourFreqA / 100));
+                        await _catClient.SendCommandAsync($"CO01{vv:D2};", "User");
+                    }
+                    else if (aOn)
+                    {
+                        await _catClient.SendCommandAsync("CO0002;", "User");
+                        int vv = Math.Max(0, Math.Min(20, (_radioStateService.ApfFreqA / 25) + 10));
+                        await _catClient.SendCommandAsync($"CO02{vv:D2};", "User");
+                    }
+                    else
+                    {
+                        await _catClient.SendCommandAsync("CO0000;", "User");
+                    }
+                }
+                else
+                {
+                    bool contourOn  = vfoIsA ? _radioStateService.ContourOnA  : _radioStateService.ContourOnB;
+                    int  contourHz  = vfoIsA ? _radioStateService.ContourFreqA : _radioStateService.ContourFreqB;
+                    bool apfOn      = vfoIsA ? _radioStateService.ApfOnA       : _radioStateService.ApfOnB;
+                    int  apfHz      = vfoIsA ? _radioStateService.ApfFreqA     : _radioStateService.ApfFreqB;
+
+                    int  cFreq = Math.Max(100, Math.Min(3200, contourHz));
+                    await _catClient.SendCommandAsync($"CO{p1}0000{(contourOn ? 1 : 0)};", "User");
+                    await _catClient.SendCommandAsync($"CO{p1}1{cFreq:D4};", "User");
+
+                    int  aVvvv = Math.Max(0, Math.Min(50, (apfHz / 10) + 25));
+                    await _catClient.SendCommandAsync($"CO{p1}2000{(apfOn ? 1 : 0)};", "User");
+                    await _catClient.SendCommandAsync($"CO{p1}3{aVvvv:D4};", "User");
+                }
+
+                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", vfoIsA ? "0" : "1", request.Mode, receiver);
                 return Ok(new { message = $"Mode {displayMode} selected for Receiver {receiver}" });
             }
             catch (Exception ex)
@@ -1063,8 +1144,8 @@ namespace FTdx101_WebApp.Controllers
         [HttpPost("ifwidth/{receiver}")]
         public async Task<IActionResult> SetIfWidth(string receiver, [FromBody] IfWidthRequest request)
         {
-            var validCodes = new[] { "0","1","2","3","4","5","6","7","8" };
-            if (!validCodes.Contains(request.Code))
+            // Codes 0-25 cover all supported models (FTdx101=0-8, FTdx10=0-15, FT-710=0-22, FTDX3000=1-25)
+            if (!int.TryParse(request.Code, out int codeNum) || codeNum < 0 || codeNum > 25)
                 return BadRequest(new { error = $"Invalid IF Width code: {request.Code}" });
 
             if (!await _requestSemaphore.WaitAsync(2000))
@@ -1109,6 +1190,303 @@ namespace FTdx101_WebApp.Controllers
             {
                 _logger.LogError(ex, "Error setting IF Shift");
                 return StatusCode(500, new { error = "Failed to set IF Shift" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        public class ContourRequest
+        {
+            public bool On { get; set; }
+            public int FreqHz { get; set; } = 800;
+        }
+
+        public class ApfRequest
+        {
+            public bool On { get; set; }
+            public int FreqHz { get; set; } = 0;
+        }
+
+        public class ClarifierRequest
+        {
+            public string Vfo { get; set; } = "A";
+            public bool RxOn { get; set; }
+            public bool TxOn { get; set; }
+            public int OffsetHz { get; set; }
+        }
+
+        public class ClarifierNudgeRequest
+        {
+            public string Vfo { get; set; } = "A";
+            public int DeltaHz { get; set; }
+        }
+
+        [HttpPost("contour/{receiver}")]
+        public async Task<IActionResult> SetContour(string receiver, [FromBody] ContourRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var settings = await _settingsService.GetSettingsAsync();
+                bool isFtdx3000 = settings.RadioModel == "FTDX3000";
+                string p1 = (!isFtdx3000 && receiver.ToUpper() == "B") ? "1" : "0";
+
+                if (isFtdx3000)
+                {
+                    // Mode: 00=off, 01=contour on, 02=APF on
+                    string mode = request.On ? "01" : "00";
+                    await _catClient.SendCommandAsync($"CO00{mode};", "WebUI", CancellationToken.None);
+                    int vv = Math.Max(1, Math.Min(40, request.FreqHz / 100));
+                    await _catClient.SendCommandAsync($"CO01{vv:D2};", "WebUI", CancellationToken.None);
+                }
+                else
+                {
+                    int freq = Math.Max(100, Math.Min(3200, request.FreqHz));
+                    await _catClient.SendCommandAsync($"CO{p1}0000{(request.On ? 1 : 0)};", "WebUI", CancellationToken.None);
+                    await _catClient.SendCommandAsync($"CO{p1}1{freq:D4};", "WebUI", CancellationToken.None);
+                }
+
+                if (receiver.ToUpper() == "B") { _radioStateService.ContourOnB = request.On; _radioStateService.ContourFreqB = request.FreqHz; }
+                else                           { _radioStateService.ContourOnA = request.On; _radioStateService.ContourFreqA = request.FreqHz; }
+
+                if (isFtdx3000 && request.On)
+                {
+                    _radioStateService.ApfOnA = false;
+                    _radioStateService.ApfOnB = false;
+                }
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting Contour");
+                return StatusCode(500, new { error = "Failed to set Contour" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("apf/{receiver}")]
+        public async Task<IActionResult> SetApf(string receiver, [FromBody] ApfRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var settings = await _settingsService.GetSettingsAsync();
+                bool isFtdx3000 = settings.RadioModel == "FTDX3000";
+                string p1 = (!isFtdx3000 && receiver.ToUpper() == "B") ? "1" : "0";
+
+                if (isFtdx3000)
+                {
+                    string mode = request.On ? "02" : "00";
+                    await _catClient.SendCommandAsync($"CO00{mode};", "WebUI", CancellationToken.None);
+                    int vv = Math.Max(0, Math.Min(20, (request.FreqHz / 25) + 10));
+                    await _catClient.SendCommandAsync($"CO02{vv:D2};", "WebUI", CancellationToken.None);
+                }
+                else
+                {
+                    int vvvv = Math.Max(0, Math.Min(50, (request.FreqHz / 10) + 25));
+                    await _catClient.SendCommandAsync($"CO{p1}2000{(request.On ? 1 : 0)};", "WebUI", CancellationToken.None);
+                    await _catClient.SendCommandAsync($"CO{p1}3{vvvv:D4};", "WebUI", CancellationToken.None);
+                }
+
+                if (receiver.ToUpper() == "B") { _radioStateService.ApfOnB = request.On; _radioStateService.ApfFreqB = request.FreqHz; }
+                else                           { _radioStateService.ApfOnA = request.On; _radioStateService.ApfFreqA = request.FreqHz; }
+
+                if (isFtdx3000 && request.On)
+                {
+                    _radioStateService.ContourOnA = false;
+                    _radioStateService.ContourOnB = false;
+                }
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting APF");
+                return StatusCode(500, new { error = "Failed to set APF" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("clarifier")]
+        public async Task<IActionResult> SetClarifier([FromBody] ClarifierRequest request)
+        {
+            if (request.OffsetHz < -9990 || request.OffsetHz > 9990)
+                return BadRequest(new { error = "Clarifier offset must be -9990 to +9990 Hz" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var settings = await _settingsService.GetSettingsAsync();
+                bool useCf = settings.RadioModel is "FTdx10" or "FT-710";
+                string p1 = request.Vfo == "B" ? "1" : "0";
+
+                if (useCf)
+                {
+                    int rxBit = request.RxOn ? 1 : 0;
+                    int txBit = request.TxOn ? 1 : 0;
+                    await _catClient.SendCommandAsync($"CF{p1}00{rxBit}{txBit}000;", "WebUI", CancellationToken.None);
+                    string sign = request.OffsetHz >= 0 ? "+" : "-";
+                    await _catClient.SendCommandAsync($"CF{p1}01{sign}{Math.Abs(request.OffsetHz):D4};", "WebUI", CancellationToken.None);
+                }
+                else
+                {
+                    await _catClient.SendCommandAsync($"RT{(request.RxOn ? 1 : 0)};", "WebUI", CancellationToken.None);
+                    await _catClient.SendCommandAsync($"XT{(request.TxOn ? 1 : 0)};", "WebUI", CancellationToken.None);
+                    await _catClient.SendCommandAsync("RC;", "WebUI", CancellationToken.None);
+                    if (request.OffsetHz > 0)
+                        await _catClient.SendCommandAsync($"RU{request.OffsetHz:D4};", "WebUI", CancellationToken.None);
+                    else if (request.OffsetHz < 0)
+                        await _catClient.SendCommandAsync($"RD{Math.Abs(request.OffsetHz):D4};", "WebUI", CancellationToken.None);
+                }
+
+                if (request.Vfo == "B") _radioStateService.ClarifierOffsetB = request.OffsetHz;
+                else                     _radioStateService.ClarifierOffsetA = request.OffsetHz;
+                _radioStateService.RxClarOn = request.RxOn;
+                _radioStateService.TxClarOn = request.TxOn;
+                return Ok(new { message = "Clarifier updated" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting clarifier");
+                return StatusCode(500, new { error = "Failed to set clarifier" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("clarifier/nudge")]
+        public async Task<IActionResult> NudgeClarifier([FromBody] ClarifierNudgeRequest request)
+        {
+            int absHz = Math.Abs(request.DeltaHz);
+            if (absHz == 0 || absHz > 9990)
+                return BadRequest(new { error = "DeltaHz must be 1–9990 Hz" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var settings = await _settingsService.GetSettingsAsync();
+                bool useCf = settings.RadioModel is "FTdx10" or "FT-710";
+                string p1 = request.Vfo == "B" ? "1" : "0";
+
+                int currentOffset = request.Vfo == "B" ? _radioStateService.ClarifierOffsetB : _radioStateService.ClarifierOffsetA;
+                int newOffset = Math.Max(-9990, Math.Min(9990, currentOffset + request.DeltaHz));
+
+                if (useCf)
+                {
+                    string sign = newOffset >= 0 ? "+" : "-";
+                    await _catClient.SendCommandAsync($"CF{p1}01{sign}{Math.Abs(newOffset):D4};", "WebUI", CancellationToken.None);
+                }
+                else
+                {
+                    // RU/RD are incremental — send only the delta, no RC clear
+                    if (request.DeltaHz > 0)
+                        await _catClient.SendCommandAsync($"RU{absHz:D4};", "WebUI", CancellationToken.None);
+                    else
+                        await _catClient.SendCommandAsync($"RD{absHz:D4};", "WebUI", CancellationToken.None);
+                }
+
+                if (request.Vfo == "B") _radioStateService.ClarifierOffsetB = newOffset;
+                else                     _radioStateService.ClarifierOffsetA = newOffset;
+                return Ok(new { offsetHz = newOffset });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error nudging clarifier");
+                return StatusCode(500, new { error = "Failed to nudge clarifier" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("clarifier/reset")]
+        public async Task<IActionResult> ResetClarifier([FromBody] ClarifierRequest request)
+        {
+            request.RxOn = true;
+            request.TxOn = false;
+            request.OffsetHz = 0;
+            return await SetClarifier(request);
+        }
+
+        [HttpPost("split/{mode}")]
+        public async Task<IActionResult> SetSplit(int mode)
+        {
+            if (mode < 0 || mode > 2)
+                return BadRequest(new { error = "Split mode must be 0 (off), 1 (on), or 2 (quick split +5 kHz)" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"ST{mode};", "WebUI", CancellationToken.None);
+
+                // Read back actual state
+                var stResponse = await _catClient.SendCommandAsync("ST;", "WebUI", CancellationToken.None);
+                int actualMode = mode;
+                if (!string.IsNullOrWhiteSpace(stResponse) && stResponse.StartsWith("ST"))
+                    int.TryParse(stResponse.Substring(2, 1), out actualMode);
+                _radioStateService.SplitMode = actualMode;
+
+                // After Quick Split (ST2), read back VFO B so UI reflects the new +5 kHz frequency immediately
+                if (mode == 2)
+                {
+                    var fbResponse = await _catClient.SendCommandAsync("FB;", "WebUI", CancellationToken.None);
+                    if (!string.IsNullOrWhiteSpace(fbResponse) && fbResponse.StartsWith("FB") &&
+                        long.TryParse(fbResponse.Substring(2).TrimEnd(';'), out long freqB))
+                    {
+                        _radioStateService.FrequencyB = freqB;
+                    }
+                }
+
+                _logger.LogInformation("Split mode set to {Mode}", actualMode);
+                return Ok(new { splitMode = actualMode });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting split mode");
+                return StatusCode(500, new { error = "Failed to set split mode" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("swap-vfo")]
+        public async Task<IActionResult> SwapVfo()
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync("SV;", "WebUI", CancellationToken.None);
+
+                // Read back both frequencies immediately — auto-info will also arrive but this avoids UI flicker
+                var faResponse = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(faResponse) && faResponse.StartsWith("FA") &&
+                    long.TryParse(faResponse.Substring(2).TrimEnd(';'), out long freqA))
+                {
+                    _radioStateService.FrequencyA = freqA;
+                }
+
+                var fbResponse = await _catClient.SendCommandAsync("FB;", "WebUI", CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(fbResponse) && fbResponse.StartsWith("FB") &&
+                    long.TryParse(fbResponse.Substring(2).TrimEnd(';'), out long freqB))
+                {
+                    _radioStateService.FrequencyB = freqB;
+                }
+
+                _logger.LogInformation("VFO A and VFO B swapped");
+                return Ok(new { message = "VFO swapped" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error swapping VFO");
+                return StatusCode(500, new { error = "Failed to swap VFO" });
             }
             finally { _requestSemaphore.Release(); }
         }

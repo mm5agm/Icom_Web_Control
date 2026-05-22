@@ -1,5 +1,5 @@
-@page
-@model FTdx101_WebApp.Pages.UserManualModel
+﻿@page
+@model Yaesu_Web_Control.Pages.UserManualModel
 @{
     ViewData["Title"] = "User Manual";
 }
@@ -15,7 +15,7 @@
 <div class="mt-3">
     <div class="d-flex align-items-center mb-3">
         <h2 class="mb-0"><i class="bi bi-book"></i> User Manual</h2>
-        <span class="ms-3 text-muted">FTdx101 WebApp</span>
+        <span class="ms-3 text-muted">Yaesu Web Control</span>
     </div>
 
     <div class="row">
@@ -43,6 +43,10 @@
                                 <li><a href="#if-af">IF Width, IF Shift &amp; AF Gain</a></li>
                                 <li><a href="#band-segment">Band &amp; Segment Selection</a></li>
                                 <li><a href="#tx-controls">Transmit Controls</a></li>
+                                <li><a href="#split-swap">Split Frequency &amp; VFO Swap</a></li>
+                                <li><a href="#clarifier">Clarifier (RIT/XIT)</a></li>
+                                <li><a href="#contour-apf">Contour &amp; APF</a></li>
+                                <li><a href="#memories">Radio Memories</a></li>
                             </ol>
                         </li>
                         <li><a href="#settings">Settings Page</a></li>
@@ -82,19 +86,19 @@
                     <h5 class="mb-0">1. Introduction</h5>
                 </div>
                 <div class="card-body">
-                    <p>FTdx101 WebApp is a web-based control panel for Yaesu transceivers especially the FTdx101MP and FTdx101D but also works with the FTdx10. It runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.</p>
+                    <p>Yaesu Web Control is a web-based control panel for Yaesu transceivers. It is primarily designed for the FTdx101MP and FTdx101D but also supports the FTdx10, FT-710, and FTDX3000. It runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.</p>
                     <p>The application was written for operators who find the physical controls on the FTdx101 difficult to read or use, and for those who want a large, clean touchscreen-friendly display alongside their existing logging software.</p>
                     <h6 class="mt-3">Key features</h6>
                     <ul>
                         <li>Large, readable frequency displays with digit-by-digit mouse-wheel tuning</li>
-                        <li>Full dual-receiver control for FTdx101MP and FTdx101D (VFO A and VFO B received simultaneously); VFO A and VFO B panels also shown for FTdx10 for split and memory operation</li>
+                        <li>Full dual-receiver control for FTdx101MP and FTdx101D (VFO A and VFO B received simultaneously); VFO A and VFO B panels also shown for FTdx10, FT-710, and FTDX3000 for split and memory operation</li>
                         <li>Live S-meter, power, SWR, ALC, temperature, IDD, VDD, and compression meters</li>
                         <li>Real-time two-way sync — changes on the radio front panel appear immediately in the app, and vice versa</li>
                         <li>Band and segment selectors for fast QSY to CW, FT8, SSB, or RTTY</li>
                         <li>Optional real-time spectrum display and waterfall (requires an SDR connected to the 9 MHz IF output)</li>
                         <li>Integration with WSJT-X, JTAlert, and Log4OM</li>
                         <li>Built-in rigctld server so WSJT-X can control the radio through the app</li>
-                        <li>UK and USA band plans</li>
+                        <li>IARU Region 1, 2, and 3 band plans plus Japan (JARL)</li>
                         <li>Full screen reader support — compatible with NVDA and Windows Narrator</li>
                         <li>Windows High Contrast mode support for all gauge displays</li>
                         <li>Customisable accessible labels (band names, meter names, control names) for any language</li>
@@ -109,7 +113,7 @@
                 </div>
                 <div class="card-body">
                     <ol>
-                        <li>Download the installer from the <a href="https://github.com/mm5agm/FTdx101_WebApp/releases" target="_blank">GitHub Releases page <i class="bi bi-box-arrow-up-right"></i></a>.</li>
+                        <li>Download the installer from the <a href="https://github.com/mm5agm/Yaesu_Web_Control/releases" target="_blank">GitHub Releases page <i class="bi bi-box-arrow-up-right"></i></a>.</li>
                         <li>Run the installer. .NET 10 is bundled — you do not need to install it separately.</li>
                         <li>A desktop shortcut and a Start Menu entry are created automatically.</li>
                         <li>The first time you run the app, Windows may show a <strong>Smart App Control</strong> or <strong>Unknown Publisher</strong> warning. Click <strong>More info → Run anyway</strong> to proceed. This warning appears because the installer is not signed with a commercial certificate.</li>
@@ -127,10 +131,10 @@
                     <ol>
                         <li>Open a browser and go to <code>http://localhost:8080</code></li>
                         <li>Click <strong>Settings</strong> in the navigation bar.</li>
-                        <li>Set <strong>Radio Model</strong> to your transceiver: <strong>FTdx101MP</strong> (200 W, dual receiver), <strong>FTdx101D</strong> (100 W, dual receiver), or <strong>FTdx10</strong> (100 W, single receiver).</li>
+                        <li>Set <strong>Radio Model</strong> to your transceiver: <strong>FTdx101MP</strong> (200 W, dual receiver), <strong>FTdx101D</strong> (100 W, dual receiver), <strong>FTdx10</strong> (100 W, single receiver), <strong>FT-710</strong> (100 W, single receiver), or <strong>FTDX3000</strong> (100 W, single receiver, SDR IF output available).</li>
                         <li>Set <strong>Serial Port</strong> to the COM port your radio is connected to. If you are unsure, go to <strong>Diagnostics → Ports</strong> to see a list of available ports, or check Windows Device Manager.</li>
                         <li>Set <strong>Baud Rate</strong> to match the radio's CAT baud rate. The factory default on the FTdx101 is <strong>38400</strong>. You can verify or change this on the radio under <strong>Menu → CAT Rate</strong>.</li>
-                        <li>Select your <strong>Band Plan</strong> (UK or USA).</li>
+                        <li>Select your <strong>Band Plan / IARU Region</strong>: Region 1 (Europe, Africa, Middle East — includes the 4m band), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan (JARL band plan).</li>
                         <li>Click <strong>Save Settings</strong>, then <strong>Test Connection</strong>. A green tick means the app is talking to the radio.</li>
                     </ol>
                     <div class="alert alert-warning py-2 mb-0">
@@ -145,7 +149,7 @@
                     <h5 class="mb-0">4. Starting the Application</h5>
                 </div>
                 <div class="card-body">
-                    <p>Double-click the <strong>FTdx101 WebApp</strong> shortcut on your desktop. A small window opens confirming the server has started. The window must remain open while you use the app.</p>
+                    <p>Double-click the <strong>Yaesu Web Control</strong> shortcut on your desktop. A small window opens confirming the server has started. The window must remain open while you use the app.</p>
                     <p>Open your browser and go to <code>http://localhost:8080</code>.</p>
                     <p>The main control panel loads. If the radio is powered on and the serial connection is correct, a brief <em>Initialising…</em> overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio.</p>
                     <div class="alert alert-info py-2 mb-0">
@@ -268,6 +272,8 @@
                                 <tr><td>Roofing Filter (FTdx101MP)</td><td>12 kHz, 3 kHz, 1.2 kHz, 600 Hz, 300 Hz (all fitted as standard)</td></tr>
                                 <tr><td>Roofing Filter (FTdx101D)</td><td>12 kHz, 3 kHz, 600 Hz always shown; 1.2 kHz and 300 Hz shown only if ticked as installed in Settings</td></tr>
                                 <tr><td>Roofing Filter (FTdx10)</td><td>3 kHz, 6 kHz, 15 kHz standard; optional 1.2 kHz (YF-130CN) and 300 Hz (YF-130CW). Selected automatically by the radio based on DSP bandwidth and mode — no manual control or CAT command involved.</td></tr>
+                                <tr><td>Roofing Filter (FT-710)</td><td>No CAT command — the radio selects its filter automatically. No roofing filter dropdown is shown.</td></tr>
+                                <tr><td>Roofing Filter (FTDX3000)</td><td>AUTO, 15 kHz, 6 kHz, 3 kHz always shown; 600 Hz and 300 Hz shown only if ticked as installed in Settings (optional YH-77SDE filters).</td></tr>
                                 <tr><td>AGC</td><td>OFF, FAST, MID, SLOW, AUTO</td></tr>
                                 <tr>
                                     <td>IPO/AMP</td>
@@ -294,6 +300,8 @@
                         <ul>
                             <li><strong>FTdx101MP/D:</strong> 200 Hz, 400 Hz, 600 Hz, 850 Hz, 1.2 kHz, 1.4 kHz, 1.8 kHz, 2.4 kHz, 3.0 kHz</li>
                             <li><strong>FTdx10:</strong> 400 Hz, 600 Hz, 800 Hz, 1.0 kHz, 1.2 kHz, 1.4 kHz, 1.6 kHz, 1.8 kHz, 2.0 kHz, 2.2 kHz, 2.4 kHz, 2.6 kHz, 2.8 kHz, 3.0 kHz, 3.2 kHz, 3.4 kHz</li>
+                            <li><strong>FT-710:</strong> 300 Hz, 600 Hz, 850 Hz, 1.2 kHz, 1.65 kHz, 1.95 kHz, 2.4 kHz, 2.7 kHz, 3.0 kHz, 3.2 kHz, 3.5 kHz, 4.0 kHz</li>
+                            <li><strong>FTDX3000:</strong> 200 Hz, 400 Hz, 600 Hz, 850 Hz, 1.35 kHz, 1.5 kHz, 1.8 kHz, 2.2 kHz, 2.4 kHz, 2.6 kHz, 2.8 kHz, 3.0 kHz, 3.4 kHz, 4.0 kHz</li>
                         </ul>
                         <p>This setting is persisted and restored on startup.</p>
                         <p><strong>Reset button</strong> (next to IF Width) — Resets IF Width to its widest bandwidth in one click.</p>
@@ -306,18 +314,29 @@
                     <div class="p-3 border-bottom section-anchor" id="band-segment">
                         <h6 class="text-primary fw-bold">5.9 Band and Segment Selection</h6>
                         <p><strong>Band buttons</strong> — Click a band button (160m, 80m, 40m, etc.) to switch the VFO to that band. You can also navigate with the keyboard: <kbd>Tab</kbd> moves focus into the band group, then <kbd>←</kbd> / <kbd>→</kbd> move between bands and switch immediately.</p>
-                        <p>Available bands depend on your band plan: UK includes 4m and 60m; USA includes the five 60m FCC channels.</p>
+                        <p>Available bands and segments depend on your IARU Region setting:</p>
+                        <table class="table table-sm table-bordered mb-3">
+                            <thead class="table-light"><tr><th>Region</th><th>Notes</th></tr></thead>
+                            <tbody>
+                                <tr><td><strong>Region 1</strong></td><td>Europe, Africa, Middle East. Includes 4m (70 MHz). 80m SSB starts ~3.690 MHz; 40m SSB starts ~7.090 MHz. 60m shows FT8 (5.357) and mid-band USB (5.362) — individual countries within Region 1 have their own channel plans within 5351.5–5366.5 kHz.</td></tr>
+                                <tr><td><strong>Region 2</strong></td><td>Americas. 80m SSB ~3.800 MHz; 40m SSB ~7.200 MHz. 60m shows the five USA FCC Part 97 channels (5.331–5.404 MHz dial). No 4m.</td></tr>
+                                <tr><td><strong>Region 3</strong></td><td>Asia-Pacific (excluding Japan). 80m SSB starts ~3.770 MHz; 40m SSB starts ~7.100 MHz. 60m shows FT8 and mid-band USB (access varies by country). No 4m.</td></tr>
+                                <tr><td><strong>Japan</strong></td><td>JARL band plan. 160m SSB entry points to the 1.9 MHz phone allocation (1.908 MHz). 80m SSB ~3.740 MHz. 40m SSB ~7.100 MHz. No 60m (Japan has no secondary allocation). No 4m.</td></tr>
+                            </tbody>
+                        </table>
                         <p><strong>Segment dropdown</strong> — After selecting a band, a dropdown above the frequency display shows common operating segments for that band. Select a segment to jump directly to its standard frequency and set the appropriate mode:</p>
                         <table class="table table-sm table-bordered mb-3">
                             <thead class="table-light"><tr><th>Segment</th><th>Example (20m)</th><th>Mode set</th></tr></thead>
                             <tbody>
                                 <tr><td>CW</td><td>14.025 MHz</td><td>CW-U</td></tr>
                                 <tr><td>FT8</td><td>14.074 MHz</td><td>DATA-U</td></tr>
-                                <tr><td>SSB</td><td>14.150 MHz</td><td>USB</td></tr>
+                                <tr><td>SSB</td><td>14.225 MHz</td><td>USB</td></tr>
                                 <tr><td>RTTY</td><td>14.080 MHz</td><td>RTTY-U</td></tr>
                             </tbody>
                         </table>
-                        <p>The last segment you used on each band is remembered — when you return to a band, the dropdown re-selects your previous segment. On 60m, the dropdown shows named channels (e.g., CH1, CH2…) rather than generic segments.</p>
+                        <p>The segment labels describe <em>operating activities</em> (FT8, CW, SSB, RTTY), not the radio's internal mode names. The table above shows what mode the radio is actually set to — for example, selecting <strong>FT8</strong> sends <strong>DATA-U</strong> to the radio. DATA-U does not appear as a named segment because it is the underlying mode for digital activities like FT8, not an activity in its own right.</p>
+                        <p>If you want to change the mode without jumping to a preset frequency, use the <strong>Mode dropdown</strong> (LSB / USB / DATA-U / CW-U etc.) directly below the band buttons.</p>
+                        <p>The last segment you used on each band is remembered — when you return to a band, the dropdown re-selects your previous segment. On 60m, the dropdown shows named channels or spots (e.g., FT8, USB, CH1…) rather than generic segments.</p>
                         <div class="alert alert-info py-2 mb-0">
                             <strong>Why does 30m only show CW and FT8?</strong> This is correct — 30m (10 MHz) has no international phone (SSB) allocation. The ITU and most national regulators restrict 30m to CW and digital modes only. No SSB or RTTY segments exist for this band, so none appear in the dropdown. If you switch to 30m and the dropdown looks sparse, that is intentional, not a bug.
                         </div>
@@ -328,6 +347,221 @@
                         <h6 class="text-primary fw-bold">5.10 Transmit Controls</h6>
                         <p><strong>TX button</strong> — Appears on whichever VFO is currently the transmit VFO. Click to start transmitting; click again to return to receive. The button turns red while transmitting.</p>
                         <p class="mb-0"><strong>Radio POWER button</strong> — Turns the FTdx101 on or off. The button shows <span class="badge bg-success">ON</span> or <span class="badge bg-danger">OFF</span>.</p>
+                    </div>
+
+                    <!-- 5.11 Split and Swap -->
+                    <div class="p-3 section-anchor" id="split-swap">
+                        <h6 class="text-primary fw-bold">5.11 Split Frequency and VFO Swap</h6>
+                        <p>Three buttons in the toolbar support split-frequency operation and VFO swapping:</p>
+                        <table class="table table-sm table-bordered mb-3">
+                            <thead class="table-light"><tr><th>Button</th><th>Action</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>A↔B</strong></td>
+                                    <td>Swaps the frequencies (and modes) of VFO A and VFO B instantly. Useful for reversing a split setup or quickly comparing two frequencies.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Split</strong></td>
+                                    <td>Toggles split operation on and off. When active the button turns red and shows <span class="badge bg-danger">Split ON</span>. In split mode VFO A is the receive frequency and VFO B is the transmit frequency. The VFO B panel border also turns red and a <span class="badge bg-danger">SPLIT TX</span> badge appears in its header.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>+5k</strong></td>
+                                    <td>Quick Split — enables split and simultaneously sets VFO B to VFO A + 5 kHz in one click. This is the standard DX-pedition offset. Pressing it again adds another 5 kHz to VFO B.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p><strong>Typical DX-pedition workflow:</strong></p>
+                        <ol>
+                            <li>Tune VFO A to the DX station's receive frequency.</li>
+                            <li>Click <strong>+5k</strong> — split engages and VFO B is set 5 kHz up (the DX station's transmit frequency).</li>
+                            <li>Call the DX station. Your radio transmits on VFO B and listens on VFO A.</li>
+                            <li>Click <strong>Split</strong> (now showing Split ON) to turn split off when you are done.</li>
+                        </ol>
+                        <div class="alert alert-info py-2 mb-2">
+                            <strong>Terminology note:</strong> The FTdx101MP and FTdx101D manuals refer to VFO A as the <em>MAIN band</em> and VFO B as the <em>SUB band</em>. The FTdx10 and FT-710 manuals use VFO A and VFO B. Single-receiver models (FTdx10, FT-710) receive on VFO A and transmit on VFO B in split mode, but cannot decode both frequencies simultaneously.
+                        </div>
+                    </div>
+
+                    <!-- 5.12 Clarifier -->
+                    <div class="p-3 section-anchor" id="clarifier">
+                        <h6 class="text-primary fw-bold">5.12 Clarifier (RIT/XIT)</h6>
+                        <p>
+                            The Clarifier strip appears below the VFO panels. It lets you shift the receive (RIT),
+                            transmit (XIT), or both frequencies by a small offset without retuning the VFO —
+                            useful for finding the exact pitch of a signal in SSB or CW without moving the displayed frequency.
+                        </p>
+                        <table class="table table-sm table-bordered mb-3">
+                            <thead class="table-light"><tr><th>Control</th><th>Description</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>VFO A / VFO B</strong></td>
+                                    <td>Selects which VFO the clarifier offset applies to. Each VFO stores its own offset value independently.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Mode</strong></td>
+                                    <td>
+                                        <strong>OFF</strong> — Clarifier disabled.<br>
+                                        <strong>RX</strong> — RIT active: receive frequency is shifted by the offset; transmit stays on the VFO frequency.<br>
+                                        <strong>TX</strong> — XIT active: transmit frequency is shifted; receive stays on the VFO frequency.<br>
+                                        <strong>RX+TX</strong> — Both RIT and XIT active.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Offset slider</strong></td>
+                                    <td>Sets the offset in Hz for the selected VFO. Range ±9,990 Hz in 10 Hz steps. The current value is shown next to the slider. The CAT command is sent when you release the slider.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Reset</strong></td>
+                                    <td>Sets the offset to 0 Hz and switches the mode to RX for the currently selected VFO.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="alert alert-info py-2 mb-0">
+                            <strong>Persistence:</strong> The clarifier offset for each VFO is saved to disk and restored when the app restarts.
+                            The on/off mode (RX/TX/OFF) is always read from the radio at startup.
+                        </div>
+                    </div>
+
+                    <!-- 5.13 Contour and APF -->
+                    <div class="p-3 section-anchor" id="contour-apf">
+                        <h6 class="text-primary fw-bold">5.13 Contour and APF (Audio Peak Filter)</h6>
+                        <p>
+                            The <strong>Contour</strong> and <strong>APF</strong> controls appear inline on each VFO panel, in the same row as the Segment dropdown. They
+                            shape the received audio to cut interference or peak a wanted signal.
+                        </p>
+                        <table class="table table-sm table-bordered mb-3">
+                            <thead class="table-light"><tr><th>Control</th><th>Function</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Contour Off / Contour On</strong> button</td>
+                                    <td>
+                                        Toggles the Contour filter. When on, the button turns green. Contour boosts or cuts a narrow
+                                        band of audio around the set frequency — useful for reducing adjacent QRM on SSB and CW.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Contour frequency slider</td>
+                                    <td>
+                                        Sets the centre frequency of the Contour filter.
+                                        Range 100–3200 Hz (FTdx101, FTdx10, FT-710) or 100–4000 Hz (FTDX3000), in steps matching the radio's resolution.
+                                        The Hz value updates live as you drag.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>APF Off / APF On</strong> button</td>
+                                    <td>
+                                        Toggles the Audio Peak Filter. When on, the button turns green. APF creates a very sharp
+                                        audio peak at the set offset from the carrier — primarily used in CW to isolate a single tone.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>APF frequency slider</td>
+                                    <td>
+                                        Sets the APF peak offset from the carrier: −250 to +250 Hz in 10 Hz steps
+                                        (FTdx101, FTdx10, FT-710) or 25 Hz steps (FTDX3000). Centre (0 Hz) places the peak exactly on the carrier.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <h6>Model differences</h6>
+                        <ul>
+                            <li>
+                                <strong>FTdx101MP/D</strong> — VFO A and VFO B each have independent Contour and APF settings.
+                                Both can be on simultaneously.
+                            </li>
+                            <li>
+                                <strong>FTdx10 / FT-710</strong> — Single receiver; P1 is always 0 (radio ignores VFO B selector).
+                                Both can be on simultaneously.
+                            </li>
+                            <li>
+                                <strong>FTDX3000</strong> — Contour and APF are mutually exclusive; only one can be active at a time.
+                                Turning one on automatically turns the other off in both the UI and the radio.
+                                Contour frequency range is wider (up to 4000 Hz) and APF uses 25 Hz steps.
+                            </li>
+                        </ul>
+                        <div class="alert alert-info py-2 mb-2">
+                            <strong>Persistence:</strong> Contour and APF on/off states and frequencies are saved to disk and restored when the app restarts.
+                            The radio's actual state is also read at startup and overrides the saved values when a connection is established.
+                        </div>
+                        <div class="alert alert-warning py-2 mb-0">
+                            <strong>Mode changes and Contour/APF:</strong> The radio stores separate Contour and APF settings for each mode internally.
+                            When you change mode from this app, the radio would normally switch to that mode's stored settings — which could turn Contour or APF on or off unexpectedly.
+                            To prevent this, the app automatically re-sends your current Contour and APF state to the radio immediately after every mode change,
+                            so your settings are preserved regardless of what the radio has stored for that mode.
+                            If you change mode directly on the radio's front panel (not through this app), the radio's own per-mode settings will take effect and the display will update accordingly.
+                        </div>
+                    </div>
+
+                    <!-- 5.14 Memories -->
+                    <div class="p-3 section-anchor" id="memories">
+                        <h6 class="text-primary fw-bold">5.14 Radio Memories</h6>
+                        <p>
+                            Radio Memories let you save up to 99 frequency/mode/clarifier presets and recall them
+                            instantly with a single click. Memories live in the app (not in the radio's built-in
+                            channels), so they are independent of the radio model.
+                        </p>
+
+                        <h6>Save to Mem Button</h6>
+                        <p>
+                            A <strong>Save to Mem</strong> button appears below the S-meter on each VFO panel.
+                            Click it to instantly create a new app memory from the current VFO frequency, mode,
+                            and clarifier settings. The memory is saved with no label — add or edit the label
+                            later in the Memories editor. The button briefly shows <strong>✓ Saved</strong> to confirm.
+                        </p>
+
+                        <h6>Floating Memory Panel</h6>
+                        <p>
+                            Click the <strong>Mem</strong> button in the toolbar to open the floating panel.
+                            The panel shows all saved memories as tiles. Click any tile to instantly tune VFO A to
+                            that frequency and mode, and restore the clarifier settings stored with it.
+                            The panel is non-modal — you can interact with all other controls while it is open.
+                            Drag the header to reposition it; its position is saved between page loads.
+                        </p>
+                        <p>
+                            The <strong>Edit</strong> link in the panel header opens the <a href="/Memories">Memories editor</a> in a new tab.
+                            The panel toolbar also contains the radio import/export buttons described below.
+                        </p>
+
+                        <h6>Memories Editor Page</h6>
+                        <p>
+                            Navigate to <strong>Memories</strong> in the navigation bar to open the full editor.
+                            Click <strong>Pop Out</strong> to open it in a separate browser window — useful on a
+                            second monitor, tablet, or phone on the same network.
+                        </p>
+                        <table class="table table-sm table-bordered mb-3">
+                            <thead class="table-light"><tr><th>Column</th><th>Description</th></tr></thead>
+                            <tbody>
+                                <tr><td><strong>Label</strong></td><td>Up to 12 characters. Used as the tile name in the panel and as the channel tag when exporting to the radio.</td></tr>
+                                <tr><td><strong>Frequency (MHz)</strong></td><td>Enter the frequency in MHz (e.g. <code>14.074</code>).</td></tr>
+                                <tr><td><strong>Mode</strong></td><td>Operating mode: LSB, USB, CW-U, etc.</td></tr>
+                                <tr><td><strong>Clarifier (Hz)</strong></td><td>RIT/XIT offset stored with this memory (−9990 to +9990 Hz).</td></tr>
+                                <tr><td><strong>RX Clar / TX Clar</strong></td><td>Whether RIT / XIT is active when this memory is recalled.</td></tr>
+                            </tbody>
+                        </table>
+                        <p>Click <strong>Add Memory</strong> to append a new row. Click <strong>Save</strong> to persist all changes.</p>
+
+                        <h6>Import and Export (Radio Channels)</h6>
+                        <p>Both the floating panel toolbar and the Memories editor page have buttons to synchronise app memories with the radio's built-in channel memories:</p>
+                        <table class="table table-sm table-bordered mb-3">
+                            <thead class="table-light"><tr><th>Button</th><th>Action</th></tr></thead>
+                            <tbody>
+                                <tr><td><strong>Load from Rig (Replace all)</strong></td><td>Reads channels 001–099 from the radio and replaces <em>all</em> app memories. Existing app memories are lost.</td></tr>
+                                <tr><td><strong>Load from Rig (Add new)</strong></td><td>Reads radio channels and adds them to the existing app memory list. Nothing is deleted.</td></tr>
+                                <tr><td><strong>Save to Rig (Replace all)</strong></td><td>Writes all app memories to radio channels 001 onwards, overwriting all existing radio memory channels.</td></tr>
+                                <tr><td><strong>Save to Rig (Add new)</strong></td><td>Writes app memories only to empty radio channels; existing radio channels are not touched. (Panel toolbar only.)</td></tr>
+                            </tbody>
+                        </table>
+                        <p>
+                            Load operations read both the channel data (frequency, mode, clarifier) and the channel tag/label
+                            where supported — the FTDX3000 does not support reading channel tags.
+                            Loading may take up to 30 seconds as each channel is queried individually.
+                        </p>
+
+                        <div class="alert alert-info py-2 mb-0">
+                            <strong>Persistence:</strong> Memories are saved to
+                            <code>%APPDATA%\MM5AGM\Yaesu Web Control\memories.json</code>.
+                            You can back this file up or copy it between PCs.
+                        </div>
                     </div>
 
                 </div>
@@ -345,15 +579,15 @@
                     <table class="table table-sm table-bordered mb-4">
                         <thead class="table-light"><tr><th>Setting</th><th>Description</th></tr></thead>
                         <tbody>
-                            <tr><td>Radio Model</td><td><strong>FTdx101MP</strong> (200 W, dual RX), <strong>FTdx101D</strong> (100 W, dual RX), or <strong>FTdx10</strong> (100 W, single RX)</td></tr>
+                            <tr><td>Radio Model</td><td><strong>FTdx101MP</strong> (200 W, dual RX), <strong>FTdx101D</strong> (100 W, dual RX), <strong>FTdx10</strong> (100 W, single RX), <strong>FT-710</strong> (100 W, single RX), <strong>FTDX3000</strong> (100 W, single RX, 9 MHz IF output)</td></tr>
                             <tr><td>Serial Port</td><td>COM port the radio is connected to (e.g., COM3). Check Device Manager or Diagnostics → Ports if unsure.</td></tr>
                             <tr><td>Baud Rate</td><td>Must match the radio's CAT Rate setting. Factory default: <strong>38400</strong>.</td></tr>
-                            <tr><td>Band Plan</td><td>UK or USA. Affects which bands and segment frequencies appear.</td></tr>
+                            <tr><td>Band Plan / IARU Region</td><td><strong>Region 1</strong> (Europe, Africa, Middle East — includes 4m), <strong>Region 2</strong> (Americas), <strong>Region 3</strong> (Asia-Pacific), or <strong>Japan</strong> (JARL). Affects which bands and segment frequencies appear. See <a href="#band-segment">Section 5.9</a> for details.</td></tr>
                         </tbody>
                     </table>
                     <p>After changing the serial port or baud rate, click <strong>Test Connection</strong> to verify the radio responds.</p>
 
-                    <h6>6.2 Optional Roofing Filters (FTdx101D only)</h6>
+                    <h6>6.2 Roofing Filter Settings</h6>
                     <p>The roofing filter dropdown in the VFO panels only shows filters that are actually fitted in your radio. The standard fitment differs by model:</p>
                     <table class="table table-sm table-bordered mb-3">
                         <thead class="table-light"><tr><th>Model</th><th>Standard (always shown)</th><th>Optional (tick if fitted)</th></tr></thead>
@@ -361,9 +595,11 @@
                             <tr><td>FTdx101MP</td><td>12 kHz, 3 kHz, 1.2 kHz, 600 Hz, 300 Hz</td><td>— (fully loaded as standard)</td></tr>
                             <tr><td>FTdx101D</td><td>12 kHz, 3 kHz, 600 Hz</td><td>1.2 kHz, 300 Hz</td></tr>
                             <tr><td>FTdx10</td><td>3 kHz, 6 kHz, 15 kHz</td><td>1.2 kHz (YF-130CN), 300 Hz (YF-130CW) — selected automatically by the radio, no CAT control</td></tr>
+                            <tr><td>FT-710</td><td colspan="2">No roofing filter CAT command — radio selects automatically. No filter dropdown is shown.</td></tr>
+                            <tr><td>FTDX3000</td><td>AUTO, 15 kHz, 6 kHz, 3 kHz</td><td>600 Hz, 300 Hz (optional YH-77SDE filters)</td></tr>
                         </tbody>
                     </table>
-                    <p>The optional filter checkboxes only appear on this page when <strong>FTdx101D</strong> is selected. Tick any optional filters you have installed, then click <strong>Save Settings</strong>.</p>
+                    <p>Optional filter checkboxes appear in Settings when <strong>FTdx101D</strong> or <strong>FTDX3000</strong> is selected. Tick any optional filters you have installed, then click <strong>Save Settings</strong>.</p>
 
                     <h6>6.3 Web Server Settings</h6>
                     <table class="table table-sm table-bordered mb-3">
@@ -377,16 +613,16 @@
                     </div>
 
                     <h6>6.4 SDR Spectrum Display</h6>
-                    <p>The spectrum display requires an SDR receiver. On the FTdx101MP and FTdx101D the SDR is connected to the radio's 9 MHz IF output (rear panel RCA socket labelled <strong>IF OUT</strong>), giving a VFO-centred panoramic view of the band.</p>
+                    <p>The spectrum display requires an SDR receiver. On the FTdx101MP, FTdx101D, and FTDX3000 the SDR is connected to the radio's 9 MHz IF output (rear panel RCA socket labelled <strong>IF OUT</strong>), giving a VFO-centred panoramic view of the band.</p>
                     <div class="alert alert-warning py-2 mb-3">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>FTdx10 users:</strong> The FTdx10 has no rear-panel IF output. You can still use an SDR for spectrum display by connecting it to an antenna port, but the spectrum will show absolute RF frequencies rather than a view centred on your VFO frequency. The IF Frequency setting has no effect when used this way.
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>FTdx10 and FT-710 users:</strong> These radios do not have a rear-panel IF output. You can still use an SDR for spectrum display by connecting it to an antenna port, but the spectrum will show absolute RF frequencies rather than a view centred on your VFO frequency. The IF Frequency setting has no effect when used this way.
                     </div>
                     <p><strong>Supported hardware:</strong></p>
                     <ul>
                         <li><strong>SDRplay RSP1 and RSP series</strong> — requires the <a href="https://www.sdrplay.com/downloads/" target="_blank">SDRplay API v3 <i class="bi bi-box-arrow-up-right"></i></a> to be installed separately.</li>
                         <li><strong>RTL-SDR, Airspy, HackRF</strong> — drivers are included in the app installer; no separate installation needed.</li>
                     </ul>
-                    <p><strong>Setting up the SDR (FTdx101MP / FTdx101D):</strong></p>
+                    <p><strong>Setting up the SDR (FTdx101MP / FTdx101D / FTDX3000):</strong></p>
                     <ol>
                         <li>Connect the SDR to the 9 MHz IF output using an RCA-to-SMA adapter and a short coax cable.</li>
                         <li>Go to Settings and click <strong>Scan</strong> in the SDR section.</li>
@@ -525,7 +761,7 @@
                         <li>Click <strong>Save Calibration</strong> when finished.</li>
                         <li>Click <strong>Reload From File</strong> to discard unsaved changes.</li>
                     </ol>
-                    <p class="mb-0 text-muted small">Calibration is saved to <code>%APPDATA%\MM5AGM\FTdx101 WebApp\calibration.user.json</code>.</p>
+                    <p class="mb-0 text-muted small">Calibration is saved to <code>%APPDATA%\MM5AGM\Yaesu Web Control\calibration.user.json</code>.</p>
                 </div>
             </div>
 
@@ -732,6 +968,21 @@
                             </div>
                         </div>
 
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ts9">
+                                    Meter gauges are wrapping to a second row
+                                </button>
+                            </h2>
+                            <div id="ts9" class="accordion-collapse collapse" data-bs-parent="#troubleshootAccordion">
+                                <div class="accordion-body">
+                                    <p>This is almost always a browser zoom issue. Browsers remember the zoom level <strong>per domain</strong>, so if you accidentally pressed <kbd>Ctrl</kbd>+<kbd>+</kbd> while the app was open, the zoom will have increased for <code>localhost:8080</code> only — leaving all other websites unaffected.</p>
+                                    <p>Press <kbd>Ctrl</kbd>+<kbd>0</kbd> while the app is in focus to reset the zoom to 100%, and the gauges will return to a single row. Use <kbd>Ctrl</kbd>+<kbd>+</kbd> and <kbd>Ctrl</kbd>+<kbd>-</kbd> to adjust zoom to your preference.</p>
+                                    <p class="mb-0">The app also shows a yellow <strong>"Your browser viewport appears narrow"</strong> banner near the top of the page when it detects the window is too narrow for the meter row. Dismiss it with the <strong>×</strong> button once you have adjusted the zoom or window width.</p>
+                                </div>
+                            </div>
+                        </div>
+
                     </div><!-- /accordion -->
                 </div>
             </div>
@@ -819,7 +1070,7 @@
                         <p>Labels are stored in a file you can also edit with a text editor:</p>
                         <ul>
                             <li>The app ships with a default English labels file.</li>
-                            <li>Your saved labels live at <code>%APPDATA%\MM5AGM\FTdx101 WebApp\labels.json</code> and survive app updates.</li>
+                            <li>Your saved labels live at <code>%APPDATA%\MM5AGM\Yaesu Web Control\labels.json</code> and survive app updates.</li>
                         </ul>
                         <div class="alert alert-warning py-2 mb-0">
                             <i class="bi bi-exclamation-triangle"></i> If editing the file directly, <strong>do not change the keys</strong> (the text on the left of each colon, such as <code>"20m"</code>, <code>"swr"</code>, <code>"temp"</code>). Only change the values on the right.
@@ -831,9 +1082,9 @@
 
             <!-- Footer -->
             <div class="text-muted small text-center mb-4">
-                FTdx101 WebApp is written and maintained by mm5agm &bull;
+                Yaesu Web Control is written and maintained by mm5agm &bull;
                 <a href="https://groups.io/g/ftdx101-webapp/topics" target="_blank">Groups.io <i class="bi bi-box-arrow-up-right"></i></a> &bull;
-                <a href="https://github.com/mm5agm/FTdx101_WebApp/issues" target="_blank">GitHub Issues <i class="bi bi-box-arrow-up-right"></i></a>
+                <a href="https://github.com/mm5agm/Yaesu_Web_Control/issues" target="_blank">GitHub Issues <i class="bi bi-box-arrow-up-right"></i></a>
             </div>
 
         </div><!-- /col -->

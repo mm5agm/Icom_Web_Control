@@ -1,10 +1,10 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using IOFile = System.IO.File;
 
-namespace FTdx101_WebApp.Pages
+namespace Yaesu_Web_Control.Pages
 {
     public class LabelsModel : PageModel
     {
@@ -18,7 +18,7 @@ namespace FTdx101_WebApp.Pages
 
         private static readonly string UserLabelsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "FTdx101 WebApp", "labels.json");
+            "MM5AGM", "Yaesu Web Control", "labels.json");
 
         public LabelsModel(IWebHostEnvironment env)
         {

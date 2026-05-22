@@ -1,7 +1,7 @@
-using System.Text;
+﻿using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     /// <summary>
     /// Buffers incoming CAT serial data and splits it into complete messages

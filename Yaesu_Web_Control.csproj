@@ -58,9 +58,11 @@
 
   <PropertyGroup>
     <Version>1.4.0</Version>
-    <AssemblyTitle>MM5AGM Yaesu Control</AssemblyTitle>
-    <Product>MM5AGM Yaesu Control</Product>
-    <Description>Web-based control panel for Yaesu FTdx101 series transceivers</Description>
+    <AssemblyTitle>Yaesu Web Control</AssemblyTitle>
+    <Product>Yaesu Web Control</Product>
+    <Description>Browser-based CAT controller for Yaesu HF transceivers</Description>
+    <AssemblyName>Yaesu_Web_Control</AssemblyName>
+    <RootNamespace>Yaesu_Web_Control</RootNamespace>
     <Company>MM5AGM</Company>
     <Copyright>© 2026 MM5AGM</Copyright>
     <AssemblyConfiguration>Debug</AssemblyConfiguration>

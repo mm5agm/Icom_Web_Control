@@ -1,4 +1,4 @@
-// FTdx101 WebApp – SDR Background Service
+﻿// Yaesu Web Control – SDR Background Service
 // Manages the SDR lifecycle: open device → configure → stream IQ → FFT → broadcast.
 // No UI, no DOM. Publishes spectrum data via SignalR using the existing RadioHub
 // and the same { property, value } message envelope that WsUpdatePipeline handles.
@@ -6,10 +6,10 @@
 // Device selection is driven by ApplicationSettings.SdrDeviceKey.
 // Keys prefixed with "sdrplay:" are handled by SdrplayDevice (sdrplay_api.dll).
 
-using FTdx101_WebApp.Hubs;
+using Yaesu_Web_Control.Hubs;
 using Microsoft.AspNetCore.SignalR;
 
-namespace FTdx101_WebApp.Services.Sdr
+namespace Yaesu_Web_Control.Services.Sdr
 {
     public sealed class SdrBackgroundService : BackgroundService
     {

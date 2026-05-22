@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Mvc;
-using FTdx101_WebApp.Services;
-using FTdx101_WebApp.Models.Calibration;
+﻿using Microsoft.AspNetCore.Mvc;
+using Yaesu_Web_Control.Services;
+using Yaesu_Web_Control.Models.Calibration;
 
 [ApiController]
 [Route("api/calibration")]

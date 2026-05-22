@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Mvc.RazorPages;
+﻿using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace FTdx101_WebApp.Pages
+namespace Yaesu_Web_Control.Pages
 {
     public class CalibrationsModel : PageModel
     {

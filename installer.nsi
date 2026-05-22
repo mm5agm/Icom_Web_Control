@@ -1,6 +1,6 @@
 !define APPNAME "FTdx101 WebApp"
 !define COMPANY "MM5AGM"
-!define VERSION "1.4.0"
+!define VERSION "1.5.0"
 !define INSTALLDIR "$PROGRAMFILES64\${COMPANY}\${APPNAME}"
 Name "${APPNAME} ${VERSION}"
 OutFile "FTdx101_WebApp_Setup.exe"

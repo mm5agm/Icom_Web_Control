@@ -137,8 +137,20 @@ bin/
 obj/
 *.user
 
-# Add this line to your .gitignore file in the root of your FTdx101_WebApp repository
-
-
 FTdx101 WebApp_Setup.exe
 FTdx101_WebApp_Setup_*.exe
+Yaesu_Web_Control_Setup_*.exe
+
+# Local reference documents — not committed to repo
+docs/
+
+# Runtime logs
+*.log
+run.log
+
+# Local backup scripts
+Backup*.ps1
+
+# Local Claude Code settings
+.claude/settings.local.json
+.claude/boot-prompt.md

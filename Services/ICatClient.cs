@@ -2,14 +2,14 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public interface ICatClient : IDisposable
     {
         Task<bool> ConnectAsync(string portName, int baudRate = 38400);
         Task DisconnectAsync();
         bool IsConnected { get; }
-        Task<string> SendCommandAsync(string command, string clientId, CancellationToken cancellationToken = default);
+        Task<string> SendCommandAsync(string command, string clientId, CancellationToken cancellationToken = default, int timeoutMs = 150);
 
         // VFO-A (Main) Methods
         Task<long> ReadFrequencyAsync();

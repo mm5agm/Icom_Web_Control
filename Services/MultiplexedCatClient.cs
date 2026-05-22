@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     /// <summary>
     /// ICatClient implementation that uses the multiplexer instead of direct serial access
@@ -36,10 +36,10 @@ namespace FTdx101_WebApp.Services
 
         public void Dispose() { }
 
-        public async Task<string> SendCommandAsync(string command, string clientId, CancellationToken cancellationToken = default)
+        public async Task<string> SendCommandAsync(string command, string clientId, CancellationToken cancellationToken = default, int timeoutMs = 150)
         {
             _logger.LogWarning("[sent] {Command}", command.Trim());
-            var result = await _multiplexer.SendCommandAsync(command, clientId, cancellationToken);
+            var result = await _multiplexer.SendCommandAsync(command, clientId, cancellationToken, timeoutMs);
             return result ?? string.Empty; // Guarantees non-null return
         }
 

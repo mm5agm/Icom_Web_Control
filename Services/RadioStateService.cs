@@ -1,10 +1,10 @@
-using FTdx101_WebApp.Hubs;
+﻿using Yaesu_Web_Control.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public class RadioStateService : INotifyPropertyChanged, IRadioStateService
     {
@@ -251,6 +251,32 @@ namespace FTdx101_WebApp.Services
         private int _ifShiftB = 0;
         public int IfShiftB { get => _ifShiftB; set => SetField(ref _ifShiftB, value); }
 
+        private int _clarifierOffsetA = 0;
+        public int ClarifierOffsetA { get => _clarifierOffsetA; set => SetField(ref _clarifierOffsetA, value); }
+        private int _clarifierOffsetB = 0;
+        public int ClarifierOffsetB { get => _clarifierOffsetB; set => SetField(ref _clarifierOffsetB, value); }
+        private bool _rxClarOn = false;
+        public bool RxClarOn { get => _rxClarOn; set => SetField(ref _rxClarOn, value); }
+        private bool _txClarOn = false;
+        public bool TxClarOn { get => _txClarOn; set => SetField(ref _txClarOn, value); }
+
+        private bool _contourOnA = false;
+        public bool ContourOnA { get => _contourOnA; set => SetField(ref _contourOnA, value); }
+        private bool _contourOnB = false;
+        public bool ContourOnB { get => _contourOnB; set => SetField(ref _contourOnB, value); }
+        private bool _apfOnA = false;
+        public bool ApfOnA { get => _apfOnA; set => SetField(ref _apfOnA, value); }
+        private bool _apfOnB = false;
+        public bool ApfOnB { get => _apfOnB; set => SetField(ref _apfOnB, value); }
+        private int _contourFreqA = 800;
+        public int ContourFreqA { get => _contourFreqA; set => SetField(ref _contourFreqA, value); }
+        private int _contourFreqB = 800;
+        public int ContourFreqB { get => _contourFreqB; set => SetField(ref _contourFreqB, value); }
+        private int _apfFreqA = 0;
+        public int ApfFreqA { get => _apfFreqA; set => SetField(ref _apfFreqA, value); }
+        private int _apfFreqB = 0;
+        public int ApfFreqB { get => _apfFreqB; set => SetField(ref _apfFreqB, value); }
+
         private string _bandA = "20m";
         public string BandA { get => _bandA; set => SetField(ref _bandA, value); }
 
@@ -403,6 +429,10 @@ namespace FTdx101_WebApp.Services
         private int _txVfo = 0;
         public int TxVfo { get => _txVfo; set => SetField(ref _txVfo, value); }
 
+        // Split mode: 0 = OFF, 1 = ON (VFO A = RX, VFO B = TX), 2 = ON + Quick Split (+5 kHz)
+        private int _splitMode = 0;
+        public int SplitMode { get => _splitMode; set => SetField(ref _splitMode, value); }
+
         public RadioState GetState()
         {
             return new RadioState
@@ -438,7 +468,7 @@ namespace FTdx101_WebApp.Services
         {
             if (freq >= 1800000 && freq < 2000000) return "160m";
             if (freq >= 3500000 && freq < 4000000) return "80m";
-            if (freq >= 5351500 && freq <= 5366500) return "60m";
+            if (freq >= 5258000 && freq <= 5408000) return "60m";
             if (freq >= 7000000 && freq < 7300000) return "40m";
             if (freq >= 10100000 && freq < 10150000) return "30m";
             if (freq >= 14000000 && freq < 14350000) return "20m";
@@ -495,6 +525,16 @@ namespace FTdx101_WebApp.Services
             IfWidthB = state.IfWidthB ?? "8";
             IfShiftA = state.IfShiftA;
             IfShiftB = state.IfShiftB;
+            ClarifierOffsetA = state.ClarifierOffsetA;
+            ClarifierOffsetB = state.ClarifierOffsetB;
+            ContourOnA = state.ContourOnA;
+            ContourOnB = state.ContourOnB;
+            ContourFreqA = state.ContourFreqA > 0 ? state.ContourFreqA : 800;
+            ContourFreqB = state.ContourFreqB > 0 ? state.ContourFreqB : 800;
+            ApfOnA = state.ApfOnA;
+            ApfOnB = state.ApfOnB;
+            ApfFreqA = state.ApfFreqA;
+            ApfFreqB = state.ApfFreqB;
         }
 
         public RadioState ToRadioState()
@@ -530,7 +570,17 @@ namespace FTdx101_WebApp.Services
                 IfWidthA = IfWidthA,
                 IfWidthB = IfWidthB,
                 IfShiftA = IfShiftA,
-                IfShiftB = IfShiftB
+                IfShiftB = IfShiftB,
+                ClarifierOffsetA = ClarifierOffsetA,
+                ClarifierOffsetB = ClarifierOffsetB,
+                ContourOnA = ContourOnA,
+                ContourOnB = ContourOnB,
+                ContourFreqA = ContourFreqA,
+                ContourFreqB = ContourFreqB,
+                ApfOnA = ApfOnA,
+                ApfOnB = ApfOnB,
+                ApfFreqA = ApfFreqA,
+                ApfFreqB = ApfFreqB
             };
         }
     }

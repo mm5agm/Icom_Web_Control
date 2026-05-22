@@ -1,4 +1,4 @@
-// FTdx101 WebApp – SDRplay Device (P/Invoke into sdrplay_api.dll)
+﻿// Yaesu Web Control – SDRplay Device (P/Invoke into sdrplay_api.dll)
 // Implements ISdrDevice using the SDRplay API v3.
 // The SDRplay API is callback-based; this class bridges the native callback
 // thread to the managed consumer via a System.Threading.Channels.Channel<float[]>.
@@ -38,7 +38,7 @@
 using System.Runtime.InteropServices;
 using System.Threading.Channels;
 
-namespace FTdx101_WebApp.Services.Sdr
+namespace Yaesu_Web_Control.Services.Sdr
 {
     public sealed class SdrplayDevice : ISdrDevice
     {

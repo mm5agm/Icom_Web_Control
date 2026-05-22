@@ -2,7 +2,7 @@
 using System.IO.Ports;
 using System.Text;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     /// <summary>
     /// Central CAT multiplexer that owns the serial port and services multiple clients
@@ -194,14 +194,17 @@ namespace FTdx101_WebApp.Services
             _logger.LogInformation("✓ Initial state queried");
         }
 
-        public async Task<string?> SendCommandAsync(string command, string clientId, CancellationToken cancellationToken = default)
+        public async Task<string?> SendCommandAsync(string command, string clientId, CancellationToken cancellationToken = default, int timeoutMs = 150)
         {
+            if (_serialPort?.IsOpen != true)
+                return null;
+
             var prefix = command.Substring(0, 2);
             var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             _pendingResponses[prefix] = tcs;
             await SendToSerialPortAsync(command, cancellationToken);
 
-            var timeoutTask = Task.Delay(150, cancellationToken);
+            var timeoutTask = Task.Delay(timeoutMs, cancellationToken);
             var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
 
             _pendingResponses.TryRemove(prefix, out _);
