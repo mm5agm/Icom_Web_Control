@@ -243,7 +243,99 @@ if ($createResp.Ok) {
 Test-Status "PUT non-existent memory returns 404" -Method PUT -Path "/api/memory/999999" -Body $newMem -ExpectedStatus 404
 
 # ==============================================================================
-#  3. MEMORY RECALL
+#  3. MEMORY BANKS (no radio access -- always run)
+# ==============================================================================
+Section "Memory banks"
+
+# Seed one memory so the bank has something in it
+$bankSeed = @{
+    label             = "BankSeed"
+    frequencyHz       = 21074000
+    mode              = "USB"
+    clarifierOffsetHz = 0
+    rxClarOn          = $false
+    txClarOn          = $false
+}
+$bankSeedResp = Invoke-Api -Method POST -Path "/api/memory" -Body $bankSeed
+if ($bankSeedResp.Ok) {
+    # GET /api/memorybank -- initial list (may or may not have entries from prior runs)
+    $r = Invoke-Api -Path "/api/memorybank"
+    if ($r.Ok) { Pass "GET /api/memorybank" } else { Fail "GET /api/memorybank" "HTTP $($r.Status)" }
+
+    # Save current memories as "TestBank"
+    $saveResp = Invoke-Api -Method POST -Path "/api/memorybank/save" -Body @{ name = "TestBank" }
+    if ($saveResp.Ok) {
+        Pass "POST /api/memorybank/save (create TestBank)"
+        $bankNameReturned = ($saveResp.Body | ConvertFrom-Json).name
+        if ($bankNameReturned -eq "TestBank") {
+            Pass "Saved bank name matches"
+        } else {
+            Fail "Saved bank name matches" "got '$bankNameReturned'"
+        }
+    } else {
+        Fail "POST /api/memorybank/save (create TestBank)" "HTTP $($saveResp.Status): $($saveResp.Body)"
+    }
+
+    # TestBank should now appear in the list
+    $banks = Get-Json "/api/memorybank"
+    if ($null -ne $banks -and $banks -contains "TestBank") {
+        Pass "TestBank visible in GET /api/memorybank"
+    } else {
+        Fail "TestBank visible in GET /api/memorybank" "not found in: $($banks -join ', ')"
+    }
+
+    # Load TestBank -- replaces current memories with bank contents
+    $loadResp = Invoke-Api -Method POST -Path ("/api/memorybank/" + [System.Uri]::EscapeDataString("TestBank") + "/load")
+    if ($loadResp.Ok) {
+        Pass "POST /api/memorybank/TestBank/load"
+        # Loaded memories should contain the seeded entry
+        $loadedMems = Get-Json "/api/memory"
+        $foundSeed = $loadedMems | Where-Object { $_.frequencyHz -eq 21074000 -and $_.label -eq "BankSeed" }
+        if ($null -ne $foundSeed) {
+            Pass "Loaded bank contains seeded memory"
+        } else {
+            Fail "Loaded bank contains seeded memory" "21074000 Hz / BankSeed not found after load"
+        }
+    } else {
+        Fail "POST /api/memorybank/TestBank/load" "HTTP $($loadResp.Status): $($loadResp.Body)"
+    }
+
+    # Delete TestBank
+    $delBankResp = Invoke-Api -Method DELETE -Path ("/api/memorybank/" + [System.Uri]::EscapeDataString("TestBank"))
+    if ($delBankResp.Ok) {
+        Pass "DELETE /api/memorybank/TestBank"
+        $banksAfter = Get-Json "/api/memorybank"
+        if ($null -eq $banksAfter -or -not ($banksAfter -contains "TestBank")) {
+            Pass "Deleted bank no longer in list"
+        } else {
+            Fail "Deleted bank no longer in list" "TestBank still present"
+        }
+    } else {
+        Fail "DELETE /api/memorybank/TestBank" "HTTP $($delBankResp.Status)"
+    }
+
+    # Clean up seeded memory (load may have restored it with a new id)
+    $allAfter = Get-Json "/api/memory"
+    $toClean  = $allAfter | Where-Object { $_.label -eq "BankSeed" }
+    foreach ($m in $toClean) { Invoke-Api -Method DELETE -Path "/api/memory/$($m.id)" | Out-Null }
+
+} else {
+    Fail "Setup seed memory for bank tests" "HTTP $($bankSeedResp.Status)"
+}
+
+# Validation: empty name returns 400
+Test-Status "Save bank with empty name returns 400" `
+    -Method POST -Path "/api/memorybank/save" -Body @{ name = "" } -ExpectedStatus 400
+
+# Not found cases
+Test-Status "Load non-existent bank returns 404" `
+    -Method POST -Path "/api/memorybank/NoSuchBank99/load" -ExpectedStatus 404
+
+Test-Status "Delete non-existent bank returns 404" `
+    -Method DELETE -Path "/api/memorybank/NoSuchBank99" -ExpectedStatus 404
+
+# ==============================================================================
+#  5. MEMORY RECALL
 # ==============================================================================
 Section "Memory recall"
 
@@ -280,7 +372,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  4. MEMORY EXPORT AND IMPORT
+#  6. MEMORY EXPORT AND IMPORT
 # ==============================================================================
 Section "Memory export and import"
 
@@ -333,7 +425,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  5. CAT -- FREQUENCY
+#  7. CAT -- FREQUENCY
 # ==============================================================================
 Section "CAT -- Frequency"
 
@@ -347,7 +439,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  6. CAT -- BAND
+#  8. CAT -- BAND
 # ==============================================================================
 Section "CAT -- Band"
 
@@ -360,7 +452,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  7. CAT -- MODE
+#  9. CAT -- MODE
 # ==============================================================================
 Section "CAT -- Mode"
 
@@ -373,7 +465,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  8. CAT -- RECEIVER DSP CONTROLS (AGC, IPO, NR, NB, Auto Notch, Att)
+#  10. CAT -- RECEIVER DSP CONTROLS (AGC, IPO, NR, NB, Auto Notch, Att)
 # ==============================================================================
 Section "CAT -- Receiver DSP controls"
 
@@ -406,7 +498,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  9. CAT -- IF WIDTH, IF SHIFT, MANUAL NOTCH
+#  11. CAT -- IF WIDTH, IF SHIFT, MANUAL NOTCH
 # ==============================================================================
 Section "CAT -- IF Width, IF Shift, Manual Notch"
 
@@ -430,7 +522,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  10. CAT -- AF GAIN, MIC GAIN, POWER
+#  12. CAT -- AF GAIN, MIC GAIN, POWER
 # ==============================================================================
 Section "CAT -- Gain and power controls"
 
@@ -452,7 +544,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  11. CAT -- ANTENNA
+#  13. CAT -- ANTENNA
 # ==============================================================================
 Section "CAT -- Antenna"
 
@@ -464,7 +556,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  12. CAT -- ROOFING FILTER
+#  14. CAT -- ROOFING FILTER
 # ==============================================================================
 Section "CAT -- Roofing filter"
 
@@ -478,7 +570,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  13. CAT -- CONTOUR AND APF
+#  15. CAT -- CONTOUR AND APF
 # ==============================================================================
 Section "CAT -- Contour and APF"
 
@@ -497,7 +589,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  14. CAT -- CLARIFIER
+#  16. CAT -- CLARIFIER
 # ==============================================================================
 Section "CAT -- Clarifier"
 
@@ -515,7 +607,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  15. CAT -- SPLIT AND VFO SWAP
+#  17. CAT -- SPLIT AND VFO SWAP
 # ==============================================================================
 Section "CAT -- Split and VFO swap"
 
@@ -531,7 +623,7 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  16. CAT -- REINITIALIZE
+#  18. CAT -- REINITIALIZE
 # ==============================================================================
 Section "CAT -- Reinitialize"
 
