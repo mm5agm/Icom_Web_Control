@@ -33,7 +33,7 @@ jobs:
 
       - name: Publish 64-bit self-contained app
         run: |
-          dotnet publish FTdx101_WebApp.csproj `
+          dotnet publish Yaesu_Web_Control.csproj `
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
@@ -59,19 +59,19 @@ jobs:
           $found = Get-ChildItem -Filter "*Setup*.exe" | Select-Object -First 1
           if (!$found) { Write-Error "No *Setup*.exe found after NSIS ran"; exit 1 }
           Write-Host "NSIS produced: $($found.FullName)"
-          if ($found.Name -ne "FTdx101_WebApp_Setup.exe") {
-            Rename-Item $found.FullName "FTdx101_WebApp_Setup.exe"
-            Write-Host "Renamed to FTdx101_WebApp_Setup.exe"
+          if ($found.Name -ne "Yaesu_Web_Control_Setup.exe") {
+            Rename-Item $found.FullName "Yaesu_Web_Control_Setup.exe"
+            Write-Host "Renamed to Yaesu_Web_Control_Setup.exe"
           }
         shell: pwsh
 
       - name: Verify installer was created
         run: |
-          if (!(Test-Path "FTdx101_WebApp_Setup.exe")) {
-            Write-Error "FTdx101_WebApp_Setup.exe not found after build"
+          if (!(Test-Path "Yaesu_Web_Control_Setup.exe")) {
+            Write-Error "Yaesu_Web_Control_Setup.exe not found after build"
             exit 1
           }
-          Write-Host "OK: $('{0:N0}' -f (Get-Item FTdx101_WebApp_Setup.exe).Length) bytes"
+          Write-Host "OK: $('{0:N0}' -f (Get-Item Yaesu_Web_Control_Setup.exe).Length) bytes"
         shell: pwsh
 
       - name: Upload installer to GitHub Release
@@ -85,7 +85,7 @@ jobs:
 
           Write-Host "Uploading installer to release: $tag"
 
-          gh release upload "$tag" "FTdx101_WebApp_Setup.exe" --clobber
+          gh release upload "$tag" "Yaesu_Web_Control_Setup.exe" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh

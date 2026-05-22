@@ -1,9 +1,9 @@
-!define APPNAME "FTdx101 WebApp"
+!define APPNAME "Yaesu Web Control"
 !define COMPANY "MM5AGM"
 !define VERSION "1.5.0"
 !define INSTALLDIR "$PROGRAMFILES64\${COMPANY}\${APPNAME}"
 Name "${APPNAME} ${VERSION}"
-OutFile "FTdx101_WebApp_Setup.exe"
+OutFile "Yaesu_Web_Control_Setup.exe"
 InstallDir "${INSTALLDIR}"
 
 RequestExecutionLevel admin
@@ -45,16 +45,16 @@ Section "Install"
     ; Restore output path to app root for remaining install steps
     SetOutPath "$INSTDIR"
 
-    CreateShortCut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\FTdx101_WebApp.exe"
+    CreateShortCut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\Yaesu_Web_Control.exe"
     CreateDirectory "$SMPROGRAMS\${COMPANY}"
-    CreateShortCut "$SMPROGRAMS\${COMPANY}\${APPNAME}.lnk" "$INSTDIR\FTdx101_WebApp.exe"
+    CreateShortCut "$SMPROGRAMS\${COMPANY}\${APPNAME}.lnk" "$INSTDIR\Yaesu_Web_Control.exe"
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "DisplayName" "${APPNAME} ${VERSION}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "UninstallString" "$INSTDIR\Uninstall.exe"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "InstallLocation" "$INSTDIR"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "DisplayIcon" "$INSTDIR\FTdx101_WebApp.exe"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "DisplayIcon" "$INSTDIR\Yaesu_Web_Control.exe"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "Publisher" "${COMPANY}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "DisplayVersion" "${VERSION}"
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "EstimatedSize" 65000
@@ -62,7 +62,7 @@ SectionEnd
 
 Section "Uninstall"
     ; Stop the app if it is running before deleting files
-    ExecWait 'taskkill /F /IM FTdx101_WebApp.exe'
+    ExecWait 'taskkill /F /IM Yaesu_Web_Control.exe'
     Sleep 1500
 
     Delete "$DESKTOP\${APPNAME}.lnk"
