@@ -1,20 +1,20 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using FTdx101_WebApp.Services;
+using Yaesu_Web_Control.Services;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 // ── Single-instance guard ────────────────────────────────────────────────────
-const string MutexName = "Global\\FTdx101_WebApp_SingleInstance";
+const string MutexName = "Global\\Yaesu_Web_Control_SingleInstance";
 var mutex = new Mutex(initiallyOwned: true, name: MutexName, out bool createdNew);
 
 if (!createdNew)
 {
 #pragma warning disable CA1416
     MessageBox.Show(
-        "FTdx101 WebApp is already running.",
+        "Yaesu Web Control is already running.",
         "Already Running",
         MessageBoxButtons.OK,
         MessageBoxIcon.Information);
@@ -126,8 +126,8 @@ builder.Services.AddHostedService<MeterPollingService>();
 
 // SDR spectrum display — reads IQ samples, computes FFT, broadcasts via SignalR
 // Registered as singleton so the span-change API endpoint can call RequestRestart().
-builder.Services.AddSingleton<FTdx101_WebApp.Services.Sdr.SdrBackgroundService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<FTdx101_WebApp.Services.Sdr.SdrBackgroundService>());
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Sdr.SdrBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Sdr.SdrBackgroundService>());
 
 // Register the radio state service — reuse the same singleton instance as RadioStateService
 builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<RadioStateService>());
@@ -153,14 +153,15 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<WsjtxUdpService>()
 builder.Services.AddSingleton<ProcessStatusCacheService>();
 
 // Register radio memories service
-builder.Services.AddSingleton<FTdx101_WebApp.Services.MemoryService>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryService>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryBankService>();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddFilter((category, level) =>
 {
     // Show Information and above for WsjtxUdpService
-    if (!string.IsNullOrEmpty(category) && category.Contains("FTdx101_WebApp.Services.WsjtxUdpService"))
+    if (!string.IsNullOrEmpty(category) && category.Contains("Yaesu_Web_Control.Services.WsjtxUdpService"))
         return level >= LogLevel.Information;
     // Show Warning and above for everything else
     return level >= LogLevel.Warning;
@@ -204,16 +205,16 @@ try
     app.MapControllers();
 
     // MAP SIGNALR HUB:
-    app.MapHub<FTdx101_WebApp.Hubs.RadioHub>("/radioHub");
+    app.MapHub<Yaesu_Web_Control.Hubs.RadioHub>("/radioHub");
 
-    app.MapGet("/api/status/init", () => new { status = FTdx101_WebApp.Services.AppStatus.InitializationStatus });
+    app.MapGet("/api/status/init", () => new { status = Yaesu_Web_Control.Services.AppStatus.InitializationStatus });
 
     // Serve accessible labels from AppData — copy default on first run so users can find and edit it.
     app.MapGet("/i18n/labels.json", (IWebHostEnvironment env) =>
     {
         var userPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "FTdx101 WebApp", "labels.json");
+            "MM5AGM", "Yaesu Web Control", "labels.json");
 
         if (!File.Exists(userPath))
         {
@@ -227,8 +228,8 @@ try
 
     app.MapPost("/api/sdr/span", async (
         [Microsoft.AspNetCore.Mvc.FromQuery] double hz,
-        FTdx101_WebApp.Services.ISettingsService settings,
-        FTdx101_WebApp.Services.Sdr.SdrBackgroundService sdr) =>
+        Yaesu_Web_Control.Services.ISettingsService settings,
+        Yaesu_Web_Control.Services.Sdr.SdrBackgroundService sdr) =>
     {
         double[] valid = [250_000, 500_000, 1_024_000, 2_048_000, 2_500_000, 3_200_000];
         if (Array.IndexOf(valid, hz) < 0) return Results.BadRequest("Invalid span value.");
@@ -267,7 +268,7 @@ catch (Exception ex)
     else
     {
         MessageBox.Show(
-            $"FTdx101 WebApp failed to start:\n\n{ex.Message}",
+            $"Yaesu Web Control failed to start:\n\n{ex.Message}",
             "Startup Error",
             MessageBoxButtons.OK,
             MessageBoxIcon.Error);
