@@ -69,7 +69,7 @@ The application was written for operators who find the physical controls on the 
 - Optional real-time spectrum display and waterfall (requires an SDR connected to the 9 MHz IF output)
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
-- UK and USA band plans
+- Four IARU band plans: Region 1 (Europe, Africa, Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), and Japan (JARL)
 - Full screen reader support — compatible with NVDA and Windows Narrator
 - Windows High Contrast mode support for all gauge displays
 - Customisable accessible labels (band names, meter names, control names) for any language
@@ -94,7 +94,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), or **FTdx10** (100 W, single receiver — two VFOs but one receiver).
 4. Set **Serial Port** to the COM port your radio is connected to. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
 5. Set **Baud Rate** to match the radio's CAT baud rate. The factory default on the FTdx101 is **38400**. You can verify or change this on the radio under **Menu → CAT Rate**.
-6. Select your **Band Plan** (UK or USA).
+6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
 7. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
 
 If you see a red cross, double-check the COM port number and baud rate, then try again.
@@ -287,8 +287,15 @@ IF Shift is persisted and restored on startup.
 **Band buttons** — Click a band button (160m, 80m, 40m, etc.) to switch the VFO to that band. The radio tunes to the last-used frequency on that band. You can also navigate between band buttons with the keyboard: **Tab** moves focus into the band group, then the **left/right arrow keys** move between bands and activate the selected one immediately.
 
 Available bands depend on your band plan setting:
-- **UK:** 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m, 4m
-- **USA:** 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m
+
+| Band Plan | Bands |
+|-----------|-------|
+| IARU Region 1 (Europe, Africa, Middle East) | 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m, **4m** |
+| IARU Region 2 (Americas) | 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m |
+| IARU Region 3 (Asia-Pacific) | 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m |
+| Japan (JARL) | 160m, 80m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m |
+
+Region 1 is the only plan that includes the 4m (70 MHz) band. Japan has no 60m secondary allocation.
 
 **Segment dropdown** — After selecting a band, a dropdown appears above the frequency display showing common operating segments for that band. Select a segment to jump directly to its standard frequency and set the appropriate mode:
 
@@ -301,9 +308,11 @@ Available bands depend on your band plan setting:
 
 The last segment you used on each band is remembered, so when you return to a band the dropdown re-selects your previous segment.
 
-**60m (UK):** The 60m band shows named channels (e.g., CH1 5.2585 MHz, CH2 5.2760 MHz, etc.) instead of generic segment names.
+**60m — Region 1 and Region 3:** Shows FT8 (5.357 MHz) and USB (5.362 MHz) segments, covering the WRC-15 secondary allocation (5351.5–5366.5 kHz). Access to 60m varies by country within these regions.
 
-**60m (USA):** Shows the five FCC-designated 60m channels.
+**60m — Region 2 (Americas):** Shows the five FCC-designated channels (5.331, 5.347, 5.357, 5.372, 5.404 MHz).
+
+**60m — Japan:** No 60m secondary allocation; the 60m band does not appear for the Japan plan.
 
 ---
 
@@ -338,7 +347,7 @@ Access Settings from the navigation bar or by clicking the settings icon. Change
 | Radio Model | **FTdx101MP** (200 W, dual RX), **FTdx101D** (100 W, dual RX), or **FTdx10** (100 W, single RX) |
 | Serial Port | COM port the radio's USB/serial cable is connected to (e.g., COM3) |
 | Baud Rate | Must match the radio's CAT Rate setting. Default: 38400 |
-| Band Plan | UK or USA. Affects which bands and segment frequencies are shown |
+| Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
 
 After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success.
 
