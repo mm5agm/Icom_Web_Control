@@ -71,7 +71,7 @@ The application was written for operators who find the physical controls on the 
 
 ## 2. Installation
 
-1. Download the installer from the [GitHub Releases page](https://github.com/mm5agm/FTdx101_WebApp/releases).
+1. Download the installer from the [GitHub Releases page](https://github.com/mm5agm/Yaesu_Web_Control/releases).
 2. Run the installer. .NET 10 is bundled — you do not need to install it separately.
 3. A desktop shortcut and a Start Menu entry are created automatically.
 4. The first time you run the app, Windows may show a **Smart App Control** or **Unknown Publisher** warning. Click **More info → Run anyway** to proceed. This warning appears because the installer is not signed with a commercial certificate.
@@ -116,7 +116,7 @@ The main control panel loads. If the radio is powered on and the serial connecti
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **FTdx101_WebApp v1.3.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Yaesu_Web_Control v1.3.0**) are shown in the top-left corner.
 
 **External app buttons** (WSJT-X, JTAlert, Log4OM) appear if they are enabled in Application Setup. The colour of each button indicates status:
 
@@ -834,4 +834,4 @@ On the Accessibility Labels page, replace each label value with the French equiv
 
 ---
 
-*FTdx101 WebApp is written and maintained by mm5agm@outlook.com. For bug reports and feedback, please use the [Groups.io discussion group](https://groups.io/g/ftdx101-webapp/topics) or the [GitHub issues page](https://github.com/mm5agm/FTdx101_WebApp/issues).*
+*FTdx101 WebApp is written and maintained by mm5agm@outlook.com. For bug reports and feedback, please use the [Groups.io discussion group](https://groups.io/g/ftdx101-webapp/topics) or the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues).*
