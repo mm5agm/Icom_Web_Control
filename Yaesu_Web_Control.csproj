@@ -1,0 +1,88 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RollForward>Minor</RollForward>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>WinExe</OutputType>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <!-- Disable automatic content inclusion so we can manage wwwroot ourselves -->
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="oldFiles\**" />
+    <Compile Remove="oldFiles/Backup/**" />
+    <Content Remove="oldFiles/Backup/**" />
+    <EmbeddedResource Remove="oldFiles/Backup/**" />
+    <None Remove="oldFiles/Backup/**" />
+    <Compile Remove="YaesuCatNew\**" />
+    <Content Remove="YaesuCatNew\**" />
+    <EmbeddedResource Remove="YaesuCatNew\**" />
+    <None Remove="YaesuCatNew\**" />
+    <Compile Remove="BenchmarkSuite1\**" />
+    <Content Remove="BenchmarkSuite1\**" />
+    <EmbeddedResource Remove="BenchmarkSuite1\**" />
+    <None Remove="BenchmarkSuite1\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Models\RigState.cs" />
+    <Compile Remove="Pages\Ports..cshtml.cs" />
+    <Compile Remove="Pages\Shared\_BandButtonsPartial.cshtml.cs" />
+    <Compile Remove="Services\CatPollingService.cs" />
+    <Compile Remove="Services\IRigStateService.cs" />
+    <Compile Remove="Services\RigStateService.cs" />
+    <Compile Remove="Services\SerialPortCatClient.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="layout-old.cshtml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include=".github\FUNDING.yml" />
+    <None Include=".github\workflows\release.yml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="System.IO.Ports" Version="10.0.1" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <Version>1.4.0</Version>
+    <AssemblyTitle>Yaesu Web Control</AssemblyTitle>
+    <Product>Yaesu Web Control</Product>
+    <Description>Browser-based CAT controller for Yaesu HF transceivers</Description>
+    <AssemblyName>Yaesu_Web_Control</AssemblyName>
+    <RootNamespace>Yaesu_Web_Control</RootNamespace>
+    <Company>MM5AGM</Company>
+    <Copyright>© 2026 MM5AGM</Copyright>
+    <AssemblyConfiguration>Debug</AssemblyConfiguration>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <!-- Explicitly copy the entire wwwroot folder into the output directory -->
+  <ItemGroup>
+    <Content Include="wwwroot\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Explicitly include Razor Pages now that EnableDefaultContentItems is false -->
+  <ItemGroup>
+    <Content Include="Pages\**\*.cshtml" />
+    <Content Include="Pages\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
+
+
