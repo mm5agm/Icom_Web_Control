@@ -1,4 +1,4 @@
-namespace FTdx101_WebApp.Services
+﻿namespace Yaesu_Web_Control.Services
 {
     /// <summary>
     /// Represents the persistent state of the radio (both receivers A and B).
@@ -130,6 +130,30 @@ namespace FTdx101_WebApp.Services
         /// </summary>
         public int ClarifierOffsetA { get; set; } = 0;
         public int ClarifierOffsetB { get; set; } = 0;
+
+        /// <summary>
+        /// Contour filter on/off per VFO
+        /// </summary>
+        public bool ContourOnA { get; set; } = false;
+        public bool ContourOnB { get; set; } = false;
+
+        /// <summary>
+        /// Contour filter frequency in Hz per VFO (100–3200 Hz FTdx101/10/710; 100–4000 Hz FTDX3000)
+        /// </summary>
+        public int ContourFreqA { get; set; } = 800;
+        public int ContourFreqB { get; set; } = 800;
+
+        /// <summary>
+        /// APF (Audio Peak Filter) on/off per VFO
+        /// </summary>
+        public bool ApfOnA { get; set; } = false;
+        public bool ApfOnB { get; set; } = false;
+
+        /// <summary>
+        /// APF frequency offset in Hz per VFO (-250 to +250 Hz)
+        /// </summary>
+        public int ApfFreqA { get; set; } = 0;
+        public int ApfFreqB { get; set; } = 0;
 
         /// <summary>
         /// Additional controls and settings (for future expansion)

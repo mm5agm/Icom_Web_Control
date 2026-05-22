@@ -1,4 +1,4 @@
-namespace FTdx101_WebApp.Models
+﻿namespace Yaesu_Web_Control.Models
 {
     public class ApplicationSettings
     {
@@ -34,7 +34,7 @@ namespace FTdx101_WebApp.Models
         public RadioState LastRadioState { get; set; } = new();
 
         // Band Plan
-        public string BandPlan { get; set; } = "UK";
+        public string BandPlan { get; set; } = "Region1";
 
         // SDR Spectrum Display
         // SdrDeviceKey: the SoapySDR args string identifying the device (e.g. "driver=rtlsdr,serial=00000001").

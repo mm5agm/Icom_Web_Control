@@ -18,6 +18,11 @@
     user-select: none;
     white-space: nowrap;
 }
+/* Save-to-memory buttons under S-meters */
+#saveMemBtnA, #saveMemBtnB {
+    font-weight: 700 !important;
+}
+
 /* Ensure analog meter containers allow overlays to position absolutely */
 .analog-meter-container {
     position: relative;
@@ -426,11 +431,11 @@ pre, code { tab-size: 4; }
 /* Band segment dropdown — narrow, bold text */
 .segment-select {
     width: fit-content;
-    min-width: 6rem;
-    max-width: 10rem;
+    min-width: 3.5rem;
+    max-width: 5.8rem;
     font-weight: bold;
     font-size: 0.8rem;
-    padding-right: 1.5rem;
+    padding-right: 2.25rem;
 }
 
 /* Maximize usable width for receiver panels */
@@ -756,6 +761,7 @@ fieldset.calibration-card {
 
 .fkb-dialog {
     position: fixed;
+    inset: 0;
     margin: auto;
     padding: 0;
     border: 2px solid #444;
@@ -925,6 +931,7 @@ fieldset.calibration-card {
 .fkb-open-btn {
     padding: 1px 6px;
     font-size: 0.9rem;
+    color: #000 !important;
 }
 
 /* ── Memories Panel Dialog ───────────────────────────────────────────────── */

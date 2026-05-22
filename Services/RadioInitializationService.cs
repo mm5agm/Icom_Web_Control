@@ -5,10 +5,10 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using FTdx101_WebApp.Hubs;
+using Yaesu_Web_Control.Hubs;
 using System.Diagnostics; // Place at the top of the file if not already present
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public class RadioInitializationService : BackgroundService
     {

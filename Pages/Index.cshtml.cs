@@ -1,11 +1,11 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using FTdx101_WebApp.Services;
+using Yaesu_Web_Control.Services;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.Json;
 
-namespace FTdx101_WebApp.Pages
+namespace Yaesu_Web_Control.Pages
 {
     // Add this at the top or in a suitable namespace
     public class RadioStateViewModel
@@ -50,7 +50,7 @@ namespace FTdx101_WebApp.Pages
         public int MicGain { get; set; } = 50;
 
         public double SdrSampleRateHz { get; set; } = 2_048_000;
-        public string BandPlan { get; set; } = "UK";
+        public string BandPlan { get; set; } = "Region1";
         public string RadioModel { get; set; } = "FTdx101MP";
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
 
@@ -60,7 +60,7 @@ namespace FTdx101_WebApp.Pages
 
         public async Task<IActionResult> OnGetAsync()
         {
-            if (FTdx101_WebApp.Services.AppStatus.InitializationStatus == "error")
+            if (Yaesu_Web_Control.Services.AppStatus.InitializationStatus == "error")
             {
                 return RedirectToPage("/Settings");
             }
@@ -74,7 +74,7 @@ namespace FTdx101_WebApp.Pages
             App2Name = settings.App2Name;
             App3Name = settings.App3Name;
             SdrSampleRateHz = settings.SdrSampleRateHz;
-            BandPlan = settings.BandPlan;
+            BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;
 

@@ -2,7 +2,7 @@
 using System.IO.Ports;
 using System.Collections.Generic;
 
-namespace FTdx101_WebApp.Pages
+namespace Yaesu_Web_Control.Pages
 {
     public class PortsModel : PageModel
     {

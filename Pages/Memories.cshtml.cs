@@ -1,8 +1,8 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using FTdx101_WebApp.Services;
+using Yaesu_Web_Control.Services;
 
-namespace FTdx101_WebApp.Pages
+namespace Yaesu_Web_Control.Pages
 {
     public class MemoriesModel : PageModel
     {

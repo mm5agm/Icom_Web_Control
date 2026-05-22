@@ -1,9 +1,9 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Hosting;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public class RadioStatePersistenceService
     {
@@ -18,7 +18,7 @@ namespace FTdx101_WebApp.Services
             _logger = logger;
 
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var stateDir = Path.Combine(appDataPath, "MM5AGM", "FTdx101 WebApp");
+            var stateDir = Path.Combine(appDataPath, "MM5AGM", "Yaesu Web Control");
             Directory.CreateDirectory(stateDir);
             _filePath = Path.Combine(stateDir, "radio_state.json");
         }

@@ -1,5 +1,5 @@
 ﻿@page
-@model FTdx101_WebApp.Pages.SettingsModel
+@model Yaesu_Web_Control.Pages.SettingsModel
 
 <div class="mt-4">
 
@@ -242,13 +242,17 @@
                             <span asp-validation-for="Settings.BaudRate" class="text-danger"></span>
                         </div>
                         <div class="mb-3">
-                            <label asp-for="Settings.BandPlan" class="form-label">Band Plan</label>
+                            <label asp-for="Settings.BandPlan" class="form-label">Band Plan / IARU Region</label>
                             <select asp-for="Settings.BandPlan" class="form-select">
-                                <option value="UK">UK (includes 4m, 60m channels per Ofcom/IARU R1)</option>
-                                <option value="USA">USA (FCC Part 97, 5 × 60m channels)</option>
+                                <option value="Region1">IARU Region 1 — Europe, Africa, Middle East (includes 4m)</option>
+                                <option value="Region2">IARU Region 2 — Americas (USA FCC Part 97 reference)</option>
+                                <option value="Region3">IARU Region 3 — Asia-Pacific</option>
+                                <option value="Japan">Japan (JARL band plan)</option>
                             </select>
                             <div class="form-text">
                                 Determines the segment frequencies shown in the VFO band dropdowns (CW, FT8, SSB, RTTY).
+                                UK is in Region 1; USA, Canada, and South America are in Region 2;
+                                Australia, New Zealand, and most of Asia (except Japan) are in Region 3.
                             </div>
                             <span asp-validation-for="Settings.BandPlan" class="text-danger"></span>
                         </div>

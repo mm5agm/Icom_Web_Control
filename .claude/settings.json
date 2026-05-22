@@ -5,11 +5,15 @@
       "Bash(cmake -S \"C:/deps/hackrf/host\" -B \"C:/build/hackrf\" -G \"Visual Studio 18 2022\" -A x64 \"-DLIBUSB_INCLUDE_DIR=C:/deps/libusb/include\" \"-DLIBUSB_LIBRARIES=C:/deps/libusb/VS2022/MS64/dll/libusb-1.0.lib\" \"-DCMAKE_INSTALL_PREFIX=C:/deps/hackrf/install\")",
       "Bash(xargs cat:*)",
       "Bash(powershell -Command \"Get-Content 'c:/Users/colin/source/repos/FTdx101_WebApp/installer/Installer.csproj'\")",
-      "Read(//c/Users/colin/source/YaesuCatNew/**)"
+      "Read(//c/Users/colin/source/YaesuCatNew/**)",
+      "Bash(pdftotext \"c:\\\\\\\\Users\\\\\\\\colin\\\\\\\\source\\\\\\\\repos\\\\\\\\FTdx101_WebApp\\\\\\\\docs\\\\\\\\manuals\\\\\\\\FT-710_CAT_OM_ENG_2306-C.pdf\" -)",
+      "Bash(sed -n '/^Command.*Function.*Set.*Read.*Ans/,/^$/p' /tmp/ft991a_cat.txt | head -150)",
+      "WebFetch(domain:www.manualslib.com)"
     ],
     "additionalDirectories": [
       "C:\\build",
-      "C:\\deps\\rtlsdr"
+      "C:\\deps\\rtlsdr",
+      "\\tmp"
     ]
   }
 }

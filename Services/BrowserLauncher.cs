@@ -1,7 +1,7 @@
-// BrowserLauncher.cs
+﻿// BrowserLauncher.cs
 using System.Diagnostics;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public class BrowserLauncher
     {

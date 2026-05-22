@@ -1,10 +1,10 @@
-// FTdx101 WebApp – FFT Processor
+﻿// Yaesu Web Control – FFT Processor
 // Pure functions only. No UI, no DOM, no WebSocket, no SignalR, no side effects.
 // Converts a buffer of interleaved float IQ samples into a dBFS spectrum array.
 
 using MathNet.Numerics.IntegralTransforms;
 
-namespace FTdx101_WebApp.Services.Sdr
+namespace Yaesu_Web_Control.Services.Sdr
 {
     internal static class FftProcessor
     {

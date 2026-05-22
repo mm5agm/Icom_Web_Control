@@ -1,10 +1,10 @@
-// FTdx101 WebApp – SoapySDR Device
+﻿// Yaesu Web Control – SoapySDR Device
 // Implements ISdrDevice using the existing SoapySdrInterop P/Invoke wrapper.
 // The SoapySDR API is pull-based (blocking ReadStream), so no Channel or
 // callback bridging is needed.  Task.Run is used to keep the read off the
 // async thread pool so it does not block other work.
 
-namespace FTdx101_WebApp.Services.Sdr
+namespace Yaesu_Web_Control.Services.Sdr
 {
     public sealed class SoapySdrDevice : ISdrDevice
     {

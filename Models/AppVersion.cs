@@ -1,4 +1,4 @@
-namespace FTdx101_WebApp;
+﻿namespace Yaesu_Web_Control;
 
 public static class AppVersion
 {

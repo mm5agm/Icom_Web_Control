@@ -1,4 +1,4 @@
-namespace FTdx101_WebApp.Services.Sdr
+﻿namespace Yaesu_Web_Control.Services.Sdr
 {
     /// <summary>
     /// Describes a SoapySDR device found during enumeration.

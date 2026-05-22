@@ -1,11 +1,11 @@
-// FTdx101 WebApp – SoapySDR P/Invoke Wrapper
+﻿// Yaesu Web Control – SoapySDR P/Invoke Wrapper
 // Thin, isolated interop layer. No UI, no SignalR, no calibration.
 // All public methods are safe to call even if SoapySDR.dll is not installed —
 // EnumerateDevices() returns an empty list, all others throw InvalidOperationException.
 
 using System.Runtime.InteropServices;
 
-namespace FTdx101_WebApp.Services.Sdr
+namespace Yaesu_Web_Control.Services.Sdr
 {
     internal static class SoapySdrInterop
     {

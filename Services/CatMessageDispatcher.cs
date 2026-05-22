@@ -1,4 +1,4 @@
-namespace FTdx101_WebApp.Services
+﻿namespace Yaesu_Web_Control.Services
 {
     /// <summary>
     /// Routes CAT messages to appropriate handlers and updates radio state
@@ -270,6 +270,67 @@ namespace FTdx101_WebApp.Services
                                 int offset = message[5] == '-' ? -offsetAbs : offsetAbs;
                                 if (cfVfo == '0') _stateService.ClarifierOffsetA = offset;
                                 else               _stateService.ClarifierOffsetB = offset;
+                            }
+                        }
+                        break;
+                    case "CO":
+                        // FTdx101/FTdx10/FT-710: CO[P1][P2][VVVV]; (9 chars)
+                        //   P1=0/1, P2=0(ContourOn),1(ContourFreq),2(ApfOn),3(ApfFreq)
+                        // FTDX3000: CO[PP][VV]; (7 chars)
+                        //   PP=00(mode:0=off,1=contour,2=APF), 01(contourFreq), 02(apfFreq)
+                        if (message.Length == 7)
+                        {
+                            // FTDX3000 format
+                            string pp = message.Substring(2, 2);
+                            if (int.TryParse(message.Substring(4, 2), out int coVv))
+                            {
+                                switch (pp)
+                                {
+                                    case "00":
+                                        _stateService.ContourOnA = coVv == 1;
+                                        _stateService.ApfOnA     = coVv == 2;
+                                        _stateService.ContourOnB = coVv == 1;
+                                        _stateService.ApfOnB     = coVv == 2;
+                                        break;
+                                    case "01":
+                                        _stateService.ContourFreqA = coVv * 100;
+                                        _stateService.ContourFreqB = coVv * 100;
+                                        break;
+                                    case "02":
+                                        int apfHz3000 = (coVv - 10) * 25;
+                                        _stateService.ApfFreqA = apfHz3000;
+                                        _stateService.ApfFreqB = apfHz3000;
+                                        break;
+                                }
+                            }
+                        }
+                        else if (message.Length >= 9)
+                        {
+                            // FTdx101/FTdx10/FT-710 format
+                            bool vfoB = message[2] == '1';
+                            char p2   = message[3];
+                            if (int.TryParse(message.Substring(4, 4), out int coVvvv))
+                            {
+                                switch (p2)
+                                {
+                                    case '0':
+                                        if (vfoB) _stateService.ContourOnB = coVvvv == 1;
+                                        else       _stateService.ContourOnA = coVvvv == 1;
+                                        break;
+                                    case '1':
+                                        if (vfoB) _stateService.ContourFreqB = coVvvv;
+                                        else       _stateService.ContourFreqA = coVvvv;
+                                        break;
+                                    case '2':
+                                        if (vfoB) _stateService.ApfOnB = coVvvv == 1;
+                                        else       _stateService.ApfOnA = coVvvv == 1;
+                                        break;
+                                    case '3':
+                                        int apfHz = (coVvvv - 25) * 10;
+                                        if (vfoB) _stateService.ApfFreqB = apfHz;
+                                        else       _stateService.ApfFreqA = apfHz;
+                                        break;
+                                }
                             }
                         }
                         break;

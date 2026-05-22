@@ -1,12 +1,12 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
-namespace FTdx101_WebApp.Services
+namespace Yaesu_Web_Control.Services
 {
     public class MemoryService
     {
         public static readonly string MemoriesPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "FTdx101 WebApp", "memories.json");
+            "MM5AGM", "Yaesu Web Control", "memories.json");
 
         private readonly SemaphoreSlim _lock = new(1, 1);
         private List<AppMemory> _memories = new();
