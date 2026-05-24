@@ -113,7 +113,7 @@ http://localhost:8080
 
 The main control panel loads. If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio.
 
-**Closing the app:** When you close the browser tab or window, the app detects that no browser is connected and begins a 30-second countdown. If you reopen the page within those 30 seconds (for example after a page refresh or accidentally closing the tab) the countdown cancels and the app continues normally. If no browser reconnects within 30 seconds the application exits automatically and disappears from Task Manager.
+**Closing the app:** When you close the browser tab or window, the app detects that no browser is connected and begins a 30-second countdown. If you reopen the page within those 30 seconds (for example after a page refresh or accidentally closing the tab) the countdown cancels and the app continues normally. If no browser reconnects within 30 seconds the application exits automatically and disappears from Task Manager. If you need to force-quit immediately, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Yaesu_Web_Control.exe** in the list, and click **End Task**.
 
 **Accessing the app from another device:** If you set **Network Interface** to `0.0.0.0 (all interfaces)` in Settings (the default), the app is also accessible from any device on your local network. The Settings page shows the full URL for each network interface — bookmark one of these on your tablet or phone.
 
@@ -193,6 +193,10 @@ There are two VFO panels side by side:
 - **VFO B** (green border) — the sub-receiver, present on all supported radios.
 
 Both panels have identical controls. All settings are independent — changing a control in VFO A does not affect VFO B.
+
+**VFO-B toggle** — the **VFO-B** button in the toolbar shows or hides the VFO B panel. The last state is remembered across sessions.
+
+**A↔B Swap** — the **A↔B** button in the toolbar swaps the frequencies between VFO A and VFO B in one click. This button is only available on dual-receiver radios (FTdx101MP, FTdx101D, FTDX3000). It is not shown on the FTdx10 or FT-710 because those radios use a memory-based VFO B — activating it with the swap command causes the radio to display "Memory mode" rather than performing a straightforward frequency swap.
 
 ---
 
@@ -716,7 +720,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 **App shuts down unexpectedly after closing the browser**
 
-- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting. If you want to keep the app running (for example while WSJT-X is using it via rigctld), leave a browser tab open on the main page.
+- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting. If you want to keep the app running (for example while WSJT-X is using it via rigctld), leave a browser tab open on the main page. If you need to force-quit immediately without waiting, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Yaesu_Web_Control.exe**, and click **End Task**.
 
 **Cannot access the app from a tablet**
 
