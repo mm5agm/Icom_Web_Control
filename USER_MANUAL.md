@@ -564,6 +564,21 @@ The JTAlert button in the top bar launches JTAlert and shows green when it is ru
 
 ### 9.3 Log4OM
 
+Log4OM integrates with Yaesu Web Control in two ways: radio control via rigctld, and receiving WSJT-X decodes via UDP.
+
+#### Radio control (rigctld) — do not use Omni-rig
+
+Yaesu Web Control includes a built-in rigctld server on TCP port 4532. Log4OM can connect to this for radio control (frequency, mode). **You do not need Omni-rig** — and if Omni-rig is running at the same time as Yaesu Web Control, both will compete for the same serial port and one will fail.
+
+To configure Log4OM to use rigctld:
+
+1. In Log4OM, go to **Settings → Program Configuration → Rig Control**.
+2. Set the rig type to **Hamlib** (or **rigctld / NET rigctl**).
+3. Set the address to **localhost** and the port to **4532**.
+4. Disable or uninstall Omni-rig if it is currently configured for this radio.
+
+#### Receiving WSJT-X decodes
+
 Configure Log4OM to receive WSJT-X decodes:
 
 1. In Log4OM, go to **Settings → Program Configuration → Software Integration → Connections**.
@@ -668,7 +683,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 **Frequency display shows 0 or does not update**
 
 - The radio may not be responding to CAT commands. Test the connection from the Settings page.
-- Check that no other software (e.g., another instance of the app, Ham Radio Deluxe, WSJT-X in direct CAT mode) is using the same COM port.
+- Check that no other software (e.g., another instance of the app, Ham Radio Deluxe, WSJT-X in direct CAT mode, Omni-rig) is using the same COM port. If you use Log4OM with Omni-rig, see Section 9.3 — Omni-rig is not needed and will conflict with this app.
 
 **WSJT-X does not show as connected**
 
