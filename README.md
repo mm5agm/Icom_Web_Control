@@ -95,6 +95,22 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 ## Release Notes
 
+## 2026-05-24 - v1.5.2
+
+### Fixed
+
+- **Server freeze / ERR_CONNECTION_REFUSED** — the app was shutting itself down whenever the user switched browser tabs or minimised the window for more than 30 seconds. The shutdown timer is now only triggered when the browser tab is actually closed or navigated away from.
+- **Memory recall frequency offset (~700 Hz)** — when recalling a memory channel on FTdx10 (and other modes that apply a carrier offset, such as CW), the VFO would land roughly 700 Hz from the correct frequency. The recall sequence now sets the mode first, then the frequency, so the radio applies the correct offset before tuning.
+- **VFO-B Show/Hide toggle not responding** — a duplicate click listener in the JavaScript caused the toggle to cancel itself. Fixed; the Show/Hide VFO-B button now works reliably.
+- **Swap button entering Memory mode on FTdx10 and FT-710** — the Swap button sent the SV CAT command, which activates memory-based VFO-B on single-receiver radios. The Swap button is now hidden for FTdx10 and FT-710.
+- **VDD supply voltage meter reading 44.7 V on FTdx10** — the Temperature, IDD (drain current), and VDD (supply voltage) meters are specific to the high-voltage PA board in the FTdx101MP, FTdx101D, and FTDX3000. These meters are now hidden for FTdx10 and FT-710.
+
+### Changed
+
+- **User manual** — updated to document meter availability by model, VFO swap limitation on single-receiver radios, the 30-second shutdown grace period and how to force-quit using Task Manager, Log4OM rigctld setup, and Omni-rig conflict note.
+
+---
+
 ## 2026-05-22 - v1.5.1
 
 ### Fixed
