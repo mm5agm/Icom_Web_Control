@@ -9,6 +9,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
 
     <!-- Disable automatic content inclusion so we can manage wwwroot ourselves -->
     <EnableDefaultContentItems>false</EnableDefaultContentItems>

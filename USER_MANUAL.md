@@ -62,7 +62,7 @@ The application was written for operators who find the physical controls on the 
 
 - Large, readable frequency displays with digit-by-digit mouse-wheel tuning and an on-screen frequency keyboard
 - Full dual-receiver control (VFO A and VFO B)
-- Live S-meter, power, SWR, ALC, temperature, IDD, VDD, and compression meters
+- Live S-meter, power, SWR, ALC, and compression meters (plus PA temperature, IDD, and VDD on FTdx101MP, FTdx101D, and FTDX3000)
 - Real-time two-way sync — changes on the radio front panel appear immediately in the app, and vice versa
 - Band and segment selectors for fast QSY to CW, FT8, SSB, or RTTY
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
@@ -113,7 +113,7 @@ http://localhost:8080
 
 The main control panel loads. If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio.
 
-**Closing the app:** When you close the browser tab or window, the app detects that no browser is connected and begins a 30-second countdown. If you reopen the page within those 30 seconds (for example after a page refresh or accidentally closing the tab) the countdown cancels and the app continues normally. If no browser reconnects within 30 seconds the application exits automatically and disappears from Task Manager.
+**Closing the app:** When you close the browser tab or window, the app detects that no browser is connected and begins a 30-second countdown. If you reopen the page within those 30 seconds (for example after a page refresh or accidentally closing the tab) the countdown cancels and the app continues normally. If no browser reconnects within 30 seconds the application exits automatically and disappears from Task Manager. If you need to force-quit immediately, open Windows Task Manager (**Ctrl+Shift+Esc**, or **Ctrl+Alt+Del** then select Task Manager), find **Yaesu_Web_Control.exe** in the list, and click **End Task**.
 
 **Accessing the app from another device:** If you set **Network Interface** to `0.0.0.0 (all interfaces)` in Settings (the default), the app is also accessible from any device on your local network. The Settings page shows the full URL for each network interface — bookmark one of these on your tablet or phone.
 
@@ -143,7 +143,9 @@ The **WSJT-X** button also shows a red **TX** badge when WSJT-X is currently tra
 
 ### 5.2 Meters
 
-Seven meters are displayed in a scrollable row above the VFO panels:
+A scrollable row of meters is displayed above the VFO panels. The meters shown depend on your radio model:
+
+**FTdx101MP, FTdx101D, FTDX3000** — seven meters:
 
 | Meter | What it shows |
 |-------|--------------|
@@ -153,11 +155,13 @@ Seven meters are displayed in a scrollable row above the VFO panels:
 | ALC | Automatic Level Control voltage — only active during transmit |
 | Temp | PA temperature in °C |
 | IDD | PA drain current in amps |
-| VDD | PA drain voltage in volts |
+| VDD | PA supply voltage in volts |
+
+**FTdx10, FT-710** — four meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.
 
 All meters update in real time at approximately 10 times per second. Meters that only apply to transmit automatically read zero when the radio is receiving.
 
-The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 9 (Meter Calibration) if you want to adjust the calibration for your specific radio.
+The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your specific radio.
 
 ---
 
@@ -193,6 +197,10 @@ There are two VFO panels side by side:
 - **VFO B** (green border) — the sub-receiver, present on all supported radios.
 
 Both panels have identical controls. All settings are independent — changing a control in VFO A does not affect VFO B.
+
+**VFO-B toggle** — the **VFO-B** button in the toolbar shows or hides the VFO B panel. The last state is remembered across sessions.
+
+**A↔B Swap** — the **A↔B** button in the toolbar swaps the frequencies between VFO A and VFO B in one click. This button is only available on dual-receiver radios (FTdx101MP, FTdx101D, FTDX3000). It is not shown on the FTdx10 or FT-710 because those radios use a memory-based VFO B — activating it with the swap command causes the radio to display "Memory mode" rather than performing a straightforward frequency swap.
 
 ---
 
@@ -564,6 +572,21 @@ The JTAlert button in the top bar launches JTAlert and shows green when it is ru
 
 ### 9.3 Log4OM
 
+Log4OM integrates with Yaesu Web Control in two ways: radio control via rigctld, and receiving WSJT-X decodes via UDP.
+
+#### Radio control (rigctld) — do not use Omni-rig
+
+Yaesu Web Control includes a built-in rigctld server on TCP port 4532. Log4OM can connect to this for radio control (frequency, mode). **You do not need Omni-rig** — and if Omni-rig is running at the same time as Yaesu Web Control, both will compete for the same serial port and one will fail.
+
+To configure Log4OM to use rigctld:
+
+1. In Log4OM, go to **Settings → Program Configuration → Rig Control**.
+2. Set the rig type to **Hamlib** (or **rigctld / NET rigctl**).
+3. Set the address to **localhost** and the port to **4532**.
+4. Disable or uninstall Omni-rig if it is currently configured for this radio.
+
+#### Receiving WSJT-X decodes
+
 Configure Log4OM to receive WSJT-X decodes:
 
 1. In Log4OM, go to **Settings → Program Configuration → Software Integration → Connections**.
@@ -668,7 +691,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 **Frequency display shows 0 or does not update**
 
 - The radio may not be responding to CAT commands. Test the connection from the Settings page.
-- Check that no other software (e.g., another instance of the app, Ham Radio Deluxe, WSJT-X in direct CAT mode) is using the same COM port.
+- Check that no other software (e.g., another instance of the app, Ham Radio Deluxe, WSJT-X in direct CAT mode, Omni-rig) is using the same COM port. If you use Log4OM with Omni-rig, see Section 9.3 — Omni-rig is not needed and will conflict with this app.
 
 **WSJT-X does not show as connected**
 
@@ -701,7 +724,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 **App shuts down unexpectedly after closing the browser**
 
-- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting. If you want to keep the app running (for example while WSJT-X is using it via rigctld), leave a browser tab open on the main page.
+- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting. If you want to keep the app running (for example while WSJT-X is using it via rigctld), leave a browser tab open on the main page. If you need to force-quit immediately without waiting, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Yaesu_Web_Control.exe**, and click **End Task**.
 
 **Cannot access the app from a tablet**
 

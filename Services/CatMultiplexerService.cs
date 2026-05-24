@@ -78,7 +78,11 @@ namespace Yaesu_Web_Control.Services
 
         public async Task<bool> ConnectAsync(string portName, int baudRate = 38400)
         {
-            await _serialSemaphore.WaitAsync();
+            if (!await _serialSemaphore.WaitAsync(5000))
+            {
+                _logger.LogError("ConnectAsync: timed out waiting for serial semaphore — possible deadlock");
+                return false;
+            }
             try
             {
                 if (_serialPort?.IsOpen == true)
@@ -287,7 +291,9 @@ namespace Yaesu_Web_Control.Services
 
         public async Task DisconnectAsync()
         {
-            await _serialSemaphore.WaitAsync();
+            bool acquired = await _serialSemaphore.WaitAsync(5000);
+            if (!acquired)
+                _logger.LogWarning("DisconnectAsync: timed out waiting for serial semaphore — forcing disconnect without lock");
             try
             {
                 _cancellationTokenSource.Cancel();
@@ -324,7 +330,7 @@ namespace Yaesu_Web_Control.Services
             }
             finally
             {
-                _serialSemaphore.Release();
+                if (acquired) _serialSemaphore.Release();
             }
         }
 

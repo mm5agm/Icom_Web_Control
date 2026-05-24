@@ -160,10 +160,12 @@
                     style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B">
                 VFO-B
             </button>
+            @if (!isFtdx10 && !isFt710) {
             <button id="swapVfoBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Swap VFO A and VFO B frequencies">
                 A&#8596;B
             </button>
+            }
             <button id="splitBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Toggle Split: VFO A = receive, VFO B = transmit">
                 Split
@@ -209,24 +211,26 @@
                                 <canvas id="alcMeterCanvas" role="img" aria-hidden="true" aria-label="ALC meter" data-a11y-key="meters.alc"></canvas>
                             </div>
                         </div>
-                        <!-- PA Temperature Meter -->
+                        @if (!isFtdx10 && !isFt710) {
+                        <!-- PA Temperature Meter — FTdx101/FTDX3000 only (high-voltage PA board) -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="tempMeterCanvas" role="img" aria-hidden="true" aria-label="Amplifier temperature meter" data-a11y-key="meters.temp"></canvas>
                             </div>
                         </div>
-                        <!-- IDD Meter -->
+                        <!-- IDD Meter — FTdx101/FTDX3000 only -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="iddMeterCanvas" role="img" aria-hidden="true" aria-label="Drain current meter" data-a11y-key="meters.idd"></canvas>
                             </div>
                         </div>
-                        <!-- VDD Meter -->
+                        <!-- VDD Meter — FTdx101/FTDX3000 only -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="vddMeterCanvas" role="img" aria-hidden="true" aria-label="Amplifier supply voltage meter" data-a11y-key="meters.vdd"></canvas>
                             </div>
                         </div>
+                        }
                     </div>
                     <!-- Power and MIC Gain on one row -->
                     <div class="d-flex align-items-center gap-2 mb-2 closer-to-raw-power" style="margin-top: -18px !important; flex-wrap: wrap;">
@@ -1225,13 +1229,11 @@
             }
         }
 
-        if (!@(isFtdx10 ? "true" : "false")) {
-            document.getElementById('vfoBToggleBtn')?.addEventListener('click', function () {
-                const newVisible = !getVisible();
-                localStorage.setItem(STORAGE_KEY, String(newVisible));
-                applyVisibility(newVisible);
-            });
-        }
+        document.getElementById('vfoBToggleBtn')?.addEventListener('click', function () {
+            const newVisible = !getVisible();
+            localStorage.setItem(STORAGE_KEY, String(newVisible));
+            applyVisibility(newVisible);
+        });
 
         applyVisibility(getVisible());
     })();

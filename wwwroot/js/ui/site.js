@@ -89,33 +89,19 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }, 5000);
     }
-    // Use 'unload', 'beforeunload', and 'visibilitychange' for best reliability
-    window.addEventListener('unload', function (e) {
+    // Stop heartbeat connection only when the tab is actually closing/navigating away.
+    // visibilitychange (tab switch, minimise) must NOT stop it — that fired the 30-second
+    // shutdown timer whenever the user alt-tabbed, causing ERR_CONNECTION_REFUSED.
+    function _stopHeartbeat() {
         if (window.signalRConnection && window.signalRConnection.stop) {
             window.signalRConnection.stop();
-            if (window.signalRHeartbeatInterval) {
-                clearInterval(window.signalRHeartbeatInterval);
-            }
         }
-    });
-    window.addEventListener('beforeunload', function () {
-        if (window.signalRConnection && window.signalRConnection.stop) {
-            window.signalRConnection.stop();
-            if (window.signalRHeartbeatInterval) {
-                clearInterval(window.signalRHeartbeatInterval);
-            }
+        if (window.signalRHeartbeatInterval) {
+            clearInterval(window.signalRHeartbeatInterval);
         }
-    });
-    document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'hidden') {
-            if (window.signalRConnection && window.signalRConnection.stop) {
-                window.signalRConnection.stop();
-                if (window.signalRHeartbeatInterval) {
-                    clearInterval(window.signalRHeartbeatInterval);
-                }
-            }
-        }
-    });
+    }
+    window.addEventListener('unload', _stopHeartbeat);
+    window.addEventListener('beforeunload', _stopHeartbeat);
 });
 // FTdx101 Web App - site.js
 // =============================================================================
@@ -1271,28 +1257,10 @@ window.addEventListener('DOMContentLoaded', () => {
     pollInitStatus();
         updateBandButtonsFromBackend();
 
-    // VFO-B show/hide toggle
-    const vfoBToggleBtn = document.getElementById('vfoBToggleBtn');
-    const vfoBCol = document.getElementById('vfoBCol');
-    if (vfoBToggleBtn && vfoBCol) {
-        const STORAGE_KEY = 'vfoBVisible';
-        const isVisible = localStorage.getItem(STORAGE_KEY) !== 'false';
-        if (!isVisible) {
-            vfoBCol.style.display = 'none';
-            vfoBToggleBtn.classList.add('active');
-            vfoBToggleBtn.setAttribute('aria-pressed', 'true');
-        } else {
-            vfoBToggleBtn.setAttribute('aria-pressed', 'false');
-        }
-        vfoBToggleBtn.setAttribute('aria-label', 'Show or hide VFO B panel');
-        vfoBToggleBtn.addEventListener('click', function () {
-            const hidden = vfoBCol.style.display === 'none';
-            vfoBCol.style.display = hidden ? '' : 'none';
-            vfoBToggleBtn.classList.toggle('active', !hidden);
-            vfoBToggleBtn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
-            localStorage.setItem(STORAGE_KEY, hidden ? 'true' : 'false');
-        });
-    }
+    // VFO-B show/hide toggle — click handler is in Index.cshtml (applyVisibility).
+    // Only set the aria-label here; do not add a second click listener.
+    document.getElementById('vfoBToggleBtn')
+        ?.setAttribute('aria-label', 'Show or hide VFO B panel');
 
     // Split / Swap VFO button handlers
     document.getElementById('splitBtn')?.addEventListener('click', () => setSplit(splitMode > 0 ? 0 : 1));
