@@ -84,17 +84,19 @@ namespace Yaesu_Web_Control.Controllers
             var settings = await _settingsService.GetSettingsAsync();
             bool useCf = settings.RadioModel is "FTdx10" or "FT-710";
 
-            // Set frequency
-            string freqStr = memory.FrequencyHz.ToString("D9");
-            await _catClient.SendCommandAsync($"FA{freqStr};", "MemRecall", CancellationToken.None);
-            _radioStateService.FrequencyA = memory.FrequencyHz;
-
-            // Set mode
+            // Set mode before frequency so the radio applies any pitch/carrier offset
+            // (e.g. CW sidetone offset) before the VFO is tuned — prevents ~700 Hz landing error.
             if (ModeToCode.TryGetValue(memory.Mode, out char modeCode))
             {
                 await _catClient.SendCommandAsync($"MD0{modeCode};", "MemRecall", CancellationToken.None);
                 _radioStateService.ModeA = memory.Mode;
+                await Task.Delay(50);
             }
+
+            // Set frequency
+            string freqStr = memory.FrequencyHz.ToString("D9");
+            await _catClient.SendCommandAsync($"FA{freqStr};", "MemRecall", CancellationToken.None);
+            _radioStateService.FrequencyA = memory.FrequencyHz;
 
             // Set clarifier
             if (useCf)
