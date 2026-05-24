@@ -62,7 +62,7 @@ The application was written for operators who find the physical controls on the 
 
 - Large, readable frequency displays with digit-by-digit mouse-wheel tuning and an on-screen frequency keyboard
 - Full dual-receiver control (VFO A and VFO B)
-- Live S-meter, power, SWR, ALC, temperature, IDD, VDD, and compression meters
+- Live S-meter, power, SWR, ALC, and compression meters (plus PA temperature, IDD, and VDD on FTdx101MP, FTdx101D, and FTDX3000)
 - Real-time two-way sync — changes on the radio front panel appear immediately in the app, and vice versa
 - Band and segment selectors for fast QSY to CW, FT8, SSB, or RTTY
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
@@ -143,7 +143,9 @@ The **WSJT-X** button also shows a red **TX** badge when WSJT-X is currently tra
 
 ### 5.2 Meters
 
-Seven meters are displayed in a scrollable row above the VFO panels:
+A scrollable row of meters is displayed above the VFO panels. The meters shown depend on your radio model:
+
+**FTdx101MP, FTdx101D, FTDX3000** — seven meters:
 
 | Meter | What it shows |
 |-------|--------------|
@@ -153,11 +155,13 @@ Seven meters are displayed in a scrollable row above the VFO panels:
 | ALC | Automatic Level Control voltage — only active during transmit |
 | Temp | PA temperature in °C |
 | IDD | PA drain current in amps |
-| VDD | PA drain voltage in volts |
+| VDD | PA supply voltage in volts |
+
+**FTdx10, FT-710** — four meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.
 
 All meters update in real time at approximately 10 times per second. Meters that only apply to transmit automatically read zero when the radio is receiving.
 
-The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 9 (Meter Calibration) if you want to adjust the calibration for your specific radio.
+The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your specific radio.
 
 ---
 
