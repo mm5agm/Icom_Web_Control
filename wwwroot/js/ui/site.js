@@ -89,33 +89,19 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }, 5000);
     }
-    // Use 'unload', 'beforeunload', and 'visibilitychange' for best reliability
-    window.addEventListener('unload', function (e) {
+    // Stop heartbeat connection only when the tab is actually closing/navigating away.
+    // visibilitychange (tab switch, minimise) must NOT stop it — that fired the 30-second
+    // shutdown timer whenever the user alt-tabbed, causing ERR_CONNECTION_REFUSED.
+    function _stopHeartbeat() {
         if (window.signalRConnection && window.signalRConnection.stop) {
             window.signalRConnection.stop();
-            if (window.signalRHeartbeatInterval) {
-                clearInterval(window.signalRHeartbeatInterval);
-            }
         }
-    });
-    window.addEventListener('beforeunload', function () {
-        if (window.signalRConnection && window.signalRConnection.stop) {
-            window.signalRConnection.stop();
-            if (window.signalRHeartbeatInterval) {
-                clearInterval(window.signalRHeartbeatInterval);
-            }
+        if (window.signalRHeartbeatInterval) {
+            clearInterval(window.signalRHeartbeatInterval);
         }
-    });
-    document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'hidden') {
-            if (window.signalRConnection && window.signalRConnection.stop) {
-                window.signalRConnection.stop();
-                if (window.signalRHeartbeatInterval) {
-                    clearInterval(window.signalRHeartbeatInterval);
-                }
-            }
-        }
-    });
+    }
+    window.addEventListener('unload', _stopHeartbeat);
+    window.addEventListener('beforeunload', _stopHeartbeat);
 });
 // FTdx101 Web App - site.js
 // =============================================================================
