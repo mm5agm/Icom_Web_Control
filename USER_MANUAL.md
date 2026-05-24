@@ -54,9 +54,19 @@
 
 ## 1. Introduction
 
-Yaesu Web Control is a web-based control panel for Yaesu transceivers — the FTdx101MP, FTdx101D, and FTdx10. It runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.
+Yaesu Web Control is a web-based control panel for Yaesu HF transceivers. Supported models are:
 
-The application was written for operators who find the physical controls on the FTdx101 difficult to read or use, and for those who want a large, clean touchscreen-friendly display alongside their existing logging software.
+| Model | Power | Receivers |
+|-------|-------|-----------|
+| FTdx101MP | 200 W | Dual |
+| FTdx101D | 100 W | Dual |
+| FTDX3000 | 100 W | Dual |
+| FTdx10 | 100 W | Single |
+| FT-710 | 100 W | Single |
+
+The app runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.
+
+The application was written for operators who want a large, clean, touchscreen-friendly display alongside their existing logging software, and for those who find the physical controls on the radio difficult to read or reach.
 
 **Key features:**
 
@@ -91,9 +101,9 @@ Before the app can communicate with your radio you need to tell it which serial 
 
 1. Open a browser and go to **http://localhost:8080**
 2. Click the **Settings** link in the navigation bar.
-3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), or **FTdx10** (100 W, single receiver — two VFOs but one receiver).
+3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), **FTDX3000** (100 W, dual receiver), **FTdx10** (100 W, single receiver), or **FT-710** (100 W, single receiver).
 4. Set **Serial Port** to the COM port your radio is connected to. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
-5. Set **Baud Rate** to match the radio's CAT baud rate. The factory default on the FTdx101 is **38400**. You can verify or change this on the radio under **Menu → CAT Rate**.
+5. Set **Baud Rate** to match the radio's CAT baud rate. The factory default is **38400** on all supported radios. You can verify or change this on the radio under **Menu → CAT Rate**.
 6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
 7. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
 
@@ -167,7 +177,7 @@ The meter scales are calibrated to show meaningful units rather than raw ADC val
 
 ### 5.3 Power and Mic Gain
 
-**Power slider** — Sets the transmit power from 5 W to 200 W (FTdx101MP) or 5 W to 100 W (FTdx101D and FTdx10). Drag the slider to set the desired power level. The current value is shown to the right of the slider.
+**Power slider** — Sets the transmit power from 5 W to 200 W (FTdx101MP) or 5 W to 100 W (FTdx101D, FTDX3000, FTdx10, and FT-710). Drag the slider to set the desired power level. The current value is shown to the right of the slider.
 
 **MIC Gain / Data Out Gain slider** — Sets the microphone gain (0–100). When the radio is in a data mode (DATA-U, DATA-L, PSK, RTTY, or DATA-FM), the label changes to **Data Out Gain** automatically.
 
@@ -328,7 +338,7 @@ The last segment you used on each band is remembered, so when you return to a ba
 
 **TX button** — Appears on whichever VFO is currently the transmit VFO. Click to start transmitting; click again to return to receive. The button turns red and the label changes to **TX** while transmitting.
 
-**Radio POWER button** — Turns the FTdx101 on or off. The button shows green (on) or red (off).
+**Radio POWER button** — Turns the radio on or off. The button shows green (on) or red (off).
 
 ---
 
@@ -352,7 +362,7 @@ Access Settings from the navigation bar or by clicking the settings icon. Change
 
 | Setting | Description |
 |---------|-------------|
-| Radio Model | **FTdx101MP** (200 W, dual RX), **FTdx101D** (100 W, dual RX), or **FTdx10** (100 W, single RX) |
+| Radio Model | **FTdx101MP** (200 W, dual RX), **FTdx101D** (100 W, dual RX), **FTDX3000** (100 W, dual RX), **FTdx10** (100 W, single RX), or **FT-710** (100 W, single RX) |
 | Serial Port | COM port the radio's USB/serial cable is connected to (e.g., COM3) |
 | Baud Rate | Must match the radio's CAT Rate setting. Default: 38400 |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
@@ -375,15 +385,15 @@ The Settings page also shows the full URL for each detected network interface so
 
 ### 6.3 SDR Spectrum Display
 
-The spectrum display requires an SDR receiver. On the FTdx101MP and FTdx101D the SDR is connected to the radio's 9 MHz IF output (rear panel RCA socket labelled **IF OUT**), giving a VFO-centred panoramic view of the band. The FTdx10 does not have an IF output — see the note below.
+The spectrum display requires an SDR receiver. On the FTdx101MP, FTdx101D, and FTDX3000 the SDR is connected to the radio's 9 MHz IF output (rear panel RCA socket labelled **IF OUT**), giving a VFO-centred panoramic view of the band. The FTdx10 and FT-710 do not have an IF output — see the note below.
 
-> **FTdx10 users:** The FTdx10 has no rear-panel IF output. You can still use an SDR for spectrum display by connecting it to an antenna port, but the spectrum will show absolute RF frequencies rather than a view centred on your VFO frequency. The IF Frequency setting has no effect when used this way. The Settings page shows a reminder of this when FTdx10 is selected as the radio model.
+> **FTdx10 and FT-710 users:** These radios have no rear-panel IF output. You can still use an SDR for spectrum display by connecting it to an antenna port, but the spectrum will show absolute RF frequencies rather than a view centred on your VFO frequency. The IF Frequency setting has no effect when used this way. The Settings page shows a reminder of this when FTdx10 or FT-710 is selected as the radio model.
 
 **Supported hardware:**
 - **SDRplay RSP1 and RSP series** — requires the [SDRplay API v3](https://www.sdrplay.com/downloads/) to be installed separately
 - **RTL-SDR, Airspy, HackRF** — drivers are included in the app installer; no separate installation needed
 
-**Setting up the SDR (FTdx101MP / FTdx101D):**
+**Setting up the SDR (FTdx101MP / FTdx101D / FTDX3000):**
 
 1. Connect the SDR to the 9 MHz IF output using an RCA-to-SMA adapter and a short coax cable.
 2. Go to Settings and click **Scan** in the SDR section.
@@ -397,7 +407,7 @@ The spectrum panel appears on the main page when a device is saved. If you want 
 
 | SDR Setting | Recommended Value |
 |-------------|------------------|
-| IF Frequency | 9,000,000 Hz (FTdx101MP/D) — no effect on FTdx10 |
+| IF Frequency | 9,000,000 Hz (FTdx101MP, FTdx101D, FTDX3000) — no effect on FTdx10 or FT-710 |
 | Sample Rate | 2,048,000 (2M) |
 | FFT Size | 1024 |
 
