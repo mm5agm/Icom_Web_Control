@@ -160,10 +160,12 @@
                     style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B">
                 VFO-B
             </button>
+            @if (!isFtdx10) {
             <button id="swapVfoBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Swap VFO A and VFO B frequencies">
                 A&#8596;B
             </button>
+            }
             <button id="splitBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Toggle Split: VFO A = receive, VFO B = transmit">
                 Split
@@ -1225,13 +1227,11 @@
             }
         }
 
-        if (!@(isFtdx10 ? "true" : "false")) {
-            document.getElementById('vfoBToggleBtn')?.addEventListener('click', function () {
-                const newVisible = !getVisible();
-                localStorage.setItem(STORAGE_KEY, String(newVisible));
-                applyVisibility(newVisible);
-            });
-        }
+        document.getElementById('vfoBToggleBtn')?.addEventListener('click', function () {
+            const newVisible = !getVisible();
+            localStorage.setItem(STORAGE_KEY, String(newVisible));
+            applyVisibility(newVisible);
+        });
 
         applyVisibility(getVisible());
     })();

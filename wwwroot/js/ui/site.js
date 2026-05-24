@@ -1271,28 +1271,10 @@ window.addEventListener('DOMContentLoaded', () => {
     pollInitStatus();
         updateBandButtonsFromBackend();
 
-    // VFO-B show/hide toggle
-    const vfoBToggleBtn = document.getElementById('vfoBToggleBtn');
-    const vfoBCol = document.getElementById('vfoBCol');
-    if (vfoBToggleBtn && vfoBCol) {
-        const STORAGE_KEY = 'vfoBVisible';
-        const isVisible = localStorage.getItem(STORAGE_KEY) !== 'false';
-        if (!isVisible) {
-            vfoBCol.style.display = 'none';
-            vfoBToggleBtn.classList.add('active');
-            vfoBToggleBtn.setAttribute('aria-pressed', 'true');
-        } else {
-            vfoBToggleBtn.setAttribute('aria-pressed', 'false');
-        }
-        vfoBToggleBtn.setAttribute('aria-label', 'Show or hide VFO B panel');
-        vfoBToggleBtn.addEventListener('click', function () {
-            const hidden = vfoBCol.style.display === 'none';
-            vfoBCol.style.display = hidden ? '' : 'none';
-            vfoBToggleBtn.classList.toggle('active', !hidden);
-            vfoBToggleBtn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
-            localStorage.setItem(STORAGE_KEY, hidden ? 'true' : 'false');
-        });
-    }
+    // VFO-B show/hide toggle — click handler is in Index.cshtml (applyVisibility).
+    // Only set the aria-label here; do not add a second click listener.
+    document.getElementById('vfoBToggleBtn')
+        ?.setAttribute('aria-label', 'Show or hide VFO B panel');
 
     // Split / Swap VFO button handlers
     document.getElementById('splitBtn')?.addEventListener('click', () => setSplit(splitMode > 0 ? 0 : 1));
