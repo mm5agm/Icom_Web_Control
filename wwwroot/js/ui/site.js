@@ -2652,3 +2652,73 @@ pollInitStatus();
         check();
     }
 })()
+
+// ── GitHub update check ───────────────────────────────────────────────────
+(function () {
+    const DISMISS_KEY = 'updateCheckDismissed';
+
+    function _escHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function _isNewer(latest, current) {
+        const parse = v => v.split('.').map(n => parseInt(n, 10) || 0);
+        const a = parse(latest);
+        const b = parse(current);
+        for (let i = 0; i < Math.max(a.length, b.length); i++) {
+            const diff = (a[i] || 0) - (b[i] || 0);
+            if (diff > 0) return true;
+            if (diff < 0) return false;
+        }
+        return false;
+    }
+
+    function _showUpdateBanner(version, releaseUrl) {
+        if (document.getElementById('updateBanner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'updateBanner';
+        banner.style.cssText = [
+            'position:fixed', 'bottom:12px', 'right:12px', 'z-index:9999',
+            'background:#1e2a38', 'border:1px solid #4a8abf', 'border-radius:8px',
+            'padding:10px 14px', 'color:#cde', 'font-size:0.84rem',
+            'box-shadow:0 4px 16px rgba(0,0,0,0.6)', 'max-width:340px'
+        ].join(';');
+        banner.innerHTML =
+            `<div style="display:flex;align-items:flex-start;gap:8px">` +
+            `<div style="flex:1"><strong>Update available — v${_escHtml(version)}</strong><br>` +
+            `<span style="color:#aab;font-size:0.78rem">A newer version of Yaesu Web Control is available.</span></div>` +
+            `<button onclick="document.getElementById('updateBanner').remove()" ` +
+            `style="background:none;border:none;color:#aaa;cursor:pointer;font-size:1rem;line-height:1;padding:0" aria-label="Dismiss">✕</button>` +
+            `</div>` +
+            `<div style="margin-top:8px;display:flex;gap:8px">` +
+            `<a href="${_escHtml(releaseUrl)}" target="_blank" rel="noopener" ` +
+            `style="background:#1a4a7a;border:1px solid #4a8abf;color:#cde;padding:3px 10px;border-radius:4px;font-size:0.78rem;text-decoration:none">Download</a>` +
+            `<button onclick="document.getElementById('updateBanner').remove()" ` +
+            `style="background:#2d2d44;border:1px solid #555;color:#aaa;padding:3px 10px;border-radius:4px;font-size:0.78rem;cursor:pointer">Dismiss</button>` +
+            `</div>`;
+        document.body.appendChild(banner);
+    }
+
+    async function _checkForUpdate() {
+        const meta = document.querySelector('meta[name="x-app-version"]');
+        if (!meta) return;
+        const current = meta.content.trim();
+        try {
+            const resp = await fetch('https://api.github.com/repos/mm5agm/Yaesu_Web_Control/releases/latest', {
+                headers: { Accept: 'application/vnd.github+json' }
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const latest = (data.tag_name || '').replace(/^v/i, '');
+            if (latest && _isNewer(latest, current)) {
+                _showUpdateBanner(latest, data.html_url || 'https://github.com/mm5agm/Yaesu_Web_Control/releases');
+            }
+        } catch { /* network unavailable or rate limited — silently skip */ }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(_checkForUpdate, 3000));
+    } else {
+        setTimeout(_checkForUpdate, 3000);
+    }
+})()

@@ -30,6 +30,7 @@ function _memConfirm(message) {
 
 let _memories = [];
 let _panelOpen = false;
+let _banks = [];
 
 export function initMemoriesPanel() {
     const dialog = document.getElementById('memoriesDialog');
@@ -51,9 +52,12 @@ export function initMemoriesPanel() {
     // Open button (toolbar)
     document.getElementById('memBtn')?.addEventListener('click', openMemoriesPanel);
 
+    // Bank switcher
+    document.getElementById('memBankSelect')?.addEventListener('change', e => _switchBank(e.target.value));
+
     // Reload when dialog opened
     dialog.addEventListener('toggle', () => {
-        if (dialog.open) _loadAndRender();
+        if (dialog.open) { _loadBanks(); _loadAndRender(); }
     });
 
     // Refresh when the user returns to this tab (e.g. after editing in /Memories)
@@ -73,6 +77,7 @@ export function openMemoriesPanel() {
     if (!dialog.open) {
         dialog.show();   // non-modal so the rest of the UI stays interactive
         _panelOpen = true;
+        _loadBanks();
         _loadAndRender();
     }
 }
@@ -101,6 +106,38 @@ async function _loadAndRender() {
             ? 'Server not responding — is Yaesu Web Control still running?'
             : `Failed to load memories: ${e.message}`;
         container.innerHTML = `<div class="text-danger small p-2">${msg}</div>`;
+    }
+}
+
+async function _loadBanks() {
+    const sel = document.getElementById('memBankSelect');
+    if (!sel) return;
+    try {
+        const resp = await fetch('/api/memorybank');
+        if (!resp.ok) return;
+        _banks = await resp.json();
+        sel.innerHTML = '<option value="">Banks…</option>';
+        for (const name of _banks) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            sel.appendChild(opt);
+        }
+        sel.style.display = _banks.length === 0 ? 'none' : '';
+    } catch { /* ignore — banks are optional */ }
+}
+
+async function _switchBank(name) {
+    if (!name) return;
+    try {
+        const resp = await fetch(`/api/memorybank/${encodeURIComponent(name)}/load`, { method: 'POST' });
+        if (resp.ok) {
+            await _loadAndRender();
+        } else {
+            console.error('Bank switch failed: server returned', resp.status);
+        }
+    } catch (e) {
+        console.error('Bank switch failed:', e);
     }
 }
 

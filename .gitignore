@@ -154,3 +154,9 @@ Backup*.ps1
 # Local Claude Code settings
 .claude/settings.local.json
 .claude/boot-prompt.md
+
+# GitHub Copilot instruction files (superseded by CLAUDE.md)
+.copilot/
+.github/COPILOT.md
+.github/copilot*.md
+.github/calibration-instructions.md
