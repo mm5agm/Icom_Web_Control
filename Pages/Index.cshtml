@@ -160,12 +160,10 @@
                     style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B">
                 VFO-B
             </button>
-            @if (!isFtdx10 && !isFt710) {
             <button id="swapVfoBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Swap VFO A and VFO B frequencies">
                 A&#8596;B
             </button>
-            }
             <button id="splitBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Toggle Split: VFO A = receive, VFO B = transmit">
                 Split
@@ -903,6 +901,10 @@
                 onclick="window.exportMemories('add')" title="Write app memories only to empty radio channels">
             <i class="bi bi-cloud-upload" aria-hidden="true"></i> Save to Rig (Add new)
         </button>
+        <select id="memBankSelect" class="mem-bank-select" style="display:none"
+                aria-label="Switch memory bank" title="Switch memory bank">
+            <option value="">Banks…</option>
+        </select>
         <span class="mem-tool-status" id="memToolbarStatus" role="status" aria-live="polite"></span>
     </div>
     <div class="mem-tiles" id="memoriesTiles" role="list" aria-label="Saved memories">

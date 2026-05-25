@@ -133,7 +133,9 @@ The main control panel loads. If the radio is powered on and the serial connecti
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Yaesu_Web_Control v1.3.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Yaesu Web Control v1.5.3**) are shown in the top-left corner.
+
+**Update notification** — on startup the app silently checks the GitHub releases page for a newer version. If one is available, a small banner appears in the bottom-right corner with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 
 **External app buttons** (WSJT-X, JTAlert, Log4OM) appear if they are enabled in Application Setup. The colour of each button indicates status:
 
@@ -210,7 +212,7 @@ Both panels have identical controls. All settings are independent — changing a
 
 **VFO-B toggle** — the **VFO-B** button in the toolbar shows or hides the VFO B panel. The last state is remembered across sessions.
 
-**A↔B Swap** — the **A↔B** button in the toolbar swaps the frequencies between VFO A and VFO B in one click. This button is only available on dual-receiver radios (FTdx101MP, FTdx101D, FTDX3000). It is not shown on the FTdx10 or FT-710 because those radios use a memory-based VFO B — activating it with the swap command causes the radio to display "Memory mode" rather than performing a straightforward frequency swap.
+**A↔B Swap** — the **A↔B** button in the toolbar swaps the frequencies and modes between VFO A and VFO B in one click. Available on all supported radios.
 
 ---
 
@@ -349,6 +351,8 @@ The **Mem** button in the toolbar opens a floating memory panel showing all your
 The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions.
 
 **Save to Mem button** — A **Save to Mem** button appears below the S-meter on both the VFO A and VFO B panels. Click it to save the current VFO frequency and mode as a new memory. A label input box appears — type a name (up to 12 characters) and press Enter or click Save. The new memory appears immediately in the floating panel.
+
+**Banks dropdown** — if you have saved memory banks (see Section 8.4), a **Banks** dropdown appears in the toolbar alongside the Save to Rig buttons. Select a bank name to switch to it instantly — the memory list is replaced with that bank's contents and the tiles refresh automatically. The dropdown resets to its placeholder after loading, and is hidden when no banks have been saved.
 
 For full memory management — editing labels and frequencies, reordering, importing from and exporting to the radio, and memory banks — see Section 8.
 
