@@ -61,5 +61,5 @@ gh release create $Version `
 
 Write-Host ""
 Write-Host "Release $Version created successfully." -ForegroundColor Green
-Write-Host "Build workflow: https://github.com/mm5agm/FTdx101_WebApp/actions" -ForegroundColor Yellow
-Write-Host "Releases:       https://github.com/mm5agm/FTdx101_WebApp/releases" -ForegroundColor Yellow
+Write-Host "Build workflow: https://github.com/mm5agm/Yaesu_Web_Control/actions" -ForegroundColor Yellow
+Write-Host "Releases:       https://github.com/mm5agm/Yaesu_Web_Control/releases" -ForegroundColor Yellow
