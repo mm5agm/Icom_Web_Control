@@ -14,6 +14,12 @@ namespace Yaesu_Web_Control.Services
             {
                 if (_opened) return;
                 _opened = true;
+            }
+            // Small delay ensures Kestrel is fully accepting connections before the
+            // browser navigates — avoids a blank tab on first launch after install.
+            Task.Run(async () =>
+            {
+                await Task.Delay(600);
                 try
                 {
                     Process.Start(new ProcessStartInfo
@@ -22,8 +28,8 @@ namespace Yaesu_Web_Control.Services
                         UseShellExecute = true
                     });
                 }
-                catch { /* Optionally log error */ }
-            }
+                catch { }
+            });
         }
     }
 }

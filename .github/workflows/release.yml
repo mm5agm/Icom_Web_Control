@@ -4,10 +4,6 @@ on:
   release:
     types: [created]
 
-  push:
-    tags:
-      - 'v*'
-
   workflow_dispatch:
     inputs:
       tag:
@@ -26,9 +22,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+        run: |
+          $v = dotnet --version 2>$null
+          if ($v -and $v.StartsWith('10.')) {
+            Write-Host ".NET $v already installed — skipping download"
+          } else {
+            Write-Host "Installing .NET 10..."
+            Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile 'dotnet-install.ps1'
+            .\dotnet-install.ps1 -Channel '10.0' -InstallDir "$env:LOCALAPPDATA\Microsoft\dotnet"
+            $env:PATH = "$env:LOCALAPPDATA\Microsoft\dotnet;$env:PATH"
+            Write-Host "Installed: $(dotnet --version)"
+          }
+        shell: pwsh
 
       - name: Install NSIS
         run: choco install nsis --yes
@@ -79,8 +84,8 @@ jobs:
 
       - name: Upload installer to GitHub Release
         run: |
-          # Determine tag: release and push events carry it in GITHUB_REF_NAME; dispatch uses the input
-          if ("${{ github.event_name }}" -eq "release" -or "${{ github.event_name }}" -eq "push") {
+          # release event carries tag in GITHUB_REF_NAME; dispatch uses the input
+          if ("${{ github.event_name }}" -eq "release") {
             $tag = $env:GITHUB_REF_NAME
           } else {
             $tag = "${{ github.event.inputs.tag }}"

@@ -59,9 +59,9 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <Version>1.5.5</Version>
-    <FileVersion>1.5.5.0</FileVersion>
-    <AssemblyVersion>1.5.5.0</AssemblyVersion>
+    <Version>1.5.6</Version>
+    <FileVersion>1.5.6.0</FileVersion>
+    <AssemblyVersion>1.5.6.0</AssemblyVersion>
     <AssemblyTitle>Yaesu Web Control</AssemblyTitle>
     <Product>Yaesu Web Control</Product>
     <Description>Browser-based CAT controller for Yaesu HF transceivers</Description>
@@ -73,6 +73,13 @@
   <!-- Explicitly copy the entire wwwroot folder into the output directory -->
   <ItemGroup>
     <Content Include="wwwroot\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Copy pictures folder (user manual screenshots served via PhysicalFileProvider) -->
+  <ItemGroup>
+    <Content Include="pictures\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
