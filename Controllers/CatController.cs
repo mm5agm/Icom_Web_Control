@@ -74,6 +74,55 @@ namespace Yaesu_Web_Control.Controllers
             }
         }
 
+        [HttpPost("proc")]
+        public async Task<IActionResult> SetProc([FromBody] ProcRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                string command = request.Enabled ? "PR1;" : "PR0;";
+                await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
+                _radioStateService.ProcEnabled = request.Enabled;
+                return Ok(new { message = $"PROC {(request.Enabled ? "ON" : "OFF")}" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting PROC");
+                return StatusCode(500, new { error = "Failed to set PROC" });
+            }
+            finally
+            {
+                _requestSemaphore.Release();
+            }
+        }
+
+        [HttpPost("proclevel")]
+        public async Task<IActionResult> SetProcLevel([FromBody] ProcLevelRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                if (request.Value < 0 || request.Value > 100)
+                    return BadRequest(new { error = "PROC level out of range (0-100)" });
+                await _catClient.SendCommandAsync($"PL{request.Value:D3};", "WebUI", CancellationToken.None);
+                _radioStateService.ProcLevel = request.Value;
+                return Ok(new { message = $"PROC level set to {request.Value}" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting PROC level");
+                return StatusCode(500, new { error = "Failed to set PROC level" });
+            }
+            finally
+            {
+                _requestSemaphore.Release();
+            }
+        }
+
         [HttpPost("radiopower")]
         public async Task<IActionResult> SetRadioPower([FromBody] RadioPowerRequest request)
         {
@@ -869,6 +918,16 @@ namespace Yaesu_Web_Control.Controllers
         }
 
         public class MicGainRequest
+        {
+            public int Value { get; set; }
+        }
+
+        public class ProcRequest
+        {
+            public bool Enabled { get; set; }
+        }
+
+        public class ProcLevelRequest
         {
             public int Value { get; set; }
         }

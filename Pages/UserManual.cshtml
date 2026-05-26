@@ -35,7 +35,7 @@
                             <ol class="ps-3">
                                 <li><a href="#top-bar">Top Bar</a></li>
                                 <li><a href="#meters">Meters</a></li>
-                                <li><a href="#power-mic">Power and Mic Gain</a></li>
+                                <li><a href="#power-mic">Power, Mic Gain &amp; Speech Processor</a></li>
                                 <li><a href="#spectrum">Spectrum Display</a></li>
                                 <li><a href="#vfo-panels">VFO Panels</a></li>
                                 <li><a href="#frequency">Frequency Tuning &amp; Keyboard</a></li>
@@ -202,11 +202,13 @@
                         <p class="mb-0">The <strong>Temp</strong> meter also shows <strong>—</strong> briefly on startup until the first live reading arrives from the radio — this prevents a stale value from a previous session appearing before the current temperature is known. If you find the meter scales inaccurate for your radio, see <a href="#calibration">Section 9 — Meter Calibration</a>.</p>
                     </div>
 
-                    <!-- 5.3 Power and Mic Gain -->
+                    <!-- 5.3 Power, Mic Gain and Speech Processor -->
                     <div class="p-3 border-bottom section-anchor" id="power-mic">
-                        <h6 class="text-primary fw-bold">5.3 Power and Mic Gain</h6>
-                        <p><strong>Power slider</strong> — Sets the transmit power from 5 W to 200 W (FTdx101MP) or 5 W to 100 W (FTdx101D and FTdx10). Drag the slider to set the desired power level. The current value is shown to the right of the slider.</p>
-                        <p class="mb-0"><strong>MIC Gain / Data Out Gain slider</strong> — Sets the microphone gain (0–100). When the radio is in a data mode (DATA-U, DATA-L, PSK, RTTY, or DATA-FM), the label changes automatically to <em>Data Out Gain</em>.</p>
+                        <h6 class="text-primary fw-bold">5.3 Power, Mic Gain and Speech Processor</h6>
+                        <p><strong>Power slider</strong> — Sets the transmit power from 5 W to 200 W (FTdx101MP) or 5 W to 100 W (FTdx101D, FTdx10, FT-710, and FTDX3000). Drag the slider to set the desired power level. The current value is shown to the right of the slider.</p>
+                        <p><strong>MIC Gain / Data Out Gain slider</strong> — Sets the microphone gain (0–100). When the radio is in a data mode (DATA-U, DATA-L, PSK, RTTY, or DATA-FM), the label changes automatically to <em>Data Out Gain</em>.</p>
+                        <p><strong>PROC button</strong> — Toggles the speech processor on and off. The button turns amber when the processor is active and grey when off. The speech processor increases the average power of your transmitted audio by compressing audio peaks, which can improve readability at the other end — particularly useful for SSB DX and pile-ups. It has no effect in data modes.</p>
+                        <p class="mb-0"><strong>PROC Level slider</strong> — Sets the speech processor compression level (0–100). Higher values give more compression and higher average power, but can cause distortion if set too high. The current value is shown next to the slider. A level of around 16 is a reasonable starting point — adjust to taste while monitoring the Compression meter.</p>
                     </div>
 
                     <!-- 5.4 Spectrum -->
@@ -699,8 +701,10 @@
                             <li>Rig: <strong>Hamlib NET rigctl</strong></li>
                             <li>Network Server: <code>localhost</code> &nbsp; Port: <code>4532</code></li>
                             <li>PTT Method: <strong>CAT</strong></li>
+                            <li>Split Operation: <strong>Fake It</strong></li>
                             <li>Click <strong>Test CAT</strong> — it should show green.</li>
                         </ul>
+                        <a href="/pictures/WSJT-X Radio.png" target="_blank"><img src="/pictures/WSJT-X Radio.png" class="img-fluid rounded border mb-3" alt="WSJT-X Radio tab settings" style="cursor:zoom-in;"></a>
 
                         <p><strong>Reporting tab:</strong></p>
                         <ul>
@@ -710,24 +714,85 @@
                             <li>Multicast TTL: <code>1</code></li>
                             <li>Tick: <em>Accept UDP requests</em>, <em>Notify on accepted UDP request</em></li>
                         </ul>
+                        <a href="/pictures/WSJT-X Reporting UDP.png" target="_blank"><img src="/pictures/WSJT-X Reporting UDP.png" class="img-fluid rounded border mb-3" alt="WSJT-X Reporting tab settings" style="cursor:zoom-in;"></a>
                         <p class="mb-0">Click OK. These settings are saved in the WebApp profile and applied every time WSJT-X is launched from the app button.</p>
                     </div>
 
                     <!-- JTAlert -->
                     <div class="p-3 border-bottom section-anchor" id="jtalert">
                         <h6 class="text-primary fw-bold">8.2 JTAlert</h6>
-                        <p class="mb-0">JTAlert does not use UDP. It reads WSJT-X log files directly. No configuration is required in this app for JTAlert to work. The JTAlert button in the top bar launches JTAlert and shows green when it is running.</p>
+                        <p>JTAlert monitors WSJT-X activity via UDP multicast and displays alerts for callsigns of interest. No configuration is required in this app for JTAlert to work with WSJT-X — JTAlert picks up the same multicast stream automatically.</p>
+                        <p>To configure JTAlert to send QSO data to <strong>Log4OM</strong>, open JTAlert settings and enable the Log4OM V2 connection:</p>
+                        <ol>
+                            <li>In JTAlert, go to <strong>Settings → Logging → Log4OM V2</strong>.</li>
+                            <li>Tick <strong>Enable Log4OM V2 Logging</strong> and <strong>Send WSJT-X DX Call to Log4OM</strong>.</li>
+                            <li>Set <strong>IP Address</strong> to <code>239.255.0.1</code>.</li>
+                            <li>Set <strong>ADif_MESSAGE Port</strong> to <code>2236</code>.</li>
+                            <li>Set <strong>Control Port</strong> to <code>2241</code>.</li>
+                            <li>Click OK.</li>
+                        </ol>
+                        <a href="/pictures/JTAlert Settings For Log4OM.png" target="_blank"><img src="/pictures/JTAlert Settings For Log4OM.png" class="img-fluid rounded border mb-3" alt="JTAlert Log4OM V2 settings" style="cursor:zoom-in;"></a>
+                        <p class="mb-0">The JTAlert button in the top bar launches JTAlert and shows green when it is running and receiving decodes from WSJT-X.</p>
                     </div>
 
                     <!-- Log4OM -->
                     <div class="p-3 section-anchor" id="log4om">
                         <h6 class="text-primary fw-bold">8.3 Log4OM</h6>
-                        <p>Configure Log4OM to receive WSJT-X decodes:</p>
-                        <ol>
-                            <li>In Log4OM, go to <strong>Settings → Program Configuration → Software Integration → Connections</strong>.</li>
-                            <li>Add a connection: Type = <strong>JT_Message</strong>, Port = <strong>2236</strong>, Enabled = <strong>Yes</strong>.</li>
-                        </ol>
-                        <p class="mb-0">Log4OM uses port 2236, which is separate from WSJT-X's UDP port (2237). Both can be active simultaneously.</p>
+                        <p>Log4OM can receive QSO data from WSJT-X and JTAlert via UDP multicast, and display the current VFO frequency via rigctld.</p>
+                        <div class="alert alert-warning py-2 mb-3">
+                            <i class="bi bi-exclamation-triangle"></i> <strong>Do not use Omni-rig.</strong> Yaesu Web Control owns the serial port. If Omni-rig is configured for the same radio it will conflict and one will fail. Use the rigctld option (Step 3 below) instead.
+                        </div>
+
+                        <h6>Step 1 — UDP inbound connections</h6>
+                        <p>In Log4OM go to <strong>Software Integration → Connections</strong> and select the <strong>UDP</strong> tab. Add two UDP INBOUND connections.</p>
+                        <p><strong>For WSJT-X</strong> (receives QSO data directly from WSJT-X):</p>
+                        <ul>
+                            <li>Connection name: <code>WSJT-X</code></li>
+                            <li>Port: <code>2237</code></li>
+                            <li>Service type: <strong>JT_MESSAGE</strong></li>
+                            <li>Multicast: <strong>ticked</strong></li>
+                            <li>Multicast source IP: <code>239.255.0.1</code></li>
+                        </ul>
+                        <a href="/pictures/Log4OM UDP Inbound WSJT-X.png" target="_blank"><img src="/pictures/Log4OM UDP Inbound WSJT-X.png" class="img-fluid rounded border mb-3" alt="Log4OM UDP Inbound connection for WSJT-X" style="cursor:zoom-in;"></a>
+
+                        <p><strong>For JTAlert</strong> (receives QSO data from JTAlert):</p>
+                        <ul>
+                            <li>Connection name: <code>JTALERT</code></li>
+                            <li>Port: <code>2236</code></li>
+                            <li>Service type: <strong>JT_MESSAGE</strong></li>
+                            <li>Multicast: <strong>ticked</strong></li>
+                            <li>Multicast source IP: <code>239.255.0.1</code></li>
+                        </ul>
+                        <a href="/pictures/JTAlert UDP Inbound.png" target="_blank"><img src="/pictures/JTAlert UDP Inbound.png" class="img-fluid rounded border mb-3" alt="Log4OM UDP Inbound connection for JTAlert" style="cursor:zoom-in;"></a>
+
+                        <h6>Step 2 — Remote control</h6>
+                        <p>Still in the Connections screen, select the <strong>Remote Control</strong> tab and set:</p>
+                        <ul>
+                            <li><strong>Remote control port:</strong> <code>2241</code></li>
+                            <li><strong>Enable remote control:</strong> ticked</li>
+                        </ul>
+                        <p>This allows JTAlert to exchange control messages with Log4OM bidirectionally.</p>
+                        <a href="/pictures/Log4OM Remote Control.png" target="_blank"><img src="/pictures/Log4OM Remote Control.png" class="img-fluid rounded border mb-3" alt="Log4OM Remote Control settings" style="cursor:zoom-in;"></a>
+
+                        <h6>Step 3 — Frequency display (optional)</h6>
+                        <p>To show the current VFO frequency in Log4OM independently of WSJT-X, configure the CAT interface. In Log4OM go to <strong>Hardware Configuration → CAT interface</strong> and set:</p>
+                        <ul>
+                            <li>CAT Engine: <strong>Hamlib</strong></li>
+                            <li>Address: <code>localhost</code></li>
+                            <li>Port: <code>4532</code></li>
+                        </ul>
+                        <a href="/pictures/Log4OM Cat Management.png" target="_blank"><img src="/pictures/Log4OM Cat Management.png" class="img-fluid rounded border mb-3" alt="Log4OM CAT Management settings" style="cursor:zoom-in;"></a>
+
+                        <h6>Startup order</h6>
+                        <div class="alert alert-info py-2 mb-0">
+                            <i class="bi bi-info-circle"></i> Always start applications in this order:
+                            <ol class="mb-0 mt-1">
+                                <li><strong>Yaesu Web Control</strong> — must be running before anything connects to rigctld</li>
+                                <li><strong>WSJT-X</strong></li>
+                                <li><strong>JTAlert</strong></li>
+                                <li><strong>Log4OM</strong></li>
+                            </ol>
+                        </div>
                     </div>
 
                 </div>

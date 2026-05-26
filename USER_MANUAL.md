@@ -9,7 +9,7 @@
 5. [Main Control Panel](#5-main-control-panel)
    - 5.1 [Top Bar](#51-top-bar)
    - 5.2 [Meters](#52-meters)
-   - 5.3 [Power and Mic Gain](#53-power-and-mic-gain)
+   - 5.3 [Power, Mic Gain and Speech Processor](#53-power-mic-gain-and-speech-processor)
    - 5.4 [Spectrum Display](#54-spectrum-display)
    - 5.5 [VFO Panels](#55-vfo-panels)
    - 5.6 [Frequency Display and Tuning](#56-frequency-display-and-tuning)
@@ -177,11 +177,15 @@ The meter scales are calibrated to show meaningful units rather than raw ADC val
 
 ---
 
-### 5.3 Power and Mic Gain
+### 5.3 Power, Mic Gain and Speech Processor
 
 **Power slider** — Sets the transmit power from 5 W to 200 W (FTdx101MP) or 5 W to 100 W (FTdx101D, FTDX3000, FTdx10, and FT-710). Drag the slider to set the desired power level. The current value is shown to the right of the slider.
 
 **MIC Gain / Data Out Gain slider** — Sets the microphone gain (0–100). When the radio is in a data mode (DATA-U, DATA-L, PSK, RTTY, or DATA-FM), the label changes to **Data Out Gain** automatically.
+
+**PROC button** — Toggles the speech processor on and off. The button is amber when the processor is active and grey when off. The speech processor increases the average power of your transmitted audio, which can improve readability at the other end — particularly useful for SSB DX and pile-ups.
+
+**PROC Level slider** — Sets the speech processor compression level (0–100). A typical starting point is around 50. Higher values increase average power further but can make the audio sound over-processed and harder to copy. Monitor the compression meter while speaking and aim for 6–10 dB of compression. Both the PROC on/off state and the level are saved and restored when the app restarts.
 
 ---
 
@@ -553,20 +557,23 @@ The default command line (`--rig-name=WebApp`) causes WSJT-X to use a separate c
 
 **Radio tab:**
 - Rig: **Hamlib NET rigctl**
-- Network Server: `localhost`
-- Port: `4532`
-- CAT Control: `Hamlib Net rigctl`
+- Network Server: `localhost:4532`
 - PTT Method: **CAT**
-- Click **Test CAT** — it should show green. Click **Test PTT**.
+- Split Operation: **Fake It**
+- Click **Test CAT** — it should show green.
 - Click OK.
+
+![WSJT-X Radio tab settings](pictures/WSJT-X Radio.png)
 
 **Reporting tab:**
 - UDP Server: `239.255.0.1`
 - UDP Server port: `2237`
-- Outgoing Interfaces: `loopback_0` (or leave blank)
+- Outgoing Interfaces: `loopback_0` (or leave blank for all interfaces)
 - Multicast TTL: `1`
 - Tick: **Accept UDP requests**, **Notify on accepted UDP request**
 - Click OK.
+
+![WSJT-X Reporting tab settings](pictures/WSJT-X Reporting UDP.png)
 
 These settings are saved in the WebApp profile and used every time WSJT-X is launched from the app button.
 
@@ -578,38 +585,84 @@ These settings are saved in the WebApp profile and used every time WSJT-X is lau
 
 ### 9.2 JTAlert
 
-JTAlert does not use UDP. It reads WSJT-X log files directly. No configuration is required in this app for JTAlert to work.
+JTAlert monitors WSJT-X activity and displays alerts for callsigns of interest. It can also send QSO data to Log4OM via UDP multicast.
 
 The JTAlert button in the top bar launches JTAlert and shows green when it is running.
+
+**Configuring JTAlert to log to Log4OM:**
+
+In JTAlert, go to **Settings → Logging → Log4OM V2** and set:
+
+- **Enable Log4OM V2 Logging:** ticked
+- **Send WSJT-X DX Call to Log4OM:** ticked
+- **IP Address:** `239.255.0.1`
+- **ADif_MESSAGE Port:** `2236`
+- **Control Port:** `2241`
+
+![JTAlert Log4OM V2 settings](pictures/JTAlert Settings For Log4OM.png)
 
 ---
 
 ### 9.3 Log4OM
 
-Log4OM integrates with Yaesu Web Control in two ways: radio control via rigctld, and receiving WSJT-X decodes via UDP.
+Log4OM can receive QSO data from WSJT-X and JTAlert via UDP multicast, and display the current frequency via rigctld.
 
-#### Radio control (rigctld) — do not use Omni-rig
+**Do not use Omni-rig.** Yaesu Web Control owns the serial port. If Omni-rig is also configured for the same radio it will conflict with the app and one will fail.
 
-Yaesu Web Control includes a built-in rigctld server on TCP port 4532. Log4OM can connect to this for radio control (frequency, mode). **You do not need Omni-rig** — and if Omni-rig is running at the same time as Yaesu Web Control, both will compete for the same serial port and one will fail.
+#### Step 1 — UDP inbound connections
 
-To configure Log4OM to use rigctld:
+Go to **Software Integration → Connections** and select the **UDP** tab. Add two UDP INBOUND connections.
 
-1. In Log4OM, go to **Settings → Program Configuration → Rig Control**.
-2. Set the rig type to **Hamlib** (or **rigctld / NET rigctl**).
-3. Set the address to **localhost** and the port to **4532**.
-4. Disable or uninstall Omni-rig if it is currently configured for this radio.
+**For WSJT-X** (receives QSO data directly from WSJT-X):
+- Connection name: `WSJT-X`
+- Port: `2237`
+- Service type: **JT_MESSAGE**
+- Multicast: **ticked**
+- Multicast source IP: `239.255.0.1`
+- Parameters: SAVE_NEW_QSO, USE_EXTERNAL_DATA, UPLOAD_QSO, UPDATE_CQ_ITUZONE
 
-#### Receiving WSJT-X decodes
+![Log4OM UDP Inbound connection for WSJT-X](pictures/Log4OM UDP Inbound WSJT-X.png)
 
-Configure Log4OM to receive WSJT-X decodes:
+**For JTAlert** (receives QSO data from JTAlert):
+- Connection name: `JTALERT`
+- Port: `2236`
+- Service type: **JT_MESSAGE**
+- Multicast: **ticked**
+- Multicast source IP: `239.255.0.1`
+- Parameters: SAVE_NEW_QSO, USE_EXTERNAL_DATA, UPLOAD_QSO, UPDATE_CQ_ITUZONE
 
-1. In Log4OM, go to **Settings → Program Configuration → Software Integration → Connections**.
-2. Add a connection:
-   - Type: **JT_Message**
-   - Port: **2236**
-   - Enabled: **Yes**
+![Log4OM UDP Inbound connection for JTAlert](pictures/JTAlert UDP Inbound.png)
 
-Note: Log4OM uses port 2236, which is different from WSJT-X's UDP port (2237). Both can be active simultaneously.
+#### Step 2 — Remote control
+
+Still in the Connections screen, select the **Remote Control** tab and set:
+
+- **Remote control port:** `2241`
+- **Enable remote control:** ticked
+- **Send to specific IP address/port:** `127.0.0.1`
+
+This allows JTAlert to exchange control messages with Log4OM bidirectionally.
+
+![Log4OM Remote Control settings](pictures/Log4OM Remote Control.png)
+
+#### Step 3 — Frequency display (optional)
+
+If you want Log4OM to display the current frequency independently of WSJT-X, configure the CAT interface. Go to **Hardware Configuration → CAT interface**:
+
+- CAT Engine: **Hamlib**
+- Address: `localhost`
+- Port: `4532`
+
+![Log4OM CAT Management](pictures/Log4OM Cat Management.png)
+
+#### Startup order
+
+Always start applications in this order:
+
+1. **Yaesu Web Control** (must be running before anything connects to rigctld)
+2. **WSJT-X**
+3. **JTAlert**
+4. **Log4OM**
 
 ---
 
