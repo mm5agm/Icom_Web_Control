@@ -252,10 +252,10 @@
                                oninput="document.getElementById('micGainValue').innerText = this.value;"
                                onchange="setMicGain(this.value);">
                         <button id="procBtn"
-                                class="btn btn-sm ms-2 @(Model.ProcEnabled ? "btn-warning" : "btn-outline-secondary")"
+                                class="btn btn-sm ms-2 @(Model.ProcEnabled ? "btn-success" : "btn-outline-secondary")"
                                 aria-label="Speech processor"
                                 title="Speech processor on/off"
-                                onclick="toggleProc()">PROC</button>
+                                onclick="toggleProc()">@(Model.ProcEnabled ? "Proc On" : "Proc Off")</button>
                         <label class="mb-0 text-nowrap ms-2">PROC Level: <span id="procLevelValue" class="fw-bold">@Model.ProcLevel</span></label>
                         <input type="range" class="flex-shrink-0"
                                id="procLevelSlider"
@@ -1241,8 +1241,9 @@
         function updateProcButton(enabled) {
             const btn = document.getElementById('procBtn');
             if (!btn) return;
-            btn.classList.toggle('btn-warning', enabled);
+            btn.classList.toggle('btn-success', enabled);
             btn.classList.toggle('btn-outline-secondary', !enabled);
+            btn.textContent = enabled ? 'Proc On' : 'Proc Off';
         }
 
         document.addEventListener('DOMContentLoaded', function() {
