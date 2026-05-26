@@ -2710,10 +2710,10 @@ pollInitStatus();
         const banner = document.createElement('div');
         banner.id = 'updateBanner';
         banner.style.cssText = [
-            'position:fixed', 'bottom:12px', 'right:12px', 'z-index:9999',
+            'position:fixed', 'top:50%', 'left:50%', 'transform:translate(-50%,-50%)', 'z-index:9999',
             'background:#1e2a38', 'border:1px solid #4a8abf', 'border-radius:8px',
             'padding:10px 14px', 'color:#cde', 'font-size:0.84rem',
-            'box-shadow:0 4px 16px rgba(0,0,0,0.6)', 'max-width:340px'
+            'box-shadow:0 4px 16px rgba(0,0,0,0.6)', 'max-width:340px', 'width:320px'
         ].join(';');
         banner.innerHTML =
             `<div style="display:flex;align-items:flex-start;gap:8px">` +
