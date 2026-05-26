@@ -274,8 +274,8 @@
             "SH0;", "SH1;", "IS0;", "IS1;",
             // Beat cancel (future)
             "BC0;", "BC1;",
-            // Speech processor (future)
-            "PR0;", "PR1;", "PL;",
+            // Speech processor
+            "PR;", "PL;",
             // VOX (future)
             "VX;", "VG;", "VD;",
             // Keyer speed and CW break-in (future)

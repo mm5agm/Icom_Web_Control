@@ -67,6 +67,16 @@
         public int MicGain { get; set; } = 50;
 
         /// <summary>
+        /// Speech Processor enabled
+        /// </summary>
+        public bool ProcEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Speech Processor level (0-100)
+        /// </summary>
+        public int ProcLevel { get; set; } = 50;
+
+        /// <summary>
         /// Receiver A roofing filter code (6=12kHz, 7=3kHz, 8=1.2kHz, 9=600Hz, A=300Hz)
         /// </summary>
         public string RoofingFilterA { get; set; } = "";

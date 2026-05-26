@@ -58,7 +58,9 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <Version>1.4.0</Version>
+    <Version>1.5.4</Version>
+    <FileVersion>1.5.4.0</FileVersion>
+    <AssemblyVersion>1.5.4.0</AssemblyVersion>
     <AssemblyTitle>Yaesu Web Control</AssemblyTitle>
     <Product>Yaesu Web Control</Product>
     <Description>Browser-based CAT controller for Yaesu HF transceivers</Description>
@@ -66,8 +68,6 @@
     <RootNamespace>Yaesu_Web_Control</RootNamespace>
     <Company>MM5AGM</Company>
     <Copyright>© 2026 MM5AGM</Copyright>
-    <AssemblyConfiguration>Debug</AssemblyConfiguration>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
   <!-- Explicitly copy the entire wwwroot folder into the output directory -->
   <ItemGroup>

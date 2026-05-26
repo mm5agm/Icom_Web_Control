@@ -143,6 +143,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+// Debounce timers for aria attribute updates — one per VFO (A/B).
+// Visual updates (innerHTML) happen immediately; screen-reader attributes
+// are only written after 300 ms of no further changes so the reader
+// announces the final frequency rather than every scroll-wheel step.
+const _ariaDebounceTimers = {};
+
 // Frequency display renderer (outer version, used by outer updateFrequencyDisplay)
 function updateFrequencyDisplay(receiver, freqHz) {
     const display = document.getElementById('freq' + receiver);
@@ -159,9 +165,12 @@ function updateFrequencyDisplay(receiver, freqHz) {
     display.innerHTML = renderFrequencyDigits(freqToShow, selIdx);
     if (freqToShow && freqToShow > 0) {
         const mhz = String(parseFloat((freqToShow / 1e6).toFixed(6)));
-        display.setAttribute('aria-valuenow', mhz);
-        display.setAttribute('aria-label', `VFO ${receiver}: ${mhz} MHz`);
-        display.setAttribute('title', `VFO ${receiver}: ${mhz} MHz`);
+        clearTimeout(_ariaDebounceTimers[receiver]);
+        _ariaDebounceTimers[receiver] = setTimeout(() => {
+            display.setAttribute('aria-valuenow', mhz);
+            display.setAttribute('aria-label', `VFO ${receiver}: ${mhz} MHz`);
+            display.setAttribute('title', `VFO ${receiver}: ${mhz} MHz`);
+        }, 300);
     }
 }
 
@@ -775,6 +784,17 @@ connection.on("RadioStateUpdate", function (update) {
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
+    }
+
+    // --- PROC ---
+    if (update.property === "ProcEnabled") {
+        if (typeof window.updateProcButton === 'function') window.updateProcButton(update.value);
+    }
+    if (update.property === "ProcLevel") {
+        const slider = document.getElementById('procLevelSlider');
+        const label  = document.getElementById('procLevelValue');
+        if (slider) slider.value = update.value;
+        if (label)  label.textContent = update.value;
     }
 
     // --- FREQUENCY CHANGE ---
@@ -1661,9 +1681,12 @@ document.addEventListener('DOMContentLoaded', function() {
         display.innerHTML = renderFrequencyDigits(freqToShow, selIdx);
         if (freqToShow && freqToShow > 0) {
             const mhz = String(parseFloat((freqToShow / 1e6).toFixed(6)));
-            display.setAttribute('aria-valuenow', mhz);
-            display.setAttribute('aria-label', `VFO ${receiver}: ${mhz} MHz`);
-            display.setAttribute('title', `VFO ${receiver}: ${mhz} MHz`);
+            clearTimeout(_ariaDebounceTimers[receiver]);
+            _ariaDebounceTimers[receiver] = setTimeout(() => {
+                display.setAttribute('aria-valuenow', mhz);
+                display.setAttribute('aria-label', `VFO ${receiver}: ${mhz} MHz`);
+                display.setAttribute('title', `VFO ${receiver}: ${mhz} MHz`);
+            }, 300);
         }
     }
 

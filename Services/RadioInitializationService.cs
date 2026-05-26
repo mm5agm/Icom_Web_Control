@@ -189,6 +189,17 @@ namespace Yaesu_Web_Control.Services
                     stateTasks.Add(multiplexer.SendCommandAsync($"MG{persistedState.MicGain:D3};", "Initialization", stoppingToken)
                         .ContinueWith(t => { if (!t.IsFaulted) radioStateService.MicGain = persistedState.MicGain; }));
                 }
+                // Restore Speech Processor
+                {
+                    string prCmd = persistedState.ProcEnabled ? "PR1;" : "PR0;";
+                    stateTasks.Add(multiplexer.SendCommandAsync(prCmd, "Initialization", stoppingToken)
+                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ProcEnabled = persistedState.ProcEnabled; }));
+                }
+                if (persistedState.ProcLevel >= 0 && persistedState.ProcLevel <= 100)
+                {
+                    stateTasks.Add(multiplexer.SendCommandAsync($"PL{persistedState.ProcLevel:D3};", "Initialization", stoppingToken)
+                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ProcLevel = persistedState.ProcLevel; }));
+                }
                 // Restore IF Width
                 if (!string.IsNullOrEmpty(persistedState.IfWidthA))
                 {

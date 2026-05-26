@@ -334,6 +334,16 @@
                             }
                         }
                         break;
+                    case "PR":
+                        // PR{n}; — n=0=OFF, n=1=ON (speech processor)
+                        if (message.Length >= 4 && (message[2] == '0' || message[2] == '1'))
+                            _stateService.ProcEnabled = message[2] == '1';
+                        break;
+                    case "PL":
+                        // PL{PPP}; — speech processor level 000-100
+                        if (message.Length >= 6 && int.TryParse(message.Substring(2, 3), out var procLevel))
+                            _stateService.ProcLevel = Math.Clamp(procLevel, 0, 100);
+                        break;
                     case "ST":
                         // ST{mode}; — 0=OFF, 1=ON (VFO A=RX / VFO B=TX), 2=ON+5kHz Quick Split
                         if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int splitMode))

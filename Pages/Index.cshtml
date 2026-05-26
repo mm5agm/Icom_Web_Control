@@ -129,21 +129,21 @@
                 </button>
             </div>
         }
-        @if (Model.ShowApp2Button)
-        {
-            <div class="col-auto">
-                <button id="jtalertBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
-                        onclick="launchJtalert()" title="Launch @Model.App2Name">
-                    @Model.App2Name
-                </button>
-            </div>
-        }
         @if (Model.ShowApp3Button)
         {
             <div class="col-auto">
                 <button id="log4omBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
                         onclick="launchLog4om()" title="Launch @Model.App3Name">
                     @Model.App3Name
+                </button>
+            </div>
+        }
+        @if (Model.ShowApp2Button)
+        {
+            <div class="col-auto">
+                <button id="jtalertBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
+                        onclick="launchJtalert()" title="Launch @Model.App2Name">
+                    @Model.App2Name
                 </button>
             </div>
         }
@@ -251,6 +251,21 @@
                                style="width: clamp(80px, 10vw, 150px); height: 18px;"
                                oninput="document.getElementById('micGainValue').innerText = this.value;"
                                onchange="setMicGain(this.value);">
+                        <button id="procBtn"
+                                class="btn btn-sm ms-2 @(Model.ProcEnabled ? "btn-warning" : "btn-outline-secondary")"
+                                aria-label="Speech processor"
+                                title="Speech processor on/off"
+                                onclick="toggleProc()">PROC</button>
+                        <label class="mb-0 text-nowrap ms-2">PROC Level: <span id="procLevelValue" class="fw-bold">@Model.ProcLevel</span></label>
+                        <input type="range" class="flex-shrink-0"
+                               id="procLevelSlider"
+                               aria-label="Speech processor level"
+                               title="Speech processor level"
+                               min="0" max="100" step="1"
+                               value="@Model.ProcLevel"
+                               style="width: clamp(80px, 10vw, 150px); height: 18px;"
+                               oninput="document.getElementById('procLevelValue').innerText = this.value;"
+                               onchange="setProcLevel(this.value);">
                     </div>
 
                 </div>
@@ -1194,6 +1209,42 @@
             }
         }
 
+        async function toggleProc() {
+            const btn = document.getElementById('procBtn');
+            const enabled = btn.classList.contains('btn-warning');
+            try {
+                const response = await fetch('/api/cat/proc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !enabled })
+                });
+                if (response.ok) {
+                    updateProcButton(!enabled);
+                }
+            } catch (e) {
+                console.error('Error toggling PROC:', e.message);
+            }
+        }
+
+        async function setProcLevel(value) {
+            try {
+                await fetch('/api/cat/proclevel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: parseInt(value) })
+                });
+            } catch (e) {
+                console.error('Error setting PROC level:', e.message);
+            }
+        }
+
+        function updateProcButton(enabled) {
+            const btn = document.getElementById('procBtn');
+            if (!btn) return;
+            btn.classList.toggle('btn-warning', enabled);
+            btn.classList.toggle('btn-outline-secondary', !enabled);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
         });
 
@@ -1202,6 +1253,8 @@
         window.launchJtalert = launchJtalert;
         window.launchLog4om  = launchLog4om;
         window.setMicGain    = setMicGain;
+        window.toggleProc    = toggleProc;
+        window.setProcLevel  = setProcLevel;
     </script>
     <script>
     (function () {

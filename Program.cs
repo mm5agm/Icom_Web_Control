@@ -197,6 +197,15 @@ try
     }
 
     app.UseStaticFiles();
+    var picturesPath = System.IO.Path.Combine(app.Environment.ContentRootPath, "pictures");
+    if (System.IO.Directory.Exists(picturesPath))
+    {
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(picturesPath),
+            RequestPath = "/pictures"
+        });
+    }
     app.UseRouting();
     app.UseAuthorization();
     //app.MapGet("/", () => "ROOT ROUTE HIT");

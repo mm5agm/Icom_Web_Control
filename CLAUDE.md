@@ -25,6 +25,35 @@ dotnet publish -c Release -r win-x64 --self-contained
 
 There are no automated tests. Verification is manual via the browser at `http://localhost:8080`.
 
+---
+
+## Release Process
+
+Before releasing: bump `Models/AppVersion.cs`, `installer.nsi`, add release notes to `README.md`, update `USER_MANUAL.md` if needed.
+
+```powershell
+# 1. Commit everything on develop
+git add -A
+git commit -m "Release vX.Y.Z: ..."
+
+# 2. Merge to main and tag
+git checkout main
+git merge develop --no-ff -m "Release vX.Y.Z"
+git tag vX.Y.Z
+git checkout develop
+
+# 3. Push branches and tag
+git push origin develop
+git push origin main
+git push origin vX.Y.Z
+
+# 4. Create the GitHub Release — this triggers the build workflow
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "See README.md for full release notes."
+```
+
+**Step 4 is required.** The build workflow triggers on `release: [created]`, not on tag push alone.
+Alternatively run `.\scripts\finish-release.ps1 -Version vX.Y.Z` which does all four steps.
+
 User settings persist to `%APPDATA%\MM5AGM\FTdx101 WebApp\appsettings.user.json`.  
 Radio state persists to `%APPDATA%\MM5AGM\FTdx101 WebApp\radio_state.json`.
 

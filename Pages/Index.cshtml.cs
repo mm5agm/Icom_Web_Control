@@ -49,6 +49,9 @@ namespace Yaesu_Web_Control.Pages
         // MIC Gain persisted value
         public int MicGain { get; set; } = 50;
 
+        public bool ProcEnabled { get; set; } = false;
+        public int ProcLevel { get; set; } = 50;
+
         public double SdrSampleRateHz { get; set; } = 2_048_000;
         public string BandPlan { get; set; } = "Region1";
         public string RadioModel { get; set; } = "FTdx101MP";
@@ -78,8 +81,10 @@ namespace Yaesu_Web_Control.Pages
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;
 
-            // Load persisted MIC Gain
+            // Load persisted MIC Gain and PROC
             MicGain = _radioStateService.MicGain;
+            ProcEnabled = _radioStateService.ProcEnabled;
+            ProcLevel = _radioStateService.ProcLevel;
 
             // VFO A (keep as is)
             State.vfoA.frequency = _radioStateService.FrequencyA;

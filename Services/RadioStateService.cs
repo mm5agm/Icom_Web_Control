@@ -45,6 +45,8 @@ namespace Yaesu_Web_Control.Services
             RoofingFilterB = _initialState.RoofingFilterB ?? "";
             Power = _initialState.Power;
             MicGain = _initialState.MicGain;
+            ProcEnabled = _initialState.ProcEnabled;
+            ProcLevel = _initialState.ProcLevel;
             IfWidthA = _initialState.IfWidthA ?? "8";
             IfWidthB = _initialState.IfWidthB ?? "8";
             IfShiftA = _initialState.IfShiftA;
@@ -422,6 +424,12 @@ namespace Yaesu_Web_Control.Services
         private int _micGain = 50;
         public int MicGain { get => _micGain; set => SetField(ref _micGain, value); }
 
+        private bool _procEnabled = false;
+        public bool ProcEnabled { get => _procEnabled; set => SetField(ref _procEnabled, value); }
+
+        private int _procLevel = 50;
+        public int ProcLevel { get => _procLevel; set => SetField(ref _procLevel, value); }
+
         private bool _radioPowerOn = true; // Assume on when app starts
         public bool RadioPowerOn { get => _radioPowerOn; set => SetField(ref _radioPowerOn, value); }
 
@@ -509,6 +517,8 @@ namespace Yaesu_Web_Control.Services
             AfGainA = state.AfGainA;
             AfGainB = state.AfGainB;
             MicGain = state.MicGain;
+            ProcEnabled = state.ProcEnabled;
+            ProcLevel = state.ProcLevel;
             AgcA = state.AgcA ?? "2";
             AgcB = state.AgcB ?? "2";
             IpoA = state.IpoA ?? "0";
@@ -580,7 +590,9 @@ namespace Yaesu_Web_Control.Services
                 ApfOnA = ApfOnA,
                 ApfOnB = ApfOnB,
                 ApfFreqA = ApfFreqA,
-                ApfFreqB = ApfFreqB
+                ApfFreqB = ApfFreqB,
+                ProcEnabled = ProcEnabled,
+                ProcLevel = ProcLevel
             };
         }
     }

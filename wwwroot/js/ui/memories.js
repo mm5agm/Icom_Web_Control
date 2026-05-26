@@ -2,6 +2,72 @@
 
 const MEM_PANEL_KEY = 'memoriesPanel';
 
+// Prompt dialog (same dark style as _memConfirm but with a text input).
+function _memPrompt(message, defaultValue = '') {
+    return new Promise(resolve => {
+        const dlg = document.createElement('dialog');
+        dlg.style.cssText = [
+            'border-radius:10px', 'border:2px solid #555', 'background:#1e1e2e',
+            'color:#e0e0e0', 'padding:20px 24px', 'max-width:420px', 'width:90vw',
+            'z-index:10001', 'box-shadow:0 10px 40px rgba(0,0,0,0.7)'
+        ].join(';');
+        dlg.innerHTML =
+            `<p style="margin:0 0 12px;font-size:0.88rem">${_esc(message)}</p>` +
+            `<input type="text" maxlength="12" value="${_esc(defaultValue)}" ` +
+            `style="width:100%;padding:6px 10px;border-radius:5px;border:1px solid #666;` +
+            `background:#2d2d44;color:#e0e0e0;font-size:0.88rem;margin-bottom:14px;box-sizing:border-box;">` +
+            `<div style="display:flex;justify-content:flex-end;gap:8px">` +
+            `<button data-r="cancel" style="padding:4px 14px;border-radius:5px;border:1px solid #666;background:#2d2d44;color:#ccc;cursor:pointer;font-size:0.85rem">Cancel</button>` +
+            `<button data-r="ok" style="padding:4px 14px;border-radius:5px;border:1px solid #4a9;background:#2a5a3a;color:#cfe;cursor:pointer;font-size:0.85rem">OK</button>` +
+            `</div>`;
+        document.body.appendChild(dlg);
+        dlg.showModal();
+        const input = dlg.querySelector('input');
+        input.focus();
+        input.select();
+        function finish(v) { dlg.close(); dlg.remove(); resolve(v); }
+        dlg.querySelector('[data-r="ok"]').addEventListener('click', () => finish(input.value));
+        dlg.querySelector('[data-r="cancel"]').addEventListener('click', () => finish(null));
+        dlg.addEventListener('cancel', () => finish(null));
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); finish(input.value); }
+        });
+    });
+}
+
+const _MODES = ['LSB','USB','CW-U','CW-L','AM','AM-N','FM','FM-N','RTTY-L','RTTY-U','DATA-L','DATA-U','DATA-FM','DATA-FM-N','PSK'];
+
+// Select dialog — like _memPrompt but with a <select>.
+function _memSelect(message, currentValue) {
+    return new Promise(resolve => {
+        const dlg = document.createElement('dialog');
+        dlg.style.cssText = [
+            'border-radius:10px', 'border:2px solid #555', 'background:#1e1e2e',
+            'color:#e0e0e0', 'padding:20px 24px', 'max-width:320px', 'width:90vw',
+            'z-index:10001', 'box-shadow:0 10px 40px rgba(0,0,0,0.7)'
+        ].join(';');
+        const opts = _MODES.map(m =>
+            `<option value="${m}"${m === currentValue ? ' selected' : ''}>${m}</option>`
+        ).join('');
+        dlg.innerHTML =
+            `<p style="margin:0 0 12px;font-size:0.88rem">${_esc(message)}</p>` +
+            `<select style="width:100%;padding:6px 10px;border-radius:5px;border:1px solid #666;` +
+            `background:#2d2d44;color:#e0e0e0;font-size:0.88rem;margin-bottom:14px;box-sizing:border-box;">${opts}</select>` +
+            `<div style="display:flex;justify-content:flex-end;gap:8px">` +
+            `<button data-r="cancel" style="padding:4px 14px;border-radius:5px;border:1px solid #666;background:#2d2d44;color:#ccc;cursor:pointer;font-size:0.85rem">Cancel</button>` +
+            `<button data-r="ok" style="padding:4px 14px;border-radius:5px;border:1px solid #4a9;background:#2a5a3a;color:#cfe;cursor:pointer;font-size:0.85rem">OK</button>` +
+            `</div>`;
+        document.body.appendChild(dlg);
+        dlg.showModal();
+        const sel = dlg.querySelector('select');
+        sel.focus();
+        function finish(v) { dlg.close(); dlg.remove(); resolve(v); }
+        dlg.querySelector('[data-r="ok"]').addEventListener('click', () => finish(sel.value));
+        dlg.querySelector('[data-r="cancel"]').addEventListener('click', () => finish(null));
+        dlg.addEventListener('cancel', () => finish(null));
+    });
+}
+
 // Replaces native confirm() to avoid the "localhost:8080 says" browser header.
 function _memConfirm(message) {
     return new Promise(resolve => {
@@ -141,6 +207,122 @@ async function _switchBank(name) {
     }
 }
 
+// ── Context menu ─────────────────────────────────────────────────────────────
+
+let _ctxTargetId = null;
+
+function _ensureContextMenu() {
+    if (document.getElementById('memCtxMenu')) return;
+    const menu = document.createElement('div');
+    menu.id = 'memCtxMenu';
+    menu.style.cssText = [
+        'position:fixed', 'z-index:10002', 'display:none',
+        'background:#1e1e2e', 'border:1px solid #555', 'border-radius:6px',
+        'box-shadow:0 4px 20px rgba(0,0,0,0.6)', 'min-width:140px',
+        'overflow:hidden', 'font-size:0.85rem', 'user-select:none'
+    ].join(';');
+
+    const items = [
+        { id: 'memCtxRecall', label: '↵ Recall',       color: '#e0e0e0' },
+        { id: 'memCtxSep',    label: null,              color: null },
+        { id: 'memCtxRename', label: '✎ Rename',       color: '#e0e0e0' },
+        { id: 'memCtxMode',   label: '⇄ Change Mode',  color: '#e0e0e0' },
+        { id: 'memCtxDelete', label: '✕ Delete',       color: '#f88' },
+    ];
+    menu.innerHTML = items.map(it =>
+        it.label === null
+            ? `<div style="border-top:1px solid #444;margin:2px 0;"></div>`
+            : `<div id="${it.id}" style="padding:8px 16px;cursor:pointer;color:${it.color}">${it.label}</div>`
+    ).join('');
+    document.body.appendChild(menu);
+
+    menu.querySelectorAll('div[id]').forEach(el => {
+        el.addEventListener('mouseenter', () => el.style.background = '#2d2d44');
+        el.addEventListener('mouseleave', () => el.style.background = '');
+    });
+
+    document.getElementById('memCtxRecall').addEventListener('click', () => {
+        const id = _ctxTargetId;
+        _hideContextMenu();
+        if (id !== null) _recallMemory(id);
+    });
+
+    document.getElementById('memCtxRename').addEventListener('click', async () => {
+        const id = _ctxTargetId;
+        _hideContextMenu();
+        if (id === null) return;
+        const mem = _memories.find(m => m.id === id);
+        if (!mem) return;
+        const newLabel = await _memPrompt('Rename memory (max 12 characters):', mem.label || '');
+        if (newLabel === null) return;
+        try {
+            await fetch(`/api/memory/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...mem, label: newLabel.trim() })
+            });
+            await _loadAndRender();
+        } catch (e) { console.error('Rename failed:', e); }
+    });
+
+    document.getElementById('memCtxMode').addEventListener('click', async () => {
+        const id = _ctxTargetId;
+        _hideContextMenu();
+        if (id === null) return;
+        const mem = _memories.find(m => m.id === id);
+        if (!mem) return;
+        const newMode = await _memSelect('Change mode:', mem.mode);
+        if (newMode === null) return;
+        try {
+            await fetch(`/api/memory/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...mem, mode: newMode })
+            });
+            await _loadAndRender();
+        } catch (e) { console.error('Change mode failed:', e); }
+    });
+
+    document.getElementById('memCtxDelete').addEventListener('click', async () => {
+        const id = _ctxTargetId;
+        _hideContextMenu();
+        if (id === null) return;
+        const mem = _memories.find(m => m.id === id);
+        const name = mem ? (mem.label || 'Mem ' + mem.id) : 'this memory';
+        if (!await _memConfirm(`Delete "${name}"?`)) return;
+        try {
+            await fetch(`/api/memory/${id}`, { method: 'DELETE' });
+            await _loadAndRender();
+        } catch (e) { console.error('Delete failed:', e); }
+    });
+
+    document.addEventListener('click', e => {
+        if (!menu.contains(e.target)) _hideContextMenu();
+    }, { capture: true });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') _hideContextMenu();
+    });
+}
+
+function _showContextMenu(e, id) {
+    _ensureContextMenu();
+    _ctxTargetId = id;
+    const menu = document.getElementById('memCtxMenu');
+    menu.style.display = 'block';
+    let x = e.clientX, y = e.clientY;
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+    const r = menu.getBoundingClientRect();
+    if (r.right  > window.innerWidth)  menu.style.left = (x - r.width)  + 'px';
+    if (r.bottom > window.innerHeight) menu.style.top  = (y - r.height) + 'px';
+}
+
+function _hideContextMenu() {
+    const menu = document.getElementById('memCtxMenu');
+    if (menu) menu.style.display = 'none';
+    _ctxTargetId = null;
+}
+
 function _renderTiles(container) {
     if (_memories.length === 0) {
         container.innerHTML =
@@ -172,6 +354,7 @@ function _renderTiles(container) {
             `<span class="mem-tile-mode" aria-hidden="true">${_esc(mem.mode)}</span>`;
 
         tile.addEventListener('click', () => _recallMemory(mem.id));
+        tile.addEventListener('contextmenu', e => { e.preventDefault(); _showContextMenu(e, mem.id); });
         item.appendChild(tile);
         frag.appendChild(item);
     }
