@@ -1211,7 +1211,7 @@
 
         async function toggleProc() {
             const btn = document.getElementById('procBtn');
-            const enabled = btn.classList.contains('btn-warning');
+            const enabled = btn.classList.contains('btn-success');
             try {
                 const response = await fetch('/api/cat/proc', {
                     method: 'POST',
