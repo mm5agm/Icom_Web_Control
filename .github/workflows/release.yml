@@ -1,16 +1,19 @@
 name: Build and Release Installer
 
 on:
-  # Automatically run when release-please creates a new GitHub Release
   release:
     types: [created]
 
-  # Still allow manual runs for testing
+  push:
+    tags:
+      - 'v*'
+
   workflow_dispatch:
     inputs:
       tag:
         description: 'Release tag to create/upload to (e.g. v0.7.0)'
         required: false
+        type: string
 
 jobs:
   build:
@@ -76,8 +79,8 @@ jobs:
 
       - name: Upload installer to GitHub Release
         run: |
-          # Determine tag: use release tag if triggered by release, otherwise manual input
-          if ("${{ github.event_name }}" -eq "release") {
+          # Determine tag: release and push events carry it in GITHUB_REF_NAME; dispatch uses the input
+          if ("${{ github.event_name }}" -eq "release" -or "${{ github.event_name }}" -eq "push") {
             $tag = $env:GITHUB_REF_NAME
           } else {
             $tag = "${{ github.event.inputs.tag }}"
