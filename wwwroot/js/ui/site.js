@@ -2674,11 +2674,13 @@ pollInitStatus();
     } else {
         check();
     }
-})()
+})();
 
 // ── GitHub update check ───────────────────────────────────────────────────
 (function () {
-    const DISMISS_KEY = 'updateCheckDismissed';
+    const DISMISS_KEY_PREFIX = 'updateCheckDismissed_';
+
+    function _dismissKey(version) { return DISMISS_KEY_PREFIX + version; }
 
     function _escHtml(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -2696,8 +2698,15 @@ pollInitStatus();
         return false;
     }
 
+    function _dismiss(version) {
+        try { localStorage.setItem(_dismissKey(version), '1'); } catch { /* private browsing */ }
+        const el = document.getElementById('updateBanner');
+        if (el) el.remove();
+    }
+
     function _showUpdateBanner(version, releaseUrl) {
         if (document.getElementById('updateBanner')) return;
+        try { if (localStorage.getItem(_dismissKey(version))) return; } catch { /* private browsing */ }
         const banner = document.createElement('div');
         banner.id = 'updateBanner';
         banner.style.cssText = [
@@ -2710,16 +2719,18 @@ pollInitStatus();
             `<div style="display:flex;align-items:flex-start;gap:8px">` +
             `<div style="flex:1"><strong>Update available — v${_escHtml(version)}</strong><br>` +
             `<span style="color:#aab;font-size:0.78rem">A newer version of Yaesu Web Control is available.</span></div>` +
-            `<button onclick="document.getElementById('updateBanner').remove()" ` +
+            `<button id="updateBannerDismissX" ` +
             `style="background:none;border:none;color:#aaa;cursor:pointer;font-size:1rem;line-height:1;padding:0" aria-label="Dismiss">✕</button>` +
             `</div>` +
             `<div style="margin-top:8px;display:flex;gap:8px">` +
             `<a href="${_escHtml(releaseUrl)}" target="_blank" rel="noopener" ` +
             `style="background:#1a4a7a;border:1px solid #4a8abf;color:#cde;padding:3px 10px;border-radius:4px;font-size:0.78rem;text-decoration:none">Download</a>` +
-            `<button onclick="document.getElementById('updateBanner').remove()" ` +
+            `<button id="updateBannerDismissBtn" ` +
             `style="background:#2d2d44;border:1px solid #555;color:#aaa;padding:3px 10px;border-radius:4px;font-size:0.78rem;cursor:pointer">Dismiss</button>` +
             `</div>`;
         document.body.appendChild(banner);
+        document.getElementById('updateBannerDismissX').addEventListener('click', () => _dismiss(version));
+        document.getElementById('updateBannerDismissBtn').addEventListener('click', () => _dismiss(version));
     }
 
     async function _checkForUpdate() {
