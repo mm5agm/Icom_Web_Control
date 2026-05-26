@@ -16,6 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="publish\**" />
     <Compile Remove="oldFiles\**" />
     <Compile Remove="oldFiles/Backup/**" />
     <Content Remove="oldFiles/Backup/**" />
