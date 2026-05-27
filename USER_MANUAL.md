@@ -392,7 +392,7 @@ Click the button to toggle the connection. While connecting, it briefly shows "C
 
 All three panels can be open at the same time and can be dragged anywhere on screen by their title bar.
 
-![VOX, CW Keyer and FM Repeater panels open simultaneously](pictures/Screen popups.png)
+![VOX, CW Keyer and FM Repeater panels open simultaneously](pictures/Screen%20popups.png)
 
 **MIC Gain** — Drag the slider to set the microphone gain (0–100). The value is sent to the radio as you release.
 
