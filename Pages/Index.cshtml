@@ -73,6 +73,29 @@
             .Where(o => o.Value == "0" || o.Value == "1" || o.Value == "2" || o.Value == "3"
                      || Model.InstalledRoofingFilters.Contains(o.Value))
             .ToArray();
+
+    // IF Low Cut options (SL command) — shared across models
+    var ifLowCutOptions = new (string Value, string Label)[]
+    {
+        ("0","OFF"), ("1","100 Hz"), ("2","200 Hz"), ("3","300 Hz"), ("4","400 Hz"),
+        ("5","500 Hz"), ("6","600 Hz"), ("7","700 Hz"), ("8","800 Hz"),
+        ("9","900 Hz"), ("10","1.0 kHz"), ("11","1.1 kHz")
+    };
+
+    // Standard CTCSS tones
+    var ctcssTones = new (string Code, string Label)[]
+    {
+        ("01","67.0"), ("02","69.3"), ("03","71.9"), ("04","74.4"), ("05","77.0"),
+        ("06","79.7"), ("07","82.5"), ("08","85.4"), ("09","88.5"), ("10","91.5"),
+        ("11","94.8"), ("12","97.4"), ("13","100.0"), ("14","103.5"), ("15","107.2"),
+        ("16","110.9"), ("17","114.8"), ("18","118.8"), ("19","123.0"), ("20","127.3"),
+        ("21","131.8"), ("22","136.5"), ("23","141.3"), ("24","146.2"), ("25","150.0"),
+        ("26","151.4"), ("27","156.7"), ("28","162.2"), ("29","165.5"), ("30","167.9"),
+        ("31","171.3"), ("32","173.8"), ("33","177.3"), ("34","179.9"), ("35","183.5"),
+        ("36","186.2"), ("37","189.9"), ("38","192.8"), ("39","196.6"), ("40","199.5"),
+        ("41","203.5"), ("42","206.5"), ("43","210.7"), ("44","218.1"), ("45","225.7"),
+        ("46","229.1"), ("47","233.6"), ("48","241.8"), ("49","250.3"), ("50","254.1")
+    };
 }
 
 <!-- Cache-busted CSS reference -->
@@ -123,7 +146,7 @@
         {
             <div class="col-auto">
                 <button id="wsjtxBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
-                        onclick="launchWsjtx()" title="Launch @Model.App1Name">
+                        onclick="launchWsjtx()" title="Launch @Model.App1Name" aria-label="Launch @Model.App1Name">
                     @Model.App1Name
                     <span id="wsjtxTxBadge" class="badge bg-danger ms-1" style="display:none;">TX</span>
                 </button>
@@ -133,7 +156,7 @@
         {
             <div class="col-auto">
                 <button id="log4omBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
-                        onclick="launchLog4om()" title="Launch @Model.App3Name">
+                        onclick="launchLog4om()" title="Launch @Model.App3Name" aria-label="Launch @Model.App3Name">
                     @Model.App3Name
                 </button>
             </div>
@@ -142,38 +165,50 @@
         {
             <div class="col-auto">
                 <button id="jtalertBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
-                        onclick="launchJtalert()" title="Launch @Model.App2Name">
+                        onclick="launchJtalert()" title="Launch @Model.App2Name" aria-label="Launch @Model.App2Name">
                     @Model.App2Name
                 </button>
             </div>
         }
         <div class="col-auto ms-auto d-flex gap-2 align-items-center">
             <a href="https://paypal.me/mm5agm" target="_blank" rel="noopener noreferrer"
-               class="btn btn-warning btn-sm" style="padding-top: 1px; padding-bottom: 1px;" title="Support this project via PayPal">
+               class="btn btn-warning btn-sm" style="padding-top: 1px; padding-bottom: 1px;" title="Support this project via PayPal"
+               aria-label="Support this project via PayPal — Buy Me a Coffee">
                 <i class="bi bi-cup-hot-fill" aria-hidden="true"></i> Buy Me a Coffee
             </a>
             <button id="memBtn" class="btn btn-sm btn-outline-info"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Open memories panel">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Open memories panel"
+                    aria-label="Open memories panel">
                 Mem
             </button>
             <button id="vfoBToggleBtn" class="btn btn-sm btn-outline-secondary"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B"
+                    aria-label="Show or hide VFO B panel">
                 VFO-B
             </button>
             <button id="swapVfoBtn" class="btn btn-sm btn-outline-secondary"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Swap VFO A and VFO B frequencies">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Swap VFO A and VFO B frequencies"
+                    aria-label="Swap VFO A and VFO B frequencies">
                 A&#8596;B
             </button>
             <button id="splitBtn" class="btn btn-sm btn-outline-secondary"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Toggle Split: VFO A = receive, VFO B = transmit">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Toggle Split: VFO A = receive, VFO B = transmit"
+                    aria-label="Toggle split mode: VFO A receive, VFO B transmit">
                 Split
             </button>
             <button id="quickSplitBtn" class="btn btn-sm btn-outline-secondary"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Quick Split: enable split and set VFO B to VFO A + 5 kHz">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Quick Split: enable split and set VFO B to VFO A + 5 kHz"
+                    aria-label="Quick split: enable split and set VFO B to VFO A plus 5 kHz">
                 +5k
             </button>
+            <button id="connectBtn" class="btn btn-danger btn-sm"
+                    onclick="toggleCatConnection()" style="padding-top: 1px; padding-bottom: 1px;" title="Connect or disconnect CAT serial port"
+                    aria-label="CAT serial connection — currently disconnected">
+                <i class="bi bi-plug" aria-hidden="true"></i> Disconnected
+            </button>
             <button id="radioPowerBtn" class="btn btn-danger btn-sm"
-                    onclick="toggleRadioPower()" style="padding-top: 1px; padding-bottom: 1px;" title="Radio Power On/Off">
+                    onclick="toggleRadioPower()" style="padding-top: 1px; padding-bottom: 1px;" title="Radio Power On/Off"
+                    aria-label="Radio power on or off">
                 <i class="bi bi-power" aria-hidden="true"></i> POWER
             </button>
         </div>
@@ -252,10 +287,10 @@
                                oninput="document.getElementById('micGainValue').innerText = this.value;"
                                onchange="setMicGain(this.value);">
                         <button id="procBtn"
-                                class="btn btn-sm ms-2 @(Model.ProcEnabled ? "btn-warning" : "btn-outline-secondary")"
+                                class="btn btn-sm ms-2 @(Model.ProcEnabled ? "btn-success" : "btn-outline-secondary")"
                                 aria-label="Speech processor"
                                 title="Speech processor on/off"
-                                onclick="toggleProc()">PROC</button>
+                                onclick="toggleProc()">@(Model.ProcEnabled ? "Proc On" : "Proc Off")</button>
                         <label class="mb-0 text-nowrap ms-2">PROC Level: <span id="procLevelValue" class="fw-bold">@Model.ProcLevel</span></label>
                         <input type="range" class="flex-shrink-0"
                                id="procLevelSlider"
@@ -266,6 +301,34 @@
                                style="width: clamp(80px, 10vw, 150px); height: 18px;"
                                oninput="document.getElementById('procLevelValue').innerText = this.value;"
                                onchange="setProcLevel(this.value);">
+                        <button id="atuBtn"
+                                class="btn btn-sm ms-2 @(Model.AtuEnabled ? "btn-success" : "btn-outline-secondary")"
+                                aria-label="Antenna tuner"
+                                title="Toggle antenna tuner (ATU) on/off"
+                                onclick="toggleAtu()">@(Model.AtuEnabled ? "ATU On" : "ATU Off")</button>
+                        <label class="mb-0 text-nowrap ms-2">Mon: <span id="monLevelValue" class="fw-bold">@Model.MonitorLevelA</span></label>
+                        <input type="range" class="flex-shrink-0"
+                               id="monLevelSlider"
+                               aria-label="TX monitor / sidetone level"
+                               title="TX monitor / sidetone level"
+                               min="0" max="100" step="1"
+                               value="@Model.MonitorLevelA"
+                               style="width: clamp(60px, 8vw, 110px); height: 18px;"
+                               oninput="document.getElementById('monLevelValue').innerText = this.value;"
+                               onchange="setMonitorLevel(this.value);">
+                        <button id="voxBtn"
+                                class="btn btn-sm ms-2 @(Model.VoxOn ? "btn-warning" : "btn-outline-secondary")"
+                                aria-label="VOX controls"
+                                title="Open VOX controls panel"
+                                onclick="document.getElementById('voxDialog').show()">VOX</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="CW keyer controls"
+                                title="Open CW keyer controls panel"
+                                onclick="document.getElementById('cwDialog').show()">CW</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="FM repeater controls"
+                                title="Open FM repeater controls panel"
+                                onclick="document.getElementById('fmDialog').show()">FM Rep</button>
                     </div>
 
                 </div>
@@ -327,7 +390,7 @@
                             </button>
                             <span id="saveMemStatusA" class="visually-hidden" role="status" aria-live="polite"></span>
                         </div>
-                        <!-- Middle: Band buttons + Mode/Antenna below -->
+                        <!-- Middle: Band buttons + Mode/Antenna below + filter scope -->
                         <div class="flex-grow-1 d-flex flex-column gap-1">
                             @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create("unused", "A", Model.SelectedBandA))
                             <div class="d-flex gap-2 mt-1">
@@ -364,6 +427,12 @@
                                     }
                                 </select>
                             </div>
+                        </div>
+                        <!-- Filter scope display VFO A — sits between band buttons and AGC column -->
+                        <div class="flex-shrink-0" id="filterScopeContainerA" style="width:160px;">
+                            <canvas id="filterScopeCanvasA" role="img" aria-hidden="true"
+                                    aria-label="VFO A filter display" data-a11y-key="filter.scopeA"
+                                    style="display:block; height:80px; border-radius:4px;"></canvas>
                         </div>
                         <!-- Right: Controls column (2-column grid) -->
                         <div class="vfo-controls-column">
@@ -422,6 +491,17 @@
                                         onchange="window.radioControl.setNoiseBlanker('A', this.value)">
                                     <option value="0" selected>OFF</option>
                                     <option value="1">ON</option>
+                                </select>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">NB Level</label>
+                                <select class="form-select form-select-sm" id="nbLevelSelectA"
+                                        aria-label="VFO A noise blanker level"
+                                        title="VFO A noise blanker depth (1=min, 20=max)"
+                                        onchange="setNbLevel('A', this.value)">
+                                    @for (int i = 1; i <= 20; i++) {
+                                        <option value="@i" selected="@(Model.RadioState.NbLevelA == i ? "selected" : null)">@i</option>
+                                    }
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -554,6 +634,17 @@
                                 <option value="@opt.Value" selected="@(Model.RadioState.IfWidthA==opt.Value||isDefault ? "selected" : null)">@opt.Label</option>
                             }
                         </select>
+                        <label class="mb-0 text-nowrap ms-2 fw-bold">Low Cut:</label>
+                        <select class="form-select form-select-sm fw-bold flex-shrink-0" id="ifLowCutSelectA"
+                                aria-label="VFO A IF low cut"
+                                title="VFO A IF low cut (lower edge of passband)"
+                                style="width: auto;"
+                                onchange="window.radioControl.setIfLowCut('A', this.value)">
+                            @foreach (var opt in ifLowCutOptions)
+                            {
+                                <option value="@opt.Value" selected="@(Model.RadioState.IfLowCutA==opt.Value ? "selected" : null)">@opt.Label</option>
+                            }
+                        </select>
                         <label class="mb-0 text-nowrap ms-1 fw-bold">IF Shift: <span id="ifShiftValueA" class="fw-bold">@Model.RadioState.IfShiftA</span></label>
                         <input type="range" class="form-range ifshift-slider flex-shrink-0"
                                id="ifShiftSliderA"
@@ -561,7 +652,7 @@
                                title="VFO A IF shift"
                                min="-1000" max="1000" step="20" value="@Model.RadioState.IfShiftA"
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
-                               oninput="document.getElementById('ifShiftValueA').textContent = this.value">
+                               oninput="document.getElementById('ifShiftValueA').textContent = this.value; if(window.filterScopePanelA) window.filterScopePanelA.setState({ifShiftHz: parseInt(this.value)||0})">
                         <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                                 onclick="resetIfShift('A')" title="Zero IF Shift">Zero</button>
                     </div>
@@ -639,6 +730,12 @@
                                 </select>
                             </div>
                         </div>
+                        <!-- Filter scope display VFO B — sits between band buttons and AGC column -->
+                        <div class="flex-shrink-0" id="filterScopeContainerB" style="width:160px;">
+                            <canvas id="filterScopeCanvasB" role="img" aria-hidden="true"
+                                    aria-label="VFO B filter display" data-a11y-key="filter.scopeB"
+                                    style="display:block; height:80px; border-radius:4px;"></canvas>
+                        </div>
                         <!-- Right: Controls column (2-column grid) -->
                         <div class="vfo-controls-column">
                             <div class="vfo-control-item">
@@ -696,6 +793,17 @@
                                         onchange="window.radioControl.setNoiseBlanker('B', this.value)">
                                     <option value="0" selected>OFF</option>
                                     <option value="1">ON</option>
+                                </select>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">NB Level</label>
+                                <select class="form-select form-select-sm" id="nbLevelSelectB"
+                                        aria-label="VFO B noise blanker level"
+                                        title="VFO B noise blanker depth (1=min, 20=max)"
+                                        onchange="setNbLevel('B', this.value)">
+                                    @for (int i = 1; i <= 20; i++) {
+                                        <option value="@i" selected="@(Model.RadioState.NbLevelB == i ? "selected" : null)">@i</option>
+                                    }
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -828,6 +936,17 @@
                                 <option value="@opt.Value" selected="@(Model.RadioState.IfWidthB==opt.Value||isDefault ? "selected" : null)">@opt.Label</option>
                             }
                         </select>
+                        <label class="mb-0 text-nowrap ms-2 fw-bold">Low Cut:</label>
+                        <select class="form-select form-select-sm fw-bold flex-shrink-0" id="ifLowCutSelectB"
+                                aria-label="VFO B IF low cut"
+                                title="VFO B IF low cut (lower edge of passband)"
+                                style="width: auto;"
+                                onchange="window.radioControl.setIfLowCut('B', this.value)">
+                            @foreach (var opt in ifLowCutOptions)
+                            {
+                                <option value="@opt.Value" selected="@(Model.RadioState.IfLowCutB==opt.Value ? "selected" : null)">@opt.Label</option>
+                            }
+                        </select>
                         <label class="mb-0 text-nowrap ms-1 fw-bold">IF Shift: <span id="ifShiftValueB" class="fw-bold">@Model.RadioState.IfShiftB</span></label>
                         <input type="range" class="form-range ifshift-slider flex-shrink-0"
                                id="ifShiftSliderB"
@@ -835,7 +954,7 @@
                                title="VFO B IF shift"
                                min="-1000" max="1000" step="20" value="@Model.RadioState.IfShiftB"
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
-                               oninput="document.getElementById('ifShiftValueB').textContent = this.value">
+                               oninput="document.getElementById('ifShiftValueB').textContent = this.value; if(window.filterScopePanelB) window.filterScopePanelB.setState({ifShiftHz: parseInt(this.value)||0})">
                         <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                                 onclick="resetIfShift('B')" title="Zero IF Shift">Zero</button>
                     </div>
@@ -850,15 +969,18 @@
             <div class="card-body py-2 px-3">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="fw-bold text-nowrap">Clarifier</span>
-                    <div class="btn-group btn-group-sm" id="clarVfoGroup">
+                    <div class="btn-group btn-group-sm" id="clarVfoGroup" role="group" aria-label="Clarifier VFO selection">
                         <button type="button" class="btn btn-outline-primary active" id="clarVfoABtn"
-                                onclick="selectClarVfo('A')" title="Apply clarifier to VFO A">VFO A</button>
+                                onclick="selectClarVfo('A')" title="Apply clarifier to VFO A"
+                                aria-label="Apply clarifier to VFO A">VFO A</button>
                         <button type="button" class="btn btn-outline-primary" id="clarVfoBBtn"
-                                onclick="selectClarVfo('B')" title="Apply clarifier to VFO B">VFO B</button>
+                                onclick="selectClarVfo('B')" title="Apply clarifier to VFO B"
+                                aria-label="Apply clarifier to VFO B">VFO B</button>
                     </div>
-                    <label class="mb-0 fw-bold text-nowrap ms-1">Mode:</label>
+                    <label class="mb-0 fw-bold text-nowrap ms-1" id="clarModeLabel">Mode:</label>
                     <select class="form-select form-select-sm fw-bold flex-shrink-0" id="clarModeSelect"
-                            style="width:auto;" onchange="setClarifierMode(this.value)">
+                            style="width:auto;" onchange="setClarifierMode(this.value)"
+                            aria-labelledby="clarModeLabel" aria-label="Clarifier mode">
                         <option value="off"  selected="@(clarModeInit=="off"  ? "selected" : null)">OFF</option>
                         <option value="rx"   selected="@(clarModeInit=="rx"   ? "selected" : null)">RX</option>
                         <option value="tx"   selected="@(clarModeInit=="tx"   ? "selected" : null)">TX</option>
@@ -868,19 +990,22 @@
                         <span id="clarOffsetValue">@Model.RadioState.ClarifierOffsetA</span> Hz
                     </label>
                     <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 px-2"
-                            onclick="nudgeClarifier(-10)" title="−10 Hz">−</button>
+                            onclick="nudgeClarifier(-10)" title="−10 Hz"
+                            aria-label="Decrease clarifier offset by 10 Hz">−</button>
                     <input type="range" id="clarOffsetSlider"
                            min="-9990" max="9990" step="10"
                            value="@Model.RadioState.ClarifierOffsetA"
                            style="width: clamp(80px,12vw,180px); height:18px;"
                            oninput="document.getElementById('clarOffsetValue').textContent = this.value"
                            onchange="setClarifierOffset(parseInt(this.value))"
-                           aria-label="Clarifier offset">
+                           aria-label="Clarifier offset in Hz" aria-valuemin="-9990" aria-valuemax="9990">
                     <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 px-2"
-                            onclick="nudgeClarifier(10)" title="+10 Hz">+</button>
+                            onclick="nudgeClarifier(10)" title="+10 Hz"
+                            aria-label="Increase clarifier offset by 10 Hz">+</button>
                     <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                             onclick="resetClarifier()"
-                            title="Reset offset to 0 Hz (mode unchanged)">Reset</button>
+                            title="Reset offset to 0 Hz (mode unchanged)"
+                            aria-label="Reset clarifier offset to zero">Reset</button>
                 </div>
             </div>
         </div>
@@ -901,19 +1026,23 @@
     </div>
     <div class="mem-toolbar" id="memoriesToolbar">
         <button type="button" class="mem-tool-btn" id="memImportReplaceBtn"
-                onclick="window.importMemories('replace')" title="Read radio channels and replace all app memories">
+                onclick="window.importMemories('replace')" title="Read radio channels and replace all app memories"
+                aria-label="Load all memories from radio, replacing existing">
             <i class="bi bi-cloud-download" aria-hidden="true"></i> Load from Rig (Replace all)
         </button>
         <button type="button" class="mem-tool-btn" id="memImportAddBtn"
-                onclick="window.importMemories('merge')" title="Read radio channels and add to existing app memories">
+                onclick="window.importMemories('merge')" title="Read radio channels and add to existing app memories"
+                aria-label="Load new memories from radio, adding to existing">
             <i class="bi bi-cloud-download" aria-hidden="true"></i> Load from Rig (Add new)
         </button>
         <button type="button" class="mem-tool-btn" id="memExportReplaceBtn"
-                onclick="window.exportMemories('replace')" title="Write app memories to radio, replacing all radio channels">
+                onclick="window.exportMemories('replace')" title="Write app memories to radio, replacing all radio channels"
+                aria-label="Save all memories to radio, replacing existing radio channels">
             <i class="bi bi-cloud-upload" aria-hidden="true"></i> Save to Rig (Replace all)
         </button>
         <button type="button" class="mem-tool-btn" id="memExportAddBtn"
-                onclick="window.exportMemories('add')" title="Write app memories only to empty radio channels">
+                onclick="window.exportMemories('add')" title="Write app memories only to empty radio channels"
+                aria-label="Save memories to radio, filling only empty radio channels">
             <i class="bi bi-cloud-upload" aria-hidden="true"></i> Save to Rig (Add new)
         </button>
         <select id="memBankSelect" class="mem-bank-select" style="display:none"
@@ -924,6 +1053,150 @@
     </div>
     <div class="mem-tiles" id="memoriesTiles" role="list" aria-label="Saved memories">
         <div class="text-muted small p-2">Loading…</div>
+    </div>
+</dialog>
+
+<!-- VOX Dialog -->
+<dialog id="voxDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:280px;" aria-labelledby="voxDialogTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
+        <strong id="voxDialogTitle">VOX Controls</strong>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('voxDialog').close()" aria-label="Close VOX controls">✕</button>
+    </div>
+    <div class="p-3 d-flex flex-column gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <button id="voxOnBtn" class="btn btn-sm @(Model.VoxOn ? "btn-warning" : "btn-outline-secondary")"
+                    onclick="toggleVox()" aria-label="VOX on/off" title="Toggle VOX">
+                @(Model.VoxOn ? "VOX On" : "VOX Off")
+            </button>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:90px;">VOX Gain: <span id="voxGainValue">@Model.VoxGain</span></label>
+            <input type="range" id="voxGainSlider" min="0" max="100" step="1" value="@Model.VoxGain"
+                   style="flex:1; height:18px;"
+                   oninput="document.getElementById('voxGainValue').textContent = this.value"
+                   onchange="setVoxGain(this.value)"
+                   aria-label="VOX gain" title="VOX sensitivity">
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:90px;">Delay ms: <span id="voxDelayValue">@Model.VoxDelay</span></label>
+            <input type="range" id="voxDelaySlider" min="0" max="2500" step="50" value="@Model.VoxDelay"
+                   style="flex:1; height:18px;"
+                   oninput="document.getElementById('voxDelayValue').textContent = this.value"
+                   onchange="setVoxDelay(this.value)"
+                   aria-label="VOX delay" title="VOX drop delay in ms">
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:90px;">Anti-VOX: <span id="antiVoxValue">@Model.AntiVoxGain</span></label>
+            <input type="range" id="antiVoxSlider" min="0" max="100" step="1" value="@Model.AntiVoxGain"
+                   style="flex:1; height:18px;"
+                   oninput="document.getElementById('antiVoxValue').textContent = this.value"
+                   onchange="setAntiVoxGain(this.value)"
+                   aria-label="Anti-VOX gain" title="Anti-VOX sensitivity">
+        </div>
+    </div>
+</dialog>
+
+<!-- FM Repeater Dialog -->
+<dialog id="fmDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:300px;" aria-labelledby="fmDialogTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
+        <strong id="fmDialogTitle">FM Repeater</strong>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('fmDialog').close()" aria-label="Close FM repeater controls">✕</button>
+    </div>
+    <div class="p-3 d-flex flex-column gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:80px;">Shift:</label>
+            <select id="fmShiftSelect" class="form-select form-select-sm" style="width:auto;"
+                    aria-label="Repeater shift direction" title="Repeater shift direction"
+                    onchange="setFmShift(this.value)">
+                <option value="0" selected="@(Model.FmShiftDir=="0"?"selected":null)">None</option>
+                <option value="1" selected="@(Model.FmShiftDir=="1"?"selected":null)">Up (+)</option>
+                <option value="2" selected="@(Model.FmShiftDir=="2"?"selected":null)">Down (−)</option>
+                <option value="3" selected="@(Model.FmShiftDir=="3"?"selected":null)">Split</option>
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:80px;">Offset kHz:</label>
+            <input type="number" id="fmOffsetInput" min="0" max="999999" step="100"
+                   value="@(Model.FmOffsetHz / 1000)"
+                   class="form-control form-control-sm" style="width:90px;"
+                   aria-label="Repeater offset in kHz" title="Repeater frequency offset in kHz"
+                   onchange="setFmOffset(parseInt(this.value) * 1000)">
+            <span>kHz</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:80px;">CTCSS:</label>
+            <select id="ctcssModeSelect" class="form-select form-select-sm" style="width:auto;"
+                    aria-label="CTCSS mode" title="CTCSS encode/decode mode"
+                    onchange="setCtcssMode(this.value)">
+                <option value="00" selected="@(Model.CtcssMode=="00"?"selected":null)">OFF</option>
+                <option value="01" selected="@(Model.CtcssMode=="01"?"selected":null)">Encode</option>
+                <option value="02" selected="@(Model.CtcssMode=="02"?"selected":null)">Decode</option>
+                <option value="03" selected="@(Model.CtcssMode=="03"?"selected":null)">Tone-Dec</option>
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:80px;">Tone Hz:</label>
+            <select id="ctcssToneSelect" class="form-select form-select-sm" style="width:auto;"
+                    aria-label="CTCSS tone" title="CTCSS tone frequency"
+                    onchange="setCtcssTone(this.value)">
+                @foreach (var t in ctcssTones)
+                {
+                    <option value="@t.Code" selected="@(Model.CtcssTone==t.Code?"selected":null)">@t.Label Hz</option>
+                }
+            </select>
+        </div>
+        <button class="btn btn-sm btn-primary mt-1" onclick="saveFmRepeater()" title="Apply FM repeater settings to radio" aria-label="Apply FM repeater settings to radio">Apply</button>
+    </div>
+</dialog>
+
+<!-- CW Keyer Dialog -->
+<dialog id="cwDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:320px;" aria-labelledby="cwDialogTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
+        <strong id="cwDialogTitle">CW Keyer</strong>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cwDialog').close()" aria-label="Close CW keyer controls">✕</button>
+    </div>
+    <div class="p-3 d-flex flex-column gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:100px;">Speed WPM: <span id="cwSpeedValue">@Model.CwSpeed</span></label>
+            <input type="range" id="cwSpeedSlider" min="4" max="60" step="1" value="@Model.CwSpeed"
+                   style="flex:1; height:18px;"
+                   oninput="document.getElementById('cwSpeedValue').textContent = this.value"
+                   onchange="setCwSpeed(this.value)"
+                   aria-label="CW keyer speed" title="CW keyer speed in WPM">
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:100px;">Break-in:</label>
+            <select id="cwBreakInSelect" class="form-select form-select-sm" style="width:auto;"
+                    aria-label="CW break-in mode" title="CW break-in mode"
+                    onchange="setCwBreakIn(this.value)">
+                <option value="0" selected="@(Model.CwBreakIn=="0"?"selected":null)">Off</option>
+                <option value="1" selected="@(Model.CwBreakIn=="1"?"selected":null)">Semi BK-IN</option>
+                <option value="2" selected="@(Model.CwBreakIn=="2"?"selected":null)">Full BK-IN</option>
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:100px;">BK-IN Delay: <span id="cwDelayValue">@Model.CwBreakInDelay</span> ms</label>
+            <input type="range" id="cwDelaySlider" min="0" max="2500" step="50" value="@Model.CwBreakInDelay"
+                   style="flex:1; height:18px;"
+                   oninput="document.getElementById('cwDelayValue').textContent = this.value"
+                   onchange="setCwBreakInDelay(this.value)"
+                   aria-label="CW break-in delay" title="Semi break-in delay in ms">
+        </div>
+        <hr style="border-color:#444; margin:4px 0;">
+        <div class="fw-bold small" style="color:#aaa;">Memory Keyer</div>
+        @for (int mi = 0; mi < 5; mi++) {
+        <div class="d-flex align-items-center gap-1">
+            <button class="btn btn-sm btn-outline-info flex-shrink-0"
+                    onclick="sendCwMessage(@mi)"
+                    title="Send CW message M@(mi+1)"
+                    aria-label="Send CW memory @(mi+1)">M@(mi+1)</button>
+            <input type="text" id="cwMsg@(mi)" value="@(Model.CwMessages.Count > mi ? Model.CwMessages[mi] : "")"
+                   class="form-control form-control-sm" maxlength="24"
+                   placeholder="CW message @(mi+1)"
+                   aria-label="CW message @(mi+1)" title="CW memory @(mi+1) text">
+        </div>
+        }
+        <button class="btn btn-sm btn-primary mt-1" onclick="saveCwMessages()" title="Save CW message memories" aria-label="Save CW memory messages to settings">Save Messages</button>
     </div>
 </dialog>
 
@@ -965,6 +1238,7 @@
         import { FTdx101Meters }        from "/js/orchestrators/FTdx101Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
+        import { FilterScopePanel }    from "/js/ui/filter-scope-panel.js?v=1";
         import { BAND_PLANS, getSegments } from "/js/ui/band-plan.js?v=1";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
@@ -1022,6 +1296,32 @@
 
             spectrumPipeline.connect();
             window.spectrumPanel = spectrumPanel;
+
+            // ── Filter scope panels ──────────────────────────────────────────
+            window.filterScopePanelA = new FilterScopePanel('filterScopeCanvasA', '@Model.RadioModel', {
+                ifWidthCode:       '@Model.RadioState.IfWidthA',
+                ifShiftHz:          @Model.RadioState.IfShiftA,
+                roofingCode:       '@Model.RadioState.RoofingFilterA',
+                manualNotchOn:      @(Model.RadioState.ManualNotchA == "1" ? "true" : "false"),
+                manualNotchFreqHz:  800,
+                contourOn:          @(Model.RadioState.ContourOnA ? "true" : "false"),
+                contourFreqHz:      @Model.RadioState.ContourFreqA,
+                apfOn:              @(Model.RadioState.ApfOnA ? "true" : "false"),
+                apfFreqHz:          @Model.RadioState.ApfFreqA,
+                mode:              '@Model.RadioState.ModeA'
+            });
+            window.filterScopePanelB = new FilterScopePanel('filterScopeCanvasB', '@Model.RadioModel', {
+                ifWidthCode:       '@Model.RadioState.IfWidthB',
+                ifShiftHz:          @Model.RadioState.IfShiftB,
+                roofingCode:       '@Model.RadioState.RoofingFilterB',
+                manualNotchOn:      @(Model.RadioState.ManualNotchB == "1" ? "true" : "false"),
+                manualNotchFreqHz:  800,
+                contourOn:          @(Model.RadioState.ContourOnB ? "true" : "false"),
+                contourFreqHz:      @Model.RadioState.ContourFreqB,
+                apfOn:              @(Model.RadioState.ApfOnB ? "true" : "false"),
+                apfFreqHz:          @Model.RadioState.ApfFreqB,
+                mode:              '@Model.RadioState.ModeB'
+            });
 
             // Span selector — POST new sample rate and restart the SDR stream.
             document.querySelectorAll('.span-btn').forEach(btn => {
@@ -1211,7 +1511,7 @@
 
         async function toggleProc() {
             const btn = document.getElementById('procBtn');
-            const enabled = btn.classList.contains('btn-warning');
+            const enabled = btn.classList.contains('btn-success');
             try {
                 const response = await fetch('/api/cat/proc', {
                     method: 'POST',
@@ -1241,12 +1541,243 @@
         function updateProcButton(enabled) {
             const btn = document.getElementById('procBtn');
             if (!btn) return;
-            btn.classList.toggle('btn-warning', enabled);
+            btn.classList.toggle('btn-success', enabled);
             btn.classList.toggle('btn-outline-secondary', !enabled);
+            btn.textContent = enabled ? 'Proc On' : 'Proc Off';
         }
 
         document.addEventListener('DOMContentLoaded', function() {
         });
+
+        // --- ATU ---
+        async function toggleAtu() {
+            const btn = document.getElementById('atuBtn');
+            const enabled = btn.classList.contains('btn-success');
+            try {
+                await fetch('/api/cat/atu', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !enabled })
+                });
+                updateAtuButton(!enabled);
+            } catch (e) { console.error('toggleAtu error:', e); }
+        }
+        function updateAtuButton(enabled) {
+            const btn = document.getElementById('atuBtn');
+            if (!btn) return;
+            btn.classList.toggle('btn-success', enabled);
+            btn.classList.toggle('btn-outline-secondary', !enabled);
+            btn.textContent = enabled ? 'ATU On' : 'ATU Off';
+        }
+
+        // --- MONITOR LEVEL ---
+        async function setMonitorLevel(value) {
+            try {
+                await fetch('/api/cat/monitorlevel/a', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: parseInt(value) })
+                });
+            } catch (e) { console.error('setMonitorLevel error:', e); }
+        }
+
+        // --- NB LEVEL ---
+        async function setNbLevel(receiver, level) {
+            try {
+                await fetch(`/api/cat/nblevel/${receiver.toLowerCase()}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: parseInt(level) })
+                });
+            } catch (e) { console.error('setNbLevel error:', e); }
+        }
+
+        // --- CONNECT / DISCONNECT ---
+        let _catConnected = false;
+
+        function _applyConnectBtnState(connected) {
+            const btn = document.getElementById('connectBtn');
+            if (!btn) return;
+            btn.classList.remove('btn-success', 'btn-danger', 'btn-secondary');
+            if (connected) {
+                btn.classList.add('btn-success');
+                btn.innerHTML = '<i class="bi bi-plug-fill" aria-hidden="true"></i> Connected';
+                btn.setAttribute('aria-label', 'CAT serial connection — currently connected');
+            } else {
+                btn.classList.add('btn-danger');
+                btn.innerHTML = '<i class="bi bi-plug" aria-hidden="true"></i> Disconnected';
+                btn.setAttribute('aria-label', 'CAT serial connection — currently disconnected');
+            }
+            _catConnected = connected;
+        }
+        window._applyConnectBtnState = _applyConnectBtnState;
+
+        async function toggleCatConnection() {
+            const btn = document.getElementById('connectBtn');
+            try {
+                if (_catConnected) {
+                    const r = await fetch('/api/cat/disconnect', { method: 'POST' });
+                    if ((await r.json()).success) _applyConnectBtnState(false);
+                } else {
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-secondary');
+                    btn.innerHTML = '<i class="bi bi-plug" aria-hidden="true"></i> Connecting…';
+                    const r = await fetch('/api/cat/connect', { method: 'POST' });
+                    _applyConnectBtnState((await r.json()).success);
+                }
+            } catch (e) {
+                console.error('toggleCatConnection error:', e);
+                _applyConnectBtnState(false);
+            }
+        }
+
+        // Set initial button state from server
+        fetch('/api/cat/status').then(r => r.json()).then(d => _applyConnectBtnState(d.isConnected === true)).catch(() => {});
+
+        // --- DRAGGABLE PANELS ---
+        function _saveDlgPos(dialog) {
+            try { localStorage.setItem('dlgPos_' + dialog.id, JSON.stringify({ left: dialog.style.left, top: dialog.style.top })); } catch {}
+        }
+
+        function makeDraggable(dialog, handle) {
+            handle.style.cursor = 'grab';
+            handle.addEventListener('mousedown', e => {
+                if (e.button !== 0 || e.target.closest('button')) return;
+                const r = dialog.getBoundingClientRect();
+                let startX = e.clientX, startY = e.clientY;
+                let origLeft = r.left, origTop = r.top;
+                dialog.style.transform = 'none';
+                function onMove(e) {
+                    dialog.style.left = (origLeft + e.clientX - startX) + 'px';
+                    dialog.style.top  = (origTop  + e.clientY - startY) + 'px';
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    handle.style.cursor = 'grab';
+                    _saveDlgPos(dialog);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+                handle.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+            handle.addEventListener('touchstart', e => {
+                if (e.target.closest('button') || e.touches.length !== 1) return;
+                const r = dialog.getBoundingClientRect();
+                let startX = e.touches[0].clientX, startY = e.touches[0].clientY;
+                let origLeft = r.left, origTop = r.top;
+                dialog.style.transform = 'none';
+                function onMove(e) {
+                    dialog.style.left = (origLeft + e.touches[0].clientX - startX) + 'px';
+                    dialog.style.top  = (origTop  + e.touches[0].clientY - startY) + 'px';
+                    e.preventDefault();
+                }
+                function onEnd() {
+                    document.removeEventListener('touchmove', onMove);
+                    document.removeEventListener('touchend', onEnd);
+                    _saveDlgPos(dialog);
+                }
+                document.addEventListener('touchmove', onMove, { passive: false });
+                document.addEventListener('touchend', onEnd);
+            }, { passive: true });
+        }
+
+        ['voxDialog', 'cwDialog', 'fmDialog'].forEach(id => {
+            const dlg = document.getElementById(id);
+            if (!dlg) return;
+            makeDraggable(dlg, dlg.querySelector('div'));
+            try {
+                const saved = JSON.parse(localStorage.getItem('dlgPos_' + id) || 'null');
+                if (saved && saved.left && saved.top) {
+                    dlg.style.left = saved.left;
+                    dlg.style.top  = saved.top;
+                    dlg.style.transform = 'none';
+                }
+            } catch {}
+        });
+
+        // --- VOX ---
+        async function toggleVox() {
+            const btn = document.getElementById('voxOnBtn');
+            const on = btn.classList.contains('btn-warning');
+            try {
+                await fetch('/api/cat/vox', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ on: !on })
+                });
+                updateVoxButton(!on);
+            } catch (e) { console.error('toggleVox error:', e); }
+        }
+        function updateVoxButton(on) {
+            const btn = document.getElementById('voxOnBtn');
+            const mainBtn = document.getElementById('voxBtn');
+            if (btn) { btn.classList.toggle('btn-warning', on); btn.classList.toggle('btn-outline-secondary', !on); btn.textContent = on ? 'VOX On' : 'VOX Off'; }
+            if (mainBtn) { mainBtn.classList.toggle('btn-warning', on); mainBtn.classList.toggle('btn-outline-secondary', !on); }
+        }
+        async function setVoxGain(v) {
+            try { await fetch('/api/cat/vox/gain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gain: parseInt(v) }) }); }
+            catch (e) { console.error('setVoxGain error:', e); }
+        }
+        async function setVoxDelay(v) {
+            try { await fetch('/api/cat/vox/delay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delay: parseInt(v) }) }); }
+            catch (e) { console.error('setVoxDelay error:', e); }
+        }
+        async function setAntiVoxGain(v) {
+            try { await fetch('/api/cat/vox/antivox', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gain: parseInt(v) }) }); }
+            catch (e) { console.error('setAntiVoxGain error:', e); }
+        }
+
+        // --- FM REPEATER ---
+        async function setFmShift(v) { _fmSettings.shiftDir = v; }
+        async function setFmOffset(v) { _fmSettings.offsetHz = v; }
+        async function setCtcssMode(v) { _fmSettings.ctcssMode = v; }
+        async function setCtcssTone(v) { _fmSettings.ctcssTone = v; }
+        const _fmSettings = {
+            shiftDir: '@Model.FmShiftDir',
+            offsetHz: @Model.FmOffsetHz,
+            ctcssMode: '@Model.CtcssMode',
+            ctcssTone: '@Model.CtcssTone'
+        };
+        async function saveFmRepeater() {
+            _fmSettings.shiftDir  = document.getElementById('fmShiftSelect').value;
+            _fmSettings.offsetHz  = parseInt(document.getElementById('fmOffsetInput').value) * 1000;
+            _fmSettings.ctcssMode = document.getElementById('ctcssModeSelect').value;
+            _fmSettings.ctcssTone = document.getElementById('ctcssToneSelect').value;
+            try {
+                await fetch('/api/cat/fmrepeater', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ shiftDir: _fmSettings.shiftDir, offsetHz: _fmSettings.offsetHz, ctcssMode: _fmSettings.ctcssMode, ctcssTone: _fmSettings.ctcssTone })
+                });
+            } catch (e) { console.error('saveFmRepeater error:', e); }
+        }
+
+        // --- CW KEYER ---
+        async function setCwSpeed(v) {
+            try { await fetch('/api/cat/cw/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed: parseInt(v) }) }); }
+            catch (e) { console.error('setCwSpeed error:', e); }
+        }
+        async function setCwBreakIn(v) {
+            try { await fetch('/api/cat/cw/breakin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: v }) }); }
+            catch (e) { console.error('setCwBreakIn error:', e); }
+        }
+        async function setCwBreakInDelay(v) {
+            try { await fetch('/api/cat/cw/breakindelay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delayMs: parseInt(v) }) }); }
+            catch (e) { console.error('setCwBreakInDelay error:', e); }
+        }
+        async function sendCwMessage(index) {
+            const input = document.getElementById(`cwMsg${index}`);
+            if (!input || !input.value.trim()) return;
+            try { await fetch('/api/cat/cw/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: input.value }) }); }
+            catch (e) { console.error('sendCwMessage error:', e); }
+        }
+        async function saveCwMessages() {
+            const msgs = [];
+            for (let i = 0; i < 5; i++) {
+                const el = document.getElementById(`cwMsg${i}`);
+                msgs.push(el ? el.value : '');
+            }
+            try {
+                await fetch('/api/cat/cw/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgs) });
+            } catch (e) { console.error('saveCwMessages error:', e); }
+        }
 
         // Expose functions called from HTML onclick/onchange attributes
         window.launchWsjtx  = launchWsjtx;
@@ -1255,6 +1786,24 @@
         window.setMicGain    = setMicGain;
         window.toggleProc    = toggleProc;
         window.setProcLevel  = setProcLevel;
+        window.toggleAtu      = toggleAtu;
+        window.setMonitorLevel = setMonitorLevel;
+        window.setNbLevel      = setNbLevel;
+        window.toggleCatConnection = toggleCatConnection;
+        window.toggleVox       = toggleVox;
+        window.setVoxGain      = setVoxGain;
+        window.setVoxDelay     = setVoxDelay;
+        window.setAntiVoxGain  = setAntiVoxGain;
+        window.setFmShift      = setFmShift;
+        window.setFmOffset     = setFmOffset;
+        window.setCtcssMode    = setCtcssMode;
+        window.setCtcssTone    = setCtcssTone;
+        window.saveFmRepeater  = saveFmRepeater;
+        window.setCwSpeed      = setCwSpeed;
+        window.setCwBreakIn    = setCwBreakIn;
+        window.setCwBreakInDelay = setCwBreakInDelay;
+        window.sendCwMessage   = sendCwMessage;
+        window.saveCwMessages  = saveCwMessages;
     </script>
     <script>
     (function () {

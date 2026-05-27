@@ -19,6 +19,12 @@ namespace Yaesu_Web_Control.Services
         private int _txFalseCount = 0;
         private bool _stableIsTransmitting = false;
 
+        // Connection health: track consecutive null poll responses to detect radio power-off.
+        // The serial port stays "open" on Windows when the radio powers off; null responses (timeouts)
+        // are the only signal. After 5 consecutive nulls (~2.5 s) we broadcast disconnected.
+        private int _consecutiveNullCount = 0;
+        private const int DisconnectThreshold = 5;
+
         public MeterPollingService(
             CatMultiplexerService multiplexer,
             RadioStateService stateService,
@@ -39,6 +45,25 @@ namespace Yaesu_Web_Control.Services
                     _logger.LogInformation("[MeterPolling][DEBUG] Polling TX status...");
                     var txResponse = await _multiplexer.SendCommandAsync("TX;", "MeterPoll", stoppingToken);
                     _logger.LogInformation("[MeterPolling][DEBUG] TX response: {0}", txResponse);
+
+                    // Connection health tracking: only applies once the radio has been successfully
+                    // initialised (IsConnected = true). Null responses mean no reply from the radio.
+                    if (txResponse == null)
+                    {
+                        if (_stateService.IsConnected)
+                        {
+                            _consecutiveNullCount++;
+                            if (_consecutiveNullCount >= DisconnectThreshold)
+                                _stateService.IsConnected = false;
+                        }
+                    }
+                    else
+                    {
+                        _consecutiveNullCount = 0;
+                        if (!_stateService.IsConnected)
+                            _stateService.IsConnected = true;
+                    }
+
                     bool rawIsTransmitting = !string.IsNullOrEmpty(txResponse) && txResponse.Contains("TX1");
                     if (rawIsTransmitting)
                     {

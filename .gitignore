@@ -160,3 +160,6 @@ Backup*.ps1
 .github/COPILOT.md
 .github/copilot*.md
 .github/calibration-instructions.md
+
+# Local planning notes
+plan.txt

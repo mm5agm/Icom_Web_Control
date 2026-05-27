@@ -777,13 +777,21 @@ function updateMicGainLabel(mode) {
 connection.on("RadioStateUpdate", function (update) {
     // ...removed debug logging...
 
+    // --- CONNECTION STATE ---
+    if (update.property === "IsConnected") {
+        const connected = update.value === true || update.value === 'true';
+        if (typeof window._applyConnectBtnState === 'function') window._applyConnectBtnState(connected);
+    }
+
     // --- MODE CHANGE (THE BUG FIX) ---
     if (update.property === "ModeA") {
         updateModeSelect('A', update.value);
         updateMicGainLabel(update.value);
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ mode: update.value });
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ mode: update.value });
     }
 
     // --- PROC ---
@@ -885,10 +893,12 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "RoofingFilterA") {
         const selectEl = document.getElementById('roofingFilterSelectA');
         if (selectEl) selectEl.value = update.value;
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ roofingCode: update.value });
     }
     if (update.property === "RoofingFilterB") {
         const selectEl = document.getElementById('roofingFilterSelectB');
         if (selectEl) selectEl.value = update.value;
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ roofingCode: update.value });
     }
 
     // --- AGC ---
@@ -937,10 +947,12 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ManualNotchFreqA") {
         const el = document.getElementById('manualNotchFreqA');
         if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueA').textContent = update.value + ' Hz'; }
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ manualNotchFreqHz: parseInt(update.value) || 800 });
     }
     if (update.property === "ManualNotchFreqB") {
         const el = document.getElementById('manualNotchFreqB');
         if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueB').textContent = update.value + ' Hz'; }
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ manualNotchFreqHz: parseInt(update.value) || 800 });
     }
 
     // --- NOISE BLANKER ---
@@ -967,10 +979,12 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "IfWidthA") {
         const el = document.getElementById('ifWidthSelectA');
         if (el) el.value = update.value;
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifWidthCode: update.value });
     }
     if (update.property === "IfWidthB") {
         const el = document.getElementById('ifWidthSelectB');
         if (el) el.value = update.value;
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifWidthCode: update.value });
     }
 
     // --- IF SHIFT ---
@@ -979,12 +993,14 @@ connection.on("RadioStateUpdate", function (update) {
         const label = document.getElementById('ifShiftValueA');
         if (slider) slider.value = update.value;
         if (label) label.textContent = update.value;
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifShiftHz: parseInt(update.value) || 0 });
     }
     if (update.property === "IfShiftB" && !ifShiftDragging.B) {
         const slider = document.getElementById('ifShiftSliderB');
         const label = document.getElementById('ifShiftValueB');
         if (slider) slider.value = update.value;
         if (label) label.textContent = update.value;
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifShiftHz: parseInt(update.value) || 0 });
     }
 
     // --- CLARIFIER ---
@@ -1021,10 +1037,12 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ContourOnA") {
         contourState.A.on = update.value === true || update.value === 'true' || update.value === 1;
         _updateContourBtn('A');
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ contourOn: contourState.A.on });
     }
     if (update.property === "ContourOnB") {
         contourState.B.on = update.value === true || update.value === 'true' || update.value === 1;
         _updateContourBtn('B');
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ contourOn: contourState.B.on });
     }
     if (update.property === "ContourFreqA") {
         contourState.A.freqHz = parseInt(update.value) || 800;
@@ -1032,6 +1050,7 @@ connection.on("RadioStateUpdate", function (update) {
         const label  = document.getElementById('contourFreqValueA');
         if (slider) slider.value = contourState.A.freqHz;
         if (label)  label.textContent = contourState.A.freqHz + ' Hz';
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ contourFreqHz: contourState.A.freqHz });
     }
     if (update.property === "ContourFreqB") {
         contourState.B.freqHz = parseInt(update.value) || 800;
@@ -1039,16 +1058,19 @@ connection.on("RadioStateUpdate", function (update) {
         const label  = document.getElementById('contourFreqValueB');
         if (slider) slider.value = contourState.B.freqHz;
         if (label)  label.textContent = contourState.B.freqHz + ' Hz';
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ contourFreqHz: contourState.B.freqHz });
     }
 
     // --- APF ---
     if (update.property === "ApfOnA") {
         apfState.A.on = update.value === true || update.value === 'true' || update.value === 1;
         _updateApfBtn('A');
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ apfOn: apfState.A.on });
     }
     if (update.property === "ApfOnB") {
         apfState.B.on = update.value === true || update.value === 'true' || update.value === 1;
         _updateApfBtn('B');
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfOn: apfState.B.on });
     }
     if (update.property === "ApfFreqA") {
         apfState.A.freqHz = parseInt(update.value) || 0;
@@ -1056,6 +1078,7 @@ connection.on("RadioStateUpdate", function (update) {
         const label  = document.getElementById('apfFreqValueA');
         if (slider) slider.value = apfState.A.freqHz;
         if (label)  label.textContent = apfState.A.freqHz + ' Hz';
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ apfFreqHz: apfState.A.freqHz });
     }
     if (update.property === "ApfFreqB") {
         apfState.B.freqHz = parseInt(update.value) || 0;
@@ -1063,16 +1086,19 @@ connection.on("RadioStateUpdate", function (update) {
         const label  = document.getElementById('apfFreqValueB');
         if (slider) slider.value = apfState.B.freqHz;
         if (label)  label.textContent = apfState.B.freqHz + ' Hz';
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfFreqHz: apfState.B.freqHz });
     }
 
     // --- MANUAL NOTCH ---
     if (update.property === "ManualNotchA") {
         const el = document.getElementById('manualNotchSelectA');
         if (el) el.value = update.value;
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ manualNotchOn: update.value === '1' });
     }
     if (update.property === "ManualNotchB") {
         const el = document.getElementById('manualNotchSelectB');
         if (el) el.value = update.value;
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ manualNotchOn: update.value === '1' });
     }
 
     // --- AF GAIN ---
@@ -1084,6 +1110,77 @@ connection.on("RadioStateUpdate", function (update) {
             slider.value = update.value;
             if (label) label.innerText = update.value;
         }
+    }
+
+    // --- ATU ---
+    if (update.property === "AtuEnabled") {
+        if (window.updateAtuButton) window.updateAtuButton(update.value === true || update.value === 'true');
+    }
+
+    // --- NB LEVEL ---
+    if (update.property === "NbLevelA") {
+        const el = document.getElementById('nbLevelSelectA');
+        if (el) el.value = update.value;
+    }
+    if (update.property === "NbLevelB") {
+        const el = document.getElementById('nbLevelSelectB');
+        if (el) el.value = update.value;
+    }
+
+    // --- MONITOR LEVEL ---
+    if (update.property === "MonitorLevelA") {
+        const slider = document.getElementById('monLevelSlider');
+        const label  = document.getElementById('monLevelValue');
+        if (slider) slider.value = update.value;
+        if (label) label.textContent = update.value;
+    }
+
+    // --- VOX ---
+    if (update.property === "VoxOn") {
+        if (window.updateVoxButton) window.updateVoxButton(update.value === true || update.value === 'true');
+    }
+    if (update.property === "VoxGain") {
+        const s = document.getElementById('voxGainSlider'); const l = document.getElementById('voxGainValue');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+    if (update.property === "VoxDelay") {
+        const s = document.getElementById('voxDelaySlider'); const l = document.getElementById('voxDelayValue');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+
+    // --- CW ---
+    if (update.property === "CwSpeed") {
+        const s = document.getElementById('cwSpeedSlider'); const l = document.getElementById('cwSpeedValue');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+    if (update.property === "CwBreakIn") {
+        const el = document.getElementById('cwBreakInSelect'); if (el) el.value = update.value;
+    }
+    if (update.property === "CwBreakInDelay") {
+        const s = document.getElementById('cwDelaySlider'); const l = document.getElementById('cwDelayValue');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+
+    // --- FM REPEATER ---
+    if (update.property === "FmShiftDir") {
+        const el = document.getElementById('fmShiftSelect'); if (el) el.value = update.value;
+    }
+    if (update.property === "FmOffsetHz") {
+        const el = document.getElementById('fmOffsetInput'); if (el) el.value = Math.round(update.value / 1000);
+    }
+    if (update.property === "CtcssMode") {
+        const el = document.getElementById('ctcssModeSelect'); if (el) el.value = update.value;
+    }
+    if (update.property === "CtcssTone") {
+        const el = document.getElementById('ctcssToneSelect'); if (el) el.value = update.value;
+    }
+
+    // --- IF LOW CUT ---
+    if (update.property === "IfLowCutA") {
+        const el = document.getElementById('ifLowCutSelectA'); if (el) el.value = update.value;
+    }
+    if (update.property === "IfLowCutB") {
+        const el = document.getElementById('ifLowCutSelectB'); if (el) el.value = update.value;
     }
 });
 
@@ -1199,6 +1296,10 @@ window.radioControl = {
     setIfShift: async function (receiver, shiftHz) {
         await fetch(`/api/cat/ifshift/${receiver.toLowerCase()}`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftHz: parseInt(shiftHz) }) });
+    },
+    setIfLowCut: async function (receiver, code) {
+        await fetch(`/api/cat/iflowcut/${receiver.toLowerCase()}`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
     }
 };
 
@@ -1571,6 +1672,8 @@ async function toggleContour(vfo) {
     const newOn = !contourState[vfo].on;
     contourState[vfo].on = newOn;
     _updateContourBtn(vfo);
+    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
+    if (panel) panel.setState({ contourOn: newOn });
     try {
         await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
             method: 'POST',
@@ -1583,6 +1686,8 @@ window.toggleContour = toggleContour;
 
 async function setContourFreq(vfo, hz) {
     contourState[vfo].freqHz = hz;
+    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
+    if (panel) panel.setState({ contourFreqHz: hz });
     try {
         await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
             method: 'POST',
@@ -1597,6 +1702,8 @@ async function toggleApf(vfo) {
     const newOn = !apfState[vfo].on;
     apfState[vfo].on = newOn;
     _updateApfBtn(vfo);
+    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
+    if (panel) panel.setState({ apfOn: newOn });
     try {
         await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
             method: 'POST',
@@ -1609,6 +1716,8 @@ window.toggleApf = toggleApf;
 
 async function setApfFreq(vfo, hz) {
     apfState[vfo].freqHz = hz;
+    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
+    if (panel) panel.setState({ apfFreqHz: hz });
     try {
         await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
             method: 'POST',
@@ -2710,10 +2819,10 @@ pollInitStatus();
         const banner = document.createElement('div');
         banner.id = 'updateBanner';
         banner.style.cssText = [
-            'position:fixed', 'bottom:12px', 'right:12px', 'z-index:9999',
+            'position:fixed', 'top:50%', 'left:50%', 'transform:translate(-50%,-50%)', 'z-index:9999',
             'background:#1e2a38', 'border:1px solid #4a8abf', 'border-radius:8px',
             'padding:10px 14px', 'color:#cde', 'font-size:0.84rem',
-            'box-shadow:0 4px 16px rgba(0,0,0,0.6)', 'max-width:340px'
+            'box-shadow:0 4px 16px rgba(0,0,0,0.6)', 'max-width:340px', 'width:320px'
         ].join(';');
         banner.innerHTML =
             `<div style="display:flex;align-items:flex-start;gap:8px">` +

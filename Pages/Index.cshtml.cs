@@ -52,6 +52,21 @@ namespace Yaesu_Web_Control.Pages
         public bool ProcEnabled { get; set; } = false;
         public int ProcLevel { get; set; } = 50;
 
+        public bool AtuEnabled { get; set; } = false;
+        public int MonitorLevelA { get; set; } = 0;
+        public bool VoxOn { get; set; } = false;
+        public int VoxGain { get; set; } = 50;
+        public int VoxDelay { get; set; } = 50;
+        public int AntiVoxGain { get; set; } = 50;
+        public int CwSpeed { get; set; } = 20;
+        public string CwBreakIn { get; set; } = "0";
+        public int CwBreakInDelay { get; set; } = 200;
+        public List<string> CwMessages { get; set; } = new() { "CQ CQ DE {CALL}", "TU 73", "QRZ?", "UR 5NN", "DE {CALL}" };
+        public string FmShiftDir { get; set; } = "0";
+        public int FmOffsetHz { get; set; } = 600000;
+        public string CtcssMode { get; set; } = "00";
+        public string CtcssTone { get; set; } = "01";
+
         public double SdrSampleRateHz { get; set; } = 2_048_000;
         public string BandPlan { get; set; } = "Region1";
         public string RadioModel { get; set; } = "FTdx101MP";
@@ -81,10 +96,24 @@ namespace Yaesu_Web_Control.Pages
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;
 
-            // Load persisted MIC Gain and PROC
+            // Load persisted MIC Gain, PROC, and other TX controls
             MicGain = _radioStateService.MicGain;
             ProcEnabled = _radioStateService.ProcEnabled;
             ProcLevel = _radioStateService.ProcLevel;
+            AtuEnabled = _radioStateService.AtuEnabled;
+            MonitorLevelA = _radioStateService.MonitorLevelA;
+            VoxOn = _radioStateService.VoxOn;
+            VoxGain = _radioStateService.VoxGain;
+            VoxDelay = _radioStateService.VoxDelay;
+            AntiVoxGain = _radioStateService.AntiVoxGain;
+            CwSpeed = _radioStateService.CwSpeed;
+            CwBreakIn = _radioStateService.CwBreakIn;
+            CwBreakInDelay = _radioStateService.CwBreakInDelay;
+            CwMessages = settings.CwMessages;
+            FmShiftDir = _radioStateService.FmShiftDir;
+            FmOffsetHz = _radioStateService.FmOffsetHz;
+            CtcssMode = _radioStateService.CtcssMode;
+            CtcssTone = _radioStateService.CtcssTone;
 
             // VFO A (keep as is)
             State.vfoA.frequency = _radioStateService.FrequencyA;

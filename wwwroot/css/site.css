@@ -191,6 +191,8 @@ html {
 
 body {
     margin-bottom: 60px;
+    color: #000;
+    font-weight: 700;
 }
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
@@ -310,6 +312,19 @@ pre, code { tab-size: 4; }
     /* No fixed width or negative margin */
 }
 
+/* Form controls: match body colour so dropdowns and inputs are also black + bold */
+.form-select,
+.form-control {
+    color: #000;
+    font-weight: 700;
+}
+
+/* Outline-secondary buttons: black text so off-state toggles (PROC, ATU, VOX, CW, FM Rep) are readable */
+.btn-outline-secondary {
+    color: #000;
+    font-weight: 700;
+}
+
 /* Mode select - sized to fit longest option (D-FM-N), sits below band buttons */
 .vfo-mode-select {
     width: 7rem;
@@ -352,7 +367,7 @@ pre, code { tab-size: 4; }
 .vfo-control-label {
     font-size: 0.78rem;
     font-weight: 700;
-    color: #212529;
+    color: #000;
     margin-bottom: 0;
     white-space: nowrap;
 }
@@ -755,6 +770,42 @@ fieldset.calibration-card {
 /* Move Power, Mic Gain, IDD, and PA Temp controls closer to Raw Power Out label (minimal gap) */
 .closer-to-raw-power {
     margin-top: 8px !important; /* Minimal gap to visually group with Raw Power Out */
+}
+
+/* ── VOX / CW / FM Repeater floating panels ─────────────────────────────── */
+/* Non-modal: all three can be open simultaneously, draggable, positioned across the top */
+#voxDialog > div:first-child,
+#cwDialog  > div:first-child,
+#fmDialog  > div:first-child {
+    cursor: grab;
+    user-select: none;
+}
+#voxDialog > div:first-child:active,
+#cwDialog  > div:first-child:active,
+#fmDialog  > div:first-child:active {
+    cursor: grabbing;
+}
+#voxDialog {
+    position: fixed;
+    top: 80px;
+    left: 5%;
+    z-index: 1050;
+    margin: 0;
+}
+#cwDialog {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1050;
+    margin: 0;
+}
+#fmDialog {
+    position: fixed;
+    top: 80px;
+    right: 5%;
+    z-index: 1050;
+    margin: 0;
 }
 
 /* ── Frequency Keyboard Dialog ──────────────────────────────────────────── */

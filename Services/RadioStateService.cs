@@ -279,6 +279,9 @@ namespace Yaesu_Web_Control.Services
         private int _apfFreqB = 0;
         public int ApfFreqB { get => _apfFreqB; set => SetField(ref _apfFreqB, value); }
 
+        private bool _isConnected = false;
+        public bool IsConnected { get => _isConnected; set => SetField(ref _isConnected, value); }
+
         private string _bandA = "20m";
         public string BandA { get => _bandA; set => SetField(ref _bandA, value); }
 
@@ -429,6 +432,56 @@ namespace Yaesu_Web_Control.Services
 
         private int _procLevel = 50;
         public int ProcLevel { get => _procLevel; set => SetField(ref _procLevel, value); }
+
+        // ATU: false = bypass, true = engaged
+        private bool _atuEnabled = false;
+        public bool AtuEnabled { get => _atuEnabled; set => SetField(ref _atuEnabled, value); }
+
+        // NB Level per VFO: 1–20
+        private int _nbLevelA = 10;
+        public int NbLevelA { get => _nbLevelA; set => SetField(ref _nbLevelA, value); }
+        private int _nbLevelB = 10;
+        public int NbLevelB { get => _nbLevelB; set => SetField(ref _nbLevelB, value); }
+
+        // Monitor/sidetone level per VFO: 0–100 (ML command)
+        private int _monitorLevelA = 0;
+        public int MonitorLevelA { get => _monitorLevelA; set => SetField(ref _monitorLevelA, value); }
+        private int _monitorLevelB = 0;
+        public int MonitorLevelB { get => _monitorLevelB; set => SetField(ref _monitorLevelB, value); }
+
+        // VOX
+        private bool _voxOn = false;
+        public bool VoxOn { get => _voxOn; set => SetField(ref _voxOn, value); }
+        private int _voxGain = 50;
+        public int VoxGain { get => _voxGain; set => SetField(ref _voxGain, value); }
+        private int _voxDelay = 50;
+        public int VoxDelay { get => _voxDelay; set => SetField(ref _voxDelay, value); }
+        private int _antiVoxGain = 50;
+        public int AntiVoxGain { get => _antiVoxGain; set => SetField(ref _antiVoxGain, value); }
+
+        // FM Repeater
+        private string _fmShiftDir = "0";
+        public string FmShiftDir { get => _fmShiftDir; set => SetField(ref _fmShiftDir, value); }
+        private int _fmOffsetHz = 600000;
+        public int FmOffsetHz { get => _fmOffsetHz; set => SetField(ref _fmOffsetHz, value); }
+        private string _ctcssMode = "00";
+        public string CtcssMode { get => _ctcssMode; set => SetField(ref _ctcssMode, value); }
+        private string _ctcssTone = "01";
+        public string CtcssTone { get => _ctcssTone; set => SetField(ref _ctcssTone, value); }
+
+        // CW Keyer
+        private int _cwSpeed = 20;
+        public int CwSpeed { get => _cwSpeed; set => SetField(ref _cwSpeed, value); }
+        private string _cwBreakIn = "0";
+        public string CwBreakIn { get => _cwBreakIn; set => SetField(ref _cwBreakIn, value); }
+        private int _cwBreakInDelay = 200;
+        public int CwBreakInDelay { get => _cwBreakInDelay; set => SetField(ref _cwBreakInDelay, value); }
+
+        // IF Low Cut per VFO (SL command) — complements IF Width (SH command)
+        private string _ifLowCutA = "0";
+        public string IfLowCutA { get => _ifLowCutA; set => SetField(ref _ifLowCutA, value); }
+        private string _ifLowCutB = "0";
+        public string IfLowCutB { get => _ifLowCutB; set => SetField(ref _ifLowCutB, value); }
 
         private bool _radioPowerOn = true; // Assume on when app starts
         public bool RadioPowerOn { get => _radioPowerOn; set => SetField(ref _radioPowerOn, value); }

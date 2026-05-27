@@ -354,6 +354,88 @@
                         if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int txVfo))
                             _stateService.TxVfo = txVfo;
                         break;
+                    case "AC":
+                        // AC{P1}{P2}{P3}; P1=0=bypass/1=ATU on, P2=0=not tuning/1=tuning, P3=misc
+                        if (message.Length >= 5)
+                            _stateService.AtuEnabled = message[2] == '1';
+                        break;
+                    case "NL":
+                        // NL{vfo}{nnn}; — NB level 001-020 per VFO
+                        if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int nlVal))
+                        {
+                            if (message[2] == '0') _stateService.NbLevelA = Math.Clamp(nlVal, 1, 20);
+                            else if (message[2] == '1') _stateService.NbLevelB = Math.Clamp(nlVal, 1, 20);
+                        }
+                        break;
+                    case "ML":
+                        // ML{vfo}{nnn}; — monitor level 000-100 per VFO
+                        if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int mlVal))
+                        {
+                            if (message[2] == '0') _stateService.MonitorLevelA = Math.Clamp(mlVal, 0, 100);
+                            else if (message[2] == '1') _stateService.MonitorLevelB = Math.Clamp(mlVal, 0, 100);
+                        }
+                        break;
+                    case "VX":
+                        // VX{n}; — 0=VOX off, 1=VOX on
+                        if (message.Length >= 4)
+                            _stateService.VoxOn = message[2] == '1';
+                        break;
+                    case "VG":
+                        // VG{nnn}; — VOX gain 000-100
+                        if (message.Length >= 6 && int.TryParse(message.Substring(2, 3), out int vgVal))
+                            _stateService.VoxGain = Math.Clamp(vgVal, 0, 100);
+                        break;
+                    case "VD":
+                        // VD{nnnn}; — VOX delay 0000-2500 ms (stored as int, divide by 25 for slider)
+                        if (message.Length >= 7 && int.TryParse(message.Substring(2, 4), out int vdVal))
+                            _stateService.VoxDelay = Math.Clamp(vdVal, 0, 2500);
+                        break;
+                    case "RS":
+                        // RS{n}; — repeater shift: 0=none, 1=up, 2=down, 3=split
+                        if (message.Length >= 4)
+                            _stateService.FmShiftDir = message[2].ToString();
+                        break;
+                    case "RO":
+                        // RO{nnnnnn}; — repeater offset in Hz
+                        if (message.Length >= 9 && int.TryParse(message.Substring(2, 6), out int roVal))
+                            _stateService.FmOffsetHz = roVal;
+                        break;
+                    case "CT":
+                        // CT{nn}; — CTCSS mode: 00=off, 01=ENC, 02=DEC, 03=T-DEC
+                        if (message.Length >= 5)
+                            _stateService.CtcssMode = message.Substring(2, 2);
+                        break;
+                    case "CN":
+                        // CN{nn}; — CTCSS/DCS tone number
+                        if (message.Length >= 5)
+                            _stateService.CtcssTone = message.Substring(2, 2);
+                        break;
+                    case "KS":
+                        // KS{nnn}; — CW keyer speed 004-060 WPM
+                        if (message.Length >= 6 && int.TryParse(message.Substring(2, 3), out int ksVal))
+                            _stateService.CwSpeed = Math.Clamp(ksVal, 4, 60);
+                        break;
+                    case "BI":
+                        // BI{n}; — CW break-in: 0=off, 1=semi BK-IN, 2=full BK-IN
+                        if (message.Length >= 4)
+                            _stateService.CwBreakIn = message[2].ToString();
+                        break;
+                    case "SD":
+                        // SD{nnnn}; — semi BK-IN delay 0000-2500 ms
+                        if (message.Length >= 7 && int.TryParse(message.Substring(2, 4), out int sdVal))
+                            _stateService.CwBreakInDelay = Math.Clamp(sdVal, 0, 2500);
+                        break;
+                    case "SL":
+                        // SL{vfo}0{nn}; — IF low cut code per VFO (mirrors SH structure)
+                        if (message.Length >= 6)
+                        {
+                            var slVfo = message[2];
+                            var slRaw = message.Substring(4, 2).TrimStart('0');
+                            var slCode = string.IsNullOrEmpty(slRaw) ? "0" : slRaw;
+                            if (slVfo == '0') _stateService.IfLowCutA = slCode;
+                            else if (slVfo == '1') _stateService.IfLowCutB = slCode;
+                        }
+                        break;
                     // No debug logging for unhandled commands
                 }
             }

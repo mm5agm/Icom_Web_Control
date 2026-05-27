@@ -276,10 +276,12 @@
             "BC0;", "BC1;",
             // Speech processor
             "PR;", "PL;",
-            // VOX (future)
+            // VOX
             "VX;", "VG;", "VD;",
-            // Keyer speed and CW break-in (future)
-            "KS;", "BI;",
+            // FM repeater
+            "RS;", "RO;", "CT;", "CN;",
+            // Keyer speed and CW break-in
+            "KS;", "BI;", "SD;",
             // Antenna tuner (future)
             "AC;",
             // Init completion signal — must be last

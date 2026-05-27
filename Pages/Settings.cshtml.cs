@@ -110,6 +110,9 @@ namespace Yaesu_Web_Control.Pages
                         .Concat(optionalSelected.Where(f => f is "4" or "5"))
                         .Distinct().ToList();
                 }
+                if (Settings.CwMessages != null && Settings.CwMessages.Count == 5)
+                    current.CwMessages = Settings.CwMessages;
+
                 await _settingsService.SaveSettingsAsync(current);
 
                 // Reset initialization status so app will try again
