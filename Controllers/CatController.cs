@@ -287,7 +287,7 @@ namespace Yaesu_Web_Control.Controllers
             var settings = await _settingsService.GetSettingsAsync();
             return Ok(new
             {
-                isConnected = _catClient.IsConnected,
+                isConnected = _radioStateService.IsConnected,
                 radioModel = settings.RadioModel,
                 vfoA = new
                 {

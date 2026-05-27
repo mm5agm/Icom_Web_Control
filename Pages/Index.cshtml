@@ -146,7 +146,7 @@
         {
             <div class="col-auto">
                 <button id="wsjtxBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
-                        onclick="launchWsjtx()" title="Launch @Model.App1Name">
+                        onclick="launchWsjtx()" title="Launch @Model.App1Name" aria-label="Launch @Model.App1Name">
                     @Model.App1Name
                     <span id="wsjtxTxBadge" class="badge bg-danger ms-1" style="display:none;">TX</span>
                 </button>
@@ -156,7 +156,7 @@
         {
             <div class="col-auto">
                 <button id="log4omBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
-                        onclick="launchLog4om()" title="Launch @Model.App3Name">
+                        onclick="launchLog4om()" title="Launch @Model.App3Name" aria-label="Launch @Model.App3Name">
                     @Model.App3Name
                 </button>
             </div>
@@ -165,42 +165,50 @@
         {
             <div class="col-auto">
                 <button id="jtalertBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
-                        onclick="launchJtalert()" title="Launch @Model.App2Name">
+                        onclick="launchJtalert()" title="Launch @Model.App2Name" aria-label="Launch @Model.App2Name">
                     @Model.App2Name
                 </button>
             </div>
         }
         <div class="col-auto ms-auto d-flex gap-2 align-items-center">
             <a href="https://paypal.me/mm5agm" target="_blank" rel="noopener noreferrer"
-               class="btn btn-warning btn-sm" style="padding-top: 1px; padding-bottom: 1px;" title="Support this project via PayPal">
+               class="btn btn-warning btn-sm" style="padding-top: 1px; padding-bottom: 1px;" title="Support this project via PayPal"
+               aria-label="Support this project via PayPal — Buy Me a Coffee">
                 <i class="bi bi-cup-hot-fill" aria-hidden="true"></i> Buy Me a Coffee
             </a>
             <button id="memBtn" class="btn btn-sm btn-outline-info"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Open memories panel">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Open memories panel"
+                    aria-label="Open memories panel">
                 Mem
             </button>
             <button id="vfoBToggleBtn" class="btn btn-sm btn-outline-secondary"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B"
+                    aria-label="Show or hide VFO B panel">
                 VFO-B
             </button>
             <button id="swapVfoBtn" class="btn btn-sm btn-outline-secondary"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Swap VFO A and VFO B frequencies">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Swap VFO A and VFO B frequencies"
+                    aria-label="Swap VFO A and VFO B frequencies">
                 A&#8596;B
             </button>
             <button id="splitBtn" class="btn btn-sm btn-outline-secondary"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Toggle Split: VFO A = receive, VFO B = transmit">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Toggle Split: VFO A = receive, VFO B = transmit"
+                    aria-label="Toggle split mode: VFO A receive, VFO B transmit">
                 Split
             </button>
             <button id="quickSplitBtn" class="btn btn-sm btn-outline-secondary"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Quick Split: enable split and set VFO B to VFO A + 5 kHz">
+                    style="padding-top: 1px; padding-bottom: 1px;" title="Quick Split: enable split and set VFO B to VFO A + 5 kHz"
+                    aria-label="Quick split: enable split and set VFO B to VFO A plus 5 kHz">
                 +5k
             </button>
             <button id="connectBtn" class="btn btn-danger btn-sm"
-                    onclick="toggleCatConnection()" style="padding-top: 1px; padding-bottom: 1px;" title="Connect or disconnect CAT serial port">
+                    onclick="toggleCatConnection()" style="padding-top: 1px; padding-bottom: 1px;" title="Connect or disconnect CAT serial port"
+                    aria-label="CAT serial connection — currently disconnected">
                 <i class="bi bi-plug" aria-hidden="true"></i> Disconnected
             </button>
             <button id="radioPowerBtn" class="btn btn-danger btn-sm"
-                    onclick="toggleRadioPower()" style="padding-top: 1px; padding-bottom: 1px;" title="Radio Power On/Off">
+                    onclick="toggleRadioPower()" style="padding-top: 1px; padding-bottom: 1px;" title="Radio Power On/Off"
+                    aria-label="Radio power on or off">
                 <i class="bi bi-power" aria-hidden="true"></i> POWER
             </button>
         </div>
@@ -961,15 +969,18 @@
             <div class="card-body py-2 px-3">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="fw-bold text-nowrap">Clarifier</span>
-                    <div class="btn-group btn-group-sm" id="clarVfoGroup">
+                    <div class="btn-group btn-group-sm" id="clarVfoGroup" role="group" aria-label="Clarifier VFO selection">
                         <button type="button" class="btn btn-outline-primary active" id="clarVfoABtn"
-                                onclick="selectClarVfo('A')" title="Apply clarifier to VFO A">VFO A</button>
+                                onclick="selectClarVfo('A')" title="Apply clarifier to VFO A"
+                                aria-label="Apply clarifier to VFO A">VFO A</button>
                         <button type="button" class="btn btn-outline-primary" id="clarVfoBBtn"
-                                onclick="selectClarVfo('B')" title="Apply clarifier to VFO B">VFO B</button>
+                                onclick="selectClarVfo('B')" title="Apply clarifier to VFO B"
+                                aria-label="Apply clarifier to VFO B">VFO B</button>
                     </div>
-                    <label class="mb-0 fw-bold text-nowrap ms-1">Mode:</label>
+                    <label class="mb-0 fw-bold text-nowrap ms-1" id="clarModeLabel">Mode:</label>
                     <select class="form-select form-select-sm fw-bold flex-shrink-0" id="clarModeSelect"
-                            style="width:auto;" onchange="setClarifierMode(this.value)">
+                            style="width:auto;" onchange="setClarifierMode(this.value)"
+                            aria-labelledby="clarModeLabel" aria-label="Clarifier mode">
                         <option value="off"  selected="@(clarModeInit=="off"  ? "selected" : null)">OFF</option>
                         <option value="rx"   selected="@(clarModeInit=="rx"   ? "selected" : null)">RX</option>
                         <option value="tx"   selected="@(clarModeInit=="tx"   ? "selected" : null)">TX</option>
@@ -979,19 +990,22 @@
                         <span id="clarOffsetValue">@Model.RadioState.ClarifierOffsetA</span> Hz
                     </label>
                     <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 px-2"
-                            onclick="nudgeClarifier(-10)" title="−10 Hz">−</button>
+                            onclick="nudgeClarifier(-10)" title="−10 Hz"
+                            aria-label="Decrease clarifier offset by 10 Hz">−</button>
                     <input type="range" id="clarOffsetSlider"
                            min="-9990" max="9990" step="10"
                            value="@Model.RadioState.ClarifierOffsetA"
                            style="width: clamp(80px,12vw,180px); height:18px;"
                            oninput="document.getElementById('clarOffsetValue').textContent = this.value"
                            onchange="setClarifierOffset(parseInt(this.value))"
-                           aria-label="Clarifier offset">
+                           aria-label="Clarifier offset in Hz" aria-valuemin="-9990" aria-valuemax="9990">
                     <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 px-2"
-                            onclick="nudgeClarifier(10)" title="+10 Hz">+</button>
+                            onclick="nudgeClarifier(10)" title="+10 Hz"
+                            aria-label="Increase clarifier offset by 10 Hz">+</button>
                     <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                             onclick="resetClarifier()"
-                            title="Reset offset to 0 Hz (mode unchanged)">Reset</button>
+                            title="Reset offset to 0 Hz (mode unchanged)"
+                            aria-label="Reset clarifier offset to zero">Reset</button>
                 </div>
             </div>
         </div>
@@ -1012,19 +1026,23 @@
     </div>
     <div class="mem-toolbar" id="memoriesToolbar">
         <button type="button" class="mem-tool-btn" id="memImportReplaceBtn"
-                onclick="window.importMemories('replace')" title="Read radio channels and replace all app memories">
+                onclick="window.importMemories('replace')" title="Read radio channels and replace all app memories"
+                aria-label="Load all memories from radio, replacing existing">
             <i class="bi bi-cloud-download" aria-hidden="true"></i> Load from Rig (Replace all)
         </button>
         <button type="button" class="mem-tool-btn" id="memImportAddBtn"
-                onclick="window.importMemories('merge')" title="Read radio channels and add to existing app memories">
+                onclick="window.importMemories('merge')" title="Read radio channels and add to existing app memories"
+                aria-label="Load new memories from radio, adding to existing">
             <i class="bi bi-cloud-download" aria-hidden="true"></i> Load from Rig (Add new)
         </button>
         <button type="button" class="mem-tool-btn" id="memExportReplaceBtn"
-                onclick="window.exportMemories('replace')" title="Write app memories to radio, replacing all radio channels">
+                onclick="window.exportMemories('replace')" title="Write app memories to radio, replacing all radio channels"
+                aria-label="Save all memories to radio, replacing existing radio channels">
             <i class="bi bi-cloud-upload" aria-hidden="true"></i> Save to Rig (Replace all)
         </button>
         <button type="button" class="mem-tool-btn" id="memExportAddBtn"
-                onclick="window.exportMemories('add')" title="Write app memories only to empty radio channels">
+                onclick="window.exportMemories('add')" title="Write app memories only to empty radio channels"
+                aria-label="Save memories to radio, filling only empty radio channels">
             <i class="bi bi-cloud-upload" aria-hidden="true"></i> Save to Rig (Add new)
         </button>
         <select id="memBankSelect" class="mem-bank-select" style="display:none"
@@ -1042,7 +1060,7 @@
 <dialog id="voxDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:280px;" aria-labelledby="voxDialogTitle">
     <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
         <strong id="voxDialogTitle">VOX Controls</strong>
-        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('voxDialog').close()" aria-label="Close">✕</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('voxDialog').close()" aria-label="Close VOX controls">✕</button>
     </div>
     <div class="p-3 d-flex flex-column gap-2">
         <div class="d-flex align-items-center gap-2">
@@ -1082,7 +1100,7 @@
 <dialog id="fmDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:300px;" aria-labelledby="fmDialogTitle">
     <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
         <strong id="fmDialogTitle">FM Repeater</strong>
-        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('fmDialog').close()" aria-label="Close">✕</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('fmDialog').close()" aria-label="Close FM repeater controls">✕</button>
     </div>
     <div class="p-3 d-flex flex-column gap-2">
         <div class="d-flex align-items-center gap-2">
@@ -1127,7 +1145,7 @@
                 }
             </select>
         </div>
-        <button class="btn btn-sm btn-primary mt-1" onclick="saveFmRepeater()" title="Apply FM repeater settings to radio">Apply</button>
+        <button class="btn btn-sm btn-primary mt-1" onclick="saveFmRepeater()" title="Apply FM repeater settings to radio" aria-label="Apply FM repeater settings to radio">Apply</button>
     </div>
 </dialog>
 
@@ -1135,7 +1153,7 @@
 <dialog id="cwDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:320px;" aria-labelledby="cwDialogTitle">
     <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
         <strong id="cwDialogTitle">CW Keyer</strong>
-        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cwDialog').close()" aria-label="Close">✕</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cwDialog').close()" aria-label="Close CW keyer controls">✕</button>
     </div>
     <div class="p-3 d-flex flex-column gap-2">
         <div class="d-flex align-items-center gap-2">
@@ -1178,7 +1196,7 @@
                    aria-label="CW message @(mi+1)" title="CW memory @(mi+1) text">
         </div>
         }
-        <button class="btn btn-sm btn-primary mt-1" onclick="saveCwMessages()" title="Save CW message memories">Save Messages</button>
+        <button class="btn btn-sm btn-primary mt-1" onclick="saveCwMessages()" title="Save CW message memories" aria-label="Save CW memory messages to settings">Save Messages</button>
     </div>
 </dialog>
 
@@ -1581,12 +1599,15 @@
             if (connected) {
                 btn.classList.add('btn-success');
                 btn.innerHTML = '<i class="bi bi-plug-fill" aria-hidden="true"></i> Connected';
+                btn.setAttribute('aria-label', 'CAT serial connection — currently connected');
             } else {
                 btn.classList.add('btn-danger');
                 btn.innerHTML = '<i class="bi bi-plug" aria-hidden="true"></i> Disconnected';
+                btn.setAttribute('aria-label', 'CAT serial connection — currently disconnected');
             }
             _catConnected = connected;
         }
+        window._applyConnectBtnState = _applyConnectBtnState;
 
         async function toggleCatConnection() {
             const btn = document.getElementById('connectBtn');
@@ -1611,6 +1632,10 @@
         fetch('/api/cat/status').then(r => r.json()).then(d => _applyConnectBtnState(d.isConnected === true)).catch(() => {});
 
         // --- DRAGGABLE PANELS ---
+        function _saveDlgPos(dialog) {
+            try { localStorage.setItem('dlgPos_' + dialog.id, JSON.stringify({ left: dialog.style.left, top: dialog.style.top })); } catch {}
+        }
+
         function makeDraggable(dialog, handle) {
             handle.style.cursor = 'grab';
             handle.addEventListener('mousedown', e => {
@@ -1627,6 +1652,7 @@
                     document.removeEventListener('mousemove', onMove);
                     document.removeEventListener('mouseup', onUp);
                     handle.style.cursor = 'grab';
+                    _saveDlgPos(dialog);
                 }
                 document.addEventListener('mousemove', onMove);
                 document.addEventListener('mouseup', onUp);
@@ -1647,6 +1673,7 @@
                 function onEnd() {
                     document.removeEventListener('touchmove', onMove);
                     document.removeEventListener('touchend', onEnd);
+                    _saveDlgPos(dialog);
                 }
                 document.addEventListener('touchmove', onMove, { passive: false });
                 document.addEventListener('touchend', onEnd);
@@ -1655,7 +1682,16 @@
 
         ['voxDialog', 'cwDialog', 'fmDialog'].forEach(id => {
             const dlg = document.getElementById(id);
-            if (dlg) makeDraggable(dlg, dlg.querySelector('div'));
+            if (!dlg) return;
+            makeDraggable(dlg, dlg.querySelector('div'));
+            try {
+                const saved = JSON.parse(localStorage.getItem('dlgPos_' + id) || 'null');
+                if (saved && saved.left && saved.top) {
+                    dlg.style.left = saved.left;
+                    dlg.style.top  = saved.top;
+                    dlg.style.transform = 'none';
+                }
+            } catch {}
         });
 
         // --- VOX ---

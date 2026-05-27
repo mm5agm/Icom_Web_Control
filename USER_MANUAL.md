@@ -378,6 +378,8 @@ The last segment you used on each band is remembered, so when you return to a ba
 - **Connected** (green) — the serial port is open and the radio is communicating
 - **Disconnected** (red) — the serial port is closed or the radio is not responding
 
+The button updates automatically — if the radio is powered off or stops responding, it switches to red/Disconnected within a few seconds without any action needed.
+
 Click the button to toggle the connection. While connecting, it briefly shows "Connecting…". On reconnect the app re-reads all radio settings so the controls reflect the current radio state. Useful if the radio was powered on after the app started, or after a USB cable was unplugged and re-plugged.
 
 **ATU button** — Initiates an ATU (Automatic Tuner Unit) tune cycle. Labelled **ATU: On** (green) when the ATU is active or **ATU: Off** (grey) when bypassed. Clicking the button when active triggers a fresh tune cycle; clicking when inactive activates the ATU. Only applies to radios fitted with an internal or external ATU.
@@ -413,7 +415,7 @@ Click the **VOX** button to open the VOX pop-up panel.
 | Delay | VOX hang time (0–2500 ms). Time TX stays active after audio stops |
 | Anti-VOX | Anti-VOX level (0–100). Suppresses the receiver audio from triggering VOX |
 
-Close the panel by clicking the **×** button or clicking outside it.
+Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
 
 ---
 
@@ -430,6 +432,8 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 
 **CW memory messages** are configured on the **Settings** page (see Section 6.5). Each message can be up to 24 characters. Use `{CALL}` as a placeholder — it is sent literally (the radio does not expand it; configure your callsign in the message text directly for CW use).
 
+Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
+
 ---
 
 ### 5.13 FM Repeater Panel
@@ -443,6 +447,8 @@ Click the **FM Rep** button to open the FM Repeater pop-up panel. These settings
 | CTCSS Mode | **Off**, **Encoder**, **Decoder**, or **Encoder + Decoder** |
 | CTCSS Tone | Select the required CTCSS sub-tone from the standard set (67.0 Hz – 254.1 Hz) |
 | Apply button | Sends all FM repeater settings to the radio in one operation |
+
+Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
 
 ---
 
@@ -584,7 +590,7 @@ These must match WSJT-X's **Settings → Reporting → UDP Server** settings. Se
 
 ## 8. Radio Memories
 
-The app maintains its own list of memory channels, independent of the radio's built-in memories. You can store as many channels as you like, organised with labels, and recall any of them at a click from the floating Mem panel (see Section 5.11).
+The app maintains its own list of memory channels, independent of the radio's built-in memories. You can store as many channels as you like, organised with labels, and recall any of them at a click from the floating Mem panel (see Section 5.14).
 
 ### 8.1 Memories Editor
 
@@ -909,7 +915,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 **Meters appear to show incorrect values**
 
-- The meters use a default calibration that may not exactly match every individual radio. See Section 9 to adjust the calibration.
+- The meters use a default calibration that may not exactly match every individual radio. See Section 10 to adjust the calibration.
 
 **App will not start — "Another instance is already running"**
 
@@ -976,7 +982,7 @@ The app does **not** rely on NVDA's built-in mouse tracking for meter gauges. In
 
 When you move the mouse over a meter gauge, the app reads:
 
-1. The meter's accessible label from your saved labels (see Section 14.5)
+1. The meter's accessible label from your saved labels (see Section 15.5)
 2. The current reading at that moment (e.g., "S5", "50.2 V", "1.5:1")
 
 It then writes *both* into the live region, and NVDA announces them as a single phrase — for example: **"Amplifier supply voltage meter: 50.2 V"**.

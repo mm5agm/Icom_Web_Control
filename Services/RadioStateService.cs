@@ -279,6 +279,9 @@ namespace Yaesu_Web_Control.Services
         private int _apfFreqB = 0;
         public int ApfFreqB { get => _apfFreqB; set => SetField(ref _apfFreqB, value); }
 
+        private bool _isConnected = false;
+        public bool IsConnected { get => _isConnected; set => SetField(ref _isConnected, value); }
+
         private string _bandA = "20m";
         public string BandA { get => _bandA; set => SetField(ref _bandA, value); }
 

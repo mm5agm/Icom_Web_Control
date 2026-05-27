@@ -314,6 +314,7 @@ namespace Yaesu_Web_Control.Services
                 await multiplexer.EnableAutoInformationAsync();
 
                 logger.LogInformation("[RadioInitializationService] ✓ Radio connected, initialized, and Auto Information streaming enabled");
+                radioStateService.IsConnected = true;
                 AppStatus.InitializationStatus = "complete";
                 logger.LogInformation("[RadioInitializationService] InitializationStatus set to complete");
                 await _hubContext.Clients.All.SendAsync("InitializationStatus", "complete");

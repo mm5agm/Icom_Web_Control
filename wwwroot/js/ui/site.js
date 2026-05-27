@@ -777,6 +777,12 @@ function updateMicGainLabel(mode) {
 connection.on("RadioStateUpdate", function (update) {
     // ...removed debug logging...
 
+    // --- CONNECTION STATE ---
+    if (update.property === "IsConnected") {
+        const connected = update.value === true || update.value === 'true';
+        if (typeof window._applyConnectBtnState === 'function') window._applyConnectBtnState(connected);
+    }
+
     // --- MODE CHANGE (THE BUG FIX) ---
     if (update.property === "ModeA") {
         updateModeSelect('A', update.value);
@@ -1666,6 +1672,8 @@ async function toggleContour(vfo) {
     const newOn = !contourState[vfo].on;
     contourState[vfo].on = newOn;
     _updateContourBtn(vfo);
+    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
+    if (panel) panel.setState({ contourOn: newOn });
     try {
         await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
             method: 'POST',
@@ -1678,6 +1686,8 @@ window.toggleContour = toggleContour;
 
 async function setContourFreq(vfo, hz) {
     contourState[vfo].freqHz = hz;
+    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
+    if (panel) panel.setState({ contourFreqHz: hz });
     try {
         await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
             method: 'POST',
@@ -1692,6 +1702,8 @@ async function toggleApf(vfo) {
     const newOn = !apfState[vfo].on;
     apfState[vfo].on = newOn;
     _updateApfBtn(vfo);
+    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
+    if (panel) panel.setState({ apfOn: newOn });
     try {
         await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
             method: 'POST',
@@ -1704,6 +1716,8 @@ window.toggleApf = toggleApf;
 
 async function setApfFreq(vfo, hz) {
     apfState[vfo].freqHz = hz;
+    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
+    if (panel) panel.setState({ apfFreqHz: hz });
     try {
         await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
             method: 'POST',
