@@ -195,9 +195,9 @@
                     style="padding-top: 1px; padding-bottom: 1px;" title="Quick Split: enable split and set VFO B to VFO A + 5 kHz">
                 +5k
             </button>
-            <button id="connectBtn" class="btn btn-outline-secondary btn-sm"
+            <button id="connectBtn" class="btn btn-danger btn-sm"
                     onclick="toggleCatConnection()" style="padding-top: 1px; padding-bottom: 1px;" title="Connect or disconnect CAT serial port">
-                <i class="bi bi-plug" aria-hidden="true"></i> Connect
+                <i class="bi bi-plug" aria-hidden="true"></i> Disconnected
             </button>
             <button id="radioPowerBtn" class="btn btn-danger btn-sm"
                     onclick="toggleRadioPower()" style="padding-top: 1px; padding-bottom: 1px;" title="Radio Power On/Off">
@@ -1572,32 +1572,43 @@
         }
 
         // --- CONNECT / DISCONNECT ---
-        let _catConnected = true;
+        let _catConnected = false;
+
+        function _applyConnectBtnState(connected) {
+            const btn = document.getElementById('connectBtn');
+            if (!btn) return;
+            btn.classList.remove('btn-success', 'btn-danger', 'btn-secondary');
+            if (connected) {
+                btn.classList.add('btn-success');
+                btn.innerHTML = '<i class="bi bi-plug-fill" aria-hidden="true"></i> Connected';
+            } else {
+                btn.classList.add('btn-danger');
+                btn.innerHTML = '<i class="bi bi-plug" aria-hidden="true"></i> Disconnected';
+            }
+            _catConnected = connected;
+        }
+
         async function toggleCatConnection() {
             const btn = document.getElementById('connectBtn');
             try {
                 if (_catConnected) {
                     const r = await fetch('/api/cat/disconnect', { method: 'POST' });
-                    if ((await r.json()).success) {
-                        _catConnected = false;
-                        btn.classList.remove('btn-outline-secondary');
-                        btn.classList.add('btn-warning');
-                        btn.innerHTML = '<i class="bi bi-plug" aria-hidden="true"></i> Connect';
-                    }
+                    if ((await r.json()).success) _applyConnectBtnState(false);
                 } else {
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-secondary');
                     btn.innerHTML = '<i class="bi bi-plug" aria-hidden="true"></i> Connecting…';
                     const r = await fetch('/api/cat/connect', { method: 'POST' });
-                    if ((await r.json()).success) {
-                        _catConnected = true;
-                        btn.classList.remove('btn-warning');
-                        btn.classList.add('btn-outline-secondary');
-                        btn.innerHTML = '<i class="bi bi-plug" aria-hidden="true"></i> Connect';
-                    } else {
-                        btn.innerHTML = '<i class="bi bi-plug" aria-hidden="true"></i> Connect';
-                    }
+                    _applyConnectBtnState((await r.json()).success);
                 }
-            } catch (e) { console.error('toggleCatConnection error:', e); }
+            } catch (e) {
+                console.error('toggleCatConnection error:', e);
+                _applyConnectBtnState(false);
+            }
         }
+
+        // Set initial button state from server
+        fetch('/api/cat/status').then(r => r.json()).then(d => _applyConnectBtnState(d.isConnected === true)).catch(() => {});
 
         // --- VOX ---
         async function toggleVox() {
