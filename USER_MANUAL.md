@@ -14,14 +14,19 @@
    - 5.5 [VFO Panels](#55-vfo-panels)
    - 5.6 [Frequency Display and Tuning](#56-frequency-display-and-tuning)
    - 5.7 [Receiver Controls](#57-receiver-controls)
-   - 5.8 [IF Width, IF Shift, and AF Gain](#58-if-width-if-shift-and-af-gain)
+   - 5.8 [IF Width, IF Low Cut, IF Shift, and AF Gain](#58-if-width-if-low-cut-if-shift-and-af-gain)
    - 5.9 [Band and Segment Selection](#59-band-and-segment-selection)
    - 5.10 [Transmit Controls](#510-transmit-controls)
-   - 5.11 [Memory Panel](#511-memory-panel)
+   - 5.11 [VOX Panel](#511-vox-panel)
+   - 5.12 [CW Keyer Panel](#512-cw-keyer-panel)
+   - 5.13 [FM Repeater Panel](#513-fm-repeater-panel)
+   - 5.14 [Memory Panel](#514-memory-panel)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
    - 6.3 [SDR Spectrum Display](#63-sdr-spectrum-display)
+   - 6.4 [Roofing Filters](#64-roofing-filters)
+   - 6.5 [CW Memory Messages](#65-cw-memory-messages-m1m5)
 7. [Application Setup](#7-application-setup)
    - 7.1 [External App Buttons](#71-external-app-buttons)
    - 7.2 [WSJT-X UDP Settings](#72-wsjt-x-udp-settings)
@@ -284,6 +289,7 @@ LSB, USB, CW-U, CW-L, FM, FM-N, AM, AM-N, RTTY-L, RTTY-U, DATA-L, DATA-U, DATA-F
 | ATT | OFF, 6 dB, 12 dB, 18 dB |
 | NR | OFF, NR1, NR2 |
 | NB | OFF, ON |
+| NB Level | 1–20 (noise blanker depth; only relevant when NB is ON) |
 | Auto Notch | OFF, ON |
 | Man Notch | OFF, ON |
 | Notch Hz | Slider 10–3200 Hz (only relevant when Man Notch is ON) |
@@ -301,9 +307,11 @@ All of these settings are restored to the radio when the app starts.
 
 ---
 
-### 5.8 IF Width, IF Shift, and AF Gain
+### 5.8 IF Width, IF Low Cut, IF Shift, and AF Gain
 
 **IF Width** — Sets the DSP filter bandwidth. Options: 200 Hz, 400 Hz, 600 Hz, 850 Hz, 1.2 kHz, 1.4 kHz, 1.8 kHz, 2.4 kHz, 3.0 kHz. This setting is persisted and restored on startup.
+
+**IF Low Cut** — Sets the lower edge of the DSP passband (SL command). Options: OFF, 100 Hz, 200 Hz, 300 Hz, 400 Hz, 500 Hz, 600 Hz, 700 Hz, 800 Hz, 900 Hz, 1.0 kHz, 1.1 kHz. Use this to cut low-frequency audio or interference — for example, 300 Hz in SSB to reduce hum and LF splatter. This setting is independent per VFO.
 
 **IF Shift** — Shifts the passband centre ±1000 Hz in 20 Hz steps. Drag the slider or use the keyboard arrow keys. The current offset is shown next to the slider.
 
@@ -355,9 +363,71 @@ The last segment you used on each band is remembered, so when you return to a ba
 
 **Radio POWER button** — Turns the radio on or off. The button shows green (on) or red (off).
 
+**Connect button** — Manually connects or disconnects the CAT serial link to the radio. Shown as **Connect** (grey) when disconnected and **Disconnect** (green) when connected. Useful if the radio was powered on after the app started, or after a USB cable was unplugged and re-plugged.
+
+**ATU button** — Initiates an ATU (Automatic Tuner Unit) tune cycle. Labelled **ATU: On** (green) when the ATU is active or **ATU: Off** (grey) when bypassed. Clicking the button when active triggers a fresh tune cycle; clicking when inactive activates the ATU. Only applies to radios fitted with an internal or external ATU.
+
+**Mon level** — TX monitor level slider (0–100). Controls how much of the transmitted audio you hear in the headphones during TX. Drag and release to apply.
+
+**VOX button** — Opens the **VOX Settings** panel. The button shows **VOX: On** (green) or **VOX: Off** (grey) based on the current VOX state.
+
+**CW button** — Opens the **CW Keyer** panel. See Section 5.12.
+
+**FM Rep button** — Opens the **FM Repeater** panel. See Section 5.13.
+
+**MIC Gain** — Drag the slider to set the microphone gain (0–100). The value is sent to the radio as you release.
+
+**PROC** — Speech processor toggle. Shows **Proc On** (green) or **Proc Off** (grey).
+
+**PROC Level** — Speech processor level slider (0–100).
+
 ---
 
-### 5.11 Memory Panel
+### 5.11 VOX Panel
+
+Click the **VOX** button to open the VOX pop-up panel.
+
+| Control | Description |
+|---------|-------------|
+| VOX toggle | Enables or disables VOX. Shows **VOX: On** (green) or **VOX: Off** (grey) |
+| Gain | VOX sensitivity (0–100). Higher values trigger TX more easily |
+| Delay | VOX hang time (0–2500 ms). Time TX stays active after audio stops |
+| Anti-VOX | Anti-VOX level (0–100). Suppresses the receiver audio from triggering VOX |
+
+Close the panel by clicking the **×** button or clicking outside it.
+
+---
+
+### 5.12 CW Keyer Panel
+
+Click the **CW** button to open the CW Keyer pop-up panel.
+
+| Control | Description |
+|---------|-------------|
+| Speed | Keyer speed in WPM (4–60) |
+| Break-in | **Off** (keyer only), **Semi** (semi break-in), or **Full** (QSK full break-in) |
+| Delay | Semi break-in delay (0–2500 ms) — only relevant in Semi mode |
+| M1–M5 buttons | Sends the corresponding memory message via the radio's KY CAT command |
+
+**CW memory messages** are configured on the **Settings** page (see Section 6.5). Each message can be up to 24 characters. Use `{CALL}` as a placeholder — it is sent literally (the radio does not expand it; configure your callsign in the message text directly for CW use).
+
+---
+
+### 5.13 FM Repeater Panel
+
+Click the **FM Rep** button to open the FM Repeater pop-up panel. These settings apply when using FM mode.
+
+| Control | Description |
+|---------|-------------|
+| Shift | **None**, **Positive** (+), **Negative** (−), or **Split** |
+| Offset | Repeater offset in kHz. Common values: 600 kHz (2m), 1600 kHz (70cm) |
+| CTCSS Mode | **Off**, **Encoder**, **Decoder**, or **Encoder + Decoder** |
+| CTCSS Tone | Select the required CTCSS sub-tone from the standard set (67.0 Hz – 254.1 Hz) |
+| Apply button | Sends all FM repeater settings to the radio in one operation |
+
+---
+
+### 5.14 Memory Panel
 
 The **Mem** button in the toolbar opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. Click a tile to instantly tune VFO A to that frequency and mode.
 
@@ -427,6 +497,34 @@ The spectrum panel appears on the main page when a device is saved. If you want 
 | IF Frequency | 9,000,000 Hz (FTdx101MP, FTdx101D, FTDX3000) — no effect on FTdx10 or FT-710 |
 | Sample Rate | 2,048,000 (2M) |
 | FFT Size | 1024 |
+
+---
+
+### 6.4 Roofing Filters
+
+Select which optional roofing filters are fitted to your radio. The app uses this list to show only the installed filters in the Roofing Filter dropdown on the main page. FTdx101MP comes fully loaded; FTdx101D, FTdx10, and FTDX3000 allow optional filter selection.
+
+---
+
+### 6.5 CW Memory Messages (M1–M5)
+
+Enter up to five CW message memories. These are available from the CW Keyer panel (see Section 5.12) via the M1–M5 buttons.
+
+- Maximum 24 characters per message
+- Messages are saved in application settings and persist between sessions
+- Use the M1–M5 buttons in the CW panel to send a message
+
+**Example messages:**
+
+| Slot | Default message |
+|------|----------------|
+| M1 | CQ CQ DE {CALL} |
+| M2 | TU 73 |
+| M3 | QRZ? |
+| M4 | UR 5NN |
+| M5 | DE {CALL} |
+
+Note: `{CALL}` is a reminder placeholder — the radio's KY command does not perform variable substitution. Replace `{CALL}` with your actual callsign.
 
 ---
 

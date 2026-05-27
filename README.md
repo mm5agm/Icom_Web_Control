@@ -95,6 +95,24 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 ## Release Notes
 
+## 2026-05-27 - v1.6.0
+
+### Added
+
+- **ATU Tune button** — initiates a tuner cycle (AC CAT command); shows ATU On/Off state
+- **NB Level control** — noise blanker depth dropdown (1–20) inline next to NB On/Off, per VFO
+- **TX Monitor level** — monitor level slider (0–100) in the TX controls row (ML command)
+- **Manual Connect/Disconnect button** — manually connects or disconnects the CAT serial link; useful when the radio is powered on after the app starts
+- **VOX pop-up panel** — VOX on/off toggle, gain, hang delay, and anti-VOX sliders (VX/VG/VD CAT commands)
+- **FM Repeater pop-up panel** — shift direction, offset (kHz), CTCSS mode, and CTCSS tone selects with an Apply button (RS/RO/CT/CN CAT commands); 50 standard CTCSS tones
+- **CW Keyer pop-up panel** — speed (WPM), break-in mode (Off/Semi/Full), and semi break-in delay controls (KS/BI/SD CAT commands)
+- **CW Memory Keyer M1–M5** — five memory message buttons in the CW panel; clicking a button sends the message via the radio's KY CAT command
+- **CW Message Editor** — M1–M5 messages are editable on the Settings page and persisted to application settings
+- **IF Low Cut (TX bandwidth)** — DSP low-cut filter select per VFO, range OFF–1.1 kHz in 100 Hz steps (SL CAT command), inline next to IF Width
+- **Read all settings from radio on connect** — app now queries ATU, VOX, FM repeater, CW keyer, and NB level on startup/reconnect so the UI reflects the radio's current state
+
+---
+
 ## 2026-05-26 - v1.5.6
 
 ### Fixed

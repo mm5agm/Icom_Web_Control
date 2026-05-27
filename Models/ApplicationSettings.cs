@@ -44,6 +44,9 @@
         public long SdrIfFrequencyHz { get; set; } = 9_000_000;
         public int SdrFftSize { get; set; } = 1024;
 
+        // CW keyer message memories M1-M5 (sent via KY command)
+        public List<string> CwMessages { get; set; } = new() { "CQ CQ DE {CALL}", "TU 73", "QRZ?", "UR 5NN", "DE {CALL}" };
+
         // Optional roofing filters installed in the radio (FTdx101MP/D only).
         // "6"=12kHz and "7"=3kHz are always fitted. "8"=1.2kHz, "9"=600Hz, "A"=300Hz are optional.
         // FTdx10 has fixed roofing filters and ignores this setting.

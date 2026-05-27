@@ -1570,5 +1570,368 @@ namespace Yaesu_Web_Control.Controllers
                 return Ok(new { success = false, message = ex.Message });
             }
         }
+
+        // --- ATU ---
+        public class AtuRequest { public bool Enabled { get; set; } }
+
+        [HttpPost("atu")]
+        public async Task<IActionResult> SetAtu([FromBody] AtuRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                string cmd = request.Enabled ? "AC001;" : "AC000;";
+                await _catClient.SendCommandAsync(cmd, "WebUI", CancellationToken.None);
+                _radioStateService.AtuEnabled = request.Enabled;
+                return Ok(new { atuEnabled = request.Enabled });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting ATU");
+                return StatusCode(500, new { error = "Failed to set ATU" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- NB LEVEL ---
+        public class NbLevelRequest { public int Level { get; set; } = 10; }
+
+        [HttpPost("nblevel/{receiver}")]
+        public async Task<IActionResult> SetNbLevel(string receiver, [FromBody] NbLevelRequest request)
+        {
+            if (request.Level < 1 || request.Level > 20)
+                return BadRequest(new { error = "NB level must be 1–20" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
+                await _catClient.SendCommandAsync($"NL{vfo}{request.Level:D3};", "WebUI", CancellationToken.None);
+                if (vfo == "0") _radioStateService.NbLevelA = request.Level;
+                else            _radioStateService.NbLevelB = request.Level;
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting NB level");
+                return StatusCode(500, new { error = "Failed to set NB level" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- MONITOR LEVEL ---
+        public class MonitorLevelRequest { public int Level { get; set; } = 0; }
+
+        [HttpPost("monitorlevel/{receiver}")]
+        public async Task<IActionResult> SetMonitorLevel(string receiver, [FromBody] MonitorLevelRequest request)
+        {
+            if (request.Level < 0 || request.Level > 100)
+                return BadRequest(new { error = "Monitor level must be 0–100" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
+                await _catClient.SendCommandAsync($"ML{vfo}{request.Level:D3};", "WebUI", CancellationToken.None);
+                if (vfo == "0") _radioStateService.MonitorLevelA = request.Level;
+                else            _radioStateService.MonitorLevelB = request.Level;
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting monitor level");
+                return StatusCode(500, new { error = "Failed to set monitor level" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- CONNECT / DISCONNECT ---
+        [HttpPost("connect")]
+        public async Task<IActionResult> Connect()
+        {
+            try
+            {
+                await _radioInitService.InitializeRadioAsync();
+                AppStatus.InitializationStatus = "complete";
+                return Ok(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Manual connect failed");
+                AppStatus.InitializationStatus = "error";
+                return Ok(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("disconnect")]
+        public async Task<IActionResult> Disconnect()
+        {
+            try
+            {
+                await _catClient.DisconnectAsync();
+                AppStatus.InitializationStatus = "disconnected";
+                return Ok(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Manual disconnect failed");
+                return Ok(new { success = false, message = ex.Message });
+            }
+        }
+
+        // --- VOX ---
+        public class VoxRequest
+        {
+            public bool On { get; set; }
+            public int Gain { get; set; } = 50;
+            public int Delay { get; set; } = 50;
+            public int AntiVoxGain { get; set; } = 50;
+        }
+
+        [HttpPost("vox")]
+        public async Task<IActionResult> SetVox([FromBody] VoxRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"VX{(request.On ? 1 : 0)};", "WebUI", CancellationToken.None);
+                _radioStateService.VoxOn = request.On;
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error setting VOX"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        public class VoxGainRequest { public int Gain { get; set; } = 50; }
+        public class VoxDelayRequest { public int Delay { get; set; } = 50; }
+        public class AntiVoxGainRequest { public int Gain { get; set; } = 50; }
+
+        [HttpPost("vox/gain")]
+        public async Task<IActionResult> SetVoxGain([FromBody] VoxGainRequest request)
+        {
+            if (request.Gain < 0 || request.Gain > 100)
+                return BadRequest(new { error = "Gain 0–100" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"VG{request.Gain:D3};", "WebUI", CancellationToken.None);
+                _radioStateService.VoxGain = request.Gain;
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error setting VOX gain"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("vox/delay")]
+        public async Task<IActionResult> SetVoxDelay([FromBody] VoxDelayRequest request)
+        {
+            if (request.Delay < 0 || request.Delay > 2500)
+                return BadRequest(new { error = "Delay 0–2500 ms" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"VD{request.Delay:D4};", "WebUI", CancellationToken.None);
+                _radioStateService.VoxDelay = request.Delay;
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error setting VOX delay"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("vox/antivox")]
+        public async Task<IActionResult> SetAntiVoxGain([FromBody] AntiVoxGainRequest request)
+        {
+            if (request.Gain < 0 || request.Gain > 100)
+                return BadRequest(new { error = "Anti-VOX gain 0–100" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                // Anti-VOX is typically stored in menu — store locally only
+                _radioStateService.AntiVoxGain = request.Gain;
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error setting anti-VOX gain"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- FM REPEATER ---
+        public class FmRepeaterRequest
+        {
+            public string ShiftDir { get; set; } = "0";
+            public int OffsetHz { get; set; } = 600000;
+            public string CtcssMode { get; set; } = "00";
+            public string CtcssTone { get; set; } = "01";
+        }
+
+        [HttpPost("fmrepeater")]
+        public async Task<IActionResult> SetFmRepeater([FromBody] FmRepeaterRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                if (new[] { "0", "1", "2", "3" }.Contains(request.ShiftDir))
+                {
+                    await _catClient.SendCommandAsync($"RS{request.ShiftDir};", "WebUI", CancellationToken.None);
+                    _radioStateService.FmShiftDir = request.ShiftDir;
+                }
+                int offsetClamp = Math.Max(0, Math.Min(999999, request.OffsetHz));
+                await _catClient.SendCommandAsync($"RO{offsetClamp:D6};", "WebUI", CancellationToken.None);
+                _radioStateService.FmOffsetHz = offsetClamp;
+                if (new[] { "00", "01", "02", "03" }.Contains(request.CtcssMode))
+                {
+                    await _catClient.SendCommandAsync($"CT{request.CtcssMode};", "WebUI", CancellationToken.None);
+                    _radioStateService.CtcssMode = request.CtcssMode;
+                }
+                await _catClient.SendCommandAsync($"CN{request.CtcssTone};", "WebUI", CancellationToken.None);
+                _radioStateService.CtcssTone = request.CtcssTone;
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error setting FM repeater"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- CW KEYER ---
+        public class CwSpeedRequest { public int Speed { get; set; } = 20; }
+        public class CwBreakInRequest { public string Mode { get; set; } = "0"; }
+        public class CwBreakInDelayRequest { public int DelayMs { get; set; } = 200; }
+
+        [HttpPost("cw/speed")]
+        public async Task<IActionResult> SetCwSpeed([FromBody] CwSpeedRequest request)
+        {
+            if (request.Speed < 4 || request.Speed > 60)
+                return BadRequest(new { error = "CW speed 4–60 WPM" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"KS{request.Speed:D3};", "WebUI", CancellationToken.None);
+                _radioStateService.CwSpeed = request.Speed;
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error setting CW speed"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("cw/breakin")]
+        public async Task<IActionResult> SetCwBreakIn([FromBody] CwBreakInRequest request)
+        {
+            if (!new[] { "0", "1", "2" }.Contains(request.Mode))
+                return BadRequest(new { error = "Break-in mode 0/1/2" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"BI{request.Mode};", "WebUI", CancellationToken.None);
+                _radioStateService.CwBreakIn = request.Mode;
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error setting CW break-in"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("cw/breakindelay")]
+        public async Task<IActionResult> SetCwBreakInDelay([FromBody] CwBreakInDelayRequest request)
+        {
+            if (request.DelayMs < 0 || request.DelayMs > 2500)
+                return BadRequest(new { error = "Delay 0–2500 ms" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"SD{request.DelayMs:D4};", "WebUI", CancellationToken.None);
+                _radioStateService.CwBreakInDelay = request.DelayMs;
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error setting CW break-in delay"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        public class CwMessageRequest { public string Message { get; set; } = ""; }
+
+        [HttpPost("cw/send")]
+        public async Task<IActionResult> SendCwMessage([FromBody] CwMessageRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Message))
+                return BadRequest(new { error = "Empty message" });
+            var clean = new string(request.Message.ToUpper().Where(c =>
+                (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                c == ' ' || c == '?' || c == '/' || c == '.' || c == ','
+            ).Take(24).ToArray());
+            if (string.IsNullOrEmpty(clean))
+                return BadRequest(new { error = "No valid CW characters" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"KY {clean};", "WebUI", CancellationToken.None);
+                return Ok(new { sent = clean });
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error sending CW message"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- CW MESSAGES ---
+        [HttpGet("cw/messages")]
+        public async Task<IActionResult> GetCwMessages()
+        {
+            var settings = await _settingsService.GetSettingsAsync();
+            return Ok(settings.CwMessages);
+        }
+
+        [HttpPost("cw/messages")]
+        public async Task<IActionResult> SaveCwMessages([FromBody] List<string> messages)
+        {
+            if (messages == null || messages.Count != 5)
+                return BadRequest(new { error = "Exactly 5 messages required" });
+            var settings = await _settingsService.GetSettingsAsync();
+            settings.CwMessages = messages.Select(m => m ?? "").Take(5).ToList();
+            await _settingsService.SaveSettingsAsync(settings);
+            return Ok(new { saved = true });
+        }
+
+        // --- TX BANDWIDTH (IF Low Cut) ---
+        public class IfLowCutRequest { public string Code { get; set; } = "0"; }
+
+        [HttpPost("iflowcut/{receiver}")]
+        public async Task<IActionResult> SetIfLowCut(string receiver, [FromBody] IfLowCutRequest request)
+        {
+            if (!int.TryParse(request.Code, out int codeNum) || codeNum < 0 || codeNum > 11)
+                return BadRequest(new { error = $"Invalid IF Low Cut code: {request.Code}" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
+                await _catClient.SendCommandAsync($"SL{vfo}0{codeNum:D2};", "WebUI", CancellationToken.None);
+                if (vfo == "0") _radioStateService.IfLowCutA = request.Code;
+                else            _radioStateService.IfLowCutB = request.Code;
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting IF Low Cut");
+                return StatusCode(500, new { error = "Failed to set IF Low Cut" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
     }
 }

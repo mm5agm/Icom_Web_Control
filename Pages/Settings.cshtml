@@ -385,6 +385,36 @@
         </div>
     </div>
 
+    <!-- CW Memory Messages -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="bi bi-keyboard"></i> CW Memory Messages (M1–M5)</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        These messages can be sent from the CW panel on the main control page using the M1–M5 buttons.
+                        Use <code>{CALL}</code> as a placeholder for your callsign (set in WSJT-X or similar software).
+                        Maximum 24 characters per message.
+                    </p>
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        <div class="mb-2 d-flex align-items-center gap-2">
+                            <span class="badge bg-secondary" style="min-width:2.5rem;">M@(i+1)</span>
+                            <input type="text"
+                                   name="Settings.CwMessages[@i]"
+                                   value="@(Model.Settings.CwMessages != null && Model.Settings.CwMessages.Count > i ? Model.Settings.CwMessages[i] : "")"
+                                   maxlength="24"
+                                   class="form-control form-control-sm font-monospace"
+                                   placeholder="Message @(i+1)" />
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="mt-4 mb-4">
         <button type="submit" class="btn btn-primary btn-lg">
             <i class="bi bi-save"></i> Save Settings

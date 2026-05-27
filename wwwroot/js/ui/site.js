@@ -1105,6 +1105,77 @@ connection.on("RadioStateUpdate", function (update) {
             if (label) label.innerText = update.value;
         }
     }
+
+    // --- ATU ---
+    if (update.property === "AtuEnabled") {
+        if (window.updateAtuButton) window.updateAtuButton(update.value === true || update.value === 'true');
+    }
+
+    // --- NB LEVEL ---
+    if (update.property === "NbLevelA") {
+        const el = document.getElementById('nbLevelSelectA');
+        if (el) el.value = update.value;
+    }
+    if (update.property === "NbLevelB") {
+        const el = document.getElementById('nbLevelSelectB');
+        if (el) el.value = update.value;
+    }
+
+    // --- MONITOR LEVEL ---
+    if (update.property === "MonitorLevelA") {
+        const slider = document.getElementById('monLevelSlider');
+        const label  = document.getElementById('monLevelValue');
+        if (slider) slider.value = update.value;
+        if (label) label.textContent = update.value;
+    }
+
+    // --- VOX ---
+    if (update.property === "VoxOn") {
+        if (window.updateVoxButton) window.updateVoxButton(update.value === true || update.value === 'true');
+    }
+    if (update.property === "VoxGain") {
+        const s = document.getElementById('voxGainSlider'); const l = document.getElementById('voxGainValue');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+    if (update.property === "VoxDelay") {
+        const s = document.getElementById('voxDelaySlider'); const l = document.getElementById('voxDelayValue');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+
+    // --- CW ---
+    if (update.property === "CwSpeed") {
+        const s = document.getElementById('cwSpeedSlider'); const l = document.getElementById('cwSpeedValue');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+    if (update.property === "CwBreakIn") {
+        const el = document.getElementById('cwBreakInSelect'); if (el) el.value = update.value;
+    }
+    if (update.property === "CwBreakInDelay") {
+        const s = document.getElementById('cwDelaySlider'); const l = document.getElementById('cwDelayValue');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+
+    // --- FM REPEATER ---
+    if (update.property === "FmShiftDir") {
+        const el = document.getElementById('fmShiftSelect'); if (el) el.value = update.value;
+    }
+    if (update.property === "FmOffsetHz") {
+        const el = document.getElementById('fmOffsetInput'); if (el) el.value = Math.round(update.value / 1000);
+    }
+    if (update.property === "CtcssMode") {
+        const el = document.getElementById('ctcssModeSelect'); if (el) el.value = update.value;
+    }
+    if (update.property === "CtcssTone") {
+        const el = document.getElementById('ctcssToneSelect'); if (el) el.value = update.value;
+    }
+
+    // --- IF LOW CUT ---
+    if (update.property === "IfLowCutA") {
+        const el = document.getElementById('ifLowCutSelectA'); if (el) el.value = update.value;
+    }
+    if (update.property === "IfLowCutB") {
+        const el = document.getElementById('ifLowCutSelectB'); if (el) el.value = update.value;
+    }
 });
 
 // SignalR connection is started once below (after the IIFE) with a .catch() error handler.
@@ -1219,6 +1290,10 @@ window.radioControl = {
     setIfShift: async function (receiver, shiftHz) {
         await fetch(`/api/cat/ifshift/${receiver.toLowerCase()}`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftHz: parseInt(shiftHz) }) });
+    },
+    setIfLowCut: async function (receiver, code) {
+        await fetch(`/api/cat/iflowcut/${receiver.toLowerCase()}`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
     }
 };
 
