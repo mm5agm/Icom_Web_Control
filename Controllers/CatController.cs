@@ -1484,6 +1484,27 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
+
+                if (mode == 2)
+                {
+                    // Quick Split: implement explicitly so it works whether split is already on or off.
+                    // ST2; on the FTdx101 only executes the +5 kHz part when transitioning from off→on;
+                    // if split is already active the radio ignores the frequency offset. So we read
+                    // VFO A, compute +5 kHz, set VFO B directly, then enable split.
+                    var faResponse = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
+                    if (!string.IsNullOrWhiteSpace(faResponse) && faResponse.StartsWith("FA") &&
+                        long.TryParse(faResponse.Substring(2).TrimEnd(';'), out long freqA))
+                    {
+                        long freqB = Math.Min(freqA + 5000, 75_000_000);
+                        await _catClient.SendCommandAsync($"FB{freqB:D11};", "WebUI", CancellationToken.None);
+                        _radioStateService.FrequencyB = freqB;
+                    }
+                    await _catClient.SendCommandAsync("ST1;", "WebUI", CancellationToken.None);
+                    _radioStateService.SplitMode = 1;
+                    _logger.LogInformation("Quick Split: VFO B set to VFO A + 5 kHz, split ON");
+                    return Ok(new { splitMode = 1 });
+                }
+
                 await _catClient.SendCommandAsync($"ST{mode};", "WebUI", CancellationToken.None);
 
                 // Read back actual state
@@ -1492,17 +1513,6 @@ namespace Yaesu_Web_Control.Controllers
                 if (!string.IsNullOrWhiteSpace(stResponse) && stResponse.StartsWith("ST"))
                     int.TryParse(stResponse.Substring(2, 1), out actualMode);
                 _radioStateService.SplitMode = actualMode;
-
-                // After Quick Split (ST2), read back VFO B so UI reflects the new +5 kHz frequency immediately
-                if (mode == 2)
-                {
-                    var fbResponse = await _catClient.SendCommandAsync("FB;", "WebUI", CancellationToken.None);
-                    if (!string.IsNullOrWhiteSpace(fbResponse) && fbResponse.StartsWith("FB") &&
-                        long.TryParse(fbResponse.Substring(2).TrimEnd(';'), out long freqB))
-                    {
-                        _radioStateService.FrequencyB = freqB;
-                    }
-                }
 
                 _logger.LogInformation("Split mode set to {Mode}", actualMode);
                 return Ok(new { splitMode = actualMode });
