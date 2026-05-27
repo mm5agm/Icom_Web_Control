@@ -319,6 +319,12 @@ pre, code { tab-size: 4; }
     font-weight: 700;
 }
 
+/* Outline-secondary buttons: black text so off-state toggles (PROC, ATU, VOX, CW, FM Rep) are readable */
+.btn-outline-secondary {
+    color: #000;
+    font-weight: 700;
+}
+
 /* Mode select - sized to fit longest option (D-FM-N), sits below band buttons */
 .vfo-mode-select {
     width: 7rem;
