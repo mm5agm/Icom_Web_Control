@@ -773,7 +773,18 @@ fieldset.calibration-card {
 }
 
 /* ── VOX / CW / FM Repeater floating panels ─────────────────────────────── */
-/* Non-modal: all three can be open simultaneously, positioned across the top */
+/* Non-modal: all three can be open simultaneously, draggable, positioned across the top */
+#voxDialog > div:first-child,
+#cwDialog  > div:first-child,
+#fmDialog  > div:first-child {
+    cursor: grab;
+    user-select: none;
+}
+#voxDialog > div:first-child:active,
+#cwDialog  > div:first-child:active,
+#fmDialog  > div:first-child:active {
+    cursor: grabbing;
+}
 #voxDialog {
     position: fixed;
     top: 80px;

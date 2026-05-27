@@ -1610,6 +1610,54 @@
         // Set initial button state from server
         fetch('/api/cat/status').then(r => r.json()).then(d => _applyConnectBtnState(d.isConnected === true)).catch(() => {});
 
+        // --- DRAGGABLE PANELS ---
+        function makeDraggable(dialog, handle) {
+            handle.style.cursor = 'grab';
+            handle.addEventListener('mousedown', e => {
+                if (e.button !== 0 || e.target.closest('button')) return;
+                const r = dialog.getBoundingClientRect();
+                let startX = e.clientX, startY = e.clientY;
+                let origLeft = r.left, origTop = r.top;
+                dialog.style.transform = 'none';
+                function onMove(e) {
+                    dialog.style.left = (origLeft + e.clientX - startX) + 'px';
+                    dialog.style.top  = (origTop  + e.clientY - startY) + 'px';
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    handle.style.cursor = 'grab';
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+                handle.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+            handle.addEventListener('touchstart', e => {
+                if (e.target.closest('button') || e.touches.length !== 1) return;
+                const r = dialog.getBoundingClientRect();
+                let startX = e.touches[0].clientX, startY = e.touches[0].clientY;
+                let origLeft = r.left, origTop = r.top;
+                dialog.style.transform = 'none';
+                function onMove(e) {
+                    dialog.style.left = (origLeft + e.touches[0].clientX - startX) + 'px';
+                    dialog.style.top  = (origTop  + e.touches[0].clientY - startY) + 'px';
+                    e.preventDefault();
+                }
+                function onEnd() {
+                    document.removeEventListener('touchmove', onMove);
+                    document.removeEventListener('touchend', onEnd);
+                }
+                document.addEventListener('touchmove', onMove, { passive: false });
+                document.addEventListener('touchend', onEnd);
+            }, { passive: true });
+        }
+
+        ['voxDialog', 'cwDialog', 'fmDialog'].forEach(id => {
+            const dlg = document.getElementById(id);
+            if (dlg) makeDraggable(dlg, dlg.querySelector('div'));
+        });
+
         // --- VOX ---
         async function toggleVox() {
             const btn = document.getElementById('voxOnBtn');
