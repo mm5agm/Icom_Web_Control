@@ -126,7 +126,7 @@ Open your browser and go to:
 http://localhost:8080
 ```
 
-The main control panel loads. If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio.
+The main control panel loads. If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio. This includes frequencies, mode, antenna, AGC, NB level, ATU state, VOX settings, FM repeater settings, CW keyer speed and break-in mode, IF width, IF shift, and more — no software defaults are applied.
 
 **Closing the app:** When you close the browser tab or window, the app detects that no browser is connected and begins a 30-second countdown. If you reopen the page within those 30 seconds (for example after a page refresh or accidentally closing the tab) the countdown cancels and the app continues normally. If no browser reconnects within 30 seconds the application exits automatically and disappears from Task Manager. If you need to force-quit immediately, open Windows Task Manager (**Ctrl+Shift+Esc**, or **Ctrl+Alt+Del** then select Task Manager), find **Yaesu_Web_Control.exe** in the list, and click **End Task**.
 
@@ -294,7 +294,7 @@ LSB, USB, CW-U, CW-L, FM, FM-N, AM, AM-N, RTTY-L, RTTY-U, DATA-L, DATA-U, DATA-F
 | Man Notch | OFF, ON |
 | Notch Hz | Slider 10–3200 Hz (only relevant when Man Notch is ON) |
 
-All of these settings are restored to the radio when the app starts.
+All of these settings are read from the radio when the app starts.
 
 **Filter Function Display** — A compact real-time display positioned alongside the band buttons, between the band button column and the receiver controls column. It shows the shape of the active DSP filter passband, matching the style of the filter scope on the FTdx101MP front panel.
 
@@ -363,7 +363,7 @@ The last segment you used on each band is remembered, so when you return to a ba
 
 **Radio POWER button** — Turns the radio on or off. The button shows green (on) or red (off).
 
-**Connect button** — Manually connects or disconnects the CAT serial link to the radio. Shown as **Connect** (grey) when disconnected and **Disconnect** (green) when connected. Useful if the radio was powered on after the app started, or after a USB cable was unplugged and re-plugged.
+**Connect button** — Manually connects or disconnects the CAT serial link to the radio. Shown as **Connect** (grey) when disconnected and **Disconnect** (green) when connected. Useful if the radio was powered on after the app started, or after a USB cable was unplugged and re-plugged. On reconnect the app re-reads all radio settings so the controls reflect the current radio state.
 
 **ATU button** — Initiates an ATU (Automatic Tuner Unit) tune cycle. Labelled **ATU: On** (green) when the ATU is active or **ATU: Off** (grey) when bypassed. Clicking the button when active triggers a fresh tune cycle; clicking when inactive activates the ATU. Only applies to radios fitted with an internal or external ATU.
 
