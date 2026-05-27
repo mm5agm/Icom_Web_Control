@@ -327,7 +327,7 @@
                             </button>
                             <span id="saveMemStatusA" class="visually-hidden" role="status" aria-live="polite"></span>
                         </div>
-                        <!-- Middle: Band buttons + Mode/Antenna below -->
+                        <!-- Middle: Band buttons + Mode/Antenna below + filter scope -->
                         <div class="flex-grow-1 d-flex flex-column gap-1">
                             @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create("unused", "A", Model.SelectedBandA))
                             <div class="d-flex gap-2 mt-1">
@@ -364,6 +364,12 @@
                                     }
                                 </select>
                             </div>
+                        </div>
+                        <!-- Filter scope display VFO A — sits between band buttons and AGC column -->
+                        <div class="flex-shrink-0" id="filterScopeContainerA" style="width:160px;">
+                            <canvas id="filterScopeCanvasA" role="img" aria-hidden="true"
+                                    aria-label="VFO A filter display" data-a11y-key="filter.scopeA"
+                                    style="display:block; height:80px; border-radius:4px;"></canvas>
                         </div>
                         <!-- Right: Controls column (2-column grid) -->
                         <div class="vfo-controls-column">
@@ -561,7 +567,7 @@
                                title="VFO A IF shift"
                                min="-1000" max="1000" step="20" value="@Model.RadioState.IfShiftA"
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
-                               oninput="document.getElementById('ifShiftValueA').textContent = this.value">
+                               oninput="document.getElementById('ifShiftValueA').textContent = this.value; if(window.filterScopePanelA) window.filterScopePanelA.setState({ifShiftHz: parseInt(this.value)||0})">
                         <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                                 onclick="resetIfShift('A')" title="Zero IF Shift">Zero</button>
                     </div>
@@ -638,6 +644,12 @@
                                     }
                                 </select>
                             </div>
+                        </div>
+                        <!-- Filter scope display VFO B — sits between band buttons and AGC column -->
+                        <div class="flex-shrink-0" id="filterScopeContainerB" style="width:160px;">
+                            <canvas id="filterScopeCanvasB" role="img" aria-hidden="true"
+                                    aria-label="VFO B filter display" data-a11y-key="filter.scopeB"
+                                    style="display:block; height:80px; border-radius:4px;"></canvas>
                         </div>
                         <!-- Right: Controls column (2-column grid) -->
                         <div class="vfo-controls-column">
@@ -835,7 +847,7 @@
                                title="VFO B IF shift"
                                min="-1000" max="1000" step="20" value="@Model.RadioState.IfShiftB"
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
-                               oninput="document.getElementById('ifShiftValueB').textContent = this.value">
+                               oninput="document.getElementById('ifShiftValueB').textContent = this.value; if(window.filterScopePanelB) window.filterScopePanelB.setState({ifShiftHz: parseInt(this.value)||0})">
                         <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                                 onclick="resetIfShift('B')" title="Zero IF Shift">Zero</button>
                     </div>
@@ -965,6 +977,7 @@
         import { FTdx101Meters }        from "/js/orchestrators/FTdx101Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
+        import { FilterScopePanel }    from "/js/ui/filter-scope-panel.js?v=1";
         import { BAND_PLANS, getSegments } from "/js/ui/band-plan.js?v=1";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
@@ -1022,6 +1035,32 @@
 
             spectrumPipeline.connect();
             window.spectrumPanel = spectrumPanel;
+
+            // ── Filter scope panels ──────────────────────────────────────────
+            window.filterScopePanelA = new FilterScopePanel('filterScopeCanvasA', '@Model.RadioModel', {
+                ifWidthCode:       '@Model.RadioState.IfWidthA',
+                ifShiftHz:          @Model.RadioState.IfShiftA,
+                roofingCode:       '@Model.RadioState.RoofingFilterA',
+                manualNotchOn:      @(Model.RadioState.ManualNotchA == "1" ? "true" : "false"),
+                manualNotchFreqHz:  800,
+                contourOn:          @(Model.RadioState.ContourOnA ? "true" : "false"),
+                contourFreqHz:      @Model.RadioState.ContourFreqA,
+                apfOn:              @(Model.RadioState.ApfOnA ? "true" : "false"),
+                apfFreqHz:          @Model.RadioState.ApfFreqA,
+                mode:              '@Model.RadioState.ModeA'
+            });
+            window.filterScopePanelB = new FilterScopePanel('filterScopeCanvasB', '@Model.RadioModel', {
+                ifWidthCode:       '@Model.RadioState.IfWidthB',
+                ifShiftHz:          @Model.RadioState.IfShiftB,
+                roofingCode:       '@Model.RadioState.RoofingFilterB',
+                manualNotchOn:      @(Model.RadioState.ManualNotchB == "1" ? "true" : "false"),
+                manualNotchFreqHz:  800,
+                contourOn:          @(Model.RadioState.ContourOnB ? "true" : "false"),
+                contourFreqHz:      @Model.RadioState.ContourFreqB,
+                apfOn:              @(Model.RadioState.ApfOnB ? "true" : "false"),
+                apfFreqHz:          @Model.RadioState.ApfFreqB,
+                mode:              '@Model.RadioState.ModeB'
+            });
 
             // Span selector — POST new sample rate and restart the SDR stream.
             document.querySelectorAll('.span-btn').forEach(btn => {

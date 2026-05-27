@@ -1,0 +1,271 @@
+// filter-scope-panel.js — Filter Function Display canvas renderer
+// Shows DSP filter passband shape, roofing filter outline, notch, contour, and APF markers.
+// Pure computation from CAT state — no actual signal content.
+
+// IF Width code → Hz per radio model (mirrors ifWidthOptions in Index.cshtml)
+const IF_WIDTH_TABLES = {
+    'FTdx101MP': { '0':200,'1':400,'2':600,'3':850,'4':1200,'5':1400,'6':1800,'7':2400,'8':3000 },
+    'FTdx101D':  { '0':200,'1':400,'2':600,'3':850,'4':1200,'5':1400,'6':1800,'7':2400,'8':3000 },
+    'FTdx10':    { '0':400,'1':600,'2':800,'3':1000,'4':1200,'5':1400,'6':1600,'7':1800,
+                   '8':2000,'9':2200,'10':2400,'11':2600,'12':2800,'13':3000,'14':3200,'15':3400 },
+    'FT-710':    { '0':300,'2':600,'3':850,'5':1200,'7':1650,'9':1950,'12':2400,'16':2700,
+                   '19':3000,'20':3200,'21':3500,'22':4000 },
+    'FTDX3000':  { '1':200,'2':400,'3':600,'4':850,'6':1350,'7':1500,'9':1800,'12':2200,
+                   '14':2400,'16':2600,'18':2800,'20':3000,'22':3400,'25':4000 },
+};
+
+// Roofing filter code → Hz (FTdx101MP/D)
+const ROOFING_HZ = { '6':12000,'7':3000,'8':1200,'9':600,'A':300,'a':300 };
+
+// FTDX3000 roofing filter codes 0-5
+const ROOFING_HZ_3000 = { '0':15000,'1':6000,'2':3000,'3':600,'4':300,'5':150 };
+
+export class FilterScopePanel {
+    constructor(canvasId, radioModel, initialState = {}) {
+        this._canvasId  = canvasId;
+        this._model     = radioModel || 'FTdx101MP';
+        this._widthTable = IF_WIDTH_TABLES[this._model] || IF_WIDTH_TABLES['FTdx101MP'];
+        this._resizeObserver = null;
+
+        this._state = {
+            ifWidthCode:      '8',
+            ifShiftHz:        0,
+            roofingCode:      '',
+            manualNotchOn:    false,
+            manualNotchFreqHz: 800,
+            contourOn:        false,
+            contourFreqHz:    800,
+            apfOn:            false,
+            apfFreqHz:        0,
+            mode:             'USB',
+            ...initialState
+        };
+
+        this._init();
+    }
+
+    setState(updates) {
+        Object.assign(this._state, updates);
+        this._render();
+    }
+
+    _init() {
+        const canvas = document.getElementById(this._canvasId);
+        if (!canvas) return;
+        this._sizeCanvas(canvas);
+        this._resizeObserver = new ResizeObserver(() => {
+            this._sizeCanvas(canvas);
+        });
+        this._resizeObserver.observe(canvas.parentElement ?? canvas);
+        this._startAnimation();
+    }
+
+    _startAnimation() {
+        let frameCount = 0;
+        const loop = () => {
+            this._animFrame = requestAnimationFrame(loop);
+            if (++frameCount % 3 === 0) this._render();  // ~20 fps
+        };
+        this._animFrame = requestAnimationFrame(loop);
+    }
+
+    _sizeCanvas(canvas) {
+        const w = 160;
+        canvas.width        = w;
+        canvas.height       = 80;
+        canvas.style.width  = w + 'px';
+        canvas.style.height = '80px';
+    }
+
+    // Returns the display range in Hz based on the current mode
+    _displayRangeHz() {
+        const mode = (this._state.mode || '').toUpperCase();
+        if (mode === 'AM' || mode === 'AM-N') return 6000;
+        if (mode === 'FM' || mode === 'FM-N' || mode === 'DATA-FM' || mode === 'DATA-FM-N') return 10000;
+        return 3500;
+    }
+
+    _hzToX(hz, W, rangeHz) {
+        return Math.round((hz / rangeHz) * W);
+    }
+
+    _ifWidthHz() {
+        const hz = this._widthTable[String(this._state.ifWidthCode)] || 3000;
+        const roofHz = this._roofingHz();
+        return roofHz !== null ? Math.min(hz, roofHz) : hz;
+    }
+
+    _roofingHz() {
+        if (this._model === 'FTDX3000') {
+            return ROOFING_HZ_3000[String(this._state.roofingCode)] || null;
+        }
+        return ROOFING_HZ[String(this._state.roofingCode)] || null;
+    }
+
+    // Returns { lo, hi } passband edges in audio Hz
+    _passbandEdges(ifWidthHz) {
+        const mode = (this._state.mode || '').toUpperCase();
+        const shift = this._state.ifShiftHz || 0;
+        if (mode.startsWith('CW')) {
+            const centre = 700 + shift;
+            return { lo: centre - ifWidthHz / 2, hi: centre + ifWidthHz / 2 };
+        } else if (mode === 'AM' || mode === 'AM-N') {
+            return { lo: 0, hi: ifWidthHz / 2 };
+        } else {
+            // SSB/Data: audio lower cutoff is ~300 Hz; IF Width extends upward from there
+            return { lo: 300 + shift, hi: 300 + shift + ifWidthHz };
+        }
+    }
+
+    _render() {
+        const canvas = document.getElementById(this._canvasId);
+        if (!canvas) return;
+        const ctx    = canvas.getContext('2d');
+        const W      = canvas.width;
+        const H      = canvas.height;
+        const rangeHz = this._displayRangeHz();
+        const axisH  = 14;   // pixels reserved for frequency axis at bottom
+        const scopeH = H - axisH;
+
+        // --- Background ---
+        ctx.fillStyle = '#1e2a38';
+        ctx.fillRect(0, 0, W, H);
+
+        const x = hz => this._hzToX(hz, W, rangeHz);
+
+        // --- Passband (trapezoid with sloped sides) ---
+        const ifWidthHz = this._ifWidthHz();
+        const { lo: pbLo, hi: pbHi } = this._passbandEdges(ifWidthHz);
+        const pxLo    = x(pbLo);
+        const pxHi    = x(pbHi);
+        const pbTop   = Math.round(scopeH * 0.05);
+        const pbBot   = scopeH;
+        const slopeW  = Math.max(6, Math.round((pxHi - pxLo) * 0.08));
+
+        // Trapezoid path: wider at bottom, narrower at top (filter roll-off shape)
+        const trapPath = () => {
+            ctx.beginPath();
+            ctx.moveTo(pxLo,           pbBot);
+            ctx.lineTo(pxHi,           pbBot);
+            ctx.lineTo(pxHi - slopeW,  pbTop);
+            ctx.lineTo(pxLo + slopeW,  pbTop);
+            ctx.closePath();
+        };
+
+        // Subtle fill inside the trapezoid
+        trapPath();
+        ctx.fillStyle = 'rgba(74,138,191,0.10)';
+        ctx.fill();
+
+        // Clip to trapezoid, then draw animated signal bars inside it
+        ctx.save();
+        trapPath();
+        ctx.clip();
+
+        const barW    = 2;
+        const maxBarH = Math.floor((pbBot - pbTop) * 0.85);
+        const barBase = pbBot - 1;
+        for (let bx = pxLo; bx <= pxHi; bx += barW) {
+            const nh = Math.random();
+            const bh = Math.max(2, Math.round(nh * maxBarH));
+            ctx.fillStyle = `rgba(80,210,80,${(0.4 + nh * 0.5).toFixed(2)})`;
+            ctx.fillRect(bx, barBase - bh, barW - 1, bh);
+        }
+
+        ctx.restore();
+
+        // Red trapezoid border — all sides
+        trapPath();
+        ctx.strokeStyle = '#e83535';
+        ctx.lineWidth   = 1.5;
+        ctx.stroke();
+
+        // --- Manual notch ---
+        if (this._state.manualNotchOn) {
+            const nFreq = this._state.manualNotchFreqHz || 800;
+            const nPx   = x(nFreq);
+            const notchW = Math.max(2, Math.round(W * 0.008));
+            ctx.fillStyle = 'rgba(0,0,0,0.75)';
+            ctx.fillRect(nPx - notchW, pbTop, notchW * 2, pbBot - pbTop);
+            ctx.strokeStyle = 'rgba(180,180,180,0.5)';
+            ctx.lineWidth   = 1;
+            ctx.beginPath();
+            ctx.moveTo(nPx + 0.5, pbTop);
+            ctx.lineTo(nPx + 0.5, pbBot);
+            ctx.stroke();
+        }
+
+        // --- Contour marker (downward arrow on top edge, like FTdx101MP display) ---
+        if (this._state.contourOn) {
+            const cPx = x(this._state.contourFreqHz || 800);
+            const aW  = 5;   // half-width of arrowhead base
+            const aH  = 7;   // height of arrowhead
+            ctx.fillStyle   = '#ffffff';
+            ctx.strokeStyle = '#aaaaaa';
+            ctx.lineWidth   = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(cPx,      pbTop + aH);  // tip — pointing down into passband
+            ctx.lineTo(cPx - aW, pbTop - 1);   // base left — sits above top edge
+            ctx.lineTo(cPx + aW, pbTop - 1);   // base right
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // --- APF marker ---
+        if (this._state.apfOn) {
+            const mode    = (this._state.mode || '').toUpperCase();
+            const cwCentre = 700 + (this._state.ifShiftHz || 0);
+            const apfPx   = x(cwCentre + (this._state.apfFreqHz || 0));
+            const peakHalf = Math.max(3, Math.round(W * 0.015));
+            ctx.fillStyle = 'rgba(0,229,204,0.7)';
+            ctx.beginPath();
+            ctx.moveTo(apfPx, pbTop + 4);
+            ctx.lineTo(apfPx - peakHalf, pbBot - 4);
+            ctx.lineTo(apfPx + peakHalf, pbBot - 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#00e5cc';
+            ctx.lineWidth   = 1;
+            ctx.stroke();
+        }
+
+        // --- IF shift arrow at top ---
+        const shift = this._state.ifShiftHz || 0;
+        if (Math.abs(shift) > 50) {
+            const arrowX = x(1500 + shift);
+            const dir    = shift > 0 ? 1 : -1;
+            const aSize  = 5;
+            ctx.fillStyle = 'rgba(200,220,255,0.8)';
+            ctx.beginPath();
+            ctx.moveTo(arrowX + dir * aSize, 4);
+            ctx.lineTo(arrowX - dir * aSize, 4 - aSize);
+            ctx.lineTo(arrowX - dir * aSize, 4 + aSize);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // --- Grid lines ---
+        ctx.strokeStyle = 'rgba(100,120,140,0.3)';
+        ctx.lineWidth   = 0.5;
+        const step = rangeHz <= 4000 ? 500 : rangeHz <= 7000 ? 1000 : 2000;
+        for (let hz = step; hz < rangeHz; hz += step) {
+            const gx = x(hz) + 0.5;
+            ctx.beginPath();
+            ctx.moveTo(gx, 0);
+            ctx.lineTo(gx, scopeH);
+            ctx.stroke();
+        }
+
+        // --- Frequency axis ---
+        ctx.fillStyle = '#8899aa';
+        ctx.font      = '9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        for (let hz = 0; hz <= rangeHz; hz += step) {
+            const lx  = x(hz);
+            const lbl = hz >= 1000 ? (hz / 1000) + 'k' : hz === 0 ? '0' : hz + '';
+            ctx.fillText(lbl, lx, H - 1);
+        }
+    }
+}

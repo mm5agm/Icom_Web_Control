@@ -781,9 +781,11 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ModeA") {
         updateModeSelect('A', update.value);
         updateMicGainLabel(update.value);
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ mode: update.value });
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ mode: update.value });
     }
 
     // --- PROC ---
@@ -885,10 +887,12 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "RoofingFilterA") {
         const selectEl = document.getElementById('roofingFilterSelectA');
         if (selectEl) selectEl.value = update.value;
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ roofingCode: update.value });
     }
     if (update.property === "RoofingFilterB") {
         const selectEl = document.getElementById('roofingFilterSelectB');
         if (selectEl) selectEl.value = update.value;
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ roofingCode: update.value });
     }
 
     // --- AGC ---
@@ -937,10 +941,12 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ManualNotchFreqA") {
         const el = document.getElementById('manualNotchFreqA');
         if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueA').textContent = update.value + ' Hz'; }
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ manualNotchFreqHz: parseInt(update.value) || 800 });
     }
     if (update.property === "ManualNotchFreqB") {
         const el = document.getElementById('manualNotchFreqB');
         if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueB').textContent = update.value + ' Hz'; }
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ manualNotchFreqHz: parseInt(update.value) || 800 });
     }
 
     // --- NOISE BLANKER ---
@@ -967,10 +973,12 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "IfWidthA") {
         const el = document.getElementById('ifWidthSelectA');
         if (el) el.value = update.value;
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifWidthCode: update.value });
     }
     if (update.property === "IfWidthB") {
         const el = document.getElementById('ifWidthSelectB');
         if (el) el.value = update.value;
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifWidthCode: update.value });
     }
 
     // --- IF SHIFT ---
@@ -979,12 +987,14 @@ connection.on("RadioStateUpdate", function (update) {
         const label = document.getElementById('ifShiftValueA');
         if (slider) slider.value = update.value;
         if (label) label.textContent = update.value;
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifShiftHz: parseInt(update.value) || 0 });
     }
     if (update.property === "IfShiftB" && !ifShiftDragging.B) {
         const slider = document.getElementById('ifShiftSliderB');
         const label = document.getElementById('ifShiftValueB');
         if (slider) slider.value = update.value;
         if (label) label.textContent = update.value;
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifShiftHz: parseInt(update.value) || 0 });
     }
 
     // --- CLARIFIER ---
@@ -1021,10 +1031,12 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ContourOnA") {
         contourState.A.on = update.value === true || update.value === 'true' || update.value === 1;
         _updateContourBtn('A');
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ contourOn: contourState.A.on });
     }
     if (update.property === "ContourOnB") {
         contourState.B.on = update.value === true || update.value === 'true' || update.value === 1;
         _updateContourBtn('B');
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ contourOn: contourState.B.on });
     }
     if (update.property === "ContourFreqA") {
         contourState.A.freqHz = parseInt(update.value) || 800;
@@ -1032,6 +1044,7 @@ connection.on("RadioStateUpdate", function (update) {
         const label  = document.getElementById('contourFreqValueA');
         if (slider) slider.value = contourState.A.freqHz;
         if (label)  label.textContent = contourState.A.freqHz + ' Hz';
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ contourFreqHz: contourState.A.freqHz });
     }
     if (update.property === "ContourFreqB") {
         contourState.B.freqHz = parseInt(update.value) || 800;
@@ -1039,16 +1052,19 @@ connection.on("RadioStateUpdate", function (update) {
         const label  = document.getElementById('contourFreqValueB');
         if (slider) slider.value = contourState.B.freqHz;
         if (label)  label.textContent = contourState.B.freqHz + ' Hz';
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ contourFreqHz: contourState.B.freqHz });
     }
 
     // --- APF ---
     if (update.property === "ApfOnA") {
         apfState.A.on = update.value === true || update.value === 'true' || update.value === 1;
         _updateApfBtn('A');
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ apfOn: apfState.A.on });
     }
     if (update.property === "ApfOnB") {
         apfState.B.on = update.value === true || update.value === 'true' || update.value === 1;
         _updateApfBtn('B');
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfOn: apfState.B.on });
     }
     if (update.property === "ApfFreqA") {
         apfState.A.freqHz = parseInt(update.value) || 0;
@@ -1056,6 +1072,7 @@ connection.on("RadioStateUpdate", function (update) {
         const label  = document.getElementById('apfFreqValueA');
         if (slider) slider.value = apfState.A.freqHz;
         if (label)  label.textContent = apfState.A.freqHz + ' Hz';
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ apfFreqHz: apfState.A.freqHz });
     }
     if (update.property === "ApfFreqB") {
         apfState.B.freqHz = parseInt(update.value) || 0;
@@ -1063,16 +1080,19 @@ connection.on("RadioStateUpdate", function (update) {
         const label  = document.getElementById('apfFreqValueB');
         if (slider) slider.value = apfState.B.freqHz;
         if (label)  label.textContent = apfState.B.freqHz + ' Hz';
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfFreqHz: apfState.B.freqHz });
     }
 
     // --- MANUAL NOTCH ---
     if (update.property === "ManualNotchA") {
         const el = document.getElementById('manualNotchSelectA');
         if (el) el.value = update.value;
+        if (window.filterScopePanelA) window.filterScopePanelA.setState({ manualNotchOn: update.value === '1' });
     }
     if (update.property === "ManualNotchB") {
         const el = document.getElementById('manualNotchSelectB');
         if (el) el.value = update.value;
+        if (window.filterScopePanelB) window.filterScopePanelB.setState({ manualNotchOn: update.value === '1' });
     }
 
     // --- AF GAIN ---

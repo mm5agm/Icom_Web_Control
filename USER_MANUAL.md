@@ -290,6 +290,15 @@ LSB, USB, CW-U, CW-L, FM, FM-N, AM, AM-N, RTTY-L, RTTY-U, DATA-L, DATA-U, DATA-F
 
 All of these settings are restored to the radio when the app starts.
 
+**Filter Function Display** — A compact real-time display positioned alongside the band buttons, between the band button column and the receiver controls column. It shows the shape of the active DSP filter passband, matching the style of the filter scope on the FTdx101MP front panel.
+
+- The **red-bordered trapezoid** represents the active passband. The sloped sides reflect the filter roll-off characteristic at the passband edges.
+- **Green animated bars** inside the trapezoid represent signals passing through the filter. No signals are shown outside the passband, making it immediately clear which audio frequencies are being received.
+- **Passband width** reflects the current IF Width setting, automatically constrained by the selected Roofing Filter if it is narrower than the DSP setting.
+- **Passband position** shifts left or right as the IF Shift slider is adjusted — the display updates live while dragging the slider.
+- A **white downward arrow** appears on the top edge of the passband when the Contour filter is active, indicating the contour centre frequency. It moves as the contour frequency slider is adjusted.
+- The display updates automatically whenever any filter parameter changes, whether adjusted from the browser or from the radio's front panel.
+
 ---
 
 ### 5.8 IF Width, IF Shift, and AF Gain
