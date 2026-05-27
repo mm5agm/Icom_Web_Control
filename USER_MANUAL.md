@@ -363,7 +363,12 @@ The last segment you used on each band is remembered, so when you return to a ba
 
 **Radio POWER button** — Turns the radio on or off. The button shows green (on) or red (off).
 
-**Connect button** — Manually connects or disconnects the CAT serial link to the radio. Shown as **Connect** (grey) when disconnected and **Disconnect** (green) when connected. Useful if the radio was powered on after the app started, or after a USB cable was unplugged and re-plugged. On reconnect the app re-reads all radio settings so the controls reflect the current radio state.
+**Connect button** — Manually connects or disconnects the CAT serial link to the radio. The button reflects the actual serial port state when the page loads:
+
+- **Connected** (green) — the serial port is open and the radio is communicating
+- **Disconnected** (red) — the serial port is closed or the radio is not responding
+
+Click the button to toggle the connection. While connecting, it briefly shows "Connecting…". On reconnect the app re-reads all radio settings so the controls reflect the current radio state. Useful if the radio was powered on after the app started, or after a USB cable was unplugged and re-plugged.
 
 **ATU button** — Initiates an ATU (Automatic Tuner Unit) tune cycle. Labelled **ATU: On** (green) when the ATU is active or **ATU: Off** (grey) when bypassed. Clicking the button when active triggers a fresh tune cycle; clicking when inactive activates the ATU. Only applies to radios fitted with an internal or external ATU.
 
