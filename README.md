@@ -18,6 +18,9 @@ This is a continuation of my FTdx101_WebApp with more Yaesu transceivers added a
 ## Main Page
 ![Yaesu Web Control Main Page](pictures/DevelopScreen.png)
 
+## VOX, CW and FM Repeater Panels
+![VOX, CW Keyer and FM Repeater panels open simultaneously](pictures/Screen popups.png)
+
 ## Calibration Page
 ![Calibration Page](pictures/Calibration.png)
 

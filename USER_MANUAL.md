@@ -390,6 +390,10 @@ Click the button to toggle the connection. While connecting, it briefly shows "C
 
 **FM Rep button** — Opens the **FM Repeater** panel. See Section 5.13.
 
+All three panels can be open at the same time and can be dragged anywhere on screen by their title bar.
+
+![VOX, CW Keyer and FM Repeater panels open simultaneously](pictures/Screen popups.png)
+
 **MIC Gain** — Drag the slider to set the microphone gain (0–100). The value is sent to the radio as you release.
 
 **PROC** — Speech processor toggle. Shows **Proc On** (green) or **Proc Off** (grey).
