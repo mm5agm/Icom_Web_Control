@@ -772,6 +772,31 @@ fieldset.calibration-card {
     margin-top: 8px !important; /* Minimal gap to visually group with Raw Power Out */
 }
 
+/* ── VOX / CW / FM Repeater floating panels ─────────────────────────────── */
+/* Non-modal: all three can be open simultaneously, positioned across the top */
+#voxDialog {
+    position: fixed;
+    top: 80px;
+    left: 5%;
+    z-index: 1050;
+    margin: 0;
+}
+#cwDialog {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1050;
+    margin: 0;
+}
+#fmDialog {
+    position: fixed;
+    top: 80px;
+    right: 5%;
+    z-index: 1050;
+    margin: 0;
+}
+
 /* ── Frequency Keyboard Dialog ──────────────────────────────────────────── */
 
 .fkb-dialog {

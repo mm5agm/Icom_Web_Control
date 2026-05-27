@@ -312,15 +312,15 @@
                                 class="btn btn-sm ms-2 @(Model.VoxOn ? "btn-warning" : "btn-outline-secondary")"
                                 aria-label="VOX controls"
                                 title="Open VOX controls panel"
-                                onclick="document.getElementById('voxDialog').showModal()">VOX</button>
+                                onclick="document.getElementById('voxDialog').show()">VOX</button>
                         <button class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="CW keyer controls"
                                 title="Open CW keyer controls panel"
-                                onclick="document.getElementById('cwDialog').showModal()">CW</button>
+                                onclick="document.getElementById('cwDialog').show()">CW</button>
                         <button class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="FM repeater controls"
                                 title="Open FM repeater controls panel"
-                                onclick="document.getElementById('fmDialog').showModal()">FM Rep</button>
+                                onclick="document.getElementById('fmDialog').show()">FM Rep</button>
                     </div>
 
                 </div>
@@ -1039,7 +1039,7 @@
 </dialog>
 
 <!-- VOX Dialog -->
-<dialog id="voxDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:280px;" aria-labelledby="voxDialogTitle" aria-modal="true">
+<dialog id="voxDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:280px;" aria-labelledby="voxDialogTitle">
     <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
         <strong id="voxDialogTitle">VOX Controls</strong>
         <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('voxDialog').close()" aria-label="Close">✕</button>
@@ -1079,7 +1079,7 @@
 </dialog>
 
 <!-- FM Repeater Dialog -->
-<dialog id="fmDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:300px;" aria-labelledby="fmDialogTitle" aria-modal="true">
+<dialog id="fmDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:300px;" aria-labelledby="fmDialogTitle">
     <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
         <strong id="fmDialogTitle">FM Repeater</strong>
         <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('fmDialog').close()" aria-label="Close">✕</button>
@@ -1132,7 +1132,7 @@
 </dialog>
 
 <!-- CW Keyer Dialog -->
-<dialog id="cwDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:320px;" aria-labelledby="cwDialogTitle" aria-modal="true">
+<dialog id="cwDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:320px;" aria-labelledby="cwDialogTitle">
     <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
         <strong id="cwDialogTitle">CW Keyer</strong>
         <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cwDialog').close()" aria-label="Close">✕</button>
