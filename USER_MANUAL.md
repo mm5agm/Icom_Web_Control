@@ -326,7 +326,7 @@ All of these settings are read from the radio when the app connects.
 
 ### 5.8 IF Width, IF Low Cut, IF Shift, and AF Gain
 
-**IF Width** — Sets the DSP filter bandwidth. Options: 200 Hz, 400 Hz, 600 Hz, 850 Hz, 1.2 kHz, 1.4 kHz, 1.8 kHz, 2.4 kHz, 3.0 kHz. This setting is persisted and restored on startup.
+**IF Width** — Sets the DSP filter bandwidth. The available widths and the number of steps depend on the radio model — the FTdx101MP/D and FTdx10 have 22 steps from 300 Hz to ~3.2 kHz, the FT-710 has 12 steps from 300 Hz to 4 kHz, and the FTDX3000 has 14 steps from 200 Hz to 4 kHz. The first entry in the dropdown ("3.0 kHz" on FTdx101 and FTdx10) is the radio's mode-dependent default — in SSB this is whatever bandwidth the selected roofing filter allows. The current width is read from the radio on connect; selecting a new value sends it immediately.
 
 **IF Low Cut** — Sets the lower edge of the DSP passband (SL command). Options: OFF, 100 Hz, 200 Hz, 300 Hz, 400 Hz, 500 Hz, 600 Hz, 700 Hz, 800 Hz, 900 Hz, 1.0 kHz, 1.1 kHz. Use this to cut low-frequency audio or interference — for example, 300 Hz in SSB to reduce hum and LF splatter. This setting is independent per VFO.
 
