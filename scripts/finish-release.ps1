@@ -25,12 +25,25 @@ if ($branch -ne "develop") {
 
 if (-not $Version.StartsWith('v')) { $Version = "v$Version" }
 
-# 1. Commit any pending changes on develop
-$pending = git status --porcelain
+# 1. Commit any pending changes on develop.
+# Use `git add -u` (not `git add .`) so we only stage modifications to ALREADY
+# tracked files. This stops the script accidentally committing untracked
+# build artefacts like Yaesu_Web_Control_Setup.exe (which the .gitignore
+# correctly excludes but `git add .` would override).
+# If you genuinely want new files in the release, stage them manually before
+# running this script.
+$pending = git status --porcelain --untracked-files=no
 if ($pending) {
-    Write-Host "Committing pending changes on develop..." -ForegroundColor Yellow
-    git add .
+    Write-Host "Committing pending tracked changes on develop..." -ForegroundColor Yellow
+    git add -u
     git commit -m "Pre-release: pending changes for $Version"
+}
+
+# Warn if untracked files are present but do not stage them.
+$untracked = git ls-files --others --exclude-standard
+if ($untracked) {
+    Write-Host "Note: ignoring untracked files (not committed):" -ForegroundColor DarkYellow
+    $untracked | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkYellow }
 }
 
 # 2. Push develop
