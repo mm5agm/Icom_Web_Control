@@ -172,13 +172,15 @@ namespace Yaesu_Web_Control.Services
                     stateTasks.Add(multiplexer.SendCommandAsync($"AN1{persistedState.AntennaB};", "Initialization", stoppingToken)
                         .ContinueWith(t => { if (!t.IsFaulted) radioStateService.AntennaB = persistedState.AntennaB; }));
                 }
-                // Restore AF Gain
-                if (persistedState.AfGainA >= 0 && persistedState.AfGainA <= 255)
+                // Restore AF Gain — only if the user previously saved a non-zero value.
+                // 0 is the int default (never saved), so sending AG0000; on every fresh start
+                // would silence the radio.
+                if (persistedState.AfGainA > 0 && persistedState.AfGainA <= 255)
                 {
                     stateTasks.Add(multiplexer.SendCommandAsync($"AG0{persistedState.AfGainA:D3};", "Initialization", stoppingToken)
                         .ContinueWith(t => { if (!t.IsFaulted) radioStateService.AfGainA = persistedState.AfGainA; }));
                 }
-                if (persistedState.AfGainB >= 0 && persistedState.AfGainB <= 255)
+                if (persistedState.AfGainB > 0 && persistedState.AfGainB <= 255)
                 {
                     stateTasks.Add(multiplexer.SendCommandAsync($"AG1{persistedState.AfGainB:D3};", "Initialization", stoppingToken)
                         .ContinueWith(t => { if (!t.IsFaulted) radioStateService.AfGainB = persistedState.AfGainB; }));
@@ -200,17 +202,7 @@ namespace Yaesu_Web_Control.Services
                     stateTasks.Add(multiplexer.SendCommandAsync($"PL{persistedState.ProcLevel:D3};", "Initialization", stoppingToken)
                         .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ProcLevel = persistedState.ProcLevel; }));
                 }
-                // Restore IF Width
-                if (!string.IsNullOrEmpty(persistedState.IfWidthA))
-                {
-                    stateTasks.Add(multiplexer.SendCommandAsync($"SH00{int.Parse(persistedState.IfWidthA):D2};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.IfWidthA = persistedState.IfWidthA; }));
-                }
-                if (!string.IsNullOrEmpty(persistedState.IfWidthB))
-                {
-                    stateTasks.Add(multiplexer.SendCommandAsync($"SH10{int.Parse(persistedState.IfWidthB):D2};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.IfWidthB = persistedState.IfWidthB; }));
-                }
+                // IF Width is read from the radio on connect (SH queries after stateTasks) — not written here.
                 // Restore IF Shift
                 {
                     var signA = persistedState.IfShiftA >= 0 ? '+' : '-';
@@ -297,6 +289,50 @@ namespace Yaesu_Web_Control.Services
                     await multiplexer.SendCommandAsync("CF011;", "Initialization", stoppingToken);
                 }
 
+                // Read actual radio state — all dispatcher-handled commands.
+                // These overwrite any defaults or persisted values with what the radio actually has.
+                var readQueries = new[]
+                {
+                    // IF / filter
+                    "SH00;", "SH10;",       // IF Width A/B
+                    // Receive controls A
+                    "GT0;",                  // AGC A
+                    "PA0;",                  // IPO/AMP A
+                    "RA0;",                  // Attenuator A
+                    "NR0;",                  // Noise Reduction A
+                    "NB0;",                  // Noise Blanker A
+                    "NL0;",                  // NB Level A
+                    "BC0;",                  // Auto Notch A
+                    // Receive controls B
+                    "GT1;",                  // AGC B
+                    "PA1;",                  // IPO/AMP B
+                    "RA1;",                  // Attenuator B
+                    "NR1;",                  // Noise Reduction B
+                    "NB1;",                  // Noise Blanker B
+                    "NL1;",                  // NB Level B
+                    "BC1;",                  // Auto Notch B
+                    // RF Gain / Squelch
+                    "RG0;", "RG1;",
+                    "SQ0;", "SQ1;",
+                    // Audio / TX
+                    "AG0;", "AG1;",          // AF Gain A/B
+                    "MG;",                   // MIC Gain
+                    "PR;",                   // Speech Processor on/off
+                    "PL;",                   // Processor Level
+                    "ML0;", "ML1;",          // Monitor on/off / level
+                    // CW
+                    "KP;",                   // CW Pitch
+                    "KS;",                   // CW Speed
+                    "BI;",                   // CW Break-in mode
+                    "SD;",                   // CW Break-in delay
+                    // VOX
+                    "VX;",                   // VOX on/off
+                    "VG;",                   // VOX Gain
+                    "VD;",                   // VOX Delay
+                };
+                foreach (var q in readQueries)
+                    await multiplexer.SendCommandAsync(q, "Initialization", stoppingToken);
+
                 // 5. Set IsInitialized = true FIRST to allow property changes to be persisted and broadcast
                 radioStateService.IsInitialized = true;
 
@@ -312,6 +348,35 @@ namespace Yaesu_Web_Control.Services
 
                 // 6. Enable auto information
                 await multiplexer.EnableAutoInformationAsync();
+
+                // 7. Configure USB audio for DATA modes if the user has opted in.
+                // Sends EX commands to override the radio's factory default (rear DATA connector).
+                if (settings.UseUsbAudioForDataModes)
+                {
+                    logger.LogInformation("[RadioInitializationService] Configuring USB audio for DATA modes (radio model: {Model})", settings.RadioModel);
+                    switch (settings.RadioModel)
+                    {
+                        case "FTdx101MP":
+                        case "FTdx101D":
+                            // DATA MOD SOURCE = REAR (1), then REAR SELECT = USB (1)
+                            await multiplexer.SendCommandAsync("EX0104151;", "Initialization", stoppingToken);
+                            await multiplexer.SendCommandAsync("EX0104161;", "Initialization", stoppingToken);
+                            break;
+                        case "FT-710":
+                            // DATA MOD SOURCE = REAR (1), then REAR SELECT = USB (1)
+                            await multiplexer.SendCommandAsync("EX0104131;", "Initialization", stoppingToken);
+                            await multiplexer.SendCommandAsync("EX0104141;", "Initialization", stoppingToken);
+                            break;
+                        case "FTdx10":
+                            // Single MOD SOURCE setting: 1 = USB direct
+                            await multiplexer.SendCommandAsync("EX0104141;", "Initialization", stoppingToken);
+                            break;
+                        case "FTDX3000":
+                            // Menu 075 DATA IN SELECT: 1 = USB
+                            await multiplexer.SendCommandAsync("EX0751;", "Initialization", stoppingToken);
+                            break;
+                    }
+                }
 
                 logger.LogInformation("[RadioInitializationService] ✓ Radio connected, initialized, and Auto Information streaming enabled");
                 radioStateService.IsConnected = true;

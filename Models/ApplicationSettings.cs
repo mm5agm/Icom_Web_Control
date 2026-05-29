@@ -47,6 +47,15 @@
         // CW keyer message memories M1-M5 (sent via KY command)
         public List<string> CwMessages { get; set; } = new() { "CQ CQ DE {CALL}", "TU 73", "QRZ?", "UR 5NN", "DE {CALL}" };
 
+        // Per-band IF Width/Shift/Mode memory — keyed by band name (e.g. "20m")
+        public Dictionary<string, BandProfile> BandProfilesA { get; set; } = new();
+        public Dictionary<string, BandProfile> BandProfilesB { get; set; } = new();
+
+        // When true, the app sends EX commands on connect to route DATA mode audio through USB
+        // rather than the rear DATA/ACC connector (the radio's factory default).
+        // Enable this if you use USB audio for digital modes (FT8, etc.) and have no rear connector wired.
+        public bool UseUsbAudioForDataModes { get; set; } = false;
+
         // Optional roofing filters installed in the radio (FTdx101MP/D only).
         // "6"=12kHz and "7"=3kHz are always fitted. "8"=1.2kHz, "9"=600Hz, "A"=300Hz are optional.
         // FTdx10 has fixed roofing filters and ignores this setting.
@@ -70,5 +79,21 @@
         public string IfWidthB { get; set; } = "8";
         public int IfShiftA { get; set; } = 0;
         public int IfShiftB { get; set; } = 0;
+
+        // RF Gain (read from radio on connect — default 255 = max gain)
+        public int RfGainA { get; set; } = 255;
+        public int RfGainB { get; set; } = 255;
+
+        // Squelch (read from radio on connect — default 0 = open)
+        public int SquelchA { get; set; } = 0;
+        public int SquelchB { get; set; } = 0;
+    }
+
+    // Stores per-band IF Width/Shift/Mode so they are restored when the operator returns to a band.
+    public class BandProfile
+    {
+        public string IfWidthCode { get; set; } = "";
+        public int IfShiftHz { get; set; } = 0;
+        public string Mode { get; set; } = "";
     }
 }

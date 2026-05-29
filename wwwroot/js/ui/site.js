@@ -788,10 +788,12 @@ connection.on("RadioStateUpdate", function (update) {
         updateModeSelect('A', update.value);
         updateMicGainLabel(update.value);
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ mode: update.value });
+        if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('A', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ mode: update.value });
+        if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('B', update.value);
     }
 
     // --- PROC ---
@@ -978,12 +980,18 @@ connection.on("RadioStateUpdate", function (update) {
     // --- IF WIDTH ---
     if (update.property === "IfWidthA") {
         const el = document.getElementById('ifWidthSelectA');
-        if (el) el.value = update.value;
+        if (el) {
+            const exists = Array.from(el.options).some(o => o.value === String(update.value));
+            if (exists) el.value = update.value;
+        }
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifWidthCode: update.value });
     }
     if (update.property === "IfWidthB") {
         const el = document.getElementById('ifWidthSelectB');
-        if (el) el.value = update.value;
+        if (el) {
+            const exists = Array.from(el.options).some(o => o.value === String(update.value));
+            if (exists) el.value = update.value;
+        }
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifWidthCode: update.value });
     }
 
@@ -1127,7 +1135,31 @@ connection.on("RadioStateUpdate", function (update) {
         if (el) el.value = update.value;
     }
 
-    // --- MONITOR LEVEL ---
+    // --- RF GAIN ---
+    if (update.property === "RfGainA") {
+        const s = document.getElementById('rfGainSliderA'); const l = document.getElementById('rfGainValueA');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+    if (update.property === "RfGainB") {
+        const s = document.getElementById('rfGainSliderB'); const l = document.getElementById('rfGainValueB');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+
+    // --- SQUELCH ---
+    if (update.property === "SquelchA") {
+        const s = document.getElementById('squelchSliderA'); const l = document.getElementById('squelchValueA');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+    if (update.property === "SquelchB") {
+        const s = document.getElementById('squelchSliderB'); const l = document.getElementById('squelchValueB');
+        if (s) s.value = update.value; if (l) l.textContent = update.value;
+    }
+
+    // --- MONITOR ON/OFF + LEVEL ---
+    if (update.property === "MonitorOn") {
+        const on = update.value === true || update.value === 'true';
+        if (typeof window._updateMonitorBtn === 'function') window._updateMonitorBtn(on);
+    }
     if (update.property === "MonitorLevelA") {
         const slider = document.getElementById('monLevelSlider');
         const label  = document.getElementById('monLevelValue');
@@ -1149,6 +1181,11 @@ connection.on("RadioStateUpdate", function (update) {
     }
 
     // --- CW ---
+    if (update.property === "CwPitch") {
+        const s = document.getElementById('cwPitchSlider'); const l = document.getElementById('cwPitchHz');
+        if (s) s.value = update.value;
+        if (l) l.textContent = (300 + parseInt(update.value) * 10) + ' Hz';
+    }
     if (update.property === "CwSpeed") {
         const s = document.getElementById('cwSpeedSlider'); const l = document.getElementById('cwSpeedValue');
         if (s) s.value = update.value; if (l) l.textContent = update.value;

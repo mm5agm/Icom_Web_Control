@@ -48,9 +48,11 @@ namespace Yaesu_Web_Control.Services
 
                     // Connection health tracking: only applies once the radio has been successfully
                     // initialised (IsConnected = true). Null responses mean no reply from the radio.
+                    // Don't count null responses toward disconnect while transmitting — the radio may
+                    // be too busy handling TX to answer CAT queries (hardware PTT in particular).
                     if (txResponse == null)
                     {
-                        if (_stateService.IsConnected)
+                        if (_stateService.IsConnected && !_stableIsTransmitting)
                         {
                             _consecutiveNullCount++;
                             if (_consecutiveNullCount >= DisconnectThreshold)
@@ -70,10 +72,12 @@ namespace Yaesu_Web_Control.Services
                         _txFalseCount = 0;
                         _stableIsTransmitting = true;
                     }
-                    else
+                    else if (txResponse != null)
                     {
+                        // Only count an explicit TX0 response toward the debounce — a null response
+                        // (radio busy / no reply) should not be treated as "not transmitting".
                         _txFalseCount++;
-                        if (_txFalseCount >= 2)
+                        if (_txFalseCount >= 5)
                             _stableIsTransmitting = false;
                     }
                     bool isTransmitting = _stableIsTransmitting;

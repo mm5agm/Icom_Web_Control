@@ -31,10 +31,14 @@
     var ifWidthOptions = isFtdx10
         ? new (string Value, string Label)[]
         {
-            ("0","400 Hz"), ("1","600 Hz"), ("2","800 Hz"), ("3","1.0 kHz"),
-            ("4","1.2 kHz"), ("5","1.4 kHz"), ("6","1.6 kHz"), ("7","1.8 kHz"),
-            ("8","2.0 kHz"), ("9","2.2 kHz"), ("10","2.4 kHz"), ("11","2.6 kHz"),
-            ("12","2.8 kHz"), ("13","3.0 kHz"), ("14","3.2 kHz"), ("15","3.4 kHz")
+            // FTdx10 SH codes: code 0 is the wide 3 kHz default; codes 1-22 run narrow→wide.
+            ("0","3.0 kHz"),
+            ("1","300 Hz"), ("2","400 Hz"), ("3","600 Hz"), ("4","850 Hz"),
+            ("5","1.1 kHz"), ("6","1.2 kHz"), ("7","1.5 kHz"), ("8","1.65 kHz"),
+            ("9","1.8 kHz"), ("10","1.95 kHz"), ("11","2.1 kHz"), ("12","2.25 kHz"),
+            ("13","2.4 kHz"), ("14","2.45 kHz"), ("15","2.5 kHz"), ("16","2.6 kHz"),
+            ("17","2.7 kHz"), ("18","2.8 kHz"), ("19","2.9 kHz"), ("20","3.2 kHz"),
+            ("21","3.5 kHz"), ("22","4.0 kHz")
         }
         : isFt710
         ? new (string Value, string Label)[]
@@ -57,8 +61,8 @@
             ("4","1.2 kHz"), ("5","1.4 kHz"), ("6","1.8 kHz"), ("7","2.4 kHz"),
             ("8","3.0 kHz")
         };
-    string ifWidthDefaultA = isFtdx10 ? "13" : isFt710 ? "12" : isFtdx3000 ? "14" : "8";
-    string ifWidthDefaultB = isFtdx10 ? "13" : isFt710 ? "12" : isFtdx3000 ? "14" : "8";
+    string ifWidthDefaultA = isFtdx10 ? "0" : isFt710 ? "12" : isFtdx3000 ? "14" : "8";
+    string ifWidthDefaultB = isFtdx10 ? "0" : isFt710 ? "12" : isFtdx3000 ? "14" : "8";
 
     // Roofing filter options: FTdx101MP/D only (FTdx10 and FT-710 have no CAT roofing filter control).
     // RF command codes 6-A, filtered to only fitted filters per Settings.
@@ -306,7 +310,12 @@
                                 aria-label="Antenna tuner"
                                 title="Toggle antenna tuner (ATU) on/off"
                                 onclick="toggleAtu()">@(Model.AtuEnabled ? "ATU On" : "ATU Off")</button>
-                        <label class="mb-0 text-nowrap ms-2">Mon: <span id="monLevelValue" class="fw-bold">@Model.MonitorLevelA</span></label>
+                        <button id="monitorOnBtn"
+                                class="btn btn-sm ms-2 @(Model.MonitorOn ? "btn-warning" : "btn-outline-secondary")"
+                                aria-label="TX monitor — currently @(Model.MonitorOn ? "on" : "off")"
+                                title="Toggle TX monitor / sidetone on/off"
+                                onclick="toggleMonitor()">Mon</button>
+                        <label class="mb-0 text-nowrap ms-1"><span id="monLevelValue" class="fw-bold">@Model.MonitorLevelA</span></label>
                         <input type="range" class="flex-shrink-0"
                                id="monLevelSlider"
                                aria-label="TX monitor / sidetone level"
@@ -531,6 +540,22 @@
                                        oninput="document.getElementById('manualNotchFreqValueA').textContent = this.value + ' Hz'; window.radioControl.setManualNotchFreq('A', this.value)">
                                 <span id="manualNotchFreqValueA" class="vfo-control-label" style="min-width: 52px; text-align: right;">1000 Hz</span>
                             </div>
+                            <div class="vfo-control-item" style="grid-column: 1 / -1;">
+                                <label class="vfo-control-label">RF Gain</label>
+                                <input type="range" id="rfGainSliderA" aria-label="VFO A RF gain" title="VFO A RF gain (0=min, 255=max)" min="0" max="255" step="1" value="@Model.RadioState.RfGainA"
+                                       style="flex: 1; height: 16px;"
+                                       oninput="document.getElementById('rfGainValueA').textContent = this.value"
+                                       onchange="setRfGain('A', this.value)">
+                                <span id="rfGainValueA" class="vfo-control-label" style="min-width: 36px; text-align: right;">@Model.RadioState.RfGainA</span>
+                            </div>
+                            <div class="vfo-control-item" id="squelchRowA" style="grid-column: 1 / -1; display:none;">
+                                <label class="vfo-control-label">Squelch</label>
+                                <input type="range" id="squelchSliderA" aria-label="VFO A squelch" title="VFO A squelch level (0=open, 255=max)" min="0" max="255" step="1" value="@Model.RadioState.SquelchA"
+                                       style="flex: 1; height: 16px;"
+                                       oninput="document.getElementById('squelchValueA').textContent = this.value"
+                                       onchange="setSquelch('A', this.value)">
+                                <span id="squelchValueA" class="vfo-control-label" style="min-width: 36px; text-align: right;">@Model.RadioState.SquelchA</span>
+                            </div>
                         </div>
                     </div>
 
@@ -610,12 +635,12 @@
                             }
                         </select>
                         }
-                        <label class="mb-0 text-nowrap ms-1 fw-bold">AF Gain: <span id="afGainValueA" class="fw-bold">0</span></label>
+                        <label class="mb-0 text-nowrap ms-1 fw-bold">AF Gain: <span id="afGainValueA" class="fw-bold">@Model.AfGainA</span></label>
                         <input type="range" class="flex-shrink-0"
                                id="afGainSliderA"
                                aria-label="VFO A AF gain"
                                title="VFO A AF gain"
-                               min="0" max="255" step="1" value="0"
+                               min="0" max="255" step="1" value="@Model.AfGainA"
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
                                oninput="document.getElementById('afGainValueA').innerText = this.value">
                     </div>
@@ -833,6 +858,22 @@
                                        oninput="document.getElementById('manualNotchFreqValueB').textContent = this.value + ' Hz'; window.radioControl.setManualNotchFreq('B', this.value)">
                                 <span id="manualNotchFreqValueB" class="vfo-control-label" style="min-width: 52px; text-align: right;">1000 Hz</span>
                             </div>
+                            <div class="vfo-control-item" style="grid-column: 1 / -1;">
+                                <label class="vfo-control-label">RF Gain</label>
+                                <input type="range" id="rfGainSliderB" aria-label="VFO B RF gain" title="VFO B RF gain (0=min, 255=max)" min="0" max="255" step="1" value="@Model.RadioState.RfGainB"
+                                       style="flex: 1; height: 16px;"
+                                       oninput="document.getElementById('rfGainValueB').textContent = this.value"
+                                       onchange="setRfGain('B', this.value)">
+                                <span id="rfGainValueB" class="vfo-control-label" style="min-width: 36px; text-align: right;">@Model.RadioState.RfGainB</span>
+                            </div>
+                            <div class="vfo-control-item" id="squelchRowB" style="grid-column: 1 / -1; display:none;">
+                                <label class="vfo-control-label">Squelch</label>
+                                <input type="range" id="squelchSliderB" aria-label="VFO B squelch" title="VFO B squelch level (0=open, 255=max)" min="0" max="255" step="1" value="@Model.RadioState.SquelchB"
+                                       style="flex: 1; height: 16px;"
+                                       oninput="document.getElementById('squelchValueB').textContent = this.value"
+                                       onchange="setSquelch('B', this.value)">
+                                <span id="squelchValueB" class="vfo-control-label" style="min-width: 36px; text-align: right;">@Model.RadioState.SquelchB</span>
+                            </div>
                         </div>
                     </div>
 
@@ -912,12 +953,12 @@
                             }
                         </select>
                         }
-                        <label class="mb-0 text-nowrap ms-1 fw-bold">AF Gain: <span id="afGainValueB" class="fw-bold">0</span></label>
+                        <label class="mb-0 text-nowrap ms-1 fw-bold">AF Gain: <span id="afGainValueB" class="fw-bold">@Model.AfGainB</span></label>
                         <input type="range" class="flex-shrink-0"
                                id="afGainSliderB"
                                aria-label="VFO B AF gain"
                                title="VFO B AF gain"
-                               min="0" max="255" step="1" value="0"
+                               min="0" max="255" step="1" value="@Model.AfGainB"
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
                                oninput="document.getElementById('afGainValueB').innerText = this.value">
                     </div>
@@ -1181,6 +1222,14 @@
                    oninput="document.getElementById('cwDelayValue').textContent = this.value"
                    onchange="setCwBreakInDelay(this.value)"
                    aria-label="CW break-in delay" title="Semi break-in delay in ms">
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:100px;">Pitch: <span id="cwPitchHz">@(300 + Model.CwPitch * 10)</span> Hz</label>
+            <input type="range" id="cwPitchSlider" min="0" max="75" step="1" value="@Model.CwPitch"
+                   style="flex:1; height:18px;"
+                   oninput="document.getElementById('cwPitchHz').textContent = (300 + parseInt(this.value) * 10) + ' Hz'"
+                   onchange="setCwPitch(this.value)"
+                   aria-label="CW pitch frequency" title="CW sidetone pitch (300–1050 Hz)">
         </div>
         <hr style="border-color:#444; margin:4px 0;">
         <div class="fw-bold small" style="color:#aaa;">Memory Keyer</div>
@@ -1569,7 +1618,26 @@
             btn.textContent = enabled ? 'ATU On' : 'ATU Off';
         }
 
-        // --- MONITOR LEVEL ---
+        // --- MONITOR ON/OFF + LEVEL ---
+        let _monitorOn = @(Model.MonitorOn ? "true" : "false");
+        function _updateMonitorBtn(on) {
+            const btn = document.getElementById('monitorOnBtn');
+            if (!btn) return;
+            btn.classList.toggle('btn-warning', on);
+            btn.classList.toggle('btn-outline-secondary', !on);
+            btn.setAttribute('aria-label', `TX monitor — currently ${on ? 'on' : 'off'}`);
+        }
+        async function toggleMonitor() {
+            const newOn = !_monitorOn;
+            _monitorOn = newOn;
+            _updateMonitorBtn(newOn);
+            try {
+                await fetch('/api/cat/monitoron', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ on: newOn })
+                });
+            } catch (e) { console.error('toggleMonitor error:', e); }
+        }
         async function setMonitorLevel(value) {
             try {
                 await fetch('/api/cat/monitorlevel/a', {
@@ -1587,6 +1655,31 @@
                     body: JSON.stringify({ level: parseInt(level) })
                 });
             } catch (e) { console.error('setNbLevel error:', e); }
+        }
+
+        // --- RF GAIN ---
+        async function setRfGain(receiver, value) {
+            try {
+                await fetch(`/api/cat/rfgain/${receiver.toLowerCase()}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: parseInt(value) })
+                });
+            } catch (e) { console.error('setRfGain error:', e); }
+        }
+
+        // --- SQUELCH ---
+        function _updateSquelchVisibility(vfo, mode) {
+            const isFm = mode === 'FM' || mode === 'FM-N' || mode === 'DATA-FM' || mode === 'DATA-FM-N';
+            const row = document.getElementById(`squelchRow${vfo}`);
+            if (row) row.style.display = isFm ? '' : 'none';
+        }
+        async function setSquelch(receiver, value) {
+            try {
+                await fetch(`/api/cat/squelch/${receiver.toLowerCase()}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: parseInt(value) })
+                });
+            } catch (e) { console.error('setSquelch error:', e); }
         }
 
         // --- CONNECT / DISCONNECT ---
@@ -1750,6 +1843,10 @@
         }
 
         // --- CW KEYER ---
+        async function setCwPitch(code) {
+            try { await fetch('/api/cat/cwpitch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: parseInt(code) }) }); }
+            catch (e) { console.error('setCwPitch error:', e); }
+        }
         async function setCwSpeed(v) {
             try { await fetch('/api/cat/cw/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed: parseInt(v) }) }); }
             catch (e) { console.error('setCwSpeed error:', e); }
@@ -1786,9 +1883,17 @@
         window.setMicGain    = setMicGain;
         window.toggleProc    = toggleProc;
         window.setProcLevel  = setProcLevel;
-        window.toggleAtu      = toggleAtu;
-        window.setMonitorLevel = setMonitorLevel;
+        window.toggleAtu        = toggleAtu;
+        window.toggleMonitor    = toggleMonitor;
+        window._updateMonitorBtn = _updateMonitorBtn;
+        window.setMonitorLevel  = setMonitorLevel;
         window.setNbLevel      = setNbLevel;
+        window.setRfGain                  = setRfGain;
+        window.setSquelch                 = setSquelch;
+        window._updateSquelchVisibility   = _updateSquelchVisibility;
+        // Apply squelch visibility for initial mode on page load
+        _updateSquelchVisibility('A', '@Model.RadioState.ModeA');
+        _updateSquelchVisibility('B', '@Model.RadioState.ModeB');
         window.toggleCatConnection = toggleCatConnection;
         window.toggleVox       = toggleVox;
         window.setVoxGain      = setVoxGain;
@@ -1799,6 +1904,7 @@
         window.setCtcssMode    = setCtcssMode;
         window.setCtcssTone    = setCtcssTone;
         window.saveFmRepeater  = saveFmRepeater;
+        window.setCwPitch      = setCwPitch;
         window.setCwSpeed      = setCwSpeed;
         window.setCwBreakIn    = setCwBreakIn;
         window.setCwBreakInDelay = setCwBreakInDelay;

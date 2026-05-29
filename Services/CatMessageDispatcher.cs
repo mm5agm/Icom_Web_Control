@@ -368,12 +368,47 @@
                         }
                         break;
                     case "ML":
-                        // ML{vfo}{nnn}; — monitor level 000-100 per VFO
+                        // ML0{nnn}; — monitor on/off (000=off, 001=on)
+                        // ML1{nnn}; — monitor level 001-100
                         if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int mlVal))
                         {
-                            if (message[2] == '0') _stateService.MonitorLevelA = Math.Clamp(mlVal, 0, 100);
-                            else if (message[2] == '1') _stateService.MonitorLevelB = Math.Clamp(mlVal, 0, 100);
+                            if (message[2] == '0') _stateService.MonitorOn = mlVal > 0;
+                            else if (message[2] == '1') _stateService.MonitorLevelA = Math.Clamp(mlVal, 0, 100);
                         }
+                        break;
+                    case "KP":
+                        // KP{NN}; — CW pitch code 00-75 (300-1050 Hz in 10 Hz steps)
+                        if (message.Length >= 4 && int.TryParse(message.Substring(2, 2), out int kpVal))
+                            _stateService.CwPitch = Math.Clamp(kpVal, 0, 75);
+                        break;
+                    case "RG":
+                        // RG{V}{NNN}; — RF Gain 000-255 per VFO (V=0=Main, V=1=Sub)
+                        if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int rgVal))
+                        {
+                            if (message[2] == '0') _stateService.RfGainA = Math.Clamp(rgVal, 0, 255);
+                            else if (message[2] == '1') _stateService.RfGainB = Math.Clamp(rgVal, 0, 255);
+                        }
+                        break;
+                    case "SQ":
+                        // SQ{V}{NNN}; — Squelch 000-255 per VFO (V=0=Main, V=1=Sub)
+                        if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int sqVal))
+                        {
+                            if (message[2] == '0') _stateService.SquelchA = Math.Clamp(sqVal, 0, 255);
+                            else if (message[2] == '1') _stateService.SquelchB = Math.Clamp(sqVal, 0, 255);
+                        }
+                        break;
+                    case "AG":
+                        // AG{V}{NNN}; — AF Gain 000-255 per VFO (V=0=Main, V=1=Sub)
+                        if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int agVal))
+                        {
+                            if (message[2] == '0') _stateService.AfGainA = Math.Clamp(agVal, 0, 255);
+                            else if (message[2] == '1') _stateService.AfGainB = Math.Clamp(agVal, 0, 255);
+                        }
+                        break;
+                    case "MG":
+                        // MG{NNN}; — MIC Gain 000-100
+                        if (message.Length >= 6 && int.TryParse(message.Substring(2, 3), out int mgVal))
+                            _stateService.MicGain = Math.Clamp(mgVal, 0, 100);
                         break;
                     case "VX":
                         // VX{n}; — 0=VOX off, 1=VOX on

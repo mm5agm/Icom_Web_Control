@@ -53,6 +53,9 @@ namespace Yaesu_Web_Control.Pages
         public int ProcLevel { get; set; } = 50;
 
         public bool AtuEnabled { get; set; } = false;
+        public int AfGainA { get; set; } = 0;
+        public int AfGainB { get; set; } = 0;
+        public bool MonitorOn { get; set; } = false;
         public int MonitorLevelA { get; set; } = 0;
         public bool VoxOn { get; set; } = false;
         public int VoxGain { get; set; } = 50;
@@ -61,6 +64,7 @@ namespace Yaesu_Web_Control.Pages
         public int CwSpeed { get; set; } = 20;
         public string CwBreakIn { get; set; } = "0";
         public int CwBreakInDelay { get; set; } = 200;
+        public int CwPitch { get; set; } = 30;
         public List<string> CwMessages { get; set; } = new() { "CQ CQ DE {CALL}", "TU 73", "QRZ?", "UR 5NN", "DE {CALL}" };
         public string FmShiftDir { get; set; } = "0";
         public int FmOffsetHz { get; set; } = 600000;
@@ -101,6 +105,9 @@ namespace Yaesu_Web_Control.Pages
             ProcEnabled = _radioStateService.ProcEnabled;
             ProcLevel = _radioStateService.ProcLevel;
             AtuEnabled = _radioStateService.AtuEnabled;
+            AfGainA = _radioStateService.AfGainA;
+            AfGainB = _radioStateService.AfGainB;
+            MonitorOn = _radioStateService.MonitorOn;
             MonitorLevelA = _radioStateService.MonitorLevelA;
             VoxOn = _radioStateService.VoxOn;
             VoxGain = _radioStateService.VoxGain;
@@ -109,6 +116,7 @@ namespace Yaesu_Web_Control.Pages
             CwSpeed = _radioStateService.CwSpeed;
             CwBreakIn = _radioStateService.CwBreakIn;
             CwBreakInDelay = _radioStateService.CwBreakInDelay;
+            CwPitch = _radioStateService.CwPitch;
             CwMessages = settings.CwMessages;
             FmShiftDir = _radioStateService.FmShiftDir;
             FmOffsetHz = _radioStateService.FmOffsetHz;
