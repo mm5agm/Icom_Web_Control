@@ -443,7 +443,25 @@ namespace Yaesu_Web_Control.Services
         private int _nbLevelB = 10;
         public int NbLevelB { get => _nbLevelB; set => SetField(ref _nbLevelB, value); }
 
-        // Monitor/sidetone level per VFO: 0–100 (ML command)
+        // CW Pitch: code 0–75 = 300–1050 Hz in 10 Hz steps (KP command)
+        private int _cwPitch = 30; // default code 30 = 600 Hz
+        public int CwPitch { get => _cwPitch; set => SetField(ref _cwPitch, value); }
+
+        // RF Gain per VFO: 0–255 (RG command)
+        private int _rfGainA = 255;
+        public int RfGainA { get => _rfGainA; set => SetField(ref _rfGainA, value); }
+        private int _rfGainB = 255;
+        public int RfGainB { get => _rfGainB; set => SetField(ref _rfGainB, value); }
+
+        // Squelch per VFO: 0–255 (SQ command)
+        private int _squelchA = 0;
+        public int SquelchA { get => _squelchA; set => SetField(ref _squelchA, value); }
+        private int _squelchB = 0;
+        public int SquelchB { get => _squelchB; set => SetField(ref _squelchB, value); }
+
+        // Monitor/sidetone on/off and level (ML command)
+        private bool _monitorOn = false;
+        public bool MonitorOn { get => _monitorOn; set => SetField(ref _monitorOn, value); }
         private int _monitorLevelA = 0;
         public int MonitorLevelA { get => _monitorLevelA; set => SetField(ref _monitorLevelA, value); }
         private int _monitorLevelB = 0;

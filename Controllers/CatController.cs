@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Yaesu_Web_Control.Services;
+using Yaesu_Web_Control.Models;
 using System.Text.Json;
 using System.Threading;
 
@@ -409,15 +410,46 @@ namespace Yaesu_Web_Control.Controllers
                 if (!BandFreqs.TryGetValue(request.Band, out var freq))
                     return BadRequest(new { error = "Invalid band" });
 
+                var settings = await _settingsService.GetSettingsAsync();
+
+                // Save current band profile before switching
+                var oldBand = _radioStateService.BandA;
+                if (!string.IsNullOrEmpty(oldBand))
+                {
+                    settings.BandProfilesA[oldBand] = new BandProfile
+                    {
+                        IfWidthCode = _radioStateService.IfWidthA,
+                        IfShiftHz   = _radioStateService.IfShiftA,
+                        Mode        = _radioStateService.ModeA
+                    };
+                    await _settingsService.SaveSettingsAsync(settings);
+                }
+
                 var command = $"FA{freq:D9};";
                 await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
 
                 var actualFreq = await _catClient.QueryFrequencyAAsync("WebUI", CancellationToken.None);
-
                 _radioStateService.SetBand("A", request.Band);
                 _radioStateService.FrequencyA = actualFreq;
 
-                _logger.LogInformation("Set Receiver A band to {Band} (freq {Freq})", request.Band, actualFreq);
+                // Restore saved profile for the new band if one exists
+                if (settings.BandProfilesA.TryGetValue(request.Band, out var profile))
+                {
+                    if (!string.IsNullOrEmpty(profile.IfWidthCode))
+                    {
+                        await _catClient.SendCommandAsync($"SH00{int.Parse(profile.IfWidthCode):D2};", "WebUI", CancellationToken.None);
+                        _radioStateService.IfWidthA = profile.IfWidthCode;
+                    }
+                    var sign = profile.IfShiftHz >= 0 ? '+' : '-';
+                    await _catClient.SendCommandAsync($"IS00{sign}{Math.Abs(profile.IfShiftHz):D4};", "WebUI", CancellationToken.None);
+                    _radioStateService.IfShiftA = profile.IfShiftHz;
+                    if (!string.IsNullOrEmpty(profile.Mode))
+                    {
+                        await _catClient.SendCommandAsync(CatCommands.FormatMode(profile.Mode, false), "WebUI", CancellationToken.None);
+                        _radioStateService.ModeA = profile.Mode;
+                    }
+                }
+
                 _logger.LogInformation("[API] SetBandA completed: band={Band}, freq={Freq}", request.Band, actualFreq);
                 return Ok(new { message = $"Band {request.Band} selected", frequency = actualFreq });
             }
@@ -446,15 +478,46 @@ namespace Yaesu_Web_Control.Controllers
                 if (!BandFreqs.TryGetValue(request.Band, out var freq))
                     return BadRequest(new { error = "Invalid band" });
 
+                var settings = await _settingsService.GetSettingsAsync();
+
+                // Save current band profile before switching
+                var oldBand = _radioStateService.BandB;
+                if (!string.IsNullOrEmpty(oldBand))
+                {
+                    settings.BandProfilesB[oldBand] = new BandProfile
+                    {
+                        IfWidthCode = _radioStateService.IfWidthB,
+                        IfShiftHz   = _radioStateService.IfShiftB,
+                        Mode        = _radioStateService.ModeB
+                    };
+                    await _settingsService.SaveSettingsAsync(settings);
+                }
+
                 var command = $"FB{freq:D9};";
                 await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
 
                 var actualFreq = await _catClient.QueryFrequencyBAsync("WebUI", CancellationToken.None);
-
                 _radioStateService.SetBand("B", request.Band);
                 _radioStateService.FrequencyB = actualFreq;
 
-                _logger.LogInformation("Set Receiver B band to {Band} (freq {Freq})", request.Band, actualFreq);
+                // Restore saved profile for the new band if one exists
+                if (settings.BandProfilesB.TryGetValue(request.Band, out var profile))
+                {
+                    if (!string.IsNullOrEmpty(profile.IfWidthCode))
+                    {
+                        await _catClient.SendCommandAsync($"SH10{int.Parse(profile.IfWidthCode):D2};", "WebUI", CancellationToken.None);
+                        _radioStateService.IfWidthB = profile.IfWidthCode;
+                    }
+                    var sign = profile.IfShiftHz >= 0 ? '+' : '-';
+                    await _catClient.SendCommandAsync($"IS10{sign}{Math.Abs(profile.IfShiftHz):D4};", "WebUI", CancellationToken.None);
+                    _radioStateService.IfShiftB = profile.IfShiftHz;
+                    if (!string.IsNullOrEmpty(profile.Mode))
+                    {
+                        await _catClient.SendCommandAsync(CatCommands.FormatMode(profile.Mode, true), "WebUI", CancellationToken.None);
+                        _radioStateService.ModeB = profile.Mode;
+                    }
+                }
+
                 _logger.LogInformation("[API] SetBandB completed: band={Band}, freq={Freq}", request.Band, actualFreq);
                 return Ok(new { message = $"Band {request.Band} selected", frequency = actualFreq });
             }
@@ -1629,6 +1692,108 @@ namespace Yaesu_Web_Control.Controllers
             {
                 _logger.LogError(ex, "Error setting NB level");
                 return StatusCode(500, new { error = "Failed to set NB level" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- CW PITCH ---
+        public class CwPitchRequest { public int Code { get; set; } = 30; }
+
+        [HttpPost("cwpitch")]
+        public async Task<IActionResult> SetCwPitch([FromBody] CwPitchRequest request)
+        {
+            if (request.Code < 0 || request.Code > 75)
+                return BadRequest(new { error = "CW pitch code must be 0–75 (300–1050 Hz)" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync($"KP{request.Code:D2};", "WebUI", CancellationToken.None);
+                _radioStateService.CwPitch = request.Code;
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting CW pitch");
+                return StatusCode(500, new { error = "Failed to set CW pitch" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- RF GAIN ---
+        public class RfGainRequest { public int Value { get; set; } = 255; }
+
+        [HttpPost("rfgain/{receiver}")]
+        public async Task<IActionResult> SetRfGain(string receiver, [FromBody] RfGainRequest request)
+        {
+            if (request.Value < 0 || request.Value > 255)
+                return BadRequest(new { error = "RF Gain must be 0–255" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
+                await _catClient.SendCommandAsync($"RG{vfo}{request.Value:D3};", "WebUI", CancellationToken.None);
+                if (vfo == "0") _radioStateService.RfGainA = request.Value;
+                else            _radioStateService.RfGainB = request.Value;
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting RF gain");
+                return StatusCode(500, new { error = "Failed to set RF gain" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- SQUELCH ---
+        public class SquelchRequest { public int Value { get; set; } = 0; }
+
+        [HttpPost("squelch/{receiver}")]
+        public async Task<IActionResult> SetSquelch(string receiver, [FromBody] SquelchRequest request)
+        {
+            if (request.Value < 0 || request.Value > 255)
+                return BadRequest(new { error = "Squelch must be 0–255" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
+                await _catClient.SendCommandAsync($"SQ{vfo}{request.Value:D3};", "WebUI", CancellationToken.None);
+                if (vfo == "0") _radioStateService.SquelchA = request.Value;
+                else            _radioStateService.SquelchB = request.Value;
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting squelch");
+                return StatusCode(500, new { error = "Failed to set squelch" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // --- MONITOR ON/OFF ---
+        public class MonitorOnRequest { public bool On { get; set; } }
+
+        [HttpPost("monitoron")]
+        public async Task<IActionResult> SetMonitorOn([FromBody] MonitorOnRequest request)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                await _catClient.SendCommandAsync(request.On ? "ML0001;" : "ML0000;", "WebUI", CancellationToken.None);
+                _radioStateService.MonitorOn = request.On;
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting monitor on/off");
+                return StatusCode(500, new { error = "Failed to set monitor" });
             }
             finally { _requestSemaphore.Release(); }
         }

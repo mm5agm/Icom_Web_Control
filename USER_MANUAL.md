@@ -80,10 +80,15 @@ The application was written for operators who want a large, clean, touchscreen-f
 - Live S-meter, power, SWR, ALC, and compression meters (plus PA temperature, IDD, and VDD on FTdx101MP, FTdx101D, and FTDX3000)
 - Real-time two-way sync — changes on the radio front panel appear immediately in the app, and vice versa
 - Band and segment selectors for fast QSY to CW, FT8, SSB, or RTTY
+- **Per-band memory** for IF Width, IF Shift, and Mode — switching to a band automatically restores your preferred filter and mode for that band
+- Full receive controls: AGC, IPO/AMP, Attenuator, NR, NB, Auto Notch, Manual Notch, **RF Gain**, **Squelch** (FM mode)
+- CW keyer with speed, break-in, delay, **sidetone pitch**, and five programmable memory messages
+- TX monitor on/off toggle and level control
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Optional real-time spectrum display and waterfall (requires an SDR connected to the 9 MHz IF output)
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
+- **USB audio for DATA modes** — one-click setting configures the radio to route FT8, WSJT-X and other digital modes through the USB connection, no rear DATA connector required
 - Four IARU band plans: Region 1 (Europe, Africa, Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), and Japan (JARL)
 - Full screen reader support — compatible with NVDA and Windows Narrator
 - Windows High Contrast mode support for all gauge displays
@@ -303,8 +308,10 @@ LSB, USB, CW-U, CW-L, FM, FM-N, AM, AM-N, RTTY-L, RTTY-U, DATA-L, DATA-U, DATA-F
 | Auto Notch | OFF, ON |
 | Man Notch | OFF, ON |
 | Notch Hz | Slider 10–3200 Hz (only relevant when Man Notch is ON) |
+| RF Gain | Slider 0–255. Controls the RF preamplifier gain. At 255 (maximum) sensitivity is highest; reducing RF Gain is useful when a strong nearby signal is causing overload that AGC and IPO cannot handle. |
+| Squelch | Slider 0–255. Only shown when the VFO is in FM or FM-N mode. 0 = squelch fully open (hear everything); higher values cut off weaker signals. |
 
-All of these settings are read from the radio when the app starts.
+All of these settings are read from the radio when the app connects.
 
 **Filter Function Display** — A compact real-time display positioned alongside the band buttons, between the band button column and the receiver controls column. It shows the shape of the active DSP filter passband, matching the style of the filter scope on the FTdx101MP front panel.
 
@@ -359,6 +366,8 @@ Region 1 is the only plan that includes the 4m (70 MHz) band. Japan has no 60m s
 
 The last segment you used on each band is remembered, so when you return to a band the dropdown re-selects your previous segment.
 
+**Per-band IF and mode memory** — When you switch away from a band the app saves the current IF Width, IF Shift, and Mode for that band. When you return to the band those settings are automatically restored on the radio. This means, for example, you can have a 500 Hz CW filter on 40m and a 2.4 kHz SSB filter on 20m and the app will switch between them as you change bands. Settings are saved per-VFO (VFO A and VFO B are independent) and persist between sessions.
+
 **60m — Region 1 and Region 3:** Shows FT8 (5.357 MHz) and USB (5.362 MHz) segments, covering the WRC-15 secondary allocation (5351.5–5366.5 kHz). Access to 60m varies by country within these regions.
 
 **60m — Region 2 (Americas):** Shows the five FCC-designated channels (5.331, 5.347, 5.357, 5.372, 5.404 MHz).
@@ -384,7 +393,9 @@ Click the button to toggle the connection. While connecting, it briefly shows "C
 
 **ATU button** — Initiates an ATU (Automatic Tuner Unit) tune cycle. Labelled **ATU: On** (green) when the ATU is active or **ATU: Off** (grey) when bypassed. Clicking the button when active triggers a fresh tune cycle; clicking when inactive activates the ATU. Only applies to radios fitted with an internal or external ATU.
 
-**Mon level** — TX monitor level slider (0–100). Controls how much of the transmitted audio you hear in the headphones during TX. Drag and release to apply.
+**Mon button** — Toggles the TX monitor (sidetone) on and off. The button is amber when the monitor is active and grey when off. Click to toggle.
+
+**Mon level slider** — Sets the TX monitor volume (0–100). Controls how much of the transmitted audio you hear in the headphones during TX. Drag and release to apply. Both the on/off state and the level are read from the radio when the app connects.
 
 **VOX button** — Opens the **VOX Settings** panel. The button shows **VOX: On** (green) or **VOX: Off** (grey) based on the current VOX state.
 
@@ -428,6 +439,7 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 | Speed | Keyer speed in WPM (4–60) |
 | Break-in | **Off** (keyer only), **Semi** (semi break-in), or **Full** (QSK full break-in) |
 | Delay | Semi break-in delay (0–2500 ms) — only relevant in Semi mode |
+| Pitch | CW sidetone pitch frequency (300–1050 Hz in 10 Hz steps). Also sets the CW receive offset so the radio zero-beats at this tone. Read from the radio on connect. |
 | M1–M5 buttons | Sends the corresponding memory message via the radio's KY CAT command |
 
 **CW memory messages** are configured on the **Settings** page (see Section 6.5). Each message can be up to 24 characters. Use `{CALL}` as a placeholder — it is sent literally (the radio does not expand it; configure your callsign in the message text directly for CW use).
@@ -478,8 +490,11 @@ Access Settings from the navigation bar or by clicking the settings icon. Change
 | Serial Port | COM port the radio's USB/serial cable is connected to (e.g., COM3) |
 | Baud Rate | Must match the radio's CAT Rate setting. Default: 38400 |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
+| Use USB audio for DATA modes | When enabled, the app sends a CAT command to the radio on every connect that routes DATA mode audio (FT8, FT4, RTTY, PSK etc.) through the **USB connection** rather than the rear DATA/ACC connector. Enable this if you run WSJT-X or similar software via USB and do not have the rear connector wired. Leave disabled if you use an external soundcard interface on the rear DATA connector. See the note below. |
 
 After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success.
+
+> **USB audio for DATA modes — how it works:** All supported radios have a built-in USB audio codec (appears in Windows Sound settings as **USB Audio CODEC** after installing the Silicon Labs driver). By default the radio's factory setting routes DATA mode TX/RX audio through the rear DATA/ACC/DIN connector, not the USB codec. Enabling this setting makes the app send the appropriate radio-menu command (`REAR SELECT = USB` or equivalent) each time it connects, so you never have to configure this in the radio's touch menu. This setting has no effect if you do not use digital modes.
 
 ---
 
