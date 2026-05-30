@@ -420,7 +420,7 @@ namespace Yaesu_Web_Control.Controllers
                     {
                         IfWidthCode = _radioStateService.IfWidthA,
                         IfShiftHz   = _radioStateService.IfShiftA,
-                        Mode        = _radioStateService.ModeA
+                        Mode        = _radioStateService.ModeA ?? ""
                     };
                     await _settingsService.SaveSettingsAsync(settings);
                 }
@@ -488,7 +488,7 @@ namespace Yaesu_Web_Control.Controllers
                     {
                         IfWidthCode = _radioStateService.IfWidthB,
                         IfShiftHz   = _radioStateService.IfShiftB,
-                        Mode        = _radioStateService.ModeB
+                        Mode        = _radioStateService.ModeB ?? ""
                     };
                     await _settingsService.SaveSettingsAsync(settings);
                 }
