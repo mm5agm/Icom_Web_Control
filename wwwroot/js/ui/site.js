@@ -1632,21 +1632,17 @@ window.resetClarifier = resetClarifier;
 async function saveVfoToMemory(vfo) {
     const btn    = document.getElementById('saveMemBtn' + vfo);
     const status = document.getElementById('saveMemStatus' + vfo);
-    const freqHz = window.radioControl?._state?.lastBackendFreq?.[vfo] || 0;
-    const mode   = document.getElementById('modeSelect' + vfo)?.value || 'USB';
     try {
         if (btn) { btn.disabled = true; btn.textContent = '…'; }
         if (status) status.textContent = '';
-        const resp = await fetch('/api/memory', {
+        // Use the dedicated save-vfo endpoint: the backend reads the full
+        // live radio state from RadioStateService and captures every advanced
+        // field (antenna, IF width/shift, roofing, NB/NR/AGC, power) in one
+        // shot. The browser only needs to send a label.
+        const resp = await fetch(`/api/memory/save-vfo/${vfo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                frequencyHz:       freqHz,
-                mode:              mode,
-                clarifierOffsetHz: clarOffsets[vfo] || 0,
-                rxClarOn:          rxClarOn,
-                txClarOn:          txClarOn
-            })
+            body: JSON.stringify({ label: '' })
         });
         if (resp.ok) {
             if (status) status.textContent = `VFO ${vfo} saved to memories`;

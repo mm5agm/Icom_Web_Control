@@ -630,9 +630,30 @@ The editor shows all your saved memories in a table. For each memory you can edi
 | RX Clar | Whether the RX clarifier is enabled |
 | TX Clar | Whether the TX clarifier is enabled |
 
+**Advanced fields** — tick the **Show advanced fields** toggle at the top of the editor to reveal extra columns:
+
+| Field | Description |
+|-------|-------------|
+| Ant | Antenna selector (1, 2, 3) |
+| IF Width | The SH command code for the desired filter width |
+| IF Shift | IF shift in Hz, range −1000 to +1000 |
+| Roofing | Roofing filter code (e.g. 7 = 3 kHz on FTdx101). Ignored on FTdx10/FT-710 |
+| NB | Noise blanker on/off |
+| NB Lvl | Noise blanker level, 1–20 |
+| NR | Noise reduction (Off / NR1 / NR2) |
+| AGC | AGC mode (Off / Fast / Mid / Slow / Auto) |
+| Power | Transmit power in watts |
+| Notes | Free-text notes, up to 100 characters |
+
+**Each advanced field is applied on recall only if you have set a value.** Leave any field blank and the radio's current value for that setting is left alone. This means you can save a memory that only changes frequency and mode (the simple use case), or one that fully configures the radio (e.g. "20m FT8" with antenna 2, IF Width 8, NR2, 50 W, AGC Auto).
+
+> **Important:** Advanced fields are **app-side only**. They are stored in `memories.json` on your PC but the radio's own memory channels (used by the Import/Export buttons) cannot hold these fields. Exporting to the radio writes only label, frequency, mode, and clarifier values.
+
 Click **Save** to save all changes. Click **Add Memory** to append a blank row. Click the **trash** icon on any row to delete that memory.
 
 The **Pop Out** button opens the Memories page in a new browser tab — useful if you want to edit memories on a second monitor while the main control panel is open in the first.
+
+**Save to Mem button** — When you click "Save to Mem" on a VFO panel, the app captures the **full live state** of that VFO at the moment you clicked it: frequency, mode, antenna, IF width and shift, roofing, NB/NR/AGC, and power. The memory is added with all advanced fields populated. Edit the label later from the Memories page.
 
 ---
 

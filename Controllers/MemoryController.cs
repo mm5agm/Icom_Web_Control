@@ -122,7 +122,102 @@ namespace Yaesu_Web_Control.Controllers
             _radioStateService.RxClarOn = memory.RxClarOn;
             _radioStateService.TxClarOn = memory.TxClarOn;
 
+            // ── Apply advanced / optional fields ───────────────────────────────
+            // Each field is applied only if non-null. Null = leave radio alone.
+            if (!string.IsNullOrEmpty(memory.Antenna))
+            {
+                await _catClient.SendCommandAsync($"AN0{memory.Antenna};", "MemRecall", CancellationToken.None);
+                _radioStateService.AntennaA = memory.Antenna;
+            }
+            if (!string.IsNullOrEmpty(memory.IfWidthCode) && int.TryParse(memory.IfWidthCode, out int ifw))
+            {
+                await _catClient.SendCommandAsync($"SH00{ifw:D2};", "MemRecall", CancellationToken.None);
+                _radioStateService.IfWidthA = memory.IfWidthCode;
+            }
+            if (memory.IfShiftHz.HasValue)
+            {
+                int shift = memory.IfShiftHz.Value;
+                char sign = shift >= 0 ? '+' : '-';
+                await _catClient.SendCommandAsync($"IS00{sign}{Math.Abs(shift):D4};", "MemRecall", CancellationToken.None);
+                _radioStateService.IfShiftA = shift;
+            }
+            if (!string.IsNullOrEmpty(memory.RoofingCode))
+            {
+                // FTdx10/FT-710 have no CAT roofing filter control; skip silently.
+                if (settings.RadioModel is not ("FTdx10" or "FT-710"))
+                {
+                    await _catClient.SendCommandAsync($"RF0{memory.RoofingCode};", "MemRecall", CancellationToken.None);
+                    _radioStateService.RoofingFilterA = memory.RoofingCode;
+                }
+            }
+            if (memory.NbOn.HasValue)
+            {
+                await _catClient.SendCommandAsync($"NB0{(memory.NbOn.Value ? 1 : 0)};", "MemRecall", CancellationToken.None);
+                _radioStateService.NbA = memory.NbOn.Value ? "1" : "0";
+            }
+            if (memory.NbLevel.HasValue)
+            {
+                int nbl = Math.Clamp(memory.NbLevel.Value, 1, 20);
+                await _catClient.SendCommandAsync($"NL0{nbl:D3};", "MemRecall", CancellationToken.None);
+                _radioStateService.NbLevelA = nbl;
+            }
+            if (!string.IsNullOrEmpty(memory.NrLevel))
+            {
+                await _catClient.SendCommandAsync($"NR0{memory.NrLevel};", "MemRecall", CancellationToken.None);
+                _radioStateService.NrA = memory.NrLevel;
+            }
+            if (!string.IsNullOrEmpty(memory.AgcMode))
+            {
+                await _catClient.SendCommandAsync($"GT0{memory.AgcMode};", "MemRecall", CancellationToken.None);
+                _radioStateService.AgcA = memory.AgcMode;
+            }
+            if (memory.PowerWatts.HasValue)
+            {
+                int pw = Math.Clamp(memory.PowerWatts.Value, 5, 200);
+                await _catClient.SendCommandAsync($"PC{pw:D3};", "MemRecall", CancellationToken.None);
+                _radioStateService.Power = pw;
+            }
+            // Notes are app-side only; not sent to the radio.
+
             return Ok();
+        }
+
+        // ── Save current VFO state as a new memory (with advanced fields) ────
+        //
+        // Reads the live radio state from RadioStateService so we capture
+        // every field at the moment the user clicked "Save to Mem", rather
+        // than asking the browser to round up scattered DOM values.
+        public class SaveVfoRequest
+        {
+            public string Label { get; set; } = "";
+            public string? Notes { get; set; }
+        }
+
+        [HttpPost("save-vfo/{vfo}")]
+        public async Task<IActionResult> SaveVfo(string vfo, [FromBody] SaveVfoRequest? request)
+        {
+            bool isA = string.Equals(vfo, "A", StringComparison.OrdinalIgnoreCase);
+            var mem = new AppMemory
+            {
+                Label             = string.IsNullOrWhiteSpace(request?.Label) ? "" : request!.Label.Trim(),
+                FrequencyHz       = isA ? _radioStateService.FrequencyA : _radioStateService.FrequencyB,
+                Mode              = (isA ? _radioStateService.ModeA : _radioStateService.ModeB) ?? "USB",
+                ClarifierOffsetHz = isA ? _radioStateService.ClarifierOffsetA : _radioStateService.ClarifierOffsetB,
+                RxClarOn          = _radioStateService.RxClarOn,
+                TxClarOn          = _radioStateService.TxClarOn,
+                Antenna           = isA ? _radioStateService.AntennaA : _radioStateService.AntennaB,
+                IfWidthCode       = isA ? _radioStateService.IfWidthA : _radioStateService.IfWidthB,
+                IfShiftHz         = isA ? _radioStateService.IfShiftA : _radioStateService.IfShiftB,
+                RoofingCode       = isA ? _radioStateService.RoofingFilterA : _radioStateService.RoofingFilterB,
+                NbOn              = (isA ? _radioStateService.NbA : _radioStateService.NbB) == "1",
+                NbLevel           = isA ? _radioStateService.NbLevelA : _radioStateService.NbLevelB,
+                NrLevel           = isA ? _radioStateService.NrA : _radioStateService.NrB,
+                AgcMode           = isA ? _radioStateService.AgcA : _radioStateService.AgcB,
+                PowerWatts        = _radioStateService.Power > 0 ? _radioStateService.Power : (int?)null,
+                Notes             = request?.Notes,
+            };
+            var created = await _memoryService.AddAsync(mem);
+            return Ok(created);
         }
 
         // ── Import from Radio ────────────────────────────────────────────────
