@@ -40,6 +40,38 @@ namespace Yaesu_Web_Control.Services
             lock (_recentLinesLock) return _recentLines.ToList();
         }
 
+        // Diagnostic log file. Cleared on every new session so it does not
+        // grow without bound. User can open this file in any text editor
+        // to see exactly what the cluster has been sending.
+        public static readonly string LogFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "MM5AGM", "Yaesu Web Control", "dx-cluster.log");
+        private readonly object _logFileLock = new();
+
+        private void AppendLogFile(string line)
+        {
+            try
+            {
+                lock (_logFileLock)
+                    File.AppendAllText(LogFilePath, $"{DateTime.UtcNow:HH:mm:ss}  {line}{Environment.NewLine}");
+            }
+            catch { /* never let log file errors break the cluster session */ }
+        }
+
+        private void ResetLogFile()
+        {
+            try
+            {
+                lock (_logFileLock)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(LogFilePath)!);
+                    File.WriteAllText(LogFilePath,
+                        $"# DX cluster diagnostic log — opened {DateTime.UtcNow:u}{Environment.NewLine}");
+                }
+            }
+            catch { }
+        }
+
         // Connection lifecycle: "off" (disabled in Settings or missing fields),
         // "connecting" (TCP open in progress), "connected" (logged in / receiving),
         // "disconnected" (last attempt failed or remote dropped — service is
@@ -137,6 +169,9 @@ namespace Yaesu_Web_Control.Services
             _logger.LogInformation("[DxCluster] Connecting to {Host}:{Port} as {Callsign}",
                 settings.DxClusterHost, settings.DxClusterPort, settings.DxClusterLoginCallsign);
 
+            ResetLogFile();
+            AppendLogFile($"# Connecting to {settings.DxClusterHost}:{settings.DxClusterPort} as {settings.DxClusterLoginCallsign}");
+
             await SetStatus("connecting", $"Opening {settings.DxClusterHost}:{settings.DxClusterPort}");
 
             using var client = new TcpClient();
@@ -176,9 +211,12 @@ namespace Yaesu_Web_Control.Services
                 if (line == null) break; // remote closed
                 if (line.Length == 0) continue;
 
-                // Log every line received and also keep a ring buffer for
-                // browser-visible diagnostics via /api/dxcluster/recent.
+                // Log every line received. Three destinations:
+                //   1. Standard ILogger (filtered to Information for DxCluster)
+                //   2. Browser-visible ring buffer via /api/dxcluster/recent
+                //   3. Diagnostic file (%APPDATA%\MM5AGM\Yaesu Web Control\dx-cluster.log)
                 _logger.LogInformation("[DxCluster] << {Line}", line);
+                AppendLogFile($"<< {line}");
                 lock (_recentLinesLock)
                 {
                     _recentLines.AddLast($"{DateTime.UtcNow:HH:mm:ss}  {line}");
