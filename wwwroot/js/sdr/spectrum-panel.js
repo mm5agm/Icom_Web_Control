@@ -287,13 +287,13 @@ export class SpectrumPanel {
         }
 
         ctx.save();
-        ctx.font      = 'bold 10px monospace';
+        ctx.font         = 'bold 14px sans-serif';
         ctx.textBaseline = 'top';
-        const padX = 6;
-        const padY = 3;
+        const padX = 8;
+        const padY = 5;
         const textWidth = ctx.measureText(label).width;
         const w = textWidth + padX * 2;
-        const h = 16;
+        const h = 24;
         const x = W - w - 4;
         const y = 4;
         ctx.fillStyle = bg;
