@@ -789,11 +789,19 @@ connection.on("RadioStateUpdate", function (update) {
         updateMicGainLabel(update.value);
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ mode: update.value });
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('A', update.value);
+        if (window.IfWidth && window._radioModel) {
+            window.IfWidth.rebuildIfWidthSelect(
+                document.getElementById('ifWidthSelectA'), window._radioModel, update.value);
+        }
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ mode: update.value });
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('B', update.value);
+        if (window.IfWidth && window._radioModel) {
+            window.IfWidth.rebuildIfWidthSelect(
+                document.getElementById('ifWidthSelectB'), window._radioModel, update.value);
+        }
     }
 
     // --- PROC ---
