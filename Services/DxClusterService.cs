@@ -166,6 +166,13 @@ namespace Yaesu_Web_Control.Services
                 if (line == null) break; // remote closed
                 if (line.Length == 0) continue;
 
+                // Log every line received so we can see exactly what the
+                // cluster is sending. Spot lines tend to be frequent on busy
+                // bands, so this can get chatty — kept at Information so it
+                // shows in normal dev-server output but not on quiet bands
+                // when nothing is happening.
+                _logger.LogInformation("[DxCluster] << {Line}", line);
+
                 // Login: most clusters print a prompt containing "call:" or
                 // "callsign" or "login". Respond with the configured callsign.
                 if (!loggedIn && (line.Contains("call:", StringComparison.OrdinalIgnoreCase)
@@ -175,6 +182,17 @@ namespace Yaesu_Web_Control.Services
                     await writer.WriteLineAsync(settings.DxClusterLoginCallsign);
                     loggedIn = true;
                     _logger.LogInformation("[DxCluster] Sent login callsign");
+                    continue;
+                }
+
+                // After login, some clusters still prompt for things ("name?",
+                // "Welcome — set/name?", "QTH?"). Be forgiving: any line ending
+                // with ":" or "?" after we've logged in, reply with the
+                // callsign again. Harmless on clusters that don't need it.
+                if (loggedIn && (line.TrimEnd().EndsWith(":") || line.TrimEnd().EndsWith("?")))
+                {
+                    await writer.WriteLineAsync(settings.DxClusterLoginCallsign);
+                    _logger.LogInformation("[DxCluster] Replied to post-login prompt with callsign");
                     continue;
                 }
 
