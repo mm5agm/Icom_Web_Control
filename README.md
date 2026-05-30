@@ -98,6 +98,16 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 ## Release Notes
 
+## 2026-05-30 - v1.8.0
+
+### Fixed / Improved
+
+- **IF Width dropdown is now mode-aware.** The SH command takes the same code regardless of mode but the resulting bandwidth differs per mode — in SSB code 8 = 1650 Hz; in CW the same code 8 = 400 Hz. Until now the dropdown showed SSB labels in every mode, so selecting "1.5 kHz" while in CW actually gave 350 Hz on the radio. The dropdown now rebuilds with the correct labels each time the mode changes, and the Filter Function Display uses the mode-aware width when drawing the passband.
+
+- **IF Width dropdown is automatically hidden in AM and FM modes.** The SH command does not apply in these modes (the radio uses fixed filters or a separate NA narrow toggle), so the row disappears rather than showing misleading SSB labels.
+
+---
+
 ## 2026-05-29 - v1.7.1
 
 ### Fixed

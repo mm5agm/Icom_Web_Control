@@ -98,7 +98,15 @@ export class FilterScopePanel {
     }
 
     _ifWidthHz() {
-        const hz = this._widthTable[String(this._state.ifWidthCode)] || 3000;
+        // Prefer the mode-aware lookup so the passband matches what the radio
+        // is actually doing in the current mode (CW code 8 = 400 Hz, SSB
+        // code 8 = 1650 Hz on the FTdx101 etc.). Falls back to the static
+        // SSB table if the mode-aware module is unavailable.
+        let hz = null;
+        if (window.IfWidth) {
+            hz = window.IfWidth.ifWidthHzFor(this._model, this._state.mode, parseInt(this._state.ifWidthCode));
+        }
+        if (hz == null) hz = this._widthTable[String(this._state.ifWidthCode)] || 3000;
         const roofHz = this._roofingHz();
         return roofHz !== null ? Math.min(hz, roofHz) : hz;
     }
