@@ -46,6 +46,9 @@ namespace Yaesu_Web_Control.Pages
             // [Required] from <Nullable>enable</Nullable> would otherwise reject an empty
             // string and silently prevent the save.
             ModelState.Remove("Settings.SdrDeviceKey");
+            // DX cluster host/callsign also allowed empty (empty = feature disabled).
+            ModelState.Remove("Settings.DxClusterHost");
+            ModelState.Remove("Settings.DxClusterLoginCallsign");
 
             if (!ModelState.IsValid)
             {
@@ -112,6 +115,13 @@ namespace Yaesu_Web_Control.Pages
                 }
                 if (Settings.CwMessages != null && Settings.CwMessages.Count == 5)
                     current.CwMessages = Settings.CwMessages;
+
+                // DX cluster settings — copy through. Normalise callsign to upper case.
+                current.DxClusterEnabled         = Settings.DxClusterEnabled;
+                current.DxClusterHost            = (Settings.DxClusterHost ?? "").Trim();
+                current.DxClusterPort            = Settings.DxClusterPort;
+                current.DxClusterLoginCallsign   = (Settings.DxClusterLoginCallsign ?? "").Trim().ToUpperInvariant();
+                current.DxSpotAgeMinutes         = Settings.DxSpotAgeMinutes > 0 ? Settings.DxSpotAgeMinutes : 15;
 
                 await _settingsService.SaveSettingsAsync(current);
 

@@ -56,6 +56,14 @@
         // Enable this if you use USB audio for digital modes (FT8, etc.) and have no rear connector wired.
         public bool UseUsbAudioForDataModes { get; set; } = false;
 
+        // DX cluster settings. No default host — the user picks their cluster
+        // explicitly from Settings before enabling. Empty host = feature off.
+        public bool DxClusterEnabled { get; set; } = false;
+        public string DxClusterHost { get; set; } = "";
+        public int DxClusterPort { get; set; } = 7300;
+        public string DxClusterLoginCallsign { get; set; } = "";
+        public int DxSpotAgeMinutes { get; set; } = 15;
+
         // Optional roofing filters installed in the radio (FTdx101MP/D only).
         // "6"=12kHz and "7"=3kHz are always fitted. "8"=1.2kHz, "9"=600Hz, "A"=300Hz are optional.
         // FTdx10 has fixed roofing filters and ignores this setting.

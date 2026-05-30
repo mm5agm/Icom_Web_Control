@@ -156,6 +156,11 @@ builder.Services.AddSingleton<ProcessStatusCacheService>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryService>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryBankService>();
 
+// Register DX cluster service — single instance shared between controllers and
+// the background hosted service so the API can read the spot buffer.
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.DxClusterService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.DxClusterService>());
+
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddFilter((category, level) =>

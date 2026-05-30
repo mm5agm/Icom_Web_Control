@@ -400,6 +400,78 @@
         </div>
     </div>
 
+    <!-- DX Cluster -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="bi bi-globe2"></i> DX Cluster</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        Connect to a DX cluster server to overlay DX spots on the SDR spectrum display.
+                        Spots show callsigns at their reported frequencies; click a spot to QSY VFO A to it.
+                        Pick any cluster server you have access to — there is no preset default. Common
+                        examples include <code>cluster.dl4ny.de:7300</code>, <code>ve7cc.net:23</code>,
+                        and <code>dxc.k4ldc.com:7300</code>. The connection is established only after you
+                        enable it below.
+                    </p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                           id="dxClusterEnabled" asp-for="Settings.DxClusterEnabled" />
+                                    <label class="form-check-label" for="dxClusterEnabled">
+                                        Enable DX cluster connection
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    When off, the app does not connect to any cluster and no spots are received.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="Settings.DxClusterHost" class="form-label">Cluster host</label>
+                                <input asp-for="Settings.DxClusterHost" class="form-control"
+                                       placeholder="e.g. cluster.dl4ny.de" autocomplete="off" />
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="Settings.DxClusterPort" class="form-label">Port</label>
+                                <input asp-for="Settings.DxClusterPort" class="form-control" type="number"
+                                       min="1" max="65535" />
+                                <div class="form-text">Most clusters use 7300, 23, or 8000.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label asp-for="Settings.DxClusterLoginCallsign" class="form-label">
+                                    Login callsign
+                                </label>
+                                <input asp-for="Settings.DxClusterLoginCallsign" class="form-control"
+                                       placeholder="Your callsign, e.g. MM5AGM" autocomplete="off"
+                                       style="text-transform: uppercase" />
+                                <div class="form-text">
+                                    Sent to the cluster when it prompts for login. Use your own amateur
+                                    callsign — most clusters require a valid licensed call.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="Settings.DxSpotAgeMinutes" class="form-label">
+                                    Spot age-off (minutes)
+                                </label>
+                                <input asp-for="Settings.DxSpotAgeMinutes" class="form-control" type="number"
+                                       min="1" max="120" />
+                                <div class="form-text">
+                                    Spots older than this are removed from the overlay. Typical: 15–30 minutes.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- CW Memory Messages -->
     <div class="row mb-4">
         <div class="col-12">

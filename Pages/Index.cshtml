@@ -1351,6 +1351,14 @@
             });
             spectrumPipeline.onFrequencyA(hz => spectrumPanel.setVfoFrequency(hz));
             spectrumPipeline.onError(detail => spectrumPanel.setError(detail));
+            // DX cluster spots — incoming SignalR pushes go to the spectrum
+            // overlay. On page load, also fetch the current ring buffer so the
+            // overlay isn't empty until a new spot arrives.
+            spectrumPipeline.onDxSpot(spot => spectrumPanel.addSpot(spot));
+            fetch('/api/dxcluster/spots')
+                .then(r => r.ok ? r.json() : [])
+                .then(arr => spectrumPanel.setSpots(arr))
+                .catch(() => { /* feature off or backend not ready — ignore */ });
 
             spectrumPipeline.connect();
             window.spectrumPanel = spectrumPanel;

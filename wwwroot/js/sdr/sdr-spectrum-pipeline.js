@@ -81,4 +81,13 @@ export class SdrSpectrumPipeline {
     onFrequencyB(handler) {
         this._pipeline.register('FrequencyB', (value) => handler(value));
     }
+
+    /**
+     * Register a handler for new DX cluster spots.
+     * Each spot is the JSON shape from /api/dxcluster/spots.
+     * @param {function(object)} handler
+     */
+    onDxSpot(handler) {
+        this._pipeline.register('DxSpot', (value) => handler(value));
+    }
 }

@@ -27,6 +27,7 @@
    - 6.3 [SDR Spectrum Display](#63-sdr-spectrum-display)
    - 6.4 [Roofing Filters](#64-roofing-filters)
    - 6.5 [CW Memory Messages](#65-cw-memory-messages-m1m5)
+   - 6.6 [DX Cluster](#66-dx-cluster)
 7. [Application Setup](#7-application-setup)
    - 7.1 [External App Buttons](#71-external-app-buttons)
    - 7.2 [WSJT-X UDP Settings](#72-wsjt-x-udp-settings)
@@ -210,6 +211,8 @@ The spectrum display is only visible if an SDR device has been configured in Set
 **Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune VFO A up or down in 1 kHz steps.
 
 **Frequency crosshair** — Move the mouse over the spectrum to see the exact RF frequency at the cursor position displayed above the waterfall.
+
+**DX cluster spots** — If you have configured a DX cluster server in Settings (see §6.6), incoming spots are overlaid as small yellow callsign labels along the top of the spectrum at each spot's frequency. Clicking on a spot (within a few pixels of its marker) tunes VFO A exactly to that frequency. Spots outside the current span are not drawn; spots older than the configured age (default 15 minutes) are removed automatically.
 
 A status badge in the spectrum panel shows the current SDR state: **No SDR**, **Connecting…**, **Live**, or **Disconnected**.
 
@@ -573,6 +576,32 @@ Enter up to five CW message memories. These are available from the CW Keyer pane
 | M5 | DE {CALL} |
 
 Note: `{CALL}` is a reminder placeholder — the radio's KY command does not perform variable substitution. Replace `{CALL}` with your actual callsign.
+
+---
+
+### 6.6 DX Cluster
+
+Connect to a DX cluster server to overlay DX spots on the SDR spectrum display. Spots appear as small yellow callsign labels at each spot's frequency on the spectrum panel; clicking a spot tunes VFO A exactly to that frequency.
+
+There is **no default cluster server** — pick one you have access to. The connection is only made when you tick the **Enable** switch below.
+
+| Setting | Description |
+|---------|-------------|
+| Enable DX cluster connection | Master on/off. When off, no connection is made and no spots are received |
+| Cluster host | Hostname or IP of the DX cluster, e.g. `cluster.dl4ny.de` |
+| Port | TCP port. Most clusters use 7300, 23, or 8000 |
+| Login callsign | Your amateur callsign — sent to the cluster when it prompts for login. Most clusters require a valid licensed call |
+| Spot age-off (minutes) | Spots older than this are removed automatically. Typical 15–30 minutes |
+
+**Common cluster servers** (the app does not endorse any particular one — these are starting points):
+
+- `cluster.dl4ny.de` port 7300 (DXSpider, Germany)
+- `ve7cc.net` port 23 (AR-Cluster, Canada)
+- `dxc.k4ldc.com` port 7300
+
+The app uses a generous parser that accepts spot lines from AR-Cluster, CC-Cluster, and DXSpider format servers. If you connect to a cluster but no spots appear, check the app log for "DX cluster" messages — the connection state is reported there.
+
+If the connection drops, the app reconnects automatically after 15 seconds. Disabling the toggle in Settings stops reconnection attempts.
 
 ---
 

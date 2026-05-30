@@ -32,6 +32,12 @@ export class SpectrumPanel {
         this._lastCentreHz = 0;
         this._lastSpanHz   = 0;
 
+        // DX cluster spots overlaid on the spectrum. Each entry is the JSON
+        // shape from /api/dxcluster/spots — { callsign, frequencyHz, spotter,
+        // comment, receivedUtc }. Only spots within the current span are
+        // drawn; clicks within a few pixels of a spot QSY to it precisely.
+        this._spots = [];
+
         // Crosshair state — null when mouse is outside the canvas.
         this._crosshairX  = null;
         this._crosshairY  = null;
@@ -53,6 +59,25 @@ export class SpectrumPanel {
     /** Store the latest error detail string for display alongside status overlays. */
     setError(detail) {
         this._errorDetail = detail;
+    }
+
+    /** Replace the full DX spots array (used on page load when fetching /api/dxcluster/spots). */
+    setSpots(spots) {
+        this._spots = Array.isArray(spots) ? spots.slice() : [];
+        if (this._lastBins) this._render();
+    }
+
+    /** Add or update a single spot — used when SignalR pushes a new DxSpot. */
+    addSpot(spot) {
+        if (!spot || !spot.callsign) return;
+        // De-duplicate by callsign + frequency: a re-spot replaces the older entry.
+        const i = this._spots.findIndex(s =>
+            s.callsign === spot.callsign && Math.abs(s.frequencyHz - spot.frequencyHz) < 100);
+        if (i >= 0) this._spots[i] = spot;
+        else        this._spots.unshift(spot);
+        // Cap memory: don't accumulate more than 500 spots client-side.
+        if (this._spots.length > 500) this._spots.length = 500;
+        if (this._lastBins) this._render();
     }
 
     /** Receive the current VFO frequency so the axis labels stay accurate. */
@@ -156,13 +181,25 @@ export class SpectrumPanel {
         const y     = e.clientY - rect.top;
         if (y > specH * (rect.height / canvas.height)) return;
 
+        // Convert canvas-relative x (CSS pixels) to canvas-internal pixels.
+        const canvasX = x * (W / rect.width);
         const leftHz  = this._vfoHz - this._lastSpanHz / 2;
-        const clickHz = Math.round(leftHz + (x / W) * this._lastSpanHz);
+
+        // If the click is within 8 internal-pixels of a spot's marker, snap
+        // to that spot's exact frequency. Otherwise tune to the click x.
+        let targetHz = Math.round(leftHz + (canvasX / W) * this._lastSpanHz);
+        for (const s of this._spots) {
+            const sx = ((s.frequencyHz - leftHz) / this._lastSpanHz) * W;
+            if (Math.abs(sx - canvasX) <= 8) {
+                targetHz = s.frequencyHz;
+                break;
+            }
+        }
 
         fetch('/api/cat/frequency/a', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ frequencyHz: clickHz }),
+            body:    JSON.stringify({ frequencyHz: targetHz }),
         }).catch(() => { /* ignore network errors */ });
     }
 
@@ -215,8 +252,68 @@ export class SpectrumPanel {
 
         this._drawSpectrum(ctx, bins, W, specH);
         this._drawFrequencyAxis(ctx, bins, W, specH, centreHz, spanHz);
+        this._drawSpots(ctx, W, specH);
         this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawCrosshair(ctx, W, specH, spanHz);
+    }
+
+    // ── DX cluster spot overlay ──────────────────────────────────────────────
+    //
+    // Draws a small downward-pointing tick at each spot's frequency with the
+    // callsign label above. Spots outside the current span are skipped. When
+    // multiple spots fall within ~50 px of each other their labels are
+    // staggered vertically so they don't overlap.
+    _drawSpots(ctx, W, specH) {
+        if (!this._spots.length || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+
+        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+
+        // Build a list of (x, spot) for spots in range, sorted left-to-right.
+        const drawList = [];
+        for (const s of this._spots) {
+            if (s.frequencyHz < leftHz || s.frequencyHz > rightHz) continue;
+            const x = ((s.frequencyHz - leftHz) / this._lastSpanHz) * W;
+            drawList.push({ x, spot: s });
+        }
+        if (drawList.length === 0) return;
+        drawList.sort((a, b) => a.x - b.x);
+
+        ctx.save();
+        ctx.font      = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle   = '#ffcc33';
+        ctx.strokeStyle = '#ffcc33';
+        ctx.lineWidth   = 1.5;
+
+        const minXGap = 50;       // px; labels closer than this are staggered
+        const rowHeight = 12;     // px between stagger rows
+        const maxRows = 3;        // wrap after 3 rows
+        let lastRowX = [-Infinity, -Infinity, -Infinity];
+
+        for (const { x, spot } of drawList) {
+            // Pick the lowest row whose last entry is far enough left.
+            let row = 0;
+            for (let r = 0; r < maxRows; r++) {
+                if (x - lastRowX[r] >= minXGap) { row = r; break; }
+                if (r === maxRows - 1) row = maxRows - 1; // overflow falls into last row
+            }
+            lastRowX[row] = x;
+            const labelY = 12 + row * rowHeight;
+
+            // Callsign label.
+            ctx.fillText(spot.callsign, x, labelY);
+
+            // Tick mark dropping from the label to mid-spectrum.
+            const tickTop = labelY + 2;
+            const tickBot = tickTop + 6;
+            ctx.beginPath();
+            ctx.moveTo(x, tickTop);
+            ctx.lineTo(x, tickBot);
+            ctx.stroke();
+        }
+
+        ctx.restore();
     }
 
     // ── Spectrum trace ───────────────────────────────────────────────────────
