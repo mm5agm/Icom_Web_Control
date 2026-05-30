@@ -168,6 +168,10 @@ builder.Logging.AddFilter((category, level) =>
     // Show Information and above for WsjtxUdpService
     if (!string.IsNullOrEmpty(category) && category.Contains("Yaesu_Web_Control.Services.WsjtxUdpService"))
         return level >= LogLevel.Information;
+    // Show Information and above for DxClusterService so we can see the
+    // raw protocol exchange when diagnosing why no spots appear.
+    if (!string.IsNullOrEmpty(category) && category.Contains("Yaesu_Web_Control.Services.DxClusterService"))
+        return level >= LogLevel.Information;
     // Show Warning and above for everything else
     return level >= LogLevel.Warning;
 });

@@ -30,6 +30,16 @@ namespace Yaesu_Web_Control.Services
         private readonly LinkedList<DxSpot> _spots = new();
         private readonly object _spotsLock = new();
 
+        // Recent raw lines from the cluster — captured for browser-visible
+        // diagnostics so the user does not need to find the dev console.
+        // Capped at 100 entries.
+        private readonly LinkedList<string> _recentLines = new();
+        private readonly object _recentLinesLock = new();
+        public List<string> GetRecentLines()
+        {
+            lock (_recentLinesLock) return _recentLines.ToList();
+        }
+
         // Connection lifecycle: "off" (disabled in Settings or missing fields),
         // "connecting" (TCP open in progress), "connected" (logged in / receiving),
         // "disconnected" (last attempt failed or remote dropped — service is
@@ -166,12 +176,14 @@ namespace Yaesu_Web_Control.Services
                 if (line == null) break; // remote closed
                 if (line.Length == 0) continue;
 
-                // Log every line received so we can see exactly what the
-                // cluster is sending. Spot lines tend to be frequent on busy
-                // bands, so this can get chatty — kept at Information so it
-                // shows in normal dev-server output but not on quiet bands
-                // when nothing is happening.
+                // Log every line received and also keep a ring buffer for
+                // browser-visible diagnostics via /api/dxcluster/recent.
                 _logger.LogInformation("[DxCluster] << {Line}", line);
+                lock (_recentLinesLock)
+                {
+                    _recentLines.AddLast($"{DateTime.UtcNow:HH:mm:ss}  {line}");
+                    while (_recentLines.Count > 100) _recentLines.RemoveFirst();
+                }
 
                 // Login: most clusters print a prompt containing "call:" or
                 // "callsign" or "login". Respond with the configured callsign.

@@ -34,5 +34,21 @@ namespace Yaesu_Web_Control.Controllers
             detail    = _dxCluster.LastError,
             spotCount = _dxCluster.SpotCount,
         });
+
+        /// <summary>
+        /// Last ~100 raw lines received from the cluster, one per line.
+        /// Use this in the browser to see the actual protocol exchange when
+        /// diagnosing why spots are not appearing. Plain text response so it
+        /// is easy to read directly.
+        /// </summary>
+        [HttpGet("recent")]
+        [Produces("text/plain")]
+        public IActionResult GetRecent()
+        {
+            var lines = _dxCluster.GetRecentLines();
+            return Content(lines.Count == 0
+                ? "(no lines received yet)"
+                : string.Join('\n', lines), "text/plain");
+        }
     }
 }
