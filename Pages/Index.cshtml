@@ -1355,10 +1355,15 @@
             // overlay. On page load, also fetch the current ring buffer so the
             // overlay isn't empty until a new spot arrives.
             spectrumPipeline.onDxSpot(spot => spectrumPanel.addSpot(spot));
+            spectrumPipeline.onDxClusterStatus(s => spectrumPanel.setDxStatus(s?.status, s?.detail));
             fetch('/api/dxcluster/spots')
                 .then(r => r.ok ? r.json() : [])
                 .then(arr => spectrumPanel.setSpots(arr))
                 .catch(() => { /* feature off or backend not ready — ignore */ });
+            fetch('/api/dxcluster/status')
+                .then(r => r.ok ? r.json() : null)
+                .then(s => { if (s) spectrumPanel.setDxStatus(s.status, s.detail); })
+                .catch(() => { /* ignore */ });
 
             spectrumPipeline.connect();
             window.spectrumPanel = spectrumPanel;

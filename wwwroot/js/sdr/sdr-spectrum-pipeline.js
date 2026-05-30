@@ -90,4 +90,13 @@ export class SdrSpectrumPipeline {
     onDxSpot(handler) {
         this._pipeline.register('DxSpot', (value) => handler(value));
     }
+
+    /**
+     * Register a handler for DX cluster connection-status changes.
+     * Value is { status, detail }.
+     * @param {function({status:string, detail:string})} handler
+     */
+    onDxClusterStatus(handler) {
+        this._pipeline.register('DxClusterStatus', (value) => handler(value));
+    }
 }

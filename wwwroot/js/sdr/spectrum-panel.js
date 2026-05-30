@@ -38,6 +38,11 @@ export class SpectrumPanel {
         // drawn; clicks within a few pixels of a spot QSY to it precisely.
         this._spots = [];
 
+        // DX cluster connection status — shown as a small badge in the
+        // top-right of the spectrum canvas. Updated by setDxStatus().
+        this._dxStatus = 'off';
+        this._dxDetail = '';
+
         // Crosshair state — null when mouse is outside the canvas.
         this._crosshairX  = null;
         this._crosshairY  = null;
@@ -59,6 +64,18 @@ export class SpectrumPanel {
     /** Store the latest error detail string for display alongside status overlays. */
     setError(detail) {
         this._errorDetail = detail;
+    }
+
+    /**
+     * Update the DX cluster connection status. Drives the small badge in
+     * the top-right of the spectrum canvas.
+     * @param {string} status  "off" | "connecting" | "connected" | "disconnected"
+     * @param {string} detail  Optional human-readable detail / error message
+     */
+    setDxStatus(status, detail) {
+        this._dxStatus = status || 'off';
+        this._dxDetail = detail || '';
+        if (this._lastBins) this._render();
     }
 
     /** Replace the full DX spots array (used on page load when fetching /api/dxcluster/spots). */
@@ -253,8 +270,38 @@ export class SpectrumPanel {
         this._drawSpectrum(ctx, bins, W, specH);
         this._drawFrequencyAxis(ctx, bins, W, specH, centreHz, spanHz);
         this._drawSpots(ctx, W, specH);
+        this._drawDxBadge(ctx, W);
         this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawCrosshair(ctx, W, specH, spanHz);
+    }
+
+    // ── DX cluster status badge ──────────────────────────────────────────────
+    _drawDxBadge(ctx, W) {
+        const label = `DX: ${this._dxStatus}`;
+        let bg, fg;
+        switch (this._dxStatus) {
+            case 'connected':    bg = '#1e7e34'; fg = '#ffffff'; break;
+            case 'connecting':   bg = '#b58900'; fg = '#000000'; break;
+            case 'disconnected': bg = '#a03030'; fg = '#ffffff'; break;
+            default:             bg = '#3a3a3a'; fg = '#aaaaaa'; break;
+        }
+
+        ctx.save();
+        ctx.font      = 'bold 10px monospace';
+        ctx.textBaseline = 'top';
+        const padX = 6;
+        const padY = 3;
+        const textWidth = ctx.measureText(label).width;
+        const w = textWidth + padX * 2;
+        const h = 16;
+        const x = W - w - 4;
+        const y = 4;
+        ctx.fillStyle = bg;
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = fg;
+        ctx.textAlign = 'left';
+        ctx.fillText(label, x + padX, y + padY);
+        ctx.restore();
     }
 
     // ── DX cluster spot overlay ──────────────────────────────────────────────

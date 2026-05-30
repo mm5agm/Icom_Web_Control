@@ -30,6 +30,15 @@ namespace Yaesu_Web_Control.Services
         private readonly LinkedList<DxSpot> _spots = new();
         private readonly object _spotsLock = new();
 
+        // Connection lifecycle: "off" (disabled in Settings or missing fields),
+        // "connecting" (TCP open in progress), "connected" (logged in / receiving),
+        // "disconnected" (last attempt failed or remote dropped — service is
+        // waiting before reconnecting). LastError holds the most recent failure
+        // message so the UI can show why a connection isn't established.
+        public string Status { get; private set; } = "off";
+        public string LastError { get; private set; } = "";
+        public int SpotCount { get { lock (_spotsLock) return _spots.Count; } }
+
         // Cluster lines tend to look like one of:
         //   "DX de F5OYE-#:   14074.0  W2AAA       FT8 RTTY                 1234Z"
         //   "DX de SP9XYZ:    7050.5   DL1ABC      CW EU                    0815Z"
@@ -82,6 +91,10 @@ namespace Yaesu_Web_Control.Services
                     || string.IsNullOrWhiteSpace(settings.DxClusterHost)
                     || string.IsNullOrWhiteSpace(settings.DxClusterLoginCallsign))
                 {
+                    await SetStatus("off",
+                        !settings.DxClusterEnabled ? "Cluster disabled in Settings" :
+                        string.IsNullOrWhiteSpace(settings.DxClusterHost) ? "No cluster host configured" :
+                        "No login callsign configured");
                     await SafeDelay(ReconnectDelaySeconds, stoppingToken);
                     continue;
                 }
@@ -100,6 +113,7 @@ namespace Yaesu_Web_Control.Services
                 {
                     _logger.LogWarning(ex, "[DxCluster] Session ended unexpectedly — reconnecting in {Sec}s",
                         ReconnectDelaySeconds);
+                    await SetStatus("disconnected", ex.Message);
                 }
 
                 await SafeDelay(ReconnectDelaySeconds, stoppingToken);
@@ -113,12 +127,14 @@ namespace Yaesu_Web_Control.Services
             _logger.LogInformation("[DxCluster] Connecting to {Host}:{Port} as {Callsign}",
                 settings.DxClusterHost, settings.DxClusterPort, settings.DxClusterLoginCallsign);
 
+            await SetStatus("connecting", $"Opening {settings.DxClusterHost}:{settings.DxClusterPort}");
+
             using var client = new TcpClient();
             using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             connectCts.CancelAfter(TimeSpan.FromSeconds(15));
             await client.ConnectAsync(settings.DxClusterHost, settings.DxClusterPort, connectCts.Token);
 
-            await BroadcastConnectionStatus("connected");
+            await SetStatus("connected", "");
 
             using var stream = client.GetStream();
             using var reader = new StreamReader(stream);
@@ -169,7 +185,7 @@ namespace Yaesu_Web_Control.Services
                 }
             }
 
-            await BroadcastConnectionStatus("disconnected");
+            await SetStatus("disconnected", "Remote closed the connection");
         }
 
         /// <summary>
@@ -226,10 +242,18 @@ namespace Yaesu_Web_Control.Services
                 new { property = "DxSpot", value = spot });
         }
 
-        private async Task BroadcastConnectionStatus(string status)
+        // Update the cached status fields and broadcast over SignalR so the
+        // UI can show a live badge. Suppresses repeat broadcasts when the
+        // state has not actually changed (avoids hammering SignalR every
+        // 15 s while idle).
+        private async Task SetStatus(string status, string detail)
         {
+            if (Status == status && LastError == detail) return;
+            Status = status;
+            LastError = detail ?? "";
+            _logger.LogInformation("[DxCluster] Status: {Status} ({Detail})", status, detail);
             await _hubContext.Clients.All.SendAsync("RadioStateUpdate",
-                new { property = "DxClusterStatus", value = status });
+                new { property = "DxClusterStatus", value = new { status, detail } });
         }
 
         private static async Task SafeDelay(int seconds, CancellationToken token)

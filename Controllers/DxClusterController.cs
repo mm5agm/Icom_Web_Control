@@ -21,5 +21,18 @@ namespace Yaesu_Web_Control.Controllers
         /// </summary>
         [HttpGet("spots")]
         public IActionResult GetSpots() => Ok(_dxCluster.GetAllSpots());
+
+        /// <summary>
+        /// Returns the current cluster connection status — used by the
+        /// spectrum-panel badge on page load (before the first SignalR
+        /// push) and for ad-hoc diagnostics from a browser.
+        /// </summary>
+        [HttpGet("status")]
+        public IActionResult GetStatus() => Ok(new
+        {
+            status    = _dxCluster.Status,
+            detail    = _dxCluster.LastError,
+            spotCount = _dxCluster.SpotCount,
+        });
     }
 }
