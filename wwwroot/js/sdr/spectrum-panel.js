@@ -333,19 +333,28 @@ export class SpectrumPanel {
         ctx.strokeStyle = '#ffcc33';
         ctx.lineWidth   = 1.5;
 
-        const minXGap = 70;       // px; labels closer than this are staggered
-        const rowHeight = 16;     // px between stagger rows
-        const maxRows = 3;        // wrap after 3 rows
-        let lastRowX = [-Infinity, -Infinity, -Infinity];
+        // Stagger labels across multiple rows so they don't overlap. For each
+        // candidate label, measure its actual rendered width and find the
+        // first row whose previous label's right edge is far enough left.
+        // If no row has space, drop the label rather than overlap. Newer
+        // spots are drawn last so they win when crowded — drawList is sorted
+        // by x but spots are most-recent-first within the same x.
+        const rowHeight    = 16;
+        const maxRows      = 5;
+        const minLabelGap  = 4;   // px between adjacent labels in the same row
+        const rowRightEdge = new Array(maxRows).fill(-Infinity);
 
         for (const { x, spot } of drawList) {
-            // Pick the lowest row whose last entry is far enough left.
-            let row = 0;
+            const halfWidth = ctx.measureText(spot.callsign).width / 2;
+            const leftEdge  = x - halfWidth;
+            const rightEdge = x + halfWidth;
+
+            let row = -1;
             for (let r = 0; r < maxRows; r++) {
-                if (x - lastRowX[r] >= minXGap) { row = r; break; }
-                if (r === maxRows - 1) row = maxRows - 1; // overflow falls into last row
+                if (leftEdge >= rowRightEdge[r] + minLabelGap) { row = r; break; }
             }
-            lastRowX[row] = x;
+            if (row < 0) continue; // crowded — skip this label rather than overlap
+            rowRightEdge[row] = rightEdge;
             const labelY = 14 + row * rowHeight;
 
             // Callsign label.
