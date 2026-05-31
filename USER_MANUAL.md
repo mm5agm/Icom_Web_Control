@@ -20,7 +20,8 @@
    - 5.11 [VOX Panel](#511-vox-panel)
    - 5.12 [CW Keyer Panel](#512-cw-keyer-panel)
    - 5.13 [FM Repeater Panel](#513-fm-repeater-panel)
-   - 5.14 [Memory Panel](#514-memory-panel)
+   - 5.14 [DX Watch Panel](#514-dx-watch-panel)
+   - 5.15 [Memory Panel](#515-memory-panel)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -89,6 +90,7 @@ The application was written for operators who want a large, clean, touchscreen-f
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Optional real-time spectrum display and waterfall (requires an SDR connected to the 9 MHz IF output)
 - **DX cluster spots** overlaid on the spectrum — click a callsign to QSY straight to that frequency; user-selectable cluster server with live connection-status badge
+- **DX watch list** — get a popup alert and a beep when watched callsigns or prefixes appear in the cluster feed (e.g. `P29*` for a DXpedition); persisted across app restarts
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
 - **USB audio for DATA modes** — one-click setting configures the radio to route FT8, WSJT-X and other digital modes through the USB connection, no rear DATA connector required
@@ -497,7 +499,38 @@ Close the panel by clicking the **×** button in its title bar. Drag the title b
 
 ---
 
-### 5.14 Memory Panel
+### 5.14 DX Watch Panel
+
+Click the **DX Watch** button on the toolbar to open the watched-callsign panel. This is where you tell the app which callsigns or callsign prefixes you want to be alerted on when they show up in the DX cluster feed.
+
+Use it for chasing a particular DXpedition (`P29VR`), staying on top of a contest call (`G4ABC/P`), or watching a whole prefix run (`VK*` for any Australian station).
+
+**Adding a watched call:**
+
+1. Type the callsign or prefix in the input field (e.g. `G4ABC` or `VK*`).
+2. Click **Add** or press Enter.
+3. The entry appears in the list below.
+
+**Removing a watched call:**
+
+Click the red **×** to the right of any entry. The entry is removed immediately and the change is persisted.
+
+**Wildcard matching:**
+
+- Plain callsign — exact match, case-insensitive (`G4ABC` matches only `G4ABC`)
+- Trailing `*` — prefix match (`G4*` matches `G4ABC`, `G4XYZ`, `G4ABC/P`, etc.)
+
+**What happens when a watched call is spotted:**
+
+- A small red **alert toast** appears in the bottom-right corner with the callsign, frequency, spotter and any comment from the spot. The toast fades after about 8 seconds. **Click the toast to QSY VFO A directly to that frequency.**
+- A short two-tone **beep** plays (only after you've interacted with the page — browsers block audio until the user has clicked something on the page first).
+- On the spectrum panel, the watched callsign is drawn in **bright red** instead of the usual yellow, so you can see it at a glance.
+
+The list is saved across app restarts in your user settings file. You don't need to re-enter it after a reboot. Close the panel with the **×** button in its title bar; drag the title bar to reposition the panel anywhere on screen — the position is remembered between sessions.
+
+---
+
+### 5.15 Memory Panel
 
 The **Mem** button in the toolbar opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. Click a tile to instantly tune VFO A to that frequency and mode.
 
@@ -697,7 +730,7 @@ These must match WSJT-X's **Settings → Reporting → UDP Server** settings. Se
 
 ## 8. Radio Memories
 
-The app maintains its own list of memory channels, independent of the radio's built-in memories. You can store as many channels as you like, organised with labels, and recall any of them at a click from the floating Mem panel (see Section 5.14).
+The app maintains its own list of memory channels, independent of the radio's built-in memories. You can store as many channels as you like, organised with labels, and recall any of them at a click from the floating Mem panel (see Section 5.15).
 
 ### 8.1 Memories Editor
 

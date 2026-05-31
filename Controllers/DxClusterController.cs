@@ -8,10 +8,50 @@ namespace Yaesu_Web_Control.Controllers
     public class DxClusterController : ControllerBase
     {
         private readonly DxClusterService _dxCluster;
+        private readonly ISettingsService _settings;
 
-        public DxClusterController(DxClusterService dxCluster)
+        public DxClusterController(DxClusterService dxCluster, ISettingsService settings)
         {
             _dxCluster = dxCluster;
+            _settings = settings;
+        }
+
+        // ── Watched callsigns ─────────────────────────────────────────────
+        //
+        // Persisted in ApplicationSettings.DxClusterWatchedCallsigns as one
+        // pattern per line. The popup dialog calls GET to read the list and
+        // PUT to replace it. Each pattern is either an exact callsign or a
+        // prefix ending in "*" (case-insensitive). Lines starting with "#"
+        // are ignored.
+
+        public class WatchedListDto { public List<string> Patterns { get; set; } = new(); }
+
+        [HttpGet("watched")]
+        public async Task<IActionResult> GetWatched()
+        {
+            var s = await _settings.GetSettingsAsync();
+            var patterns = (s.DxClusterWatchedCallsigns ?? "")
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(l => l.Trim())
+                .Where(l => l.Length > 0 && !l.StartsWith("#"))
+                .ToList();
+            return Ok(new WatchedListDto { Patterns = patterns });
+        }
+
+        [HttpPut("watched")]
+        public async Task<IActionResult> SaveWatched([FromBody] WatchedListDto dto)
+        {
+            if (dto == null) return BadRequest();
+            var cleaned = (dto.Patterns ?? new List<string>())
+                .Select(p => (p ?? "").Trim().ToUpperInvariant())
+                .Where(p => p.Length > 0)
+                .Distinct()
+                .ToList();
+
+            var s = await _settings.GetSettingsAsync();
+            s.DxClusterWatchedCallsigns = string.Join("\n", cleaned);
+            await _settings.SaveSettingsAsync(s);
+            return Ok(new WatchedListDto { Patterns = cleaned });
         }
 
         /// <summary>

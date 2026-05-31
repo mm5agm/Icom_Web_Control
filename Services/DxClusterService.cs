@@ -275,8 +275,13 @@ namespace Yaesu_Web_Control.Services
 
                 if (TryParseSpot(line, out var spot))
                 {
+                    // Flag the spot if it matches the user's watched list,
+                    // then broadcast — frontend handles alerts and highlight.
+                    spot.IsWatched = MatchesWatchList(spot.Callsign, settings.DxClusterWatchedCallsigns);
                     AddSpot(spot);
                     await BroadcastSpot(spot);
+                    if (spot.IsWatched)
+                        await BroadcastAlert(spot);
                 }
             }
 
@@ -335,6 +340,39 @@ namespace Yaesu_Web_Control.Services
         {
             await _hubContext.Clients.All.SendAsync("RadioStateUpdate",
                 new { property = "DxSpot", value = spot });
+        }
+
+        private async Task BroadcastAlert(DxSpot spot)
+        {
+            await _hubContext.Clients.All.SendAsync("RadioStateUpdate",
+                new { property = "DxAlert", value = spot });
+        }
+
+        /// <summary>
+        /// Case-insensitive match of a spot callsign against the user's
+        /// watched-callsigns list. Each non-comment line is either an exact
+        /// callsign or a prefix ending in "*".
+        /// </summary>
+        internal static bool MatchesWatchList(string callsign, string watchedRaw)
+        {
+            if (string.IsNullOrWhiteSpace(callsign) || string.IsNullOrWhiteSpace(watchedRaw))
+                return false;
+            var call = callsign.ToUpperInvariant();
+            foreach (var raw in watchedRaw.Split('\n'))
+            {
+                var p = raw.Trim().ToUpperInvariant();
+                if (p.Length == 0 || p.StartsWith("#")) continue;
+                if (p.EndsWith("*"))
+                {
+                    var prefix = p[..^1];
+                    if (prefix.Length > 0 && call.StartsWith(prefix)) return true;
+                }
+                else if (call == p)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // Update the cached status fields and broadcast over SignalR so the

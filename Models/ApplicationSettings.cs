@@ -69,6 +69,12 @@
         // Commands are sent in order after the callsign is accepted.
         public string DxClusterPostLoginCommands { get; set; } = "";
 
+        // Callsigns or callsign prefixes to watch. Each line is matched
+        // case-insensitively. A trailing * makes it a prefix match
+        // ("G4*" matches G4ABC, G4XYZ). No wildcards = exact match.
+        // Lines starting with # are ignored. Empty = feature off.
+        public string DxClusterWatchedCallsigns { get; set; } = "";
+
         // Optional roofing filters installed in the radio (FTdx101MP/D only).
         // "6"=12kHz and "7"=3kHz are always fitted. "8"=1.2kHz, "9"=600Hz, "A"=300Hz are optional.
         // FTdx10 has fixed roofing filters and ignores this setting.

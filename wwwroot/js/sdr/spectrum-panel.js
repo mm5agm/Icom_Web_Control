@@ -329,8 +329,6 @@ export class SpectrumPanel {
         ctx.save();
         ctx.font      = 'bold 13px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillStyle   = '#ffcc33';
-        ctx.strokeStyle = '#ffcc33';
         ctx.lineWidth   = 1.5;
 
         // Stagger labels across multiple rows so they don't overlap. For each
@@ -339,6 +337,10 @@ export class SpectrumPanel {
         // If no row has space, drop the label rather than overlap. Newer
         // spots are drawn last so they win when crowded — drawList is sorted
         // by x but spots are most-recent-first within the same x.
+        //
+        // Watched callsigns are drawn in bright red instead of yellow so the
+        // operator can spot them at a glance amongst the regular cluster
+        // traffic.
         const rowHeight    = 16;
         const maxRows      = 5;
         const minLabelGap  = 4;   // px between adjacent labels in the same row
@@ -356,6 +358,11 @@ export class SpectrumPanel {
             if (row < 0) continue; // crowded — skip this label rather than overlap
             rowRightEdge[row] = rightEdge;
             const labelY = 14 + row * rowHeight;
+
+            // Colour per spot — bright red for watched callsigns, yellow otherwise.
+            const colour = spot.isWatched ? '#ff4040' : '#ffcc33';
+            ctx.fillStyle   = colour;
+            ctx.strokeStyle = colour;
 
             // Callsign label.
             ctx.fillText(spot.callsign, x, labelY);

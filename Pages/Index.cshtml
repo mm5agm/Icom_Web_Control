@@ -346,6 +346,10 @@
                                 aria-label="FM repeater controls"
                                 title="Open FM repeater controls panel"
                                 onclick="document.getElementById('fmDialog').show()">FM Rep</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="DX watch — alerts for spotted callsigns"
+                                title="Open DX watch list — get alerts when watched callsigns are spotted"
+                                onclick="document.getElementById('dxWatchDialog').show(); window.refreshDxWatchList && window.refreshDxWatchList();">DX Watch</button>
                     </div>
 
                 </div>
@@ -1287,6 +1291,45 @@
     </div>
 </dialog>
 
+<!-- DX Watch (watched-callsign alerts) Dialog -->
+<dialog id="dxWatchDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:320px; max-width:420px;" aria-labelledby="dxWatchTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+        <strong id="dxWatchTitle">DX Watch</strong>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="document.getElementById('dxWatchDialog').close()"
+                aria-label="Close DX watch panel">✕</button>
+    </div>
+    <div class="p-3 d-flex flex-column gap-2">
+        <p class="text-muted small mb-1" style="color:#bbb !important;">
+            Get notified when these callsigns are spotted on the DX cluster.
+            Use a trailing <code style="color:#ffd">*</code> for prefix match
+            (<code style="color:#ffd">G4*</code> matches G4ABC, G4XYZ).
+        </p>
+        <div class="d-flex align-items-center gap-2">
+            <input type="text" id="dxWatchNewInput" class="form-control form-control-sm font-monospace"
+                   placeholder="Callsign or prefix*"
+                   maxlength="16"
+                   style="text-transform:uppercase"
+                   aria-label="New watched callsign or prefix">
+            <button id="dxWatchAddBtn" class="btn btn-sm btn-success"
+                    aria-label="Add to watch list"
+                    onclick="window.dxWatchAdd && window.dxWatchAdd()">Add</button>
+        </div>
+        <hr style="border-color:#444; margin:4px 0;">
+        <div class="fw-bold small" style="color:#aaa;">Watched</div>
+        <ul id="dxWatchList" class="list-unstyled mb-0 small" style="max-height:240px; overflow-y:auto;"
+            aria-live="polite" aria-label="Watched callsigns list"></ul>
+        <div id="dxWatchEmpty" class="text-muted small" style="display:none;">
+            No callsigns watched yet. Add one above to get alerts.
+        </div>
+    </div>
+</dialog>
+
+<!-- DX Watch alert toast container — populated by site.js when a watched spot arrives -->
+<div id="dxAlertToastHost" aria-live="assertive" aria-atomic="true"
+     style="position:fixed; right:16px; bottom:16px; z-index:9999;
+            display:flex; flex-direction:column; gap:8px; pointer-events:none;"></div>
+
 @section Scripts {
     <!-- Cache-busted JS reference, placed BEFORE your inline script if you use window.radioControl, etc. -->
     <script>window.bandPlan = '@Model.BandPlan';</script>
@@ -1356,6 +1399,7 @@
             // overlay isn't empty until a new spot arrives.
             spectrumPipeline.onDxSpot(spot => spectrumPanel.addSpot(spot));
             spectrumPipeline.onDxClusterStatus(s => spectrumPanel.setDxStatus(s?.status, s?.detail));
+            spectrumPipeline.onDxAlert(spot => { if (window.handleDxAlert) window.handleDxAlert(spot); });
             fetch('/api/dxcluster/spots')
                 .then(r => r.ok ? r.json() : [])
                 .then(arr => spectrumPanel.setSpots(arr))
@@ -1813,7 +1857,7 @@
             }, { passive: true });
         }
 
-        ['voxDialog', 'cwDialog', 'fmDialog'].forEach(id => {
+        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog'].forEach(id => {
             const dlg = document.getElementById(id);
             if (!dlg) return;
             makeDraggable(dlg, dlg.querySelector('div'));
@@ -1826,6 +1870,148 @@
                 }
             } catch {}
         });
+
+        // --- DX Watch (watched-callsign alerts) ---
+        // Backed by ApplicationSettings.DxClusterWatchedCallsigns. The
+        // popup edits the persisted list via GET/PUT on /api/dxcluster/watched.
+        // When a watched spot arrives, DxClusterService fires a DxAlert
+        // SignalR event which we handle in site.js (toast + beep + spectrum
+        // highlight).
+        let _dxWatched = [];
+
+        async function dxWatchLoad() {
+            try {
+                const resp = await fetch('/api/dxcluster/watched');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                _dxWatched = Array.isArray(data.patterns) ? data.patterns : [];
+                dxWatchRender();
+            } catch { /* ignore */ }
+        }
+
+        async function dxWatchSave() {
+            try {
+                const resp = await fetch('/api/dxcluster/watched', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ patterns: _dxWatched })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                _dxWatched = Array.isArray(data.patterns) ? data.patterns : [];
+                dxWatchRender();
+            } catch { /* ignore */ }
+        }
+
+        function dxWatchRender() {
+            const list = document.getElementById('dxWatchList');
+            const empty = document.getElementById('dxWatchEmpty');
+            if (!list) return;
+            list.innerHTML = '';
+            if (_dxWatched.length === 0) {
+                if (empty) empty.style.display = '';
+                return;
+            }
+            if (empty) empty.style.display = 'none';
+            for (const pat of _dxWatched) {
+                const li = document.createElement('li');
+                li.className = 'd-flex align-items-center justify-content-between py-1';
+                li.style.borderBottom = '1px solid #333';
+                const span = document.createElement('span');
+                span.className = 'font-monospace';
+                span.textContent = pat;
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-sm btn-outline-danger';
+                btn.style.padding = '0 8px';
+                btn.setAttribute('aria-label', `Remove ${pat}`);
+                btn.title = `Remove ${pat}`;
+                btn.textContent = '✕';
+                btn.onclick = () => {
+                    _dxWatched = _dxWatched.filter(p => p !== pat);
+                    dxWatchSave();
+                };
+                li.appendChild(span);
+                li.appendChild(btn);
+                list.appendChild(li);
+            }
+        }
+
+        window.dxWatchAdd = function () {
+            const input = document.getElementById('dxWatchNewInput');
+            if (!input) return;
+            const val = (input.value || '').trim().toUpperCase();
+            if (!val) return;
+            if (_dxWatched.includes(val)) { input.value = ''; return; }
+            _dxWatched = [..._dxWatched, val];
+            input.value = '';
+            dxWatchSave();
+        };
+        window.refreshDxWatchList = dxWatchLoad;
+
+        // Enter key in the input adds the entry
+        document.getElementById('dxWatchNewInput')?.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); window.dxWatchAdd(); }
+        });
+
+        // Initial load on page open so the alert system has the list ready
+        // even if the user never opens the popup.
+        dxWatchLoad();
+
+        // --- DX Watch alert handler ---
+        // Fired by SignalR when DxClusterService detects a spot that matches
+        // the watched list. Plays a short beep, shows a toast that auto-fades,
+        // and the spectrum overlay already highlights the spot via spot.isWatched.
+        function _dxAlertBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                o.frequency.setValueAtTime(880, ctx.currentTime);
+                o.frequency.setValueAtTime(1320, ctx.currentTime + 0.15);
+                g.gain.setValueAtTime(0.0001, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+                o.connect(g).connect(ctx.destination);
+                o.start();
+                o.stop(ctx.currentTime + 0.45);
+            } catch { /* ignore — audio not allowed before user interaction */ }
+        }
+
+        function _dxAlertToast(spot) {
+            const host = document.getElementById('dxAlertToastHost');
+            if (!host) return;
+            const div = document.createElement('div');
+            div.style.cssText = 'background:#a03030; color:#fff; padding:10px 14px; ' +
+                'border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.4); ' +
+                'min-width:260px; pointer-events:auto; cursor:pointer; ' +
+                'font-family:sans-serif; opacity:0; transition:opacity 200ms;';
+            div.setAttribute('role', 'alert');
+            const freqMHz = (spot.frequencyHz / 1e6).toFixed(3);
+            div.innerHTML = `<div style="font-weight:bold;font-size:1.05em">DX ${spot.callsign}</div>` +
+                            `<div style="font-size:0.9em;margin-top:2px">${freqMHz} MHz — spotted by ${spot.spotter || '?'}</div>` +
+                            (spot.comment ? `<div style="font-size:0.85em;opacity:0.85;margin-top:2px">${spot.comment}</div>` : '');
+            div.onclick = () => {
+                fetch('/api/cat/frequency/a', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ frequencyHz: spot.frequencyHz })
+                }).catch(() => {});
+                div.remove();
+            };
+            host.appendChild(div);
+            requestAnimationFrame(() => { div.style.opacity = '1'; });
+            setTimeout(() => {
+                div.style.opacity = '0';
+                setTimeout(() => div.remove(), 220);
+            }, 8000);
+        }
+
+        window.handleDxAlert = function (spot) {
+            if (!spot || !spot.callsign) return;
+            _dxAlertBeep();
+            _dxAlertToast(spot);
+        };
 
         // --- VOX ---
         async function toggleVox() {

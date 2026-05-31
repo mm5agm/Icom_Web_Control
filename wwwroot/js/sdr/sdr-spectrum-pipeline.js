@@ -99,4 +99,13 @@ export class SdrSpectrumPipeline {
     onDxClusterStatus(handler) {
         this._pipeline.register('DxClusterStatus', (value) => handler(value));
     }
+
+    /**
+     * Register a handler for watched-callsign alerts.
+     * Fired in addition to DxSpot when a spot matches the user's watch list.
+     * @param {function(object)} handler  receives the full spot object
+     */
+    onDxAlert(handler) {
+        this._pipeline.register('DxAlert', (value) => handler(value));
+    }
 }

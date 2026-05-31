@@ -19,5 +19,8 @@ namespace Yaesu_Web_Control.Models
 
         /// <summary>Time the spot was received by this app (UTC).</summary>
         public DateTime ReceivedUtc { get; set; }
+
+        /// <summary>True if this spot matches one of the user's watched callsigns/prefixes.</summary>
+        public bool IsWatched { get; set; }
     }
 }
