@@ -467,6 +467,19 @@
                             </div>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label asp-for="Settings.DxClusterPostLoginCommands" class="form-label">
+                            Post-login commands
+                        </label>
+                        <textarea asp-for="Settings.DxClusterPostLoginCommands" class="form-control font-monospace"
+                                  rows="4" placeholder="set/qra IO75JA&#10;set/name Colin"></textarea>
+                        <div class="form-text">
+                            One DXSpider command per line. Sent each time the app connects, after the callsign
+                            is accepted. Use this to set your Maidenhead grid (<code>set/qra IO75JA</code>),
+                            name (<code>set/name Colin</code>), or any spot filters you prefer. Lines starting
+                            with <code>#</code> are ignored. Leading <code>/</code> is stripped.
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

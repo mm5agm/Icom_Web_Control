@@ -195,6 +195,23 @@ namespace Yaesu_Web_Control.Services
             AppendLogFile($">> {settings.DxClusterLoginCallsign}");
             _logger.LogInformation("[DxCluster] Sent proactive login: {Callsign}", settings.DxClusterLoginCallsign);
 
+            // Send any user-configured post-login commands (set/qra IO75JA,
+            // set/name Colin, set/filter ... etc.). Pause briefly first so
+            // the cluster has time to process the login.
+            if (!string.IsNullOrWhiteSpace(settings.DxClusterPostLoginCommands))
+            {
+                await Task.Delay(1500, stoppingToken);
+                foreach (var raw in settings.DxClusterPostLoginCommands.Split('\n'))
+                {
+                    var cmd = raw.Trim().TrimStart('/');
+                    if (string.IsNullOrEmpty(cmd) || cmd.StartsWith("#")) continue;
+                    await writer.WriteLineAsync(cmd);
+                    AppendLogFile($">> {cmd}");
+                    _logger.LogInformation("[DxCluster] Sent post-login command: {Cmd}", cmd);
+                    await Task.Delay(250, stoppingToken);
+                }
+            }
+
             bool loggedIn = true;
             long ageOffCounter = 0;
 
