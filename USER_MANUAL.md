@@ -36,6 +36,7 @@
    - 8.2 [Importing from the Radio](#82-importing-from-the-radio)
    - 8.3 [Exporting to the Radio](#83-exporting-to-the-radio)
    - 8.4 [Memory Banks](#84-memory-banks)
+   - 8.5 [What about the radio's PRESET function?](#85-what-about-the-radios-preset-function)
 9. [External Applications](#9-external-applications)
    - 9.1 [WSJT-X](#91-wsjt-x)
    - 9.2 [JTAlert](#92-jtalert)
@@ -747,6 +748,21 @@ The bank is saved immediately. Your current working memories are unchanged.
 Deleting a bank does not affect your current working memories.
 
 Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and are not affected by importing from or exporting to the radio.
+
+---
+
+### 8.5 What about the radio's PRESET function?
+
+The FT-710 and FTdx10 have a hardware **PRESET** button on the radio's front panel that loads a factory-recommended configuration for a particular operating mode — e.g. PRESET FT8 sets MIC GAIN to 0, disables the speech processor, locks WIDTH and SHIFT to sensible values, sets AGC to SLOW, and so on. The radio has five preset slots (PRESET1–5) configurable from the EX menu. *(The FTdx101MP/D and FTDX3000 do not have this feature.)*
+
+**Yaesu Web Control does not duplicate the PRESET function in the app, and here's why:**
+
+- The per-VFO memories with **Advanced fields** (Section 8.1) do everything PRESET does and more. You can save a memory channel labelled "20m FT8" with the exact antenna, IF width, IF shift, NR, NB, AGC, and power settings you want, and recall it with one click from the floating Mem panel. PRESET only stores per-mode defaults — memories store per-frequency-and-mode-and-everything-else.
+- **Per-band memory** (Section 5.9) automatically remembers your IF Width, IF Shift, and Mode for each band, so switching from 40m CW back to 20m SSB restores your filter and mode without any explicit recall.
+- PRESET is a hardware front-panel button on the radio — one keystroke away. The app doesn't need to reinvent it.
+- PRESET is only present on two of the five supported radio models; implementing it in the app would be inconsistent across radios.
+
+If you want a "one click for FT8" workflow in the app, the recommended approach is: tune to your favourite FT8 frequency on the radio, set all your preferred settings, click **Save to Mem** on the VFO panel, then optionally edit the label and notes from the Memories page. Next time, click that memory tile in the floating Mem panel and you're back exactly where you left off.
 
 ---
 
