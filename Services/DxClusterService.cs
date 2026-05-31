@@ -185,7 +185,17 @@ namespace Yaesu_Web_Control.Services
             using var reader = new StreamReader(stream);
             using var writer = new StreamWriter(stream) { AutoFlush = true, NewLine = "\r\n" };
 
-            bool loggedIn = false;
+            // Many DXSpider nodes send "login: " with no trailing newline,
+            // which causes ReadLineAsync to hang forever waiting for a \n.
+            // Send the callsign proactively after a short pause so the
+            // cluster receives it whether the prompt has been sent or not.
+            // DXSpider treats unsolicited input as the login response.
+            await Task.Delay(1500, stoppingToken);
+            await writer.WriteLineAsync(settings.DxClusterLoginCallsign);
+            AppendLogFile($">> {settings.DxClusterLoginCallsign}");
+            _logger.LogInformation("[DxCluster] Sent proactive login: {Callsign}", settings.DxClusterLoginCallsign);
+
+            bool loggedIn = true;
             long ageOffCounter = 0;
 
             while (!stoppingToken.IsCancellationRequested)
