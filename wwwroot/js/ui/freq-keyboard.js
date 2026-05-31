@@ -87,6 +87,8 @@ async function pressEnter() {
     if (window.radioControl?.setFrequency) {
         await window.radioControl.setFrequency(_receiver, hz);
     }
+    // Confirm the entry to a voice-announcement user
+    if (window.voiceAnnounce) window.voiceAnnounce.sayFrequencyEntered(hz);
 }
 
 // ── Physical keyboard handler ─────────────────────────────────────────────────

@@ -365,6 +365,11 @@
                                 aria-label="DX watch — alerts for spotted callsigns"
                                 title="Open DX watch list — get alerts when watched callsigns are spotted"
                                 onclick="document.getElementById('dxWatchDialog').show(); window.refreshDxWatchList && window.refreshDxWatchList();">DX Watch</button>
+                        <button id="voiceBtn"
+                                class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="Voice announcements settings"
+                                title="Voice announcements for band, mode, TX state etc. — useful for partially sighted operators"
+                                onclick="document.getElementById('voiceDialog').show();">Voice</button>
                     </div>
 
                 </div>
@@ -1352,6 +1357,65 @@
     </div>
 </dialog>
 
+<!-- Voice Announcements Dialog -->
+<dialog id="voiceDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:340px; max-width:480px;" aria-labelledby="voiceDialogTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+        <strong id="voiceDialogTitle">Voice Announcements</strong>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="document.getElementById('voiceDialog').close()"
+                aria-label="Close voice announcements panel">✕</button>
+    </div>
+    <div class="p-3 d-flex flex-column gap-2">
+        <p class="text-muted small mb-1" style="color:#bbb !important;">
+            Spoken announcements via your browser's text-to-speech engine.
+            Useful for partially sighted operators or anyone who wants to
+            be told when a setting changes without looking at the screen.
+            <br><strong>Note:</strong> If you use a screen reader (NVDA / JAWS),
+            leave this off to avoid double announcements.
+        </p>
+
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="voiceEnabledChk">
+            <label class="form-check-label" for="voiceEnabledChk"><strong>Enable voice announcements</strong></label>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:64px;">Voice:</label>
+            <select id="voicePickerSelect" class="form-select form-select-sm" style="flex:1;"
+                    aria-label="Text-to-speech voice"></select>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:64px;">Rate:</label>
+            <input type="range" id="voiceRateSlider" min="0.5" max="2.0" step="0.1" value="1.0"
+                   style="flex:1;" aria-label="Speech rate">
+            <span id="voiceRateValue" class="font-monospace" style="min-width:34px; text-align:right;">1.0×</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:64px;">Volume:</label>
+            <input type="range" id="voiceVolumeSlider" min="0" max="1.0" step="0.1" value="1.0"
+                   style="flex:1;" aria-label="Speech volume">
+            <span id="voiceVolumeValue" class="font-monospace" style="min-width:34px; text-align:right;">100%</span>
+        </div>
+
+        <hr style="border-color:#444; margin:4px 0;">
+        <div class="fw-bold small" style="color:#aaa;">Announce</div>
+
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceBandChk"><label class="form-check-label" for="voiceBandChk">Band changes ("forty metres")</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceModeChk"><label class="form-check-label" for="voiceModeChk">Mode changes ("upper sideband")</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceTxChk"><label class="form-check-label" for="voiceTxChk">TX / RX state ("transmit" / "receive")</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceFreqChk"><label class="form-check-label" for="voiceFreqChk">Manual frequency entry confirmation</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceDxAlertChk"><label class="form-check-label" for="voiceDxAlertChk">DX watched-callsign alerts</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceTxTimeoutChk"><label class="form-check-label" for="voiceTxTimeoutChk">TX timeout warning</label></div>
+
+        <div class="d-flex gap-2 mt-2">
+            <button id="voiceTestBtn" class="btn btn-sm btn-primary">Test voice</button>
+            <button id="voiceStopBtn" class="btn btn-sm btn-outline-secondary">Stop talking</button>
+        </div>
+    </div>
+</dialog>
+
 <!-- DX Watch alert toast container — populated by site.js when a watched spot arrives.
      Position is user-draggable; saved in localStorage as dxAlertPos. Defaults to
      bottom-right of the viewport on first run. -->
@@ -1905,7 +1969,7 @@
             }, { passive: true });
         }
 
-        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog'].forEach(id => {
+        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog'].forEach(id => {
             const dlg = document.getElementById(id);
             if (!dlg) return;
             makeDraggable(dlg, dlg.querySelector('div'));
@@ -2143,7 +2207,245 @@
             if (!spot || !spot.callsign) return;
             _dxAlertBeep();
             _dxAlertToast(spot);
+            if (window.voiceAnnounce) window.voiceAnnounce.sayDxAlert(spot);
         };
+
+        // ───────────────────────────────────────────────────────────────
+        // Voice announcements (Web Speech API)
+        //
+        // Spoken cues for partially sighted operators. Off by default; user
+        // turns on via the Voice popup. Settings (enable, voice name, rate,
+        // volume, category checkboxes) are persisted in localStorage.
+        //
+        // Initial-load suppression: we record the first value of each
+        // category and only start announcing on *subsequent* changes, so
+        // opening the page doesn't read out the whole current state.
+        // ───────────────────────────────────────────────────────────────
+        (function initVoice() {
+            const LS = 'voiceSettings';
+
+            // Defaults — all categories enabled so once the master switch
+            // goes on, the user immediately hears useful announcements.
+            const defaults = {
+                enabled: false,
+                voiceName: '',
+                rate: 1.0,
+                volume: 1.0,
+                band: true, mode: true, tx: true, freq: true, dxAlert: true, txTimeout: true,
+            };
+            let settings = { ...defaults };
+            try {
+                const saved = JSON.parse(localStorage.getItem(LS) || 'null');
+                if (saved) settings = { ...defaults, ...saved };
+            } catch {}
+
+            function persist() { try { localStorage.setItem(LS, JSON.stringify(settings)); } catch {} }
+
+            // Voice list populates asynchronously in some browsers.
+            let voices = [];
+            function loadVoices() {
+                voices = speechSynthesis.getVoices() || [];
+                rebuildVoicePicker();
+            }
+            if (typeof speechSynthesis !== 'undefined') {
+                loadVoices();
+                speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+            }
+
+            function rebuildVoicePicker() {
+                const sel = document.getElementById('voicePickerSelect');
+                if (!sel) return;
+                const prev = settings.voiceName;
+                sel.innerHTML = '';
+                if (voices.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.textContent = '(no voices available)';
+                    opt.value = '';
+                    sel.appendChild(opt);
+                    return;
+                }
+                for (const v of voices) {
+                    const opt = document.createElement('option');
+                    opt.value = v.name;
+                    opt.textContent = `${v.name}${v.lang ? ' — ' + v.lang : ''}${v.default ? ' (default)' : ''}`;
+                    sel.appendChild(opt);
+                }
+                if (prev && voices.some(v => v.name === prev)) sel.value = prev;
+            }
+
+            function pickVoice() {
+                if (!voices.length) return null;
+                if (settings.voiceName) {
+                    const v = voices.find(v => v.name === settings.voiceName);
+                    if (v) return v;
+                }
+                return voices.find(v => v.default) || voices[0];
+            }
+
+            function speak(text) {
+                if (!settings.enabled || !text) return;
+                if (typeof speechSynthesis === 'undefined') return;
+                try {
+                    const u = new SpeechSynthesisUtterance(String(text));
+                    const v = pickVoice();
+                    if (v) u.voice = v;
+                    u.rate   = settings.rate;
+                    u.volume = settings.volume;
+                    speechSynthesis.cancel(); // never queue; latest cue wins
+                    speechSynthesis.speak(u);
+                } catch { /* speech engine not available */ }
+            }
+
+            // ─ Formatters ─
+            function fmtBand(b) {
+                if (!b) return '';
+                const m = String(b).match(/^(\d+)m$/i);
+                return m ? `${m[1]} metres` : String(b);
+            }
+            function fmtMode(m) {
+                if (!m) return '';
+                const map = {
+                    'LSB': 'lower sideband', 'USB': 'upper sideband',
+                    'CW-U': 'CW upper', 'CW-L': 'CW lower',
+                    'AM': 'A M', 'AM-N': 'A M narrow',
+                    'FM': 'F M', 'FM-N': 'F M narrow',
+                    'RTTY-L': 'RTTY lower', 'RTTY-U': 'RTTY upper',
+                    'DATA-L': 'data lower', 'DATA-U': 'data upper',
+                    'DATA-FM': 'data F M', 'DATA-FM-N': 'data F M narrow',
+                    'PSK': 'P S K',
+                };
+                return map[String(m).toUpperCase()] || String(m);
+            }
+            function fmtFreqMHz(hz) {
+                if (!hz || hz <= 0) return '';
+                return (hz / 1e6).toFixed(3) + ' megahertz';
+            }
+
+            // ─ Initial-load suppression ─
+            // First call for each category just records the value; we only
+            // speak on the SECOND and later changes. That way the page load
+            // doesn't read out every initial value.
+            const seen = {};
+            function announce(category, key, text) {
+                if (!settings.enabled) return;
+                if (!settings[category]) return;
+                if (!(key in seen)) { seen[key] = true; return; }
+                speak(text);
+            }
+
+            // ─ Public API for site.js to call ─
+            window.voiceAnnounce = {
+                sayBand(receiver, band) {
+                    // VFO B band changes only spoken if explicitly the active one;
+                    // for now only A is announced to avoid noise.
+                    if (receiver !== 'A') { seen[`band${receiver}`] = true; return; }
+                    announce('band', 'bandA', fmtBand(band));
+                },
+                sayMode(receiver, mode) {
+                    if (receiver !== 'A') { seen[`mode${receiver}`] = true; return; }
+                    announce('mode', 'modeA', fmtMode(mode));
+                },
+                sayTxState(isTx) {
+                    announce('tx', 'txState', isTx ? 'transmit' : 'receive');
+                },
+                sayFrequencyEntered(hz) {
+                    if (!settings.enabled || !settings.freq) return;
+                    speak(fmtFreqMHz(hz));
+                },
+                sayDxAlert(spot) {
+                    if (!settings.enabled || !settings.dxAlert) return;
+                    const callLetters = String(spot.callsign || '').split('').join(' ');
+                    speak(`D X alert. ${callLetters}. ${fmtFreqMHz(spot.frequencyHz)}`);
+                },
+                sayTxTimeout() {
+                    if (!settings.enabled || !settings.txTimeout) return;
+                    speak('Warning. Transmit timeout. Check microphone.');
+                },
+                test() {
+                    // Force a speak() even if announcements are disabled —
+                    // the test button needs to work to confirm voice setup.
+                    if (typeof speechSynthesis === 'undefined') {
+                        alert('Your browser does not support speech synthesis.');
+                        return;
+                    }
+                    const u = new SpeechSynthesisUtterance('Voice announcements ready');
+                    const v = pickVoice();
+                    if (v) u.voice = v;
+                    u.rate   = settings.rate;
+                    u.volume = settings.volume;
+                    speechSynthesis.cancel();
+                    speechSynthesis.speak(u);
+                },
+                stop() { try { speechSynthesis.cancel(); } catch {} },
+                _settings: settings, // exposed for the dialog
+            };
+
+            // ─ Bind dialog controls once the DOM is ready ─
+            document.addEventListener('DOMContentLoaded', () => {
+                const enabledChk    = document.getElementById('voiceEnabledChk');
+                const voicePicker   = document.getElementById('voicePickerSelect');
+                const rateSlider    = document.getElementById('voiceRateSlider');
+                const rateValue     = document.getElementById('voiceRateValue');
+                const volSlider     = document.getElementById('voiceVolumeSlider');
+                const volValue      = document.getElementById('voiceVolumeValue');
+                const bandChk       = document.getElementById('voiceBandChk');
+                const modeChk       = document.getElementById('voiceModeChk');
+                const txChk         = document.getElementById('voiceTxChk');
+                const freqChk       = document.getElementById('voiceFreqChk');
+                const dxAlertChk    = document.getElementById('voiceDxAlertChk');
+                const txTimeoutChk  = document.getElementById('voiceTxTimeoutChk');
+                const testBtn       = document.getElementById('voiceTestBtn');
+                const stopBtn       = document.getElementById('voiceStopBtn');
+
+                if (!enabledChk) return;
+
+                // Apply persisted settings to UI
+                enabledChk.checked   = settings.enabled;
+                bandChk.checked      = settings.band;
+                modeChk.checked      = settings.mode;
+                txChk.checked        = settings.tx;
+                freqChk.checked      = settings.freq;
+                dxAlertChk.checked   = settings.dxAlert;
+                txTimeoutChk.checked = settings.txTimeout;
+                rateSlider.value     = settings.rate;
+                rateValue.textContent = settings.rate.toFixed(1) + '×';
+                volSlider.value      = settings.volume;
+                volValue.textContent = Math.round(settings.volume * 100) + '%';
+                rebuildVoicePicker();
+
+                enabledChk.addEventListener('change', () => {
+                    settings.enabled = enabledChk.checked;
+                    persist();
+                    // Subtle visual indicator on the toolbar button
+                    const btn = document.getElementById('voiceBtn');
+                    if (btn) btn.classList.toggle('btn-warning', settings.enabled);
+                });
+                voicePicker.addEventListener('change', () => { settings.voiceName = voicePicker.value; persist(); });
+                rateSlider.addEventListener('input', () => {
+                    settings.rate = parseFloat(rateSlider.value);
+                    rateValue.textContent = settings.rate.toFixed(1) + '×';
+                    persist();
+                });
+                volSlider.addEventListener('input', () => {
+                    settings.volume = parseFloat(volSlider.value);
+                    volValue.textContent = Math.round(settings.volume * 100) + '%';
+                    persist();
+                });
+                bandChk.addEventListener('change',      () => { settings.band      = bandChk.checked;      persist(); });
+                modeChk.addEventListener('change',      () => { settings.mode      = modeChk.checked;      persist(); });
+                txChk.addEventListener('change',        () => { settings.tx        = txChk.checked;        persist(); });
+                freqChk.addEventListener('change',      () => { settings.freq      = freqChk.checked;      persist(); });
+                dxAlertChk.addEventListener('change',   () => { settings.dxAlert   = dxAlertChk.checked;   persist(); });
+                txTimeoutChk.addEventListener('change', () => { settings.txTimeout = txTimeoutChk.checked; persist(); });
+
+                testBtn.addEventListener('click', () => window.voiceAnnounce.test());
+                stopBtn.addEventListener('click', () => window.voiceAnnounce.stop());
+
+                // Apply toolbar button highlight on initial render
+                const btn = document.getElementById('voiceBtn');
+                if (btn && settings.enabled) btn.classList.add('btn-warning');
+            });
+        })();
 
         // --- TX timeout warning ---
         // Watches the SignalR-driven `isTransmitting` flag (via window.handleTxStateForTimeout
@@ -2193,6 +2495,7 @@
             // Repeat every 3 s until dismissed or TX stops
             if (_txTimeoutBeepInterval) clearInterval(_txTimeoutBeepInterval);
             _txTimeoutBeepInterval = setInterval(_txTimeoutBeep, 3000);
+            if (window.voiceAnnounce) window.voiceAnnounce.sayTxTimeout();
         }
 
         function _hideTxTimeoutBanner() {

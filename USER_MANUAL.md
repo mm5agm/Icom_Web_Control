@@ -22,6 +22,7 @@
    - 5.13 [FM Repeater Panel](#513-fm-repeater-panel)
    - 5.14 [DX Watch Panel](#514-dx-watch-panel)
    - 5.15 [Memory Panel](#515-memory-panel)
+   - 5.16 [Voice Announcements](#516-voice-announcements)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -93,6 +94,7 @@ The application was written for operators who want a large, clean, touchscreen-f
 - **DX watch list** — get a popup alert and a beep when watched callsigns or prefixes appear in the cluster feed (e.g. `P29*` for a DXpedition); persisted across app restarts
 - **TX timeout warning** — visible red banner + audible tone if TX has been on too long (configurable threshold), as a safety net against open mics, stuck PTTs and VOX false-triggers
 - **Per-VFO status line** inside each VFO panel — at-a-glance summary of band, mode, frequency, power and split state, banner-coloured to match the receiver
+- **Voice announcements** — optional spoken cues for band/mode/TX changes, DX alerts and TX timeout, using your browser's built-in text-to-speech (handy for partially sighted operators)
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
 - **USB audio for DATA modes** — one-click setting configures the radio to route FT8, WSJT-X and other digital modes through the USB connection, no rear DATA connector required
@@ -560,6 +562,42 @@ The panel is non-modal — it stays open while you use the rest of the app. Drag
 **Banks dropdown** — if you have saved memory banks (see Section 8.4), a **Banks** dropdown appears in the toolbar alongside the Save to Rig buttons. Select a bank name to switch to it instantly — the memory list is replaced with that bank's contents and the tiles refresh automatically. The dropdown resets to its placeholder after loading, and is hidden when no banks have been saved.
 
 For full memory management — editing labels and frequencies, reordering, importing from and exporting to the radio, and memory banks — see Section 8.
+
+---
+
+### 5.16 Voice Announcements
+
+Click the **Voice** button in the toolbar to open the voice-announcements panel. This makes the app speak when key things change — useful for partially sighted operators, or for anyone who wants to be told what the radio is doing without having to look at the screen.
+
+The feature uses your browser's built-in text-to-speech engine (Web Speech API), so any voices already installed on your operating system are available. On Windows that's whatever SAPI 5 voices you have installed; on macOS the system voices; on Linux it depends on your speech package.
+
+> **If you use a screen reader (NVDA, JAWS, etc.) leave this OFF.** The app already announces important events via standard `aria-live` regions which your screen reader picks up — turning on the Voice panel as well would give you double announcements.
+
+**Controls in the panel:**
+
+| Control | Description |
+|---------|-------------|
+| Enable voice announcements | Master on/off. When off, nothing is spoken |
+| Voice | Pick which TTS voice to use — populated from your OS |
+| Rate | Speech rate, 0.5×–2.0× normal speed |
+| Volume | Speech volume, 0–100% |
+| Test voice | Speak a sample phrase — use this to confirm your voice and rate are right |
+| Stop talking | Cancel any in-progress speech immediately |
+
+**What's announced (each can be toggled separately):**
+
+- **Band changes** — "forty metres" when you change band on VFO A
+- **Mode changes** — "upper sideband", "C W upper", "data lower", etc.
+- **TX / RX state** — "transmit" when you key up, "receive" when you stop
+- **Manual frequency entry** — confirmation after typing a frequency on the on-screen keyboard
+- **DX watched-callsign alerts** — spelled-out callsign and frequency when a watched call appears in the DX cluster feed (in addition to the existing toast + beep)
+- **TX timeout warning** — "Warning. Transmit timeout. Check microphone."
+
+**Initial load is silent.** When you open the app the current band, mode and frequency are loaded from the radio's state but **not** spoken — the first announcement for each category fires on the next *change*. So opening the app doesn't read out the whole state.
+
+**Persistence.** All settings (master enable, voice name, rate, volume, category checkboxes) are saved to localStorage per browser. Different devices remember their own preferences.
+
+**Position.** The panel is draggable like the other popups (VOX, CW, FM Repeater, DX Watch) and its on-screen position is remembered between sessions.
 
 ---
 

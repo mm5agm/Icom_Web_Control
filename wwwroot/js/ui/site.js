@@ -801,6 +801,7 @@ connection.on("RadioStateUpdate", function (update) {
                 document.getElementById('ifWidthSelectA'), window._radioModel, update.value);
         }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeA', update.value);
+        if (window.voiceAnnounce) window.voiceAnnounce.sayMode('A', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
@@ -811,6 +812,7 @@ connection.on("RadioStateUpdate", function (update) {
                 document.getElementById('ifWidthSelectB'), window._radioModel, update.value);
         }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeB', update.value);
+        if (window.voiceAnnounce) window.voiceAnnounce.sayMode('B', update.value);
     }
 
     // --- PROC ---
@@ -849,11 +851,13 @@ connection.on("RadioStateUpdate", function (update) {
         // ...removed debug logging...
         updateBandButton('A', update.value);
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('bandA', update.value);
+        if (window.voiceAnnounce) window.voiceAnnounce.sayBand('A', update.value);
     }
     if (update.property === "BandB") {
         // ...removed debug logging...
         updateBandButton('B', update.value);
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('bandB', update.value);
+        if (window.voiceAnnounce) window.voiceAnnounce.sayBand('B', update.value);
     }
 
     // --- POWER CHANGE ---
@@ -896,6 +900,7 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.handleTxStateForTimeout === 'function') {
             window.handleTxStateForTimeout(!!update.value);
         }
+        if (window.voiceAnnounce) window.voiceAnnounce.sayTxState(!!update.value);
     }
     if (update.property === "TxVfo") {
         txVfo = update.value;
