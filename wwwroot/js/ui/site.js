@@ -873,6 +873,9 @@ connection.on("RadioStateUpdate", function (update) {
         }
         updateTxButton();
         updateTxIndicators(update.value);
+        if (typeof window.handleTxStateForTimeout === 'function') {
+            window.handleTxStateForTimeout(!!update.value);
+        }
     }
     if (update.property === "TxVfo") {
         txVfo = update.value;

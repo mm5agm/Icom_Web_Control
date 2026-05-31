@@ -1330,6 +1330,25 @@
      style="position:fixed; right:16px; bottom:16px; z-index:9999;
             display:flex; flex-direction:column; gap:8px; pointer-events:none;"></div>
 
+<!-- TX timeout warning banner — shown when transmit has been on longer than the threshold -->
+<div id="txTimeoutBanner"
+     role="alert"
+     aria-live="assertive"
+     style="display:none; position:fixed; top:0; left:0; right:0; z-index:10000;
+            background:#a02020; color:#fff; padding:10px 16px;
+            font-family:sans-serif; font-weight:bold; font-size:1.05em;
+            box-shadow:0 2px 8px rgba(0,0,0,0.5);">
+    <span id="txTimeoutBannerText">TX has been on for too long</span>
+    <button type="button" id="txTimeoutDismissBtn"
+            style="float:right; background:#fff; color:#a02020; border:none;
+                   padding:2px 10px; border-radius:4px; font-weight:bold; cursor:pointer;"
+            aria-label="Dismiss TX timeout warning">Dismiss</button>
+    <button type="button" id="txTimeoutSetBtn"
+            style="float:right; background:#7a1818; color:#fff; border:1px solid #fff;
+                   padding:2px 10px; border-radius:4px; margin-right:8px; cursor:pointer;"
+            aria-label="Change TX timeout threshold">Change timeout…</button>
+</div>
+
 @section Scripts {
     <!-- Cache-busted JS reference, placed BEFORE your inline script if you use window.radioControl, etc. -->
     <script>window.bandPlan = '@Model.BandPlan';</script>
@@ -2012,6 +2031,90 @@
             _dxAlertBeep();
             _dxAlertToast(spot);
         };
+
+        // --- TX timeout warning ---
+        // Watches the SignalR-driven `isTransmitting` flag (via window.handleTxStateForTimeout
+        // which site.js calls every time IsTransmitting updates). After the configured
+        // threshold of continuous TX, shows the red banner across the top of the page
+        // and plays a repeating attention tone. Threshold is persisted to localStorage;
+        // default 120 s.
+        const TX_TIMEOUT_LS_KEY = 'tx_timeout_seconds';
+        const TX_TIMEOUT_DEFAULT = 120;
+        let _txTimeoutTimer = null;
+        let _txTimeoutBeepInterval = null;
+
+        function _getTxTimeoutSeconds() {
+            const v = parseInt(localStorage.getItem(TX_TIMEOUT_LS_KEY), 10);
+            return (isFinite(v) && v > 0) ? v : TX_TIMEOUT_DEFAULT;
+        }
+        function _setTxTimeoutSeconds(s) {
+            const v = Math.max(5, Math.min(3600, parseInt(s, 10) || TX_TIMEOUT_DEFAULT));
+            localStorage.setItem(TX_TIMEOUT_LS_KEY, String(v));
+            return v;
+        }
+
+        function _txTimeoutBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'square';
+                o.frequency.setValueAtTime(440, ctx.currentTime);
+                g.gain.setValueAtTime(0.0001, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+                o.connect(g).connect(ctx.destination);
+                o.start();
+                o.stop(ctx.currentTime + 0.3);
+            } catch { /* audio not allowed */ }
+        }
+
+        function _showTxTimeoutBanner() {
+            const banner = document.getElementById('txTimeoutBanner');
+            const text   = document.getElementById('txTimeoutBannerText');
+            if (!banner) return;
+            const secs = _getTxTimeoutSeconds();
+            if (text) text.textContent = `⚠ TX has been ON for more than ${secs} seconds — check your microphone, keyer or VOX!`;
+            banner.style.display = '';
+            _txTimeoutBeep();
+            // Repeat every 3 s until dismissed or TX stops
+            if (_txTimeoutBeepInterval) clearInterval(_txTimeoutBeepInterval);
+            _txTimeoutBeepInterval = setInterval(_txTimeoutBeep, 3000);
+        }
+
+        function _hideTxTimeoutBanner() {
+            const banner = document.getElementById('txTimeoutBanner');
+            if (banner) banner.style.display = 'none';
+            if (_txTimeoutBeepInterval) { clearInterval(_txTimeoutBeepInterval); _txTimeoutBeepInterval = null; }
+        }
+
+        // Called from site.js on every IsTransmitting SignalR update.
+        window.handleTxStateForTimeout = function (isTx) {
+            if (isTx) {
+                if (_txTimeoutTimer) clearTimeout(_txTimeoutTimer);
+                _txTimeoutTimer = setTimeout(_showTxTimeoutBanner, _getTxTimeoutSeconds() * 1000);
+            } else {
+                if (_txTimeoutTimer) { clearTimeout(_txTimeoutTimer); _txTimeoutTimer = null; }
+                _hideTxTimeoutBanner();
+            }
+        };
+
+        document.getElementById('txTimeoutDismissBtn')?.addEventListener('click', _hideTxTimeoutBanner);
+        document.getElementById('txTimeoutSetBtn')?.addEventListener('click', () => {
+            const current = _getTxTimeoutSeconds();
+            const input = prompt(
+                'TX timeout warning threshold (seconds).\n' +
+                'The banner appears after TX has been on for this long.\n' +
+                'Range: 5–3600 seconds. Default: 120.',
+                String(current));
+            if (input === null) return;
+            const newVal = _setTxTimeoutSeconds(input);
+            const banner = document.getElementById('txTimeoutBanner');
+            if (banner && banner.style.display !== 'none') {
+                const text = document.getElementById('txTimeoutBannerText');
+                if (text) text.textContent = `⚠ TX has been ON for more than ${newVal} seconds — check your microphone, keyer or VOX!`;
+            }
+        });
 
         // --- VOX ---
         async function toggleVox() {
