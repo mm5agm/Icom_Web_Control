@@ -61,7 +61,7 @@
 
 ## 1. Introduction
 
-Yaesu Web Control is a web-based control panel for Yaesu HF transceivers. Supported models are:
+Yaesu Web Control — **YWC** for short — is a web-based control panel for Yaesu HF transceivers. Supported models are:
 
 | Model | Power | Receivers |
 |-------|-------|-----------|

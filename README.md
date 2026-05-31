@@ -3,7 +3,7 @@
 
 > I would appreciate feedback and bug/layout reports. I have only tested on the FTdx101MP and the spectrum display with the SDRplay RSP1B.
 
-This is a continuation of my FTdx101_WebApp with more Yaesu transceivers added and more controls.
+Yaesu Web Control (**YWC**) is a continuation of my FTdx101_WebApp with more Yaesu transceivers added and more controls.
 
 **Supported transceivers:**
 
