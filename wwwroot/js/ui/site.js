@@ -1458,6 +1458,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('quickSplitBtn')?.addEventListener('click', () => setSplit(2));
     document.getElementById('swapVfoBtn')?.addEventListener('click', swapVfo);
     document.getElementById('copyBtoABtn')?.addEventListener('click', () => copyVfo('ba'));
+    document.getElementById('copyAtoBBtn')?.addEventListener('click', () => copyVfo('ab'));
 
     // Clarifier: seed JS state from server-rendered HTML values
     const clarSlider = document.getElementById('clarOffsetSlider');
