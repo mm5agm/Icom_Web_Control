@@ -1655,6 +1655,54 @@ namespace Yaesu_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        // POST /api/cat/copy-vfo/{direction}
+        //   direction = "ba" → copy VFO B to VFO A (Yaesu BA; CAT command)
+        //   direction = "ab" → copy VFO A to VFO B (Yaesu AB; CAT command)
+        //
+        // Differs from swap (SV) in that it does NOT exchange — the source
+        // VFO keeps its value. Useful for transmitting on VFO B's frequency
+        // without enabling split: copy B→A and the radio's normal TX (which
+        // uses VFO A) is now on the desired frequency.
+        [HttpPost("copy-vfo/{direction}")]
+        public async Task<IActionResult> CopyVfo(string direction)
+        {
+            var dir = (direction ?? "").ToLowerInvariant();
+            if (dir != "ba" && dir != "ab")
+                return BadRequest(new { error = "direction must be 'ba' or 'ab'" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var cmd = dir == "ba" ? "BA;" : "AB;";
+                await _catClient.SendCommandAsync(cmd, "WebUI", CancellationToken.None);
+
+                // Read back both frequencies so the UI reflects the new state immediately.
+                var faResponse = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(faResponse) && faResponse.StartsWith("FA") &&
+                    long.TryParse(faResponse.Substring(2).TrimEnd(';'), out long freqA))
+                {
+                    _radioStateService.FrequencyA = freqA;
+                }
+                var fbResponse = await _catClient.SendCommandAsync("FB;", "WebUI", CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(fbResponse) && fbResponse.StartsWith("FB") &&
+                    long.TryParse(fbResponse.Substring(2).TrimEnd(';'), out long freqB))
+                {
+                    _radioStateService.FrequencyB = freqB;
+                }
+
+                _logger.LogInformation("VFO copy {Dir} completed", dir.ToUpperInvariant());
+                return Ok(new { message = $"VFO {dir.ToUpperInvariant()} copy completed" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error copying VFO ({Dir})", dir);
+                return StatusCode(500, new { error = "Failed to copy VFO" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
         [HttpPost("reinitialize")]
         public async Task<IActionResult> Reinitialize()
         {

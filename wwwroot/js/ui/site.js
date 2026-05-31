@@ -701,6 +701,13 @@ async function swapVfo() {
     } catch {}
 }
 
+async function copyVfo(direction) {
+    try {
+        await fetch(`/api/cat/copy-vfo/${direction}`, { method: 'POST' });
+    } catch {}
+}
+window.copyVfo = copyVfo;
+
 async function checkTxStatus() {
     try {
         const response = await fetch('/api/cat/tx');
@@ -1450,6 +1457,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('splitBtn')?.addEventListener('click', () => setSplit(splitMode > 0 ? 0 : 1));
     document.getElementById('quickSplitBtn')?.addEventListener('click', () => setSplit(2));
     document.getElementById('swapVfoBtn')?.addEventListener('click', swapVfo);
+    document.getElementById('copyBtoABtn')?.addEventListener('click', () => copyVfo('ba'));
 
     // Clarifier: seed JS state from server-rendered HTML values
     const clarSlider = document.getElementById('clarOffsetSlider');
