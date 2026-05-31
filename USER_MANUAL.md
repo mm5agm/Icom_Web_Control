@@ -112,15 +112,27 @@ The application was written for operators who want a large, clean, touchscreen-f
 
 Before the app can communicate with your radio you need to tell it which serial port the radio is connected to and what baud rate to use.
 
+**Required — radio connection:**
+
 1. Open a browser and go to **http://localhost:8080**
 2. Click the **Settings** link in the navigation bar.
 3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), **FTDX3000** (100 W, dual receiver), **FTdx10** (100 W, single receiver), or **FT-710** (100 W, single receiver).
 4. Set **Serial Port** to the COM port your radio is connected to. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
 5. Set **Baud Rate** to match the radio's CAT baud rate. The factory default is **38400** on all supported radios. You can verify or change this on the radio under **Menu → CAT Rate**.
 6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
-7. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
+7. If you run digital modes (FT8, FT4, RTTY, PSK) via USB audio and do *not* have the rear DATA/ACC connector wired up, tick **Use USB audio for DATA modes**. If you use an external soundcard interface on the rear connector, leave this off. See Section 6.1 for details.
+8. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
 
 If you see a red cross, double-check the COM port number and baud rate, then try again.
+
+**Optional — extras you can set up later in Settings:**
+
+- **SDR spectrum display** (Section 6.3) — connect an SDR to your radio's 9 MHz IF output to get a live spectrum and waterfall.
+- **DX cluster** (Section 6.6) — connect to a DX cluster server to overlay live DX spots on the spectrum.
+- **CW memory messages** (Section 6.5) — pre-fill the M1–M5 CW keyer memories.
+- **Roofing filters** (Section 6.4) — tell the app which optional roofing filters are fitted on your radio so the dropdown shows only the ones you actually have.
+
+None of these are required for basic operation. Get the radio connection working first; come back for the extras when you want them.
 
 ---
 
@@ -219,6 +231,8 @@ The spectrum display is only visible if an SDR device has been configured in Set
 On crowded bands (the lower end of 20m on a contest weekend, for example) labels are stacked across up to five rows to avoid overlap. If even five rows can't fit everything in a tight cluster of nearby frequencies, **the app drops the spots that don't fit rather than letting labels overlap and become illegible**. The dropped spots are still in the underlying spot list — they just aren't drawn. Zooming the spectrum to a narrower span (e.g. 250k or 500k) spreads spots out and reveals the ones that were hidden.
 
 A status badge in the spectrum panel shows the current SDR state: **No SDR**, **Connecting…**, **Live**, or **Disconnected**.
+
+A second small badge in the **top-right corner of the spectrum canvas** shows the DX cluster connection state — green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.6 for cluster setup and troubleshooting.
 
 ---
 
@@ -589,27 +603,60 @@ Note: `{CALL}` is a reminder placeholder — the radio's KY command does not per
 
 ### 6.6 DX Cluster
 
-Connect to a DX cluster server to overlay DX spots on the SDR spectrum display. Spots appear as small yellow callsign labels at each spot's frequency on the spectrum panel; clicking a spot tunes VFO A exactly to that frequency.
+Connect to a DX cluster server to overlay live DX spots on the SDR spectrum display. Spots appear as small yellow callsign labels at each spot's frequency on the spectrum panel; clicking a spot tunes VFO A exactly to that frequency. See Section 5.4 for how the overlay behaves on crowded bands.
 
 There is **no default cluster server** — pick one you have access to. The connection is only made when you tick the **Enable** switch below.
 
 | Setting | Description |
 |---------|-------------|
 | Enable DX cluster connection | Master on/off. When off, no connection is made and no spots are received |
-| Cluster host | Hostname or IP of the DX cluster, e.g. `cluster.dl4ny.de` |
+| Cluster host | Hostname or IP of the DX cluster, e.g. `dxspider.co.uk` |
 | Port | TCP port. Most clusters use 7300, 23, or 8000 |
 | Login callsign | Your amateur callsign — sent to the cluster when it prompts for login. Most clusters require a valid licensed call |
 | Spot age-off (minutes) | Spots older than this are removed automatically. Typical 15–30 minutes |
+| Post-login commands | DXSpider commands to send after the callsign is accepted (one per line). See subsection below. |
 
-**Common cluster servers** (the app does not endorse any particular one — these are starting points):
+**Common cluster servers** (the app does not endorse any particular one — these are starting points; cluster servers come and go, so if one stops responding try another):
 
-- `cluster.dl4ny.de` port 7300 (DXSpider, Germany)
-- `ve7cc.net` port 23 (AR-Cluster, Canada)
-- `dxc.k4ldc.com` port 7300
+- `dxspider.co.uk` port 7300 (DXSpider, UK — G6NHU-2 in Essex, RBN-fed, low latency from the UK)
+- `ei7mre.ath.cx` port 7300 (DXSpider, Ireland)
+- `cluster.f1led.fr` port 7300 (DXSpider, France)
+- `dxfun.com` port 8000 (DXSpider, Spain)
+- `ve7cc.net` port 23 (AR-Cluster, Canada — globally connected, higher latency but very stable)
 
-The app uses a generous parser that accepts spot lines from AR-Cluster, CC-Cluster, and DXSpider format servers. If you connect to a cluster but no spots appear, check the app log for "DX cluster" messages — the connection state is reported there.
+**Post-login commands** — many DXSpider clusters ask you to set your location and other details once you've logged in. Rather than typing those commands into the cluster on every connect, list them in this textarea (one per line) and the app sends them automatically each time. Lines beginning with `#` are ignored, and a leading `/` is stripped (so you can paste DXSpider help syntax verbatim).
+
+Common things to put in this textarea:
+
+```
+set/qra IO75JA            # your Maidenhead grid square — improves your spot list
+set/name Colin            # your name as it appears to other users
+set/skimmer               # enable RBN/Skimmer spots on clusters that have an RBN feed (e.g. G6NHU-2)
+set/filter ...            # whatever spot filters you prefer
+```
+
+The app uses a generous parser that accepts spot lines from AR-Cluster, CC-Cluster, and DXSpider format servers. The cluster connection sends the configured callsign 1.5 seconds after the TCP socket opens — this handles servers whose login prompt has no newline (which would otherwise cause our reader to hang silently).
+
+**Status badge on the spectrum panel** — top-right corner of the spectrum canvas shows the live cluster connection state:
+
+- 🟢 green **DX: connected** — connected and receiving
+- 🟡 amber **DX: connecting** — opening the TCP socket
+- 🔴 red **DX: disconnected** — connection dropped or initial connect failed
+- ⚫ grey **DX: off** — feature disabled or settings incomplete
+
+If the badge stays red, hit `http://localhost:8080/api/dxcluster/status` in a browser — the `detail` field shows the underlying error message (e.g. "No such host is known").
+
+**Diagnostic log** — every line received from the cluster is written to:
+
+```
+%APPDATA%\MM5AGM\Yaesu Web Control\dx-cluster.log
+```
+
+The file is rewritten on each new connection so it never grows large. Open it in any text editor to see the raw protocol exchange — useful for troubleshooting or just to watch what the cluster is sending. There is also an HTTP endpoint `http://localhost:8080/api/dxcluster/recent` that returns the last 100 lines as plain text in a browser.
 
 If the connection drops, the app reconnects automatically after 15 seconds. Disabling the toggle in Settings stops reconnection attempts.
+
+> **Note on registering to send spots:** Most clusters accept connections from any callsign for *receiving* spots, but require a one-off email registration before they accept spots you upload (the cluster will tell you the address). YWC only receives spots — it does not send any — so you can ignore that prompt.
 
 ---
 
