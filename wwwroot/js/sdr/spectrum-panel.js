@@ -327,14 +327,14 @@ export class SpectrumPanel {
         drawList.sort((a, b) => a.x - b.x);
 
         ctx.save();
-        ctx.font      = 'bold 10px monospace';
+        ctx.font      = 'bold 13px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillStyle   = '#ffcc33';
         ctx.strokeStyle = '#ffcc33';
         ctx.lineWidth   = 1.5;
 
-        const minXGap = 50;       // px; labels closer than this are staggered
-        const rowHeight = 12;     // px between stagger rows
+        const minXGap = 70;       // px; labels closer than this are staggered
+        const rowHeight = 16;     // px between stagger rows
         const maxRows = 3;        // wrap after 3 rows
         let lastRowX = [-Infinity, -Infinity, -Infinity];
 
@@ -346,7 +346,7 @@ export class SpectrumPanel {
                 if (r === maxRows - 1) row = maxRows - 1; // overflow falls into last row
             }
             lastRowX[row] = x;
-            const labelY = 12 + row * rowHeight;
+            const labelY = 14 + row * rowHeight;
 
             // Callsign label.
             ctx.fillText(spot.callsign, x, labelY);
