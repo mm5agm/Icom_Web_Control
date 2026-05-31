@@ -88,6 +88,7 @@ The application was written for operators who want a large, clean, touchscreen-f
 - TX monitor on/off toggle and level control
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Optional real-time spectrum display and waterfall (requires an SDR connected to the 9 MHz IF output)
+- **DX cluster spots** overlaid on the spectrum — click a callsign to QSY straight to that frequency; user-selectable cluster server with live connection-status badge
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
 - **USB audio for DATA modes** — one-click setting configures the radio to route FT8, WSJT-X and other digital modes through the USB connection, no rear DATA connector required
