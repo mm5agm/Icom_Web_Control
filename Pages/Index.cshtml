@@ -2291,10 +2291,20 @@
                     if (v) u.voice = v;
                     u.rate   = settings.rate;
                     u.volume = settings.volume;
-                    speechSynthesis.cancel(); // never queue; latest cue wins
+                    // Don't call speechSynthesis.cancel() — when a band change
+                    // also restores the per-band saved mode, both Band and
+                    // Mode announcements arrive within milliseconds of each
+                    // other. Cancelling would cut the first one mid-word.
+                    // Queueing lets the user hear "forty metres" then a
+                    // moment later "upper sideband". Browser maintains the
+                    // queue automatically.
                     speechSynthesis.speak(u);
                 } catch { /* speech engine not available */ }
             }
+
+            // Hard-stop wipes the queue — used by the dialog's Stop button
+            // and not by individual announcements.
+            function hardStop() { try { speechSynthesis.cancel(); } catch {} }
 
             // ─ Formatters ─
             function fmtBand(b) {
@@ -2373,10 +2383,10 @@
                     if (v) u.voice = v;
                     u.rate   = settings.rate;
                     u.volume = settings.volume;
-                    speechSynthesis.cancel();
+                    hardStop(); // test should always take priority over any queued cues
                     speechSynthesis.speak(u);
                 },
-                stop() { try { speechSynthesis.cancel(); } catch {} },
+                stop() { hardStop(); },
                 _settings: settings, // exposed for the dialog
             };
 
