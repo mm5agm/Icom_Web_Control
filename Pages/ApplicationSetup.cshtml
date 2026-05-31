@@ -91,6 +91,29 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- App 4 -->
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><strong>Application 4</strong></span>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="showApp4" asp-for="ShowApp4Button">
+                                <label class="form-check-label" for="showApp4">Show</label>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <label class="form-label small text-muted">Button Name:</label>
+                                <input type="text" class="form-control" asp-for="App4Name" placeholder="GridTracker" />
+                            </div>
+                            <div>
+                                <label class="form-label small text-muted">Command Line:</label>
+                                <input type="text" class="form-control form-control-sm" asp-for="App4CommandLine" placeholder="C:\Program Files\GridTracker2\GridTracker2.exe" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <hr class="my-4" />

@@ -43,6 +43,7 @@
    - 9.1 [WSJT-X](#91-wsjt-x)
    - 9.2 [JTAlert](#92-jtalert)
    - 9.3 [Log4OM](#93-log4om)
+   - 9.4 [GridTracker](#94-gridtracker)
 10. [Meter Calibration](#10-meter-calibration)
 11. [Diagnostics](#11-diagnostics)
 12. [Using the App on a Tablet or Phone](#12-using-the-app-on-a-tablet-or-phone)
@@ -764,7 +765,7 @@ Access Application Setup from the navigation bar. This page configures the exter
 
 ### 7.1 External App Buttons
 
-Three buttons can appear in the top bar to launch external applications. For each button you can set:
+Up to four buttons can appear in the top bar to launch external applications. For each button you can set:
 
 - **Show / Hide** — whether the button appears on the main page
 - **Button Name** — the label shown on the button (e.g., "WSJT-X")
@@ -777,8 +778,9 @@ Default command lines:
 | WSJT-X | `C:\WSJT\wsjtx\bin\wsjtx.exe --rig-name=WebApp` |
 | JTAlert | `C:\HamApps\JTAlert\JTAlert.exe` |
 | Log4OM | `C:\Program Files (x86)\Log4OM 2\Log4OM.exe` |
+| GridTracker | `C:\Program Files\GridTracker2\GridTracker2.exe` |
 
-Adjust these to match where you have installed each program.
+Adjust these to match where you have installed each program. GridTracker is **off by default** — tick its **Show** box once you've installed it and confirmed the command line is correct.
 
 ---
 
@@ -1036,6 +1038,25 @@ Always start applications in this order:
 2. **WSJT-X**
 3. **JTAlert**
 4. **Log4OM**
+5. **GridTracker** (if used)
+
+---
+
+### 9.4 GridTracker
+
+GridTracker is a separate desktop app that draws a live world map of WSJT-X grid contacts and worked-stations data. It is **not** a web app — it runs as its own window — but YWC will launch it for you and show whether it's currently running.
+
+**Setup:**
+
+1. Install GridTracker 2 from [gridtracker.org](https://gridtracker.org/) (the v2 Electron rewrite has a single Windows installer — the older v1 with MariaDB is no longer required).
+2. In YWC, open **Application Setup**.
+3. In the **Application 4** card, set the **Command Line** to your installed path (default: `C:\Program Files\GridTracker2\GridTracker2.exe`).
+4. Tick **Show** and click **Save**.
+5. A **GridTracker** button appears in the top bar. Green = running, red = not running. Click it to launch.
+
+**How it works with WSJT-X:** GridTracker reads WSJT-X's UDP feed independently — YWC doesn't forward anything to it. Make sure WSJT-X is set to **multicast** UDP (default `239.255.0.1:2237`) so YWC, JTAlert, and GridTracker can all subscribe to the same feed at once. If WSJT-X is set to unicast (`127.0.0.1:2237`), only one of the three apps will receive packets — this is a WSJT-X limitation, not a YWC one.
+
+**No CAT integration is needed.** GridTracker is a passive listener; it doesn't talk to the radio at all. YWC still controls the radio, WSJT-X still drives QSOs, and GridTracker just paints the picture.
 
 ---
 

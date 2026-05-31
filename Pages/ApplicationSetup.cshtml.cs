@@ -43,6 +43,16 @@ namespace Yaesu_Web_Control.Pages
         [BindProperty]
         public string App3CommandLine { get; set; } = string.Empty;
 
+        // App 4 (default: GridTracker)
+        [BindProperty]
+        public bool ShowApp4Button { get; set; }
+
+        [BindProperty]
+        public string App4Name { get; set; } = "GridTracker";
+
+        [BindProperty]
+        public string App4CommandLine { get; set; } = string.Empty;
+
         // WSJT-X UDP Settings
         [BindProperty]
         public string WsjtxUdpAddress { get; set; } = "127.0.0.1";
@@ -69,6 +79,11 @@ namespace Yaesu_Web_Control.Pages
             App3Name = settings.App3Name;
             App3CommandLine = settings.Log4omCommandLine;
 
+            // App 4
+            ShowApp4Button = settings.ShowGridtrackerButton;
+            App4Name = settings.App4Name;
+            App4CommandLine = settings.GridtrackerCommandLine;
+
             // UDP Settings
             WsjtxUdpAddress = settings.WsjtxUdpAddress;
             WsjtxUdpPort = settings.WsjtxUdpPort;
@@ -92,6 +107,11 @@ namespace Yaesu_Web_Control.Pages
             settings.ShowLog4omButton = ShowApp3Button;
             settings.App3Name = App3Name;
             settings.Log4omCommandLine = App3CommandLine;
+
+            // App 4
+            settings.ShowGridtrackerButton = ShowApp4Button;
+            settings.App4Name = App4Name;
+            settings.GridtrackerCommandLine = App4CommandLine;
 
             // UDP Settings
             settings.WsjtxUdpAddress = WsjtxUdpAddress;

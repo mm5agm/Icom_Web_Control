@@ -56,6 +56,23 @@ namespace Yaesu_Web_Control.Controllers
             return Ok(new { running });
         }
 
+        [HttpPost("gridtracker/launch")]
+        public async Task<IActionResult> LaunchGridtracker()
+        {
+            return await LaunchExternalApp("GridTracker", "GridTracker2", async () =>
+            {
+                var settings = await _settingsService.GetSettingsAsync();
+                return settings.GridtrackerCommandLine;
+            });
+        }
+
+        [HttpGet("gridtracker/status")]
+        public IActionResult GridtrackerStatus()
+        {
+            var running = _processStatusCache.IsProcessRunning("GridTracker2");
+            return Ok(new { running });
+        }
+
         private async Task<IActionResult> LaunchExternalApp(string appName, string processName, Func<Task<string>> getCommandLine)
         {
             // Check if the app is already running
