@@ -819,18 +819,22 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- FREQUENCY CHANGE ---
     if (update.property === "FrequencyA") {
-        console.log('[DIAG] SignalR FrequencyA =', update.value);
-        state.lastBackendFreq.A = update.value;
-        updateFrequencyDisplay('A', update.value);
-        window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } }));
+        // Update the toolbar status FIRST — earlier ordering made it
+        // dependent on updateFrequencyDisplay() / dispatchEvent() running
+        // without throwing, which they don't always do when called with a
+        // long integer Hz value during a rapid band-change cascade.
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
+        state.lastBackendFreq.A = update.value;
+        try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
+        try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } })); }
+        catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
     }
     if (update.property === "FrequencyB") {
-        console.log('[DIAG] SignalR FrequencyB =', update.value);
-        state.lastBackendFreq.B = update.value;
-        updateFrequencyDisplay('B', update.value);
-        window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } }));
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
+        state.lastBackendFreq.B = update.value;
+        try { updateFrequencyDisplay('B', update.value); } catch (e) { console.error('updateFrequencyDisplay B error:', e); }
+        try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } })); }
+        catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
     }
 
     // --- BAND CHANGE ---
