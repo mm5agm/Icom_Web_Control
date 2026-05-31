@@ -819,12 +819,14 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- FREQUENCY CHANGE ---
     if (update.property === "FrequencyA") {
+        console.log('[DIAG] SignalR FrequencyA =', update.value);
         state.lastBackendFreq.A = update.value;
         updateFrequencyDisplay('A', update.value);
         window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } }));
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
     }
     if (update.property === "FrequencyB") {
+        console.log('[DIAG] SignalR FrequencyB =', update.value);
         state.lastBackendFreq.B = update.value;
         updateFrequencyDisplay('B', update.value);
         window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } }));
