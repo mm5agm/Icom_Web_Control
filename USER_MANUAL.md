@@ -63,7 +63,11 @@
 
 ## 1. Introduction
 
-Yaesu Web Control — **YWC** for short — is a web-based control panel for Yaesu HF transceivers. Supported models are:
+Yaesu Web Control — **YWC** for short — is a web-based control panel for Yaesu HF transceivers.
+
+> **Windows only.** YWC runs on Windows 10 or 11 (64-bit). There is no Linux or macOS build, and none is planned. The app is hosted by a small WinForms process and uses Windows-specific serial-port and SDR drivers. You can still access the browser interface itself from any device on your home network (tablet, phone, Linux laptop) — but the YWC server must be running on a Windows PC.
+
+Supported radios:
 
 | Model | Power | Receivers |
 |-------|-------|-----------|
@@ -571,7 +575,7 @@ For full memory management — editing labels and frequencies, reordering, impor
 
 Click the **Voice** button in the toolbar to open the voice-announcements panel. This makes the app speak when key things change — useful for partially sighted operators, or for anyone who wants to be told what the radio is doing without having to look at the screen.
 
-The feature uses your browser's built-in text-to-speech engine (Web Speech API), so any voices already installed on your operating system are available. On Windows that's whatever SAPI 5 voices you have installed; on macOS the system voices; on Linux it depends on your speech package.
+The feature uses your browser's built-in text-to-speech engine (Web Speech API), so any SAPI 5 voices already installed on Windows are available in the Voice picker.
 
 > **If you use a screen reader (NVDA, JAWS, etc.) leave this OFF.** The app already announces important events via standard `aria-live` regions which your screen reader picks up — turning on the Voice panel as well would give you double announcements.
 
