@@ -2282,29 +2282,49 @@
                 return voices.find(v => v.default) || voices[0];
             }
 
-            function speak(text) {
-                if (!settings.enabled || !text) return;
-                if (typeof speechSynthesis === 'undefined') return;
+            // Local utterance queue. The Web Speech API's built-in queueing is
+            // unreliable: when two speak() calls land within a few ms (e.g. a
+            // band change that also restores the saved mode, which broadcasts
+            // BandA followed by ModeA), Chromium frequently drops the first
+            // utterance entirely. We chain manually via onend so every cue is
+            // guaranteed to play in order.
+            const _queue = [];
+            let _speaking = false;
+
+            function _flushQueue() {
+                if (_speaking) return;
+                if (_queue.length === 0) return;
+                const text = _queue.shift();
                 try {
-                    const u = new SpeechSynthesisUtterance(String(text));
+                    const u = new SpeechSynthesisUtterance(text);
                     const v = pickVoice();
                     if (v) u.voice = v;
                     u.rate   = settings.rate;
                     u.volume = settings.volume;
-                    // Don't call speechSynthesis.cancel() — when a band change
-                    // also restores the per-band saved mode, both Band and
-                    // Mode announcements arrive within milliseconds of each
-                    // other. Cancelling would cut the first one mid-word.
-                    // Queueing lets the user hear "forty metres" then a
-                    // moment later "upper sideband". Browser maintains the
-                    // queue automatically.
+                    _speaking = true;
+                    u.onend   = () => { _speaking = false; _flushQueue(); };
+                    u.onerror = () => { _speaking = false; _flushQueue(); };
                     speechSynthesis.speak(u);
-                } catch { /* speech engine not available */ }
+                } catch {
+                    _speaking = false;
+                }
             }
 
-            // Hard-stop wipes the queue — used by the dialog's Stop button
-            // and not by individual announcements.
-            function hardStop() { try { speechSynthesis.cancel(); } catch {} }
+            function speak(text) {
+                if (!settings.enabled || !text) return;
+                if (typeof speechSynthesis === 'undefined') return;
+                // Cap queue depth so a flood of events can't pile up minutes of audio
+                if (_queue.length >= 6) _queue.shift();
+                _queue.push(String(text));
+                _flushQueue();
+            }
+
+            // Hard-stop wipes the queue — used by the dialog's Stop button.
+            function hardStop() {
+                _queue.length = 0;
+                _speaking = false;
+                try { speechSynthesis.cancel(); } catch {}
+            }
 
             // ─ Formatters ─
             function fmtBand(b) {
