@@ -225,6 +225,21 @@
             </button>
         </div>
     </div>
+
+    <!-- Toolbar status line — single readable summary of band, mode, frequency, power -->
+    <div id="toolbarStatusLine"
+         class="px-2 py-1 mb-1 font-monospace"
+         style="background:#0a1828; color:#cfe6ff; border-radius:4px;
+                font-size:0.85rem; line-height:1.25; overflow-x:auto; white-space:nowrap;"
+         aria-live="polite"
+         aria-atomic="true">
+        <span id="statusVfoA">VFO A: —</span>
+        <span id="statusSeparator" style="color:#446680; margin:0 12px;">|</span>
+        <span id="statusVfoB" style="color:#a8d8a8;">VFO B: —</span>
+        <span id="statusSplit" style="display:none; color:#ff7f50; margin-left:12px; font-weight:bold;">SPLIT</span>
+        <span id="statusTxVfo" style="display:none; color:#ffc060; margin-left:12px;">TX=A</span>
+    </div>
+
     <!-- Power and SWR Meters -->
     <div class="row mt-3">
         <div class="col-12">
@@ -2115,6 +2130,65 @@
                 if (text) text.textContent = `⚠ TX has been ON for more than ${newVal} seconds — check your microphone, keyer or VOX!`;
             }
         });
+
+        // --- Toolbar status line ---
+        // Compact single-line summary of band / mode / frequency / power for
+        // each VFO. Updated by site.js whenever the underlying values change
+        // via SignalR. Live state is held on _statusState to avoid having to
+        // pull it from many DOM elements.
+        const _statusState = {
+            bandA: '', modeA: '', freqHzA: 0,
+            bandB: '', modeB: '', freqHzB: 0,
+            power: 0, split: 0, txVfo: 0,
+        };
+
+        function _fmtFreq(hz) {
+            if (!hz || hz <= 0) return '—';
+            // Three groups of digits separated by dots, e.g. 14.150.000
+            const s = String(Math.round(hz)).padStart(9, '0');
+            return `${parseInt(s.slice(0,3),10)}.${s.slice(3,6)}.${s.slice(6,9)}`;
+        }
+
+        function _renderToolbarStatus() {
+            const a = document.getElementById('statusVfoA');
+            const b = document.getElementById('statusVfoB');
+            const split = document.getElementById('statusSplit');
+            const tx = document.getElementById('statusTxVfo');
+            if (a) {
+                const pw = _statusState.power > 0 ? ` / ${_statusState.power}W` : '';
+                a.textContent = `VFO A: ${_statusState.bandA || '—'} / ${_statusState.modeA || '—'} / ${_fmtFreq(_statusState.freqHzA)}${pw}`;
+            }
+            if (b) {
+                b.textContent = `VFO B: ${_statusState.bandB || '—'} / ${_statusState.modeB || '—'} / ${_fmtFreq(_statusState.freqHzB)}`;
+            }
+            if (split) split.style.display = (_statusState.split > 0) ? '' : 'none';
+            if (tx) {
+                if (_statusState.split > 0 || _statusState.txVfo === 1) {
+                    tx.style.display = '';
+                    tx.textContent = `TX=${_statusState.txVfo === 1 ? 'B' : 'A'}`;
+                } else {
+                    tx.style.display = 'none';
+                }
+            }
+        }
+
+        // Public setters that site.js calls from its SignalR handlers.
+        window.updateToolbarStatus = function (key, value) {
+            if (!(key in _statusState)) return;
+            _statusState[key] = value;
+            _renderToolbarStatus();
+        };
+
+        // Initial values from the server-rendered model so the line is
+        // populated before any SignalR updates arrive.
+        _statusState.freqHzA = @Model.State.vfoA.frequency;
+        _statusState.bandA   = '@(Model.State.vfoA.band ?? "")';
+        _statusState.modeA   = '@(Model.State.vfoA.mode ?? "")';
+        _statusState.freqHzB = @Model.State.vfoB.frequency;
+        _statusState.bandB   = '@(Model.State.vfoB.band ?? "")';
+        _statusState.modeB   = '@(Model.State.vfoB.mode ?? "")';
+        _statusState.power   = @Model.State.vfoA.power;
+        _renderToolbarStatus();
 
         // --- VOX ---
         async function toggleVox() {

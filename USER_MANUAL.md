@@ -92,6 +92,7 @@ The application was written for operators who want a large, clean, touchscreen-f
 - **DX cluster spots** overlaid on the spectrum — click a callsign to QSY straight to that frequency; user-selectable cluster server with live connection-status badge
 - **DX watch list** — get a popup alert and a beep when watched callsigns or prefixes appear in the cluster feed (e.g. `P29*` for a DXpedition); persisted across app restarts
 - **TX timeout warning** — visible red banner + audible tone if TX has been on too long (configurable threshold), as a safety net against open mics, stuck PTTs and VOX false-triggers
+- **Compact status line** below the toolbar — at-a-glance summary of band, mode, frequency, power, split state and active TX VFO
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
 - **USB audio for DATA modes** — one-click setting configures the radio to route FT8, WSJT-X and other digital modes through the USB connection, no rear DATA connector required
@@ -178,6 +179,14 @@ Click a button to launch the application. If it is already running, it is brough
 The **WSJT-X** button also shows a red **TX** badge when WSJT-X is currently transmitting.
 
 **POWER button** (top right) turns the radio on or off. The button is green when the radio is on and red when it is off.
+
+**Status line** — directly below the toolbar is a compact one-line summary in monospace text on a dark blue background:
+
+```
+VFO A: 20m / USB / 14.150.000 / 100W | VFO B: 40m / CW-U / 7.025.000   SPLIT   TX=B
+```
+
+The line shows the current band, mode, frequency and (for VFO A) transmit power. **SPLIT** appears in orange when split mode is on. **TX=A** or **TX=B** appears in amber when the transmit VFO is not the default. The line updates live whenever any of these values change — useful as a quick at-a-glance overview of operating state without scanning the larger displays.
 
 ---
 

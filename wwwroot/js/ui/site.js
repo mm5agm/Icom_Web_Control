@@ -793,6 +793,7 @@ connection.on("RadioStateUpdate", function (update) {
             window.IfWidth.rebuildIfWidthSelect(
                 document.getElementById('ifWidthSelectA'), window._radioModel, update.value);
         }
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeA', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
@@ -802,6 +803,7 @@ connection.on("RadioStateUpdate", function (update) {
             window.IfWidth.rebuildIfWidthSelect(
                 document.getElementById('ifWidthSelectB'), window._radioModel, update.value);
         }
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeB', update.value);
     }
 
     // --- PROC ---
@@ -820,21 +822,25 @@ connection.on("RadioStateUpdate", function (update) {
         state.lastBackendFreq.A = update.value;
         updateFrequencyDisplay('A', update.value);
         window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } }));
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
     }
     if (update.property === "FrequencyB") {
         state.lastBackendFreq.B = update.value;
         updateFrequencyDisplay('B', update.value);
         window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } }));
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
     }
 
     // --- BAND CHANGE ---
     if (update.property === "BandA") {
         // ...removed debug logging...
         updateBandButton('A', update.value);
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('bandA', update.value);
     }
     if (update.property === "BandB") {
         // ...removed debug logging...
         updateBandButton('B', update.value);
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('bandB', update.value);
     }
 
     // --- POWER CHANGE ---
@@ -853,6 +859,7 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.updatePowerDisplay === 'function') window.updatePowerDisplay("A", update.value);
         const sliderA = document.getElementById('powerSliderA');
         if (sliderA) sliderA.value = update.value;
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('power', update.value);
     }
 
     // --- RADIO POWER STATE ---
@@ -880,12 +887,14 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "TxVfo") {
         txVfo = update.value;
         updateTxButton();
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('txVfo', update.value);
     }
 
     // --- SPLIT MODE ---
     if (update.property === "SplitMode") {
         splitMode = update.value;
         updateSplitButton();
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('split', update.value);
     }
 
     // --- METER UPDATES ---
