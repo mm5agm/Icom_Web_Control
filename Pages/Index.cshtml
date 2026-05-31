@@ -2265,7 +2265,11 @@
 
         // Public setters that site.js calls from its SignalR handlers.
         window.updateToolbarStatus = function (key, value) {
-            if (!(key in _statusState)) return;
+            if (!(key in _statusState)) {
+                console.log('[StatusLine] ignored unknown key:', key, value);
+                return;
+            }
+            console.log('[StatusLine] update', key, '=', value);
             _statusState[key] = value;
             _renderToolbarStatus();
         };
