@@ -299,7 +299,9 @@ namespace Yaesu_Web_Control.Controllers
                     mode = _radioStateService.ModeA ?? "",
                     antenna = _radioStateService.AntennaA ?? "",
                     afGain = _radioStateService.AfGainA,
-                    roofingFilter = _radioStateService.RoofingFilterA ?? ""
+                    roofingFilter = _radioStateService.RoofingFilterA ?? "",
+                    ifWidth = _radioStateService.IfWidthA ?? "",
+                    ifShift = _radioStateService.IfShiftA
                 },
                 vfoB = new
                 {
@@ -309,7 +311,9 @@ namespace Yaesu_Web_Control.Controllers
                     mode = _radioStateService.ModeB ?? "",
                     antenna = _radioStateService.AntennaB ?? "",
                     afGain = _radioStateService.AfGainB,
-                    roofingFilter = _radioStateService.RoofingFilterB ?? ""
+                    roofingFilter = _radioStateService.RoofingFilterB ?? "",
+                    ifWidth = _radioStateService.IfWidthB ?? "",
+                    ifShift = _radioStateService.IfShiftB
                 },
                 micGain = _radioStateService.MicGain,
                 powerMeter = _radioStateService.PowerMeter ?? 0,
