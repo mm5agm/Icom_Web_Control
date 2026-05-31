@@ -1268,11 +1268,38 @@ namespace Yaesu_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        // GET — query the radio for its current IF Width code and refresh
+        // RadioStateService. Used for live calibration discovery: the user
+        // changes WIDTH on the radio's front panel, then hits this URL to
+        // see what SH code came back. Returns 99 max to allow probing codes
+        // beyond the official documented range (post-firmware extensions).
+        [HttpGet("ifwidth/{receiver}")]
+        public async Task<IActionResult> QueryIfWidth(string receiver)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
+                var response = await _catClient.SendCommandAsync($"SH{vfo};", "WebUI", CancellationToken.None);
+                // The dispatcher will have updated RadioStateService.IfWidthA/B by now.
+                var current = vfo == "0" ? _radioStateService.IfWidthA : _radioStateService.IfWidthB;
+                return Ok(new { vfo = receiver.ToUpper(), code = current, rawResponse = response });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error querying IF Width");
+                return StatusCode(500, new { error = "Failed to query IF Width" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
         [HttpPost("ifwidth/{receiver}")]
         public async Task<IActionResult> SetIfWidth(string receiver, [FromBody] IfWidthRequest request)
         {
-            // Codes 0-25 cover all supported models (FTdx101=0-8, FTdx10=0-15, FT-710=0-22, FTDX3000=1-25)
-            if (!int.TryParse(request.Code, out int codeNum) || codeNum < 0 || codeNum > 25)
+            // 0-99 allows probing post-firmware codes beyond the official 0-25 range.
+            if (!int.TryParse(request.Code, out int codeNum) || codeNum < 0 || codeNum > 99)
                 return BadRequest(new { error = $"Invalid IF Width code: {request.Code}" });
 
             if (!await _requestSemaphore.WaitAsync(2000))
