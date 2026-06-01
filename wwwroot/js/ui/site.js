@@ -2560,14 +2560,29 @@ document.addEventListener('DOMContentLoaded', function() {
     // initial connect before BandA arrives).
     function syncSegmentSelectToFrequency(vfo, hz) {
         const select = document.getElementById(`segmentSelect${vfo}`);
-        if (!select || select.disabled) return;
+        if (!select) {
+            console.log('[SegSync]', vfo, hz, 'no select element');
+            return;
+        }
+        if (select.disabled) {
+            console.log('[SegSync]', vfo, hz, 'select disabled');
+            return;
+        }
         const band = state.lastBand && state.lastBand[vfo];
-        if (!band) return;
+        if (!band) {
+            console.log('[SegSync]', vfo, hz, 'no band (state.lastBand=', state.lastBand, ')');
+            return;
+        }
         const plan = window.bandPlan || 'UK';
+        const before = select.value;
+        const optionValues = Array.from(select.options).map(o => o.value);
         if (!window.bandPlanData || !window.getBandSegmentForHz) {
             // Fallback if helper not loaded — use inline lookup against the plan
             const segments = (window.bandPlanData && window.bandPlanData[plan] && window.bandPlanData[plan][band]) || null;
-            if (!segments) return;
+            if (!segments) {
+                console.log('[SegSync]', vfo, hz, 'fallback: no segments for', plan, band);
+                return;
+            }
             const ordered = Object.entries(segments).sort((a, b) => a[1].freq - b[1].freq);
             let match = '';
             for (const [key, seg] of ordered) {
@@ -2575,11 +2590,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (hz >= seg.freq) match = key;
                 else break;
             }
+            console.log('[SegSync]', vfo, hz, 'plan=', plan, 'band=', band, 'segments=', Object.keys(segments), 'options=', optionValues, 'before=', before, 'match=', match);
             if (select.value !== match) select.value = match;
+            console.log('[SegSync]', vfo, hz, 'after=', select.value);
             return;
         }
         const key = window.getBandSegmentForHz(plan, band, hz) || '';
+        console.log('[SegSync]', vfo, hz, 'plan=', plan, 'band=', band, 'options=', optionValues, 'before=', before, 'key=', key);
         if (select.value !== key) select.value = key;
+        console.log('[SegSync]', vfo, hz, 'after=', select.value);
     }
 
     function populateSegmentSelect(vfo, band) {
@@ -2663,9 +2682,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // dropdown to its localStorage value and stomp on the auto-sync we did
     // from the matching FrequencyA event.
     function onBandChanged(vfo, band) {
-        if (state.lastBand[vfo] === band) return;
+        console.log('[SegSync] onBandChanged', vfo, 'incoming=', band, 'prev=', state.lastBand[vfo]);
+        if (state.lastBand[vfo] === band) {
+            console.log('[SegSync] onBandChanged guard fired — no repopulate');
+            return;
+        }
         state.lastBand[vfo] = band;
         populateSegmentSelect(vfo, band);
+        console.log('[SegSync] onBandChanged repopulated for', band);
     }
 
     // Wrap the outer updateBandButton so SignalR-driven band changes also update segments
