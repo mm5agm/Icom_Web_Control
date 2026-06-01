@@ -37,16 +37,9 @@ Tablet testing has been limited — feedback from tablet users is particularly w
 
 ---
 
-## 💬 Community
-
-Join the discussion group for announcements, bug reports, and feedback:
-
-- **Groups.io:** [Yaesu-Web-Control](https://groups.io/g/Yaesu-Web-Control/topics)
-
 ---
 
 ## 🌱 Why Sponsorship Matters
-
 I’m retired and maintain this project on a limited income, funding all development tools personally. AI‑assisted coding has been invaluable for building features quickly, but it isn’t free. 
 
 If this project has helped you, please consider sponsoring it. Even small contributions make a real difference and help keep the development tools running.
