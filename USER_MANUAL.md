@@ -597,13 +597,13 @@ The list of watched calls is saved across app restarts in your user settings fil
 
 ### 5.15 Memory Panel
 
-The **Mem** button in the toolbar opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. Click a tile to instantly tune VFO A to that frequency and mode.
+The **Mem** button in the toolbar (bold black text) opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. **Click a tile to QSY VFO A to that frequency** — and any of the memory's saved advanced settings (mode, AGC, NB, NR, power, IF Width, IF Shift, antenna, roofing filter) are sent to the radio at the same time. Fields that aren't set in the memory are left as-is on the radio.
 
 The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions.
 
-**Save to Mem button** — A **Save to Mem** button appears below the S-meter on both the VFO A and VFO B panels. Click it to save the current VFO frequency and mode as a new memory. A label input box appears — type a name (up to 12 characters) and press Enter or click Save. The new memory appears immediately in the floating panel.
+**Save to Mem button** — A **Save to Mem** button appears below the S-meter on both the VFO A and VFO B panels. Click it to save the current VFO frequency, mode and all advanced settings as a new memory. A label input box appears — type a name (up to 12 characters) and press Enter or click Save. The new memory appears immediately in the floating panel.
 
-**Banks dropdown** — if you have saved memory banks (see Section 8.4), a **Banks** dropdown appears in the toolbar alongside the Save to Rig buttons. Select a bank name to switch to it instantly — the memory list is replaced with that bank's contents and the tiles refresh automatically. The dropdown resets to its placeholder after loading, and is hidden when no banks have been saved.
+**Banks dropdown** — a **Banks** dropdown sits in the floating panel's toolbar alongside the Save to Rig buttons. The first entry is always **📥 YWC Starter Bank (built-in)** — the bundled set of common watering-hole memories shipped with the app (§8.5). Below that, any banks you've saved yourself appear (§8.4). Select any entry to switch — the memory list is replaced with that bank's contents and the tiles refresh automatically. The dropdown resets to its placeholder after loading.
 
 For full memory management — editing labels and frequencies, reordering, importing from and exporting to the radio, and memory banks — see Section 8.
 
