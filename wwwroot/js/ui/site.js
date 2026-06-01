@@ -828,20 +828,25 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- FREQUENCY CHANGE ---
     if (update.property === "FrequencyA") {
-        console.log('[DIAG] FrequencyA SignalR fired, value=', update.value, 'fn?', typeof window.syncSegmentSelectToFrequency);
-        // Update the toolbar status FIRST — earlier ordering made it
-        // dependent on updateFrequencyDisplay() / dispatchEvent() running
-        // without throwing, which they don't always do when called with a
-        // long integer Hz value during a rapid band-change cascade.
+        const _selBefore = (() => { const s = document.getElementById('segmentSelectA'); return s ? s.value : '(no el)'; })();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
         state.lastBackendFreq.A = update.value;
         try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
-        try { if (window.syncSegmentSelectToFrequency) window.syncSegmentSelectToFrequency('A', update.value); }
-        catch (e) { console.error('syncSegmentSelectToFrequency A error:', e); }
-        const _selA = document.getElementById('segmentSelectA');
-        console.log('[DIAG] After sync call, segmentSelectA.value=', _selA ? _selA.value : '(no element)');
+        let _syncResult = 'not-called';
+        try {
+            if (window.syncSegmentSelectToFrequency) {
+                window.syncSegmentSelectToFrequency('A', update.value);
+                _syncResult = 'called-ok';
+            } else {
+                _syncResult = 'window.syncSegmentSelectToFrequency missing';
+            }
+        } catch (e) {
+            _syncResult = 'threw: ' + (e && e.message);
+        }
+        const _selAfter = (() => { const s = document.getElementById('segmentSelectA'); return s ? s.value : '(no el)'; })();
+        console.log('[DIAG] FreqA value=' + update.value + ' band=' + (state.lastBand && state.lastBand.A) + ' selBefore=' + _selBefore + ' sync=' + _syncResult + ' selAfter=' + _selAfter);
     }
     if (update.property === "FrequencyB") {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
