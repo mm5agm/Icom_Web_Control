@@ -308,6 +308,12 @@ export function segmentForHz(bandPlan, band, hz) {
         if (hz >= seg.freq) match = key;
         else break;
     }
+    // If hz is below the lowest segment, default to the first (lowest-freq)
+    // segment. On HF that's typically CW — and 14.010 MHz is still in the
+    // 20 m CW sub-band even though it's below the CW watering hole at
+    // 14.025. Without this fallback the dropdown would go blank for
+    // frequencies between the band edge and the first activity centre.
+    if (match === null && ordered.length > 0) match = ordered[0][0];
     return match;
 }
 
