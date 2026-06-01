@@ -2446,6 +2446,9 @@
                 if (_queue.length === 0) return;
                 const text = _queue.shift();
                 try {
+                    // Refresh the voice list — Chromium can update it after the
+                    // initial load and stale voice references silently fail.
+                    voices = speechSynthesis.getVoices() || voices;
                     const u = new SpeechSynthesisUtterance(text);
                     const v = pickVoice();
                     if (v) u.voice = v;
@@ -2454,10 +2457,24 @@
                     _speaking = true;
                     u.onend   = () => { _speaking = false; _flushQueue(); };
                     u.onerror = () => { _speaking = false; _flushQueue(); };
+                    // Chromium pauses the synthesis engine after long idle and
+                    // future speak() calls become silent. resume() un-sticks it.
+                    if (speechSynthesis.paused) speechSynthesis.resume();
                     speechSynthesis.speak(u);
                 } catch {
                     _speaking = false;
                 }
+            }
+
+            // Keep the synthesis engine awake. Chromium has a long-standing
+            // bug where if no speech happens for ~15 s it silently pauses;
+            // calling resume() periodically prevents that.
+            if (typeof speechSynthesis !== 'undefined') {
+                setInterval(() => {
+                    if (speechSynthesis.paused && !speechSynthesis.speaking) {
+                        try { speechSynthesis.resume(); } catch {}
+                    }
+                }, 10000);
             }
 
             function speak(text) {
@@ -2548,13 +2565,23 @@
                         alert('Your browser does not support speech synthesis.');
                         return;
                     }
-                    const u = new SpeechSynthesisUtterance('Voice announcements ready');
-                    const v = pickVoice();
-                    if (v) u.voice = v;
-                    u.rate   = settings.rate;
-                    u.volume = settings.volume;
-                    hardStop(); // test should always take priority over any queued cues
-                    speechSynthesis.speak(u);
+                    hardStop(); // wipe any queued cues so the test wins immediately
+                    // Chromium quirk: calling cancel() then immediately speak()
+                    // in the same tick can leave the engine silently stuck.
+                    // A small setTimeout lets cancel() complete before we issue
+                    // the new utterance, which makes Test voice reliable.
+                    setTimeout(() => {
+                        // Refresh voices each time — list can change after
+                        // initial load and stale references silently fail.
+                        voices = speechSynthesis.getVoices() || voices;
+                        const u = new SpeechSynthesisUtterance('Voice announcements ready');
+                        const v = pickVoice();
+                        if (v) u.voice = v;
+                        u.rate   = settings.rate;
+                        u.volume = settings.volume;
+                        if (speechSynthesis.paused) speechSynthesis.resume();
+                        speechSynthesis.speak(u);
+                    }, 100);
                 },
                 stop() { hardStop(); },
                 _settings: settings, // exposed for the dialog
