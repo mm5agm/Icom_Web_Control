@@ -782,7 +782,6 @@ function updateMicGainLabel(mode) {
 // First SignalR RadioStateUpdate handler (outer scope).
 // Handles ModeA/B, FrequencyA/B, PowerA/B updates pushed from the backend.
 connection.on("RadioStateUpdate", function (update) {
-    console.log('[DIAG] RSU', update && update.property, update && update.value);
 
     // --- CONNECTION STATE ---
     if (update.property === "IsConnected") {
@@ -827,30 +826,26 @@ connection.on("RadioStateUpdate", function (update) {
     }
 
     // --- FREQUENCY CHANGE ---
+    //
+    // Important: `state` in this scope refers to a variable defined inside an
+    // IIFE further down the file (line ~1829) and is NOT visible here.
+    // Touching it bare throws ReferenceError and silently aborts the rest of
+    // the handler — which is what was breaking the segment-dropdown auto-sync
+    // for ages. Wrap every `state.*` access in try/catch so a single failure
+    // can't kill the handler. The IIFE's own polling loop keeps the
+    // frequency display fresh independently, so losing this write isn't fatal.
     if (update.property === "FrequencyA") {
-        const _selBefore = (() => { const s = document.getElementById('segmentSelectA'); return s ? s.value : '(no el)'; })();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
-        state.lastBackendFreq.A = update.value;
+        try { state.lastBackendFreq.A = update.value; } catch (_) { /* state lives in IIFE scope only */ }
         try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
-        let _syncResult = 'not-called';
-        try {
-            if (window.syncSegmentSelectToFrequency) {
-                window.syncSegmentSelectToFrequency('A', update.value);
-                _syncResult = 'called-ok';
-            } else {
-                _syncResult = 'window.syncSegmentSelectToFrequency missing';
-            }
-        } catch (e) {
-            _syncResult = 'threw: ' + (e && e.message);
-        }
-        const _selAfter = (() => { const s = document.getElementById('segmentSelectA'); return s ? s.value : '(no el)'; })();
-        console.log('[DIAG] FreqA value=' + update.value + ' band=' + (state.lastBand && state.lastBand.A) + ' selBefore=' + _selBefore + ' sync=' + _syncResult + ' selAfter=' + _selAfter);
+        try { if (window.syncSegmentSelectToFrequency) window.syncSegmentSelectToFrequency('A', update.value); }
+        catch (e) { console.error('syncSegmentSelectToFrequency A error:', e); }
     }
     if (update.property === "FrequencyB") {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
-        state.lastBackendFreq.B = update.value;
+        try { state.lastBackendFreq.B = update.value; } catch (_) { /* state lives in IIFE scope only */ }
         try { updateFrequencyDisplay('B', update.value); } catch (e) { console.error('updateFrequencyDisplay B error:', e); }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
