@@ -782,7 +782,7 @@ function updateMicGainLabel(mode) {
 // First SignalR RadioStateUpdate handler (outer scope).
 // Handles ModeA/B, FrequencyA/B, PowerA/B updates pushed from the backend.
 connection.on("RadioStateUpdate", function (update) {
-    // ...removed debug logging...
+    console.log('[DIAG] RSU', update && update.property, update && update.value);
 
     // --- CONNECTION STATE ---
     if (update.property === "IsConnected") {
