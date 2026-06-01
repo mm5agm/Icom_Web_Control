@@ -282,3 +282,70 @@ export function getSegments(bandPlan, band) {
     const plan = BAND_PLANS[bandPlan] || BAND_PLANS['Region1'];
     return plan[band] || null;
 }
+
+/**
+ * Best-guess radio mode for a given frequency, based on the usual amateur
+ * sub-band assignments. Used when the operator clicks a new frequency on the
+ * spectrum so the mode follows them without a separate mode-button press.
+ *
+ * Region-agnostic: the digital and CW sub-bands are broadly the same across
+ * IARU regions, so a single lookup covers all four. The 60m channels return
+ * USB because every region uses USB on 5 MHz.
+ *
+ * Returns one of the mode names accepted by window.setMode() (LSB, USB, CW-U,
+ * DATA-U, RTTY-U, FM, AM). Returns null for frequencies outside known amateur
+ * bands so the caller can decide not to change mode.
+ */
+export function modeForHz(hz) {
+    const khz = hz / 1000;
+    // 160m
+    if (khz >= 1800 && khz < 1838) return 'CW-U';
+    if (khz >= 1838 && khz < 1843) return 'DATA-U';   // FT8 1840
+    if (khz >= 1843 && khz < 2000) return 'LSB';
+    // 80m
+    if (khz >= 3500 && khz < 3570) return 'CW-U';
+    if (khz >= 3570 && khz < 3620) return 'DATA-U';   // FT8 3573, FT4 3575
+    if (khz >= 3620 && khz < 4000) return 'LSB';
+    // 60m — USB worldwide
+    if (khz >= 5250 && khz < 5450) return 'USB';
+    // 40m
+    if (khz >= 7000 && khz < 7040) return 'CW-U';
+    if (khz >= 7040 && khz < 7100) return 'DATA-U';   // FT4 7047, FT8 7074
+    if (khz >= 7100 && khz < 7300) return 'LSB';
+    // 30m — CW + digital only
+    if (khz >= 10100 && khz < 10130) return 'CW-U';
+    if (khz >= 10130 && khz < 10150) return 'DATA-U'; // FT8 10136, FT4 10140
+    // 20m
+    if (khz >= 14000 && khz < 14070) return 'CW-U';
+    if (khz >= 14070 && khz < 14099) return 'DATA-U'; // FT8 14074, RTTY 14080
+    if (khz >= 14099 && khz < 14350) return 'USB';
+    // 17m
+    if (khz >= 18068 && khz < 18095) return 'CW-U';
+    if (khz >= 18095 && khz < 18109) return 'DATA-U'; // FT8 18100, FT4 18104
+    if (khz >= 18109 && khz < 18168) return 'USB';
+    // 15m
+    if (khz >= 21000 && khz < 21070) return 'CW-U';
+    if (khz >= 21070 && khz < 21149) return 'DATA-U'; // FT8 21074, FT4 21140
+    if (khz >= 21149 && khz < 21450) return 'USB';
+    // 12m
+    if (khz >= 24890 && khz < 24915) return 'CW-U';
+    if (khz >= 24915 && khz < 24929) return 'DATA-U'; // FT8 24915, FT4 24919
+    if (khz >= 24929 && khz < 24990) return 'USB';
+    // 10m
+    if (khz >= 28000 && khz < 28070) return 'CW-U';
+    if (khz >= 28070 && khz < 28190) return 'DATA-U'; // FT8 28074, FT4 28180
+    if (khz >= 28190 && khz < 28225) return 'USB';
+    if (khz >= 28225 && khz < 29000) return 'USB';
+    if (khz >= 29000 && khz < 29700) return 'FM';
+    // 6m
+    if (khz >= 50000 && khz < 50100) return 'CW-U';
+    if (khz >= 50100 && khz < 50500) return 'USB';
+    if (khz >= 50500 && khz < 54000) return 'FM';
+    // 4m
+    if (khz >= 70000 && khz < 70500) return 'USB';
+    // 2m
+    if (khz >= 144000 && khz < 144500) return 'USB';
+    if (khz >= 144500 && khz < 148000) return 'FM';
+
+    return null;
+}

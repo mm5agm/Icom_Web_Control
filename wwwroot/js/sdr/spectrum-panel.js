@@ -7,6 +7,8 @@
 // Frequency axis labels are computed from the VFO frequency reported by
 // SdrSpectrumPipeline so the display is always centred on the current band.
 
+import { modeForHz } from '../ui/band-plan.js';
+
 export class SpectrumPanel {
 
     /**
@@ -234,6 +236,15 @@ export class SpectrumPanel {
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ frequencyHz: targetHz }),
         }).catch(() => { /* ignore network errors */ });
+
+        // Follow the click with a best-guess mode change. Most operators expect
+        // jumping from 14.074 (FT8) to 14.284 (SSB) to also flip the radio to
+        // USB rather than leave it stuck in DATA-U. window.setMode is defined
+        // by site.js and uses the same CAT path the mode buttons use.
+        const targetMode = modeForHz(targetHz);
+        if (targetMode && window.setMode) {
+            try { window.setMode('A', targetMode); } catch { /* ignore */ }
+        }
     }
 
     _onCanvasWheel(e) {
@@ -296,37 +307,68 @@ export class SpectrumPanel {
     // Vertical ticks at the standard CW / FT8 / FT4 / RTTY / SSB activity
     // frequencies for the current region's band plan. Helps orient newer
     // operators who don't yet have the watering holes memorised.
+    //
+    // Labels are staggered across up to three rows when they would overlap
+    // (e.g. FT8 at 14.074 and RTTY at 14.080 are only 6 kHz apart and would
+    // collide at any reasonable span).
     _drawBandMarkers(ctx, W, specH) {
         if (!this._bandPlan || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
 
         const leftHz  = this._vfoHz - this._lastSpanHz / 2;
         const rightHz = this._vfoHz + this._lastSpanHz / 2;
 
-        ctx.save();
-        ctx.font      = '11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = '#80c0ff';
-        ctx.fillStyle   = '#80c0ff';
-
-        // Iterate every band → every segment in the plan. The visible window
-        // typically spans one band so most lookups miss quickly.
+        // Collect all in-window markers with their pixel x and label width.
+        const markers = [];
         for (const bandName in this._bandPlan) {
             const segments = this._bandPlan[bandName];
             for (const segKey in segments) {
                 const seg = segments[segKey];
                 if (!seg || typeof seg.freq !== 'number') continue;
                 if (seg.freq < leftHz || seg.freq > rightHz) continue;
-                const x = ((seg.freq - leftHz) / this._lastSpanHz) * W;
-                // Short tick rising from just above the waterfall transition
-                ctx.beginPath();
-                ctx.moveTo(x, specH - 18);
-                ctx.lineTo(x, specH - 4);
-                ctx.stroke();
-                // Label above the tick — segment short name ("FT8", "CW", "SSB")
+                const x     = ((seg.freq - leftHz) / this._lastSpanHz) * W;
                 const label = seg.label || segKey;
-                ctx.fillText(label, x, specH - 20);
+                markers.push({ x, label });
             }
+        }
+        if (markers.length === 0) return;
+        markers.sort((a, b) => a.x - b.x);
+
+        ctx.save();
+        ctx.font        = '11px sans-serif';
+        ctx.textAlign   = 'center';
+        ctx.lineWidth   = 1;
+        ctx.strokeStyle = '#80c0ff';
+        ctx.fillStyle   = '#80c0ff';
+
+        // Stagger labels across up to three rows so closely-spaced markers
+        // (FT8 + RTTY on 20m being the worst case) remain readable.
+        const rowGap       = 12;   // vertical spacing between label rows
+        const maxRows      = 3;
+        const minLabelGap  = 4;
+        const rowRightEdge = new Array(maxRows).fill(-Infinity);
+
+        for (const m of markers) {
+            const halfWidth = ctx.measureText(m.label).width / 2;
+            const leftEdge  = m.x - halfWidth;
+            const rightEdge = m.x + halfWidth;
+
+            let row = 0;
+            for (let r = 0; r < maxRows; r++) {
+                if (leftEdge >= rowRightEdge[r] + minLabelGap) { row = r; break; }
+                row = r;
+            }
+            rowRightEdge[row] = rightEdge;
+
+            // Tick mark — same position regardless of which row the label is on.
+            ctx.beginPath();
+            ctx.moveTo(m.x, specH - 18);
+            ctx.lineTo(m.x, specH - 4);
+            ctx.stroke();
+
+            // Label — rendered above the tick, pushed up by `row` × rowGap
+            // so overlapping labels stack vertically instead of overwriting.
+            const labelY = specH - 20 - row * rowGap;
+            ctx.fillText(m.label, m.x, labelY);
         }
         ctx.restore();
     }
