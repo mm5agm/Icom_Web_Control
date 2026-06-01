@@ -189,7 +189,22 @@ The **WSJT-X** button also shows a red **TX** badge when WSJT-X is currently tra
 
 **POWER button** (top right) turns the radio on or off. The button is green when the radio is on and red when it is off.
 
-**UTC clock** — a yellow `HH:MM:SS Z` clock sits just left of the Buy Me a Coffee button. Amateur radio operates on UTC for logging, contests and beacon schedules, so the time is always visible regardless of your PC's local time zone. The clock is taken from your PC's system clock (not from the radio or a network source), so make sure your PC's time is correct — Windows usually keeps it accurate via `time.windows.com`.
+**UTC clock** — a yellow `HH:MM:SS Z` clock sits just left of the Buy Me a Coffee button. Amateur radio operates on UTC for logging, contests and beacon schedules, so the time is always visible regardless of your PC's local time zone.
+
+> **Where the time comes from.** The clock reads your **PC's system clock**, converted to UTC. There is no separate network time source — YWC trusts whatever Windows says the time is. Hovering the clock gives a one-line reminder; **clicking it** opens a popover with a full explanation and step-by-step instructions for verifying Windows time-sync.
+>
+> **Why this matters beyond just the clock display.** The same PC time is also used for:
+>
+> - The **Age** and **Time UTC** columns in the DX Spots list (§5.17)
+> - The **15-minute spot age-out** (§5.4)
+> - The **TX timeout warning** countdown (§5.10)
+> - QSO timestamps in any external logger you're using (Log4OM, JTAlert)
+>
+> If the PC clock is wrong, all of those misbehave.
+>
+> **For users with constant internet**, Windows syncs against `time.windows.com` typically once a week or whenever the connection comes back. Your clock stays within a second of UTC without effort.
+>
+> **For users who operate offline a lot**, a typical PC clock drifts seconds-to-minutes per week. Fine for SSB casual logging, problematic for FT8 and contests. Re-sync whenever you reconnect to the internet (Windows Settings → Time & Language → Date & time → Sync now).
 
 **Status line** — each VFO panel has its own compact one-line summary directly below the IF Width row, banner-coloured to match the panel (blue for VFO A, green for VFO B):
 

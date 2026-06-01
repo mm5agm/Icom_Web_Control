@@ -194,10 +194,11 @@
         <div class="col-auto ms-auto d-flex gap-2 align-items-center">
             <span id="utcClock"
                   class="font-monospace fw-bold px-2"
-                  style="font-size:0.95rem; color:#ffe066; background:#222; border:1px solid #444; border-radius:4px; padding-top: 1px; padding-bottom: 1px;"
-                  title="Current UTC time — useful for amateur radio logging, contests and band-opening predictions"
+                  style="font-size:0.95rem; color:#ffe066; background:#222; border:1px solid #444; border-radius:4px; padding-top: 1px; padding-bottom: 1px; cursor:help;"
+                  title="UTC time from your PC system clock. Drifts if Windows can't reach time.windows.com. Click for details and how to verify."
+                  onclick="document.getElementById('utcClockInfoDialog').show()"
                   aria-live="off"
-                  aria-label="Current UTC time">--:--:--Z</span>
+                  aria-label="Current UTC time. Click for source and accuracy details.">--:--:--Z</span>
             <a href="https://paypal.me/mm5agm" target="_blank" rel="noopener noreferrer"
                class="btn btn-warning btn-sm" style="padding-top: 1px; padding-bottom: 1px;" title="Support this project via PayPal"
                aria-label="Support this project via PayPal — Buy Me a Coffee">
@@ -1432,6 +1433,38 @@
             <button id="voiceTestBtn" class="btn btn-sm btn-primary">Test voice</button>
             <button id="voiceStopBtn" class="btn btn-sm btn-outline-secondary">Stop talking</button>
         </div>
+    </div>
+</dialog>
+
+<!-- UTC clock info popover — opened by clicking the top-bar clock.
+     Explains the clock source, what depends on it, and how to verify
+     the PC's time-sync state. -->
+<dialog id="utcClockInfoDialog"
+        style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:380px; max-width:520px;"
+        aria-labelledby="utcClockInfoTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
+        <strong id="utcClockInfoTitle">UTC clock — where does the time come from?</strong>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="document.getElementById('utcClockInfoDialog').close()"
+                aria-label="Close UTC clock info">✕</button>
+    </div>
+    <div class="p-3 small" style="line-height:1.5;">
+        <p class="mb-2">The clock reads <strong>your PC's system clock</strong>, converted to UTC. There is no separate network time source.</p>
+        <p class="mb-2"><strong>What depends on accurate time:</strong></p>
+        <ul class="mb-2 ps-3">
+            <li>DX Spots <em>Age</em> and <em>Time UTC</em> columns</li>
+            <li>The 15-minute spot age-out</li>
+            <li>The TX timeout warning countdown</li>
+            <li>QSO timestamps in any external logger you're using</li>
+        </ul>
+        <p class="mb-2"><strong>How to verify your PC time is correct:</strong></p>
+        <ol class="mb-2 ps-3">
+            <li>Open Windows <strong>Settings → Time &amp; Language → Date &amp; time</strong>.</li>
+            <li>Confirm <strong>Set time automatically</strong> is on.</li>
+            <li>Under <strong>Additional settings</strong>, click <strong>Sync now</strong> and check the &quot;Last successful time synchronisation&quot; date. If it&#39;s more than a few days ago and you have no continual internet, your clock may have drifted.</li>
+        </ol>
+        <p class="mb-2"><strong>If you operate offline a lot:</strong> rough rule of thumb is a typical PC clock drifts seconds-to-minutes per week without sync. Fine for SSB casual logging, problematic for FT8 and contests. Re-sync whenever you reconnect to the internet.</p>
+        <p class="mb-0 text-muted">The clock cannot detect drift on its own — your PC&#39;s clock is the only reference YWC has.</p>
     </div>
 </dialog>
 
