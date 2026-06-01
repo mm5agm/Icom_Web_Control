@@ -644,7 +644,7 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 
 **Age-out** — spots older than the configured age (default 15 min, set in Settings → DX Cluster) are dropped automatically. The list re-renders every 30 seconds to remove stale rows even when no new spots arrive.
 
-**Persistence** — panel position, size, sort column, sort direction, and the All bands setting are saved per browser.
+**Position and persistence** — drag the title bar to move the panel anywhere on screen. Panel position, size, sort column, sort direction, and the All bands setting are all saved per browser so the panel returns to where you left it next session.
 
 **Empty state** — if you see "No spots on this band", either no spots are in the buffer yet (cluster just connected, give it a few seconds), or the DX cluster feature isn't configured at all (see §6.6).
 
