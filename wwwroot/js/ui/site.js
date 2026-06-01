@@ -828,6 +828,7 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- FREQUENCY CHANGE ---
     if (update.property === "FrequencyA") {
+        console.log('[DIAG] FrequencyA SignalR fired, value=', update.value, 'fn?', typeof window.syncSegmentSelectToFrequency);
         // Update the toolbar status FIRST — earlier ordering made it
         // dependent on updateFrequencyDisplay() / dispatchEvent() running
         // without throwing, which they don't always do when called with a
@@ -839,6 +840,8 @@ connection.on("RadioStateUpdate", function (update) {
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
         try { if (window.syncSegmentSelectToFrequency) window.syncSegmentSelectToFrequency('A', update.value); }
         catch (e) { console.error('syncSegmentSelectToFrequency A error:', e); }
+        const _selA = document.getElementById('segmentSelectA');
+        console.log('[DIAG] After sync call, segmentSelectA.value=', _selA ? _selA.value : '(no element)');
     }
     if (update.property === "FrequencyB") {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
