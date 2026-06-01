@@ -460,45 +460,53 @@ namespace Yaesu_Web_Control.Controllers
             // Strip any IDs from the bank entries — IDs are assigned by MemoryService on insert.
             foreach (var e in bank.Entries) { e.Id = 0; e.SortOrder = 0; }
 
-            int added;
-            if (mode == "replace")
+            try
             {
-                await _memoryService.ReplaceAllAsync(new List<AppMemory>(bank.Entries));
-                added = bank.Entries.Count;
-            }
-            else if (mode == "append")
-            {
-                await _memoryService.MergeAsync(new List<AppMemory>(bank.Entries));
-                added = bank.Entries.Count;
-            }
-            else // add-missing
-            {
-                var existingLabels = new HashSet<string>(
-                    _memoryService.GetAll().Select(m => (m.Label ?? "").Trim()),
-                    StringComparer.OrdinalIgnoreCase);
-                var toAdd = bank.Entries
-                    .Where(e => !existingLabels.Contains((e.Label ?? "").Trim()))
-                    .ToList();
-                if (toAdd.Count > 0)
-                    await _memoryService.MergeAsync(toAdd);
-                added = toAdd.Count;
-            }
-
-            return Ok(new
-            {
-                mode,
-                added,
-                total = bank.Entries.Count,
-                bankName = bank.Name,
-                message = mode switch
+                int added;
+                if (mode == "replace")
                 {
-                    "replace"     => $"Replaced all memories with {added} starter-bank entries.",
-                    "append"      => $"Added {added} starter-bank entries (duplicates allowed).",
-                    _             => added == 0
-                        ? "No entries added — all starter-bank entries are already present (matched by label)."
-                        : $"Added {added} missing starter-bank entries. Existing entries left untouched."
+                    await _memoryService.ReplaceAllAsync(new List<AppMemory>(bank.Entries));
+                    added = bank.Entries.Count;
                 }
-            });
+                else if (mode == "append")
+                {
+                    await _memoryService.MergeAsync(new List<AppMemory>(bank.Entries));
+                    added = bank.Entries.Count;
+                }
+                else // add-missing
+                {
+                    var existingLabels = new HashSet<string>(
+                        _memoryService.GetAll().Select(m => (m.Label ?? "").Trim()),
+                        StringComparer.OrdinalIgnoreCase);
+                    var toAdd = bank.Entries
+                        .Where(e => !existingLabels.Contains((e.Label ?? "").Trim()))
+                        .ToList();
+                    if (toAdd.Count > 0)
+                        await _memoryService.MergeAsync(toAdd);
+                    added = toAdd.Count;
+                }
+
+                return Ok(new
+                {
+                    mode,
+                    added,
+                    total = bank.Entries.Count,
+                    bankName = bank.Name,
+                    message = mode switch
+                    {
+                        "replace"     => $"Replaced all memories with {added} starter-bank entries.",
+                        "append"      => $"Added {added} starter-bank entries (duplicates allowed).",
+                        _             => added == 0
+                            ? "No entries added — all starter-bank entries are already present (matched by label)."
+                            : $"Added {added} missing starter-bank entries. Existing entries left untouched."
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to apply starter bank in mode {Mode}", mode);
+                return StatusCode(500, new { error = $"Failed to apply starter bank: {ex.Message}" });
+            }
         }
 
         private async Task<StarterBankFile?> LoadStarterBankFromDiskAsync()

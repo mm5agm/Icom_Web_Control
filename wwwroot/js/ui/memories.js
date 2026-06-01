@@ -208,67 +208,28 @@ async function _loadBanks() {
 
 async function _switchBank(name) {
     if (!name) return;
-    // Built-in starter bank: ask the user how they want to load it.
-    if (name === STARTER_BANK_VALUE) {
-        await _loadStarterBankWithModePicker();
-        // Reset the dropdown so the same option can be picked again later.
-        const sel = document.getElementById('memBankSelect');
-        if (sel) sel.value = '';
-        return;
-    }
+    const statusEl = document.getElementById('memToolbarStatus');
+    if (statusEl) statusEl.textContent = 'Loading bank…';
     try {
-        const resp = await fetch(`/api/memorybank/${encodeURIComponent(name)}/load`, { method: 'POST' });
+        // Built-in starter bank uses its own endpoint, otherwise the standard
+        // bank-load endpoint. Both replace the current memories so the bank's
+        // entries appear in the Mem panel for normal use (click to QSY,
+        // edit, delete etc.) — identical behaviour either way.
+        const isStarter = name === STARTER_BANK_VALUE;
+        const url  = isStarter ? '/api/memory/starter-bank/load' : `/api/memorybank/${encodeURIComponent(name)}/load`;
+        const init = isStarter
+            ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'replace' }) }
+            : { method: 'POST' };
+        const resp = await fetch(url, init);
         if (resp.ok) {
             await _loadAndRender();
+            if (statusEl) statusEl.textContent = isStarter ? '✓ Starter bank loaded' : `✓ Loaded "${name}"`;
+            setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
         } else {
-            console.error('Bank switch failed: server returned', resp.status);
+            if (statusEl) statusEl.textContent = '✗ Load failed';
         }
     } catch (e) {
-        console.error('Bank switch failed:', e);
-    }
-}
-
-async function _loadStarterBankWithModePicker() {
-    const choice = window.prompt(
-        'YWC Starter Bank — how would you like to load it?\n\n' +
-        'Type a letter and press Enter:\n' +
-        '  m = Add Missing (recommended; restores deleted entries, keeps your edits)\n' +
-        '  a = Append All (adds everything, duplicates allowed)\n' +
-        '  r = Replace All (wipes current memories first — confirmation will follow)\n\n' +
-        'Or click Cancel to abort.', 'm');
-    if (choice === null) return;
-    const c = choice.trim().toLowerCase();
-    let mode = null;
-    if (c === 'm' || c === 'add-missing' || c === 'missing') mode = 'add-missing';
-    else if (c === 'a' || c === 'append')                     mode = 'append';
-    else if (c === 'r' || c === 'replace')                    mode = 'replace';
-    if (!mode) return;
-
-    if (mode === 'replace') {
-        const ok = window.confirm(
-            'Replace all memories with the YWC starter bank?\n\n' +
-            'ALL current memories — including any you have added or edited — will be wiped, ' +
-            'and the full starter bank loaded in their place. Memory Banks (saved sets) are not affected.\n\n' +
-            'Continue?');
-        if (!ok) return;
-    }
-    try {
-        const resp = await fetch('/api/memory/starter-bank/load', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ mode })
-        });
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-            window.alert('Starter bank load failed: ' + (data.error || resp.statusText));
-            return;
-        }
-        await _loadAndRender();
-        // Brief confirmation — no permanent surface to show this on the main page,
-        // so a one-line alert is the simplest visible feedback.
-        window.alert(data.message || `Done — ${data.added} entries added.`);
-    } catch (e) {
-        window.alert('Starter bank load failed: ' + e.message);
+        if (statusEl) statusEl.textContent = '✗ Error loading bank';
     }
 }
 

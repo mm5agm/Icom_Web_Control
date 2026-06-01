@@ -421,21 +421,22 @@
         const name = sel?.value;
         if (!name) return;
 
-        // Starter bank gets the three-mode picker instead of the standard
-        // replace-all confirmation, so users can recover deleted entries
-        // without losing their customisations.
-        if (name === STARTER_BANK_VALUE) {
-            await loadStarterBankWithModePicker();
-            return;
-        }
-
+        const isStarter = name === STARTER_BANK_VALUE;
+        const displayName = isStarter ? 'YWC Starter Bank' : name;
         if (!await pageConfirm(
-            `Load bank "${name}"?\n\nThis will replace your current app memories. Any unsaved changes will be lost.\n\nContinue?`)) return;
+            `Load bank "${displayName}"?\n\nThis will replace your current app memories. Any unsaved changes will be lost.\n\nContinue?`)) return;
 
         const statusEl = document.getElementById('bankStatus');
         statusEl.textContent = 'Loading…';
         try {
-            const resp = await fetch(`/api/memorybank/${encodeURIComponent(name)}/load`, { method: 'POST' });
+            // Built-in starter bank is loaded through its own endpoint; user
+            // banks go through /api/memorybank. Both produce the same end
+            // result — current memories replaced with the bank's contents.
+            const url    = isStarter ? '/api/memory/starter-bank/load'                          : `/api/memorybank/${encodeURIComponent(name)}/load`;
+            const init   = isStarter
+                ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'replace' }) }
+                : { method: 'POST' };
+            const resp = await fetch(url, init);
             if (resp.ok) {
                 location.reload();
             } else {
@@ -444,56 +445,6 @@
         } catch {
             statusEl.textContent = '✗ Error';
         }
-    }
-
-    // Three-mode loader for the built-in YWC starter bank.
-    async function loadStarterBankWithModePicker() {
-        const choice = await starterBankModeDialog();
-        if (!choice) return;
-        if (choice === 'replace') {
-            const ok = await pageConfirm(
-                'Replace all memories with the YWC starter bank?\n\n' +
-                'ALL current memories — including any you\'ve added or edited — will be wiped, and the full starter bank loaded in their place. ' +
-                'Memory Banks (saved sets) are not affected.\n\nContinue?');
-            if (!ok) return;
-        }
-        const statusEl = document.getElementById('bankStatus');
-        statusEl.textContent = 'Loading…';
-        try {
-            const resp = await fetch('/api/memory/starter-bank/load', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ mode: choice })
-            });
-            const data = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-                statusEl.textContent = `✗ ${data.error || 'Load failed'}`;
-                return;
-            }
-            statusEl.textContent = data.message || `✓ Done — ${data.added} added.`;
-            setTimeout(() => location.reload(), 1500);
-        } catch (e) {
-            statusEl.textContent = `✗ ${e.message}`;
-        }
-    }
-
-    // Small dialog with three mode buttons. Returns 'add-missing', 'append',
-    // 'replace' or null (cancel). Implementation uses native confirm/prompt
-    // chain so it works without any extra HTML.
-    async function starterBankModeDialog() {
-        const choice = await pagePrompt(
-            'YWC Starter Bank — how would you like to load it?\n\n' +
-            'Type a letter and press Enter:\n' +
-            '  m = Add Missing (recommended; restores deleted entries, keeps your edits)\n' +
-            '  a = Append All (adds everything, duplicates allowed)\n' +
-            '  r = Replace All (wipes current memories first — confirmation will follow)\n\n' +
-            'Or click Cancel to abort.', 'm');
-        if (choice === null) return null;
-        const c = choice.trim().toLowerCase();
-        if (c === 'm' || c === 'add-missing' || c === 'missing') return 'add-missing';
-        if (c === 'a' || c === 'append')                          return 'append';
-        if (c === 'r' || c === 'replace')                         return 'replace';
-        return null;
     }
 
     async function saveBankAs() {
