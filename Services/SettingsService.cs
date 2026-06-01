@@ -98,6 +98,15 @@ namespace Yaesu_Web_Control.Services
             }
         }
 
+        public string GetSettingsFilePath() => _settingsFilePath;
+
+        public void InvalidateCache()
+        {
+            _semaphore.Wait();
+            try { _cachedSettings = null; }
+            finally { _semaphore.Release(); }
+        }
+
         private static void MigrateAppDataIfNeeded(string newFolder)
         {
             if (Directory.Exists(newFolder)) return;

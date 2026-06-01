@@ -31,6 +31,7 @@
    - 6.4 [Roofing Filters](#64-roofing-filters)
    - 6.5 [CW Memory Messages](#65-cw-memory-messages-m1m5)
    - 6.6 [DX Cluster](#66-dx-cluster)
+   - 6.7 [Backup &amp; Restore](#67-backup--restore)
 7. [Application Setup](#7-application-setup)
    - 7.1 [External App Buttons](#71-external-app-buttons)
    - 7.2 [WSJT-X UDP Settings](#72-wsjt-x-udp-settings)
@@ -188,6 +189,8 @@ The **WSJT-X** button also shows a red **TX** badge when WSJT-X is currently tra
 
 **POWER button** (top right) turns the radio on or off. The button is green when the radio is on and red when it is off.
 
+**UTC clock** — a yellow `HH:MM:SS Z` clock sits just left of the Buy Me a Coffee button. Amateur radio operates on UTC for logging, contests and beacon schedules, so the time is always visible regardless of your PC's local time zone. The clock is taken from your PC's system clock (not from the radio or a network source), so make sure your PC's time is correct — Windows usually keeps it accurate via `time.windows.com`.
+
 **Status line** — each VFO panel has its own compact one-line summary directly below the IF Width row, banner-coloured to match the panel (blue for VFO A, green for VFO B):
 
 ```
@@ -254,6 +257,8 @@ The spectrum display is only visible if an SDR device has been configured in Set
 The cluster feed itself is not band-filtered by YWC — spots arrive for every band the cluster carries. They are all kept client-side; only the ones inside the visible window get drawn. To reduce traffic at the source (for example, to receive only 20 m and 40 m spots), add a line like `set/filter band 20 or band 40` to **Settings → DX Cluster → Post-login commands**. That filter runs on the cluster server and cuts down on spots before they reach YWC.
 
 On crowded bands (the lower end of 20m on a contest weekend, for example) labels are stacked across up to five rows to avoid overlap. If even five rows can't fit everything in a tight cluster of nearby frequencies, **the app drops the spots that don't fit rather than letting labels overlap and become illegible**. The dropped spots are still in the underlying spot list — they just aren't drawn. Zooming the spectrum to a narrower span (e.g. 250k or 500k) spreads spots out and reveals the ones that were hidden.
+
+**Band-plan markers** — small cyan tick marks at the bottom of the spectrum show the standard activity frequencies for the currently visible band: CW, FT8, FT4, RTTY, SSB DX window etc. The exact frequencies come from your selected IARU region (§6.1 Band Plan). The markers update automatically as you change band or zoom the spectrum; only segments whose frequency falls inside the visible window are drawn. They're a quick orientation aid — especially helpful when visiting an unfamiliar band — and they don't interact with anything; nothing happens if you click them.
 
 A status badge in the spectrum panel shows the current SDR state: **No SDR**, **Connecting…**, **Live**, or **Disconnected**.
 
@@ -810,6 +815,31 @@ The file is rewritten on each new connection so it never grows large. Open it in
 If the connection drops, the app reconnects automatically after 15 seconds. Disabling the toggle in Settings stops reconnection attempts.
 
 > **Note on registering to send spots:** Most clusters accept connections from any callsign for *receiving* spots, but require a one-off email registration before they accept spots you upload (the cluster will tell you the address). YWC only receives spots — it does not send any — so you can ignore that prompt.
+
+---
+
+### 6.7 Backup &amp; Restore
+
+At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete YWC configuration. This is **everything that's been customised in your shack** — radio model, COM port, baud rate, band plan, SDR settings, DX cluster login and watch list, CW memory messages, external app paths, per-band Width/Shift/Mode memory, antenna selections, RF Gain, Squelch, and all your radio memory channels.
+
+**Export Settings**
+
+Click **Export Settings** to download a single file named `ywc-settings-YYYYMMDD-HHMMSS.json`. Keep it somewhere safe — OneDrive, a USB stick, or your shack laptop. Re-export occasionally as your setup evolves.
+
+**Import Settings…**
+
+Click **Import Settings…**, pick a previously exported file, and confirm the replacement. Your current settings are preserved as `appsettings.user.json.bak` in `%APPDATA%\MM5AGM\Yaesu Web Control\` so you can recover if the import causes problems.
+
+**You must restart YWC after importing.** Most services (radio connection, DX cluster, SDR streaming, rigctld server) only read the settings file at startup, so changes only take full effect after a restart. The app displays a reminder when the import completes.
+
+**Typical use cases:**
+
+- **New PC** — install YWC, copy your exported settings file across, import. You're up and running in under a minute with all bands, memories and DX watch list intact.
+- **Before a Windows rebuild or major update** — export, then re-import after the rebuild.
+- **Sharing setup with a friend** — export and email them the file. They get a working starting point (though they'll want to change the callsign and possibly the COM port).
+- **Experimenting safely** — export before trying something risky; import the file to revert if it goes wrong.
+
+The settings JSON is human-readable; you can open it in a text editor to inspect or hand-edit if you ever need to. The file lives at `%APPDATA%\MM5AGM\Yaesu Web Control\appsettings.user.json` and is also accessible directly without going through the export.
 
 ---
 

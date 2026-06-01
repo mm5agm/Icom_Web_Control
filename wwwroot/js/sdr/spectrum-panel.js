@@ -47,6 +47,11 @@ export class SpectrumPanel {
         this._crosshairX  = null;
         this._crosshairY  = null;
 
+        // Band-plan segment data for marker overlay (CW / FT8 / SSB / RTTY etc.
+        // tick marks under the spectrum). Set via setBandPlan(); shape is the
+        // region-specific subset of BAND_PLANS, e.g. BAND_PLANS.Region1.
+        this._bandPlan = null;
+
         this._resizeObserver = null;
         this._init();
     }
@@ -75,6 +80,17 @@ export class SpectrumPanel {
     setDxStatus(status, detail) {
         this._dxStatus = status || 'off';
         this._dxDetail = detail || '';
+        if (this._lastBins) this._render();
+    }
+
+    /**
+     * Provide the region-specific band plan so the spectrum can draw marker
+     * ticks at the standard CW / FT8 / SSB / RTTY activity centres. The data
+     * is the region subset of BAND_PLANS (e.g. BAND_PLANS.Region1), keyed by
+     * band name → { CW: {freq, label}, FT8: ..., ... }.
+     */
+    setBandPlan(planForRegion) {
+        this._bandPlan = planForRegion || null;
         if (this._lastBins) this._render();
     }
 
@@ -269,10 +285,50 @@ export class SpectrumPanel {
 
         this._drawSpectrum(ctx, bins, W, specH);
         this._drawFrequencyAxis(ctx, bins, W, specH, centreHz, spanHz);
+        this._drawBandMarkers(ctx, W, specH);
         this._drawSpots(ctx, W, specH);
         this._drawDxBadge(ctx, W);
         this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawCrosshair(ctx, W, specH, spanHz);
+    }
+
+    // ── Band-plan marker ticks ───────────────────────────────────────────────
+    // Vertical ticks at the standard CW / FT8 / FT4 / RTTY / SSB activity
+    // frequencies for the current region's band plan. Helps orient newer
+    // operators who don't yet have the watering holes memorised.
+    _drawBandMarkers(ctx, W, specH) {
+        if (!this._bandPlan || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+
+        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+
+        ctx.save();
+        ctx.font      = '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#80c0ff';
+        ctx.fillStyle   = '#80c0ff';
+
+        // Iterate every band → every segment in the plan. The visible window
+        // typically spans one band so most lookups miss quickly.
+        for (const bandName in this._bandPlan) {
+            const segments = this._bandPlan[bandName];
+            for (const segKey in segments) {
+                const seg = segments[segKey];
+                if (!seg || typeof seg.freq !== 'number') continue;
+                if (seg.freq < leftHz || seg.freq > rightHz) continue;
+                const x = ((seg.freq - leftHz) / this._lastSpanHz) * W;
+                // Short tick rising from just above the waterfall transition
+                ctx.beginPath();
+                ctx.moveTo(x, specH - 18);
+                ctx.lineTo(x, specH - 4);
+                ctx.stroke();
+                // Label above the tick — segment short name ("FT8", "CW", "SSB")
+                const label = seg.label || segKey;
+                ctx.fillText(label, x, specH - 20);
+            }
+        }
+        ctx.restore();
     }
 
     // ── DX cluster status badge ──────────────────────────────────────────────

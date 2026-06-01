@@ -527,7 +527,66 @@
         </a>
     </div>
     </form>
+
+    <!-- Settings Backup / Restore — outside the main form so the import button doesn't trigger a save -->
+    <hr class="my-4" />
+    <h4><i class="bi bi-box-arrow-up"></i> Backup &amp; Restore</h4>
+    <p class="text-muted">
+        Download your full configuration (band profiles, memories, calibration, CW messages, DX watch list, external app paths)
+        as a single JSON file for safekeeping or transfer to another PC. Import a previously exported file to restore.
+    </p>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <a class="btn btn-outline-primary" href="/api/settings/export">
+            <i class="bi bi-download"></i> Export Settings
+        </a>
+        <label class="btn btn-outline-warning mb-0" for="settingsImportFile">
+            <i class="bi bi-upload"></i> Import Settings…
+        </label>
+        <input type="file" id="settingsImportFile" accept="application/json,.json" hidden>
+        <span id="settingsImportStatus" class="ms-2 small"></span>
+    </div>
+    <p class="text-muted small mt-2 mb-0">
+        Import overwrites your current settings. The previous file is kept as <code>appsettings.user.json.bak</code> so you can recover.
+        After importing, <strong>restart the app</strong> so the radio-connection, DX-cluster, SDR and rigctld services pick up the new values.
+    </p>
 </div>
+
+<script>
+    (function () {
+        const fileInput = document.getElementById('settingsImportFile');
+        const statusEl  = document.getElementById('settingsImportStatus');
+        if (!fileInput) return;
+        fileInput.addEventListener('change', async () => {
+            if (!fileInput.files || fileInput.files.length === 0) return;
+            const file = fileInput.files[0];
+            if (!confirm(`Replace current settings with the contents of "${file.name}"? Your existing settings will be saved to appsettings.user.json.bak.`)) {
+                fileInput.value = '';
+                return;
+            }
+            statusEl.textContent = 'Importing…';
+            statusEl.className = 'ms-2 small text-muted';
+            const fd = new FormData();
+            fd.append('file', file);
+            try {
+                const r = await fetch('/api/settings/import', { method: 'POST', body: fd });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) {
+                    statusEl.textContent = `Import failed: ${data.error || r.statusText}`;
+                    statusEl.className = 'ms-2 small text-danger';
+                    return;
+                }
+                statusEl.textContent = `Imported ${data.bytes} bytes. Please restart the app.`;
+                statusEl.className = 'ms-2 small text-success';
+                alert(data.message || 'Settings imported. Restart the app for all changes to take effect.');
+            } catch (e) {
+                statusEl.textContent = `Import failed: ${e.message}`;
+                statusEl.className = 'ms-2 small text-danger';
+            } finally {
+                fileInput.value = '';
+            }
+        });
+    })();
+</script>
 
 <!-- SDR Help Modal -->
 <div class="modal fade" id="sdrHelpModal" tabindex="-1" aria-labelledby="sdrHelpModalLabel" aria-hidden="true">

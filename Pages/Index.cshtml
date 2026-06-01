@@ -192,6 +192,12 @@
             </div>
         }
         <div class="col-auto ms-auto d-flex gap-2 align-items-center">
+            <span id="utcClock"
+                  class="font-monospace fw-bold px-2"
+                  style="font-size:0.95rem; color:#ffe066; background:#222; border:1px solid #444; border-radius:4px; padding-top: 1px; padding-bottom: 1px;"
+                  title="Current UTC time — useful for amateur radio logging, contests and band-opening predictions"
+                  aria-live="off"
+                  aria-label="Current UTC time">--:--:--Z</span>
             <a href="https://paypal.me/mm5agm" target="_blank" rel="noopener noreferrer"
                class="btn btn-warning btn-sm" style="padding-top: 1px; padding-bottom: 1px;" title="Support this project via PayPal"
                aria-label="Support this project via PayPal — Buy Me a Coffee">
@@ -1526,6 +1532,19 @@
         document.addEventListener('DOMContentLoaded', function () {
             initFreqKeyboard();
             initMemoriesPanel();
+
+            // ── UTC clock in the top bar ──────────────────────────────────────
+            const utcClockEl = document.getElementById('utcClock');
+            if (utcClockEl) {
+                const pad2 = n => String(n).padStart(2, '0');
+                const tick = () => {
+                    const d = new Date();
+                    utcClockEl.textContent =
+                        `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}Z`;
+                };
+                tick();
+                setInterval(tick, 1000);
+            }
             window.meterPanel = new MeterPanel({
                 smeterA:     { type: 'smeter', canvasId: 'sMeterCanvasA' },
                 smeterB:     { type: 'smeter', canvasId: 'sMeterCanvasB' },
@@ -1547,6 +1566,11 @@
                 'spectrumContainer',
                 @Model.RadioState.FrequencyA   // server-rendered initial VFO A frequency
             );
+
+            // Provide the region-specific band plan so the panel can draw FT8/CW/SSB
+            // marker ticks at the standard activity frequencies.
+            const _ywcRegion = '@Model.BandPlan';
+            if (BAND_PLANS[_ywcRegion]) spectrumPanel.setBandPlan(BAND_PLANS[_ywcRegion]);
 
             const spectrumPipeline = new SdrSpectrumPipeline();
 
