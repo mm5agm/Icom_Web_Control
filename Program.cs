@@ -156,12 +156,21 @@ builder.Services.AddSingleton<ProcessStatusCacheService>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryService>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryBankService>();
 
+// Register DX cluster service — single instance shared between controllers and
+// the background hosted service so the API can read the spot buffer.
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.DxClusterService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.DxClusterService>());
+
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddFilter((category, level) =>
 {
     // Show Information and above for WsjtxUdpService
     if (!string.IsNullOrEmpty(category) && category.Contains("Yaesu_Web_Control.Services.WsjtxUdpService"))
+        return level >= LogLevel.Information;
+    // Show Information and above for DxClusterService so we can see the
+    // raw protocol exchange when diagnosing why no spots appear.
+    if (!string.IsNullOrEmpty(category) && category.Contains("Yaesu_Web_Control.Services.DxClusterService"))
         return level >= LogLevel.Information;
     // Show Warning and above for everything else
     return level >= LogLevel.Warning;

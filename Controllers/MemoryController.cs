@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Yaesu_Web_Control.Services;
 
 namespace Yaesu_Web_Control.Controllers
@@ -28,19 +30,22 @@ namespace Yaesu_Web_Control.Controllers
         private readonly ISettingsService _settingsService;
         private readonly RadioStateService _radioStateService;
         private readonly ILogger<MemoryController> _logger;
+        private readonly IWebHostEnvironment _env;
 
         public MemoryController(
             MemoryService memoryService,
             ICatClient catClient,
             ISettingsService settingsService,
             RadioStateService radioStateService,
-            ILogger<MemoryController> logger)
+            ILogger<MemoryController> logger,
+            IWebHostEnvironment env)
         {
             _memoryService = memoryService;
             _catClient = catClient;
             _settingsService = settingsService;
             _radioStateService = radioStateService;
             _logger = logger;
+            _env = env;
         }
 
         // ── CRUD ─────────────────────────────────────────────────────────────
@@ -122,7 +127,102 @@ namespace Yaesu_Web_Control.Controllers
             _radioStateService.RxClarOn = memory.RxClarOn;
             _radioStateService.TxClarOn = memory.TxClarOn;
 
+            // ── Apply advanced / optional fields ───────────────────────────────
+            // Each field is applied only if non-null. Null = leave radio alone.
+            if (!string.IsNullOrEmpty(memory.Antenna))
+            {
+                await _catClient.SendCommandAsync($"AN0{memory.Antenna};", "MemRecall", CancellationToken.None);
+                _radioStateService.AntennaA = memory.Antenna;
+            }
+            if (!string.IsNullOrEmpty(memory.IfWidthCode) && int.TryParse(memory.IfWidthCode, out int ifw))
+            {
+                await _catClient.SendCommandAsync($"SH00{ifw:D2};", "MemRecall", CancellationToken.None);
+                _radioStateService.IfWidthA = memory.IfWidthCode;
+            }
+            if (memory.IfShiftHz.HasValue)
+            {
+                int shift = memory.IfShiftHz.Value;
+                char sign = shift >= 0 ? '+' : '-';
+                await _catClient.SendCommandAsync($"IS00{sign}{Math.Abs(shift):D4};", "MemRecall", CancellationToken.None);
+                _radioStateService.IfShiftA = shift;
+            }
+            if (!string.IsNullOrEmpty(memory.RoofingCode))
+            {
+                // FTdx10/FT-710 have no CAT roofing filter control; skip silently.
+                if (settings.RadioModel is not ("FTdx10" or "FT-710"))
+                {
+                    await _catClient.SendCommandAsync($"RF0{memory.RoofingCode};", "MemRecall", CancellationToken.None);
+                    _radioStateService.RoofingFilterA = memory.RoofingCode;
+                }
+            }
+            if (memory.NbOn.HasValue)
+            {
+                await _catClient.SendCommandAsync($"NB0{(memory.NbOn.Value ? 1 : 0)};", "MemRecall", CancellationToken.None);
+                _radioStateService.NbA = memory.NbOn.Value ? "1" : "0";
+            }
+            if (memory.NbLevel.HasValue)
+            {
+                int nbl = Math.Clamp(memory.NbLevel.Value, 1, 20);
+                await _catClient.SendCommandAsync($"NL0{nbl:D3};", "MemRecall", CancellationToken.None);
+                _radioStateService.NbLevelA = nbl;
+            }
+            if (!string.IsNullOrEmpty(memory.NrLevel))
+            {
+                await _catClient.SendCommandAsync($"NR0{memory.NrLevel};", "MemRecall", CancellationToken.None);
+                _radioStateService.NrA = memory.NrLevel;
+            }
+            if (!string.IsNullOrEmpty(memory.AgcMode))
+            {
+                await _catClient.SendCommandAsync($"GT0{memory.AgcMode};", "MemRecall", CancellationToken.None);
+                _radioStateService.AgcA = memory.AgcMode;
+            }
+            if (memory.PowerWatts.HasValue)
+            {
+                int pw = Math.Clamp(memory.PowerWatts.Value, 5, 200);
+                await _catClient.SendCommandAsync($"PC{pw:D3};", "MemRecall", CancellationToken.None);
+                _radioStateService.Power = pw;
+            }
+            // Notes are app-side only; not sent to the radio.
+
             return Ok();
+        }
+
+        // ── Save current VFO state as a new memory (with advanced fields) ────
+        //
+        // Reads the live radio state from RadioStateService so we capture
+        // every field at the moment the user clicked "Save to Mem", rather
+        // than asking the browser to round up scattered DOM values.
+        public class SaveVfoRequest
+        {
+            public string Label { get; set; } = "";
+            public string? Notes { get; set; }
+        }
+
+        [HttpPost("save-vfo/{vfo}")]
+        public async Task<IActionResult> SaveVfo(string vfo, [FromBody] SaveVfoRequest? request)
+        {
+            bool isA = string.Equals(vfo, "A", StringComparison.OrdinalIgnoreCase);
+            var mem = new AppMemory
+            {
+                Label             = string.IsNullOrWhiteSpace(request?.Label) ? "" : request!.Label.Trim(),
+                FrequencyHz       = isA ? _radioStateService.FrequencyA : _radioStateService.FrequencyB,
+                Mode              = (isA ? _radioStateService.ModeA : _radioStateService.ModeB) ?? "USB",
+                ClarifierOffsetHz = isA ? _radioStateService.ClarifierOffsetA : _radioStateService.ClarifierOffsetB,
+                RxClarOn          = _radioStateService.RxClarOn,
+                TxClarOn          = _radioStateService.TxClarOn,
+                Antenna           = isA ? _radioStateService.AntennaA : _radioStateService.AntennaB,
+                IfWidthCode       = isA ? _radioStateService.IfWidthA : _radioStateService.IfWidthB,
+                IfShiftHz         = isA ? _radioStateService.IfShiftA : _radioStateService.IfShiftB,
+                RoofingCode       = isA ? _radioStateService.RoofingFilterA : _radioStateService.RoofingFilterB,
+                NbOn              = (isA ? _radioStateService.NbA : _radioStateService.NbB) == "1",
+                NbLevel           = isA ? _radioStateService.NbLevelA : _radioStateService.NbLevelB,
+                NrLevel           = isA ? _radioStateService.NrA : _radioStateService.NrB,
+                AgcMode           = isA ? _radioStateService.AgcA : _radioStateService.AgcB,
+                PowerWatts        = _radioStateService.Power > 0 ? _radioStateService.Power : (int?)null,
+                Notes             = request?.Notes,
+            };
+            var created = await _memoryService.AddAsync(mem);
+            return Ok(created);
         }
 
         // ── Import from Radio ────────────────────────────────────────────────
@@ -293,6 +393,145 @@ namespace Yaesu_Web_Control.Controllers
                 await _catClient.SendCommandAsync(
                     $"MT{ch}{freq}{clarDir}{clarOff}{rxBit}{txBit}{modeCode}000000{0}{tag};", "MemExport", cancellationToken);
             }
+        }
+
+        // ── YWC starter bank (bundled with the app) ──────────────────────────
+        //
+        // The starter bank is a region-specific set of watering-hole memories
+        // (FT8/FT4/SSB/CW/RTTY/beacons) shipped in wwwroot/data/starter-bank-*.json.
+        // Three load modes are offered so the user can re-load after deleting
+        // entries by accident without losing any customisations they've made:
+        //
+        //   add-missing  Only add entries whose labels aren't already present.
+        //                Preserves edits AND restores deleted entries.
+        //   append       Add every entry, even if duplicate labels result.
+        //   replace      Wipe all existing memories and load the full bank.
+        //                Frontend warns the user before invoking this mode.
+
+        public class StarterBankFile
+        {
+            [JsonPropertyName("name")]        public string Name { get; set; } = "";
+            [JsonPropertyName("description")] public string Description { get; set; } = "";
+            [JsonPropertyName("entries")]     public List<AppMemory> Entries { get; set; } = new();
+        }
+
+        public class LoadStarterRequest
+        {
+            public string Mode { get; set; } = "add-missing"; // add-missing | append | replace
+        }
+
+        [HttpGet("starter-bank")]
+        public async Task<IActionResult> GetStarterBank()
+        {
+            try
+            {
+                var bank = await LoadStarterBankFromDiskAsync();
+                if (bank == null)
+                    return NotFound(new { error = "Starter bank file not found for the current region." });
+                return Ok(bank);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load starter bank file");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("starter-bank/load")]
+        public async Task<IActionResult> LoadStarterBank([FromBody] LoadStarterRequest? request)
+        {
+            var mode = (request?.Mode ?? "add-missing").Trim().ToLowerInvariant();
+            if (mode != "add-missing" && mode != "append" && mode != "replace")
+                return BadRequest(new { error = $"Invalid mode '{mode}'. Expected add-missing, append or replace." });
+
+            StarterBankFile? bank;
+            try
+            {
+                bank = await LoadStarterBankFromDiskAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read starter bank file");
+                return StatusCode(500, new { error = $"Failed to read starter bank: {ex.Message}" });
+            }
+            if (bank == null || bank.Entries.Count == 0)
+                return NotFound(new { error = "Starter bank file not found or empty for the current region." });
+
+            // Strip any IDs from the bank entries — IDs are assigned by MemoryService on insert.
+            foreach (var e in bank.Entries) { e.Id = 0; e.SortOrder = 0; }
+
+            try
+            {
+                int added;
+                if (mode == "replace")
+                {
+                    await _memoryService.ReplaceAllAsync(new List<AppMemory>(bank.Entries));
+                    added = bank.Entries.Count;
+                }
+                else if (mode == "append")
+                {
+                    await _memoryService.MergeAsync(new List<AppMemory>(bank.Entries));
+                    added = bank.Entries.Count;
+                }
+                else // add-missing
+                {
+                    var existingLabels = new HashSet<string>(
+                        _memoryService.GetAll().Select(m => (m.Label ?? "").Trim()),
+                        StringComparer.OrdinalIgnoreCase);
+                    var toAdd = bank.Entries
+                        .Where(e => !existingLabels.Contains((e.Label ?? "").Trim()))
+                        .ToList();
+                    if (toAdd.Count > 0)
+                        await _memoryService.MergeAsync(toAdd);
+                    added = toAdd.Count;
+                }
+
+                return Ok(new
+                {
+                    mode,
+                    added,
+                    total = bank.Entries.Count,
+                    bankName = bank.Name,
+                    message = mode switch
+                    {
+                        "replace"     => $"Replaced all memories with {added} starter-bank entries.",
+                        "append"      => $"Added {added} starter-bank entries (duplicates allowed).",
+                        _             => added == 0
+                            ? "No entries added — all starter-bank entries are already present (matched by label)."
+                            : $"Added {added} missing starter-bank entries. Existing entries left untouched."
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to apply starter bank in mode {Mode}", mode);
+                return StatusCode(500, new { error = $"Failed to apply starter bank: {ex.Message}" });
+            }
+        }
+
+        private async Task<StarterBankFile?> LoadStarterBankFromDiskAsync()
+        {
+            var settings = await _settingsService.GetSettingsAsync();
+            // Normalise legacy region names. Pages/Index.cshtml.cs does similar mapping.
+            var region = settings.BandPlan switch
+            {
+                "UK"  => "Region1",
+                "USA" => "Region2",
+                var v => v
+            };
+            var filename = region switch
+            {
+                "Region1" => "starter-bank-region1.json",
+                "Region2" => "starter-bank-region2.json",
+                "Region3" => "starter-bank-region3.json",
+                "Japan"   => "starter-bank-japan.json",
+                _          => "starter-bank-region1.json"
+            };
+            var path = Path.Combine(_env.WebRootPath, "data", filename);
+            if (!System.IO.File.Exists(path)) return null;
+            var json = await System.IO.File.ReadAllTextAsync(path);
+            return JsonSerializer.Deserialize<StarterBankFile>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
     }
 }

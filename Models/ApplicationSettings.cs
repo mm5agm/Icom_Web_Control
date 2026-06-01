@@ -13,16 +13,20 @@
         public string WsjtxCommandLine { get; set; } = @"C:\WSJT\wsjtx\bin\wsjtx.exe --rig-name=WebApp";
         public string JtalertCommandLine { get; set; } = @"C:\HamApps\JTAlert\JTAlert.exe";
         public string Log4omCommandLine { get; set; } = @"C:\Program Files (x86)\Log4OM 2\Log4OM.exe";
+        public string GridtrackerCommandLine { get; set; } = @"C:\Program Files\GridTracker2\GridTracker2.exe";
 
         // External Applications - Custom Names (user can rename buttons)
         public string App1Name { get; set; } = "WSJT-X";
         public string App2Name { get; set; } = "JTAlert";
         public string App3Name { get; set; } = "Log4OM";
+        public string App4Name { get; set; } = "GridTracker";
 
         // External Applications - Show/Hide buttons (optional apps)
         public bool ShowWsjtxButton { get; set; } = true;
         public bool ShowJtalertButton { get; set; } = true;
         public bool ShowLog4omButton { get; set; } = true;
+        // Default off — most users won't have GridTracker installed
+        public bool ShowGridtrackerButton { get; set; } = false;
 
         // WSJT-X UDP Settings
         // Default: Use the same multicast address as configured in WSJT-X
@@ -51,10 +55,24 @@
         public Dictionary<string, BandProfile> BandProfilesA { get; set; } = new();
         public Dictionary<string, BandProfile> BandProfilesB { get; set; } = new();
 
-        // When true, the app sends EX commands on connect to route DATA mode audio through USB
-        // rather than the rear DATA/ACC connector (the radio's factory default).
-        // Enable this if you use USB audio for digital modes (FT8, etc.) and have no rear connector wired.
-        public bool UseUsbAudioForDataModes { get; set; } = false;
+        // DX cluster settings. No default host — the user picks their cluster
+        // explicitly from Settings before enabling. Empty host = feature off.
+        public bool DxClusterEnabled { get; set; } = false;
+        public string DxClusterHost { get; set; } = "";
+        public int DxClusterPort { get; set; } = 7300;
+        public string DxClusterLoginCallsign { get; set; } = "";
+        public int DxSpotAgeMinutes { get; set; } = 15;
+
+        // Cluster commands to send each time we log in. One per line.
+        // Useful for set/qra IO75JA, set/name Colin, set/filter, set/skimmer etc.
+        // Commands are sent in order after the callsign is accepted.
+        public string DxClusterPostLoginCommands { get; set; } = "";
+
+        // Callsigns or callsign prefixes to watch. Each line is matched
+        // case-insensitively. A trailing * makes it a prefix match
+        // ("G4*" matches G4ABC, G4XYZ). No wildcards = exact match.
+        // Lines starting with # are ignored. Empty = feature off.
+        public string DxClusterWatchedCallsigns { get; set; } = "";
 
         // Optional roofing filters installed in the radio (FTdx101MP/D only).
         // "6"=12kHz and "7"=3kHz are always fitted. "8"=1.2kHz, "9"=600Hz, "A"=300Hz are optional.

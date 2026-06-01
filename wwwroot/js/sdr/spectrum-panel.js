@@ -7,6 +7,8 @@
 // Frequency axis labels are computed from the VFO frequency reported by
 // SdrSpectrumPipeline so the display is always centred on the current band.
 
+import { modeForHz } from '../ui/band-plan.js';
+
 export class SpectrumPanel {
 
     /**
@@ -32,9 +34,25 @@ export class SpectrumPanel {
         this._lastCentreHz = 0;
         this._lastSpanHz   = 0;
 
+        // DX cluster spots overlaid on the spectrum. Each entry is the JSON
+        // shape from /api/dxcluster/spots — { callsign, frequencyHz, spotter,
+        // comment, receivedUtc }. Only spots within the current span are
+        // drawn; clicks within a few pixels of a spot QSY to it precisely.
+        this._spots = [];
+
+        // DX cluster connection status — shown as a small badge in the
+        // top-right of the spectrum canvas. Updated by setDxStatus().
+        this._dxStatus = 'off';
+        this._dxDetail = '';
+
         // Crosshair state — null when mouse is outside the canvas.
         this._crosshairX  = null;
         this._crosshairY  = null;
+
+        // Band-plan segment data for marker overlay (CW / FT8 / SSB / RTTY etc.
+        // tick marks under the spectrum). Set via setBandPlan(); shape is the
+        // region-specific subset of BAND_PLANS, e.g. BAND_PLANS.Region1.
+        this._bandPlan = null;
 
         this._resizeObserver = null;
         this._init();
@@ -53,6 +71,48 @@ export class SpectrumPanel {
     /** Store the latest error detail string for display alongside status overlays. */
     setError(detail) {
         this._errorDetail = detail;
+    }
+
+    /**
+     * Update the DX cluster connection status. Drives the small badge in
+     * the top-right of the spectrum canvas.
+     * @param {string} status  "off" | "connecting" | "connected" | "disconnected"
+     * @param {string} detail  Optional human-readable detail / error message
+     */
+    setDxStatus(status, detail) {
+        this._dxStatus = status || 'off';
+        this._dxDetail = detail || '';
+        if (this._lastBins) this._render();
+    }
+
+    /**
+     * Provide the region-specific band plan so the spectrum can draw marker
+     * ticks at the standard CW / FT8 / SSB / RTTY activity centres. The data
+     * is the region subset of BAND_PLANS (e.g. BAND_PLANS.Region1), keyed by
+     * band name → { CW: {freq, label}, FT8: ..., ... }.
+     */
+    setBandPlan(planForRegion) {
+        this._bandPlan = planForRegion || null;
+        if (this._lastBins) this._render();
+    }
+
+    /** Replace the full DX spots array (used on page load when fetching /api/dxcluster/spots). */
+    setSpots(spots) {
+        this._spots = Array.isArray(spots) ? spots.slice() : [];
+        if (this._lastBins) this._render();
+    }
+
+    /** Add or update a single spot — used when SignalR pushes a new DxSpot. */
+    addSpot(spot) {
+        if (!spot || !spot.callsign) return;
+        // De-duplicate by callsign + frequency: a re-spot replaces the older entry.
+        const i = this._spots.findIndex(s =>
+            s.callsign === spot.callsign && Math.abs(s.frequencyHz - spot.frequencyHz) < 100);
+        if (i >= 0) this._spots[i] = spot;
+        else        this._spots.unshift(spot);
+        // Cap memory: don't accumulate more than 500 spots client-side.
+        if (this._spots.length > 500) this._spots.length = 500;
+        if (this._lastBins) this._render();
     }
 
     /** Receive the current VFO frequency so the axis labels stay accurate. */
@@ -156,14 +216,35 @@ export class SpectrumPanel {
         const y     = e.clientY - rect.top;
         if (y > specH * (rect.height / canvas.height)) return;
 
+        // Convert canvas-relative x (CSS pixels) to canvas-internal pixels.
+        const canvasX = x * (W / rect.width);
         const leftHz  = this._vfoHz - this._lastSpanHz / 2;
-        const clickHz = Math.round(leftHz + (x / W) * this._lastSpanHz);
+
+        // If the click is within 8 internal-pixels of a spot's marker, snap
+        // to that spot's exact frequency. Otherwise tune to the click x.
+        let targetHz = Math.round(leftHz + (canvasX / W) * this._lastSpanHz);
+        for (const s of this._spots) {
+            const sx = ((s.frequencyHz - leftHz) / this._lastSpanHz) * W;
+            if (Math.abs(sx - canvasX) <= 8) {
+                targetHz = s.frequencyHz;
+                break;
+            }
+        }
 
         fetch('/api/cat/frequency/a', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ frequencyHz: clickHz }),
+            body:    JSON.stringify({ frequencyHz: targetHz }),
         }).catch(() => { /* ignore network errors */ });
+
+        // Follow the click with a best-guess mode change. Most operators expect
+        // jumping from 14.074 (FT8) to 14.284 (SSB) to also flip the radio to
+        // USB rather than leave it stuck in DATA-U. window.setMode is defined
+        // by site.js and uses the same CAT path the mode buttons use.
+        const targetMode = modeForHz(targetHz);
+        if (targetMode && window.setMode) {
+            try { window.setMode('A', targetMode); } catch { /* ignore */ }
+        }
     }
 
     _onCanvasWheel(e) {
@@ -215,8 +296,217 @@ export class SpectrumPanel {
 
         this._drawSpectrum(ctx, bins, W, specH);
         this._drawFrequencyAxis(ctx, bins, W, specH, centreHz, spanHz);
+        this._drawBandEdges(ctx, W, specH);
+        this._drawBandMarkers(ctx, W, specH);
+        this._drawSpots(ctx, W, specH);
+        this._drawDxBadge(ctx, W);
         this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawCrosshair(ctx, W, specH, spanHz);
+    }
+
+    // ── Band-edge guard rails ────────────────────────────────────────────────
+    // Vertical red lines at the lower and upper edges of each amateur band
+    // visible in the current spectrum window. Makes it visually obvious if
+    // the operator tunes (deliberately or accidentally) outside the amateur
+    // allocation. Edges are the broadest amateur envelopes (worldwide), so a
+    // line at e.g. 7.300 MHz on 40m might be lenient in a Region 1 country
+    // where the band ends at 7.200 — but it's never wrong (no transmission
+    // is legal beyond these limits in any region).
+    _drawBandEdges(ctx, W, specH) {
+        if (this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+
+        ctx.save();
+        ctx.strokeStyle = '#ff4040';
+        ctx.lineWidth   = 1.5;
+        ctx.setLineDash([4, 3]);   // dashed so it's clearly a "guard" not a "marker"
+
+        for (const edge of SpectrumPanel.BAND_EDGES) {
+            for (const hz of [edge.lo, edge.hi]) {
+                if (hz < leftHz || hz > rightHz) continue;
+                const x = ((hz - leftHz) / this._lastSpanHz) * W;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, specH - 2);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+
+    // ── Band-plan marker ticks ───────────────────────────────────────────────
+    // Vertical ticks at the standard CW / FT8 / FT4 / RTTY / SSB activity
+    // frequencies for the current region's band plan. Helps orient newer
+    // operators who don't yet have the watering holes memorised.
+    //
+    // Labels are staggered across up to three rows when they would overlap
+    // (e.g. FT8 at 14.074 and RTTY at 14.080 are only 6 kHz apart and would
+    // collide at any reasonable span).
+    _drawBandMarkers(ctx, W, specH) {
+        if (!this._bandPlan || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+
+        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+
+        // Collect all in-window markers with their pixel x and label width.
+        const markers = [];
+        for (const bandName in this._bandPlan) {
+            const segments = this._bandPlan[bandName];
+            for (const segKey in segments) {
+                const seg = segments[segKey];
+                if (!seg || typeof seg.freq !== 'number') continue;
+                if (seg.freq < leftHz || seg.freq > rightHz) continue;
+                const x     = ((seg.freq - leftHz) / this._lastSpanHz) * W;
+                const label = seg.label || segKey;
+                markers.push({ x, label });
+            }
+        }
+        if (markers.length === 0) return;
+        markers.sort((a, b) => a.x - b.x);
+
+        ctx.save();
+        ctx.font        = '11px sans-serif';
+        ctx.textAlign   = 'center';
+        ctx.lineWidth   = 1;
+        ctx.strokeStyle = '#80c0ff';
+        ctx.fillStyle   = '#80c0ff';
+
+        // Stagger labels across up to three rows so closely-spaced markers
+        // (FT8 + RTTY on 20m being the worst case) remain readable.
+        const rowGap       = 12;   // vertical spacing between label rows
+        const maxRows      = 3;
+        const minLabelGap  = 4;
+        const rowRightEdge = new Array(maxRows).fill(-Infinity);
+
+        for (const m of markers) {
+            const halfWidth = ctx.measureText(m.label).width / 2;
+            const leftEdge  = m.x - halfWidth;
+            const rightEdge = m.x + halfWidth;
+
+            let row = 0;
+            for (let r = 0; r < maxRows; r++) {
+                if (leftEdge >= rowRightEdge[r] + minLabelGap) { row = r; break; }
+                row = r;
+            }
+            rowRightEdge[row] = rightEdge;
+
+            // Tick mark — same position regardless of which row the label is on.
+            ctx.beginPath();
+            ctx.moveTo(m.x, specH - 18);
+            ctx.lineTo(m.x, specH - 4);
+            ctx.stroke();
+
+            // Label — rendered above the tick, pushed up by `row` × rowGap
+            // so overlapping labels stack vertically instead of overwriting.
+            const labelY = specH - 20 - row * rowGap;
+            ctx.fillText(m.label, m.x, labelY);
+        }
+        ctx.restore();
+    }
+
+    // ── DX cluster status badge ──────────────────────────────────────────────
+    _drawDxBadge(ctx, W) {
+        const label = `DX: ${this._dxStatus}`;
+        let bg, fg;
+        switch (this._dxStatus) {
+            case 'connected':    bg = '#1e7e34'; fg = '#ffffff'; break;
+            case 'connecting':   bg = '#b58900'; fg = '#000000'; break;
+            case 'disconnected': bg = '#a03030'; fg = '#ffffff'; break;
+            default:             bg = '#3a3a3a'; fg = '#aaaaaa'; break;
+        }
+
+        ctx.save();
+        ctx.font         = 'bold 14px sans-serif';
+        ctx.textBaseline = 'top';
+        const padX = 8;
+        const padY = 5;
+        const textWidth = ctx.measureText(label).width;
+        const w = textWidth + padX * 2;
+        const h = 24;
+        const x = W - w - 4;
+        const y = 4;
+        ctx.fillStyle = bg;
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = fg;
+        ctx.textAlign = 'left';
+        ctx.fillText(label, x + padX, y + padY);
+        ctx.restore();
+    }
+
+    // ── DX cluster spot overlay ──────────────────────────────────────────────
+    //
+    // Draws a small downward-pointing tick at each spot's frequency with the
+    // callsign label above. Spots outside the current span are skipped. When
+    // multiple spots fall within ~50 px of each other their labels are
+    // staggered vertically so they don't overlap.
+    _drawSpots(ctx, W, specH) {
+        if (!this._spots.length || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+
+        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+
+        // Build a list of (x, spot) for spots in range, sorted left-to-right.
+        const drawList = [];
+        for (const s of this._spots) {
+            if (s.frequencyHz < leftHz || s.frequencyHz > rightHz) continue;
+            const x = ((s.frequencyHz - leftHz) / this._lastSpanHz) * W;
+            drawList.push({ x, spot: s });
+        }
+        if (drawList.length === 0) return;
+        drawList.sort((a, b) => a.x - b.x);
+
+        ctx.save();
+        ctx.font      = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.lineWidth   = 1.5;
+
+        // Stagger labels across multiple rows so they don't overlap. For each
+        // candidate label, measure its actual rendered width and find the
+        // first row whose previous label's right edge is far enough left.
+        // If no row has space, drop the label rather than overlap. Newer
+        // spots are drawn last so they win when crowded — drawList is sorted
+        // by x but spots are most-recent-first within the same x.
+        //
+        // Watched callsigns are drawn in bright red instead of yellow so the
+        // operator can spot them at a glance amongst the regular cluster
+        // traffic.
+        const rowHeight    = 16;
+        const maxRows      = 5;
+        const minLabelGap  = 4;   // px between adjacent labels in the same row
+        const rowRightEdge = new Array(maxRows).fill(-Infinity);
+
+        for (const { x, spot } of drawList) {
+            const halfWidth = ctx.measureText(spot.callsign).width / 2;
+            const leftEdge  = x - halfWidth;
+            const rightEdge = x + halfWidth;
+
+            let row = -1;
+            for (let r = 0; r < maxRows; r++) {
+                if (leftEdge >= rowRightEdge[r] + minLabelGap) { row = r; break; }
+            }
+            if (row < 0) continue; // crowded — skip this label rather than overlap
+            rowRightEdge[row] = rightEdge;
+            const labelY = 14 + row * rowHeight;
+
+            // Colour per spot — bright red for watched callsigns, yellow otherwise.
+            const colour = spot.isWatched ? '#ff4040' : '#ffcc33';
+            ctx.fillStyle   = colour;
+            ctx.strokeStyle = colour;
+
+            // Callsign label.
+            ctx.fillText(spot.callsign, x, labelY);
+
+            // Tick mark dropping from the label to mid-spectrum.
+            const tickTop = labelY + 2;
+            const tickBot = tickTop + 6;
+            ctx.beginPath();
+            ctx.moveTo(x, tickTop);
+            ctx.lineTo(x, tickBot);
+            ctx.stroke();
+        }
+
+        ctx.restore();
     }
 
     // ── Spectrum trace ───────────────────────────────────────────────────────
@@ -517,3 +807,24 @@ export class SpectrumPanel {
         return               [255,                 Math.round(200 - (t - 0.8) * 5 * 200), 0];
     }
 }
+
+// Amateur band envelopes in Hz — the broadest worldwide limits, used to draw
+// red guard-rail lines at the edges of each band on the spectrum. These are
+// not per-region; a Region-1 operator may see a guard rail at 7.300 MHz where
+// the legal limit is actually 7.200, but the inverse is never true (no region
+// permits TX beyond these envelopes).
+SpectrumPanel.BAND_EDGES = [
+    { name: '160m', lo:   1800000, hi:   2000000 },
+    { name:  '80m', lo:   3500000, hi:   4000000 },
+    { name:  '60m', lo:   5250000, hi:   5450000 },
+    { name:  '40m', lo:   7000000, hi:   7300000 },
+    { name:  '30m', lo:  10100000, hi:  10150000 },
+    { name:  '20m', lo:  14000000, hi:  14350000 },
+    { name:  '17m', lo:  18068000, hi:  18168000 },
+    { name:  '15m', lo:  21000000, hi:  21450000 },
+    { name:  '12m', lo:  24890000, hi:  24990000 },
+    { name:  '10m', lo:  28000000, hi:  29700000 },
+    { name:   '6m', lo:  50000000, hi:  54000000 },
+    { name:   '4m', lo:  70000000, hi:  70500000 },
+    { name:   '2m', lo: 144000000, hi: 148000000 },
+];

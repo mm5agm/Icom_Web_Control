@@ -175,6 +175,10 @@ async function _loadAndRender() {
     }
 }
 
+// Sentinel value used for the always-present built-in YWC starter bank entry.
+// Must match the Memories editor page constant of the same name.
+const STARTER_BANK_VALUE = '__ywc_starter__';
+
 async function _loadBanks() {
     const sel = document.getElementById('memBankSelect');
     if (!sel) return;
@@ -183,27 +187,49 @@ async function _loadBanks() {
         if (!resp.ok) return;
         _banks = await resp.json();
         sel.innerHTML = '<option value="">Banks…</option>';
+        // Always-available built-in starter bank entry. Sits at the top of
+        // the dropdown so users can find the YWC factory memories without
+        // visiting the Memories editor page.
+        const starterOpt = document.createElement('option');
+        starterOpt.value       = STARTER_BANK_VALUE;
+        starterOpt.textContent = '📥 YWC Starter Bank (built-in)';
+        sel.appendChild(starterOpt);
         for (const name of _banks) {
             const opt = document.createElement('option');
             opt.value = name;
             opt.textContent = name;
             sel.appendChild(opt);
         }
-        sel.style.display = _banks.length === 0 ? 'none' : '';
+        // Always visible now — the starter bank guarantees at least one
+        // selectable entry beyond the placeholder.
+        sel.style.display = '';
     } catch { /* ignore — banks are optional */ }
 }
 
 async function _switchBank(name) {
     if (!name) return;
+    const statusEl = document.getElementById('memToolbarStatus');
+    if (statusEl) statusEl.textContent = 'Loading bank…';
     try {
-        const resp = await fetch(`/api/memorybank/${encodeURIComponent(name)}/load`, { method: 'POST' });
+        // Built-in starter bank uses its own endpoint, otherwise the standard
+        // bank-load endpoint. Both replace the current memories so the bank's
+        // entries appear in the Mem panel for normal use (click to QSY,
+        // edit, delete etc.) — identical behaviour either way.
+        const isStarter = name === STARTER_BANK_VALUE;
+        const url  = isStarter ? '/api/memory/starter-bank/load' : `/api/memorybank/${encodeURIComponent(name)}/load`;
+        const init = isStarter
+            ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'replace' }) }
+            : { method: 'POST' };
+        const resp = await fetch(url, init);
         if (resp.ok) {
             await _loadAndRender();
+            if (statusEl) statusEl.textContent = isStarter ? '✓ Starter bank loaded' : `✓ Loaded "${name}"`;
+            setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
         } else {
-            console.error('Bank switch failed: server returned', resp.status);
+            if (statusEl) statusEl.textContent = '✗ Load failed';
         }
     } catch (e) {
-        console.error('Bank switch failed:', e);
+        if (statusEl) statusEl.textContent = '✗ Error loading bank';
     }
 }
 

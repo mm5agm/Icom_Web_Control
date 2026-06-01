@@ -299,7 +299,9 @@ namespace Yaesu_Web_Control.Controllers
                     mode = _radioStateService.ModeA ?? "",
                     antenna = _radioStateService.AntennaA ?? "",
                     afGain = _radioStateService.AfGainA,
-                    roofingFilter = _radioStateService.RoofingFilterA ?? ""
+                    roofingFilter = _radioStateService.RoofingFilterA ?? "",
+                    ifWidth = _radioStateService.IfWidthA ?? "",
+                    ifShift = _radioStateService.IfShiftA
                 },
                 vfoB = new
                 {
@@ -309,7 +311,9 @@ namespace Yaesu_Web_Control.Controllers
                     mode = _radioStateService.ModeB ?? "",
                     antenna = _radioStateService.AntennaB ?? "",
                     afGain = _radioStateService.AfGainB,
-                    roofingFilter = _radioStateService.RoofingFilterB ?? ""
+                    roofingFilter = _radioStateService.RoofingFilterB ?? "",
+                    ifWidth = _radioStateService.IfWidthB ?? "",
+                    ifShift = _radioStateService.IfShiftB
                 },
                 micGain = _radioStateService.MicGain,
                 powerMeter = _radioStateService.PowerMeter ?? 0,
@@ -420,7 +424,7 @@ namespace Yaesu_Web_Control.Controllers
                     {
                         IfWidthCode = _radioStateService.IfWidthA,
                         IfShiftHz   = _radioStateService.IfShiftA,
-                        Mode        = _radioStateService.ModeA
+                        Mode        = _radioStateService.ModeA ?? ""
                     };
                     await _settingsService.SaveSettingsAsync(settings);
                 }
@@ -488,7 +492,7 @@ namespace Yaesu_Web_Control.Controllers
                     {
                         IfWidthCode = _radioStateService.IfWidthB,
                         IfShiftHz   = _radioStateService.IfShiftB,
-                        Mode        = _radioStateService.ModeB
+                        Mode        = _radioStateService.ModeB ?? ""
                     };
                     await _settingsService.SaveSettingsAsync(settings);
                 }
@@ -1264,11 +1268,38 @@ namespace Yaesu_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        // GET — query the radio for its current IF Width code and refresh
+        // RadioStateService. Used for live calibration discovery: the user
+        // changes WIDTH on the radio's front panel, then hits this URL to
+        // see what SH code came back. Returns 99 max to allow probing codes
+        // beyond the official documented range (post-firmware extensions).
+        [HttpGet("ifwidth/{receiver}")]
+        public async Task<IActionResult> QueryIfWidth(string receiver)
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
+                var response = await _catClient.SendCommandAsync($"SH{vfo};", "WebUI", CancellationToken.None);
+                // The dispatcher will have updated RadioStateService.IfWidthA/B by now.
+                var current = vfo == "0" ? _radioStateService.IfWidthA : _radioStateService.IfWidthB;
+                return Ok(new { vfo = receiver.ToUpper(), code = current, rawResponse = response });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error querying IF Width");
+                return StatusCode(500, new { error = "Failed to query IF Width" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
         [HttpPost("ifwidth/{receiver}")]
         public async Task<IActionResult> SetIfWidth(string receiver, [FromBody] IfWidthRequest request)
         {
-            // Codes 0-25 cover all supported models (FTdx101=0-8, FTdx10=0-15, FT-710=0-22, FTDX3000=1-25)
-            if (!int.TryParse(request.Code, out int codeNum) || codeNum < 0 || codeNum > 25)
+            // 0-99 allows probing post-firmware codes beyond the official 0-25 range.
+            if (!int.TryParse(request.Code, out int codeNum) || codeNum < 0 || codeNum > 99)
                 return BadRequest(new { error = $"Invalid IF Width code: {request.Code}" });
 
             if (!await _requestSemaphore.WaitAsync(2000))
@@ -1620,6 +1651,54 @@ namespace Yaesu_Web_Control.Controllers
             {
                 _logger.LogError(ex, "Error swapping VFO");
                 return StatusCode(500, new { error = "Failed to swap VFO" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // POST /api/cat/copy-vfo/{direction}
+        //   direction = "ba" → copy VFO B to VFO A (Yaesu BA; CAT command)
+        //   direction = "ab" → copy VFO A to VFO B (Yaesu AB; CAT command)
+        //
+        // Differs from swap (SV) in that it does NOT exchange — the source
+        // VFO keeps its value. Useful for transmitting on VFO B's frequency
+        // without enabling split: copy B→A and the radio's normal TX (which
+        // uses VFO A) is now on the desired frequency.
+        [HttpPost("copy-vfo/{direction}")]
+        public async Task<IActionResult> CopyVfo(string direction)
+        {
+            var dir = (direction ?? "").ToLowerInvariant();
+            if (dir != "ba" && dir != "ab")
+                return BadRequest(new { error = "direction must be 'ba' or 'ab'" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var cmd = dir == "ba" ? "BA;" : "AB;";
+                await _catClient.SendCommandAsync(cmd, "WebUI", CancellationToken.None);
+
+                // Read back both frequencies so the UI reflects the new state immediately.
+                var faResponse = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(faResponse) && faResponse.StartsWith("FA") &&
+                    long.TryParse(faResponse.Substring(2).TrimEnd(';'), out long freqA))
+                {
+                    _radioStateService.FrequencyA = freqA;
+                }
+                var fbResponse = await _catClient.SendCommandAsync("FB;", "WebUI", CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(fbResponse) && fbResponse.StartsWith("FB") &&
+                    long.TryParse(fbResponse.Substring(2).TrimEnd(';'), out long freqB))
+                {
+                    _radioStateService.FrequencyB = freqB;
+                }
+
+                _logger.LogInformation("VFO copy {Dir} completed", dir.ToUpperInvariant());
+                return Ok(new { message = $"VFO {dir.ToUpperInvariant()} copy completed" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error copying VFO ({Dir})", dir);
+                return StatusCode(500, new { error = "Failed to copy VFO" });
             }
             finally { _requestSemaphore.Release(); }
         }

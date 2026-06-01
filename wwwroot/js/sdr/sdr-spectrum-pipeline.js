@@ -81,4 +81,31 @@ export class SdrSpectrumPipeline {
     onFrequencyB(handler) {
         this._pipeline.register('FrequencyB', (value) => handler(value));
     }
+
+    /**
+     * Register a handler for new DX cluster spots.
+     * Each spot is the JSON shape from /api/dxcluster/spots.
+     * @param {function(object)} handler
+     */
+    onDxSpot(handler) {
+        this._pipeline.register('DxSpot', (value) => handler(value));
+    }
+
+    /**
+     * Register a handler for DX cluster connection-status changes.
+     * Value is { status, detail }.
+     * @param {function({status:string, detail:string})} handler
+     */
+    onDxClusterStatus(handler) {
+        this._pipeline.register('DxClusterStatus', (value) => handler(value));
+    }
+
+    /**
+     * Register a handler for watched-callsign alerts.
+     * Fired in addition to DxSpot when a spot matches the user's watch list.
+     * @param {function(object)} handler  receives the full spot object
+     */
+    onDxAlert(handler) {
+        this._pipeline.register('DxAlert', (value) => handler(value));
+    }
 }

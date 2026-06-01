@@ -42,9 +42,11 @@ namespace Yaesu_Web_Control.Pages
         public bool ShowApp1Button { get; set; } = true;
         public bool ShowApp2Button { get; set; } = true;
         public bool ShowApp3Button { get; set; } = true;
+        public bool ShowApp4Button { get; set; } = false;
         public string App1Name { get; set; } = "WSJT-X";
         public string App2Name { get; set; } = "JTAlert";
         public string App3Name { get; set; } = "Log4OM";
+        public string App4Name { get; set; } = "GridTracker";
 
         // MIC Gain persisted value
         public int MicGain { get; set; } = 50;
@@ -92,9 +94,11 @@ namespace Yaesu_Web_Control.Pages
             ShowApp1Button = settings.ShowWsjtxButton;
             ShowApp2Button = settings.ShowJtalertButton;
             ShowApp3Button = settings.ShowLog4omButton;
+            ShowApp4Button = settings.ShowGridtrackerButton;
             App1Name = settings.App1Name;
             App2Name = settings.App2Name;
             App3Name = settings.App3Name;
+            App4Name = settings.App4Name;
             SdrSampleRateHz = settings.SdrSampleRateHz;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;

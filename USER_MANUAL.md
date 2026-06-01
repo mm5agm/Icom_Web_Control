@@ -20,13 +20,18 @@
    - 5.11 [VOX Panel](#511-vox-panel)
    - 5.12 [CW Keyer Panel](#512-cw-keyer-panel)
    - 5.13 [FM Repeater Panel](#513-fm-repeater-panel)
-   - 5.14 [Memory Panel](#514-memory-panel)
+   - 5.14 [DX Watch Panel](#514-dx-watch-panel)
+   - 5.15 [Memory Panel](#515-memory-panel)
+   - 5.16 [Voice Announcements](#516-voice-announcements)
+   - 5.17 [DX Spots List](#517-dx-spots-list)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
    - 6.3 [SDR Spectrum Display](#63-sdr-spectrum-display)
    - 6.4 [Roofing Filters](#64-roofing-filters)
    - 6.5 [CW Memory Messages](#65-cw-memory-messages-m1m5)
+   - 6.6 [DX Cluster](#66-dx-cluster)
+   - 6.7 [Backup &amp; Restore](#67-backup--restore)
 7. [Application Setup](#7-application-setup)
    - 7.1 [External App Buttons](#71-external-app-buttons)
    - 7.2 [WSJT-X UDP Settings](#72-wsjt-x-udp-settings)
@@ -35,21 +40,26 @@
    - 8.2 [Importing from the Radio](#82-importing-from-the-radio)
    - 8.3 [Exporting to the Radio](#83-exporting-to-the-radio)
    - 8.4 [Memory Banks](#84-memory-banks)
+   - 8.5 [YWC Starter Bank](#85-ywc-starter-bank)
+   - 8.6 [What about the radio's PRESET function?](#86-what-about-the-radios-preset-function)
 9. [External Applications](#9-external-applications)
    - 9.1 [WSJT-X](#91-wsjt-x)
    - 9.2 [JTAlert](#92-jtalert)
    - 9.3 [Log4OM](#93-log4om)
+   - 9.4 [GridTracker](#94-gridtracker)
 10. [Meter Calibration](#10-meter-calibration)
 11. [Diagnostics](#11-diagnostics)
 12. [Using the App on a Tablet or Phone](#12-using-the-app-on-a-tablet-or-phone)
 13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
 14. [Troubleshooting](#14-troubleshooting)
-15. [Accessibility and Screen Readers](#15-accessibility-and-screen-readers)
-    - 15.1 [Windows High Contrast Mode](#151-windows-high-contrast-mode)
-    - 15.2 [Screen Reader Support](#152-screen-reader-support)
-    - 15.3 [NVDA](#153-nvda)
-    - 15.4 [Windows Narrator](#154-windows-narrator)
-    - 15.5 [Customising Accessible Labels](#155-customising-screen-reader-labels)
+15. [Frequently Asked Questions](#15-frequently-asked-questions)
+    - 15.1 [WSJT-X has no TX audio in DATA modes](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode)
+16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
+    - 16.1 [Windows High Contrast Mode](#161-windows-high-contrast-mode)
+    - 16.2 [Screen Reader Support](#162-screen-reader-support)
+    - 16.3 [NVDA](#163-nvda)
+    - 16.4 [Windows Narrator](#164-windows-narrator)
+    - 16.5 [Customising Accessible Labels](#165-customising-screen-reader-labels)
 
 ---
 
@@ -59,7 +69,11 @@
 
 ## 1. Introduction
 
-Yaesu Web Control is a web-based control panel for Yaesu HF transceivers. Supported models are:
+Yaesu Web Control — **YWC** for short — is a web-based control panel for Yaesu HF transceivers.
+
+> **Windows only.** YWC runs on Windows 10 or 11 (64-bit). There is no Linux or macOS build, and none is planned. The app is hosted by a small WinForms process and uses Windows-specific serial-port and SDR drivers. You can still access the browser interface itself from any device on your home network (tablet, phone, Linux laptop) — but the YWC server must be running on a Windows PC.
+
+Supported radios:
 
 | Model | Power | Receivers |
 |-------|-------|-----------|
@@ -86,9 +100,13 @@ The application was written for operators who want a large, clean, touchscreen-f
 - TX monitor on/off toggle and level control
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Optional real-time spectrum display and waterfall (requires an SDR connected to the 9 MHz IF output)
+- **DX cluster spots** overlaid on the spectrum — click a callsign to QSY straight to that frequency; user-selectable cluster server with live connection-status badge
+- **DX watch list** — get a popup alert and a beep when watched callsigns or prefixes appear in the cluster feed (e.g. `P29*` for a DXpedition); persisted across app restarts
+- **TX timeout warning** — visible red banner + audible tone if TX has been on too long (configurable threshold), as a safety net against open mics, stuck PTTs and VOX false-triggers
+- **Per-VFO status line** inside each VFO panel — at-a-glance summary of band, mode, frequency, power and split state, banner-coloured to match the receiver
+- **Voice announcements** — optional spoken cues for band/mode/TX changes, DX alerts and TX timeout, using your browser's built-in text-to-speech (handy for partially sighted operators)
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
-- **USB audio for DATA modes** — one-click setting configures the radio to route FT8, WSJT-X and other digital modes through the USB connection, no rear DATA connector required
 - Four IARU band plans: Region 1 (Europe, Africa, Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), and Japan (JARL)
 - Full screen reader support — compatible with NVDA and Windows Narrator
 - Windows High Contrast mode support for all gauge displays
@@ -109,15 +127,27 @@ The application was written for operators who want a large, clean, touchscreen-f
 
 Before the app can communicate with your radio you need to tell it which serial port the radio is connected to and what baud rate to use.
 
+**Required — radio connection:**
+
 1. Open a browser and go to **http://localhost:8080**
 2. Click the **Settings** link in the navigation bar.
 3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), **FTDX3000** (100 W, dual receiver), **FTdx10** (100 W, single receiver), or **FT-710** (100 W, single receiver).
 4. Set **Serial Port** to the COM port your radio is connected to. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
 5. Set **Baud Rate** to match the radio's CAT baud rate. The factory default is **38400** on all supported radios. You can verify or change this on the radio under **Menu → CAT Rate**.
 6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
-7. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
+7. If you run digital modes (FT8, FT4, RTTY, PSK) via USB audio, see the FAQ (§15) for a one-time radio menu change needed on the radio itself — it's not configurable from YWC.
+8. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
 
 If you see a red cross, double-check the COM port number and baud rate, then try again.
+
+**Optional — extras you can set up later in Settings:**
+
+- **SDR spectrum display** (Section 6.3) — connect an SDR to your radio's 9 MHz IF output to get a live spectrum and waterfall.
+- **DX cluster** (Section 6.6) — connect to a DX cluster server to overlay live DX spots on the spectrum.
+- **CW memory messages** (Section 6.5) — pre-fill the M1–M5 CW keyer memories.
+- **Roofing filters** (Section 6.4) — tell the app which optional roofing filters are fitted on your radio so the dropdown shows only the ones you actually have.
+
+None of these are required for basic operation. Get the radio connection working first; come back for the extras when you want them.
 
 ---
 
@@ -143,7 +173,7 @@ The main control panel loads. If the radio is powered on and the serial connecti
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Yaesu Web Control v1.5.3**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Yaesu Web Control v2.0.0**) are shown in the top-left corner.
 
 **Update notification** — on startup the app silently checks the GitHub releases page for a newer version. If one is available, a small banner appears in the bottom-right corner with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 
@@ -160,6 +190,32 @@ Click a button to launch the application. If it is already running, it is brough
 The **WSJT-X** button also shows a red **TX** badge when WSJT-X is currently transmitting.
 
 **POWER button** (top right) turns the radio on or off. The button is green when the radio is on and red when it is off.
+
+**UTC clock** — a yellow `HH:MM:SS Z` clock sits just left of the Buy Me a Coffee button. Amateur radio operates on UTC for logging, contests and beacon schedules, so the time is always visible regardless of your PC's local time zone.
+
+> **Where the time comes from.** The clock reads your **PC's system clock**, converted to UTC. There is no separate network time source — YWC trusts whatever Windows says the time is. Hovering the clock gives a one-line reminder; **clicking it** opens a popover with a full explanation and step-by-step instructions for verifying Windows time-sync.
+>
+> **Why this matters beyond just the clock display.** The same PC time is also used for:
+>
+> - The **Age** and **Time UTC** columns in the DX Spots list (§5.17)
+> - The **15-minute spot age-out** (§5.4)
+> - The **TX timeout warning** countdown (§5.10)
+> - QSO timestamps in any external logger you're using (Log4OM, JTAlert)
+>
+> If the PC clock is wrong, all of those misbehave.
+>
+> **For users with constant internet**, Windows syncs against `time.windows.com` typically once a week or whenever the connection comes back. Your clock stays within a second of UTC without effort.
+>
+> **For users who operate offline a lot**, a typical PC clock drifts seconds-to-minutes per week. Fine for SSB casual logging, problematic for FT8 and contests. Re-sync whenever you reconnect to the internet (Windows Settings → Time & Language → Date & time → Sync now).
+
+**Status line** — each VFO panel has its own compact one-line summary directly below the IF Width row, banner-coloured to match the panel (blue for VFO A, green for VFO B):
+
+```
+VFO A:  40m / USB / 7.100.000 / 100W
+VFO B:  17m / USB / 18.110.000
+```
+
+The line shows the current band, mode and frequency, with transmit power appended on the VFO A line. When split mode is active the VFO A line ends with **SPLIT  RX** and the VFO B line ends with **TX**, making the transmit-vs-receive role obvious at a glance. The line updates live whenever any of these values change.
 
 ---
 
@@ -205,13 +261,27 @@ The spectrum display is only visible if an SDR device has been configured in Set
 
 **Span buttons** — Click **250k**, **500k**, **1M**, or **2M** to change the visible bandwidth. The display recentres on VFO A.
 
-**Click to tune** — Click anywhere on the spectrum to tune VFO A to that frequency.
+**Click to tune** — Click anywhere on the spectrum to tune VFO A to that frequency. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
 
 **Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune VFO A up or down in 1 kHz steps.
 
 **Frequency crosshair** — Move the mouse over the spectrum to see the exact RF frequency at the cursor position displayed above the waterfall.
 
+**DX cluster spots** — If you have configured a DX cluster server in Settings (see §6.6), incoming spots are overlaid as small yellow callsign labels along the top of the spectrum at each spot's frequency. Clicking on a spot (within a few pixels of its marker) tunes VFO A exactly to that frequency. Spots outside the current span are not drawn; spots older than the configured age (default 15 minutes) are removed automatically.
+
+**How spots are filtered for display** — the spectrum panel shows any spot whose frequency falls inside the currently visible window (VFO A ± half the span). When you change band, VFO A moves and the spectrum recentres, so the visible spots change automatically to match the new band. There is no explicit band filter — just a "is this spot inside the visible window?" check. In practice this means you see only the current band, because amateur bands have large gaps between them. If you zoom out to a 2 MHz span you'd technically see a wider chunk, but adjacent bands rarely overlap that window.
+
+The cluster feed itself is not band-filtered by YWC — spots arrive for every band the cluster carries. They are all kept client-side; only the ones inside the visible window get drawn. To reduce traffic at the source (for example, to receive only 20 m and 40 m spots), add a line like `set/filter band 20 or band 40` to **Settings → DX Cluster → Post-login commands**. That filter runs on the cluster server and cuts down on spots before they reach YWC.
+
+On crowded bands (the lower end of 20m on a contest weekend, for example) labels are stacked across up to five rows to avoid overlap. If even five rows can't fit everything in a tight cluster of nearby frequencies, **the app drops the spots that don't fit rather than letting labels overlap and become illegible**. The dropped spots are still in the underlying spot list — they just aren't drawn. Zooming the spectrum to a narrower span (e.g. 250k or 500k) spreads spots out and reveals the ones that were hidden.
+
+**Band-plan markers** — small cyan tick marks at the bottom of the spectrum show the standard activity frequencies for the currently visible band: CW, FT8, RTTY, SSB DX window etc. The exact frequencies come from your selected IARU region (§6.1 Band Plan). The markers update automatically as you change band or zoom the spectrum; only segments whose frequency falls inside the visible window are drawn. Where two markers would overlap (e.g. FT8 at 14.074 and RTTY at 14.080 — only 6 kHz apart), the labels stack vertically so both remain readable. They're a quick orientation aid — especially helpful when visiting an unfamiliar band — and they don't interact with anything; nothing happens if you click them.
+
+**Band-edge guard rails** — dashed red vertical lines drawn at the lower and upper edges of every amateur band that falls inside the visible window. They make it immediately obvious when you've tuned outside the amateur allocation (e.g. clicking 14.396 MHz on the spectrum lands you above the 20m upper edge at 14.350 — the red line is right there, telling you why no DX cluster spots are appearing and why the mode hasn't auto-changed). The edges use the worldwide amateur envelopes (the broadest limits across all regions), so a Region 1 operator may see a guard rail slightly beyond their own legal limit on a few bands — never the other way round.
+
 A status badge in the spectrum panel shows the current SDR state: **No SDR**, **Connecting…**, **Live**, or **Disconnected**.
+
+A second small badge in the **top-right corner of the spectrum canvas** shows the DX cluster connection state — green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.6 for cluster setup and troubleshooting.
 
 ---
 
@@ -227,6 +297,10 @@ Both panels have identical controls. All settings are independent — changing a
 **VFO-B toggle** — the **VFO-B** button in the toolbar shows or hides the VFO B panel. The last state is remembered across sessions.
 
 **A↔B Swap** — the **A↔B** button in the toolbar swaps the frequencies and modes between VFO A and VFO B in one click. Available on all supported radios.
+
+**B→A Copy** — the **B→A** button copies VFO B's frequency and mode into VFO A. **VFO B is left unchanged.** This is the right control to use when you want to transmit on VFO B's settings without enabling split — after the copy, VFO A holds the same frequency and mode as VFO B and the radio transmits normally on VFO A. Different from swap (which exchanges both VFOs), and different from split (which leaves the VFOs alone but uses VFO B as the TX frequency only while in RX/TX mode).
+
+**A→B Copy** — the **A→B** button is the mirror operation: copies VFO A's frequency and mode into VFO B with VFO A left unchanged. Useful for seeding VFO B from your current operating frequency before nudging one of the two (e.g. to set up split manually).
 
 **Split** — enables split operation: VFO A is the receive frequency, VFO B is the transmit frequency. The button turns red and shows **Split ON** when active. Pressing it again turns split off. **No frequencies are changed** — whatever VFO B is currently set to becomes the TX frequency. Use this button whenever you want to transmit on a different frequency from your receive frequency, including cross-band split (e.g. listening on 20m, transmitting on 6m) or any arbitrary TX offset.
 
@@ -336,6 +410,10 @@ The IF Width dropdown is **mode-aware**: the SH command code sent to the radio i
 
 The first entry in the dropdown ("Default") is the radio's mode-dependent default, which varies by the selected roofing filter. The current width is read from the radio on connect; selecting a new value sends it immediately.
 
+> **About the FTdx101 "4 kHz" firmware update** — Yaesu's 2023 firmware release notes mention *"Increased RX IF Band WIDTH up to 4000 Hz"* for SSB, CW, RTTY, PSK and DATA. This is **not** an extension of the IF Width dropdown's range. The FTdx101's IF DSP filter (SH command) still tops out at 3.2 kHz in SSB and 3.0 kHz in CW — the dropdown values in this app are correct and match the Yaesu CAT manual.
+>
+> What the firmware *did* extend is **HCUT** — the audio high-cut filter that shapes audio inside the IF passband. HCUT now goes up to 4000 Hz (was 3000 Hz). HCUT is an EX menu setting on the radio's own touch screen — set it once on the radio and it stays. The app does not control HCUT directly. If you want fuller audio (e.g. 4 kHz HCUT for SSB ESSB-style audio), set it via your radio's **Function → Radio Setting → Mode SSB → HCUT FREQ** menu.
+
 **IF Low Cut** — Sets the lower edge of the DSP passband (SL command). Options: OFF, 100 Hz, 200 Hz, 300 Hz, 400 Hz, 500 Hz, 600 Hz, 700 Hz, 800 Hz, 900 Hz, 1.0 kHz, 1.1 kHz. Use this to cut low-frequency audio or interference — for example, 300 Hz in SSB to reduce hum and LF splatter. This setting is independent per VFO.
 
 **IF Shift** — Shifts the passband centre ±1000 Hz in 20 Hz steps. Drag the slider or use the keyboard arrow keys. The current offset is shown next to the slider.
@@ -374,6 +452,8 @@ Region 1 is the only plan that includes the 4m (70 MHz) band. Japan has no 60m s
 
 The last segment you used on each band is remembered, so when you return to a band the dropdown re-selects your previous segment.
 
+**Auto-sync to current frequency** — the Segment dropdown also follows your actual tuning. When you change frequency by any means (clicking the spectrum, turning the radio's front-panel knob, typing on the on-screen frequency keyboard), the dropdown updates to show the segment that contains your new frequency. If you tune into a gap between segments (e.g. 14.150 — between FT8 at 14.074 and SSB at 14.225 on 20m), the dropdown shows the closest segment at or below your frequency. This keeps the dropdown's display honest — it always tells you where you actually are, not where you last clicked.
+
 **Per-band IF and mode memory** — When you switch away from a band the app saves the current IF Width, IF Shift, and Mode for that band. When you return to the band those settings are automatically restored on the radio. This means, for example, you can have a 500 Hz CW filter on 40m and a 2.4 kHz SSB filter on 20m and the app will switch between them as you change bands. Settings are saved per-VFO (VFO A and VFO B are independent) and persist between sessions.
 
 **60m — Region 1 and Region 3:** Shows FT8 (5.357 MHz) and USB (5.362 MHz) segments, covering the WRC-15 secondary allocation (5351.5–5366.5 kHz). Access to 60m varies by country within these regions.
@@ -405,6 +485,10 @@ Click the button to toggle the connection. While connecting, it briefly shows "C
 
 **Mon level slider** — Sets the TX monitor volume (0–100). Controls how much of the transmitted audio you hear in the headphones during TX. Drag and release to apply. Both the on/off state and the level are read from the radio when the app connects.
 
+**TX timeout warning** — If the radio has been transmitting continuously for longer than a configurable threshold (default **120 seconds**), a red banner appears across the top of the page reading *"TX has been ON for more than N seconds — check your microphone, keyer or VOX!"* and a tone beeps every three seconds until the warning is cleared. The warning triggers regardless of how TX was started (app button, hardware PTT, VOX, CAT) and automatically clears the moment the radio returns to receive.
+
+Click **Dismiss** on the banner to silence it without stopping TX (useful for a long deliberate transmission). Click **Change timeout…** to set a different threshold (5–3600 seconds); the new value is remembered between sessions for that browser. The warning exists as a safety net against open mics, stuck PTTs and VOX false-triggers — it doesn't stop the transmission itself.
+
 **VOX button** — Opens the **VOX Settings** panel. The button shows **VOX: On** (green) or **VOX: Off** (grey) based on the current VOX state.
 
 **CW button** — Opens the **CW Keyer** panel. See Section 5.12.
@@ -434,6 +518,8 @@ Click the **VOX** button to open the VOX pop-up panel.
 | Delay | VOX hang time (0–2500 ms). Time TX stays active after audio stops |
 | Anti-VOX | Anti-VOX level (0–100). Suppresses the receiver audio from triggering VOX |
 
+![VOX panel showing Gain, Delay and Anti-VOX sliders](pictures/Vox-Control.png)
+
 Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
 
 ---
@@ -452,6 +538,8 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 
 **CW memory messages** are configured on the **Settings** page (see Section 6.5). Each message can be up to 24 characters. Use `{CALL}` as a placeholder — it is sent literally (the radio does not expand it; configure your callsign in the message text directly for CW use).
 
+![CW Keyer panel with Speed, Break-in, Delay, Pitch and M1–M5 memory buttons](pictures/CW-Keyer.png)
+
 Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
 
 ---
@@ -468,21 +556,137 @@ Click the **FM Rep** button to open the FM Repeater pop-up panel. These settings
 | CTCSS Tone | Select the required CTCSS sub-tone from the standard set (67.0 Hz – 254.1 Hz) |
 | Apply button | Sends all FM repeater settings to the radio in one operation |
 
+![FM Repeater panel showing Shift, Offset, CTCSS Mode and CTCSS Tone controls](pictures/FM-Repeater.png)
+
 Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
 
 ---
 
-### 5.14 Memory Panel
+### 5.14 DX Watch Panel
 
-The **Mem** button in the toolbar opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. Click a tile to instantly tune VFO A to that frequency and mode.
+Click the **DX Watch** button on the toolbar to open the watched-callsign panel. This is where you tell the app which callsigns or callsign prefixes you want to be alerted on when they show up in the DX cluster feed.
+
+Use it for chasing a particular DXpedition (`P29VR`), staying on top of a contest call (`G4ABC/P`), or watching a whole prefix run (`VK*` for any Australian station).
+
+![DX Watch panel — add and remove callsigns or prefixes to alert on](pictures/DX-Watch.png)
+
+**Adding a watched call:**
+
+1. Type the callsign or prefix in the input field (e.g. `G4ABC` or `VK*`).
+2. Click **Add** or press Enter.
+3. The entry appears in the list below.
+
+**Removing a watched call:**
+
+Click the red **×** to the right of any entry. The entry is removed immediately and the change is persisted.
+
+**Wildcard matching:**
+
+- Plain callsign — exact match, case-insensitive (`G4ABC` matches only `G4ABC`)
+- Trailing `*` — prefix match (`G4*` matches `G4ABC`, `G4XYZ`, `G4ABC/P`, etc.)
+
+**What happens when a watched call is spotted:**
+
+- A small red **alert toast** appears with the callsign, frequency, spotter and any comment from the spot. The toast fades after about 8 seconds. **Click the toast to QSY VFO A directly to that frequency.**
+- A short two-tone **beep** plays (only after you've interacted with the page — browsers block audio until the user has clicked something on the page first).
+- On the spectrum panel, the watched callsign is drawn in **bright red** instead of the usual yellow, so you can see it at a glance.
+
+![DX Alert toast — shown when a watched callsign appears in the cluster feed](pictures/DX-Alert-PopUp.png)
+
+**Moving the alert toast.** The toast appears in the bottom-right of the page by default, but you can **drag it anywhere on screen** by pressing and holding on it and moving the mouse. The new position is remembered between sessions, so the next alert appears in the same place. (Click without dragging still QSYs as normal — the app distinguishes the two by checking whether the pointer actually moved by more than a few pixels.)
+
+The list of watched calls is saved across app restarts in your user settings file. You don't need to re-enter it after a reboot. Close the watch panel with the **×** button in its title bar; drag the title bar to reposition the panel anywhere on screen — the position is remembered between sessions.
+
+---
+
+### 5.15 Memory Panel
+
+The **Mem** button in the toolbar (bold black text) opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. **Click a tile to QSY VFO A to that frequency** — and any of the memory's saved advanced settings (mode, AGC, NB, NR, power, IF Width, IF Shift, antenna, roofing filter) are sent to the radio at the same time. Fields that aren't set in the memory are left as-is on the radio.
 
 The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions.
 
-**Save to Mem button** — A **Save to Mem** button appears below the S-meter on both the VFO A and VFO B panels. Click it to save the current VFO frequency and mode as a new memory. A label input box appears — type a name (up to 12 characters) and press Enter or click Save. The new memory appears immediately in the floating panel.
+**Save to Mem button** — A **Save to Mem** button appears below the S-meter on both the VFO A and VFO B panels. Click it to save the current VFO frequency, mode and all advanced settings as a new memory. A label input box appears — type a name (up to 12 characters) and press Enter or click Save. The new memory appears immediately in the floating panel.
 
-**Banks dropdown** — if you have saved memory banks (see Section 8.4), a **Banks** dropdown appears in the toolbar alongside the Save to Rig buttons. Select a bank name to switch to it instantly — the memory list is replaced with that bank's contents and the tiles refresh automatically. The dropdown resets to its placeholder after loading, and is hidden when no banks have been saved.
+**Banks dropdown** — a **Banks** dropdown sits in the floating panel's toolbar alongside the Save to Rig buttons. The first entry is always **📥 YWC Starter Bank (built-in)** — the bundled set of common watering-hole memories shipped with the app (§8.5). Below that, any banks you've saved yourself appear (§8.4). Select any entry to switch — the memory list is replaced with that bank's contents and the tiles refresh automatically. The dropdown resets to its placeholder after loading.
 
 For full memory management — editing labels and frequencies, reordering, importing from and exporting to the radio, and memory banks — see Section 8.
+
+---
+
+### 5.16 Voice Announcements
+
+Click the **Voice** button in the toolbar to open the voice-announcements panel. This makes the app speak when key things change — useful for partially sighted operators, or for anyone who wants to be told what the radio is doing without having to look at the screen.
+
+The feature uses your browser's built-in text-to-speech engine (Web Speech API), so any SAPI 5 voices already installed on Windows are available in the Voice picker.
+
+> **If you use a screen reader (NVDA, JAWS, etc.) leave this OFF.** The app already announces important events via standard `aria-live` regions which your screen reader picks up — turning on the Voice panel as well would give you double announcements.
+
+**Controls in the panel:**
+
+| Control | Description |
+|---------|-------------|
+| Enable voice announcements | Master on/off. When off, nothing is spoken |
+| Voice | Pick which TTS voice to use — populated from your OS |
+| Rate | Speech rate, 0.5×–2.0× normal speed |
+| Volume | Speech volume, 0–100% |
+| Test voice | Speak a sample phrase — use this to confirm your voice and rate are right |
+| Stop talking | Cancel any in-progress speech immediately |
+
+**What's announced (each can be toggled separately):**
+
+- **Band changes** — "forty metres" when you change band on VFO A
+- **Mode changes** — "upper sideband", "C W upper", "data lower", etc.
+- **TX / RX state** — "transmit" when you key up, "receive" when you stop
+- **Manual frequency entry** — confirmation after typing a frequency on the on-screen keyboard
+- **DX watched-callsign alerts** — spelled-out callsign and frequency when a watched call appears in the DX cluster feed (in addition to the existing toast + beep)
+- **TX timeout warning** — "Warning. Transmit timeout. Check microphone."
+
+**Initial load is silent.** When you open the app the current band, mode and frequency are loaded from the radio's state but **not** spoken — the first announcement for each category fires on the next *change*. So opening the app doesn't read out the whole state.
+
+**Multiple announcements are queued in order.** A single band-button press often triggers several changes back-to-back — the band changes, then the per-band saved mode and IF settings are restored. The app speaks each enabled announcement in full before moving on to the next, so you'll hear (for example) "forty metres" followed shortly by "upper sideband" rather than one cutting the other off. Use **Stop talking** to clear the queue immediately if you've heard enough.
+
+**Persistence.** All settings (master enable, voice name, rate, volume, category checkboxes) are saved to localStorage per browser. Different devices remember their own preferences.
+
+**Position.** The panel is draggable like the other popups (VOX, CW, FM Repeater, DX Watch) and its on-screen position is remembered between sessions.
+
+---
+
+### 5.17 DX Spots List
+
+Click the **DX Spots** button on the toolbar to open a list of DX cluster spots filtered to the current band. This complements the spectrum overlay — and unlike the overlay, it works **whether or not you have an SDR connected**.
+
+| Column | What it shows |
+|---|---|
+| Callsign | The spotted station. Watched callsigns (from §5.14) appear in **bright red**. |
+| Freq kHz | Spot frequency in kHz |
+| Mode | Mode parsed from the comment (FT8, CW, SSB, RTTY, etc.) or inferred from the frequency segment if not in the comment |
+| Time UTC | Absolute time the spot was received, in `HH:MM` UTC |
+| Age | Relative age — "<1m", "3m", "12m" |
+| Spotter | The station that reported the spot |
+| Comment | Free-text comment from the spotter |
+
+**Click any row** to QSY VFO A to that spot's frequency.
+
+**Click any column header** to sort by that column; click again to reverse the sort direction. The current sort is shown by a ▲ or ▼ next to the column name.
+
+![DX Spots list filtered to the current band — the default view](pictures/DX-Spots-Single-Band.png)
+
+**All bands toggle** — by default the list filters to spots on your current band (so changing band changes what you see). Tick **All bands** in the title bar to see every spot in the buffer regardless of frequency — useful when chasing a rare DXpedition wherever it pops up.
+
+![DX Spots list with the All bands toggle on — shows spots from every band](pictures/DX-Spots-All-Bands.png)
+
+**Why this is useful alongside the spectrum overlay:**
+
+- The spectrum overlay drops callsign labels on crowded bands (§5.4). The list shows them all.
+- The list shows comments, spotter info and exact time — the overlay only has room for the callsign.
+- The list is fully accessible to screen readers; canvas-rendered text in the overlay is not.
+- On phones and tablets, tapping a list row is easier than tapping a tiny spectrum label.
+
+**Age-out** — spots older than the configured age (default 15 min, set in Settings → DX Cluster) are dropped automatically. The list re-renders every 30 seconds to remove stale rows even when no new spots arrive.
+
+**Position and persistence** — drag the title bar to move the panel anywhere on screen. Panel position, size, sort column, sort direction, and the All bands setting are all saved per browser so the panel returns to where you left it next session.
+
+**Empty state** — if you see "No spots on this band", either no spots are in the buffer yet (cluster just connected, give it a few seconds), or the DX cluster feature isn't configured at all (see §6.6).
 
 ---
 
@@ -498,11 +702,10 @@ Access Settings from the navigation bar or by clicking the settings icon. Change
 | Serial Port | COM port the radio's USB/serial cable is connected to (e.g., COM3) |
 | Baud Rate | Must match the radio's CAT Rate setting. Default: 38400 |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
-| Use USB audio for DATA modes | When enabled, the app sends a CAT command to the radio on every connect that routes DATA mode audio (FT8, FT4, RTTY, PSK etc.) through the **USB connection** rather than the rear DATA/ACC connector. Enable this if you run WSJT-X or similar software via USB and do not have the rear connector wired. Leave disabled if you use an external soundcard interface on the rear DATA connector. See the note below. |
 
 After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success.
 
-> **USB audio for DATA modes — how it works:** All supported radios have a built-in USB audio codec (appears in Windows Sound settings as **USB Audio CODEC** after installing the Silicon Labs driver). By default the radio's factory setting routes DATA mode TX/RX audio through the rear DATA/ACC/DIN connector, not the USB codec. Enabling this setting makes the app send the appropriate radio-menu command (`REAR SELECT = USB` or equivalent) each time it connects, so you never have to configure this in the radio's touch menu. This setting has no effect if you do not use digital modes.
+> **Running WSJT-X / FT8 via USB audio?** Your radio needs **REAR SELECT = USB** in its menu before it'll transmit digital audio from a PC. This is a one-time radio setup — see FAQ §15 for the menu numbers per radio.
 
 ---
 
@@ -576,13 +779,97 @@ Note: `{CALL}` is a reminder placeholder — the radio's KY command does not per
 
 ---
 
+### 6.6 DX Cluster
+
+Connect to a DX cluster server to overlay live DX spots on the SDR spectrum display. Spots appear as small yellow callsign labels at each spot's frequency on the spectrum panel; clicking a spot tunes VFO A exactly to that frequency. See Section 5.4 for how the overlay behaves on crowded bands.
+
+There is **no default cluster server** — pick one you have access to. The connection is only made when you tick the **Enable** switch below.
+
+| Setting | Description |
+|---------|-------------|
+| Enable DX cluster connection | Master on/off. When off, no connection is made and no spots are received |
+| Cluster host | Hostname or IP of the DX cluster, e.g. `dxspider.co.uk` |
+| Port | TCP port. Most clusters use 7300, 23, or 8000 |
+| Login callsign | Your amateur callsign — sent to the cluster when it prompts for login. Most clusters require a valid licensed call |
+| Spot age-off (minutes) | Spots older than this are removed automatically. Typical 15–30 minutes |
+| Post-login commands | DXSpider commands to send after the callsign is accepted (one per line). See subsection below. |
+
+**Common cluster servers** (the app does not endorse any particular one — these are starting points; cluster servers come and go, so if one stops responding try another):
+
+- `dxspider.co.uk` port 7300 (DXSpider, UK — G6NHU-2 in Essex, RBN-fed, low latency from the UK)
+- `ei7mre.ath.cx` port 7300 (DXSpider, Ireland)
+- `cluster.f1led.fr` port 7300 (DXSpider, France)
+- `dxfun.com` port 8000 (DXSpider, Spain)
+- `ve7cc.net` port 23 (AR-Cluster, Canada — globally connected, higher latency but very stable)
+
+**Post-login commands** — many DXSpider clusters ask you to set your location and other details once you've logged in. Rather than typing those commands into the cluster on every connect, list them in this textarea (one per line) and the app sends them automatically each time. Lines beginning with `#` are ignored, and a leading `/` is stripped (so you can paste DXSpider help syntax verbatim).
+
+Common things to put in this textarea:
+
+```
+set/qra IO75JA            # your Maidenhead grid square — improves your spot list
+set/name Colin            # your name as it appears to other users
+set/skimmer               # enable RBN/Skimmer spots on clusters that have an RBN feed (e.g. G6NHU-2)
+set/filter ...            # whatever spot filters you prefer
+```
+
+The app uses a generous parser that accepts spot lines from AR-Cluster, CC-Cluster, and DXSpider format servers. The cluster connection sends the configured callsign 1.5 seconds after the TCP socket opens — this handles servers whose login prompt has no newline (which would otherwise cause our reader to hang silently).
+
+**Status badge on the spectrum panel** — top-right corner of the spectrum canvas shows the live cluster connection state:
+
+- 🟢 green **DX: connected** — connected and receiving
+- 🟡 amber **DX: connecting** — opening the TCP socket
+- 🔴 red **DX: disconnected** — connection dropped or initial connect failed
+- ⚫ grey **DX: off** — feature disabled or settings incomplete
+
+If the badge stays red, hit `http://localhost:8080/api/dxcluster/status` in a browser — the `detail` field shows the underlying error message (e.g. "No such host is known").
+
+**Diagnostic log** — every line received from the cluster is written to:
+
+```
+%APPDATA%\MM5AGM\Yaesu Web Control\dx-cluster.log
+```
+
+The file is rewritten on each new connection so it never grows large. Open it in any text editor to see the raw protocol exchange — useful for troubleshooting or just to watch what the cluster is sending. There is also an HTTP endpoint `http://localhost:8080/api/dxcluster/recent` that returns the last 100 lines as plain text in a browser.
+
+If the connection drops, the app reconnects automatically after 15 seconds. Disabling the toggle in Settings stops reconnection attempts.
+
+> **Note on registering to send spots:** Most clusters accept connections from any callsign for *receiving* spots, but require a one-off email registration before they accept spots you upload (the cluster will tell you the address). YWC only receives spots — it does not send any — so you can ignore that prompt.
+
+---
+
+### 6.7 Backup &amp; Restore
+
+At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete YWC configuration. This is **everything that's been customised in your shack** — radio model, COM port, baud rate, band plan, SDR settings, DX cluster login and watch list, CW memory messages, external app paths, per-band Width/Shift/Mode memory, antenna selections, RF Gain, Squelch, and all your radio memory channels.
+
+**Export Settings**
+
+Click **Export Settings** to download a single file named `ywc-settings-YYYYMMDD-HHMMSS.json`. Keep it somewhere safe — OneDrive, a USB stick, or your shack laptop. Re-export occasionally as your setup evolves.
+
+**Import Settings…**
+
+Click **Import Settings…**, pick a previously exported file, and confirm the replacement. Your current settings are preserved as `appsettings.user.json.bak` in `%APPDATA%\MM5AGM\Yaesu Web Control\` so you can recover if the import causes problems.
+
+**You must restart YWC after importing.** Most services (radio connection, DX cluster, SDR streaming, rigctld server) only read the settings file at startup, so changes only take full effect after a restart. The app displays a reminder when the import completes.
+
+**Typical use cases:**
+
+- **New PC** — install YWC, copy your exported settings file across, import. You're up and running in under a minute with all bands, memories and DX watch list intact.
+- **Before a Windows rebuild or major update** — export, then re-import after the rebuild.
+- **Sharing setup with a friend** — export and email them the file. They get a working starting point (though they'll want to change the callsign and possibly the COM port).
+- **Experimenting safely** — export before trying something risky; import the file to revert if it goes wrong.
+
+The settings JSON is human-readable; you can open it in a text editor to inspect or hand-edit if you ever need to. The file lives at `%APPDATA%\MM5AGM\Yaesu Web Control\appsettings.user.json` and is also accessible directly without going through the export.
+
+---
+
 ## 7. Application Setup
 
 Access Application Setup from the navigation bar. This page configures the external application buttons and the WSJT-X UDP connection.
 
 ### 7.1 External App Buttons
 
-Three buttons can appear in the top bar to launch external applications. For each button you can set:
+Up to four buttons can appear in the top bar to launch external applications. For each button you can set:
 
 - **Show / Hide** — whether the button appears on the main page
 - **Button Name** — the label shown on the button (e.g., "WSJT-X")
@@ -595,8 +882,9 @@ Default command lines:
 | WSJT-X | `C:\WSJT\wsjtx\bin\wsjtx.exe --rig-name=WebApp` |
 | JTAlert | `C:\HamApps\JTAlert\JTAlert.exe` |
 | Log4OM | `C:\Program Files (x86)\Log4OM 2\Log4OM.exe` |
+| GridTracker | `C:\Program Files\GridTracker2\GridTracker2.exe` |
 
-Adjust these to match where you have installed each program.
+Adjust these to match where you have installed each program. GridTracker is **off by default** — tick its **Show** box once you've installed it and confirmed the command line is correct.
 
 ---
 
@@ -613,7 +901,7 @@ These must match WSJT-X's **Settings → Reporting → UDP Server** settings. Se
 
 ## 8. Radio Memories
 
-The app maintains its own list of memory channels, independent of the radio's built-in memories. You can store as many channels as you like, organised with labels, and recall any of them at a click from the floating Mem panel (see Section 5.14).
+The app maintains its own list of memory channels, independent of the radio's built-in memories. You can store as many channels as you like, organised with labels, and recall any of them at a click from the floating Mem panel (see Section 5.15).
 
 ### 8.1 Memories Editor
 
@@ -630,9 +918,30 @@ The editor shows all your saved memories in a table. For each memory you can edi
 | RX Clar | Whether the RX clarifier is enabled |
 | TX Clar | Whether the TX clarifier is enabled |
 
+**Advanced fields** — tick the **Show advanced fields** toggle at the top of the editor to reveal extra columns:
+
+| Field | Description |
+|-------|-------------|
+| Ant | Antenna selector (1, 2, 3) |
+| IF Width | The SH command code for the desired filter width |
+| IF Shift | IF shift in Hz, range −1000 to +1000 |
+| Roofing | Roofing filter code (e.g. 7 = 3 kHz on FTdx101). Ignored on FTdx10/FT-710 |
+| NB | Noise blanker on/off |
+| NB Lvl | Noise blanker level, 1–20 |
+| NR | Noise reduction (Off / NR1 / NR2) |
+| AGC | AGC mode (Off / Fast / Mid / Slow / Auto) |
+| Power | Transmit power in watts |
+| Notes | Free-text notes, up to 100 characters |
+
+**Each advanced field is applied on recall only if you have set a value.** Leave any field blank and the radio's current value for that setting is left alone. This means you can save a memory that only changes frequency and mode (the simple use case), or one that fully configures the radio (e.g. "20m FT8" with antenna 2, IF Width 8, NR2, 50 W, AGC Auto).
+
+> **Important:** Advanced fields are **app-side only**. They are stored in `memories.json` on your PC but the radio's own memory channels (used by the Import/Export buttons) cannot hold these fields. Exporting to the radio writes only label, frequency, mode, and clarifier values.
+
 Click **Save** to save all changes. Click **Add Memory** to append a blank row. Click the **trash** icon on any row to delete that memory.
 
 The **Pop Out** button opens the Memories page in a new browser tab — useful if you want to edit memories on a second monitor while the main control panel is open in the first.
+
+**Save to Mem button** — When you click "Save to Mem" on a VFO panel, the app captures the **full live state** of that VFO at the moment you clicked it: frequency, mode, antenna, IF width and shift, roofing, NB/NR/AGC, and power. The memory is added with all advanced fields populated. Edit the label later from the Memories page.
 
 ---
 
@@ -691,6 +1000,80 @@ The bank is saved immediately. Your current working memories are unchanged.
 Deleting a bank does not affect your current working memories.
 
 Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and are not affected by importing from or exporting to the radio.
+
+---
+
+### 8.5 YWC Starter Bank
+
+YWC ships with a built-in **starter bank** of common watering-hole memories — pre-populated, region-aware, and ready to load with one click. New users get a useful set of memories without having to type in every FT8 frequency by hand; experienced users can pick and choose which entries to keep.
+
+**What's in it (typical entry counts vary slightly per region):**
+
+- FT8 calling frequencies on every band from 160m to 6m (plus 4m in Region 1)
+- FT4 calling frequencies for all bands where FT4 is active
+- 60m channels — five fixed USA channels for Region 2, or the WRC-15 secondary allocation for Region 1
+- SSB DX windows and general SSB calling — region-specific (Region 1 uses 14.195 for DX, Region 2 uses 14.230, etc.)
+- CW DX windows on every band
+- RTTY centres
+- The NCDXF/IBP beacon sub-band on 10m
+- 10m FM (29.600) and 6m SSB
+
+Each entry has sensible defaults for AGC, NB, NR, and power — for example, FT8 entries set AGC to **Slow**, NB **off**, NR **off**, Power **25 W**. SSB entries use AGC **Mid** and 100 W; CW uses AGC **Fast**. Radio-specific fields (IF Width, IF Shift, Roofing filter, Antenna selection) are deliberately left blank so your existing per-band memory and your own preferences take effect.
+
+**Loading the starter bank.** The starter bank appears as a permanent entry at the top of the **Banks** dropdown — labelled **📥 YWC Starter Bank (built-in)** — both on the main page (in the floating Mem panel) and on the full Memories editor page. Loading it works exactly like any other Memory Bank (§8.4): selecting it loads the bank's contents into your working memory list, replacing whatever is there. The new entries then appear in the Mem panel as clickable tiles — click any tile to QSY VFO A to that frequency with all its saved settings, or use the Memories editor to change labels, edit fields, delete entries you don't want, etc.
+
+On the **Memories editor page** a confirmation dialog appears before the load (same as for other banks). On the **floating Mem panel** the load happens immediately on dropdown change (also the same as for other banks).
+
+**The built-in starter bank cannot be deleted** — its **Delete** button on the Memories editor is greyed out when the starter bank is selected. If you accidentally delete some of its entries from your working memories, just select the starter bank again from the dropdown and reload — your missing entries come back. (Any other customisations you've made since the previous load are replaced too, so save your work as a named bank with **Save As…** first if you want to preserve it.)
+
+**Region awareness** — the starter bank entry shows the same name regardless of region, but the data loaded depends on the Band Plan in **Settings → §6.1**. Setting it to Region 1 loads `starter-bank-region1.json` (40 entries including 4 m), Region 2 loads the Americas bank with the five USA 60m channels, and so on. To switch regions, change the Band Plan in Settings, click **Save Settings**, then return to the Memories page or Mem panel and reload the starter bank — you'll get the new region's data.
+
+**Editing freely** — once a starter entry is in your memory list, it's just an ordinary memory. Edit the label, change the power, add notes, delete it — anything you can do with a Save-to-Mem memory you can do with a starter entry. The starter bank file itself is read-only and shipped with the app, so your edits never affect what other users see; you can always click **Add Missing** to restore the original entry if you change your mind.
+
+**Where the files live** — the starter banks are in `wwwroot/data/starter-bank-*.json` inside the install folder. They're plain JSON; if you want to look at the source data or contribute corrections, the format is one object per entry with frequency in Hz, mode, and the same advanced-field set the in-app memories use.
+
+---
+
+### 8.6 What about the radio's PRESET function?
+
+PRESET is a Yaesu feature that loads a **factory-defined operating profile** for a given mode (FT8, SSB, CW, RTTY, DATA-USB, AM, FM). It varies enormously across the supported radios — both in scope and in how invasive it is.
+
+**FTdx101MP / FTdx101D — full locked PRESET**
+
+When PRESET is active, the radio applies a Yaesu-designed configuration *and locks you out of changing parts of it*. The screen shows e.g. "PRESET FT8" at the top.
+
+| Mode | What it forces |
+|---|---|
+| **FT8** | MIC GAIN = 0, PROC OFF, fixed WIDTH/SHIFT, AGC SLOW, NB/DNR OFF, ALC locked out, fixed RF GAIN |
+| **SSB** | MIC GAIN set to Yaesu's recommended value, PROC level fixed, EQ locked, WIDTH/SHIFT defaults |
+| **CW** | Narrow WIDTH, SHIFT centred, AGC FAST, NB/DNR OFF |
+
+While PRESET is on:
+- Some controls become inactive on the touch panel
+- Some items disappear from the MULTI menu entirely
+- Your normal saved settings are overridden, not lost — turning PRESET off restores them
+- The behaviour catches a lot of operators out, who think the radio is broken when actually PRESET is on
+
+To turn PRESET off on these radios: press **MODE**, scroll past the normal mode list, select **PRESET OFF** (or **DEFAULT**). MIC GAIN, WIDTH, SHIFT, PROC, EQ and the full MULTI menu return.
+
+**FTdx10 — simplified PRESET (mini-preset)**
+
+A much lighter version. PRESET on the FTdx10 does **not** lock the MULTI menu, does **not** hide controls, and overrides far fewer parameters. Mostly it sets MIC GAIN = 0, PROC OFF, and a fixed WIDTH. Think of it as a one-click "safe FT8 setup" rather than the FTdx101's full locked profile.
+
+**FT-710 and FTDX3000 — no PRESET function at all.**
+
+---
+
+**Yaesu Web Control does not duplicate the PRESET function in the app, and here's why:**
+
+- The per-VFO memories with **Advanced fields** (§8.1) do everything PRESET does and more — *without* locking the radio. You can save a memory channel labelled "20m FT8" with the exact antenna, IF width, IF shift, NR, NB, AGC and power settings you want, and recall it with one click from the floating Mem panel. PRESET only stores per-mode templates; memories store per-frequency-and-mode-and-everything-else.
+- **Per-band memory** (§5.9) automatically remembers your IF Width, IF Shift and Mode for each band, so switching from 40m CW back to 20m SSB restores your filter and mode without any explicit recall.
+- PRESET is a hardware function on the radio — one menu away on the radios that have it. The app doesn't need to reinvent it.
+- The behaviour varies so much across radios (full lock-out vs mini-preset vs absent) that anything app-level would be inconsistent and unpredictable.
+
+If you want a "one click for FT8" workflow in the app, the recommended approach is: tune to your favourite FT8 frequency on the radio, set all your preferred settings, click **Save to Mem** on the VFO panel, then optionally edit the label and notes from the Memories page. Next time, click that memory tile in the floating Mem panel and you're back exactly where you left off — and without PRESET's lock-outs.
+
+**Tip if your radio "suddenly behaves wrong" (FTdx101MP/D):** check the top of the radio's display for the word PRESET. If you see it, that's almost certainly the cause — turn it off using the MODE menu as described above. This is one of the most common "broken radio" mysteries reported by FTdx101 owners.
 
 ---
 
@@ -818,6 +1201,25 @@ Always start applications in this order:
 2. **WSJT-X**
 3. **JTAlert**
 4. **Log4OM**
+5. **GridTracker** (if used)
+
+---
+
+### 9.4 GridTracker
+
+GridTracker is a separate desktop app that draws a live world map of WSJT-X grid contacts and worked-stations data. It is **not** a web app — it runs as its own window — but YWC will launch it for you and show whether it's currently running.
+
+**Setup:**
+
+1. Install GridTracker 2 from [gridtracker.org](https://gridtracker.org/) (the v2 Electron rewrite has a single Windows installer — the older v1 with MariaDB is no longer required).
+2. In YWC, open **Application Setup**.
+3. In the **Application 4** card, set the **Command Line** to your installed path (default: `C:\Program Files\GridTracker2\GridTracker2.exe`).
+4. Tick **Show** and click **Save**.
+5. A **GridTracker** button appears in the top bar. Green = running, red = not running. Click it to launch.
+
+**How it works with WSJT-X:** GridTracker reads WSJT-X's UDP feed independently — YWC doesn't forward anything to it. Make sure WSJT-X is set to **multicast** UDP (default `239.255.0.1:2237`) so YWC, JTAlert, and GridTracker can all subscribe to the same feed at once. If WSJT-X is set to unicast (`127.0.0.1:2237`), only one of the three apps will receive packets — this is a WSJT-X limitation, not a YWC one.
+
+**No CAT integration is needed.** GridTracker is a passive listener; it doesn't talk to the radio at all. YWC still controls the radio, WSJT-X still drives QSOs, and GridTracker just paints the picture.
 
 ---
 
@@ -956,9 +1358,34 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 ---
 
-## 15. Accessibility and Screen Readers
+## 15. Frequently Asked Questions
 
-### 15.1 Windows High Contrast Mode
+### 15.1 WSJT-X transmits but the radio shows no TX audio (or zero power output) in DATA-U / DATA-L mode
+
+This is the most common digital-mode setup pitfall and it's not a YWC problem — it's a one-time radio menu setting that has to be done on the radio itself. Yaesu radios ship with the rear DATA/ACC jack as the default audio input for DATA modes, **not** the USB codec that WSJT-X is sending audio to. Until you switch the radio over, DATA-mode TX produces silence.
+
+**Fix on the radio menu:**
+
+| Radio | Menu item | Set to |
+|---|---|---|
+| FTdx101MP / FTdx101D | 070 **DATA MOD SOURCE** | **REAR** |
+| FTdx101MP / FTdx101D | 071 **REAR SELECT** | **USB** |
+| FTdx10 | 070 **MOD SOURCE / DATA** | **USB** |
+| FT-710 | 070 **DATA MOD SOURCE** | **REAR** |
+| FT-710 | 071 **REAR SELECT** | **USB** |
+| FTDX3000 | 075 **DATA IN SELECT** | **USB** |
+
+(Menu numbers may shift slightly across firmware revisions — if a number doesn't match, look for an item with a similar name nearby.)
+
+The radio remembers this across power cycles, so it's a once-only change. **Why not configure it from YWC?** An earlier version of YWC tried to send the CAT commands for these menu items automatically, but testing revealed the commands were writing to the wrong menu addresses and never actually worked — the radio appeared to be correctly configured only because operators had set it manually at first install. The auto-config feature was removed rather than ship something misleading.
+
+If you can't find these menu items, your operating manual's index under "DATA MOD SOURCE" or "REAR SELECT" is the authoritative reference for your firmware version.
+
+---
+
+## 16. Accessibility and Screen Readers
+
+### 16.1 Windows High Contrast Mode
 
 When a Windows High Contrast theme is active, the gauge displays automatically adjust:
 
@@ -969,7 +1396,7 @@ To enable a High Contrast theme: **Windows Settings → Accessibility → Contra
 
 ---
 
-### 15.2 Screen Reader Support
+### 16.2 Screen Reader Support
 
 All interactive controls in the app have accessible labels that screen readers announce when you hover over or focus on them:
 
@@ -983,7 +1410,7 @@ All interactive controls in the app have accessible labels that screen readers a
 
 ---
 
-### 15.3 NVDA
+### 16.3 NVDA
 
 NVDA (NonVisual Desktop Access) is a free, open-source screen reader for Windows.
 
@@ -1025,7 +1452,7 @@ When the app loads, NVDA does not automatically read through the page. Two desig
 
 ---
 
-### 15.4 Windows Narrator
+### 16.4 Windows Narrator
 
 Narrator is the screen reader built into Windows 11 — no download required.
 
@@ -1039,7 +1466,7 @@ Once running, Narrator reads aloud the element that has keyboard focus. To navig
 
 ---
 
-### 15.5 Customising Screen Reader Labels
+### 16.5 Customising Screen Reader Labels
 
 Every control in the app — band buttons, meters, VFO controls, the on-screen frequency keyboard, spectrum span buttons, and the navigation bar home link — has a text label that screen readers announce. You can change any of these labels through the built-in **Accessibility Labels** editor.
 

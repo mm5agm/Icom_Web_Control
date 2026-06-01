@@ -12,6 +12,7 @@ namespace Yaesu_Web_Control.Services
         private readonly CatMultiplexerService _multiplexer;
         private readonly RadioStateService _stateService;
         private readonly ILogger<MeterPollingService> _logger;
+        private readonly ISettingsService _settingsService;
 
         // TX debounce: require 2 consecutive TX=false readings before declaring not-transmitting.
         // A single TX=false poll (e.g. from a stale CAT response mid-burst) would otherwise
@@ -28,11 +29,13 @@ namespace Yaesu_Web_Control.Services
         public MeterPollingService(
             CatMultiplexerService multiplexer,
             RadioStateService stateService,
-            ILogger<MeterPollingService> logger)
+            ILogger<MeterPollingService> logger,
+            ISettingsService settingsService)
         {
             _multiplexer = multiplexer;
             _stateService = stateService;
             _logger = logger;
+            _settingsService = settingsService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -116,12 +119,41 @@ namespace Yaesu_Web_Control.Services
                         }
                     }
 
-                    _logger.LogInformation("[MeterPolling][DEBUG] Polling Compression+SWR (MS13+RM0)... TX={IsTransmitting}", isTransmitting);
-                    await _multiplexer.SendCommandAsync(CatCommands.SetMetersCompAndSWR + ";", "MeterPoll", stoppingToken);
-                    var compSwrResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterBoth + ";", "MeterPoll", stoppingToken);
-                    _logger.LogInformation("[MeterPolling][DEBUG] MS13+RM0 response: '{Raw}'", compSwrResponse);
-                    int compression = CatCommands.ParseRm0LeftMeter(compSwrResponse ?? "");
-                    int swr = CatCommands.ParseRm0RightMeter(compSwrResponse ?? "");
+                    // SWR and Compression meter polling differs by radio model.
+                    //
+                    //  - FTdx101MP / FTdx101D: RM6 (the documented SWR read) returns
+                    //    stale/wrong values, so we have to set both meter slots via
+                    //    MS13 (compression-left, SWR-right) and then read both at once
+                    //    with RM0. Pre-existing workaround, do not regress.
+                    //
+                    //  - FTdx10 / FT-710 / FTDX3000: MS13+RM0 doesn't read SWR
+                    //    correctly (reported by OE5HMR on FTdx10, 2026-06-01).
+                    //    Reverting to the documented direct reads — RM3 for
+                    //    compression, RM6 for SWR — which is what Yaesu's CAT
+                    //    manual specifies for these radios.
+                    var settings = await _settingsService.GetSettingsAsync();
+                    bool useRm0Pair = settings.RadioModel is "FTdx101MP" or "FTdx101D";
+                    int compression;
+                    int swr;
+                    if (useRm0Pair)
+                    {
+                        _logger.LogInformation("[MeterPolling][DEBUG] Polling Compression+SWR (MS13+RM0)... TX={IsTransmitting}", isTransmitting);
+                        await _multiplexer.SendCommandAsync(CatCommands.SetMetersCompAndSWR + ";", "MeterPoll", stoppingToken);
+                        var compSwrResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterBoth + ";", "MeterPoll", stoppingToken);
+                        _logger.LogInformation("[MeterPolling][DEBUG] MS13+RM0 response: '{Raw}'", compSwrResponse);
+                        compression = CatCommands.ParseRm0LeftMeter(compSwrResponse ?? "");
+                        swr         = CatCommands.ParseRm0RightMeter(compSwrResponse ?? "");
+                    }
+                    else
+                    {
+                        _logger.LogInformation("[MeterPolling][DEBUG] Polling Compression (RM3) and SWR (RM6) directly... TX={IsTransmitting}", isTransmitting);
+                        var compResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterComp + ";", "MeterPoll", stoppingToken);
+                        _logger.LogInformation("[MeterPolling][DEBUG] RM3 response: '{Raw}'", compResponse);
+                        compression = CatCommands.ParseMeterReading(compResponse ?? "");
+                        var swrResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterSWR + ";", "MeterPoll", stoppingToken);
+                        _logger.LogInformation("[MeterPolling][DEBUG] RM6 response: '{Raw}'", swrResponse);
+                        swr = CatCommands.ParseMeterReading(swrResponse ?? "");
+                    }
                     _logger.LogInformation("[MeterPolling][DEBUG] TX={IsTransmitting} Compression={Comp} SWR={SWR}", isTransmitting, compression, swr);
                     _stateService.SWRMeter = isTransmitting ? swr : 0;
                     if (isTransmitting)

@@ -701,6 +701,13 @@ async function swapVfo() {
     } catch {}
 }
 
+async function copyVfo(direction) {
+    try {
+        await fetch(`/api/cat/copy-vfo/${direction}`, { method: 'POST' });
+    } catch {}
+}
+window.copyVfo = copyVfo;
+
 async function checkTxStatus() {
     try {
         const response = await fetch('/api/cat/tx');
@@ -775,7 +782,6 @@ function updateMicGainLabel(mode) {
 // First SignalR RadioStateUpdate handler (outer scope).
 // Handles ModeA/B, FrequencyA/B, PowerA/B updates pushed from the backend.
 connection.on("RadioStateUpdate", function (update) {
-    // ...removed debug logging...
 
     // --- CONNECTION STATE ---
     if (update.property === "IsConnected") {
@@ -793,6 +799,8 @@ connection.on("RadioStateUpdate", function (update) {
             window.IfWidth.rebuildIfWidthSelect(
                 document.getElementById('ifWidthSelectA'), window._radioModel, update.value);
         }
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeA', update.value);
+        if (window.voiceAnnounce) window.voiceAnnounce.sayMode('A', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
@@ -802,6 +810,8 @@ connection.on("RadioStateUpdate", function (update) {
             window.IfWidth.rebuildIfWidthSelect(
                 document.getElementById('ifWidthSelectB'), window._radioModel, update.value);
         }
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeB', update.value);
+        if (window.voiceAnnounce) window.voiceAnnounce.sayMode('B', update.value);
     }
 
     // --- PROC ---
@@ -816,25 +826,45 @@ connection.on("RadioStateUpdate", function (update) {
     }
 
     // --- FREQUENCY CHANGE ---
+    //
+    // Important: `state` in this scope refers to a variable defined inside an
+    // IIFE further down the file (line ~1829) and is NOT visible here.
+    // Touching it bare throws ReferenceError and silently aborts the rest of
+    // the handler — which is what was breaking the segment-dropdown auto-sync
+    // for ages. Wrap every `state.*` access in try/catch so a single failure
+    // can't kill the handler. The IIFE's own polling loop keeps the
+    // frequency display fresh independently, so losing this write isn't fatal.
     if (update.property === "FrequencyA") {
-        state.lastBackendFreq.A = update.value;
-        updateFrequencyDisplay('A', update.value);
-        window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } }));
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
+        try { state.lastBackendFreq.A = update.value; } catch (_) { /* state lives in IIFE scope only */ }
+        try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
+        try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } })); }
+        catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
+        try { if (window.syncSegmentSelectToFrequency) window.syncSegmentSelectToFrequency('A', update.value); }
+        catch (e) { console.error('syncSegmentSelectToFrequency A error:', e); }
     }
     if (update.property === "FrequencyB") {
-        state.lastBackendFreq.B = update.value;
-        updateFrequencyDisplay('B', update.value);
-        window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } }));
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
+        try { state.lastBackendFreq.B = update.value; } catch (_) { /* state lives in IIFE scope only */ }
+        try { updateFrequencyDisplay('B', update.value); } catch (e) { console.error('updateFrequencyDisplay B error:', e); }
+        try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } })); }
+        catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
+        try { if (window.syncSegmentSelectToFrequency) window.syncSegmentSelectToFrequency('B', update.value); }
+        catch (e) { console.error('syncSegmentSelectToFrequency B error:', e); }
     }
 
     // --- BAND CHANGE ---
     if (update.property === "BandA") {
         // ...removed debug logging...
         updateBandButton('A', update.value);
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('bandA', update.value);
+        if (window.voiceAnnounce) window.voiceAnnounce.sayBand('A', update.value);
     }
     if (update.property === "BandB") {
         // ...removed debug logging...
         updateBandButton('B', update.value);
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('bandB', update.value);
+        if (window.voiceAnnounce) window.voiceAnnounce.sayBand('B', update.value);
     }
 
     // --- POWER CHANGE ---
@@ -853,6 +883,7 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.updatePowerDisplay === 'function') window.updatePowerDisplay("A", update.value);
         const sliderA = document.getElementById('powerSliderA');
         if (sliderA) sliderA.value = update.value;
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('power', update.value);
     }
 
     // --- RADIO POWER STATE ---
@@ -873,16 +904,22 @@ connection.on("RadioStateUpdate", function (update) {
         }
         updateTxButton();
         updateTxIndicators(update.value);
+        if (typeof window.handleTxStateForTimeout === 'function') {
+            window.handleTxStateForTimeout(!!update.value);
+        }
+        if (window.voiceAnnounce) window.voiceAnnounce.sayTxState(!!update.value);
     }
     if (update.property === "TxVfo") {
         txVfo = update.value;
         updateTxButton();
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('txVfo', update.value);
     }
 
     // --- SPLIT MODE ---
     if (update.property === "SplitMode") {
         splitMode = update.value;
         updateSplitButton();
+        if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('split', update.value);
     }
 
     // --- METER UPDATES ---
@@ -1432,6 +1469,8 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('splitBtn')?.addEventListener('click', () => setSplit(splitMode > 0 ? 0 : 1));
     document.getElementById('quickSplitBtn')?.addEventListener('click', () => setSplit(2));
     document.getElementById('swapVfoBtn')?.addEventListener('click', swapVfo);
+    document.getElementById('copyBtoABtn')?.addEventListener('click', () => copyVfo('ba'));
+    document.getElementById('copyAtoBBtn')?.addEventListener('click', () => copyVfo('ab'));
 
     // Clarifier: seed JS state from server-rendered HTML values
     const clarSlider = document.getElementById('clarOffsetSlider');
@@ -1632,21 +1671,17 @@ window.resetClarifier = resetClarifier;
 async function saveVfoToMemory(vfo) {
     const btn    = document.getElementById('saveMemBtn' + vfo);
     const status = document.getElementById('saveMemStatus' + vfo);
-    const freqHz = window.radioControl?._state?.lastBackendFreq?.[vfo] || 0;
-    const mode   = document.getElementById('modeSelect' + vfo)?.value || 'USB';
     try {
         if (btn) { btn.disabled = true; btn.textContent = '…'; }
         if (status) status.textContent = '';
-        const resp = await fetch('/api/memory', {
+        // Use the dedicated save-vfo endpoint: the backend reads the full
+        // live radio state from RadioStateService and captures every advanced
+        // field (antenna, IF width/shift, roofing, NB/NR/AGC, power) in one
+        // shot. The browser only needs to send a label.
+        const resp = await fetch(`/api/memory/save-vfo/${vfo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                frequencyHz:       freqHz,
-                mode:              mode,
-                clarifierOffsetHz: clarOffsets[vfo] || 0,
-                rxClarOn:          rxClarOn,
-                txClarOn:          txClarOn
-            })
+            body: JSON.stringify({ label: '' })
         });
         if (resp.ok) {
             if (status) status.textContent = `VFO ${vfo} saved to memories`;
@@ -2522,6 +2557,43 @@ document.addEventListener('DOMContentLoaded', function() {
         return `bandSeg_${vfo}_${band}`;
     }
 
+    // Set the Segment dropdown to reflect whichever segment of the band
+    // contains the current frequency. Called from the FrequencyA/B SignalR
+    // handlers so the dropdown stays in sync when the operator tunes via
+    // the radio's knob, the spectrum click, or the on-screen freq keyboard.
+    // No-op if the band's dropdown hasn't been populated yet (e.g. on
+    // initial connect before BandA arrives).
+    function syncSegmentSelectToFrequency(vfo, hz) {
+        const select = document.getElementById(`segmentSelect${vfo}`);
+        if (!select || select.disabled) return;
+        const band = state.lastBand && state.lastBand[vfo];
+        if (!band) return;
+        const plan = window.bandPlan || 'UK';
+        if (!window.bandPlanData || !window.getBandSegmentForHz) {
+            // Fallback if helper not loaded — use inline lookup against the plan.
+            // Mirror the band-plan.js segmentForHz logic exactly, including the
+            // "below-lowest → first segment" fallback, so 14.010 etc don't
+            // produce a blank dropdown when the helper isn't loaded.
+            const segments = (window.bandPlanData && window.bandPlanData[plan] && window.bandPlanData[plan][band]) || null;
+            if (!segments) return;
+            const ordered = Object.entries(segments).sort((a, b) => a[1].freq - b[1].freq);
+            let match = '';
+            for (const [key, seg] of ordered) {
+                if (typeof seg.freq !== 'number') continue;
+                if (hz >= seg.freq) match = key;
+                else break;
+            }
+            if (!match && ordered.length > 0) match = ordered[0][0];
+            if (select.value !== match) select.value = match;
+            return;
+        }
+        const key = window.getBandSegmentForHz(plan, band, hz) || '';
+        if (select.value !== key) select.value = key;
+    }
+    // Expose to the outer SignalR handler (FrequencyA/B), which lives outside
+    // this IIFE and would otherwise get a ReferenceError trying to call it.
+    window.syncSegmentSelectToFrequency = syncSegmentSelectToFrequency;
+
     function populateSegmentSelect(vfo, band) {
         const select = document.getElementById(`segmentSelect${vfo}`);
         if (!select) return;
@@ -2597,8 +2669,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // UI-driven and SignalR-driven band changes trigger the update.
     const _origUpdateBandButton = window.updateBandButton;
 
-    // Re-populate segments whenever band state changes
+    // Re-populate segments whenever band state changes. Skip if the band is
+    // unchanged — the BandA SignalR event fires on every frequency change,
+    // not only on real band transitions, so repopulating here would reset the
+    // dropdown to its localStorage value and stomp on the auto-sync we did
+    // from the matching FrequencyA event.
     function onBandChanged(vfo, band) {
+        if (state.lastBand[vfo] === band) return;
         state.lastBand[vfo] = band;
         populateSegmentSelect(vfo, band);
     }

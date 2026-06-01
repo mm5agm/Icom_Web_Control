@@ -46,9 +46,25 @@ namespace Yaesu_Web_Control.Pages
             // [Required] from <Nullable>enable</Nullable> would otherwise reject an empty
             // string and silently prevent the save.
             ModelState.Remove("Settings.SdrDeviceKey");
+            // DX cluster host/callsign also allowed empty (empty = feature disabled).
+            ModelState.Remove("Settings.DxClusterHost");
+            ModelState.Remove("Settings.DxClusterLoginCallsign");
+            ModelState.Remove("Settings.DxClusterPostLoginCommands");
 
             if (!ModelState.IsValid)
             {
+                // Log every ModelState error so we can see exactly which
+                // field failed validation. Without this the page silently
+                // redisplays with no visible error indication.
+                foreach (var (key, entry) in ModelState)
+                {
+                    foreach (var err in entry.Errors)
+                    {
+                        _logger.LogWarning("[Settings] Validation error on {Key}: {Msg}",
+                            key, err.ErrorMessage);
+                    }
+                }
+                StatusMessage = "❌ Settings not saved — see console log for validation errors.";
                 NetworkAddresses = GetLocalIPAddresses();
                 return Page();
             }
@@ -112,6 +128,14 @@ namespace Yaesu_Web_Control.Pages
                 }
                 if (Settings.CwMessages != null && Settings.CwMessages.Count == 5)
                     current.CwMessages = Settings.CwMessages;
+
+                // DX cluster settings — copy through. Normalise callsign to upper case.
+                current.DxClusterEnabled         = Settings.DxClusterEnabled;
+                current.DxClusterHost            = (Settings.DxClusterHost ?? "").Trim();
+                current.DxClusterPort            = Settings.DxClusterPort > 0 ? Settings.DxClusterPort : 7300;
+                current.DxClusterLoginCallsign   = (Settings.DxClusterLoginCallsign ?? "").Trim().ToUpperInvariant();
+                current.DxSpotAgeMinutes         = Settings.DxSpotAgeMinutes > 0 ? Settings.DxSpotAgeMinutes : 15;
+                current.DxClusterPostLoginCommands = Settings.DxClusterPostLoginCommands ?? "";
 
                 await _settingsService.SaveSettingsAsync(current);
 

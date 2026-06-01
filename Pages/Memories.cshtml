@@ -92,6 +92,17 @@
 
     <!-- Memory editor form -->
     <form method="post">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="showAdvanced"
+                       onchange="toggleAdvanced(this.checked)">
+                <label class="form-check-label" for="showAdvanced">Show advanced fields</label>
+            </div>
+            <span class="text-muted small">
+                Antenna, IF Width/Shift, Roofing, NB, NR, AGC, Power, Notes —
+                applied on recall only if set. Not exported to the radio's own memory channels.
+            </span>
+        </div>
         <div class="table-responsive">
             <table class="table table-sm table-striped table-hover mb-3" id="memoriesTable">
                 <thead class="table-dark">
@@ -103,6 +114,16 @@
                         <th style="min-width:100px">Clarifier (Hz)</th>
                         <th style="width:70px">RX Clar</th>
                         <th style="width:70px">TX Clar</th>
+                        <th class="advanced-col" style="min-width:70px; display:none">Ant</th>
+                        <th class="advanced-col" style="min-width:90px; display:none">IF Width</th>
+                        <th class="advanced-col" style="min-width:90px; display:none">IF Shift</th>
+                        <th class="advanced-col" style="min-width:90px; display:none">Roofing</th>
+                        <th class="advanced-col" style="width:60px; display:none">NB</th>
+                        <th class="advanced-col" style="width:70px; display:none">NB Lvl</th>
+                        <th class="advanced-col" style="min-width:80px; display:none">NR</th>
+                        <th class="advanced-col" style="min-width:80px; display:none">AGC</th>
+                        <th class="advanced-col" style="width:80px; display:none">Power</th>
+                        <th class="advanced-col" style="min-width:140px; display:none">Notes</th>
                         <th style="width:60px"></th>
                     </tr>
                 </thead>
@@ -165,6 +186,84 @@
                                        @(m.TxClarOn ? "checked" : "") />
                                 <input type="hidden" name="Memories[@i].TxClarOn" value="false" />
                             </td>
+                            <td class="advanced-col" style="display:none">
+                                <select class="form-select form-select-sm" name="Memories[@i].Antenna">
+                                    <option value="" selected="@(string.IsNullOrEmpty(m.Antenna) ? "selected" : null)">—</option>
+                                    <option value="1" selected="@(m.Antenna == "1" ? "selected" : null)">1</option>
+                                    <option value="2" selected="@(m.Antenna == "2" ? "selected" : null)">2</option>
+                                    <option value="3" selected="@(m.Antenna == "3" ? "selected" : null)">3</option>
+                                </select>
+                            </td>
+                            <td class="advanced-col" style="display:none">
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].IfWidthCode"
+                                       value="@m.IfWidthCode"
+                                       placeholder="—"
+                                       title="SH command code (raw integer, e.g. 8)" />
+                            </td>
+                            <td class="advanced-col" style="display:none">
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].IfShiftHz"
+                                       type="number"
+                                       value="@(m.IfShiftHz?.ToString() ?? "")"
+                                       min="-1000" max="1000" step="20"
+                                       placeholder="—" />
+                            </td>
+                            <td class="advanced-col" style="display:none">
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].RoofingCode"
+                                       value="@m.RoofingCode"
+                                       placeholder="—"
+                                       title="Roofing filter code (6=12kHz, 7=3kHz, 8=1.2kHz, 9=600Hz, A=300Hz)" />
+                            </td>
+                            <td class="advanced-col text-center align-middle" style="display:none">
+                                <select class="form-select form-select-sm" name="Memories[@i].NbOn">
+                                    <option value="" selected="@(m.NbOn == null ? "selected" : null)">—</option>
+                                    <option value="true" selected="@(m.NbOn == true ? "selected" : null)">On</option>
+                                    <option value="false" selected="@(m.NbOn == false ? "selected" : null)">Off</option>
+                                </select>
+                            </td>
+                            <td class="advanced-col" style="display:none">
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].NbLevel"
+                                       type="number"
+                                       value="@(m.NbLevel?.ToString() ?? "")"
+                                       min="1" max="20"
+                                       placeholder="—" />
+                            </td>
+                            <td class="advanced-col" style="display:none">
+                                <select class="form-select form-select-sm" name="Memories[@i].NrLevel">
+                                    <option value="" selected="@(string.IsNullOrEmpty(m.NrLevel) ? "selected" : null)">—</option>
+                                    <option value="0" selected="@(m.NrLevel == "0" ? "selected" : null)">Off</option>
+                                    <option value="1" selected="@(m.NrLevel == "1" ? "selected" : null)">NR1</option>
+                                    <option value="2" selected="@(m.NrLevel == "2" ? "selected" : null)">NR2</option>
+                                </select>
+                            </td>
+                            <td class="advanced-col" style="display:none">
+                                <select class="form-select form-select-sm" name="Memories[@i].AgcMode">
+                                    <option value="" selected="@(string.IsNullOrEmpty(m.AgcMode) ? "selected" : null)">—</option>
+                                    <option value="0" selected="@(m.AgcMode == "0" ? "selected" : null)">Off</option>
+                                    <option value="1" selected="@(m.AgcMode == "1" ? "selected" : null)">Fast</option>
+                                    <option value="2" selected="@(m.AgcMode == "2" ? "selected" : null)">Mid</option>
+                                    <option value="3" selected="@(m.AgcMode == "3" ? "selected" : null)">Slow</option>
+                                    <option value="4" selected="@(m.AgcMode == "4" ? "selected" : null)">Auto</option>
+                                </select>
+                            </td>
+                            <td class="advanced-col" style="display:none">
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].PowerWatts"
+                                       type="number"
+                                       value="@(m.PowerWatts?.ToString() ?? "")"
+                                       min="5" max="200"
+                                       placeholder="—" />
+                            </td>
+                            <td class="advanced-col" style="display:none">
+                                <input class="form-control form-control-sm"
+                                       name="Memories[@i].Notes"
+                                       value="@m.Notes"
+                                       maxlength="100"
+                                       placeholder="(notes)" />
+                            </td>
                             <td>
                                 <button type="submit" asp-page-handler="Delete"
                                         asp-route-id="@m.Id"
@@ -195,6 +294,23 @@
 
 @section Scripts {
 <script>
+    // Show/hide advanced columns. Persists the choice in localStorage so
+    // returning to the page keeps the previous view.
+    function toggleAdvanced(show) {
+        document.querySelectorAll('.advanced-col').forEach(el => {
+            el.style.display = show ? '' : 'none';
+        });
+        try { localStorage.setItem('mem_show_advanced', show ? '1' : '0'); } catch {}
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        let saved = '0';
+        try { saved = localStorage.getItem('mem_show_advanced') || '0'; } catch {}
+        if (saved === '1') {
+            const sw = document.getElementById('showAdvanced');
+            if (sw) { sw.checked = true; toggleAdvanced(true); }
+        }
+    });
+
     function updateFreqHz(input, index) {
         const mhz = parseFloat(input.value);
         const hidden = document.getElementById('freqHz_' + index);
@@ -268,13 +384,20 @@
         });
     }
 
+    // Sentinel value for the built-in YWC starter bank option in the Banks
+    // dropdown. Real user-saved bank names can't collide because the bank
+    // controller rejects names containing path-unsafe characters.
+    const STARTER_BANK_VALUE = '__ywc_starter__';
+
     function updateBankButtons() {
         const sel = document.getElementById('bankSelect');
         const has = sel && sel.value !== '';
+        const isStarter = sel && sel.value === STARTER_BANK_VALUE;
         const load = document.getElementById('loadBankBtn');
         const del  = document.getElementById('deleteBankBtn');
         if (load) load.disabled = !has;
-        if (del)  del.disabled  = !has;
+        // Built-in starter bank cannot be deleted
+        if (del)  del.disabled  = !has || isStarter;
     }
 
     async function loadBanks(selectName) {
@@ -284,7 +407,10 @@
             const resp = await fetch('/api/memorybank');
             const names = await resp.json();
             const current = selectName !== undefined ? selectName : sel.value;
+            // Always prepend the built-in starter bank option after the placeholder
+            const starterOption = `<option value="${STARTER_BANK_VALUE}"${current === STARTER_BANK_VALUE ? ' selected' : ''}>📥 YWC Starter Bank (built-in)</option>`;
             sel.innerHTML = '<option value="">-- Select bank --</option>' +
+                starterOption +
                 names.map(n => `<option value="${escHtml(n)}"${n === current ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
             updateBankButtons();
         } catch {}
@@ -294,13 +420,23 @@
         const sel = document.getElementById('bankSelect');
         const name = sel?.value;
         if (!name) return;
+
+        const isStarter = name === STARTER_BANK_VALUE;
+        const displayName = isStarter ? 'YWC Starter Bank' : name;
         if (!await pageConfirm(
-            `Load bank "${name}"?\n\nThis will replace your current app memories. Any unsaved changes will be lost.\n\nContinue?`)) return;
+            `Load bank "${displayName}"?\n\nThis will replace your current app memories. Any unsaved changes will be lost.\n\nContinue?`)) return;
 
         const statusEl = document.getElementById('bankStatus');
         statusEl.textContent = 'Loading…';
         try {
-            const resp = await fetch(`/api/memorybank/${encodeURIComponent(name)}/load`, { method: 'POST' });
+            // Built-in starter bank is loaded through its own endpoint; user
+            // banks go through /api/memorybank. Both produce the same end
+            // result — current memories replaced with the bank's contents.
+            const url    = isStarter ? '/api/memory/starter-bank/load'                          : `/api/memorybank/${encodeURIComponent(name)}/load`;
+            const init   = isStarter
+                ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'replace' }) }
+                : { method: 'POST' };
+            const resp = await fetch(url, init);
             if (resp.ok) {
                 location.reload();
             } else {

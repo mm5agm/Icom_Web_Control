@@ -182,14 +182,30 @@
                 </button>
             </div>
         }
+        @if (Model.ShowApp4Button)
+        {
+            <div class="col-auto">
+                <button id="gridtrackerBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
+                        onclick="launchGridtracker()" title="Launch @Model.App4Name" aria-label="Launch @Model.App4Name">
+                    @Model.App4Name
+                </button>
+            </div>
+        }
         <div class="col-auto ms-auto d-flex gap-2 align-items-center">
+            <span id="utcClock"
+                  class="font-monospace fw-bold px-2"
+                  style="font-size:0.95rem; color:#ffe066; background:#222; border:1px solid #444; border-radius:4px; padding-top: 1px; padding-bottom: 1px; cursor:help;"
+                  title="UTC time from your PC system clock. Drifts if Windows can't reach time.windows.com. Click for details and how to verify."
+                  onclick="document.getElementById('utcClockInfoDialog').show()"
+                  aria-live="off"
+                  aria-label="Current UTC time. Click for source and accuracy details.">--:--:--Z</span>
             <a href="https://paypal.me/mm5agm" target="_blank" rel="noopener noreferrer"
                class="btn btn-warning btn-sm" style="padding-top: 1px; padding-bottom: 1px;" title="Support this project via PayPal"
                aria-label="Support this project via PayPal — Buy Me a Coffee">
                 <i class="bi bi-cup-hot-fill" aria-hidden="true"></i> Buy Me a Coffee
             </a>
-            <button id="memBtn" class="btn btn-sm btn-outline-info"
-                    style="padding-top: 1px; padding-bottom: 1px;" title="Open memories panel"
+            <button id="memBtn" class="btn btn-sm btn-outline-info fw-bold"
+                    style="padding-top: 1px; padding-bottom: 1px; color: #000;" title="Open memories panel"
                     aria-label="Open memories panel">
                 Mem
             </button>
@@ -202,6 +218,18 @@
                     style="padding-top: 1px; padding-bottom: 1px;" title="Swap VFO A and VFO B frequencies"
                     aria-label="Swap VFO A and VFO B frequencies">
                 A&#8596;B
+            </button>
+            <button id="copyBtoABtn" class="btn btn-sm btn-outline-secondary"
+                    style="padding-top: 1px; padding-bottom: 1px;"
+                    title="Copy VFO B frequency &amp; mode to VFO A. VFO B is left unchanged. Useful for transmitting on VFO B's settings without enabling split."
+                    aria-label="Copy VFO B to VFO A">
+                B&rarr;A
+            </button>
+            <button id="copyAtoBBtn" class="btn btn-sm btn-outline-secondary"
+                    style="padding-top: 1px; padding-bottom: 1px;"
+                    title="Copy VFO A frequency &amp; mode to VFO B. VFO A is left unchanged. Useful for seeding VFO B from VFO A before adjusting one of them."
+                    aria-label="Copy VFO A to VFO B">
+                A&rarr;B
             </button>
             <button id="splitBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Toggle Split: VFO A = receive, VFO B = transmit"
@@ -225,6 +253,9 @@
             </button>
         </div>
     </div>
+
+    <!-- (Status line moved inside each VFO panel — see #vfoAStatusLine / #vfoBStatusLine) -->
+
     <!-- Power and SWR Meters -->
     <div class="row mt-3">
         <div class="col-12">
@@ -346,6 +377,19 @@
                                 aria-label="FM repeater controls"
                                 title="Open FM repeater controls panel"
                                 onclick="document.getElementById('fmDialog').show()">FM Rep</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="DX watch — alerts for spotted callsigns"
+                                title="Open DX watch list — get alerts when watched callsigns are spotted"
+                                onclick="document.getElementById('dxWatchDialog').show(); window.refreshDxWatchList && window.refreshDxWatchList();">DX Watch</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="DX spots — list of cluster spots on current band"
+                                title="Open DX spots list — see callsigns spotted on the current band"
+                                onclick="window.dxSpotsPanel && window.dxSpotsPanel.toggle()">DX Spots</button>
+                        <button id="voiceBtn"
+                                class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="Voice announcements settings"
+                                title="Voice announcements for band, mode, TX state etc. — useful for partially sighted operators"
+                                onclick="document.getElementById('voiceDialog').show();">Voice</button>
                     </div>
 
                 </div>
@@ -689,6 +733,12 @@
                         <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                                 onclick="resetIfShift('A')" title="Zero IF Shift">Zero</button>
                     </div>
+
+                    <!-- VFO A status line — live band/mode/freq/power summary, banner-coloured -->
+                    <div id="vfoAStatusLine"
+                         class="bg-primary text-white px-2 py-1 mt-1 font-monospace rounded"
+                         style="font-size:0.9rem; line-height:1.25; overflow-x:auto; white-space:nowrap;"
+                         aria-live="polite" aria-atomic="true">—</div>
                             </div>
                         </div>
                     </div>
@@ -1007,6 +1057,12 @@
                         <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
                                 onclick="resetIfShift('B')" title="Zero IF Shift">Zero</button>
                     </div>
+
+                    <!-- VFO B status line — live band/mode/freq summary, banner-coloured -->
+                    <div id="vfoBStatusLine"
+                         class="bg-success text-white px-2 py-1 mt-1 font-monospace rounded"
+                         style="font-size:0.9rem; line-height:1.25; overflow-x:auto; white-space:nowrap;"
+                         aria-live="polite" aria-atomic="true">—</div>
                                 </div>
                             </div>
                         </div>
@@ -1287,6 +1343,206 @@
     </div>
 </dialog>
 
+<!-- DX Watch (watched-callsign alerts) Dialog -->
+<dialog id="dxWatchDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:320px; max-width:420px;" aria-labelledby="dxWatchTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+        <strong id="dxWatchTitle">DX Watch</strong>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="document.getElementById('dxWatchDialog').close()"
+                aria-label="Close DX watch panel">✕</button>
+    </div>
+    <div class="p-3 d-flex flex-column gap-2">
+        <p class="text-muted small mb-1" style="color:#bbb !important;">
+            Get notified when these callsigns are spotted on the DX cluster.
+            Use a trailing <code style="color:#ffd">*</code> for prefix match
+            (<code style="color:#ffd">G4*</code> matches G4ABC, G4XYZ).
+        </p>
+        <div class="d-flex align-items-center gap-2">
+            <input type="text" id="dxWatchNewInput" class="form-control form-control-sm font-monospace"
+                   placeholder="Callsign or prefix*"
+                   maxlength="16"
+                   style="text-transform:uppercase"
+                   aria-label="New watched callsign or prefix">
+            <button id="dxWatchAddBtn" class="btn btn-sm btn-success"
+                    aria-label="Add to watch list"
+                    onclick="window.dxWatchAdd && window.dxWatchAdd()">Add</button>
+        </div>
+        <hr style="border-color:#444; margin:4px 0;">
+        <div class="fw-bold small" style="color:#aaa;">Watched</div>
+        <ul id="dxWatchList" class="list-unstyled mb-0 small" style="max-height:240px; overflow-y:auto;"
+            aria-live="polite" aria-label="Watched callsigns list"></ul>
+        <div id="dxWatchEmpty" class="text-muted small" style="display:none;">
+            No callsigns watched yet. Add one above to get alerts.
+        </div>
+    </div>
+</dialog>
+
+<!-- Voice Announcements Dialog -->
+<dialog id="voiceDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:340px; max-width:480px;" aria-labelledby="voiceDialogTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+        <strong id="voiceDialogTitle">Voice Announcements</strong>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="document.getElementById('voiceDialog').close()"
+                aria-label="Close voice announcements panel">✕</button>
+    </div>
+    <div class="p-3 d-flex flex-column gap-2">
+        <p class="text-muted small mb-1" style="color:#bbb !important;">
+            Spoken announcements via your browser's text-to-speech engine.
+            Useful for partially sighted operators or anyone who wants to
+            be told when a setting changes without looking at the screen.
+            <br><strong>Note:</strong> If you use a screen reader (NVDA / JAWS),
+            leave this off to avoid double announcements.
+        </p>
+
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="voiceEnabledChk">
+            <label class="form-check-label" for="voiceEnabledChk"><strong>Enable voice announcements</strong></label>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:64px;">Voice:</label>
+            <select id="voicePickerSelect" class="form-select form-select-sm" style="flex:1;"
+                    aria-label="Text-to-speech voice"></select>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:64px;">Rate:</label>
+            <input type="range" id="voiceRateSlider" min="0.5" max="2.0" step="0.1" value="1.0"
+                   style="flex:1;" aria-label="Speech rate">
+            <span id="voiceRateValue" class="font-monospace" style="min-width:34px; text-align:right;">1.0×</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" style="min-width:64px;">Volume:</label>
+            <input type="range" id="voiceVolumeSlider" min="0" max="1.0" step="0.1" value="1.0"
+                   style="flex:1;" aria-label="Speech volume">
+            <span id="voiceVolumeValue" class="font-monospace" style="min-width:34px; text-align:right;">100%</span>
+        </div>
+
+        <hr style="border-color:#444; margin:4px 0;">
+        <div class="fw-bold small" style="color:#aaa;">Announce</div>
+
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceBandChk"><label class="form-check-label" for="voiceBandChk">Band changes ("forty metres")</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceModeChk"><label class="form-check-label" for="voiceModeChk">Mode changes ("upper sideband")</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceTxChk"><label class="form-check-label" for="voiceTxChk">TX / RX state ("transmit" / "receive")</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceFreqChk"><label class="form-check-label" for="voiceFreqChk">Manual frequency entry confirmation</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceDxAlertChk"><label class="form-check-label" for="voiceDxAlertChk">DX watched-callsign alerts</label></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="voiceTxTimeoutChk"><label class="form-check-label" for="voiceTxTimeoutChk">TX timeout warning</label></div>
+
+        <div class="d-flex gap-2 mt-2">
+            <button id="voiceTestBtn" class="btn btn-sm btn-primary">Test voice</button>
+            <button id="voiceStopBtn" class="btn btn-sm btn-outline-secondary">Stop talking</button>
+        </div>
+    </div>
+</dialog>
+
+<!-- UTC clock info popover — opened by clicking the top-bar clock.
+     Explains the clock source, what depends on it, and how to verify
+     the PC's time-sync state. -->
+<dialog id="utcClockInfoDialog"
+        style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:380px; max-width:520px;"
+        aria-labelledby="utcClockInfoTitle">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+        <strong id="utcClockInfoTitle">UTC clock — where does the time come from?</strong>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="document.getElementById('utcClockInfoDialog').close()"
+                aria-label="Close UTC clock info">✕</button>
+    </div>
+    <div class="p-3 small" style="line-height:1.5;">
+        <p class="mb-2">The clock reads <strong>your PC's system clock</strong>, converted to UTC. There is no separate network time source.</p>
+        <p class="mb-2"><strong>What depends on accurate time:</strong></p>
+        <ul class="mb-2 ps-3">
+            <li>DX Spots <em>Age</em> and <em>Time UTC</em> columns</li>
+            <li>The 15-minute spot age-out</li>
+            <li>The TX timeout warning countdown</li>
+            <li>QSO timestamps in any external logger you're using</li>
+        </ul>
+        <p class="mb-2"><strong>How to verify your PC time is correct:</strong></p>
+        <ol class="mb-2 ps-3">
+            <li>Open Windows <strong>Settings → Time &amp; Language → Date &amp; time</strong>.</li>
+            <li>Confirm <strong>Set time automatically</strong> is on.</li>
+            <li>Under <strong>Additional settings</strong>, click <strong>Sync now</strong> and check the &quot;Last successful time synchronisation&quot; date. If it&#39;s more than a few days ago and you have no continual internet, your clock may have drifted.</li>
+        </ol>
+        <p class="mb-2"><strong>If you operate offline a lot:</strong> rough rule of thumb is a typical PC clock drifts seconds-to-minutes per week without sync. Fine for SSB casual logging, problematic for FT8 and contests. Re-sync whenever you reconnect to the internet.</p>
+        <p class="mb-0 text-muted">The clock cannot detect drift on its own — your PC&#39;s clock is the only reference YWC has.</p>
+    </div>
+</dialog>
+
+<!-- DX Spots list panel — filtered list of cluster spots on the current band.
+     Works regardless of whether an SDR is configured; data flows over the
+     same SignalR DxSpot stream the spectrum overlay uses. -->
+<style>
+    .dxs-call     { font-weight:600; }
+    .dxs-watched  { color:#ff5050; font-weight:bold; }
+    .dxs-num      { font-family:monospace; text-align:right; }
+    .dxs-mode     { font-family:monospace; }
+    .dxs-comment  { color:#bbb; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #dxSpotsTbody tr        { cursor:pointer; }
+    #dxSpotsTbody tr:hover td { background:#333; }
+    #dxSpotsDialog th[data-sort]:hover { background:#444; }
+</style>
+<dialog id="dxSpotsDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:720px; max-width:95vw;" aria-labelledby="dxSpotsTitle">
+    <div class="dxs-header d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+        <strong id="dxSpotsTitle">DX Spots</strong>
+        <div class="d-flex align-items-center gap-3">
+            <small id="dxSpotsCount" class="text-muted">0 shown / 0 total</small>
+            <div class="form-check form-switch mb-0" style="cursor:default;">
+                <input class="form-check-input" type="checkbox" id="dxSpotsAllBandsChk">
+                <label class="form-check-label small" for="dxSpotsAllBandsChk">All bands</label>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary"
+                    onclick="document.getElementById('dxSpotsDialog').close()"
+                    aria-label="Close DX spots panel">✕</button>
+        </div>
+    </div>
+    <div class="p-2" style="max-height:60vh; overflow-y:auto;">
+        <table class="table table-sm table-dark table-hover mb-0" style="font-size:0.85rem;">
+            <thead style="position:sticky; top:0; background:#222; z-index:1;">
+                <tr>
+                    <th data-sort="callsign" style="cursor:pointer;">Callsign</th>
+                    <th data-sort="freq"     style="cursor:pointer;">Freq kHz</th>
+                    <th data-sort="mode"     style="cursor:pointer;">Mode</th>
+                    <th data-sort="time"     style="cursor:pointer;">Time UTC</th>
+                    <th data-sort="age"      style="cursor:pointer;">Age</th>
+                    <th data-sort="spotter"  style="cursor:pointer;">Spotter</th>
+                    <th>Comment</th>
+                </tr>
+            </thead>
+            <tbody id="dxSpotsTbody"></tbody>
+        </table>
+        <div id="dxSpotsEmpty" class="text-muted small p-3" style="display:none;">
+            No spots on this band. Configure DX cluster in Settings (§6.6) if not already done,
+            or tick <strong>All bands</strong> above to see spots from elsewhere.
+        </div>
+    </div>
+</dialog>
+
+<!-- DX Watch alert toast container — populated by site.js when a watched spot arrives.
+     Position is user-draggable; saved in localStorage as dxAlertPos. Defaults to
+     bottom-right of the viewport on first run. -->
+<div id="dxAlertToastHost" aria-live="assertive" aria-atomic="true"
+     style="position:fixed; right:16px; bottom:16px; z-index:9999;
+            display:flex; flex-direction:column; gap:8px;"></div>
+
+<!-- TX timeout warning banner — shown when transmit has been on longer than the threshold -->
+<div id="txTimeoutBanner"
+     role="alert"
+     aria-live="assertive"
+     style="display:none; position:fixed; top:0; left:0; right:0; z-index:10000;
+            background:#a02020; color:#fff; padding:10px 16px;
+            font-family:sans-serif; font-weight:bold; font-size:1.05em;
+            box-shadow:0 2px 8px rgba(0,0,0,0.5);">
+    <span id="txTimeoutBannerText">TX has been on for too long</span>
+    <button type="button" id="txTimeoutDismissBtn"
+            style="float:right; background:#fff; color:#a02020; border:none;
+                   padding:2px 10px; border-radius:4px; font-weight:bold; cursor:pointer;"
+            aria-label="Dismiss TX timeout warning">Dismiss</button>
+    <button type="button" id="txTimeoutSetBtn"
+            style="float:right; background:#7a1818; color:#fff; border:1px solid #fff;
+                   padding:2px 10px; border-radius:4px; margin-right:8px; cursor:pointer;"
+            aria-label="Change TX timeout threshold">Change timeout…</button>
+</div>
+
 @section Scripts {
     <!-- Cache-busted JS reference, placed BEFORE your inline script if you use window.radioControl, etc. -->
     <script>window.bandPlan = '@Model.BandPlan';</script>
@@ -1297,17 +1553,32 @@
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
         import { FilterScopePanel }    from "/js/ui/filter-scope-panel.js?v=2";
         import "/js/ui/if-width-tables.js?v=1";
-        import { BAND_PLANS, getSegments } from "/js/ui/band-plan.js?v=1";
+        import { BAND_PLANS, getSegments, segmentForHz } from "/js/ui/band-plan.js?v=3";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
         import { initMemoriesPanel }   from "/js/ui/memories.js?v=10";
+        import { DxSpotsPanel }         from "/js/ui/dx-spots-panel.js?v=1";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
+        window.getBandSegmentForHz = segmentForHz;
         loadLabels();
         window.addEventListener('focus', loadLabels);
         document.addEventListener('DOMContentLoaded', function () {
             initFreqKeyboard();
             initMemoriesPanel();
+
+            // ── UTC clock in the top bar ──────────────────────────────────────
+            const utcClockEl = document.getElementById('utcClock');
+            if (utcClockEl) {
+                const pad2 = n => String(n).padStart(2, '0');
+                const tick = () => {
+                    const d = new Date();
+                    utcClockEl.textContent =
+                        `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}Z`;
+                };
+                tick();
+                setInterval(tick, 1000);
+            }
             window.meterPanel = new MeterPanel({
                 smeterA:     { type: 'smeter', canvasId: 'sMeterCanvasA' },
                 smeterB:     { type: 'smeter', canvasId: 'sMeterCanvasB' },
@@ -1330,6 +1601,11 @@
                 @Model.RadioState.FrequencyA   // server-rendered initial VFO A frequency
             );
 
+            // Provide the region-specific band plan so the panel can draw FT8/CW/SSB
+            // marker ticks at the standard activity frequencies.
+            const _ywcRegion = '@Model.BandPlan';
+            if (BAND_PLANS[_ywcRegion]) spectrumPanel.setBandPlan(BAND_PLANS[_ywcRegion]);
+
             const spectrumPipeline = new SdrSpectrumPipeline();
 
             spectrumPipeline.onSpectrumUpdate(data  => spectrumPanel.update(data));
@@ -1349,8 +1625,39 @@
                     badge.textContent = text;
                 }
             });
-            spectrumPipeline.onFrequencyA(hz => spectrumPanel.setVfoFrequency(hz));
+            // Stand up the DX Spots list panel BEFORE wiring the pipeline so its
+            // handlers can dispatch to it. It works whether or not the SDR is
+            // configured — relies only on the DxSpot/FrequencyA event stream.
+            window.dxSpotsPanel = new DxSpotsPanel();
+            window.dxSpotsPanel.init();
+            window.dxSpotsPanel.setVfoFrequency(@Model.RadioState.FrequencyA);
+
+            spectrumPipeline.onFrequencyA(hz => {
+                spectrumPanel.setVfoFrequency(hz);
+                window.dxSpotsPanel.setVfoFrequency(hz);
+            });
             spectrumPipeline.onError(detail => spectrumPanel.setError(detail));
+            // DX cluster spots — incoming SignalR pushes feed both the spectrum
+            // overlay (when visible) and the DX Spots list (always available).
+            // On page load, also fetch the current ring buffer so both views are
+            // populated immediately rather than waiting for the next push.
+            spectrumPipeline.onDxSpot(spot => {
+                spectrumPanel.addSpot(spot);
+                window.dxSpotsPanel.addSpot(spot);
+            });
+            spectrumPipeline.onDxClusterStatus(s => spectrumPanel.setDxStatus(s?.status, s?.detail));
+            spectrumPipeline.onDxAlert(spot => { if (window.handleDxAlert) window.handleDxAlert(spot); });
+            fetch('/api/dxcluster/spots')
+                .then(r => r.ok ? r.json() : [])
+                .then(arr => {
+                    spectrumPanel.setSpots(arr);
+                    window.dxSpotsPanel.setSpots(arr);
+                })
+                .catch(() => { /* feature off or backend not ready — ignore */ });
+            fetch('/api/dxcluster/status')
+                .then(r => r.ok ? r.json() : null)
+                .then(s => { if (s) spectrumPanel.setDxStatus(s.status, s.detail); })
+                .catch(() => { /* ignore */ });
 
             spectrumPipeline.connect();
             window.spectrumPanel = spectrumPanel;
@@ -1564,6 +1871,52 @@
 
         updateLog4omStatus();
         setInterval(updateLog4omStatus, 5000);
+
+        // GridTracker launch and status functions
+        async function launchGridtracker() {
+            try {
+                const response = await fetch('/api/gridtracker/launch', { method: 'POST' });
+                const btn = document.getElementById('gridtrackerBtn');
+                if (response.ok) {
+                    const data = await response.json();
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-success');
+                    btn.title = 'GridTracker is running';
+                    if (data.alreadyRunning) {
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = 'GridTracker Already Running';
+                        setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+                    }
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to launch GridTracker');
+                }
+            } catch (e) {
+                alert('Error launching GridTracker: ' + e.message);
+            }
+        }
+
+        async function updateGridtrackerStatus() {
+            try {
+                const response = await fetch('/api/gridtracker/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    const btn = document.getElementById('gridtrackerBtn');
+                    if (!btn) return;
+                    btn.classList.remove('btn-secondary', 'btn-success', 'btn-warning', 'btn-danger');
+                    if (data.running) {
+                        btn.classList.add('btn-success');
+                        btn.title = 'GridTracker is running';
+                    } else {
+                        btn.classList.add('btn-danger');
+                        btn.title = 'GridTracker is not running';
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        updateGridtrackerStatus();
+        setInterval(updateGridtrackerStatus, 5000);
 
         async function setMicGain(value) {
             console.log('[setMicGain] Called with value:', value);
@@ -1800,7 +2153,7 @@
             }, { passive: true });
         }
 
-        ['voxDialog', 'cwDialog', 'fmDialog'].forEach(id => {
+        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'utcClockInfoDialog'].forEach(id => {
             const dlg = document.getElementById(id);
             if (!dlg) return;
             makeDraggable(dlg, dlg.querySelector('div'));
@@ -1813,6 +2166,676 @@
                 }
             } catch {}
         });
+
+        // --- DX Watch (watched-callsign alerts) ---
+        // Backed by ApplicationSettings.DxClusterWatchedCallsigns. The
+        // popup edits the persisted list via GET/PUT on /api/dxcluster/watched.
+        // When a watched spot arrives, DxClusterService fires a DxAlert
+        // SignalR event which we handle in site.js (toast + beep + spectrum
+        // highlight).
+        let _dxWatched = [];
+
+        async function dxWatchLoad() {
+            try {
+                const resp = await fetch('/api/dxcluster/watched');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                _dxWatched = Array.isArray(data.patterns) ? data.patterns : [];
+                dxWatchRender();
+            } catch { /* ignore */ }
+        }
+
+        async function dxWatchSave() {
+            try {
+                const resp = await fetch('/api/dxcluster/watched', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ patterns: _dxWatched })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                _dxWatched = Array.isArray(data.patterns) ? data.patterns : [];
+                dxWatchRender();
+            } catch { /* ignore */ }
+        }
+
+        function dxWatchRender() {
+            const list = document.getElementById('dxWatchList');
+            const empty = document.getElementById('dxWatchEmpty');
+            if (!list) return;
+            list.innerHTML = '';
+            if (_dxWatched.length === 0) {
+                if (empty) empty.style.display = '';
+                return;
+            }
+            if (empty) empty.style.display = 'none';
+            for (const pat of _dxWatched) {
+                const li = document.createElement('li');
+                li.className = 'd-flex align-items-center justify-content-between py-1';
+                li.style.borderBottom = '1px solid #333';
+                const span = document.createElement('span');
+                span.className = 'font-monospace';
+                span.textContent = pat;
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-sm btn-outline-danger';
+                btn.style.padding = '0 8px';
+                btn.setAttribute('aria-label', `Remove ${pat}`);
+                btn.title = `Remove ${pat}`;
+                btn.textContent = '✕';
+                btn.onclick = () => {
+                    _dxWatched = _dxWatched.filter(p => p !== pat);
+                    dxWatchSave();
+                };
+                li.appendChild(span);
+                li.appendChild(btn);
+                list.appendChild(li);
+            }
+        }
+
+        window.dxWatchAdd = function () {
+            const input = document.getElementById('dxWatchNewInput');
+            if (!input) return;
+            const val = (input.value || '').trim().toUpperCase();
+            if (!val) return;
+            if (_dxWatched.includes(val)) { input.value = ''; return; }
+            _dxWatched = [..._dxWatched, val];
+            input.value = '';
+            dxWatchSave();
+        };
+        window.refreshDxWatchList = dxWatchLoad;
+
+        // Enter key in the input adds the entry
+        document.getElementById('dxWatchNewInput')?.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); window.dxWatchAdd(); }
+        });
+
+        // Initial load on page open so the alert system has the list ready
+        // even if the user never opens the popup.
+        dxWatchLoad();
+
+        // --- DX Watch alert handler ---
+        // Fired by SignalR when DxClusterService detects a spot that matches
+        // the watched list. Plays a short beep, shows a toast that auto-fades,
+        // and the spectrum overlay already highlights the spot via spot.isWatched.
+        function _dxAlertBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                o.frequency.setValueAtTime(880, ctx.currentTime);
+                o.frequency.setValueAtTime(1320, ctx.currentTime + 0.15);
+                g.gain.setValueAtTime(0.0001, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+                o.connect(g).connect(ctx.destination);
+                o.start();
+                o.stop(ctx.currentTime + 0.45);
+            } catch { /* ignore — audio not allowed before user interaction */ }
+        }
+
+        // ─ Drag-to-position behaviour for the alert toast container ─
+        // The host has no visible chrome of its own, so each toast itself is
+        // the drag handle. Mouse-down on a toast starts a drag; if the
+        // pointer moves further than DRAG_THRESHOLD px before release, we
+        // commit the new position and skip the click-to-QSY action.
+        const DX_ALERT_POS_KEY = 'dxAlertPos';
+        const DX_ALERT_DRAG_THRESHOLD = 5;
+
+        function _dxAlertApplySavedPos() {
+            const host = document.getElementById('dxAlertToastHost');
+            if (!host) return;
+            try {
+                const saved = JSON.parse(localStorage.getItem(DX_ALERT_POS_KEY) || 'null');
+                if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
+                    host.style.left   = saved.left + 'px';
+                    host.style.top    = saved.top  + 'px';
+                    host.style.right  = 'auto';
+                    host.style.bottom = 'auto';
+                }
+            } catch { /* ignore — fall back to default bottom-right */ }
+        }
+        _dxAlertApplySavedPos();
+
+        function _dxAlertSavePos() {
+            const host = document.getElementById('dxAlertToastHost');
+            if (!host) return;
+            const rect = host.getBoundingClientRect();
+            try {
+                localStorage.setItem(DX_ALERT_POS_KEY,
+                    JSON.stringify({ left: Math.round(rect.left), top: Math.round(rect.top) }));
+            } catch {}
+        }
+
+        function _dxAlertAttachDrag(toastEl, spot) {
+            // Drag-vs-click discrimination on pointerdown/move/up. If the
+            // pointer moves more than DRAG_THRESHOLD px after pressing, the
+            // user is dragging — move the host and skip the QSY. Otherwise
+            // treat as a tap and QSY.
+            let startX = 0, startY = 0;
+            let hostStartLeft = 0, hostStartTop = 0;
+            let dragging = false;
+            let pointerMoved = false;
+
+            toastEl.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                toastEl.setPointerCapture(e.pointerId);
+                const host = document.getElementById('dxAlertToastHost');
+                const rect = host.getBoundingClientRect();
+                hostStartLeft = rect.left;
+                hostStartTop  = rect.top;
+                startX = e.clientX;
+                startY = e.clientY;
+                dragging = false;
+                pointerMoved = false;
+            });
+
+            toastEl.addEventListener('pointermove', (e) => {
+                if (!toastEl.hasPointerCapture(e.pointerId)) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (!dragging && Math.hypot(dx, dy) > DX_ALERT_DRAG_THRESHOLD) {
+                    dragging = true;
+                }
+                if (dragging) {
+                    pointerMoved = true;
+                    const host = document.getElementById('dxAlertToastHost');
+                    host.style.left   = (hostStartLeft + dx) + 'px';
+                    host.style.top    = (hostStartTop  + dy) + 'px';
+                    host.style.right  = 'auto';
+                    host.style.bottom = 'auto';
+                }
+            });
+
+            toastEl.addEventListener('pointerup', (e) => {
+                toastEl.releasePointerCapture(e.pointerId);
+                if (pointerMoved) {
+                    _dxAlertSavePos();
+                } else {
+                    // Treat as click — QSY to the spotted frequency
+                    fetch('/api/cat/frequency/a', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ frequencyHz: spot.frequencyHz })
+                    }).catch(() => {});
+                    toastEl.remove();
+                }
+            });
+        }
+
+        function _dxAlertToast(spot) {
+            const host = document.getElementById('dxAlertToastHost');
+            if (!host) return;
+            const div = document.createElement('div');
+            div.style.cssText = 'background:#a03030; color:#fff; padding:10px 14px; ' +
+                'border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.4); ' +
+                'min-width:260px; pointer-events:auto; cursor:move; user-select:none; ' +
+                'font-family:sans-serif; opacity:0; transition:opacity 200ms; ' +
+                'touch-action:none;';
+            div.setAttribute('role', 'alert');
+            div.title = 'Click to QSY VFO A. Drag to move the alert position (saved for next time).';
+            const freqMHz = (spot.frequencyHz / 1e6).toFixed(3);
+            div.innerHTML = `<div style="font-weight:bold;font-size:1.05em">DX ${spot.callsign}</div>` +
+                            `<div style="font-size:0.9em;margin-top:2px">${freqMHz} MHz — spotted by ${spot.spotter || '?'}</div>` +
+                            (spot.comment ? `<div style="font-size:0.85em;opacity:0.85;margin-top:2px">${spot.comment}</div>` : '');
+            _dxAlertAttachDrag(div, spot);
+            host.appendChild(div);
+            requestAnimationFrame(() => { div.style.opacity = '1'; });
+            setTimeout(() => {
+                div.style.opacity = '0';
+                setTimeout(() => div.remove(), 220);
+            }, 8000);
+        }
+
+        window.handleDxAlert = function (spot) {
+            if (!spot || !spot.callsign) return;
+            _dxAlertBeep();
+            _dxAlertToast(spot);
+            if (window.voiceAnnounce) window.voiceAnnounce.sayDxAlert(spot);
+        };
+
+        // ───────────────────────────────────────────────────────────────
+        // Voice announcements (Web Speech API)
+        //
+        // Spoken cues for partially sighted operators. Off by default; user
+        // turns on via the Voice popup. Settings (enable, voice name, rate,
+        // volume, category checkboxes) are persisted in localStorage.
+        //
+        // Initial-load suppression: we record the first value of each
+        // category and only start announcing on *subsequent* changes, so
+        // opening the page doesn't read out the whole current state.
+        // ───────────────────────────────────────────────────────────────
+        (function initVoice() {
+            const LS = 'voiceSettings';
+
+            // Defaults — all categories enabled so once the master switch
+            // goes on, the user immediately hears useful announcements.
+            const defaults = {
+                enabled: false,
+                voiceName: '',
+                rate: 1.0,
+                volume: 1.0,
+                band: true, mode: true, tx: true, freq: true, dxAlert: true, txTimeout: true,
+            };
+            let settings = { ...defaults };
+            try {
+                const saved = JSON.parse(localStorage.getItem(LS) || 'null');
+                if (saved) settings = { ...defaults, ...saved };
+            } catch {}
+
+            function persist() { try { localStorage.setItem(LS, JSON.stringify(settings)); } catch {} }
+
+            // Voice list populates asynchronously in some browsers.
+            let voices = [];
+            function loadVoices() {
+                voices = speechSynthesis.getVoices() || [];
+                rebuildVoicePicker();
+            }
+            if (typeof speechSynthesis !== 'undefined') {
+                loadVoices();
+                speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+            }
+
+            function rebuildVoicePicker() {
+                const sel = document.getElementById('voicePickerSelect');
+                if (!sel) return;
+                const prev = settings.voiceName;
+                sel.innerHTML = '';
+                if (voices.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.textContent = '(no voices available)';
+                    opt.value = '';
+                    sel.appendChild(opt);
+                    return;
+                }
+                for (const v of voices) {
+                    const opt = document.createElement('option');
+                    opt.value = v.name;
+                    opt.textContent = `${v.name}${v.lang ? ' — ' + v.lang : ''}${v.default ? ' (default)' : ''}`;
+                    sel.appendChild(opt);
+                }
+                if (prev && voices.some(v => v.name === prev)) sel.value = prev;
+            }
+
+            function pickVoice() {
+                if (!voices.length) return null;
+                if (settings.voiceName) {
+                    const v = voices.find(v => v.name === settings.voiceName);
+                    if (v) return v;
+                }
+                return voices.find(v => v.default) || voices[0];
+            }
+
+            // Local utterance queue. The Web Speech API's built-in queueing is
+            // unreliable: when two speak() calls land within a few ms (e.g. a
+            // band change that also restores the saved mode, which broadcasts
+            // BandA followed by ModeA), Chromium frequently drops the first
+            // utterance entirely. We chain manually via onend so every cue is
+            // guaranteed to play in order.
+            const _queue = [];
+            let _speaking = false;
+
+            function _flushQueue() {
+                if (_speaking) return;
+                if (_queue.length === 0) return;
+                const text = _queue.shift();
+                try {
+                    // Refresh the voice list — Chromium can update it after the
+                    // initial load and stale voice references silently fail.
+                    voices = speechSynthesis.getVoices() || voices;
+                    const u = new SpeechSynthesisUtterance(text);
+                    const v = pickVoice();
+                    if (v) u.voice = v;
+                    u.rate   = settings.rate;
+                    u.volume = settings.volume;
+                    _speaking = true;
+                    u.onend   = () => { _speaking = false; _flushQueue(); };
+                    u.onerror = () => { _speaking = false; _flushQueue(); };
+                    // Chromium pauses the synthesis engine after long idle and
+                    // future speak() calls become silent. resume() un-sticks it.
+                    if (speechSynthesis.paused) speechSynthesis.resume();
+                    speechSynthesis.speak(u);
+                } catch {
+                    _speaking = false;
+                }
+            }
+
+            // Keep the synthesis engine awake. Chromium has a long-standing
+            // bug where if no speech happens for ~15 s it silently pauses;
+            // calling resume() periodically prevents that.
+            if (typeof speechSynthesis !== 'undefined') {
+                setInterval(() => {
+                    if (speechSynthesis.paused && !speechSynthesis.speaking) {
+                        try { speechSynthesis.resume(); } catch {}
+                    }
+                }, 10000);
+            }
+
+            function speak(text) {
+                if (!settings.enabled || !text) return;
+                if (typeof speechSynthesis === 'undefined') return;
+                // Cap queue depth so a flood of events can't pile up minutes of audio
+                if (_queue.length >= 6) _queue.shift();
+                _queue.push(String(text));
+                _flushQueue();
+            }
+
+            // Hard-stop wipes the queue — used by the dialog's Stop button.
+            function hardStop() {
+                _queue.length = 0;
+                _speaking = false;
+                try { speechSynthesis.cancel(); } catch {}
+            }
+
+            // ─ Formatters ─
+            function fmtBand(b) {
+                if (!b) return '';
+                const m = String(b).match(/^(\d+)m$/i);
+                return m ? `${m[1]} metres` : String(b);
+            }
+            function fmtMode(m) {
+                if (!m) return '';
+                const map = {
+                    'LSB': 'lower sideband', 'USB': 'upper sideband',
+                    'CW-U': 'CW upper', 'CW-L': 'CW lower',
+                    'AM': 'A M', 'AM-N': 'A M narrow',
+                    'FM': 'F M', 'FM-N': 'F M narrow',
+                    'RTTY-L': 'RTTY lower', 'RTTY-U': 'RTTY upper',
+                    'DATA-L': 'data lower', 'DATA-U': 'data upper',
+                    'DATA-FM': 'data F M', 'DATA-FM-N': 'data F M narrow',
+                    'PSK': 'P S K',
+                };
+                return map[String(m).toUpperCase()] || String(m);
+            }
+            function fmtFreqMHz(hz) {
+                if (!hz || hz <= 0) return '';
+                return (hz / 1e6).toFixed(3) + ' megahertz';
+            }
+
+            // ─ Initial-load suppression ─
+            // First call for each category just records the value; we only
+            // speak on the SECOND and later changes. That way the page load
+            // doesn't read out every initial value.
+            const seen = {};
+            function announce(category, key, text) {
+                if (!settings.enabled) return;
+                if (!settings[category]) return;
+                if (!(key in seen)) { seen[key] = true; return; }
+                speak(text);
+            }
+
+            // ─ Public API for site.js to call ─
+            window.voiceAnnounce = {
+                sayBand(receiver, band) {
+                    // VFO B band changes only spoken if explicitly the active one;
+                    // for now only A is announced to avoid noise.
+                    if (receiver !== 'A') { seen[`band${receiver}`] = true; return; }
+                    announce('band', 'bandA', fmtBand(band));
+                },
+                sayMode(receiver, mode) {
+                    if (receiver !== 'A') { seen[`mode${receiver}`] = true; return; }
+                    announce('mode', 'modeA', fmtMode(mode));
+                },
+                sayTxState(isTx) {
+                    announce('tx', 'txState', isTx ? 'transmit' : 'receive');
+                },
+                sayFrequencyEntered(hz) {
+                    if (!settings.enabled || !settings.freq) return;
+                    speak(fmtFreqMHz(hz));
+                },
+                sayDxAlert(spot) {
+                    if (!settings.enabled || !settings.dxAlert) return;
+                    const callLetters = String(spot.callsign || '').split('').join(' ');
+                    speak(`D X alert. ${callLetters}. ${fmtFreqMHz(spot.frequencyHz)}`);
+                },
+                sayTxTimeout() {
+                    if (!settings.enabled || !settings.txTimeout) return;
+                    speak('Warning. Transmit timeout. Check microphone.');
+                },
+                test() {
+                    // Force a speak() even if announcements are disabled —
+                    // the test button needs to work to confirm voice setup.
+                    if (typeof speechSynthesis === 'undefined') {
+                        alert('Your browser does not support speech synthesis.');
+                        return;
+                    }
+                    hardStop(); // wipe any queued cues so the test wins immediately
+                    // Chromium quirk: calling cancel() then immediately speak()
+                    // in the same tick can leave the engine silently stuck.
+                    // A small setTimeout lets cancel() complete before we issue
+                    // the new utterance, which makes Test voice reliable.
+                    setTimeout(() => {
+                        // Refresh voices each time — list can change after
+                        // initial load and stale references silently fail.
+                        voices = speechSynthesis.getVoices() || voices;
+                        const u = new SpeechSynthesisUtterance('Voice announcements ready');
+                        const v = pickVoice();
+                        if (v) u.voice = v;
+                        u.rate   = settings.rate;
+                        u.volume = settings.volume;
+                        if (speechSynthesis.paused) speechSynthesis.resume();
+                        speechSynthesis.speak(u);
+                    }, 100);
+                },
+                stop() { hardStop(); },
+                _settings: settings, // exposed for the dialog
+            };
+
+            // ─ Bind dialog controls once the DOM is ready ─
+            document.addEventListener('DOMContentLoaded', () => {
+                const enabledChk    = document.getElementById('voiceEnabledChk');
+                const voicePicker   = document.getElementById('voicePickerSelect');
+                const rateSlider    = document.getElementById('voiceRateSlider');
+                const rateValue     = document.getElementById('voiceRateValue');
+                const volSlider     = document.getElementById('voiceVolumeSlider');
+                const volValue      = document.getElementById('voiceVolumeValue');
+                const bandChk       = document.getElementById('voiceBandChk');
+                const modeChk       = document.getElementById('voiceModeChk');
+                const txChk         = document.getElementById('voiceTxChk');
+                const freqChk       = document.getElementById('voiceFreqChk');
+                const dxAlertChk    = document.getElementById('voiceDxAlertChk');
+                const txTimeoutChk  = document.getElementById('voiceTxTimeoutChk');
+                const testBtn       = document.getElementById('voiceTestBtn');
+                const stopBtn       = document.getElementById('voiceStopBtn');
+
+                if (!enabledChk) return;
+
+                // Apply persisted settings to UI
+                enabledChk.checked   = settings.enabled;
+                bandChk.checked      = settings.band;
+                modeChk.checked      = settings.mode;
+                txChk.checked        = settings.tx;
+                freqChk.checked      = settings.freq;
+                dxAlertChk.checked   = settings.dxAlert;
+                txTimeoutChk.checked = settings.txTimeout;
+                rateSlider.value     = settings.rate;
+                rateValue.textContent = settings.rate.toFixed(1) + '×';
+                volSlider.value      = settings.volume;
+                volValue.textContent = Math.round(settings.volume * 100) + '%';
+                rebuildVoicePicker();
+
+                enabledChk.addEventListener('change', () => {
+                    settings.enabled = enabledChk.checked;
+                    persist();
+                    // Subtle visual indicator on the toolbar button
+                    const btn = document.getElementById('voiceBtn');
+                    if (btn) btn.classList.toggle('btn-warning', settings.enabled);
+                });
+                voicePicker.addEventListener('change', () => { settings.voiceName = voicePicker.value; persist(); });
+                rateSlider.addEventListener('input', () => {
+                    settings.rate = parseFloat(rateSlider.value);
+                    rateValue.textContent = settings.rate.toFixed(1) + '×';
+                    persist();
+                });
+                volSlider.addEventListener('input', () => {
+                    settings.volume = parseFloat(volSlider.value);
+                    volValue.textContent = Math.round(settings.volume * 100) + '%';
+                    persist();
+                });
+                bandChk.addEventListener('change',      () => { settings.band      = bandChk.checked;      persist(); });
+                modeChk.addEventListener('change',      () => { settings.mode      = modeChk.checked;      persist(); });
+                txChk.addEventListener('change',        () => { settings.tx        = txChk.checked;        persist(); });
+                freqChk.addEventListener('change',      () => { settings.freq      = freqChk.checked;      persist(); });
+                dxAlertChk.addEventListener('change',   () => { settings.dxAlert   = dxAlertChk.checked;   persist(); });
+                txTimeoutChk.addEventListener('change', () => { settings.txTimeout = txTimeoutChk.checked; persist(); });
+
+                testBtn.addEventListener('click', () => window.voiceAnnounce.test());
+                stopBtn.addEventListener('click', () => window.voiceAnnounce.stop());
+
+                // Apply toolbar button highlight on initial render
+                const btn = document.getElementById('voiceBtn');
+                if (btn && settings.enabled) btn.classList.add('btn-warning');
+            });
+        })();
+
+        // --- TX timeout warning ---
+        // Watches the SignalR-driven `isTransmitting` flag (via window.handleTxStateForTimeout
+        // which site.js calls every time IsTransmitting updates). After the configured
+        // threshold of continuous TX, shows the red banner across the top of the page
+        // and plays a repeating attention tone. Threshold is persisted to localStorage;
+        // default 120 s.
+        const TX_TIMEOUT_LS_KEY = 'tx_timeout_seconds';
+        const TX_TIMEOUT_DEFAULT = 120;
+        let _txTimeoutTimer = null;
+        let _txTimeoutBeepInterval = null;
+
+        function _getTxTimeoutSeconds() {
+            const v = parseInt(localStorage.getItem(TX_TIMEOUT_LS_KEY), 10);
+            return (isFinite(v) && v > 0) ? v : TX_TIMEOUT_DEFAULT;
+        }
+        function _setTxTimeoutSeconds(s) {
+            const v = Math.max(5, Math.min(3600, parseInt(s, 10) || TX_TIMEOUT_DEFAULT));
+            localStorage.setItem(TX_TIMEOUT_LS_KEY, String(v));
+            return v;
+        }
+
+        function _txTimeoutBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'square';
+                o.frequency.setValueAtTime(440, ctx.currentTime);
+                g.gain.setValueAtTime(0.0001, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+                o.connect(g).connect(ctx.destination);
+                o.start();
+                o.stop(ctx.currentTime + 0.3);
+            } catch { /* audio not allowed */ }
+        }
+
+        function _showTxTimeoutBanner() {
+            const banner = document.getElementById('txTimeoutBanner');
+            const text   = document.getElementById('txTimeoutBannerText');
+            if (!banner) return;
+            const secs = _getTxTimeoutSeconds();
+            if (text) text.textContent = `⚠ TX has been ON for more than ${secs} seconds — check your microphone, keyer or VOX!`;
+            banner.style.display = '';
+            _txTimeoutBeep();
+            // Repeat every 3 s until dismissed or TX stops
+            if (_txTimeoutBeepInterval) clearInterval(_txTimeoutBeepInterval);
+            _txTimeoutBeepInterval = setInterval(_txTimeoutBeep, 3000);
+            if (window.voiceAnnounce) window.voiceAnnounce.sayTxTimeout();
+        }
+
+        function _hideTxTimeoutBanner() {
+            const banner = document.getElementById('txTimeoutBanner');
+            if (banner) banner.style.display = 'none';
+            if (_txTimeoutBeepInterval) { clearInterval(_txTimeoutBeepInterval); _txTimeoutBeepInterval = null; }
+        }
+
+        // Called from site.js on every IsTransmitting SignalR update.
+        window.handleTxStateForTimeout = function (isTx) {
+            if (isTx) {
+                if (_txTimeoutTimer) clearTimeout(_txTimeoutTimer);
+                _txTimeoutTimer = setTimeout(_showTxTimeoutBanner, _getTxTimeoutSeconds() * 1000);
+            } else {
+                if (_txTimeoutTimer) { clearTimeout(_txTimeoutTimer); _txTimeoutTimer = null; }
+                _hideTxTimeoutBanner();
+            }
+        };
+
+        document.getElementById('txTimeoutDismissBtn')?.addEventListener('click', _hideTxTimeoutBanner);
+        document.getElementById('txTimeoutSetBtn')?.addEventListener('click', () => {
+            const current = _getTxTimeoutSeconds();
+            const input = prompt(
+                'TX timeout warning threshold (seconds).\n' +
+                'The banner appears after TX has been on for this long.\n' +
+                'Range: 5–3600 seconds. Default: 120.',
+                String(current));
+            if (input === null) return;
+            const newVal = _setTxTimeoutSeconds(input);
+            const banner = document.getElementById('txTimeoutBanner');
+            if (banner && banner.style.display !== 'none') {
+                const text = document.getElementById('txTimeoutBannerText');
+                if (text) text.textContent = `⚠ TX has been ON for more than ${newVal} seconds — check your microphone, keyer or VOX!`;
+            }
+        });
+
+        // --- Toolbar status line ---
+        // Compact single-line summary of band / mode / frequency / power for
+        // each VFO. Updated by site.js whenever the underlying values change
+        // via SignalR. Live state is held on _statusState to avoid having to
+        // pull it from many DOM elements.
+        const _statusState = {
+            bandA: '', modeA: '', freqHzA: 0,
+            bandB: '', modeB: '', freqHzB: 0,
+            power: 0, split: 0, txVfo: 0,
+        };
+
+        function _fmtFreq(hz) {
+            if (!hz || hz <= 0) return '—';
+            // Three groups of digits separated by dots, e.g. 14.150.000
+            const s = String(Math.round(hz)).padStart(9, '0');
+            return `${parseInt(s.slice(0,3),10)}.${s.slice(3,6)}.${s.slice(6,9)}`;
+        }
+
+        function _renderToolbarStatus() {
+            // Per-VFO status lines now live inside each VFO panel under the
+            // IF Width row, banner-coloured to match each receiver. Each line
+            // shows band / mode / frequency, with power and SPLIT/TX flags
+            // appended to whichever VFO is currently transmitting.
+            const a = document.getElementById('vfoAStatusLine');
+            const b = document.getElementById('vfoBStatusLine');
+            const txVfoIsB = _statusState.txVfo === 1;
+            const splitOn  = _statusState.split > 0;
+
+            if (a) {
+                let line = `${_statusState.bandA || '—'} / ${_statusState.modeA || '—'} / ${_fmtFreq(_statusState.freqHzA)}`;
+                if (_statusState.power > 0) line += ` / ${_statusState.power}W`;
+                if (splitOn) line += '   SPLIT';
+                if (splitOn || txVfoIsB === false) {
+                    // VFO A is the TX vfo (default, or split with A receive)
+                    if (splitOn) line += '   RX';
+                }
+                a.textContent = line;
+            }
+            if (b) {
+                let line = `${_statusState.bandB || '—'} / ${_statusState.modeB || '—'} / ${_fmtFreq(_statusState.freqHzB)}`;
+                if (splitOn) line += '   TX';
+                else if (txVfoIsB) line += '   TX';
+                b.textContent = line;
+            }
+        }
+
+        // Public setters that site.js calls from its SignalR handlers.
+        window.updateToolbarStatus = function (key, value) {
+            if (!(key in _statusState)) return;
+            _statusState[key] = value;
+            _renderToolbarStatus();
+        };
+
+        // Initial values from the server-rendered model so the line is
+        // populated before any SignalR updates arrive.
+        _statusState.freqHzA = @Model.State.vfoA.frequency;
+        _statusState.bandA   = '@(Model.State.vfoA.band ?? "")';
+        _statusState.modeA   = '@(Model.State.vfoA.mode ?? "")';
+        _statusState.freqHzB = @Model.State.vfoB.frequency;
+        _statusState.bandB   = '@(Model.State.vfoB.band ?? "")';
+        _statusState.modeB   = '@(Model.State.vfoB.mode ?? "")';
+        _statusState.power   = @Model.State.vfoA.power;
+        _renderToolbarStatus();
 
         // --- VOX ---
         async function toggleVox() {
@@ -1907,6 +2930,7 @@
         window.launchWsjtx  = launchWsjtx;
         window.launchJtalert = launchJtalert;
         window.launchLog4om  = launchLog4om;
+        window.launchGridtracker = launchGridtracker;
         window.setMicGain    = setMicGain;
         window.toggleProc    = toggleProc;
         window.setProcLevel  = setProcLevel;
