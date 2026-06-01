@@ -2570,7 +2570,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!band) return;
         const plan = window.bandPlan || 'UK';
         if (!window.bandPlanData || !window.getBandSegmentForHz) {
-            // Fallback if helper not loaded — use inline lookup against the plan
+            // Fallback if helper not loaded — use inline lookup against the plan.
+            // Mirror the band-plan.js segmentForHz logic exactly, including the
+            // "below-lowest → first segment" fallback, so 14.010 etc don't
+            // produce a blank dropdown when the helper isn't loaded.
             const segments = (window.bandPlanData && window.bandPlanData[plan] && window.bandPlanData[plan][band]) || null;
             if (!segments) return;
             const ordered = Object.entries(segments).sort((a, b) => a[1].freq - b[1].freq);
@@ -2580,6 +2583,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (hz >= seg.freq) match = key;
                 else break;
             }
+            if (!match && ordered.length > 0) match = ordered[0][0];
             if (select.value !== match) select.value = match;
             return;
         }
