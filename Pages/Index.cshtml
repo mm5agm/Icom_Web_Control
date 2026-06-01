@@ -374,6 +374,10 @@
                                 aria-label="DX watch — alerts for spotted callsigns"
                                 title="Open DX watch list — get alerts when watched callsigns are spotted"
                                 onclick="document.getElementById('dxWatchDialog').show(); window.refreshDxWatchList && window.refreshDxWatchList();">DX Watch</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="DX spots — list of cluster spots on current band"
+                                title="Open DX spots list — see callsigns spotted on the current band"
+                                onclick="window.dxSpotsPanel && window.dxSpotsPanel.toggle()">DX Spots</button>
                         <button id="voiceBtn"
                                 class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="Voice announcements settings"
@@ -1425,6 +1429,55 @@
     </div>
 </dialog>
 
+<!-- DX Spots list panel — filtered list of cluster spots on the current band.
+     Works regardless of whether an SDR is configured; data flows over the
+     same SignalR DxSpot stream the spectrum overlay uses. -->
+<style>
+    .dxs-call     { font-weight:600; }
+    .dxs-watched  { color:#ff5050; font-weight:bold; }
+    .dxs-num      { font-family:monospace; text-align:right; }
+    .dxs-mode     { font-family:monospace; }
+    .dxs-comment  { color:#bbb; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #dxSpotsTbody tr        { cursor:pointer; }
+    #dxSpotsTbody tr:hover td { background:#333; }
+    #dxSpotsDialog th[data-sort]:hover { background:#444; }
+</style>
+<dialog id="dxSpotsDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:720px; max-width:95vw;" aria-labelledby="dxSpotsTitle">
+    <div class="dxs-header d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+        <strong id="dxSpotsTitle">DX Spots</strong>
+        <div class="d-flex align-items-center gap-3">
+            <small id="dxSpotsCount" class="text-muted">0 shown / 0 total</small>
+            <div class="form-check form-switch mb-0" style="cursor:default;">
+                <input class="form-check-input" type="checkbox" id="dxSpotsAllBandsChk">
+                <label class="form-check-label small" for="dxSpotsAllBandsChk">All bands</label>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary"
+                    onclick="document.getElementById('dxSpotsDialog').close()"
+                    aria-label="Close DX spots panel">✕</button>
+        </div>
+    </div>
+    <div class="p-2" style="max-height:60vh; overflow-y:auto;">
+        <table class="table table-sm table-dark table-hover mb-0" style="font-size:0.85rem;">
+            <thead style="position:sticky; top:0; background:#222; z-index:1;">
+                <tr>
+                    <th data-sort="callsign" style="cursor:pointer;">Callsign</th>
+                    <th data-sort="freq"     style="cursor:pointer;">Freq kHz</th>
+                    <th data-sort="mode"     style="cursor:pointer;">Mode</th>
+                    <th data-sort="time"     style="cursor:pointer;">Time UTC</th>
+                    <th data-sort="age"      style="cursor:pointer;">Age</th>
+                    <th data-sort="spotter"  style="cursor:pointer;">Spotter</th>
+                    <th>Comment</th>
+                </tr>
+            </thead>
+            <tbody id="dxSpotsTbody"></tbody>
+        </table>
+        <div id="dxSpotsEmpty" class="text-muted small p-3" style="display:none;">
+            No spots on this band. Configure DX cluster in Settings (§6.6) if not already done,
+            or tick <strong>All bands</strong> above to see spots from elsewhere.
+        </div>
+    </div>
+</dialog>
+
 <!-- DX Watch alert toast container — populated by site.js when a watched spot arrives.
      Position is user-draggable; saved in localStorage as dxAlertPos. Defaults to
      bottom-right of the viewport on first run. -->
@@ -1465,6 +1518,7 @@
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
         import { initMemoriesPanel }   from "/js/ui/memories.js?v=10";
+        import { DxSpotsPanel }         from "/js/ui/dx-spots-panel.js?v=1";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         loadLabels();
@@ -1513,17 +1567,34 @@
                     badge.textContent = text;
                 }
             });
-            spectrumPipeline.onFrequencyA(hz => spectrumPanel.setVfoFrequency(hz));
+            // Stand up the DX Spots list panel BEFORE wiring the pipeline so its
+            // handlers can dispatch to it. It works whether or not the SDR is
+            // configured — relies only on the DxSpot/FrequencyA event stream.
+            window.dxSpotsPanel = new DxSpotsPanel();
+            window.dxSpotsPanel.init();
+            window.dxSpotsPanel.setVfoFrequency(@Model.RadioState.FrequencyA);
+
+            spectrumPipeline.onFrequencyA(hz => {
+                spectrumPanel.setVfoFrequency(hz);
+                window.dxSpotsPanel.setVfoFrequency(hz);
+            });
             spectrumPipeline.onError(detail => spectrumPanel.setError(detail));
-            // DX cluster spots — incoming SignalR pushes go to the spectrum
-            // overlay. On page load, also fetch the current ring buffer so the
-            // overlay isn't empty until a new spot arrives.
-            spectrumPipeline.onDxSpot(spot => spectrumPanel.addSpot(spot));
+            // DX cluster spots — incoming SignalR pushes feed both the spectrum
+            // overlay (when visible) and the DX Spots list (always available).
+            // On page load, also fetch the current ring buffer so both views are
+            // populated immediately rather than waiting for the next push.
+            spectrumPipeline.onDxSpot(spot => {
+                spectrumPanel.addSpot(spot);
+                window.dxSpotsPanel.addSpot(spot);
+            });
             spectrumPipeline.onDxClusterStatus(s => spectrumPanel.setDxStatus(s?.status, s?.detail));
             spectrumPipeline.onDxAlert(spot => { if (window.handleDxAlert) window.handleDxAlert(spot); });
             fetch('/api/dxcluster/spots')
                 .then(r => r.ok ? r.json() : [])
-                .then(arr => spectrumPanel.setSpots(arr))
+                .then(arr => {
+                    spectrumPanel.setSpots(arr);
+                    window.dxSpotsPanel.setSpots(arr);
+                })
                 .catch(() => { /* feature off or backend not ready — ignore */ });
             fetch('/api/dxcluster/status')
                 .then(r => r.ok ? r.json() : null)

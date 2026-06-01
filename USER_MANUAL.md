@@ -23,6 +23,7 @@
    - 5.14 [DX Watch Panel](#514-dx-watch-panel)
    - 5.15 [Memory Panel](#515-memory-panel)
    - 5.16 [Voice Announcements](#516-voice-announcements)
+   - 5.17 [DX Spots List](#517-dx-spots-list)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -611,6 +612,41 @@ The feature uses your browser's built-in text-to-speech engine (Web Speech API),
 **Persistence.** All settings (master enable, voice name, rate, volume, category checkboxes) are saved to localStorage per browser. Different devices remember their own preferences.
 
 **Position.** The panel is draggable like the other popups (VOX, CW, FM Repeater, DX Watch) and its on-screen position is remembered between sessions.
+
+---
+
+### 5.17 DX Spots List
+
+Click the **DX Spots** button on the toolbar to open a list of DX cluster spots filtered to the current band. This complements the spectrum overlay — and unlike the overlay, it works **whether or not you have an SDR connected**.
+
+| Column | What it shows |
+|---|---|
+| Callsign | The spotted station. Watched callsigns (from §5.14) appear in **bright red**. |
+| Freq kHz | Spot frequency in kHz |
+| Mode | Mode parsed from the comment (FT8, CW, SSB, RTTY, etc.) or inferred from the frequency segment if not in the comment |
+| Time UTC | Absolute time the spot was received, in `HH:MM` UTC |
+| Age | Relative age — "<1m", "3m", "12m" |
+| Spotter | The station that reported the spot |
+| Comment | Free-text comment from the spotter |
+
+**Click any row** to QSY VFO A to that spot's frequency.
+
+**Click any column header** to sort by that column; click again to reverse the sort direction. The current sort is shown by a ▲ or ▼ next to the column name.
+
+**All bands toggle** — by default the list filters to spots on your current band (so changing band changes what you see). Tick **All bands** in the title bar to see every spot in the buffer regardless of frequency — useful when chasing a rare DXpedition wherever it pops up.
+
+**Why this is useful alongside the spectrum overlay:**
+
+- The spectrum overlay drops callsign labels on crowded bands (§5.4). The list shows them all.
+- The list shows comments, spotter info and exact time — the overlay only has room for the callsign.
+- The list is fully accessible to screen readers; canvas-rendered text in the overlay is not.
+- On phones and tablets, tapping a list row is easier than tapping a tiny spectrum label.
+
+**Age-out** — spots older than the configured age (default 15 min, set in Settings → DX Cluster) are dropped automatically. The list re-renders every 30 seconds to remove stale rows even when no new spots arrive.
+
+**Persistence** — panel position, size, sort column, sort direction, and the All bands setting are saved per browser.
+
+**Empty state** — if you see "No spots on this band", either no spots are in the buffer yet (cluster just connected, give it a few seconds), or the DX cluster feature isn't configured at all (see §6.6).
 
 ---
 
