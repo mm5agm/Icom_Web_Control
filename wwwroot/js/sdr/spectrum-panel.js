@@ -296,11 +296,43 @@ export class SpectrumPanel {
 
         this._drawSpectrum(ctx, bins, W, specH);
         this._drawFrequencyAxis(ctx, bins, W, specH, centreHz, spanHz);
+        this._drawBandEdges(ctx, W, specH);
         this._drawBandMarkers(ctx, W, specH);
         this._drawSpots(ctx, W, specH);
         this._drawDxBadge(ctx, W);
         this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawCrosshair(ctx, W, specH, spanHz);
+    }
+
+    // ── Band-edge guard rails ────────────────────────────────────────────────
+    // Vertical red lines at the lower and upper edges of each amateur band
+    // visible in the current spectrum window. Makes it visually obvious if
+    // the operator tunes (deliberately or accidentally) outside the amateur
+    // allocation. Edges are the broadest amateur envelopes (worldwide), so a
+    // line at e.g. 7.300 MHz on 40m might be lenient in a Region 1 country
+    // where the band ends at 7.200 — but it's never wrong (no transmission
+    // is legal beyond these limits in any region).
+    _drawBandEdges(ctx, W, specH) {
+        if (this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+
+        ctx.save();
+        ctx.strokeStyle = '#ff4040';
+        ctx.lineWidth   = 1.5;
+        ctx.setLineDash([4, 3]);   // dashed so it's clearly a "guard" not a "marker"
+
+        for (const edge of SpectrumPanel.BAND_EDGES) {
+            for (const hz of [edge.lo, edge.hi]) {
+                if (hz < leftHz || hz > rightHz) continue;
+                const x = ((hz - leftHz) / this._lastSpanHz) * W;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, specH - 2);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
     }
 
     // ── Band-plan marker ticks ───────────────────────────────────────────────
@@ -775,3 +807,24 @@ export class SpectrumPanel {
         return               [255,                 Math.round(200 - (t - 0.8) * 5 * 200), 0];
     }
 }
+
+// Amateur band envelopes in Hz — the broadest worldwide limits, used to draw
+// red guard-rail lines at the edges of each band on the spectrum. These are
+// not per-region; a Region-1 operator may see a guard rail at 7.300 MHz where
+// the legal limit is actually 7.200, but the inverse is never true (no region
+// permits TX beyond these envelopes).
+SpectrumPanel.BAND_EDGES = [
+    { name: '160m', lo:   1800000, hi:   2000000 },
+    { name:  '80m', lo:   3500000, hi:   4000000 },
+    { name:  '60m', lo:   5250000, hi:   5450000 },
+    { name:  '40m', lo:   7000000, hi:   7300000 },
+    { name:  '30m', lo:  10100000, hi:  10150000 },
+    { name:  '20m', lo:  14000000, hi:  14350000 },
+    { name:  '17m', lo:  18068000, hi:  18168000 },
+    { name:  '15m', lo:  21000000, hi:  21450000 },
+    { name:  '12m', lo:  24890000, hi:  24990000 },
+    { name:  '10m', lo:  28000000, hi:  29700000 },
+    { name:   '6m', lo:  50000000, hi:  54000000 },
+    { name:   '4m', lo:  70000000, hi:  70500000 },
+    { name:   '2m', lo: 144000000, hi: 148000000 },
+];

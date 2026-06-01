@@ -284,6 +284,34 @@ export function getSegments(bandPlan, band) {
 }
 
 /**
+ * Which segment of the given band contains the given frequency.
+ * Each segment "owns" from its representative frequency up to (but not
+ * including) the next segment's frequency, in ascending order. Returns the
+ * segment key (e.g. "FT8", "SSB") or null if the band isn't in the plan
+ * or the frequency is below the band's first segment.
+ *
+ * Used to keep the per-VFO Segment dropdown showing the segment the
+ * operator is currently in, even when they tune via the spectrum or
+ * the radio's front-panel knob instead of picking from the dropdown.
+ */
+export function segmentForHz(bandPlan, band, hz) {
+    const segments = getSegments(bandPlan, band);
+    if (!segments) return null;
+    // Sort segment keys by frequency ascending so we can pick the last one
+    // whose freq <= hz. Object key order in modern JS is insertion order,
+    // which is already ascending in the band-plan data, but sort
+    // defensively in case the data is edited.
+    const ordered = Object.entries(segments).sort((a, b) => a[1].freq - b[1].freq);
+    let match = null;
+    for (const [key, seg] of ordered) {
+        if (typeof seg.freq !== 'number') continue;
+        if (hz >= seg.freq) match = key;
+        else break;
+    }
+    return match;
+}
+
+/**
  * Best-guess radio mode for a given frequency, based on the usual amateur
  * sub-band assignments. Used when the operator clicks a new frequency on the
  * spectrum so the mode follows them without a separate mode-button press.

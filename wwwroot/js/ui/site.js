@@ -837,6 +837,7 @@ connection.on("RadioStateUpdate", function (update) {
         try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
+        try { syncSegmentSelectToFrequency('A', update.value); } catch (e) { console.error('syncSegmentSelectToFrequency A error:', e); }
     }
     if (update.property === "FrequencyB") {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
@@ -844,6 +845,7 @@ connection.on("RadioStateUpdate", function (update) {
         try { updateFrequencyDisplay('B', update.value); } catch (e) { console.error('updateFrequencyDisplay B error:', e); }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
+        try { syncSegmentSelectToFrequency('B', update.value); } catch (e) { console.error('syncSegmentSelectToFrequency B error:', e); }
     }
 
     // --- BAND CHANGE ---
@@ -2548,6 +2550,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function segmentStorageKey(vfo, band) {
         return `bandSeg_${vfo}_${band}`;
+    }
+
+    // Set the Segment dropdown to reflect whichever segment of the band
+    // contains the current frequency. Called from the FrequencyA/B SignalR
+    // handlers so the dropdown stays in sync when the operator tunes via
+    // the radio's knob, the spectrum click, or the on-screen freq keyboard.
+    // No-op if the band's dropdown hasn't been populated yet (e.g. on
+    // initial connect before BandA arrives).
+    function syncSegmentSelectToFrequency(vfo, hz) {
+        const select = document.getElementById(`segmentSelect${vfo}`);
+        if (!select || select.disabled) return;
+        const band = state.lastBand && state.lastBand[vfo];
+        if (!band) return;
+        const plan = window.bandPlan || 'UK';
+        if (!window.bandPlanData || !window.getBandSegmentForHz) {
+            // Fallback if helper not loaded — use inline lookup against the plan
+            const segments = (window.bandPlanData && window.bandPlanData[plan] && window.bandPlanData[plan][band]) || null;
+            if (!segments) return;
+            const ordered = Object.entries(segments).sort((a, b) => a[1].freq - b[1].freq);
+            let match = '';
+            for (const [key, seg] of ordered) {
+                if (typeof seg.freq !== 'number') continue;
+                if (hz >= seg.freq) match = key;
+                else break;
+            }
+            if (select.value !== match) select.value = match;
+            return;
+        }
+        const key = window.getBandSegmentForHz(plan, band, hz) || '';
+        if (select.value !== key) select.value = key;
     }
 
     function populateSegmentSelect(vfo, band) {
