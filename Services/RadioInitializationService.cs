@@ -349,34 +349,12 @@ namespace Yaesu_Web_Control.Services
                 // 6. Enable auto information
                 await multiplexer.EnableAutoInformationAsync();
 
-                // 7. Configure USB audio for DATA modes if the user has opted in.
-                // Sends EX commands to override the radio's factory default (rear DATA connector).
-                if (settings.UseUsbAudioForDataModes)
-                {
-                    logger.LogInformation("[RadioInitializationService] Configuring USB audio for DATA modes (radio model: {Model})", settings.RadioModel);
-                    switch (settings.RadioModel)
-                    {
-                        case "FTdx101MP":
-                        case "FTdx101D":
-                            // DATA MOD SOURCE = REAR (1), then REAR SELECT = USB (1)
-                            await multiplexer.SendCommandAsync("EX0104151;", "Initialization", stoppingToken);
-                            await multiplexer.SendCommandAsync("EX0104161;", "Initialization", stoppingToken);
-                            break;
-                        case "FT-710":
-                            // DATA MOD SOURCE = REAR (1), then REAR SELECT = USB (1)
-                            await multiplexer.SendCommandAsync("EX0104131;", "Initialization", stoppingToken);
-                            await multiplexer.SendCommandAsync("EX0104141;", "Initialization", stoppingToken);
-                            break;
-                        case "FTdx10":
-                            // Single MOD SOURCE setting: 1 = USB direct
-                            await multiplexer.SendCommandAsync("EX0104141;", "Initialization", stoppingToken);
-                            break;
-                        case "FTDX3000":
-                            // Menu 075 DATA IN SELECT: 1 = USB
-                            await multiplexer.SendCommandAsync("EX0751;", "Initialization", stoppingToken);
-                            break;
-                    }
-                }
+                // 7. (Formerly) "Use USB audio for DATA modes" auto-config.
+                // Removed 2026-06-01 after RealTerm testing confirmed the EX command
+                // addresses we were sending were not REAR SELECT — they wrote a value
+                // to some other menu item that happens to exist at 010416 etc.
+                // The radio menu (071 REAR SELECT on FTdx101) must be set to USB
+                // manually. See USER_MANUAL §15 (FAQ) for the user-facing note.
 
                 logger.LogInformation("[RadioInitializationService] ✓ Radio connected, initialized, and Auto Information streaming enabled");
                 radioStateService.IsConnected = true;

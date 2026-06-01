@@ -51,12 +51,14 @@
 12. [Using the App on a Tablet or Phone](#12-using-the-app-on-a-tablet-or-phone)
 13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
 14. [Troubleshooting](#14-troubleshooting)
-15. [Accessibility and Screen Readers](#15-accessibility-and-screen-readers)
-    - 15.1 [Windows High Contrast Mode](#151-windows-high-contrast-mode)
-    - 15.2 [Screen Reader Support](#152-screen-reader-support)
-    - 15.3 [NVDA](#153-nvda)
-    - 15.4 [Windows Narrator](#154-windows-narrator)
-    - 15.5 [Customising Accessible Labels](#155-customising-screen-reader-labels)
+15. [Frequently Asked Questions](#15-frequently-asked-questions)
+    - 15.1 [WSJT-X has no TX audio in DATA modes](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode)
+16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
+    - 16.1 [Windows High Contrast Mode](#161-windows-high-contrast-mode)
+    - 16.2 [Screen Reader Support](#162-screen-reader-support)
+    - 16.3 [NVDA](#163-nvda)
+    - 16.4 [Windows Narrator](#164-windows-narrator)
+    - 16.5 [Customising Accessible Labels](#165-customising-screen-reader-labels)
 
 ---
 
@@ -104,7 +106,6 @@ The application was written for operators who want a large, clean, touchscreen-f
 - **Voice announcements** — optional spoken cues for band/mode/TX changes, DX alerts and TX timeout, using your browser's built-in text-to-speech (handy for partially sighted operators)
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
-- **USB audio for DATA modes** — one-click setting configures the radio to route FT8, WSJT-X and other digital modes through the USB connection, no rear DATA connector required
 - Four IARU band plans: Region 1 (Europe, Africa, Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), and Japan (JARL)
 - Full screen reader support — compatible with NVDA and Windows Narrator
 - Windows High Contrast mode support for all gauge displays
@@ -133,7 +134,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 4. Set **Serial Port** to the COM port your radio is connected to. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
 5. Set **Baud Rate** to match the radio's CAT baud rate. The factory default is **38400** on all supported radios. You can verify or change this on the radio under **Menu → CAT Rate**.
 6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
-7. If you run digital modes (FT8, FT4, RTTY, PSK) via USB audio and do *not* have the rear DATA/ACC connector wired up, tick **Use USB audio for DATA modes**. If you use an external soundcard interface on the rear connector, leave this off. See Section 6.1 for details.
+7. If you run digital modes (FT8, FT4, RTTY, PSK) via USB audio, see the FAQ (§15) for a one-time radio menu change needed on the radio itself — it's not configurable from YWC.
 8. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
 
 If you see a red cross, double-check the COM port number and baud rate, then try again.
@@ -696,11 +697,10 @@ Access Settings from the navigation bar or by clicking the settings icon. Change
 | Serial Port | COM port the radio's USB/serial cable is connected to (e.g., COM3) |
 | Baud Rate | Must match the radio's CAT Rate setting. Default: 38400 |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
-| Use USB audio for DATA modes | When enabled, the app sends a CAT command to the radio on every connect that routes DATA mode audio (FT8, FT4, RTTY, PSK etc.) through the **USB connection** rather than the rear DATA/ACC connector. Enable this if you run WSJT-X or similar software via USB and do not have the rear connector wired. Leave disabled if you use an external soundcard interface on the rear DATA connector. See the note below. |
 
 After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success.
 
-> **USB audio for DATA modes — how it works:** All supported radios have a built-in USB audio codec (appears in Windows Sound settings as **USB Audio CODEC** after installing the Silicon Labs driver). By default the radio's factory setting routes DATA mode TX/RX audio through the rear DATA/ACC/DIN connector, not the USB codec. Enabling this setting makes the app send the appropriate radio-menu command (`REAR SELECT = USB` or equivalent) each time it connects, so you never have to configure this in the radio's touch menu. This setting has no effect if you do not use digital modes.
+> **Running WSJT-X / FT8 via USB audio?** Your radio needs **REAR SELECT = USB** in its menu before it'll transmit digital audio from a PC. This is a one-time radio setup — see FAQ §15 for the menu numbers per radio.
 
 ---
 
@@ -1294,9 +1294,34 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 ---
 
-## 15. Accessibility and Screen Readers
+## 15. Frequently Asked Questions
 
-### 15.1 Windows High Contrast Mode
+### 15.1 WSJT-X transmits but the radio shows no TX audio (or zero power output) in DATA-U / DATA-L mode
+
+This is the most common digital-mode setup pitfall and it's not a YWC problem — it's a one-time radio menu setting that has to be done on the radio itself. Yaesu radios ship with the rear DATA/ACC jack as the default audio input for DATA modes, **not** the USB codec that WSJT-X is sending audio to. Until you switch the radio over, DATA-mode TX produces silence.
+
+**Fix on the radio menu:**
+
+| Radio | Menu item | Set to |
+|---|---|---|
+| FTdx101MP / FTdx101D | 070 **DATA MOD SOURCE** | **REAR** |
+| FTdx101MP / FTdx101D | 071 **REAR SELECT** | **USB** |
+| FTdx10 | 070 **MOD SOURCE / DATA** | **USB** |
+| FT-710 | 070 **DATA MOD SOURCE** | **REAR** |
+| FT-710 | 071 **REAR SELECT** | **USB** |
+| FTDX3000 | 075 **DATA IN SELECT** | **USB** |
+
+(Menu numbers may shift slightly across firmware revisions — if a number doesn't match, look for an item with a similar name nearby.)
+
+The radio remembers this across power cycles, so it's a once-only change. **Why not configure it from YWC?** An earlier version of YWC tried to send the CAT commands for these menu items automatically, but testing revealed the commands were writing to the wrong menu addresses and never actually worked — the radio appeared to be correctly configured only because operators had set it manually at first install. The auto-config feature was removed rather than ship something misleading.
+
+If you can't find these menu items, your operating manual's index under "DATA MOD SOURCE" or "REAR SELECT" is the authoritative reference for your firmware version.
+
+---
+
+## 16. Accessibility and Screen Readers
+
+### 16.1 Windows High Contrast Mode
 
 When a Windows High Contrast theme is active, the gauge displays automatically adjust:
 
@@ -1307,7 +1332,7 @@ To enable a High Contrast theme: **Windows Settings → Accessibility → Contra
 
 ---
 
-### 15.2 Screen Reader Support
+### 16.2 Screen Reader Support
 
 All interactive controls in the app have accessible labels that screen readers announce when you hover over or focus on them:
 
@@ -1321,7 +1346,7 @@ All interactive controls in the app have accessible labels that screen readers a
 
 ---
 
-### 15.3 NVDA
+### 16.3 NVDA
 
 NVDA (NonVisual Desktop Access) is a free, open-source screen reader for Windows.
 
@@ -1363,7 +1388,7 @@ When the app loads, NVDA does not automatically read through the page. Two desig
 
 ---
 
-### 15.4 Windows Narrator
+### 16.4 Windows Narrator
 
 Narrator is the screen reader built into Windows 11 — no download required.
 
@@ -1377,7 +1402,7 @@ Once running, Narrator reads aloud the element that has keyboard focus. To navig
 
 ---
 
-### 15.5 Customising Screen Reader Labels
+### 16.5 Customising Screen Reader Labels
 
 Every control in the app — band buttons, meters, VFO controls, the on-screen frequency keyboard, spectrum span buttons, and the navigation bar home link — has a text label that screen readers announce. You can change any of these labels through the built-in **Accessibility Labels** editor.
 

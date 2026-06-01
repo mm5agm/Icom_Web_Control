@@ -55,11 +55,6 @@
         public Dictionary<string, BandProfile> BandProfilesA { get; set; } = new();
         public Dictionary<string, BandProfile> BandProfilesB { get; set; } = new();
 
-        // When true, the app sends EX commands on connect to route DATA mode audio through USB
-        // rather than the rear DATA/ACC connector (the radio's factory default).
-        // Enable this if you use USB audio for digital modes (FT8, etc.) and have no rear connector wired.
-        public bool UseUsbAudioForDataModes { get; set; } = false;
-
         // DX cluster settings. No default host — the user picks their cluster
         // explicitly from Settings before enabling. Empty host = feature off.
         public bool DxClusterEnabled { get; set; } = false;

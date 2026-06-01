@@ -129,9 +129,6 @@ namespace Yaesu_Web_Control.Pages
                 if (Settings.CwMessages != null && Settings.CwMessages.Count == 5)
                     current.CwMessages = Settings.CwMessages;
 
-                // USB audio for DATA modes (was missing from the copy block — pre-existing bug)
-                current.UseUsbAudioForDataModes  = Settings.UseUsbAudioForDataModes;
-
                 // DX cluster settings — copy through. Normalise callsign to upper case.
                 current.DxClusterEnabled         = Settings.DxClusterEnabled;
                 current.DxClusterHost            = (Settings.DxClusterHost ?? "").Trim();
