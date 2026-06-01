@@ -275,9 +275,18 @@ namespace Yaesu_Web_Control.Services
 
                 if (TryParseSpot(line, out var spot))
                 {
-                    // Flag the spot if it matches the user's watched list,
-                    // then broadcast — frontend handles alerts and highlight.
-                    spot.IsWatched = MatchesWatchList(spot.Callsign, settings.DxClusterWatchedCallsigns);
+                    // Re-fetch the watch list on every spot rather than using
+                    // the `settings` captured at session start. SettingsService
+                    // re-reads from disk on each GetSettingsAsync() call, so
+                    // the captured local copy goes stale the moment the user
+                    // edits the DX Watch popup via the UI — the file is
+                    // updated but our captured reference still has the old
+                    // list, and we'd keep alerting on removed entries until
+                    // the cluster connection is recycled. (Bug reported by
+                    // the user 2026-06-01: only G4* in the watch list, but
+                    // EA* spots still triggered alerts.)
+                    var liveSettings = await _settingsService.GetSettingsAsync();
+                    spot.IsWatched = MatchesWatchList(spot.Callsign, liveSettings.DxClusterWatchedCallsigns);
                     AddSpot(spot);
                     await BroadcastSpot(spot);
                     if (spot.IsWatched)
