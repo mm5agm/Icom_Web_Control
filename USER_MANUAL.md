@@ -492,6 +492,8 @@ Click the **VOX** button to open the VOX pop-up panel.
 | Delay | VOX hang time (0–2500 ms). Time TX stays active after audio stops |
 | Anti-VOX | Anti-VOX level (0–100). Suppresses the receiver audio from triggering VOX |
 
+![VOX panel showing Gain, Delay and Anti-VOX sliders](pictures/Vox-Control.png)
+
 Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
 
 ---
@@ -510,6 +512,8 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 
 **CW memory messages** are configured on the **Settings** page (see Section 6.5). Each message can be up to 24 characters. Use `{CALL}` as a placeholder — it is sent literally (the radio does not expand it; configure your callsign in the message text directly for CW use).
 
+![CW Keyer panel with Speed, Break-in, Delay, Pitch and M1–M5 memory buttons](pictures/CW-Keyer.png)
+
 Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
 
 ---
@@ -526,6 +530,8 @@ Click the **FM Rep** button to open the FM Repeater pop-up panel. These settings
 | CTCSS Tone | Select the required CTCSS sub-tone from the standard set (67.0 Hz – 254.1 Hz) |
 | Apply button | Sends all FM repeater settings to the radio in one operation |
 
+![FM Repeater panel showing Shift, Offset, CTCSS Mode and CTCSS Tone controls](pictures/FM-Repeater.png)
+
 Close the panel by clicking the **×** button in its title bar. Drag the title bar to reposition the panel anywhere on screen. Its position is remembered between sessions.
 
 ---
@@ -535,6 +541,8 @@ Close the panel by clicking the **×** button in its title bar. Drag the title b
 Click the **DX Watch** button on the toolbar to open the watched-callsign panel. This is where you tell the app which callsigns or callsign prefixes you want to be alerted on when they show up in the DX cluster feed.
 
 Use it for chasing a particular DXpedition (`P29VR`), staying on top of a contest call (`G4ABC/P`), or watching a whole prefix run (`VK*` for any Australian station).
+
+![DX Watch panel — add and remove callsigns or prefixes to alert on](pictures/DX-Watch.png)
 
 **Adding a watched call:**
 
@@ -556,6 +564,8 @@ Click the red **×** to the right of any entry. The entry is removed immediately
 - A small red **alert toast** appears with the callsign, frequency, spotter and any comment from the spot. The toast fades after about 8 seconds. **Click the toast to QSY VFO A directly to that frequency.**
 - A short two-tone **beep** plays (only after you've interacted with the page — browsers block audio until the user has clicked something on the page first).
 - On the spectrum panel, the watched callsign is drawn in **bright red** instead of the usual yellow, so you can see it at a glance.
+
+![DX Alert toast — shown when a watched callsign appears in the cluster feed](pictures/DX-Alert-PopUp.png)
 
 **Moving the alert toast.** The toast appears in the bottom-right of the page by default, but you can **drag it anywhere on screen** by pressing and holding on it and moving the mouse. The new position is remembered between sessions, so the next alert appears in the same place. (Click without dragging still QSYs as normal — the app distinguishes the two by checking whether the pointer actually moved by more than a few pixels.)
 
@@ -633,7 +643,11 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 
 **Click any column header** to sort by that column; click again to reverse the sort direction. The current sort is shown by a ▲ or ▼ next to the column name.
 
+![DX Spots list filtered to the current band — the default view](pictures/DX-Spots-Single-Band.png)
+
 **All bands toggle** — by default the list filters to spots on your current band (so changing band changes what you see). Tick **All bands** in the title bar to see every spot in the buffer regardless of frequency — useful when chasing a rare DXpedition wherever it pops up.
+
+![DX Spots list with the All bands toggle on — shows spots from every band](pictures/DX-Spots-All-Bands.png)
 
 **Why this is useful alongside the spectrum overlay:**
 
