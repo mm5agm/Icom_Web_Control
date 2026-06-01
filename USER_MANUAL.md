@@ -1000,16 +1000,44 @@ Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and a
 
 ### 8.5 What about the radio's PRESET function?
 
-The FT-710 and FTdx10 have a hardware **PRESET** button on the radio's front panel that loads a factory-recommended configuration for a particular operating mode — e.g. PRESET FT8 sets MIC GAIN to 0, disables the speech processor, locks WIDTH and SHIFT to sensible values, sets AGC to SLOW, and so on. The radio has five preset slots (PRESET1–5) configurable from the EX menu. *(The FTdx101MP/D and FTDX3000 do not have this feature.)*
+PRESET is a Yaesu feature that loads a **factory-defined operating profile** for a given mode (FT8, SSB, CW, RTTY, DATA-USB, AM, FM). It varies enormously across the supported radios — both in scope and in how invasive it is.
+
+**FTdx101MP / FTdx101D — full locked PRESET**
+
+When PRESET is active, the radio applies a Yaesu-designed configuration *and locks you out of changing parts of it*. The screen shows e.g. "PRESET FT8" at the top.
+
+| Mode | What it forces |
+|---|---|
+| **FT8** | MIC GAIN = 0, PROC OFF, fixed WIDTH/SHIFT, AGC SLOW, NB/DNR OFF, ALC locked out, fixed RF GAIN |
+| **SSB** | MIC GAIN set to Yaesu's recommended value, PROC level fixed, EQ locked, WIDTH/SHIFT defaults |
+| **CW** | Narrow WIDTH, SHIFT centred, AGC FAST, NB/DNR OFF |
+
+While PRESET is on:
+- Some controls become inactive on the touch panel
+- Some items disappear from the MULTI menu entirely
+- Your normal saved settings are overridden, not lost — turning PRESET off restores them
+- The behaviour catches a lot of operators out, who think the radio is broken when actually PRESET is on
+
+To turn PRESET off on these radios: press **MODE**, scroll past the normal mode list, select **PRESET OFF** (or **DEFAULT**). MIC GAIN, WIDTH, SHIFT, PROC, EQ and the full MULTI menu return.
+
+**FTdx10 — simplified PRESET (mini-preset)**
+
+A much lighter version. PRESET on the FTdx10 does **not** lock the MULTI menu, does **not** hide controls, and overrides far fewer parameters. Mostly it sets MIC GAIN = 0, PROC OFF, and a fixed WIDTH. Think of it as a one-click "safe FT8 setup" rather than the FTdx101's full locked profile.
+
+**FT-710 and FTDX3000 — no PRESET function at all.**
+
+---
 
 **Yaesu Web Control does not duplicate the PRESET function in the app, and here's why:**
 
-- The per-VFO memories with **Advanced fields** (Section 8.1) do everything PRESET does and more. You can save a memory channel labelled "20m FT8" with the exact antenna, IF width, IF shift, NR, NB, AGC, and power settings you want, and recall it with one click from the floating Mem panel. PRESET only stores per-mode defaults — memories store per-frequency-and-mode-and-everything-else.
-- **Per-band memory** (Section 5.9) automatically remembers your IF Width, IF Shift, and Mode for each band, so switching from 40m CW back to 20m SSB restores your filter and mode without any explicit recall.
-- PRESET is a hardware front-panel button on the radio — one keystroke away. The app doesn't need to reinvent it.
-- PRESET is only present on two of the five supported radio models; implementing it in the app would be inconsistent across radios.
+- The per-VFO memories with **Advanced fields** (§8.1) do everything PRESET does and more — *without* locking the radio. You can save a memory channel labelled "20m FT8" with the exact antenna, IF width, IF shift, NR, NB, AGC and power settings you want, and recall it with one click from the floating Mem panel. PRESET only stores per-mode templates; memories store per-frequency-and-mode-and-everything-else.
+- **Per-band memory** (§5.9) automatically remembers your IF Width, IF Shift and Mode for each band, so switching from 40m CW back to 20m SSB restores your filter and mode without any explicit recall.
+- PRESET is a hardware function on the radio — one menu away on the radios that have it. The app doesn't need to reinvent it.
+- The behaviour varies so much across radios (full lock-out vs mini-preset vs absent) that anything app-level would be inconsistent and unpredictable.
 
-If you want a "one click for FT8" workflow in the app, the recommended approach is: tune to your favourite FT8 frequency on the radio, set all your preferred settings, click **Save to Mem** on the VFO panel, then optionally edit the label and notes from the Memories page. Next time, click that memory tile in the floating Mem panel and you're back exactly where you left off.
+If you want a "one click for FT8" workflow in the app, the recommended approach is: tune to your favourite FT8 frequency on the radio, set all your preferred settings, click **Save to Mem** on the VFO panel, then optionally edit the label and notes from the Memories page. Next time, click that memory tile in the floating Mem panel and you're back exactly where you left off — and without PRESET's lock-outs.
+
+**Tip if your radio "suddenly behaves wrong" (FTdx101MP/D):** check the top of the radio's display for the word PRESET. If you see it, that's almost certainly the cause — turn it off using the MODE menu as described above. This is one of the most common "broken radio" mysteries reported by FTdx101 owners.
 
 ---
 
