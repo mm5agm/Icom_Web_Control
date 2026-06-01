@@ -1442,7 +1442,7 @@
 <dialog id="utcClockInfoDialog"
         style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:380px; max-width:520px;"
         aria-labelledby="utcClockInfoTitle">
-    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
         <strong id="utcClockInfoTitle">UTC clock — where does the time come from?</strong>
         <button class="btn btn-sm btn-outline-secondary"
                 onclick="document.getElementById('utcClockInfoDialog').close()"
@@ -2152,7 +2152,7 @@
             }, { passive: true });
         }
 
-        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog'].forEach(id => {
+        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'utcClockInfoDialog'].forEach(id => {
             const dlg = document.getElementById(id);
             if (!dlg) return;
             makeDraggable(dlg, dlg.querySelector('div'));
