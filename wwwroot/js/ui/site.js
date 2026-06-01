@@ -2657,8 +2657,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // UI-driven and SignalR-driven band changes trigger the update.
     const _origUpdateBandButton = window.updateBandButton;
 
-    // Re-populate segments whenever band state changes
+    // Re-populate segments whenever band state changes. Skip if the band is
+    // unchanged — the BandA SignalR event fires on every frequency change,
+    // not only on real band transitions, so repopulating here would reset the
+    // dropdown to its localStorage value and stomp on the auto-sync we did
+    // from the matching FrequencyA event.
     function onBandChanged(vfo, band) {
+        if (state.lastBand[vfo] === band) return;
         state.lastBand[vfo] = band;
         populateSegmentSelect(vfo, band);
     }
