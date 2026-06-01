@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Yaesu_Web_Control.Services;
 
 namespace Yaesu_Web_Control.Controllers
@@ -28,19 +30,22 @@ namespace Yaesu_Web_Control.Controllers
         private readonly ISettingsService _settingsService;
         private readonly RadioStateService _radioStateService;
         private readonly ILogger<MemoryController> _logger;
+        private readonly IWebHostEnvironment _env;
 
         public MemoryController(
             MemoryService memoryService,
             ICatClient catClient,
             ISettingsService settingsService,
             RadioStateService radioStateService,
-            ILogger<MemoryController> logger)
+            ILogger<MemoryController> logger,
+            IWebHostEnvironment env)
         {
             _memoryService = memoryService;
             _catClient = catClient;
             _settingsService = settingsService;
             _radioStateService = radioStateService;
             _logger = logger;
+            _env = env;
         }
 
         // ── CRUD ─────────────────────────────────────────────────────────────
@@ -388,6 +393,137 @@ namespace Yaesu_Web_Control.Controllers
                 await _catClient.SendCommandAsync(
                     $"MT{ch}{freq}{clarDir}{clarOff}{rxBit}{txBit}{modeCode}000000{0}{tag};", "MemExport", cancellationToken);
             }
+        }
+
+        // ── YWC starter bank (bundled with the app) ──────────────────────────
+        //
+        // The starter bank is a region-specific set of watering-hole memories
+        // (FT8/FT4/SSB/CW/RTTY/beacons) shipped in wwwroot/data/starter-bank-*.json.
+        // Three load modes are offered so the user can re-load after deleting
+        // entries by accident without losing any customisations they've made:
+        //
+        //   add-missing  Only add entries whose labels aren't already present.
+        //                Preserves edits AND restores deleted entries.
+        //   append       Add every entry, even if duplicate labels result.
+        //   replace      Wipe all existing memories and load the full bank.
+        //                Frontend warns the user before invoking this mode.
+
+        public class StarterBankFile
+        {
+            [JsonPropertyName("name")]        public string Name { get; set; } = "";
+            [JsonPropertyName("description")] public string Description { get; set; } = "";
+            [JsonPropertyName("entries")]     public List<AppMemory> Entries { get; set; } = new();
+        }
+
+        public class LoadStarterRequest
+        {
+            public string Mode { get; set; } = "add-missing"; // add-missing | append | replace
+        }
+
+        [HttpGet("starter-bank")]
+        public async Task<IActionResult> GetStarterBank()
+        {
+            try
+            {
+                var bank = await LoadStarterBankFromDiskAsync();
+                if (bank == null)
+                    return NotFound(new { error = "Starter bank file not found for the current region." });
+                return Ok(bank);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load starter bank file");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("starter-bank/load")]
+        public async Task<IActionResult> LoadStarterBank([FromBody] LoadStarterRequest? request)
+        {
+            var mode = (request?.Mode ?? "add-missing").Trim().ToLowerInvariant();
+            if (mode != "add-missing" && mode != "append" && mode != "replace")
+                return BadRequest(new { error = $"Invalid mode '{mode}'. Expected add-missing, append or replace." });
+
+            StarterBankFile? bank;
+            try
+            {
+                bank = await LoadStarterBankFromDiskAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read starter bank file");
+                return StatusCode(500, new { error = $"Failed to read starter bank: {ex.Message}" });
+            }
+            if (bank == null || bank.Entries.Count == 0)
+                return NotFound(new { error = "Starter bank file not found or empty for the current region." });
+
+            // Strip any IDs from the bank entries — IDs are assigned by MemoryService on insert.
+            foreach (var e in bank.Entries) { e.Id = 0; e.SortOrder = 0; }
+
+            int added;
+            if (mode == "replace")
+            {
+                await _memoryService.ReplaceAllAsync(new List<AppMemory>(bank.Entries));
+                added = bank.Entries.Count;
+            }
+            else if (mode == "append")
+            {
+                await _memoryService.MergeAsync(new List<AppMemory>(bank.Entries));
+                added = bank.Entries.Count;
+            }
+            else // add-missing
+            {
+                var existingLabels = new HashSet<string>(
+                    _memoryService.GetAll().Select(m => (m.Label ?? "").Trim()),
+                    StringComparer.OrdinalIgnoreCase);
+                var toAdd = bank.Entries
+                    .Where(e => !existingLabels.Contains((e.Label ?? "").Trim()))
+                    .ToList();
+                if (toAdd.Count > 0)
+                    await _memoryService.MergeAsync(toAdd);
+                added = toAdd.Count;
+            }
+
+            return Ok(new
+            {
+                mode,
+                added,
+                total = bank.Entries.Count,
+                bankName = bank.Name,
+                message = mode switch
+                {
+                    "replace"     => $"Replaced all memories with {added} starter-bank entries.",
+                    "append"      => $"Added {added} starter-bank entries (duplicates allowed).",
+                    _             => added == 0
+                        ? "No entries added — all starter-bank entries are already present (matched by label)."
+                        : $"Added {added} missing starter-bank entries. Existing entries left untouched."
+                }
+            });
+        }
+
+        private async Task<StarterBankFile?> LoadStarterBankFromDiskAsync()
+        {
+            var settings = await _settingsService.GetSettingsAsync();
+            // Normalise legacy region names. Pages/Index.cshtml.cs does similar mapping.
+            var region = settings.BandPlan switch
+            {
+                "UK"  => "Region1",
+                "USA" => "Region2",
+                var v => v
+            };
+            var filename = region switch
+            {
+                "Region1" => "starter-bank-region1.json",
+                "Region2" => "starter-bank-region2.json",
+                "Region3" => "starter-bank-region3.json",
+                "Japan"   => "starter-bank-japan.json",
+                _          => "starter-bank-region1.json"
+            };
+            var path = Path.Combine(_env.WebRootPath, "data", filename);
+            if (!System.IO.File.Exists(path)) return null;
+            var json = await System.IO.File.ReadAllTextAsync(path);
+            return JsonSerializer.Deserialize<StarterBankFile>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
     }
 }

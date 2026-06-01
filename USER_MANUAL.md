@@ -40,7 +40,8 @@
    - 8.2 [Importing from the Radio](#82-importing-from-the-radio)
    - 8.3 [Exporting to the Radio](#83-exporting-to-the-radio)
    - 8.4 [Memory Banks](#84-memory-banks)
-   - 8.5 [What about the radio's PRESET function?](#85-what-about-the-radios-preset-function)
+   - 8.5 [YWC Starter Bank](#85-ywc-starter-bank)
+   - 8.6 [What about the radio's PRESET function?](#86-what-about-the-radios-preset-function)
 9. [External Applications](#9-external-applications)
    - 9.1 [WSJT-X](#91-wsjt-x)
    - 9.2 [JTAlert](#92-jtalert)
@@ -998,7 +999,40 @@ Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and a
 
 ---
 
-### 8.5 What about the radio's PRESET function?
+### 8.5 YWC Starter Bank
+
+YWC ships with a built-in **starter bank** of common watering-hole memories — pre-populated, region-aware, and ready to load with one click. New users get a useful set of memories without having to type in every FT8 frequency by hand; experienced users can pick and choose which entries to keep.
+
+**What's in it (typical entry counts vary slightly per region):**
+
+- FT8 calling frequencies on every band from 160m to 6m (plus 4m in Region 1)
+- FT4 calling frequencies for all bands where FT4 is active
+- 60m channels — five fixed USA channels for Region 2, or the WRC-15 secondary allocation for Region 1
+- SSB DX windows and general SSB calling — region-specific (Region 1 uses 14.195 for DX, Region 2 uses 14.230, etc.)
+- CW DX windows on every band
+- RTTY centres
+- The NCDXF/IBP beacon sub-band on 10m
+- 10m FM (29.600) and 6m SSB
+
+Each entry has sensible defaults for AGC, NB, NR, and power — for example, FT8 entries set AGC to **Slow**, NB **off**, NR **off**, Power **25 W**. SSB entries use AGC **Mid** and 100 W; CW uses AGC **Fast**. Radio-specific fields (IF Width, IF Shift, Roofing filter, Antenna selection) are deliberately left blank so your existing per-band memory and your own preferences take effect.
+
+**Loading the starter bank** — go to the **Memories** page. At the top of the page you'll see a **YWC Starter Bank** card with three buttons:
+
+| Button | What it does |
+|---|---|
+| **Add Missing** | Adds only entries whose labels you don't already have. Restores anything you've accidentally deleted, without touching your customisations or duplicating anything. **This is the recommended option for everyday use.** |
+| **Append All** | Adds every entry from the starter bank, even if duplicate labels result. Useful if you want a "fresh" copy of an entry alongside one you've edited. |
+| **Replace All** | Wipes every current memory and loads the full starter bank from scratch. A confirmation dialog appears first — your Memory Banks (saved sets, §8.4) are **not** affected, only the current working memories. |
+
+**Region awareness** — the starter bank loaded depends on the Band Plan in **Settings → §6.1**. Setting it to Region 1 loads `starter-bank-region1.json`, Region 2 loads the Americas bank with the five USA 60m channels, and so on. To switch regions, change the Band Plan in Settings, click **Save Settings**, then return to the Memories page and click **Replace All** (or **Add Missing** to merge the new region's entries into your current list).
+
+**Editing freely** — once a starter entry is in your memory list, it's just an ordinary memory. Edit the label, change the power, add notes, delete it — anything you can do with a Save-to-Mem memory you can do with a starter entry. The starter bank file itself is read-only and shipped with the app, so your edits never affect what other users see; you can always click **Add Missing** to restore the original entry if you change your mind.
+
+**Where the files live** — the starter banks are in `wwwroot/data/starter-bank-*.json` inside the install folder. They're plain JSON; if you want to look at the source data or contribute corrections, the format is one object per entry with frequency in Hz, mode, and the same advanced-field set the in-app memories use.
+
+---
+
+### 8.6 What about the radio's PRESET function?
 
 PRESET is a Yaesu feature that loads a **factory-defined operating profile** for a given mode (FT8, SSB, CW, RTTY, DATA-USB, AM, FM). It varies enormously across the supported radios — both in scope and in how invasive it is.
 

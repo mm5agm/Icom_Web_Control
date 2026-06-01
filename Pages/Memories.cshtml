@@ -33,6 +33,31 @@
 
     <div id="importExportStatus" class="alert d-none" role="status" aria-live="polite"></div>
 
+    <!-- YWC Starter Bank — shipped with the app, populated for the user's region -->
+    <div class="card mb-3 border-info">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold me-1" title="A bundled set of common watering-hole memories — FT8/FT4/SSB/CW/RTTY frequencies — pre-populated for your chosen IARU region.">YWC Starter Bank:</span>
+                <button type="button" class="btn btn-sm btn-outline-info" id="loadStarterMissingBtn"
+                        onclick="loadStarterBank('add-missing')"
+                        title="Add only entries you don't already have — restores accidentally-deleted starter entries without touching your customisations">
+                    <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Missing
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="loadStarterAppendBtn"
+                        onclick="loadStarterBank('append')"
+                        title="Add every starter-bank entry, even if duplicate labels result">
+                    <i class="bi bi-files" aria-hidden="true"></i> Append All
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="loadStarterReplaceBtn"
+                        onclick="loadStarterBankReplace()"
+                        title="Wipe all current memories and load the full starter bank — destructive">
+                    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Replace All
+                </button>
+                <span id="starterBankStatus" class="text-muted small ms-2"></span>
+            </div>
+        </div>
+    </div>
+
     <!-- Memory Banks -->
     <div class="card mb-3 border-secondary">
         <div class="card-body py-2 px-3">
@@ -483,6 +508,43 @@
 
     const _allBtns = () => ['importReplaceBtn','importMergeBtn','exportBtn']
         .map(id => document.getElementById(id));
+
+    async function loadStarterBank(mode) {
+        const statusEl = document.getElementById('starterBankStatus');
+        statusEl.textContent = 'Loading…';
+        statusEl.className = 'text-muted small ms-2';
+        try {
+            const resp = await fetch('/api/memory/starter-bank/load', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                statusEl.textContent = `Failed: ${data.error || resp.statusText}`;
+                statusEl.className = 'text-danger small ms-2';
+                return;
+            }
+            statusEl.textContent = data.message || `Done — ${data.added} entries added.`;
+            statusEl.className = 'text-success small ms-2';
+            // Reload the page so the newly-added rows appear in the editor table
+            setTimeout(() => location.reload(), 1500);
+        } catch (e) {
+            statusEl.textContent = `Failed: ${e.message}`;
+            statusEl.className = 'text-danger small ms-2';
+        }
+    }
+
+    async function loadStarterBankReplace() {
+        const ok = await pageConfirm(
+            'Replace all memories with the YWC starter bank?\n\n' +
+            'ALL current memories — including anything you have added or edited — will be wiped, and the full starter bank loaded in their place. ' +
+            'Memory Banks (saved sets) are not affected.\n\n' +
+            'Continue?'
+        );
+        if (!ok) return;
+        loadStarterBank('replace');
+    }
 
     async function importFromRadio(mode) {
         const msg = mode === 'replace'
