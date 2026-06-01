@@ -1016,15 +1016,17 @@ YWC ships with a built-in **starter bank** of common watering-hole memories — 
 
 Each entry has sensible defaults for AGC, NB, NR, and power — for example, FT8 entries set AGC to **Slow**, NB **off**, NR **off**, Power **25 W**. SSB entries use AGC **Mid** and 100 W; CW uses AGC **Fast**. Radio-specific fields (IF Width, IF Shift, Roofing filter, Antenna selection) are deliberately left blank so your existing per-band memory and your own preferences take effect.
 
-**Loading the starter bank** — go to the **Memories** page. At the top of the page you'll see a **YWC Starter Bank** card with three buttons:
+**Loading the starter bank.** The starter bank appears as a permanent entry at the top of the **Banks** dropdown — labelled **📥 YWC Starter Bank (built-in)** — both on the main page (next to the Save to Rig buttons, in the floating Mem panel) and on the full Memories editor page. Selecting it then triggers a small dialog asking how you want to load it:
 
-| Button | What it does |
+| Mode | What it does |
 |---|---|
-| **Add Missing** | Adds only entries whose labels you don't already have. Restores anything you've accidentally deleted, without touching your customisations or duplicating anything. **This is the recommended option for everyday use.** |
-| **Append All** | Adds every entry from the starter bank, even if duplicate labels result. Useful if you want a "fresh" copy of an entry alongside one you've edited. |
-| **Replace All** | Wipes every current memory and loads the full starter bank from scratch. A confirmation dialog appears first — your Memory Banks (saved sets, §8.4) are **not** affected, only the current working memories. |
+| **Add Missing** *(recommended)* | Adds only entries whose labels you don't already have. Restores anything you've accidentally deleted, without touching your customisations or duplicating anything. Type `m` and Enter when the dialog appears. |
+| **Append All** | Adds every entry from the starter bank, even if duplicate labels result. Useful if you want a "fresh" copy alongside one you've edited. Type `a` and Enter. |
+| **Replace All** | Wipes every current memory and loads the full starter bank. A confirmation dialog appears first — your saved Memory Banks (§8.4) are **not** affected, only the current working memories. Type `r` and Enter. |
 
-**Region awareness** — the starter bank loaded depends on the Band Plan in **Settings → §6.1**. Setting it to Region 1 loads `starter-bank-region1.json`, Region 2 loads the Americas bank with the five USA 60m channels, and so on. To switch regions, change the Band Plan in Settings, click **Save Settings**, then return to the Memories page and click **Replace All** (or **Add Missing** to merge the new region's entries into your current list).
+The built-in starter bank cannot be deleted — its **Delete** button on the Memories editor page is greyed out when the starter bank is selected.
+
+**Region awareness** — the starter bank entry shows the same name regardless of region, but the data loaded depends on the Band Plan in **Settings → §6.1**. Setting it to Region 1 loads `starter-bank-region1.json` (40 entries including 4 m), Region 2 loads the Americas bank with the five USA 60m channels, and so on. To switch regions, change the Band Plan in Settings, click **Save Settings**, then return to the Memories page or Mem panel, select the starter bank and choose **Replace All** (or **Add Missing** to merge the new region's entries into your current list).
 
 **Editing freely** — once a starter entry is in your memory list, it's just an ordinary memory. Edit the label, change the power, add notes, delete it — anything you can do with a Save-to-Mem memory you can do with a starter entry. The starter bank file itself is read-only and shipped with the app, so your edits never affect what other users see; you can always click **Add Missing** to restore the original entry if you change your mind.
 

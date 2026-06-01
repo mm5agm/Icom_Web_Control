@@ -33,31 +33,6 @@
 
     <div id="importExportStatus" class="alert d-none" role="status" aria-live="polite"></div>
 
-    <!-- YWC Starter Bank — shipped with the app, populated for the user's region -->
-    <div class="card mb-3 border-info">
-        <div class="card-body py-2 px-3">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="fw-bold me-1" title="A bundled set of common watering-hole memories — FT8/FT4/SSB/CW/RTTY frequencies — pre-populated for your chosen IARU region.">YWC Starter Bank:</span>
-                <button type="button" class="btn btn-sm btn-outline-info" id="loadStarterMissingBtn"
-                        onclick="loadStarterBank('add-missing')"
-                        title="Add only entries you don't already have — restores accidentally-deleted starter entries without touching your customisations">
-                    <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Missing
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="loadStarterAppendBtn"
-                        onclick="loadStarterBank('append')"
-                        title="Add every starter-bank entry, even if duplicate labels result">
-                    <i class="bi bi-files" aria-hidden="true"></i> Append All
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-danger" id="loadStarterReplaceBtn"
-                        onclick="loadStarterBankReplace()"
-                        title="Wipe all current memories and load the full starter bank — destructive">
-                    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Replace All
-                </button>
-                <span id="starterBankStatus" class="text-muted small ms-2"></span>
-            </div>
-        </div>
-    </div>
-
     <!-- Memory Banks -->
     <div class="card mb-3 border-secondary">
         <div class="card-body py-2 px-3">
@@ -409,13 +384,20 @@
         });
     }
 
+    // Sentinel value for the built-in YWC starter bank option in the Banks
+    // dropdown. Real user-saved bank names can't collide because the bank
+    // controller rejects names containing path-unsafe characters.
+    const STARTER_BANK_VALUE = '__ywc_starter__';
+
     function updateBankButtons() {
         const sel = document.getElementById('bankSelect');
         const has = sel && sel.value !== '';
+        const isStarter = sel && sel.value === STARTER_BANK_VALUE;
         const load = document.getElementById('loadBankBtn');
         const del  = document.getElementById('deleteBankBtn');
         if (load) load.disabled = !has;
-        if (del)  del.disabled  = !has;
+        // Built-in starter bank cannot be deleted
+        if (del)  del.disabled  = !has || isStarter;
     }
 
     async function loadBanks(selectName) {
@@ -425,7 +407,10 @@
             const resp = await fetch('/api/memorybank');
             const names = await resp.json();
             const current = selectName !== undefined ? selectName : sel.value;
+            // Always prepend the built-in starter bank option after the placeholder
+            const starterOption = `<option value="${STARTER_BANK_VALUE}"${current === STARTER_BANK_VALUE ? ' selected' : ''}>📥 YWC Starter Bank (built-in)</option>`;
             sel.innerHTML = '<option value="">-- Select bank --</option>' +
+                starterOption +
                 names.map(n => `<option value="${escHtml(n)}"${n === current ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
             updateBankButtons();
         } catch {}
@@ -435,6 +420,15 @@
         const sel = document.getElementById('bankSelect');
         const name = sel?.value;
         if (!name) return;
+
+        // Starter bank gets the three-mode picker instead of the standard
+        // replace-all confirmation, so users can recover deleted entries
+        // without losing their customisations.
+        if (name === STARTER_BANK_VALUE) {
+            await loadStarterBankWithModePicker();
+            return;
+        }
+
         if (!await pageConfirm(
             `Load bank "${name}"?\n\nThis will replace your current app memories. Any unsaved changes will be lost.\n\nContinue?`)) return;
 
@@ -450,6 +444,56 @@
         } catch {
             statusEl.textContent = '✗ Error';
         }
+    }
+
+    // Three-mode loader for the built-in YWC starter bank.
+    async function loadStarterBankWithModePicker() {
+        const choice = await starterBankModeDialog();
+        if (!choice) return;
+        if (choice === 'replace') {
+            const ok = await pageConfirm(
+                'Replace all memories with the YWC starter bank?\n\n' +
+                'ALL current memories — including any you\'ve added or edited — will be wiped, and the full starter bank loaded in their place. ' +
+                'Memory Banks (saved sets) are not affected.\n\nContinue?');
+            if (!ok) return;
+        }
+        const statusEl = document.getElementById('bankStatus');
+        statusEl.textContent = 'Loading…';
+        try {
+            const resp = await fetch('/api/memory/starter-bank/load', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ mode: choice })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                statusEl.textContent = `✗ ${data.error || 'Load failed'}`;
+                return;
+            }
+            statusEl.textContent = data.message || `✓ Done — ${data.added} added.`;
+            setTimeout(() => location.reload(), 1500);
+        } catch (e) {
+            statusEl.textContent = `✗ ${e.message}`;
+        }
+    }
+
+    // Small dialog with three mode buttons. Returns 'add-missing', 'append',
+    // 'replace' or null (cancel). Implementation uses native confirm/prompt
+    // chain so it works without any extra HTML.
+    async function starterBankModeDialog() {
+        const choice = await pagePrompt(
+            'YWC Starter Bank — how would you like to load it?\n\n' +
+            'Type a letter and press Enter:\n' +
+            '  m = Add Missing (recommended; restores deleted entries, keeps your edits)\n' +
+            '  a = Append All (adds everything, duplicates allowed)\n' +
+            '  r = Replace All (wipes current memories first — confirmation will follow)\n\n' +
+            'Or click Cancel to abort.', 'm');
+        if (choice === null) return null;
+        const c = choice.trim().toLowerCase();
+        if (c === 'm' || c === 'add-missing' || c === 'missing') return 'add-missing';
+        if (c === 'a' || c === 'append')                          return 'append';
+        if (c === 'r' || c === 'replace')                         return 'replace';
+        return null;
     }
 
     async function saveBankAs() {
@@ -508,43 +552,6 @@
 
     const _allBtns = () => ['importReplaceBtn','importMergeBtn','exportBtn']
         .map(id => document.getElementById(id));
-
-    async function loadStarterBank(mode) {
-        const statusEl = document.getElementById('starterBankStatus');
-        statusEl.textContent = 'Loading…';
-        statusEl.className = 'text-muted small ms-2';
-        try {
-            const resp = await fetch('/api/memory/starter-bank/load', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode })
-            });
-            const data = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-                statusEl.textContent = `Failed: ${data.error || resp.statusText}`;
-                statusEl.className = 'text-danger small ms-2';
-                return;
-            }
-            statusEl.textContent = data.message || `Done — ${data.added} entries added.`;
-            statusEl.className = 'text-success small ms-2';
-            // Reload the page so the newly-added rows appear in the editor table
-            setTimeout(() => location.reload(), 1500);
-        } catch (e) {
-            statusEl.textContent = `Failed: ${e.message}`;
-            statusEl.className = 'text-danger small ms-2';
-        }
-    }
-
-    async function loadStarterBankReplace() {
-        const ok = await pageConfirm(
-            'Replace all memories with the YWC starter bank?\n\n' +
-            'ALL current memories — including anything you have added or edited — will be wiped, and the full starter bank loaded in their place. ' +
-            'Memory Banks (saved sets) are not affected.\n\n' +
-            'Continue?'
-        );
-        if (!ok) return;
-        loadStarterBank('replace');
-    }
 
     async function importFromRadio(mode) {
         const msg = mode === 'replace'

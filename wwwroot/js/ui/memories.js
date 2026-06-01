@@ -175,6 +175,10 @@ async function _loadAndRender() {
     }
 }
 
+// Sentinel value used for the always-present built-in YWC starter bank entry.
+// Must match the Memories editor page constant of the same name.
+const STARTER_BANK_VALUE = '__ywc_starter__';
+
 async function _loadBanks() {
     const sel = document.getElementById('memBankSelect');
     if (!sel) return;
@@ -183,18 +187,35 @@ async function _loadBanks() {
         if (!resp.ok) return;
         _banks = await resp.json();
         sel.innerHTML = '<option value="">Banks…</option>';
+        // Always-available built-in starter bank entry. Sits at the top of
+        // the dropdown so users can find the YWC factory memories without
+        // visiting the Memories editor page.
+        const starterOpt = document.createElement('option');
+        starterOpt.value       = STARTER_BANK_VALUE;
+        starterOpt.textContent = '📥 YWC Starter Bank (built-in)';
+        sel.appendChild(starterOpt);
         for (const name of _banks) {
             const opt = document.createElement('option');
             opt.value = name;
             opt.textContent = name;
             sel.appendChild(opt);
         }
-        sel.style.display = _banks.length === 0 ? 'none' : '';
+        // Always visible now — the starter bank guarantees at least one
+        // selectable entry beyond the placeholder.
+        sel.style.display = '';
     } catch { /* ignore — banks are optional */ }
 }
 
 async function _switchBank(name) {
     if (!name) return;
+    // Built-in starter bank: ask the user how they want to load it.
+    if (name === STARTER_BANK_VALUE) {
+        await _loadStarterBankWithModePicker();
+        // Reset the dropdown so the same option can be picked again later.
+        const sel = document.getElementById('memBankSelect');
+        if (sel) sel.value = '';
+        return;
+    }
     try {
         const resp = await fetch(`/api/memorybank/${encodeURIComponent(name)}/load`, { method: 'POST' });
         if (resp.ok) {
@@ -204,6 +225,50 @@ async function _switchBank(name) {
         }
     } catch (e) {
         console.error('Bank switch failed:', e);
+    }
+}
+
+async function _loadStarterBankWithModePicker() {
+    const choice = window.prompt(
+        'YWC Starter Bank — how would you like to load it?\n\n' +
+        'Type a letter and press Enter:\n' +
+        '  m = Add Missing (recommended; restores deleted entries, keeps your edits)\n' +
+        '  a = Append All (adds everything, duplicates allowed)\n' +
+        '  r = Replace All (wipes current memories first — confirmation will follow)\n\n' +
+        'Or click Cancel to abort.', 'm');
+    if (choice === null) return;
+    const c = choice.trim().toLowerCase();
+    let mode = null;
+    if (c === 'm' || c === 'add-missing' || c === 'missing') mode = 'add-missing';
+    else if (c === 'a' || c === 'append')                     mode = 'append';
+    else if (c === 'r' || c === 'replace')                    mode = 'replace';
+    if (!mode) return;
+
+    if (mode === 'replace') {
+        const ok = window.confirm(
+            'Replace all memories with the YWC starter bank?\n\n' +
+            'ALL current memories — including any you have added or edited — will be wiped, ' +
+            'and the full starter bank loaded in their place. Memory Banks (saved sets) are not affected.\n\n' +
+            'Continue?');
+        if (!ok) return;
+    }
+    try {
+        const resp = await fetch('/api/memory/starter-bank/load', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ mode })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+            window.alert('Starter bank load failed: ' + (data.error || resp.statusText));
+            return;
+        }
+        await _loadAndRender();
+        // Brief confirmation — no permanent surface to show this on the main page,
+        // so a one-line alert is the simplest visible feedback.
+        window.alert(data.message || `Done — ${data.added} entries added.`);
+    } catch (e) {
+        window.alert('Starter bank load failed: ' + e.message);
     }
 }
 
