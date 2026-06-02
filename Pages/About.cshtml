@@ -61,8 +61,13 @@
     </p>
     <pre id="diagnosticsBlock" class="bg-light p-3 border rounded" style="font-size:0.9rem; white-space: pre-wrap;">YWC Version    @Model.Version (released @Model.ReleaseDate)
 Radio model    @Model.RadioModel
+Band plan      @Model.BandPlan
 Serial port    @Model.SerialPort at @Model.BaudRate baud
 Connection     @(Model.IsConnected ? "connected" : "not connected")
+SDR device     @Model.SdrDevice
+DX cluster     @Model.DxClusterHost
+Cluster login  @Model.DxClusterCallsign
+Browser        <span id="diagBrowser">(detecting…)</span>
 .NET runtime   @Model.DotNetVersion
 Operating sys  @Model.OsDescription</pre>
     <button type="button" class="btn btn-sm btn-primary" id="copyDiagBtn">Copy diagnostics</button>
@@ -91,6 +96,28 @@ Operating sys  @Model.OsDescription</pre>
 @section Scripts {
 <script>
     (function () {
+        // Browser detection — userAgentData (modern) falls back to UA string.
+        // The result is a short, paste-friendly string like "Edge 142" or
+        // "Chrome 142". For bug reports we mostly care about the engine,
+        // so this depth of detail is enough.
+        const browserSpan = document.getElementById('diagBrowser');
+        if (browserSpan) {
+            let label = '(unknown)';
+            try {
+                const ua = navigator.userAgentData;
+                if (ua && ua.brands) {
+                    const brand = ua.brands.find(b => !/Not.?A.?Brand|Chromium/i.test(b.brand)) || ua.brands[0];
+                    if (brand) label = `${brand.brand} ${brand.version}`;
+                    if (ua.mobile) label += ' (mobile)';
+                } else {
+                    const s = navigator.userAgent || '';
+                    const m = s.match(/(Edg|Firefox|Chrome|Safari)\/(\d+)/);
+                    if (m) label = `${m[1] === 'Edg' ? 'Edge' : m[1]} ${m[2]}`;
+                }
+            } catch { /* ignore */ }
+            browserSpan.textContent = label;
+        }
+
         const btn   = document.getElementById('copyDiagBtn');
         const block = document.getElementById('diagnosticsBlock');
         const status = document.getElementById('copyDiagStatus');

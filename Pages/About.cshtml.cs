@@ -15,22 +15,34 @@ namespace Yaesu_Web_Control.Pages
         }
 
         // Surfaced to the view for the Diagnostics block.
-        public string Version       { get; private set; } = AppVersion.Current;
-        public string ReleaseDate   { get; private set; } = AppVersion.ReleaseDate;
-        public string RadioModel    { get; private set; } = "—";
-        public string SerialPort    { get; private set; } = "—";
-        public int    BaudRate      { get; private set; }
-        public bool   IsConnected   { get; private set; }
-        public string DotNetVersion { get; private set; } = System.Environment.Version.ToString();
-        public string OsDescription { get; private set; } = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+        public string Version           { get; private set; } = AppVersion.Current;
+        public string ReleaseDate       { get; private set; } = AppVersion.ReleaseDate;
+        public string RadioModel        { get; private set; } = "—";
+        public string BandPlan          { get; private set; } = "—";
+        public string SerialPort        { get; private set; } = "—";
+        public int    BaudRate          { get; private set; }
+        public bool   IsConnected       { get; private set; }
+        public string SdrDevice         { get; private set; } = "(none configured)";
+        public string DxClusterHost     { get; private set; } = "(off)";
+        public string DxClusterCallsign { get; private set; } = "(blank)";
+        public string DotNetVersion     { get; private set; } = System.Environment.Version.ToString();
+        public string OsDescription     { get; private set; } = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
 
         public async Task OnGetAsync()
         {
             var s = await _settingsService.GetSettingsAsync();
             RadioModel  = s.RadioModel;
+            BandPlan    = s.BandPlan;
             SerialPort  = s.SerialPort;
             BaudRate    = s.BaudRate;
             IsConnected = _radioStateService.IsConnected;
+
+            if (!string.IsNullOrWhiteSpace(s.SdrDeviceKey))
+                SdrDevice = s.SdrDeviceKey;
+            if (s.DxClusterEnabled && !string.IsNullOrWhiteSpace(s.DxClusterHost))
+                DxClusterHost = $"{s.DxClusterHost}:{s.DxClusterPort}";
+            if (!string.IsNullOrWhiteSpace(s.DxClusterLoginCallsign))
+                DxClusterCallsign = s.DxClusterLoginCallsign;
         }
     }
 }
