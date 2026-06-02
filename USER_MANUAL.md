@@ -52,6 +52,8 @@
 12. [Using the App on a Tablet or Phone](#12-using-the-app-on-a-tablet-or-phone)
 13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
 14. [Troubleshooting](#14-troubleshooting)
+    - 14.1 [Reporting a bug](#141-reporting-a-bug)
+    - 14.2 [Common problems](#142-common-problems)
 15. [Frequently Asked Questions](#15-frequently-asked-questions)
     - 15.1 [WSJT-X has no TX audio in DATA modes](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
@@ -1305,7 +1307,32 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 ## 14. Troubleshooting
 
-> 💡 **When reporting a bug, open the About page first.** Click **About** in the top navigation bar, then click the **Copy diagnostics** button. That copies a small block (version, radio model, COM port, .NET version, OS) to your clipboard — paste it into the bug report on GitHub Issues and I'll know exactly what to reproduce.
+### 14.1 Reporting a bug
+
+The fastest way to get a bug fixed is a good report. YWC has two features to help:
+
+**About page → Copy diagnostics.** Click **About** in the top navigation bar. The page shows app information, useful resource links, and a **Diagnostics** block — a single small text block listing:
+
+- YWC version and release date
+- Radio model and selected band plan
+- Serial port and baud rate
+- Current radio connection state
+- SDR device (if configured)
+- DX cluster host and your cluster login callsign (if configured)
+- Browser and version
+- .NET runtime version and Windows version
+
+Click the **Copy diagnostics** button below the block and the whole lot goes onto your clipboard. Paste it straight into your bug report — it gives me everything I need to reproduce your setup, including a callsign so I know who I'm talking to.
+
+**GitHub issue templates.** When you click **New issue** on the GitHub Issues page, you'll be offered a template — pick **Bug report** and the new-issue editor pre-fills with a structured skeleton: *Describe the bug · Steps to reproduce · Expected behaviour · Actual behaviour · Diagnostics · Screenshots / logs · Anything else*. Fill in each section as best you can. The diagnostics block goes in the **Diagnostics** section.
+
+If you've got an F12 → Console error message, paste that into the **Screenshots / logs** section too — JavaScript errors are often the smoking gun for UI bugs that don't reproduce in the backend logs.
+
+A **Feature request** template is also available for ideas / improvements rather than bugs.
+
+> Please report on **GitHub** — not Groups.io. Groups.io threads scroll off and become impossible to find again. GitHub Issues stay open until fixed and closed when resolved, with the conversation preserved. See the [Issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues).
+
+### 14.2 Common problems
 
 **App shows "Initialising…" and never clears**
 
