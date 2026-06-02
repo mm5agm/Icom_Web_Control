@@ -1305,6 +1305,8 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 ## 14. Troubleshooting
 
+> 💡 **When reporting a bug, open the About page first.** Click **About** in the top navigation bar, then click the **Copy diagnostics** button. That copies a small block (version, radio model, COM port, .NET version, OS) to your clipboard — paste it into the bug report on GitHub Issues and I'll know exactly what to reproduce.
+
 **App shows "Initialising…" and never clears**
 
 - Check that the radio is powered on.

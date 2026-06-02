@@ -1,0 +1,110 @@
+@page
+@model Yaesu_Web_Control.Pages.AboutModel
+@{
+    ViewData["Title"] = "About Yaesu Web Control";
+}
+
+<div class="container my-4" style="max-width: 760px;">
+
+    <h1 class="mb-1">Yaesu Web Control</h1>
+    <p class="text-muted mb-3">
+        Version <strong>@Model.Version</strong>
+        &nbsp;·&nbsp; Released @Model.ReleaseDate
+    </p>
+    <p class="text-muted mb-4">
+        © 2026 Colin Campbell (MM5AGM) ·
+        <a href="https://github.com/mm5agm/Yaesu_Web_Control/blob/main/LICENSE" target="_blank" rel="noopener">Released under the project licence</a>
+    </p>
+
+    <h5>About this project</h5>
+    <p>
+        A web-based control panel for Yaesu HF transceivers. Written because I couldn't see the
+        FTdx101MP front-panel controls without a magnifying glass. Designed for partially sighted
+        operators (NVDA / Windows Narrator compatible) and for anyone who wants a clean,
+        tablet-friendly interface alongside their logger.
+    </p>
+    <p class="text-muted small mb-4">
+        <strong>Supported radios:</strong>
+        FTdx101MP · FTdx101D · FTdx10 · FT-710 · FTDX3000.
+        <strong>Windows only.</strong>
+    </p>
+
+    <hr/>
+
+    <h5>Resources</h5>
+    <ul class="list-unstyled">
+        <li>
+            📖 <a asp-page="/UserManual">User Manual</a> &mdash; comprehensive documentation, with screenshots
+        </li>
+        <li>
+            🐛 <a href="https://github.com/mm5agm/Yaesu_Web_Control/issues" target="_blank" rel="noopener">Report a bug</a>
+            &mdash; please use GitHub Issues, not Groups.io
+        </li>
+        <li>
+            💬 <a href="https://github.com/mm5agm/Yaesu_Web_Control/discussions" target="_blank" rel="noopener">Discussions</a>
+            &mdash; questions, ideas, feature requests
+        </li>
+        <li>
+            📦 <a href="https://github.com/mm5agm/Yaesu_Web_Control" target="_blank" rel="noopener">Source code on GitHub</a>
+        </li>
+        <li>
+            ☕ <a href="https://paypal.me/mm5agm" target="_blank" rel="noopener">Sponsor / Buy Me a Coffee</a>
+        </li>
+    </ul>
+
+    <hr/>
+
+    <h5>Diagnostics</h5>
+    <p class="text-muted small">
+        Click <strong>Copy diagnostics</strong> below and paste the result into any bug report &mdash;
+        it gives me everything I need to reproduce your setup.
+    </p>
+    <pre id="diagnosticsBlock" class="bg-light p-3 border rounded" style="font-size:0.9rem; white-space: pre-wrap;">YWC Version    @Model.Version (released @Model.ReleaseDate)
+Radio model    @Model.RadioModel
+Serial port    @Model.SerialPort at @Model.BaudRate baud
+Connection     @(Model.IsConnected ? "connected" : "not connected")
+.NET runtime   @Model.DotNetVersion
+Operating sys  @Model.OsDescription</pre>
+    <button type="button" class="btn btn-sm btn-primary" id="copyDiagBtn">Copy diagnostics</button>
+    <span id="copyDiagStatus" class="text-success small ms-2" aria-live="polite"></span>
+
+    <hr/>
+
+    <h5>Third-party components</h5>
+    <p class="text-muted small mb-1">
+        YWC stands on the shoulders of these open-source projects:
+    </p>
+    <ul class="text-muted small">
+        <li>ASP.NET Core and SignalR (Microsoft) &mdash; MIT &amp; Apache 2.0</li>
+        <li>Bootstrap 5 (Twitter, Inc.) &mdash; MIT</li>
+        <li>canvas-gauges (Mykhailo Stadnyk) &mdash; MIT</li>
+        <li>SoapySDR (Pothosware) &mdash; BSL-1.0</li>
+        <li>SDRplay API (SDRplay Ltd) &mdash; used under the SDRplay API licence</li>
+    </ul>
+
+    <p class="text-muted small mt-4">
+        73, Colin MM5AGM
+    </p>
+
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        const btn   = document.getElementById('copyDiagBtn');
+        const block = document.getElementById('diagnosticsBlock');
+        const status = document.getElementById('copyDiagStatus');
+        if (!btn || !block) return;
+        btn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(block.textContent);
+                status.textContent = '✓ Copied to clipboard';
+                setTimeout(() => { status.textContent = ''; }, 3000);
+            } catch (e) {
+                status.textContent = '✗ Copy failed — select and copy manually';
+                status.className = 'text-danger small ms-2';
+            }
+        });
+    })();
+</script>
+}
