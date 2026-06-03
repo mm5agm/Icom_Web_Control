@@ -156,17 +156,27 @@ None of these are required for basic operation. Get the radio connection working
 
 ## 4. Starting the Application
 
-Double-click the **Yaesu Web Control** shortcut on your desktop. A small window opens confirming the server has started. The window must remain open while you use the app.
+Double-click the **Yaesu Web Control** shortcut on your desktop. The app starts in the background and your default browser opens to `http://localhost:8080` automatically.
 
-Open your browser and go to:
+A small **YWC tray icon** appears in the Windows system tray (down by the clock, possibly under the **Show hidden icons ︿** arrow). The tray icon is your "the app is running" indicator and gives you a clean way to manage it without juggling Task Manager:
 
-```
-http://localhost:8080
-```
+- **Hover** over the icon — a tooltip confirms the version and `http://localhost:8080`.
+- **Double-click** the icon — opens YWC in your default browser (handy if you've closed all browser tabs and need to get back to the app).
+- **Right-click** the icon — opens a menu:
 
-The main control panel loads. If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio. This includes frequencies, mode, antenna, AGC, NB level, ATU state, VOX settings, FM repeater settings, CW keyer speed and break-in mode, IF width, IF shift, and more — no software defaults are applied.
+| Menu item | What it does |
+|---|---|
+| Open Yaesu Web Control | Opens YWC in your default browser. |
+| About — version vX.Y.Z | Shows version, release date, and licence. The browser About page (top nav bar) has full details and a Copy diagnostics button. |
+| Open user data folder | Opens `%APPDATA%\MM5AGM\Yaesu Web Control\` in File Explorer — handy for grabbing the backup zip after export, or inspecting/editing JSON files. |
+| Exit Yaesu Web Control | Confirms then shuts the app down cleanly. WSJT-X / Log4OM / JTAlert / GridTracker lose their CAT connection until you restart YWC. |
 
-**Closing the app:** When you close the browser tab or window, the app detects that no browser is connected and begins a 30-second countdown. If you reopen the page within those 30 seconds (for example after a page refresh or accidentally closing the tab) the countdown cancels and the app continues normally. If no browser reconnects within 30 seconds the application exits automatically and disappears from Task Manager. If you need to force-quit immediately, open Windows Task Manager (**Ctrl+Shift+Esc**, or **Ctrl+Alt+Del** then select Task Manager), find **Yaesu_Web_Control.exe** in the list, and click **End Task**.
+If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio. This includes frequencies, mode, antenna, AGC, NB level, ATU state, VOX settings, FM repeater settings, CW keyer speed and break-in mode, IF width, IF shift, and more — no software defaults are applied.
+
+**Closing the app:** Three ways:
+1. **Right-click the tray icon → Exit Yaesu Web Control.** Cleanest — confirms first, then shuts the server down properly.
+2. **Close the browser tab and walk away.** The app detects no browser is connected and begins a 30-second countdown; if no browser reconnects within 30 seconds it exits automatically.
+3. **Force-quit** via Task Manager (Ctrl+Shift+Esc → find `Yaesu_Web_Control.exe` → End Task). Use this only if something has hung.
 
 **Accessing the app from another device:** If you set **Network Interface** to `0.0.0.0 (all interfaces)` in Settings (the default), the app is also accessible from any device on your local network. The Settings page shows the full URL for each network interface — bookmark one of these on your tablet or phone.
 

@@ -143,7 +143,9 @@ builder.Services.AddRazorPages();
 builder.WebHost.UseUrls("http://0.0.0.0:8080");
 
 builder.Services.AddSingleton<BrowserLauncher>();
-// builder.Services.AddHostedService<SystemTrayService>();
+// System tray icon — gives operators a visible "YWC is running" indicator
+// and a clean Exit menu. Implemented as an STA-threaded hosted service.
+builder.Services.AddHostedService<SystemTrayService>();
 
 // Register WSJT-X UDP listener as a singleton so it can be injected into controllers
 builder.Services.AddSingleton<WsjtxUdpService>();
