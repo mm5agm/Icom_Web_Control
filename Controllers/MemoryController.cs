@@ -533,5 +533,105 @@ namespace Yaesu_Web_Control.Controllers
             return JsonSerializer.Deserialize<StarterBankFile>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
+
+        // ── ADIF memory import ─────────────────────────────────────────────
+        //
+        // Read an ADIF file and turn each unique (frequency, mode) pair into
+        // a YWC memory. Many operators already have their favourite
+        // frequencies in Log4OM or another logger — this saves them retyping.
+        //
+        // Strategy:
+        //  - Parse all QSO records
+        //  - Bucket by (frequency-in-Hz, ywc-mode-string) so duplicates from
+        //    multiple QSOs on the same frequency collapse into one memory
+        //  - Skip entries whose label already exists in the current memory
+        //    list (collision-safe; users can re-import without doubling up)
+        //  - Default label: "<freq-MHz> <mode>" (e.g. "14.074 DATA-U")
+        //
+        // No advanced fields are imported — the ADIF format doesn't carry
+        // them. AGC / NB / NR etc. stay null so memory recall leaves the
+        // radio's current values alone.
+
+        [HttpPost("import-adif")]
+        public async Task<IActionResult> ImportAdif(IFormFile? file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { error = "No file uploaded." });
+
+            string content;
+            try
+            {
+                using var sr = new StreamReader(file.OpenReadStream());
+                content = await sr.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = $"Could not read uploaded file: {ex.Message}" });
+            }
+
+            var records = AdifParser.Parse(content);
+            if (records.Count == 0)
+                return BadRequest(new { error = "No ADIF records found in the file." });
+
+            // Deduplicate by (Hz, ywc-mode) so the same frequency appearing in
+            // hundreds of QSOs only produces one new memory.
+            var seen = new HashSet<(long, string)>();
+            var newMemories = new List<AppMemory>();
+            int skippedNoFreq = 0;
+            foreach (var r in records)
+            {
+                var hz = AdifParser.FreqMHzToHz(r.Frequency);
+                if (!hz.HasValue) { skippedNoFreq++; continue; }
+                var mode = AdifParser.AdifModeToYwc(r.Mode);
+                if (!seen.Add((hz.Value, mode))) continue;
+                newMemories.Add(new AppMemory
+                {
+                    FrequencyHz = hz.Value,
+                    Mode        = mode,
+                    Label       = $"{(hz.Value / 1e6).ToString("F3", System.Globalization.CultureInfo.InvariantCulture)} {mode}"
+                });
+            }
+
+            // Skip any whose label collides with an existing memory — keeps
+            // repeat imports idempotent. Comparison is case-insensitive and
+            // ignores leading/trailing whitespace.
+            var existingLabels = new HashSet<string>(
+                _memoryService.GetAll().Select(m => (m.Label ?? "").Trim()),
+                StringComparer.OrdinalIgnoreCase);
+            var toAdd = newMemories.Where(m => !existingLabels.Contains(m.Label.Trim())).ToList();
+
+            if (toAdd.Count == 0)
+            {
+                return Ok(new
+                {
+                    parsed     = records.Count,
+                    unique     = newMemories.Count,
+                    added      = 0,
+                    skippedNoFreq,
+                    skippedDuplicateLabel = newMemories.Count,
+                    message = $"Read {records.Count} record(s); all {newMemories.Count} unique frequency/mode pairs already exist as memories."
+                });
+            }
+
+            try
+            {
+                await _memoryService.MergeAsync(toAdd);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to merge ADIF memories");
+                return StatusCode(500, new { error = $"Could not save imported memories: {ex.Message}" });
+            }
+
+            return Ok(new
+            {
+                parsed     = records.Count,
+                unique     = newMemories.Count,
+                added      = toAdd.Count,
+                skippedNoFreq,
+                skippedDuplicateLabel = newMemories.Count - toAdd.Count,
+                message = $"Imported {toAdd.Count} new memor{(toAdd.Count == 1 ? "y" : "ies")} from {records.Count} ADIF record(s)."
+            });
+        }
     }
 }

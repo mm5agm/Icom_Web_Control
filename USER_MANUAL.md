@@ -38,10 +38,11 @@
 8. [Radio Memories](#8-radio-memories)
    - 8.1 [Memories Editor](#81-memories-editor)
    - 8.2 [Importing from the Radio](#82-importing-from-the-radio)
-   - 8.3 [Exporting to the Radio](#83-exporting-to-the-radio)
-   - 8.4 [Memory Banks](#84-memory-banks)
-   - 8.5 [YWC Starter Bank](#85-ywc-starter-bank)
-   - 8.6 [What about the radio's PRESET function?](#86-what-about-the-radios-preset-function)
+   - 8.3 [Importing from ADIF](#83-importing-from-adif)
+   - 8.4 [Exporting to the Radio](#84-exporting-to-the-radio)
+   - 8.5 [Memory Banks](#85-memory-banks)
+   - 8.6 [YWC Starter Bank](#86-ywc-starter-bank)
+   - 8.7 [What about the radio's PRESET function?](#87-what-about-the-radios-preset-function)
 9. [External Applications](#9-external-applications)
    - 9.1 [WSJT-X](#91-wsjt-x)
    - 9.2 [JTAlert](#92-jtalert)
@@ -980,7 +981,33 @@ Import reads up to 99 channels and takes up to 30 seconds. A progress indicator 
 
 ---
 
-### 8.3 Exporting to the Radio
+### 8.3 Importing from ADIF
+
+If you already keep a list of favourite frequencies in Log4OM (or any other logger that exports ADIF), you can bring them into YWC as memories without retyping. On the Memories page there is an **ADIF import** card with a single **Import from ADIF…** button.
+
+**What gets imported.** YWC reads every QSO record in the file and creates one memory per **unique combination** of frequency and mode. So if you've logged a thousand QSOs on 14.074 MHz FT8, you get just one memory called "14.074 DATA-U" — not a thousand duplicates.
+
+**How modes are translated.** ADIF stores modes as a flat list (FT8, FT4, CW, SSB, RTTY, USB, LSB, AM, FM, etc.) but doesn't always specify upper/lower sideband for CW, RTTY or digital modes. YWC picks the convention most operators use:
+
+| ADIF mode | YWC mode |
+|---|---|
+| USB / LSB / AM / FM | same |
+| CW | CW-U |
+| RTTY | RTTY-L |
+| FT8 / FT4 / PSK / PSK31 / JT65 / JT9 / JS8 / MFSK / DATA / DIGITALVOICE | DATA-U |
+| anything else | USB |
+
+If a record has no frequency it's skipped silently — most loggers always include FREQ, but some legacy ADIF dumps don't.
+
+**Duplicates are skipped.** Each new memory gets a label like `14.074 DATA-U` (frequency in MHz to three decimal places, then the mode). Before saving, YWC checks the existing memory list — if a memory with the same label already exists, the import skips it. This means **re-importing the same ADIF file is safe**: nothing is duplicated.
+
+**Advanced fields are not imported.** ADIF doesn't carry IF Width, AGC, NB level, power, antenna selection, etc. Imported memories leave those fields empty, so recalling one of them tunes the radio and sets the mode but otherwise leaves the radio's current settings untouched. You can edit imported memories afterwards to add advanced fields if you want.
+
+**Typical use case:** export your last six months of QSOs from Log4OM as ADIF, import here, get a memory bank of every frequency you've actually used recently — great as a starting point for a new contest list or as a personal "watering holes I care about" set.
+
+---
+
+### 8.4 Exporting to the Radio
 
 | Button | What it does |
 |--------|-------------|
@@ -991,7 +1018,7 @@ Import reads up to 99 channels and takes up to 30 seconds. A progress indicator 
 
 ---
 
-### 8.4 Memory Banks
+### 8.5 Memory Banks
 
 Memory banks let you save the current memory list under a name and reload it later. This is useful if you use different sets of memories for different operating scenarios — for example a "Daily" bank for regular operating and a "Contest" bank with contest-specific frequencies.
 
@@ -1023,7 +1050,7 @@ Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and a
 
 ---
 
-### 8.5 YWC Starter Bank
+### 8.6 YWC Starter Bank
 
 YWC ships with a built-in **starter bank** of common watering-hole memories — pre-populated, region-aware, and ready to load with one click. New users get a useful set of memories without having to type in every FT8 frequency by hand; experienced users can pick and choose which entries to keep.
 
@@ -1054,7 +1081,7 @@ On the **Memories editor page** a confirmation dialog appears before the load (s
 
 ---
 
-### 8.6 What about the radio's PRESET function?
+### 8.7 What about the radio's PRESET function?
 
 PRESET is a Yaesu feature that loads a **factory-defined operating profile** for a given mode (FT8, SSB, CW, RTTY, DATA-USB, AM, FM). It varies enormously across the supported radios — both in scope and in how invasive it is.
 
