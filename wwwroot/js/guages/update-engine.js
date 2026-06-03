@@ -1,4 +1,4 @@
-// FTdx101 WebApp – Unified Gauge Update Engine
+// Yaesu Web Control – Unified Gauge Update Engine
 // No DOM queries, no layout logic, no WebSocket logic.
 // Only updates existing gauge instances with calibrated values.
 

@@ -1,4 +1,4 @@
-// FTdx101 WebApp – Gauge Factory
+// Yaesu Web Control – Gauge Factory
 // Creates gauge instances based on a type string.
 // No layout logic, no DOM queries, no calibration logic.
 

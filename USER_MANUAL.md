@@ -65,7 +65,7 @@
 
 ---
 
-![FTdx101 WebApp with the on-screen frequency keyboard open](pictures/DevelopScreen.png)
+![Yaesu Web Control main screen](pictures/DevelopScreen.png)
 
 ---
 
@@ -1582,7 +1582,7 @@ On the Accessibility Labels page, replace each label value with the French equiv
 | Spectrum Display | Span 500 kHz button | Largeur de bande 500 kHz |
 | Spectrum Display | Span 1 MHz button | Largeur de bande 1 MHz |
 | Spectrum Display | Span 2 MHz button | Largeur de bande 2 MHz |
-| Navigation | Application name / home link | Accueil FTdx101 WebApp |
+| Navigation | Application name / home link | Accueil Yaesu Web Control |
 
 ---
 
@@ -1642,7 +1642,7 @@ On the Accessibility Labels page, replace each label value with the French equiv
 | Spectrum Display | Span 500 kHz button | Spændvidde 500 kHz |
 | Spectrum Display | Span 1 MHz button | Spændvidde 1 MHz |
 | Spectrum Display | Span 2 MHz button | Spændvidde 2 MHz |
-| Navigation | Application name / home link | FTdx101 WebApp startside |
+| Navigation | Application name / home link | Yaesu Web Control startside |
 
 ---
 

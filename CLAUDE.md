@@ -54,8 +54,8 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "See README.md for full releas
 **Step 4 is required.** The build workflow triggers on `release: [created]`, not on tag push alone.
 Alternatively run `.\scripts\finish-release.ps1 -Version vX.Y.Z` which does all four steps.
 
-User settings persist to `%APPDATA%\MM5AGM\FTdx101 WebApp\appsettings.user.json`.  
-Radio state persists to `%APPDATA%\MM5AGM\FTdx101 WebApp\radio_state.json`.
+User settings persist to `%APPDATA%\MM5AGM\Yaesu Web Control\appsettings.user.json`.  
+Radio state persists to `%APPDATA%\MM5AGM\Yaesu Web Control\radio_state.json`.
 
 ---
 

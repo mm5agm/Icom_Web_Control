@@ -1,4 +1,4 @@
-// FTdx101 WebApp – Spectrum Panel
+// Yaesu Web Control – Spectrum Panel
 // UI module — DOM access is intentional and correct here.
 // Owns a single <canvas> element that is divided into two rendering zones:
 //   Top 45%  — spectrum trace (line graph of dBFS vs frequency)

@@ -1,4 +1,4 @@
-// FTdx101 WebApp – WebSocket Update Pipeline
+// Yaesu Web Control – WebSocket Update Pipeline
 // Pure routing only. No DOM, no UI, no gauge logic, no calibration.
 // Receives { property, value } messages and dispatches to registered handlers.
 
