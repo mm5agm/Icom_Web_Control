@@ -17,6 +17,10 @@ namespace Yaesu_Web_Control.Services
             LoadFromDisk();
         }
 
+        /// <summary>Re-read memories.json from disk. Used after an external
+        /// import (e.g. the unified backup/restore) has overwritten the file.</summary>
+        public void ReloadFromDisk() => LoadFromDisk();
+
         private void LoadFromDisk()
         {
             try

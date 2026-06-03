@@ -29,7 +29,7 @@ There are no automated tests. Verification is manual via the browser at `http://
 
 ## Release Process
 
-Before releasing: bump `Models/AppVersion.cs`, `installer.nsi`, add release notes to `README.md`, update `USER_MANUAL.md` if needed.
+Before releasing: bump `Models/AppVersion.cs`, `installer.nsi`, add release notes to `README.md`, update `USER_MANUAL.md` if needed, and bump the per-release download badge in `README.md` to the new version (search for the previous `vX.Y.Z` tag in the shields.io URL near the top of the file).
 
 ```powershell
 # 1. Commit everything on develop

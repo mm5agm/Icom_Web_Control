@@ -848,26 +848,38 @@ If the connection drops, the app reconnects automatically after 15 seconds. Disa
 
 ### 6.7 Backup &amp; Restore
 
-At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete YWC configuration. This is **everything that's been customised in your shack** — radio model, COM port, baud rate, band plan, SDR settings, DX cluster login and watch list, CW memory messages, external app paths, per-band Width/Shift/Mode memory, antenna selections, RF Gain, Squelch, and all your radio memory channels.
+At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete YWC user data as a **single zip file**. This rolls up everything you've customised across the app into one file:
 
-**Export Settings**
+| File in the zip | What it contains |
+|---|---|
+| `appsettings.user.json` | Radio model, COM port, baud rate, band plan, SDR settings, DX cluster login and watch list, CW memory messages, external app paths, per-band Width/Shift/Mode memory, RF Gain, Squelch, antenna selections |
+| `memories.json` | Your radio memory channels (with all advanced fields) |
+| `memory-banks.json` | Saved memory banks (named sets) |
+| `calibration.user.json` | Meter calibration overrides (if you've adjusted any meter scales) |
+| `labels.user.json` | Accessible-label customisations (if you've translated or renamed any controls) |
 
-Click **Export Settings** to download a single file named `ywc-settings-YYYYMMDD-HHMMSS.json`. Keep it somewhere safe — OneDrive, a USB stick, or your shack laptop. Re-export occasionally as your setup evolves.
+Plus a small `README.txt` recording when the backup was taken and which YWC version produced it.
 
-**Import Settings…**
+**Live radio state** (current frequency, mode, etc.) is deliberately **not** backed up — that's transient state that resets to whatever the radio reports the next time you connect.
 
-Click **Import Settings…**, pick a previously exported file, and confirm the replacement. Your current settings are preserved as `appsettings.user.json.bak` in `%APPDATA%\MM5AGM\Yaesu Web Control\` so you can recover if the import causes problems.
+**Export full backup**
 
-**You must restart YWC after importing.** Most services (radio connection, DX cluster, SDR streaming, rigctld server) only read the settings file at startup, so changes only take full effect after a restart. The app displays a reminder when the import completes.
+Click **Export full backup** to download a single file named `ywc-backup-YYYYMMDD-HHMMSS.zip`. Keep it somewhere safe — OneDrive, a USB stick, or your shack laptop. Re-export occasionally as your setup evolves.
+
+**Import full backup…**
+
+Click **Import full backup…**, pick a previously exported zip, and confirm the replacement. Each replaced file is preserved as a `.bak` in `%APPDATA%\MM5AGM\Yaesu Web Control\` so you can recover if the import causes problems. If anything goes wrong mid-import, every file written so far is rolled back automatically.
+
+**You must restart YWC after importing.** Most services (radio connection, DX cluster, SDR streaming, rigctld server) only read their files at startup, so changes only take full effect after a restart. The app displays a reminder when the import completes.
 
 **Typical use cases:**
 
-- **New PC** — install YWC, copy your exported settings file across, import. You're up and running in under a minute with all bands, memories and DX watch list intact.
+- **New PC** — install YWC, copy your exported zip across, import. You're up and running in under a minute with all bands, memories and DX watch list intact.
 - **Before a Windows rebuild or major update** — export, then re-import after the rebuild.
 - **Sharing setup with a friend** — export and email them the file. They get a working starting point (though they'll want to change the callsign and possibly the COM port).
 - **Experimenting safely** — export before trying something risky; import the file to revert if it goes wrong.
 
-The settings JSON is human-readable; you can open it in a text editor to inspect or hand-edit if you ever need to. The file lives at `%APPDATA%\MM5AGM\Yaesu Web Control\appsettings.user.json` and is also accessible directly without going through the export.
+The files inside the zip are plain JSON; you can extract and inspect or hand-edit them if needed. They live at `%APPDATA%\MM5AGM\Yaesu Web Control\` and are also accessible directly without going through the export.
 
 ---
 
