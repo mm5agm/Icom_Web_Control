@@ -58,11 +58,12 @@
 15. [Frequently Asked Questions](#15-frequently-asked-questions)
     - 15.1 [WSJT-X has no TX audio in DATA modes](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
-    - 16.1 [Windows High Contrast Mode](#161-windows-high-contrast-mode)
-    - 16.2 [Screen Reader Support](#162-screen-reader-support)
-    - 16.3 [NVDA](#163-nvda)
-    - 16.4 [Windows Narrator](#164-windows-narrator)
-    - 16.5 [Customising Accessible Labels](#165-customising-screen-reader-labels)
+    - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
+    - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
+    - 16.3 [Screen Reader Support](#163-screen-reader-support)
+    - 16.4 [NVDA](#164-nvda)
+    - 16.5 [Windows Narrator](#165-windows-narrator)
+    - 16.6 [Customising Accessible Labels](#166-customising-screen-reader-labels)
 
 ---
 
@@ -1360,6 +1361,17 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 | **↵ Enter** (frequency keyboard open) | Send the entered frequency to the radio |
 | **Esc** (frequency keyboard open) | Close the keyboard without changing frequency |
 
+**Browser zoom — make everything bigger or smaller.** YWC is a web page, so it honours your browser's standard zoom keyboard shortcuts. This is the easiest way to make controls more readable on a high-resolution monitor or to fit more on a small tablet screen:
+
+| Key | Result |
+|---|---|
+| **Ctrl + +** (Ctrl and plus / equals) | Zoom in — make the whole page larger |
+| **Ctrl + −** (Ctrl and minus) | Zoom out — make the whole page smaller |
+| **Ctrl + 0** (Ctrl and zero) | Reset to 100% — back to the default size |
+| **Ctrl + mouse wheel** | Smooth zoom in or out (over the page anywhere except the spectrum, which uses the wheel for tuning) |
+
+The browser remembers your zoom level per site, so once you've set it, every YWC session opens at that size until you change it. Worth setting once if the default text is too small (or too large) for you — and especially worth knowing about for partially-sighted operators who don't otherwise know browsers can do this.
+
 ---
 
 ## 14. Troubleshooting
@@ -1481,7 +1493,13 @@ If you can't find these menu items, your operating manual's index under "DATA MO
 
 ## 16. Accessibility and Screen Readers
 
-### 16.1 Windows High Contrast Mode
+### 16.1 Making Everything Bigger
+
+The single quickest way to make YWC more readable: **press Ctrl and the plus key** to zoom the whole page in. Each press makes everything bigger. **Ctrl and minus** zooms back out; **Ctrl and 0** resets to 100%. Your browser remembers the zoom level per site, so once you've set it, every future YWC session opens at the same size. See §13 Keyboard Shortcuts for the full list.
+
+---
+
+### 16.2 Windows High Contrast Mode
 
 When a Windows High Contrast theme is active, the gauge displays automatically adjust:
 
@@ -1492,7 +1510,7 @@ To enable a High Contrast theme: **Windows Settings → Accessibility → Contra
 
 ---
 
-### 16.2 Screen Reader Support
+### 16.3 Screen Reader Support
 
 All interactive controls in the app have accessible labels that screen readers announce when you hover over or focus on them:
 
@@ -1506,7 +1524,7 @@ All interactive controls in the app have accessible labels that screen readers a
 
 ---
 
-### 16.3 NVDA
+### 16.4 NVDA
 
 NVDA (NonVisual Desktop Access) is a free, open-source screen reader for Windows.
 
@@ -1548,7 +1566,7 @@ When the app loads, NVDA does not automatically read through the page. Two desig
 
 ---
 
-### 16.4 Windows Narrator
+### 16.5 Windows Narrator
 
 Narrator is the screen reader built into Windows 11 — no download required.
 
@@ -1562,7 +1580,7 @@ Once running, Narrator reads aloud the element that has keyboard focus. To navig
 
 ---
 
-### 16.5 Customising Screen Reader Labels
+### 16.6 Customising Screen Reader Labels
 
 Every control in the app — band buttons, meters, VFO controls, the on-screen frequency keyboard, spectrum span buttons, and the navigation bar home link — has a text label that screen readers announce. You can change any of these labels through the built-in **Accessibility Labels** editor.
 
