@@ -1,4 +1,4 @@
-// FTdx101 WebApp – SDR Spectrum Pipeline
+// Yaesu Web Control – SDR Spectrum Pipeline
 // Transport and routing only. No DOM, no canvas, no calibration, no formatting.
 //
 // Creates its own SignalR connection to /radioHub and dispatches the three

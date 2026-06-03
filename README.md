@@ -2,7 +2,7 @@
 # Yaesu Web Control
 
 ![GitHub release](https://img.shields.io/github/v/release/mm5agm/Yaesu_Web_Control?label=Latest%20release&style=flat-square)
-![v2.0.0 downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/v2.0.0/Yaesu_Web_Control_Setup.exe?label=v2.0.0%20downloads&style=flat-square)
+![v2.1.0 downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/v2.1.0/Yaesu_Web_Control_Setup.exe?label=v2.1.0%20downloads&style=flat-square)
 ![Licence](https://img.shields.io/github/license/mm5agm/Yaesu_Web_Control?label=Licence&style=flat-square)
 
 > I would appreciate feedback and bug/layout reports. I have only tested on the FTdx101MP and the spectrum display with the SDRplay RSP1B.
@@ -94,6 +94,49 @@ The application includes a real-time spectrum display and waterfall, intended fo
 ---
 
 ## Release Notes
+
+## 2026-06-03 - v2.1.0
+
+A "tidy up the seams" release on the back of v2.0.0 — adds the About page, system tray icon, full backup/restore, ADIF import, and a long list of UX polish + bug fixes that came out of testing.
+
+### New features
+
+- **About page.** New **About** link in the top navigation bar. Shows version, build date, copyright, project description, supported radios, and links to the User Manual / GitHub Issues / Discussions / source / sponsor. Includes a **Diagnostics** block (radio model, COM port, baud, browser, OS, .NET runtime, band plan, SDR device, cluster login) with two buttons:
+  - **Copy diagnostics** — puts the whole block on your clipboard
+  - **Report a bug on GitHub** — opens a pre-filled bug-report form on GitHub in a new tab (template already chosen, diagnostics already inserted; you only need to type the description)
+- **System tray icon.** A small YWC icon now appears in the Windows system tray when the app is running. Right-click for menu: *Open Yaesu Web Control · About · Open user data folder · Exit*. Double-click to open the browser. Provides a visible "the app is alive" indicator and a clean way to shut it down — no more Task Manager dance.
+- **Unified backup / restore.** The Settings-page backup is now a **single zip** containing settings, memories, memory banks, calibration overrides and label customisations. Replaces the v2.0.0 settings-only version. Atomic — every replaced file is preserved as a `.bak`, and the whole import rolls back if any single file fails.
+- **ADIF memory import.** Memories page gains an **Import from ADIF…** button. Reads any standard ADIF file (e.g. a Log4OM export), creates a memory for each unique frequency/mode pair, skips duplicates by label so re-importing is safe.
+- **"Show only watched callsigns" toggle.** New checkbox in the DX Watch popup. When ticked, the spectrum overlay and DX Spots list hide every spot that doesn't match a watch-list entry — declutter on busy bands without losing the watched-callsign alerts.
+- **Spectrum click sets mode automatically.** Click anywhere on the spectrum and the radio not only QSYs but also flips mode to match the segment (DATA-U around 14.074, USB in the SSB sub-band, CW below the digital sub-band, etc.).
+- **Segment dropdown auto-syncs to your current frequency.** Tune via the radio knob / spectrum click / on-screen keyboard — the per-VFO Segment dropdown follows.
+- **Red band-edge guard rails on the spectrum.** Dashed red vertical lines at the upper and lower edges of every amateur band in the visible window. Visually obvious when you've tuned outside the allocation.
+
+### Improvements & polish
+
+- **GitHub Issues now have a template picker.** New `.github/ISSUE_TEMPLATE/` files give every new issue a structured skeleton (Describe / Steps / Expected / Actual / Diagnostics / Screenshots).
+- **README gains live download / latest-release badges** via shields.io.
+- **DX cluster watch list now updates live** — edit the list and the next incoming spot is matched against your new entries without restarting YWC.
+- **Mem button is now bold black** instead of pale blue — easier to read against the toolbar.
+- **In-app User Manual now renders USER_MANUAL.md directly** (single source of truth via Markdig). Edits to the markdown show up in the app on next page load, no separate Razor file to keep in sync. Heading anchors match GitHub's exactly, so TOC links work.
+- **UTC clock info popover** in the top bar — explains where the time comes from and how to verify Windows time-sync.
+- **About / Report a bug on GitHub** flow makes future bug reports two clicks (one if you're already signed in).
+- **Browser zoom shortcuts documented** (Ctrl + + / − / 0) — useful for partially sighted operators.
+- **GNU GPL v3.0** licence explicitly named on the About page (was just "the project licence" before).
+- **All remaining "FTdx101 WebApp" references in source / configs / scripts** renamed to "Yaesu Web Control" to match the rebranding from earlier.
+
+### Bug fixes
+
+- **Long-standing latent bug in the outer SignalR handler.** A `ReferenceError` was silently swallowing every FrequencyA event past line `state.lastBackendFreq.A = update.value;` (the `state` variable was defined inside an IIFE further down the file, not in the outer scope). The frequency display was kept up to date by an unrelated polling loop in the IIFE, which is why nobody noticed — but it blocked every later addition to the FrequencyA path, including this release's segment-dropdown auto-sync.
+- **FTdx10 SWR meter now uses the documented RM6 read directly**, not the FTdx101-specific MS13+RM0 workaround. (Reported by OE5HMR.)
+- **Settings backup endpoint** rewritten to atomic zip-based flow with per-file rollback on any error.
+
+### Reminder
+- YWC is **Windows-only**.
+- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)), not Groups.io — searchable, threaded, traceable. With v2.1.0, the About page's **Report a bug on GitHub** button makes this near-frictionless.
+- The **user manual** is comprehensive: read it from inside the app via the **User Manual** link in the top nav (full screenshots), or on GitHub at [USER_MANUAL.md](USER_MANUAL.md).
+
+---
 
 ## 2026-06-01 - v2.0.0
 

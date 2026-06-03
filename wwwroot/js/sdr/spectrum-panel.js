@@ -1,4 +1,4 @@
-// FTdx101 WebApp – Spectrum Panel
+// Yaesu Web Control – Spectrum Panel
 // UI module — DOM access is intentional and correct here.
 // Owns a single <canvas> element that is divided into two rendering zones:
 //   Top 45%  — spectrum trace (line graph of dBFS vs frequency)
@@ -93,6 +93,16 @@ export class SpectrumPanel {
      */
     setBandPlan(planForRegion) {
         this._bandPlan = planForRegion || null;
+        if (this._lastBins) this._render();
+    }
+
+    /**
+     * Force a re-render with the existing spectrum/state — used when an
+     * external setting (e.g. the "only watched" filter toggle in the DX Watch
+     * popup) changes and we want the overlay to update immediately rather
+     * than wait for the next FFT frame.
+     */
+    redraw() {
         if (this._lastBins) this._render();
     }
 
@@ -445,11 +455,16 @@ export class SpectrumPanel {
 
         const leftHz  = this._vfoHz - this._lastSpanHz / 2;
         const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        // When the user has ticked "Show only watched callsigns" in the DX
+        // Watch popup, hide every spot that isn't flagged isWatched. The flag
+        // is set by DxClusterService on the backend, so we just respect it.
+        const onlyWatched = !!window.dxOnlyWatched;
 
         // Build a list of (x, spot) for spots in range, sorted left-to-right.
         const drawList = [];
         for (const s of this._spots) {
             if (s.frequencyHz < leftHz || s.frequencyHz > rightHz) continue;
+            if (onlyWatched && !s.isWatched) continue;
             const x = ((s.frequencyHz - leftHz) / this._lastSpanHz) * W;
             drawList.push({ x, spot: s });
         }

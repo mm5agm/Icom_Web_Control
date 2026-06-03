@@ -38,10 +38,11 @@
 8. [Radio Memories](#8-radio-memories)
    - 8.1 [Memories Editor](#81-memories-editor)
    - 8.2 [Importing from the Radio](#82-importing-from-the-radio)
-   - 8.3 [Exporting to the Radio](#83-exporting-to-the-radio)
-   - 8.4 [Memory Banks](#84-memory-banks)
-   - 8.5 [YWC Starter Bank](#85-ywc-starter-bank)
-   - 8.6 [What about the radio's PRESET function?](#86-what-about-the-radios-preset-function)
+   - 8.3 [Importing from ADIF](#83-importing-from-adif)
+   - 8.4 [Exporting to the Radio](#84-exporting-to-the-radio)
+   - 8.5 [Memory Banks](#85-memory-banks)
+   - 8.6 [YWC Starter Bank](#86-ywc-starter-bank)
+   - 8.7 [What about the radio's PRESET function?](#87-what-about-the-radios-preset-function)
 9. [External Applications](#9-external-applications)
    - 9.1 [WSJT-X](#91-wsjt-x)
    - 9.2 [JTAlert](#92-jtalert)
@@ -52,18 +53,21 @@
 12. [Using the App on a Tablet or Phone](#12-using-the-app-on-a-tablet-or-phone)
 13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
 14. [Troubleshooting](#14-troubleshooting)
+    - 14.1 [Reporting a bug](#141-reporting-a-bug)
+    - 14.2 [Common problems](#142-common-problems)
 15. [Frequently Asked Questions](#15-frequently-asked-questions)
     - 15.1 [WSJT-X has no TX audio in DATA modes](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
-    - 16.1 [Windows High Contrast Mode](#161-windows-high-contrast-mode)
-    - 16.2 [Screen Reader Support](#162-screen-reader-support)
-    - 16.3 [NVDA](#163-nvda)
-    - 16.4 [Windows Narrator](#164-windows-narrator)
-    - 16.5 [Customising Accessible Labels](#165-customising-screen-reader-labels)
+    - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
+    - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
+    - 16.3 [Screen Reader Support](#163-screen-reader-support)
+    - 16.4 [NVDA](#164-nvda)
+    - 16.5 [Windows Narrator](#165-windows-narrator)
+    - 16.6 [Customising Accessible Labels](#166-customising-screen-reader-labels)
 
 ---
 
-![FTdx101 WebApp with the on-screen frequency keyboard open](pictures/DevelopScreen.png)
+![Yaesu Web Control main screen](pictures/DevelopScreen.png)
 
 ---
 
@@ -153,17 +157,29 @@ None of these are required for basic operation. Get the radio connection working
 
 ## 4. Starting the Application
 
-Double-click the **Yaesu Web Control** shortcut on your desktop. A small window opens confirming the server has started. The window must remain open while you use the app.
+Double-click the **Yaesu Web Control** shortcut on your desktop. The app starts in the background and your default browser opens to `http://localhost:8080` automatically.
 
-Open your browser and go to:
+A small **YWC tray icon** appears in the Windows system tray (down by the clock, possibly under the **Show hidden icons ︿** arrow). The tray icon is your "the app is running" indicator and gives you a clean way to manage it without juggling Task Manager:
 
-```
-http://localhost:8080
-```
+- **Hover** over the icon — a tooltip confirms the version and `http://localhost:8080`.
+- **Double-click** the icon — opens YWC in your default browser (handy if you've closed all browser tabs and need to get back to the app).
+- **Right-click** the icon — opens a menu:
 
-The main control panel loads. If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio. This includes frequencies, mode, antenna, AGC, NB level, ATU state, VOX settings, FM repeater settings, CW keyer speed and break-in mode, IF width, IF shift, and more — no software defaults are applied.
+| Menu item | What it does |
+|---|---|
+| Open Yaesu Web Control | Opens YWC in your default browser. |
+| About — version vX.Y.Z | Shows version, release date, and licence. The browser About page (top nav bar) has full details and a Copy diagnostics button. |
+| Open user data folder | Opens `%APPDATA%\MM5AGM\Yaesu Web Control\` in File Explorer — handy for grabbing the backup zip after export, or inspecting/editing JSON files. |
+| Exit Yaesu Web Control | Confirms then shuts the app down cleanly. WSJT-X / Log4OM / JTAlert / GridTracker lose their CAT connection until you restart YWC. |
 
-**Closing the app:** When you close the browser tab or window, the app detects that no browser is connected and begins a 30-second countdown. If you reopen the page within those 30 seconds (for example after a page refresh or accidentally closing the tab) the countdown cancels and the app continues normally. If no browser reconnects within 30 seconds the application exits automatically and disappears from Task Manager. If you need to force-quit immediately, open Windows Task Manager (**Ctrl+Shift+Esc**, or **Ctrl+Alt+Del** then select Task Manager), find **Yaesu_Web_Control.exe** in the list, and click **End Task**.
+![YWC tray icon with right-click menu open, showing Open / About / Open user data folder / Exit](pictures/SystemTrayIcon.png)
+
+If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio. This includes frequencies, mode, antenna, AGC, NB level, ATU state, VOX settings, FM repeater settings, CW keyer speed and break-in mode, IF width, IF shift, and more — no software defaults are applied.
+
+**Closing the app:** Three ways:
+1. **Right-click the tray icon → Exit Yaesu Web Control.** Cleanest — confirms first, then shuts the server down properly.
+2. **Close the browser tab and walk away.** The app detects no browser is connected and begins a 30-second countdown; if no browser reconnects within 30 seconds it exits automatically.
+3. **Force-quit** via Task Manager (Ctrl+Shift+Esc → find `Yaesu_Web_Control.exe` → End Task). Use this only if something has hung.
 
 **Accessing the app from another device:** If you set **Network Interface** to `0.0.0.0 (all interfaces)` in Settings (the default), the app is also accessible from any device on your local network. The Settings page shows the full URL for each network interface — bookmark one of these on your tablet or phone.
 
@@ -274,6 +290,8 @@ The spectrum display is only visible if an SDR device has been configured in Set
 The cluster feed itself is not band-filtered by YWC — spots arrive for every band the cluster carries. They are all kept client-side; only the ones inside the visible window get drawn. To reduce traffic at the source (for example, to receive only 20 m and 40 m spots), add a line like `set/filter band 20 or band 40` to **Settings → DX Cluster → Post-login commands**. That filter runs on the cluster server and cuts down on spots before they reach YWC.
 
 On crowded bands (the lower end of 20m on a contest weekend, for example) labels are stacked across up to five rows to avoid overlap. If even five rows can't fit everything in a tight cluster of nearby frequencies, **the app drops the spots that don't fit rather than letting labels overlap and become illegible**. The dropped spots are still in the underlying spot list — they just aren't drawn. Zooming the spectrum to a narrower span (e.g. 250k or 500k) spreads spots out and reveals the ones that were hidden.
+
+**Decluttering with the watch list** — if cluster traffic is making the spectrum unreadable, open the DX Watch popup (§5.14) and tick **Show only watched callsigns**. Every yellow (non-watched) spot disappears from the spectrum and the DX Spots list, leaving only the red watched-list matches. Toast / beep / voice alerts still fire as normal on watched spots; the toggle only changes what's drawn. Untick to bring all spots back. Setting is remembered per browser.
 
 **Band-plan markers** — small cyan tick marks at the bottom of the spectrum show the standard activity frequencies for the currently visible band: CW, FT8, RTTY, SSB DX window etc. The exact frequencies come from your selected IARU region (§6.1 Band Plan). The markers update automatically as you change band or zoom the spectrum; only segments whose frequency falls inside the visible window are drawn. Where two markers would overlap (e.g. FT8 at 14.074 and RTTY at 14.080 — only 6 kHz apart), the labels stack vertically so both remain readable. They're a quick orientation aid — especially helpful when visiting an unfamiliar band — and they don't interact with anything; nothing happens if you click them.
 
@@ -585,6 +603,8 @@ Click the red **×** to the right of any entry. The entry is removed immediately
 - Plain callsign — exact match, case-insensitive (`G4ABC` matches only `G4ABC`)
 - Trailing `*` — prefix match (`G4*` matches `G4ABC`, `G4XYZ`, `G4ABC/P`, etc.)
 
+**Show only watched callsigns.** Below the input field is a toggle labelled **Show only watched callsigns**. When ticked, the spectrum overlay and the DX Spots list (§5.17) hide every spot that doesn't match an entry in your watch list — useful on a busy band where dozens of yellow labels make the spectrum hard to read. The watched spots remain visible (still drawn in red on the spectrum), and toast/beep alerts still fire as normal. Untick to bring all spots back. The setting is remembered per browser.
+
 **What happens when a watched call is spotted:**
 
 - A small red **alert toast** appears with the callsign, frequency, spotter and any comment from the spot. The toast fades after about 8 seconds. **Click the toast to QSY VFO A directly to that frequency.**
@@ -674,6 +694,8 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 **All bands toggle** — by default the list filters to spots on your current band (so changing band changes what you see). Tick **All bands** in the title bar to see every spot in the buffer regardless of frequency — useful when chasing a rare DXpedition wherever it pops up.
 
 ![DX Spots list with the All bands toggle on — shows spots from every band](pictures/DX-Spots-All-Bands.png)
+
+**Watch-list filter** — the DX Spots list also honours the **Show only watched callsigns** toggle in the DX Watch popup (§5.14). When that toggle is ticked, the list hides every spot whose callsign doesn't match the watch list. The count at the top of the panel reflects the filtered view ("3 shown / 78 total"), so it's obvious how aggressively the list is being filtered. The two toggles — All bands and Show only watched — combine orthogonally: e.g. with both on, you'd see only your watched callsigns across every band in the cluster.
 
 **Why this is useful alongside the spectrum overlay:**
 
@@ -840,26 +862,38 @@ If the connection drops, the app reconnects automatically after 15 seconds. Disa
 
 ### 6.7 Backup &amp; Restore
 
-At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete YWC configuration. This is **everything that's been customised in your shack** — radio model, COM port, baud rate, band plan, SDR settings, DX cluster login and watch list, CW memory messages, external app paths, per-band Width/Shift/Mode memory, antenna selections, RF Gain, Squelch, and all your radio memory channels.
+At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete YWC user data as a **single zip file**. This rolls up everything you've customised across the app into one file:
 
-**Export Settings**
+| File in the zip | What it contains |
+|---|---|
+| `appsettings.user.json` | Radio model, COM port, baud rate, band plan, SDR settings, DX cluster login and watch list, CW memory messages, external app paths, per-band Width/Shift/Mode memory, RF Gain, Squelch, antenna selections |
+| `memories.json` | Your radio memory channels (with all advanced fields) |
+| `memory-banks.json` | Saved memory banks (named sets) |
+| `calibration.user.json` | Meter calibration overrides (if you've adjusted any meter scales) |
+| `labels.user.json` | Accessible-label customisations (if you've translated or renamed any controls) |
 
-Click **Export Settings** to download a single file named `ywc-settings-YYYYMMDD-HHMMSS.json`. Keep it somewhere safe — OneDrive, a USB stick, or your shack laptop. Re-export occasionally as your setup evolves.
+Plus a small `README.txt` recording when the backup was taken and which YWC version produced it.
 
-**Import Settings…**
+**Live radio state** (current frequency, mode, etc.) is deliberately **not** backed up — that's transient state that resets to whatever the radio reports the next time you connect.
 
-Click **Import Settings…**, pick a previously exported file, and confirm the replacement. Your current settings are preserved as `appsettings.user.json.bak` in `%APPDATA%\MM5AGM\Yaesu Web Control\` so you can recover if the import causes problems.
+**Export full backup**
 
-**You must restart YWC after importing.** Most services (radio connection, DX cluster, SDR streaming, rigctld server) only read the settings file at startup, so changes only take full effect after a restart. The app displays a reminder when the import completes.
+Click **Export full backup** to download a single file named `ywc-backup-YYYYMMDD-HHMMSS.zip`. Keep it somewhere safe — OneDrive, a USB stick, or your shack laptop. Re-export occasionally as your setup evolves.
+
+**Import full backup…**
+
+Click **Import full backup…**, pick a previously exported zip, and confirm the replacement. Each replaced file is preserved as a `.bak` in `%APPDATA%\MM5AGM\Yaesu Web Control\` so you can recover if the import causes problems. If anything goes wrong mid-import, every file written so far is rolled back automatically.
+
+**You must restart YWC after importing.** Most services (radio connection, DX cluster, SDR streaming, rigctld server) only read their files at startup, so changes only take full effect after a restart. The app displays a reminder when the import completes.
 
 **Typical use cases:**
 
-- **New PC** — install YWC, copy your exported settings file across, import. You're up and running in under a minute with all bands, memories and DX watch list intact.
+- **New PC** — install YWC, copy your exported zip across, import. You're up and running in under a minute with all bands, memories and DX watch list intact.
 - **Before a Windows rebuild or major update** — export, then re-import after the rebuild.
 - **Sharing setup with a friend** — export and email them the file. They get a working starting point (though they'll want to change the callsign and possibly the COM port).
 - **Experimenting safely** — export before trying something risky; import the file to revert if it goes wrong.
 
-The settings JSON is human-readable; you can open it in a text editor to inspect or hand-edit if you ever need to. The file lives at `%APPDATA%\MM5AGM\Yaesu Web Control\appsettings.user.json` and is also accessible directly without going through the export.
+The files inside the zip are plain JSON; you can extract and inspect or hand-edit them if needed. They live at `%APPDATA%\MM5AGM\Yaesu Web Control\` and are also accessible directly without going through the export.
 
 ---
 
@@ -960,7 +994,33 @@ Import reads up to 99 channels and takes up to 30 seconds. A progress indicator 
 
 ---
 
-### 8.3 Exporting to the Radio
+### 8.3 Importing from ADIF
+
+If you already keep a list of favourite frequencies in Log4OM (or any other logger that exports ADIF), you can bring them into YWC as memories without retyping. On the Memories page there is an **ADIF import** card with a single **Import from ADIF…** button.
+
+**What gets imported.** YWC reads every QSO record in the file and creates one memory per **unique combination** of frequency and mode. So if you've logged a thousand QSOs on 14.074 MHz FT8, you get just one memory called "14.074 DATA-U" — not a thousand duplicates.
+
+**How modes are translated.** ADIF stores modes as a flat list (FT8, FT4, CW, SSB, RTTY, USB, LSB, AM, FM, etc.) but doesn't always specify upper/lower sideband for CW, RTTY or digital modes. YWC picks the convention most operators use:
+
+| ADIF mode | YWC mode |
+|---|---|
+| USB / LSB / AM / FM | same |
+| CW | CW-U |
+| RTTY | RTTY-L |
+| FT8 / FT4 / PSK / PSK31 / JT65 / JT9 / JS8 / MFSK / DATA / DIGITALVOICE | DATA-U |
+| anything else | USB |
+
+If a record has no frequency it's skipped silently — most loggers always include FREQ, but some legacy ADIF dumps don't.
+
+**Duplicates are skipped.** Each new memory gets a label like `14.074 DATA-U` (frequency in MHz to three decimal places, then the mode). Before saving, YWC checks the existing memory list — if a memory with the same label already exists, the import skips it. This means **re-importing the same ADIF file is safe**: nothing is duplicated.
+
+**Advanced fields are not imported.** ADIF doesn't carry IF Width, AGC, NB level, power, antenna selection, etc. Imported memories leave those fields empty, so recalling one of them tunes the radio and sets the mode but otherwise leaves the radio's current settings untouched. You can edit imported memories afterwards to add advanced fields if you want.
+
+**Typical use case:** export your last six months of QSOs from Log4OM as ADIF, import here, get a memory bank of every frequency you've actually used recently — great as a starting point for a new contest list or as a personal "watering holes I care about" set.
+
+---
+
+### 8.4 Exporting to the Radio
 
 | Button | What it does |
 |--------|-------------|
@@ -971,7 +1031,7 @@ Import reads up to 99 channels and takes up to 30 seconds. A progress indicator 
 
 ---
 
-### 8.4 Memory Banks
+### 8.5 Memory Banks
 
 Memory banks let you save the current memory list under a name and reload it later. This is useful if you use different sets of memories for different operating scenarios — for example a "Daily" bank for regular operating and a "Contest" bank with contest-specific frequencies.
 
@@ -1003,7 +1063,7 @@ Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and a
 
 ---
 
-### 8.5 YWC Starter Bank
+### 8.6 YWC Starter Bank
 
 YWC ships with a built-in **starter bank** of common watering-hole memories — pre-populated, region-aware, and ready to load with one click. New users get a useful set of memories without having to type in every FT8 frequency by hand; experienced users can pick and choose which entries to keep.
 
@@ -1034,7 +1094,7 @@ On the **Memories editor page** a confirmation dialog appears before the load (s
 
 ---
 
-### 8.6 What about the radio's PRESET function?
+### 8.7 What about the radio's PRESET function?
 
 PRESET is a Yaesu feature that loads a **factory-defined operating profile** for a given mode (FT8, SSB, CW, RTTY, DATA-USB, AM, FM). It varies enormously across the supported radios — both in scope and in how invasive it is.
 
@@ -1301,9 +1361,57 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 | **↵ Enter** (frequency keyboard open) | Send the entered frequency to the radio |
 | **Esc** (frequency keyboard open) | Close the keyboard without changing frequency |
 
+**Browser zoom — make everything bigger or smaller.** YWC is a web page, so it honours your browser's standard zoom keyboard shortcuts. This is the easiest way to make controls more readable on a high-resolution monitor or to fit more on a small tablet screen:
+
+| Key | Result |
+|---|---|
+| **Ctrl + +** (Ctrl and plus / equals) | Zoom in — make the whole page larger |
+| **Ctrl + −** (Ctrl and minus) | Zoom out — make the whole page smaller |
+| **Ctrl + 0** (Ctrl and zero) | Reset to 100% — back to the default size |
+| **Ctrl + mouse wheel** | Smooth zoom in or out (over the page anywhere except the spectrum, which uses the wheel for tuning) |
+
+The browser remembers your zoom level per site, so once you've set it, every YWC session opens at that size until you change it. Worth setting once if the default text is too small (or too large) for you — and especially worth knowing about for partially-sighted operators who don't otherwise know browsers can do this.
+
 ---
 
 ## 14. Troubleshooting
+
+### 14.1 Reporting a bug
+
+The fastest way to get a bug fixed is a good report. YWC has three features that work together to make this easy.
+
+**1. The Diagnostics block on the About page.** Click **About** in the top navigation bar. The page shows app information, useful resource links, and a **Diagnostics** block — a single small text block listing:
+
+- YWC version and release date
+- Radio model and selected band plan
+- Serial port and baud rate
+- Current radio connection state
+- SDR device (if configured)
+- DX cluster host and your cluster login callsign (if configured)
+- Browser and version
+- .NET runtime version and Windows version
+
+That gives the developer everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
+
+![The About page — Diagnostics block plus the Copy diagnostics and Report a bug on GitHub buttons](pictures/AboutPage.png)
+
+**2. Report a bug on GitHub button** *(recommended)*. Right below the Diagnostics block. Clicking it opens a pre-filled bug-report form on GitHub in a new browser tab. The new tab takes a second or two to load while it negotiates with GitHub — be patient, don't keep clicking. Once it lands you'll see the form with the Diagnostics section already populated; you only need to type a description of what went wrong and, ideally, the steps to reproduce. Submit when ready.
+
+![GitHub new-issue page after clicking the Report-a-bug button — the bug-report template is selected and the Diagnostics section is pre-filled](pictures/GitHubCreateIssue.png)
+
+If you're not already signed in to GitHub, you'll be asked to sign in first — GitHub then brings you back to the form with the diagnostics still intact. You'll need a (free) GitHub account; new operators can sign up at https://github.com/signup in about a minute.
+
+**3. Copy diagnostics button**. The alternative path for anyone who'd rather paste the diagnostics somewhere else — an email to the developer (mm5agm@outlook.com), a GitHub Discussion, a Groups.io reply, etc. Clicking it puts the same diagnostics block onto your clipboard; you can then paste with Ctrl+V into wherever you're writing.
+
+**Going to GitHub manually?** When you click **New issue** on the GitHub Issues page, you'll be offered a template picker — pick **Bug report** and the new-issue editor pre-fills with a structured skeleton: *Describe the bug · Steps to reproduce · Expected behaviour · Actual behaviour · Diagnostics · Screenshots / logs · Anything else*. Fill in each section as best you can. Paste the diagnostics block into the **Diagnostics** section. (The **Report a bug on GitHub** button does all of this automatically — recommended.)
+
+If you've got an F12 → Console error message, paste that into the **Screenshots / logs** section too — JavaScript errors are often the smoking gun for UI bugs that don't reproduce in the backend logs.
+
+A **Feature request** template is also available for ideas / improvements rather than bugs.
+
+> Please report on **GitHub** — not Groups.io. Groups.io threads scroll off and become impossible to find again. GitHub Issues stay open until fixed and closed when resolved, with the conversation preserved. See the [Issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues).
+
+### 14.2 Common problems
 
 **App shows "Initialising…" and never clears**
 
@@ -1385,7 +1493,13 @@ If you can't find these menu items, your operating manual's index under "DATA MO
 
 ## 16. Accessibility and Screen Readers
 
-### 16.1 Windows High Contrast Mode
+### 16.1 Making Everything Bigger
+
+The single quickest way to make YWC more readable: **press Ctrl and the plus key** to zoom the whole page in. Each press makes everything bigger. **Ctrl and minus** zooms back out; **Ctrl and 0** resets to 100%. Your browser remembers the zoom level per site, so once you've set it, every future YWC session opens at the same size. See §13 Keyboard Shortcuts for the full list.
+
+---
+
+### 16.2 Windows High Contrast Mode
 
 When a Windows High Contrast theme is active, the gauge displays automatically adjust:
 
@@ -1396,7 +1510,7 @@ To enable a High Contrast theme: **Windows Settings → Accessibility → Contra
 
 ---
 
-### 16.2 Screen Reader Support
+### 16.3 Screen Reader Support
 
 All interactive controls in the app have accessible labels that screen readers announce when you hover over or focus on them:
 
@@ -1410,7 +1524,7 @@ All interactive controls in the app have accessible labels that screen readers a
 
 ---
 
-### 16.3 NVDA
+### 16.4 NVDA
 
 NVDA (NonVisual Desktop Access) is a free, open-source screen reader for Windows.
 
@@ -1452,7 +1566,7 @@ When the app loads, NVDA does not automatically read through the page. Two desig
 
 ---
 
-### 16.4 Windows Narrator
+### 16.5 Windows Narrator
 
 Narrator is the screen reader built into Windows 11 — no download required.
 
@@ -1466,7 +1580,7 @@ Once running, Narrator reads aloud the element that has keyboard focus. To navig
 
 ---
 
-### 16.5 Customising Screen Reader Labels
+### 16.6 Customising Screen Reader Labels
 
 Every control in the app — band buttons, meters, VFO controls, the on-screen frequency keyboard, spectrum span buttons, and the navigation bar home link — has a text label that screen readers announce. You can change any of these labels through the built-in **Accessibility Labels** editor.
 
@@ -1553,7 +1667,7 @@ On the Accessibility Labels page, replace each label value with the French equiv
 | Spectrum Display | Span 500 kHz button | Largeur de bande 500 kHz |
 | Spectrum Display | Span 1 MHz button | Largeur de bande 1 MHz |
 | Spectrum Display | Span 2 MHz button | Largeur de bande 2 MHz |
-| Navigation | Application name / home link | Accueil FTdx101 WebApp |
+| Navigation | Application name / home link | Accueil Yaesu Web Control |
 
 ---
 
@@ -1613,7 +1727,7 @@ On the Accessibility Labels page, replace each label value with the French equiv
 | Spectrum Display | Span 500 kHz button | Spændvidde 500 kHz |
 | Spectrum Display | Span 1 MHz button | Spændvidde 1 MHz |
 | Spectrum Display | Span 2 MHz button | Spændvidde 2 MHz |
-| Navigation | Application name / home link | FTdx101 WebApp startside |
+| Navigation | Application name / home link | Yaesu Web Control startside |
 
 ---
 

@@ -65,7 +65,7 @@ $g.DrawArc($pWave,  72, -8, 112, 70, 210, 120)
 
 $g.Dispose()
 
-$out = "C:\Users\colin\source\repos\FTdx101_WebApp\wwwroot\favicon.ico"
+$out = "C:\Users\colin\source\repos\Yaesu_Web_Control\wwwroot\favicon.ico"
 Save-Ico $bmp $out
 $bmp.Dispose()
 Write-Host "Icon saved to $out"

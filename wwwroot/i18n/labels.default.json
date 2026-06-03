@@ -1,5 +1,5 @@
 {
-  "_readme": "Edit this file to customise accessible labels (what a screen reader announces). Restart the app after saving. To override without losing your changes on update, copy this file to %APPDATA%\\MM5AGM\\FTdx101 WebApp\\labels.json — that location takes priority.",
+  "_readme": "Edit this file to customise accessible labels (what a screen reader announces). Restart the app after saving. To override without losing your changes on update, copy this file to %APPDATA%\\MM5AGM\\Yaesu Web Control\\labels.json — that location takes priority.",
 
   "bands": {
     "160m": "160 metres",
@@ -69,7 +69,7 @@
   },
 
   "nav": {
-    "brand": "FTdx101 WebApp home"
+    "brand": "Yaesu Web Control home"
   },
 
   "controls": {

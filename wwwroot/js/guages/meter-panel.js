@@ -1,4 +1,4 @@
-// FTdx101 WebApp – Meter Panel
+// Yaesu Web Control – Meter Panel
 // Owns all gauge instances. Creates them via gaugeFactory, renders them, and
 // exposes update() as the single point of entry for needle changes.
 // No calibration, no WebSocket, no DOM queries beyond canvas IDs.

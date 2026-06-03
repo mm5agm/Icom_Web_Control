@@ -29,7 +29,7 @@ There are no automated tests. Verification is manual via the browser at `http://
 
 ## Release Process
 
-Before releasing: bump `Models/AppVersion.cs`, `installer.nsi`, add release notes to `README.md`, update `USER_MANUAL.md` if needed.
+Before releasing: bump `Models/AppVersion.cs`, `installer.nsi`, add release notes to `README.md`, update `USER_MANUAL.md` if needed, and bump the per-release download badge in `README.md` to the new version (search for the previous `vX.Y.Z` tag in the shields.io URL near the top of the file).
 
 ```powershell
 # 1. Commit everything on develop
@@ -54,8 +54,8 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "See README.md for full releas
 **Step 4 is required.** The build workflow triggers on `release: [created]`, not on tag push alone.
 Alternatively run `.\scripts\finish-release.ps1 -Version vX.Y.Z` which does all four steps.
 
-User settings persist to `%APPDATA%\MM5AGM\FTdx101 WebApp\appsettings.user.json`.  
-Radio state persists to `%APPDATA%\MM5AGM\FTdx101 WebApp\radio_state.json`.
+User settings persist to `%APPDATA%\MM5AGM\Yaesu Web Control\appsettings.user.json`.  
+Radio state persists to `%APPDATA%\MM5AGM\Yaesu Web Control\radio_state.json`.
 
 ---
 

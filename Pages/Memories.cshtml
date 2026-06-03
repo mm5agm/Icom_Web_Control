@@ -90,6 +90,25 @@
         </div>
     </div>
 
+    <!-- ADIF import — bring favourite frequencies from a logger -->
+    <div class="card mb-3 border-secondary">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-bold me-1">ADIF import:</span>
+                <label class="btn btn-sm btn-outline-info mb-0" for="adifImportFile"
+                       title="Read an ADIF log file and turn each unique frequency/mode pair into a YWC memory">
+                    <i class="bi bi-cloud-download" aria-hidden="true"></i> Import from ADIF…
+                </label>
+                <input type="file" id="adifImportFile" accept=".adi,.adif,.txt" hidden>
+                <span id="adifImportStatus" class="text-muted small ms-2"></span>
+            </div>
+            <p class="text-muted small mb-0 mt-1">
+                Reads QSO records from a Log4OM (or any standard ADIF) export and creates a memory for each unique frequency/mode pair.
+                Duplicates of memories you already have are skipped, so re-importing the same file is safe.
+            </p>
+        </div>
+    </div>
+
     <!-- Memory editor form -->
     <form method="post">
         <div class="d-flex align-items-center gap-2 mb-2">
@@ -500,6 +519,46 @@
     }
 
     loadBanks();
+
+    // ── ADIF import wiring ───────────────────────────────────────────────
+    (function () {
+        const fileInput = document.getElementById('adifImportFile');
+        const statusEl  = document.getElementById('adifImportStatus');
+        if (!fileInput) return;
+        fileInput.addEventListener('change', async () => {
+            if (!fileInput.files || fileInput.files.length === 0) return;
+            const file = fileInput.files[0];
+            const ok = await pageConfirm(
+                `Import memories from "${file.name}"?\n\n` +
+                `YWC will read every QSO record and create a memory for each unique frequency/mode pair. ` +
+                `Memories with labels that already exist are skipped, so this is safe to run repeatedly.`);
+            if (!ok) { fileInput.value = ''; return; }
+
+            statusEl.textContent = 'Reading…';
+            statusEl.className = 'text-muted small ms-2';
+            const fd = new FormData();
+            fd.append('file', file);
+            try {
+                const resp = await fetch('/api/memory/import-adif', { method: 'POST', body: fd });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    statusEl.textContent = `✗ ${data.error || resp.statusText}`;
+                    statusEl.className = 'text-danger small ms-2';
+                    return;
+                }
+                statusEl.textContent = data.message || `Added ${data.added} memor${data.added === 1 ? 'y' : 'ies'}.`;
+                statusEl.className = 'text-success small ms-2';
+                if (data.added > 0) {
+                    setTimeout(() => location.reload(), 1500);
+                }
+            } catch (e) {
+                statusEl.textContent = `✗ ${e.message}`;
+                statusEl.className = 'text-danger small ms-2';
+            } finally {
+                fileInput.value = '';
+            }
+        });
+    })();
 
     const _allBtns = () => ['importReplaceBtn','importMergeBtn','exportBtn']
         .map(id => document.getElementById(id));

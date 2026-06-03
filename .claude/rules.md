@@ -1,11 +1,11 @@
-# FTdx101 WebApp — Strict Architectural Rules (Authoritative Specification)
+# Yaesu Web Control — Strict Architectural Rules (Authoritative Specification)
 # Claude must follow these rules for ALL code in this repository.
 
 ---
 
 # 1. Subsystem Boundaries (Non‑Negotiable)
 
-The FTdx101 WebApp is composed of strict, isolated subsystems.
+The Yaesu Web Control is composed of strict, isolated subsystems.
 No subsystem may contain logic belonging to another.
 
 ## 1. Calibration Engine (Pure Logic Only)

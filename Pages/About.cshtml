@@ -1,0 +1,183 @@
+@page
+@model Yaesu_Web_Control.Pages.AboutModel
+@{
+    ViewData["Title"] = "About Yaesu Web Control";
+}
+
+<div class="container my-4" style="max-width: 760px;">
+
+    <h1 class="mb-1">Yaesu Web Control</h1>
+    <p class="text-muted mb-3">
+        Version <strong>@Model.Version</strong>
+        &nbsp;·&nbsp; Released @Model.ReleaseDate
+    </p>
+    <p class="text-muted mb-4">
+        © 2026 Colin Campbell (MM5AGM) ·
+        <a href="https://github.com/mm5agm/Yaesu_Web_Control/blob/main/LICENSE" target="_blank" rel="noopener">GNU General Public License v3.0</a>
+    </p>
+
+    <h5>About this project</h5>
+    <p>
+        A web-based control panel for Yaesu HF transceivers. Written because I couldn't see the
+        FTdx101MP front-panel controls without a magnifying glass. Designed for partially sighted
+        operators (NVDA / Windows Narrator compatible) and for anyone who wants a clean,
+        tablet-friendly interface alongside their logger.
+    </p>
+    <p class="text-muted small mb-4">
+        <strong>Supported radios:</strong>
+        FTdx101MP · FTdx101D · FTdx10 · FT-710 · FTDX3000.
+        <strong>Windows only.</strong>
+    </p>
+
+    <hr/>
+
+    <h5>Resources</h5>
+    <ul class="list-unstyled">
+        <li>
+            📖 <a asp-page="/UserManual">User Manual</a> &mdash; comprehensive documentation, with screenshots
+        </li>
+        <li>
+            🐛 <a href="https://github.com/mm5agm/Yaesu_Web_Control/issues" target="_blank" rel="noopener">Report a bug</a>
+            &mdash; please use GitHub Issues, not Groups.io
+        </li>
+        <li>
+            💬 <a href="https://github.com/mm5agm/Yaesu_Web_Control/discussions" target="_blank" rel="noopener">Discussions</a>
+            &mdash; questions, ideas, feature requests
+        </li>
+        <li>
+            📦 <a href="https://github.com/mm5agm/Yaesu_Web_Control" target="_blank" rel="noopener">Source code on GitHub</a>
+        </li>
+        <li>
+            ☕ <a href="https://paypal.me/mm5agm" target="_blank" rel="noopener">Sponsor / Buy Me a Coffee</a>
+        </li>
+    </ul>
+
+    <hr/>
+
+    <h5>Diagnostics</h5>
+    <p class="text-muted small">
+        Click <strong>Copy diagnostics</strong> below and paste the result into any bug report &mdash;
+        it gives me everything I need to reproduce your setup.
+    </p>
+    <pre id="diagnosticsBlock" class="bg-light p-3 border rounded" style="font-size:0.9rem; white-space: pre-wrap;">YWC Version    @Model.Version (released @Model.ReleaseDate)
+Radio model    @Model.RadioModel
+Band plan      @Model.BandPlan
+Serial port    @Model.SerialPort at @Model.BaudRate baud
+Connection     @(Model.IsConnected ? "connected" : "not connected")
+SDR device     @Model.SdrDevice
+DX cluster     @Model.DxClusterHost
+Cluster login  @Model.DxClusterCallsign
+Browser        <span id="diagBrowser">(detecting…)</span>
+.NET runtime   @Model.DotNetVersion
+Operating sys  @Model.OsDescription</pre>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <button type="button" class="btn btn-sm btn-primary" id="copyDiagBtn">Copy diagnostics</button>
+        <button type="button" class="btn btn-sm btn-outline-danger" id="reportBugBtn"
+                title="Opens a new GitHub Issue with the diagnostics already filled in.">
+            <i class="bi bi-bug" aria-hidden="true"></i> Report a bug on GitHub
+        </button>
+        <span id="copyDiagStatus" class="text-success small ms-2" aria-live="polite"></span>
+    </div>
+    <p class="text-muted small mt-2 mb-0">
+        <strong>Report a bug on GitHub</strong> opens a pre-filled bug-report form in a new tab — the diagnostics are inserted automatically; you only need to type the description. Requires a (free) GitHub account; if you're not already signed in, GitHub will ask you to sign in and bring you back to the form with your diagnostics intact. Prefer to paste somewhere else (email, Discussions, Groups.io)? Use <strong>Copy diagnostics</strong> instead.
+    </p>
+
+    <hr/>
+
+    <h5>Third-party components</h5>
+    <p class="text-muted small mb-1">
+        YWC stands on the shoulders of these open-source projects:
+    </p>
+    <ul class="text-muted small">
+        <li>ASP.NET Core and SignalR (Microsoft) &mdash; MIT &amp; Apache 2.0</li>
+        <li>Bootstrap 5 (Twitter, Inc.) &mdash; MIT</li>
+        <li>canvas-gauges (Mykhailo Stadnyk) &mdash; MIT</li>
+        <li>SoapySDR (Pothosware) &mdash; BSL-1.0</li>
+        <li>SDRplay API (SDRplay Ltd) &mdash; used under the SDRplay API licence</li>
+    </ul>
+
+    <p class="text-muted small mt-4">
+        73, Colin MM5AGM
+    </p>
+
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        // Browser detection — userAgentData (modern) falls back to UA string.
+        // The result is a short, paste-friendly string like "Edge 142" or
+        // "Chrome 142". For bug reports we mostly care about the engine,
+        // so this depth of detail is enough.
+        const browserSpan = document.getElementById('diagBrowser');
+        if (browserSpan) {
+            let label = '(unknown)';
+            try {
+                const ua = navigator.userAgentData;
+                if (ua && ua.brands) {
+                    const brand = ua.brands.find(b => !/Not.?A.?Brand|Chromium/i.test(b.brand)) || ua.brands[0];
+                    if (brand) label = `${brand.brand} ${brand.version}`;
+                    if (ua.mobile) label += ' (mobile)';
+                } else {
+                    const s = navigator.userAgent || '';
+                    const m = s.match(/(Edg|Firefox|Chrome|Safari)\/(\d+)/);
+                    if (m) label = `${m[1] === 'Edg' ? 'Edge' : m[1]} ${m[2]}`;
+                }
+            } catch { /* ignore */ }
+            browserSpan.textContent = label;
+        }
+
+        const btn     = document.getElementById('copyDiagBtn');
+        const reportBtn = document.getElementById('reportBugBtn');
+        const block   = document.getElementById('diagnosticsBlock');
+        const status  = document.getElementById('copyDiagStatus');
+        if (!btn || !block) return;
+        btn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(block.textContent);
+                status.textContent = '✓ Copied to clipboard';
+                status.className = 'text-success small ms-2';
+                setTimeout(() => { status.textContent = ''; }, 3000);
+            } catch (e) {
+                status.textContent = '✗ Copy failed — select and copy manually';
+                status.className = 'text-danger small ms-2';
+            }
+        });
+
+        if (reportBtn) {
+            // Build a URL that opens a new GitHub issue with our bug-report
+            // template selected and the diagnostics block pre-filled into
+            // the matching section. GitHub preserves query parameters
+            // through the sign-in round-trip, so users who aren't already
+            // signed in will arrive at the right place after authenticating.
+            reportBtn.addEventListener('click', () => {
+                const diag = block.textContent.trim();
+                // Mirror the section structure of .github/ISSUE_TEMPLATE/bug_report.md
+                // so the diagnostics drop into the right field. Other sections
+                // are left blank for the user to fill in.
+                const body =
+                    '## Describe the bug\n\n' +
+                    '\n\n' +
+                    '## Steps to reproduce\n\n' +
+                    '1. \n' +
+                    '2. \n' +
+                    '3. \n\n' +
+                    '## Expected behaviour\n\n' +
+                    '\n\n' +
+                    '## Actual behaviour\n\n' +
+                    '\n\n' +
+                    '## Diagnostics\n\n' +
+                    '```\n' + diag + '\n```\n\n' +
+                    '## Screenshots / logs\n\n' +
+                    '(Drag-and-drop screenshots here. Any F12 console errors below.)\n\n' +
+                    '```\n\n```\n\n' +
+                    '## Anything else?\n\n';
+                const url = 'https://github.com/mm5agm/Yaesu_Web_Control/issues/new'
+                          + '?template=bug_report.md'
+                          + '&body=' + encodeURIComponent(body);
+                window.open(url, '_blank', 'noopener');
+            });
+        }
+    })();
+</script>
+}
