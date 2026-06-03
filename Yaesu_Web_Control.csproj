@@ -52,6 +52,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Markdig" Version="1.2.0" />
     <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
@@ -80,6 +81,14 @@
   <!-- Copy pictures folder (user manual screenshots served via PhysicalFileProvider) -->
   <ItemGroup>
     <Content Include="pictures\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Ship USER_MANUAL.md alongside the app so the in-app /UserManual page
+       can render it. Read at request time from IWebHostEnvironment.ContentRootPath. -->
+  <ItemGroup>
+    <Content Include="USER_MANUAL.md">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
