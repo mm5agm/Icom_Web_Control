@@ -1368,6 +1368,16 @@
                     onclick="window.dxWatchAdd && window.dxWatchAdd()">Add</button>
         </div>
         <hr style="border-color:#444; margin:4px 0;">
+        <div class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" id="dxWatchFilterChk">
+            <label class="form-check-label small" for="dxWatchFilterChk" style="color:#ddd;">
+                Show only watched callsigns
+            </label>
+        </div>
+        <p class="text-muted small mb-2" style="color:#bbb !important; font-size:0.8rem;">
+            When ticked, the spectrum overlay and the DX Spots list hide every spot
+            except those that match a callsign or prefix in this list.
+        </p>
         <div class="fw-bold small" style="color:#aaa;">Watched</div>
         <ul id="dxWatchList" class="list-unstyled mb-0 small" style="max-height:240px; overflow-y:auto;"
             aria-live="polite" aria-label="Watched callsigns list"></ul>
@@ -1647,6 +1657,14 @@
             });
             spectrumPipeline.onDxClusterStatus(s => spectrumPanel.setDxStatus(s?.status, s?.detail));
             spectrumPipeline.onDxAlert(spot => { if (window.handleDxAlert) window.handleDxAlert(spot); });
+
+            // Repaint both DX panels when the "Show only watched callsigns"
+            // toggle changes in the DX Watch popup. Without this, the change
+            // would only become visible on the next spot arrival / band change.
+            window.addEventListener('dxWatchFilterChanged', () => {
+                try { spectrumPanel.redraw(); } catch {}
+                try { window.dxSpotsPanel && window.dxSpotsPanel.redraw(); } catch {}
+            });
             fetch('/api/dxcluster/spots')
                 .then(r => r.ok ? r.json() : [])
                 .then(arr => {
@@ -2252,6 +2270,25 @@
         // Initial load on page open so the alert system has the list ready
         // even if the user never opens the popup.
         dxWatchLoad();
+
+        // --- "Show only watched callsigns" filter ---
+        // A simple per-browser preference (no backend round-trip needed).
+        // When ticked, both the spectrum overlay and the DX Spots list panel
+        // hide spots whose callsign doesn't match the watch list. The two
+        // panels listen on the dxWatchFilterChanged custom event so a toggle
+        // takes effect immediately, without needing the next spot to arrive.
+        window.dxOnlyWatched = false;
+        try { window.dxOnlyWatched = localStorage.getItem('dxOnlyWatched') === '1'; } catch {}
+
+        const _dxWatchFilterChk = document.getElementById('dxWatchFilterChk');
+        if (_dxWatchFilterChk) {
+            _dxWatchFilterChk.checked = window.dxOnlyWatched;
+            _dxWatchFilterChk.addEventListener('change', () => {
+                window.dxOnlyWatched = _dxWatchFilterChk.checked;
+                try { localStorage.setItem('dxOnlyWatched', window.dxOnlyWatched ? '1' : '0'); } catch {}
+                window.dispatchEvent(new CustomEvent('dxWatchFilterChanged', { detail: { onlyWatched: window.dxOnlyWatched } }));
+            });
+        }
 
         // --- DX Watch alert handler ---
         // Fired by SignalR when DxClusterService detects a spot that matches

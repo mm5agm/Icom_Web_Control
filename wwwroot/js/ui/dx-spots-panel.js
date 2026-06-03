@@ -158,12 +158,22 @@ export class DxSpotsPanel {
     _filteredSpots() {
         const band = this._currentBand();
         const now  = Date.now();
+        const onlyWatched = !!window.dxOnlyWatched;
         return this._spots.filter(s => {
             const t = new Date(s.receivedUtc).getTime();
             if (now - t > AGE_MAX_MS) return false;
+            // "Show only watched callsigns" toggle in the DX Watch popup —
+            // see Pages/Index.cshtml. The flag is set by DxClusterService.
+            if (onlyWatched && !s.isWatched) return false;
             if (this._showAllBands || !band) return true;
             return this._bandForHz(s.frequencyHz) === band;
         });
+    }
+
+    /** Force a re-render — used when an external setting (the "only watched"
+     *  filter toggle) changes and the panel needs to update immediately. */
+    redraw() {
+        this._render();
     }
 
     _setSort(col) {
