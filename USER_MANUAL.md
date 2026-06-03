@@ -1364,9 +1364,9 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 ### 14.1 Reporting a bug
 
-The fastest way to get a bug fixed is a good report. YWC has two features to help:
+The fastest way to get a bug fixed is a good report. YWC has three features that work together to make this easy.
 
-**About page → Copy diagnostics.** Click **About** in the top navigation bar. The page shows app information, useful resource links, and a **Diagnostics** block — a single small text block listing:
+**1. The Diagnostics block on the About page.** Click **About** in the top navigation bar. The page shows app information, useful resource links, and a **Diagnostics** block — a single small text block listing:
 
 - YWC version and release date
 - Radio model and selected band plan
@@ -1377,9 +1377,15 @@ The fastest way to get a bug fixed is a good report. YWC has two features to hel
 - Browser and version
 - .NET runtime version and Windows version
 
-Click the **Copy diagnostics** button below the block and the whole lot goes onto your clipboard. Paste it straight into your bug report — it gives me everything I need to reproduce your setup, including a callsign so I know who I'm talking to.
+That gives the developer everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
 
-**GitHub issue templates.** When you click **New issue** on the GitHub Issues page, you'll be offered a template — pick **Bug report** and the new-issue editor pre-fills with a structured skeleton: *Describe the bug · Steps to reproduce · Expected behaviour · Actual behaviour · Diagnostics · Screenshots / logs · Anything else*. Fill in each section as best you can. The diagnostics block goes in the **Diagnostics** section.
+**2. Report a bug on GitHub button** *(recommended)*. Right below the Diagnostics block. Clicking it opens a pre-filled bug-report form in a new browser tab. The Diagnostics section is already populated; you only need to type a description of what went wrong and, ideally, the steps to reproduce. Submit when ready.
+
+If you're not already signed in to GitHub, you'll be asked to sign in first — GitHub then brings you back to the form with the diagnostics still intact. You'll need a (free) GitHub account; new operators can sign up at https://github.com/signup in about a minute.
+
+**3. Copy diagnostics button**. The alternative path for anyone who'd rather paste the diagnostics somewhere else — an email to the developer (mm5agm@outlook.com), a GitHub Discussion, a Groups.io reply, etc. Clicking it puts the same diagnostics block onto your clipboard; you can then paste with Ctrl+V into wherever you're writing.
+
+**Going to GitHub manually?** When you click **New issue** on the GitHub Issues page, you'll be offered a template picker — pick **Bug report** and the new-issue editor pre-fills with a structured skeleton: *Describe the bug · Steps to reproduce · Expected behaviour · Actual behaviour · Diagnostics · Screenshots / logs · Anything else*. Fill in each section as best you can. Paste the diagnostics block into the **Diagnostics** section. (The **Report a bug on GitHub** button does all of this automatically — recommended.)
 
 If you've got an F12 → Console error message, paste that into the **Screenshots / logs** section too — JavaScript errors are often the smoking gun for UI bugs that don't reproduce in the backend logs.
 

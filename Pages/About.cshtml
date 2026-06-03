@@ -70,8 +70,17 @@ Cluster login  @Model.DxClusterCallsign
 Browser        <span id="diagBrowser">(detecting…)</span>
 .NET runtime   @Model.DotNetVersion
 Operating sys  @Model.OsDescription</pre>
-    <button type="button" class="btn btn-sm btn-primary" id="copyDiagBtn">Copy diagnostics</button>
-    <span id="copyDiagStatus" class="text-success small ms-2" aria-live="polite"></span>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <button type="button" class="btn btn-sm btn-primary" id="copyDiagBtn">Copy diagnostics</button>
+        <button type="button" class="btn btn-sm btn-outline-danger" id="reportBugBtn"
+                title="Opens a new GitHub Issue with the diagnostics already filled in.">
+            <i class="bi bi-bug" aria-hidden="true"></i> Report a bug on GitHub
+        </button>
+        <span id="copyDiagStatus" class="text-success small ms-2" aria-live="polite"></span>
+    </div>
+    <p class="text-muted small mt-2 mb-0">
+        <strong>Report a bug on GitHub</strong> opens a pre-filled bug-report form in a new tab — the diagnostics are inserted automatically; you only need to type the description. Requires a (free) GitHub account; if you're not already signed in, GitHub will ask you to sign in and bring you back to the form with your diagnostics intact. Prefer to paste somewhere else (email, Discussions, Groups.io)? Use <strong>Copy diagnostics</strong> instead.
+    </p>
 
     <hr/>
 
@@ -118,20 +127,57 @@ Operating sys  @Model.OsDescription</pre>
             browserSpan.textContent = label;
         }
 
-        const btn   = document.getElementById('copyDiagBtn');
-        const block = document.getElementById('diagnosticsBlock');
-        const status = document.getElementById('copyDiagStatus');
+        const btn     = document.getElementById('copyDiagBtn');
+        const reportBtn = document.getElementById('reportBugBtn');
+        const block   = document.getElementById('diagnosticsBlock');
+        const status  = document.getElementById('copyDiagStatus');
         if (!btn || !block) return;
         btn.addEventListener('click', async () => {
             try {
                 await navigator.clipboard.writeText(block.textContent);
                 status.textContent = '✓ Copied to clipboard';
+                status.className = 'text-success small ms-2';
                 setTimeout(() => { status.textContent = ''; }, 3000);
             } catch (e) {
                 status.textContent = '✗ Copy failed — select and copy manually';
                 status.className = 'text-danger small ms-2';
             }
         });
+
+        if (reportBtn) {
+            // Build a URL that opens a new GitHub issue with our bug-report
+            // template selected and the diagnostics block pre-filled into
+            // the matching section. GitHub preserves query parameters
+            // through the sign-in round-trip, so users who aren't already
+            // signed in will arrive at the right place after authenticating.
+            reportBtn.addEventListener('click', () => {
+                const diag = block.textContent.trim();
+                // Mirror the section structure of .github/ISSUE_TEMPLATE/bug_report.md
+                // so the diagnostics drop into the right field. Other sections
+                // are left blank for the user to fill in.
+                const body =
+                    '## Describe the bug\n\n' +
+                    '\n\n' +
+                    '## Steps to reproduce\n\n' +
+                    '1. \n' +
+                    '2. \n' +
+                    '3. \n\n' +
+                    '## Expected behaviour\n\n' +
+                    '\n\n' +
+                    '## Actual behaviour\n\n' +
+                    '\n\n' +
+                    '## Diagnostics\n\n' +
+                    '```\n' + diag + '\n```\n\n' +
+                    '## Screenshots / logs\n\n' +
+                    '(Drag-and-drop screenshots here. Any F12 console errors below.)\n\n' +
+                    '```\n\n```\n\n' +
+                    '## Anything else?\n\n';
+                const url = 'https://github.com/mm5agm/Yaesu_Web_Control/issues/new'
+                          + '?template=bug_report.md'
+                          + '&body=' + encodeURIComponent(body);
+                window.open(url, '_blank', 'noopener');
+            });
+        }
     })();
 </script>
 }
