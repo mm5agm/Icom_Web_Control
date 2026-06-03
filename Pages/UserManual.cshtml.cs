@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Markdig;
 using Markdig.Extensions.AutoIdentifiers;
@@ -20,7 +21,7 @@ namespace Yaesu_Web_Control.Pages
         // thread-safe, so we keep a static instance.
         private static readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder()
             .UseAdvancedExtensions()                                       // tables, task lists, etc.
-            .UseAutoIdentifiers(AutoIdentifierOptions.GitHub)              // heading IDs that match the USER_MANUAL.md's own TOC anchors
+            .UseAutoIdentifiers(AutoIdentifierOptions.GitHub)
             .UseEmojiAndSmiley()
             .Build();
 
@@ -32,6 +33,21 @@ namespace Yaesu_Web_Control.Pages
         private static readonly Regex PicturesPathFix = new(
             @"(?<attr>(?:src|href)=)""pictures/",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        // Match every heading tag (with or without an existing id attribute)
+        // so we can rewrite the id to a strictly-GitHub-compatible slug.
+        // Markdig's GitHub auto-identifier is close but doesn't reliably
+        // match for headings containing dots ("5.8" → GitHub strips dots and
+        // produces "58", Markdig may emit "5-8"). The TOC inside
+        // USER_MANUAL.md uses GitHub anchors throughout, so we standardise
+        // on that.
+        private static readonly Regex HeadingPattern = new(
+            "<(?<tag>h[1-6])(?<attrs>[^>]*)>(?<inner>.*?)</h[1-6]>",
+            RegexOptions.Compiled | RegexOptions.Singleline);
+        private static readonly Regex StripIdAttr = new(
+            @"\s*id=""[^""]*""",
+            RegexOptions.Compiled);
+        private static readonly Regex StripTags = new("<[^>]+>", RegexOptions.Compiled);
 
         public UserManualModel(IWebHostEnvironment env, ILogger<UserManualModel> logger)
         {
@@ -54,13 +70,56 @@ namespace Yaesu_Web_Control.Pages
             {
                 var markdown = System.IO.File.ReadAllText(path);
                 var html = Markdown.ToHtml(markdown, _pipeline);
-                ManualHtml = PicturesPathFix.Replace(html, "${attr}\"/pictures/");
+                html = PicturesPathFix.Replace(html, "${attr}\"/pictures/");
+                html = RewriteHeadingIds(html);
+                ManualHtml = html;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to render USER_MANUAL.md");
                 LoadError = $"Failed to render the manual: {ex.Message}";
             }
+        }
+
+        /// <summary>
+        /// Replace every heading's id attribute with a strict GitHub-style
+        /// slug, so the TOC links inside USER_MANUAL.md (which use GitHub
+        /// anchors) land on the right place.
+        /// </summary>
+        private static string RewriteHeadingIds(string html)
+        {
+            return HeadingPattern.Replace(html, m =>
+            {
+                var tag    = m.Groups["tag"].Value;
+                var attrs  = StripIdAttr.Replace(m.Groups["attrs"].Value, "");
+                var inner  = m.Groups["inner"].Value;
+                var text   = StripTags.Replace(inner, "");
+                var id     = GitHubSlug(text);
+                return $"<{tag} id=\"{id}\"{attrs}>{inner}</{tag}>";
+            });
+        }
+
+        /// <summary>
+        /// Reproduce GitHub's heading-anchor slug algorithm:
+        ///   - Lowercase
+        ///   - Strip every character that isn't a letter, digit, hyphen or
+        ///     space (dots, commas, brackets etc. are removed, NOT replaced)
+        ///   - Replace runs of spaces with single hyphens
+        ///   - Trim leading / trailing hyphens
+        /// </summary>
+        public static string GitHubSlug(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            var sb = new StringBuilder(text.Length);
+            foreach (var ch in text)
+            {
+                if (char.IsLetterOrDigit(ch)) sb.Append(char.ToLowerInvariant(ch));
+                else if (ch == '-' || ch == ' ') sb.Append(ch);
+                // everything else — punctuation, dots, etc. — is dropped
+            }
+            // Collapse spaces into single hyphens
+            var slug = Regex.Replace(sb.ToString(), @"\s+", "-");
+            return slug.Trim('-');
         }
     }
 }
