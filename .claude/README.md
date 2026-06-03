@@ -1,6 +1,6 @@
-# Claude AI Configuration for FTdx101 WebApp
+# Claude AI Configuration for Yaesu Web Control
 
-This directory contains AI assistant configuration files for Claude when working with the FTdx101 WebApp project.
+This directory contains AI assistant configuration files for Claude when working with the Yaesu Web Control project.
 
 ## Files
 

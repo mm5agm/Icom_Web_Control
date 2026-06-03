@@ -1,7 +1,7 @@
-# FTdx101 WebApp – Project Overview for Claude
+# Yaesu Web Control – Project Overview for Claude
 
-This document provides Claude with a high‑level understanding of the FTdx101
-WebApp project. It describes the purpose of the application, the major
+This document provides Claude with a high‑level understanding of the Yaesu Web
+Control project. It describes the purpose of the application, the major
 subsystems, the architectural philosophy, and the domain concepts used
 throughout the codebase.
 
@@ -12,8 +12,9 @@ generate code that aligns with the existing design.
 PROJECT PURPOSE
 ====================================================================
 
-The FTdx101 WebApp is a browser‑based control and monitoring interface for the
-Yaesu FTdx101 series transceivers. It provides real‑time visualisation of radio
+Yaesu Web Control (YWC) is a browser‑based control and monitoring interface for
+Yaesu HF transceivers — currently the FTdx101MP, FTdx101D, FTdx10, FT‑710 and
+FTDX3000. It provides real‑time visualisation of radio
 metrics (S‑meter, power, SWR, ALC, etc.), CAT command integration, and a clean,
 responsive UI for operators.
 
