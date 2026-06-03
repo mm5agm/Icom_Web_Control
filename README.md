@@ -1,9 +1,9 @@
 
 # Yaesu Web Control
 
-![GitHub release](https://img.shields.io/github/v/release/mm5agm/Yaesu_Web_Control?label=Latest%20release&style=flat-square)
-![v2.1.0 downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/v2.1.0/Yaesu_Web_Control_Setup.exe?label=v2.1.0%20downloads&style=flat-square)
-![Licence](https://img.shields.io/github/license/mm5agm/Yaesu_Web_Control?label=Licence&style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.1.0-blue?style=flat-square)
+![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
+![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
 > I would appreciate feedback and bug/layout reports. I have only tested on the FTdx101MP and the spectrum display with the SDRplay RSP1B.
 
