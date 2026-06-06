@@ -36,14 +36,16 @@ namespace Yaesu_Web_Control.Services
 
                     _cachedSettings = JsonSerializer.Deserialize<ApplicationSettings>(json) ?? new ApplicationSettings();
 
-                    _logger.LogInformation("Settings deserialized: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, WebPort=8080",
-                        _cachedSettings.SerialPort, _cachedSettings.BaudRate, _cachedSettings.WebAddress);
+                    _logger.LogInformation("Settings deserialized: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
+                        _cachedSettings.SerialPort, _cachedSettings.BaudRate, _cachedSettings.WebAddress, _cachedSettings.HttpPort);
+
+                    AutoQuoteCommandLinePaths(_cachedSettings);
                 }
                 else
                 {
                     _cachedSettings = new ApplicationSettings();
-                    _logger.LogWarning("Settings file does not exist at {Path}. Using defaults: SerialPort={SerialPort}, WebAddress={WebAddress}, WebPort=8080",
-                        _settingsFilePath, _cachedSettings.SerialPort, _cachedSettings.WebAddress);
+                    _logger.LogWarning("Settings file does not exist at {Path}. Using defaults: SerialPort={SerialPort}, WebAddress={WebAddress}, HttpPort={HttpPort}",
+                        _settingsFilePath, _cachedSettings.SerialPort, _cachedSettings.WebAddress, _cachedSettings.HttpPort);
                 }
 
                 return _cachedSettings;
@@ -64,8 +66,8 @@ namespace Yaesu_Web_Control.Services
             await _semaphore.WaitAsync();
             try
             {
-                _logger.LogInformation("SaveSettingsAsync called with: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, WebPort=8080",
-                    settings.SerialPort, settings.BaudRate, settings.WebAddress);
+                _logger.LogInformation("SaveSettingsAsync called with: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
+                    settings.SerialPort, settings.BaudRate, settings.WebAddress, settings.HttpPort);
 
                 var options = new JsonSerializerOptions
                 {
@@ -105,6 +107,29 @@ namespace Yaesu_Web_Control.Services
             _semaphore.Wait();
             try { _cachedSettings = null; }
             finally { _semaphore.Release(); }
+        }
+
+        // Backward-compat for users whose *CommandLine settings were saved before
+        // the strict-quoting rule was introduced. Auto-quote any unquoted path
+        // whose entire value is an existing file (no command-line arguments
+        // included). Paths with arguments require the user to add quotes
+        // themselves — there is no reliable heuristic that distinguishes
+        // "path-with-spaces" from "path args-with-spaces".
+        private static void AutoQuoteCommandLinePaths(ApplicationSettings s)
+        {
+            s.WsjtxCommandLine       = AutoQuote(s.WsjtxCommandLine);
+            s.JtalertCommandLine     = AutoQuote(s.JtalertCommandLine);
+            s.Log4omCommandLine      = AutoQuote(s.Log4omCommandLine);
+            s.GridtrackerCommandLine = AutoQuote(s.GridtrackerCommandLine);
+        }
+
+        private static string AutoQuote(string value)
+        {
+            var trimmed = (value ?? string.Empty).Trim();
+            if (trimmed.Length == 0) return trimmed;
+            if (trimmed.StartsWith('"')) return trimmed;
+            if (!trimmed.Contains(' ')) return trimmed;
+            return System.IO.File.Exists(trimmed) ? $"\"{trimmed}\"" : trimmed;
         }
 
         private static void MigrateAppDataIfNeeded(string newFolder)

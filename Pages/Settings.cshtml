@@ -11,6 +11,29 @@
         </div>
     }
 
+    @* Restart-required banner — shown when a setting like the radio model was
+       changed and the running app needs a restart for it to fully take effect.
+       Bigger, brighter, and non-dismissible compared to the StatusMessage above,
+       so the user can't miss it. Issue #9. *@
+    @if (!string.IsNullOrEmpty(Model.RestartRequiredReason))
+    {
+        <div class="alert alert-warning border-3 d-flex flex-wrap align-items-center gap-3" role="alert" aria-live="polite">
+            <div class="flex-grow-1">
+                <h5 class="mb-1"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart Yaesu Web Control to apply your changes</h5>
+                <div class="mb-0">
+                    You changed the <strong>@Model.RestartRequiredReason</strong>.
+                    Most settings take effect immediately, but this one needs a restart so every part of the app — and any open browser tabs from before the change — picks up the new value cleanly.
+                </div>
+            </div>
+            <form method="post" asp-page-handler="Restart" class="m-0">
+                <button type="submit" class="btn btn-warning fw-bold"
+                        title="Stop the app and relaunch it. Your browser will briefly show the 'Yaesu Web Control has stopped' overlay; reload this tab when the app is back.">
+                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart Now
+                </button>
+            </form>
+        </div>
+    }
+
     <!-- Network Access URLs Card -->
     <div class="row mb-4">
         <div class="col-lg-6 mb-4 mb-lg-0">
@@ -24,7 +47,7 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-1"><i class="bi bi-laptop"></i> Local Access (This PC)</h6>
-                                    <code class="fs-5" id="localUrl">http://localhost:8080</code>
+                                    <code class="fs-5" id="localUrl">http://localhost:@Model.CurrentRunningPort</code>
                                 </div>
                                 <button class="btn btn-sm btn-outline-primary" onclick="copyToClipboard('localUrl')">
                                     <i class="bi bi-clipboard"></i> Copy
@@ -40,7 +63,7 @@
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
                                             <h6 class="mb-1"><i class="bi bi-tablet"></i> Network Access (Tablets/Phones)</h6>
-                                            <code class="fs-5" id="@urlId">http://@addr:8080</code>
+                                            <code class="fs-5" id="@urlId">http://@addr:@Model.CurrentRunningPort</code>
                                             @if (addr.StartsWith("192.168") || addr.StartsWith("10.") || addr.StartsWith("172."))
                                             {
                                                 <small class="text-muted d-block">Private Network</small>
@@ -104,7 +127,13 @@
                             }
                         </dd>
                         <dt class="col-sm-4">Web Port:</dt>
-                        <dd class="col-sm-8"><code>8080</code></dd>
+                        <dd class="col-sm-8">
+                            <code>@Model.CurrentRunningPort</code>
+                            @if (Model.CurrentRunningPort != Model.Settings.HttpPort)
+                            {
+                                <span class="badge bg-warning text-dark ms-1" title="Configured port differs — restart for it to take effect">configured: @Model.Settings.HttpPort</span>
+                            }
+                        </dd>
                         <dt class="col-sm-4">SDR Device:</dt>
                         <dd class="col-sm-8">
                             @if (string.IsNullOrEmpty(Model.Settings.SdrDeviceKey))
@@ -279,8 +308,16 @@
                             </div>
                             <span asp-validation-for="Settings.WebAddress" class="text-danger"></span>
                         </div>
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> <strong>Port:</strong> The web server always uses port <strong>8080</strong>.
+                        <div class="mb-3">
+                            <label asp-for="Settings.HttpPort" class="form-label">HTTP Port</label>
+                            <input asp-for="Settings.HttpPort" type="number" min="1" max="65535" class="form-control" style="max-width: 12em;" />
+                            <div class="form-text">
+                                Default <strong>8080</strong>. If that port is already used by another program on your PC
+                                (Plex, Jenkins, etc.), Yaesu Web Control automatically tries 8081–8089 at startup and uses the first free one.
+                                The port actually in use right now is <strong>@Model.CurrentRunningPort</strong>.
+                                Pin a specific port here only if you need to override that behaviour (e.g. you always want 9080).
+                            </div>
+                            <span asp-validation-for="Settings.HttpPort" class="text-danger"></span>
                         </div>
                         <div class="alert alert-warning" role="alert">
                             <i class="bi bi-exclamation-triangle-fill"></i>

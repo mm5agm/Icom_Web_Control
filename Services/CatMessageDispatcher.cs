@@ -154,6 +154,21 @@
                             else if (vfo == '1') _stateService.IpoB = code;
                         }
                         break;
+                    case "AN":
+                        // AN{vfo}{n}[{p3}]; — vfo: 0=Main 1=Sub; n: 1, 2, 3 (antenna jack).
+                        // Closes the gap from Issue #17: previously the front-panel
+                        // antenna change was silently ignored by the UI.
+                        if (message.Length >= 4)
+                        {
+                            var vfo = message[2];
+                            var ant = message[3].ToString();
+                            if (ant == "1" || ant == "2" || ant == "3")
+                            {
+                                if (vfo == '0') _stateService.AntennaA = ant;
+                                else if (vfo == '1') _stateService.AntennaB = ant;
+                            }
+                        }
+                        break;
                     case "BC":
                         // BC{vfo}{code}; — vfo: 0=Main 1=Sub; code: 0=OFF 1=ON
                         if (message.Length >= 4)

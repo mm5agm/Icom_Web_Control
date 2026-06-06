@@ -534,16 +534,28 @@ namespace Yaesu_Web_Control.Services.Sdr
             return IntPtr.Zero;
         }
 
+        // hwVer codes per the official SDRplay API header
+        // (C:\Program Files\SDRplay\API\inc\sdrplay_api.h):
+        //   SDRPLAY_RSP1_ID    = 1
+        //   SDRPLAY_RSP2_ID    = 2
+        //   SDRPLAY_RSPduo_ID  = 3
+        //   SDRPLAY_RSPdx_ID   = 4
+        //   SDRPLAY_RSP1B_ID   = 6
+        //   SDRPLAY_RSPdxR2_ID = 7
+        //   SDRPLAY_RSP1A_ID   = 255   (deliberately out-of-sequence)
+        // The previous table was shifted by one slot at codes 3-5 and was
+        // missing 255, so RSPdx devices were labelled "RSPduo" (Issue #10)
+        // and RSP1A devices showed as "RSP (hwVer=255)".
         private static string HwVerToModel(byte hwVer) => hwVer switch
         {
-            1 => "RSP1",
-            2 => "RSP2",
-            3 => "RSP1A",
-            4 => "RSPduo",
-            5 => "RSPdx",
-            6 => "RSP1B",
-            7 => "RSPdx R2",
-            _ => $"RSP (hwVer={hwVer})"
+            1   => "RSP1",
+            2   => "RSP2",
+            3   => "RSPduo",
+            4   => "RSPdx",
+            6   => "RSP1B",
+            7   => "RSPdx R2",
+            255 => "RSP1A",
+            _   => $"RSP (hwVer={hwVer})"
         };
 
         private static void WriteDouble(IntPtr ptr, int offset, double value)

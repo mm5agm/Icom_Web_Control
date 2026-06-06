@@ -139,7 +139,7 @@ obj/
 
 FTdx101 WebApp_Setup.exe
 FTdx101_WebApp_Setup_*.exe
-Yaesu_Web_Control_Setup_*.exe
+Yaesu_Web_Control_Setup*.exe
 
 # Local reference documents — not committed to repo
 docs/

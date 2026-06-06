@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.1.0-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.2.0-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -94,6 +94,128 @@ The application includes a real-time spectrum display and waterfall, intended fo
 ---
 
 ## Release Notes
+
+## 2026-06-06 - v2.2.0
+
+A focused bug-fix release on the back of v2.1.0 — closes seven reporter-filed
+bugs, smooths several internal rough edges, and substantially refreshes the
+Log4OM documentation now that we understand exactly what works (QSO logging)
+and what doesn't (Log4OM's own live frequency display).
+
+**Yaesu Web Control passed 100 downloads on 2026-06-06.** Thank you to every
+operator who's tried it, and especially to those who took the time to file
+bug reports — almost every change in this release came from a real user
+report rather than from me hypothesising.
+
+### New features
+
+- **Settings: HTTP port is now configurable, with automatic fallback.** YWC
+  was previously hardcoded to port 8080 and would fail to start if anything
+  else (Plex, Jenkins, MiniTool ShadowMaker, etc.) had already grabbed it.
+  v2.2.0 adds an **HTTP Port** field in Settings (default 8080), and at
+  startup tries the configured port plus nine fallbacks, binding the first
+  free one. The tray-icon tooltip and the browser auto-open URL both follow
+  the actually-chosen port. If all ten are taken, a dialog names the owning
+  process for each. (#13, Manuel Cobreros Gómez)
+
+- **Settings: "Restart YWC to apply your changes" banner + one-click
+  Restart Now button.** Some settings (radio model, web server address,
+  HTTP port) need a full app restart to take effect. v2.2.0 detects when
+  these change, shows a prominent banner, and provides a Restart Now
+  button that gracefully stops and (for the installed build) auto-relaunches
+  YWC. (#9)
+
+- **Click-to-tune now works in the waterfall.** Previously you could click
+  the live spectrum to QSY VFO A; now you can also click any signal trail
+  in the waterfall and the radio jumps to that column's frequency. Natural
+  way to chase a signal you've been watching drift down the screen.
+
+- **Front-panel antenna change now syncs to the UI.** Switching antennas on
+  the radio's front panel now updates the YWC antenna dropdown within a
+  couple of seconds. (The radio doesn't auto-broadcast antenna changes,
+  so YWC polls for them.)
+
+### Bug fixes
+
+- **FTdx10: IF Width dropdown off-by-one above 2900 Hz.** Selecting "3.2 kHz"
+  set the radio to 3.0 kHz; selecting "4.0 kHz" was unreachable. Missing
+  3 kHz entry restored to the SSB bandwidth table. (#20, Thomas OZ1JTE)
+
+- **YWC was overwriting MIC GAIN and PROC LEVEL on every connect.** Stored
+  values were being pushed to the radio at startup, wiping any front-panel
+  tweaks the operator had made. Removed all three writes — the radio is
+  now the source of truth, and YWC reads back the current values on
+  connect. (#16, SP3L-Jacek)
+
+- **Log4OM (and other apps with spaces in their path) refused to launch.**
+  The command-line parser was splitting at the first space. Rewritten to
+  a strict, predictable contract: wrap the path in double quotes if it
+  contains spaces; everything after the closing quote is passed as
+  arguments. Existing unquoted paths are auto-migrated on first read.
+  New USER_MANUAL §7.1 documents the rule with examples. (#15, SP3L-Jacek)
+
+- **SDR scan: RSPdx and RSP1A were mis-identified.** HwVerToModel had model
+  names shifted by one slot at codes 3-5 (so RSPdx showed as "RSP DUO") and
+  was missing RSP1A's hwVer 255 entirely. Fixed to match the official
+  sdrplay_api.h header. (#10)
+
+- **Settings Save was silently doing nothing when optional fields were
+  empty.** A subtle interaction between `<Nullable>enable</Nullable>` and
+  jQuery unobtrusive validation caused empty DX-cluster inputs to silently
+  abort the form POST — no banner, no log entry, no save. The genuinely-
+  optional fields are now nullable in the model so the client-side block
+  doesn't trigger.
+
+- **Tray-icon Exit could take 30+ seconds.** Four contributing causes
+  identified and fixed; Tray → Exit now completes in about **1.2 seconds**
+  end-to-end and the browser cleanly shows a "Yaesu Web Control has
+  stopped" overlay.
+
+- **FTdx101 Power needle disappeared after exiting YWC.** During normal
+  operation YWC sets the radio's meter to MS13 (Comp + SWR) so it can read
+  SWR; without restoring on quit, the Power meter stayed blank. v2.2.0
+  sends `MS01` (Power) on shutdown so the needle is back when YWC closes.
+  FTdx101MP/D only. (Discussion #6, F1UBW / Régis)
+
+- **CAT dispatcher: front-panel control changes didn't always reach the
+  UI.** Coverage now includes PA (IPO/preamp), RA (attenuator), BC (auto
+  notch), CO (contour/APF) and AN (antenna), plus the existing handlers.
+  (#17, SP3L-Jacek)
+
+- **Power gauge jitter during transmit.** Smoothing window extended from
+  7 to 15 samples (≈1.5 s at 10 Hz polling) to handle the steepness of
+  the PWR calibration curve above 100 W. SWR smoothing stays at 7 samples
+  so high-SWR faults are still seen quickly.
+
+### Documentation
+
+- **Log4OM section (§9.3) overhauled.** New "Known limitation — live
+  frequency display" callout makes it clear that Log4OM's main-window
+  frequency indicator stays OFFLINE against YWC's rigctld, **but** that's
+  purely cosmetic — QSO logging via the WSJT-X → ADIF path captures the
+  frequency correctly. Four screenshots prove it end to end.
+
+- **GridTracker section (§9.4) expanded** with screenshots of the General
+  and Logging tabs.
+
+- **External Applications section (§7.1)** has a new path-quoting
+  subsection with examples — including the JTAlert-with-`/wsjtx` pattern.
+
+- **Calibration help text** corrected (it was still pointing at the
+  pre-rename AppData folder).
+
+### Known issues carried forward
+
+- **Log4OM NextGen's live-frequency display still doesn't update from YWC's
+  rigctld.** Investigated extensively; this is a feature gap rather than a
+  regression (same symptom reproducible on YWC v1.5.4). QSO logging works
+  regardless via the WSJT-X → ADIF path documented in §9.3. Tracked as
+  issue #18.
+
+- **WSJT-X loses rig control after a frequency change on FTdx10.** Reported
+  by W1WRH against v2.1.0; appears to be an FTdx10-specific edge case in
+  YWC's rigctld readback path. Awaiting reproduction logs. Tracked as
+  issue #22.
 
 ## 2026-06-03 - v2.1.0
 

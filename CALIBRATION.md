@@ -106,7 +106,7 @@ The process is the same for all numeric meters:
 
 ## Where Calibration Data Is Saved
 
-- **Installed app:** `%APPDATA%\MM5AGM\FTdx101\WebApp\calibration.user.json`
+- **Installed app:** `%APPDATA%\MM5AGM\Yaesu Web Control\calibration.user.json`
 - **Development:** `wwwroot/calibration.default.json`
 
 The save path is shown at the top of the Meter Calibration page.

@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
+using Yaesu_Web_Control.Hubs;
 
 namespace Yaesu_Web_Control.Services
 {
@@ -28,15 +30,23 @@ namespace Yaesu_Web_Control.Services
     {
         private readonly IHostApplicationLifetime _lifetime;
         private readonly ILogger<SystemTrayService> _logger;
+        private readonly IHubContext<RadioHub> _hubContext;
+        private readonly HttpPortInfo _portInfo;
         private Thread? _uiThread;
         private NotifyIcon? _notifyIcon;
         private ApplicationContext? _appContext;
         private SynchronizationContext? _uiSync;
 
-        public SystemTrayService(IHostApplicationLifetime lifetime, ILogger<SystemTrayService> logger)
+        public SystemTrayService(
+            IHostApplicationLifetime lifetime,
+            ILogger<SystemTrayService> logger,
+            IHubContext<RadioHub> hubContext,
+            HttpPortInfo portInfo)
         {
             _lifetime = lifetime;
             _logger = logger;
+            _hubContext = hubContext;
+            _portInfo = portInfo;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -107,7 +117,7 @@ namespace Yaesu_Web_Control.Services
                 {
                     Icon = icon,
                     Visible = true,
-                    Text = $"Yaesu Web Control v{AppVersion.Current} — running on http://localhost:8080",
+                    Text = $"Yaesu Web Control v{AppVersion.Current} — running on {_portInfo.RootUrl}",
                     ContextMenuStrip = menu,
                 };
                 // Double-click the tray icon -> open the browser. Most
@@ -152,7 +162,7 @@ namespace Yaesu_Web_Control.Services
         {
             try
             {
-                Process.Start(new ProcessStartInfo("http://localhost:8080") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(_portInfo.RootUrl) { UseShellExecute = true });
             }
             catch (Exception ex)
             {
@@ -200,8 +210,52 @@ namespace Yaesu_Web_Control.Services
                 MessageBoxIcon.Question);
             if (ok != DialogResult.OK) return;
 
+            _logger.LogInformation("[TrayExit] User confirmed exit");
+
+            // Tell any connected browser tabs we are shutting down so they can
+            // replace the stale UI with a "server has stopped" overlay rather
+            // than sitting there with a frozen needle. Best-effort — we wait
+            // briefly for the broadcast to flush, then proceed to stop the
+            // host regardless.
+            try
+            {
+                _hubContext.Clients.All
+                    .SendAsync("RadioStateUpdate", new { property = "ServerShutdown", value = true })
+                    .Wait(TimeSpan.FromMilliseconds(300));
+                _logger.LogInformation("[TrayExit] ServerShutdown broadcast complete");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast ServerShutdown to clients before stopping host.");
+            }
+
             try { if (_notifyIcon != null) _notifyIcon.Visible = false; } catch { }
-            _lifetime.StopApplication();
+
+            // Call StopApplication from a thread-pool worker instead of the
+            // WinForms STA thread. Earlier diagnostic logs showed `StopApplication`
+            // blocking the STA thread for 5 seconds — a sync-over-async issue
+            // where something inside the shutdown path captured the
+            // WindowsFormsSynchronizationContext and was waiting to resume on
+            // the STA thread that was itself blocked inside the call.
+            // Off-loading to the thread pool removes that context capture and
+            // lets OnExit return immediately; the host shuts down on a worker.
+            //
+            // Small deliberate delay before StopApplication so the SignalR
+            // broadcast above has time to actually traverse the WebSocket and
+            // reach the browser before Kestrel starts tearing connections down
+            // — otherwise the "Yaesu Web Control has stopped" overlay never
+            // gets to render. The previous 5-second STA-thread hang was
+            // accidentally providing this grace window; with the hang fixed
+            // (~1.2 s total exit), we need ~250 ms explicit delay to keep the
+            // overlay UX.
+            _logger.LogInformation("[TrayExit] Queuing _lifetime.StopApplication() on thread-pool worker");
+            Task.Run(async () =>
+            {
+                await Task.Delay(250);
+                _logger.LogInformation("[TrayExit] (worker) Calling _lifetime.StopApplication()");
+                _lifetime.StopApplication();
+                _logger.LogInformation("[TrayExit] (worker) _lifetime.StopApplication() returned");
+            });
         }
     }
 }

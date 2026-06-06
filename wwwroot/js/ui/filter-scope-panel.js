@@ -77,6 +77,23 @@ export class FilterScopePanel {
         this._animFrame = requestAnimationFrame(loop);
     }
 
+    /**
+     * Cancel the animation loop and disconnect the resize observer. Called by
+     * the ServerShutdown overlay in site.js so a dead browser tab doesn't keep
+     * burning CPU at 20 fps after the server has stopped. Idempotent — safe
+     * to call multiple times.
+     */
+    stop() {
+        if (this._animFrame) {
+            try { cancelAnimationFrame(this._animFrame); } catch { /* ignore */ }
+            this._animFrame = null;
+        }
+        if (this._resizeObserver) {
+            try { this._resizeObserver.disconnect(); } catch { /* ignore */ }
+            this._resizeObserver = null;
+        }
+    }
+
     _sizeCanvas(canvas) {
         const w = 160;
         canvas.width        = w;

@@ -175,9 +175,33 @@ namespace Yaesu_Web_Control.Services
             await SetStatus("connecting", $"Opening {settings.DxClusterHost}:{settings.DxClusterPort}");
 
             using var client = new TcpClient();
+            // When the host begins shutting down, `StreamReader.ReadLineAsync`
+            // over a `NetworkStream` does NOT honour its cancellation token on
+            // Windows — the underlying TCP read keeps blocking until either
+            // data arrives or the socket is closed. That meant `_lifetime.
+            // StopApplication()` was taking up to 30 s to actually progress
+            // past this service, because the read only unblocked when the
+            // 30-second `lineCts.CancelAfter` deadline below fired.
+            //
+            // We tear the socket down aggressively when stoppingToken cancels:
+            // `Shutdown(Both)` actively signals FIN to the remote so the OS
+            // unblocks any pending recv immediately; then `Close()` releases
+            // the handle. A plain `Close()` alone was observed to leave the
+            // read blocked on this NetworkStream on Windows 11 (2026-06-04).
+            //
+            // The log line proves whether the callback actually fires — if it
+            // does and the read still doesn't break, the problem is somewhere
+            // else; if it doesn't, the registration isn't reaching the
+            // cancelled token.
+            using var closeOnShutdown = stoppingToken.Register(() =>
+            {
+                _logger.LogInformation("[DxCluster] stoppingToken fired — tearing down TcpClient");
+                try { client.Client?.Shutdown(System.Net.Sockets.SocketShutdown.Both); } catch { /* may already be closed */ }
+                try { client.Close(); } catch { /* swallow — best-effort */ }
+            });
             using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             connectCts.CancelAfter(TimeSpan.FromSeconds(15));
-            await client.ConnectAsync(settings.DxClusterHost, settings.DxClusterPort, connectCts.Token);
+            await client.ConnectAsync(settings.DxClusterHost ?? "", settings.DxClusterPort, connectCts.Token);
 
             await SetStatus("connected", "");
 
@@ -286,7 +310,7 @@ namespace Yaesu_Web_Control.Services
                     // the user 2026-06-01: only G4* in the watch list, but
                     // EA* spots still triggered alerts.)
                     var liveSettings = await _settingsService.GetSettingsAsync();
-                    spot.IsWatched = MatchesWatchList(spot.Callsign, liveSettings.DxClusterWatchedCallsigns);
+                    spot.IsWatched = MatchesWatchList(spot.Callsign, liveSettings.DxClusterWatchedCallsigns ?? "");
                     AddSpot(spot);
                     await BroadcastSpot(spot);
                     if (spot.IsWatched)

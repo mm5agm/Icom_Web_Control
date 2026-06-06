@@ -178,6 +178,10 @@ async function _loadAndRender() {
 // Sentinel value used for the always-present built-in YWC starter bank entry.
 // Must match the Memories editor page constant of the same name.
 const STARTER_BANK_VALUE = '__ywc_starter__';
+// Sentinel for the "split the starter bank into per-mode banks" action.
+// Selecting this from the dropdown triggers the themed-create flow rather
+// than a bank load.
+const CREATE_THEMED_VALUE = '__ywc_create_themed__';
 
 async function _loadBanks() {
     const sel = document.getElementById('memBankSelect');
@@ -194,6 +198,12 @@ async function _loadBanks() {
         starterOpt.value       = STARTER_BANK_VALUE;
         starterOpt.textContent = '📥 YWC Starter Bank (built-in)';
         sel.appendChild(starterOpt);
+        // Action entry: split the starter bank into themed banks (FT8, CW,
+        // SSB, RTTY, FM) the user can load individually.
+        const themedOpt = document.createElement('option');
+        themedOpt.value       = CREATE_THEMED_VALUE;
+        themedOpt.textContent = '🪄 Create themed banks…';
+        sel.appendChild(themedOpt);
         for (const name of _banks) {
             const opt = document.createElement('option');
             opt.value = name;
@@ -208,6 +218,15 @@ async function _loadBanks() {
 
 async function _switchBank(name) {
     if (!name) return;
+    if (name === CREATE_THEMED_VALUE) {
+        await _createThemedBanks();
+        // Reset the dropdown — themed-create is an action, not a bank to stay
+        // selected on. Refresh the list so newly created banks appear.
+        const sel = document.getElementById('memBankSelect');
+        if (sel) sel.value = '';
+        await _loadBanks();
+        return;
+    }
     const statusEl = document.getElementById('memToolbarStatus');
     if (statusEl) statusEl.textContent = 'Loading bank…';
     try {
@@ -230,6 +249,53 @@ async function _switchBank(name) {
         }
     } catch (e) {
         if (statusEl) statusEl.textContent = '✗ Error loading bank';
+    }
+}
+
+// Split the region starter bank into themed sub-banks (FT8, FT4, CW, SSB,
+// RTTY, FM). First pass leaves any existing same-name banks alone; user can
+// opt in to overwriting clashes on the second pass.
+async function _createThemedBanks() {
+    const statusEl = document.getElementById('memToolbarStatus');
+    if (!await _memConfirm(
+        'Create themed banks from the YWC starter bank?\n\n' +
+        'This will create banks named FT8, FT4, CW, SSB, RTTY and FM\n' +
+        '(skipping any that are empty for your region).\n\n' +
+        'Existing banks with the same name are left untouched —\n' +
+        'you\'ll be asked separately if any are found.')) return;
+
+    if (statusEl) statusEl.textContent = 'Creating themed banks…';
+    try {
+        let resp = await fetch('/api/memory/starter-bank/create-themed-banks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ overwrite: false })
+        });
+        if (!resp.ok) { if (statusEl) statusEl.textContent = '✗ Create failed'; return; }
+        let result = await resp.json();
+
+        if (result.skipped && result.skipped.length > 0) {
+            const list = result.skipped.join(', ');
+            if (await _memConfirm(
+                `These banks already exist and were not changed:\n  ${list}\n\n` +
+                'Overwrite them with the starter-bank versions?')) {
+                resp = await fetch('/api/memory/starter-bank/create-themed-banks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ overwrite: true })
+                });
+                if (resp.ok) result = await resp.json();
+            }
+        }
+
+        if (statusEl) {
+            statusEl.textContent = result.created.length > 0
+                ? `✓ Created ${result.created.length} themed bank${result.created.length === 1 ? '' : 's'}: ${result.created.join(', ')}`
+                : '✓ No banks created — all themed names already exist (overwrite declined).';
+            setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 5000);
+        }
+    } catch {
+        if (statusEl) statusEl.textContent = '✗ Error';
     }
 }
 

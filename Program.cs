@@ -1,9 +1,14 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Serilog;
 using Yaesu_Web_Control.Services;
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Windows.Forms;
 
 // ── Single-instance guard ────────────────────────────────────────────────────
@@ -70,6 +75,59 @@ static string? GetPortOwner(int port)
     return null;
 }
 
+// Probe a TCP port to see if YWC can bind to it. Uses Socket.Bind on
+// IPAddress.Any so we catch the full set of "port unavailable" cases:
+//   - port already in use by another listener
+//   - port in a Windows excluded range (WSL / Hyper-V / Docker)
+//   - "socket access permissions" denial (some antivirus winsock hooks)
+// All of these surface as a SocketException at bind time. We open and
+// immediately close — there's a small race between this probe and Kestrel's
+// real bind a few milliseconds later, but in practice that race window is
+// short enough not to matter.
+static bool IsPortFree(int port)
+{
+    // Enumerate every TCP port currently in LISTENING state on the system.
+    // Way more reliable than trying to Bind() a probe socket: on Windows,
+    // a second `Bind` to a port that another process is already listening
+    // on can silently succeed (both end up in LISTENING; only one actually
+    // receives traffic — the other "shadows" the first). SO_EXCLUSIVEADDRUSE
+    // is supposed to prevent this but its semantics depend on flags both
+    // sockets were created with, so we don't trust it. The active-listeners
+    // enumeration sees the OS truth directly.
+    var listeners = System.Net.NetworkInformation.IPGlobalProperties
+        .GetIPGlobalProperties()
+        .GetActiveTcpListeners();
+    foreach (var endpoint in listeners)
+    {
+        if (endpoint.Port == port)
+            return false;
+    }
+    return true;
+}
+
+// Pre-startup helper: read the user's configured HTTP port from
+// appsettings.user.json (if it exists) without spinning up the full DI
+// container. Falls back to 8080. Bounded to a sane range. We only need
+// the one field so a minimal JSON parse keeps startup fast and avoids
+// circular dependencies between port resolution and DI.
+static int LoadConfiguredHttpPort()
+{
+    try
+    {
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "MM5AGM", "Yaesu Web Control", "appsettings.user.json");
+        if (!File.Exists(path)) return 8080;
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        if (doc.RootElement.TryGetProperty("HttpPort", out var p) && p.TryGetInt32(out int port))
+        {
+            if (port >= 1 && port <= 65535) return port;
+        }
+    }
+    catch { }
+    return 8080;
+}
+
 // ── SoapySDR native library resolver ────────────────────────────────────────
 // .NET P/Invoke on Windows does not search PATH directories by default.
 // Resolve SoapySDR.dll explicitly from its install location so the P/Invoke
@@ -91,7 +149,47 @@ NativeLibrary.SetDllImportResolver(
         return IntPtr.Zero;   // fall back to default resolution for all other DLLs
     });
 
+// ── Serilog file logging ────────────────────────────────────────────────────
+// YWC is a WinExe (no console window) so stdout-based loggers are invisible.
+// Wire up Serilog with a rolling-daily file sink under %APPDATA% so we have a
+// readable record of what the app did — essential for diagnosing shutdown
+// hangs, CAT timeouts, SDR init failures and anything else the user can't see.
+var logDir = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+    "MM5AGM", "Yaesu Web Control", "logs");
+try { Directory.CreateDirectory(logDir); } catch { /* fall through, Serilog will surface the problem */ }
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.AspNetCore.SignalR", Serilog.Events.LogEventLevel.Warning)
+    // Keep Hosting.Lifetime at Information so we see exactly when
+    // StopApplication is called and when each hosted service's StopAsync runs
+    // — invaluable for diagnosing shutdown stalls.
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", Serilog.Events.LogEventLevel.Information)
+    .Enrich.FromLogContext()
+    .WriteTo.File(
+        Path.Combine(logDir, "ywc-.log"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        shared: true,
+        flushToDiskInterval: TimeSpan.FromSeconds(1),
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
+
+Log.Information("Yaesu Web Control starting (v{Version})", Yaesu_Web_Control.AppVersion.Current);
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Cap the host's overall shutdown timeout. Default is 30 s (which we hit on
+// every tray Exit before adding this cap); 2 s is plenty for our user
+// services to wind down their StopAsync routines. Tracked in the project
+// todo memory.
+builder.Services.Configure<HostOptions>(opts =>
+{
+    opts.ShutdownTimeout = TimeSpan.FromSeconds(2);
+});
+
 builder.Services.AddSingleton<CalibrationStorage>();
 builder.Services.AddSingleton<ICalibrationService, CalibrationService>();
 
@@ -139,8 +237,48 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioI
 // ADD THIS LINE for Razor Pages support:
 builder.Services.AddRazorPages();
 
-// Force the web host to use port 8080 on all interfaces
-builder.WebHost.UseUrls("http://0.0.0.0:8080");
+// ── HTTP port resolution ────────────────────────────────────────────────────
+// Pick the port BEFORE Kestrel binds, so we can fall back gracefully if the
+// user's configured port (default 8080) is held by another program. We try
+// the configured port plus the nine above it; whichever is free first wins.
+// The chosen port is published as a singleton HttpPortInfo so the browser
+// launcher, system tray, and Settings UI all read the same value (Issue #13).
+int basePort = LoadConfiguredHttpPort();
+int chosenPort = -1;
+var triedPorts = new List<int>();
+for (int candidate = basePort; candidate < basePort + 10 && candidate <= 65535; candidate++)
+{
+    triedPorts.Add(candidate);
+    if (IsPortFree(candidate))
+    {
+        chosenPort = candidate;
+        break;
+    }
+}
+if (chosenPort < 0)
+{
+#pragma warning disable CA1416
+    var diag = string.Join("\n",
+        triedPorts.Select(p => $"  {p,5} — {GetPortOwner(p) ?? "unknown / Windows-reserved"}"));
+    MessageBox.Show(
+        $"Yaesu Web Control couldn't find a free TCP port to listen on.\n\n" +
+        $"Tried ports {triedPorts.First()}–{triedPorts.Last()}:\n\n{diag}\n\n" +
+        $"Either close one of those programs, or open Yaesu Web Control's\n" +
+        $"Settings page on a working installation and change the HttpPort\n" +
+        $"value in %APPDATA%\\MM5AGM\\Yaesu Web Control\\appsettings.user.json\n" +
+        $"to a free port (e.g. 9080), then restart.",
+        "No free port available",
+        MessageBoxButtons.OK,
+        MessageBoxIcon.Error);
+#pragma warning restore CA1416
+    return;
+}
+
+// Force the web host to use the chosen port on all interfaces.
+builder.WebHost.UseUrls($"http://0.0.0.0:{chosenPort}");
+
+// Publish the chosen port so every consumer reads from one source of truth.
+builder.Services.AddSingleton(new HttpPortInfo(chosenPort));
 
 builder.Services.AddSingleton<BrowserLauncher>();
 // System tray icon — gives operators a visible "YWC is running" indicator
@@ -163,21 +301,12 @@ builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryBankService>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.DxClusterService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.DxClusterService>());
 
+// Route everything through Serilog (file sink configured above). The previous
+// console + filter chain is gone — it was invisible in a WinExe anyway, and
+// the file sink captures Information+ globally so we can read what happened
+// after the fact without a console window.
 builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-builder.Logging.AddFilter((category, level) =>
-{
-    // Show Information and above for WsjtxUdpService
-    if (!string.IsNullOrEmpty(category) && category.Contains("Yaesu_Web_Control.Services.WsjtxUdpService"))
-        return level >= LogLevel.Information;
-    // Show Information and above for DxClusterService so we can see the
-    // raw protocol exchange when diagnosing why no spots appear.
-    if (!string.IsNullOrEmpty(category) && category.Contains("Yaesu_Web_Control.Services.DxClusterService"))
-        return level >= LogLevel.Information;
-    // Show Warning and above for everything else
-    return level >= LogLevel.Warning;
-});
-builder.Logging.AddDebug();
+builder.Host.UseSerilog();
 
 
 try
@@ -262,27 +391,44 @@ try
 
     // Open browser automatically when app starts (but not when debugging in Visual Studio)
     var browserLauncher = app.Services.GetRequiredService<BrowserLauncher>();
-    var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+    var portInfo        = app.Services.GetRequiredService<HttpPortInfo>();
+    var lifetime        = app.Services.GetRequiredService<IHostApplicationLifetime>();
+
+    // Lifecycle-event log fences so we can see in the Serilog file exactly
+    // when each shutdown phase fires. Helps diagnose "what's the framework
+    // doing for 30 s between ApplicationStopping and the first hosted-service
+    // StopAsync" — see project todo memory.
+    lifetime.ApplicationStopping.Register(() => Log.Information("[Lifecycle] ApplicationStopping fired"));
+    lifetime.ApplicationStopped.Register(()  => Log.Information("[Lifecycle] ApplicationStopped fired"));
+
     lifetime.ApplicationStarted.Register(() =>
     {
-        browserLauncher.OpenOnce("http://localhost:8080");
+        browserLauncher.OpenOnce(portInfo.RootUrl);
     });
 
     app.Run();
+    Log.Information("app.Run() returned cleanly — flushing logs and exiting");
+    Log.CloseAndFlush();
 }
 catch (Exception ex)
 {
     var msg = $"[FATAL] Application failed to start: {ex.Message}\n{ex.StackTrace}";
     Console.Error.WriteLine(msg);
     try { File.AppendAllText("fatal_startup_error.log", $"{DateTime.Now:u} {msg}\n"); } catch { }
+    Log.Fatal(ex, "Application failed to start");
+    Log.CloseAndFlush();
 
 #pragma warning disable CA1416
     if (IsPortInUseException(ex))
     {
-        var owner = GetPortOwner(8080);
+        // We pre-probed the port before configuring Kestrel, so this catch is
+        // only reached if the chosen port was grabbed by another process in
+        // the race window between probe and bind. Report whichever port we
+        // actually chose, not the hardcoded default.
+        var owner = GetPortOwner(chosenPort);
         var portMsg = owner is not null
-            ? $"Port 8080 is already in use by {owner}.\n\nClose that application and try again."
-            : "Port 8080 is already in use by another application.\n\nClose that application and try again.";
+            ? $"Port {chosenPort} is already in use by {owner}.\n\nClose that application and try again."
+            : $"Port {chosenPort} is already in use by another application.\n\nClose that application and try again.";
         MessageBox.Show(portMsg, "Port In Use", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
     else

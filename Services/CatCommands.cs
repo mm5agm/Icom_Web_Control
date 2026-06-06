@@ -22,6 +22,7 @@
         public const string MeterPower = "RM5";    // Power output meter (0-255)
         public const string MeterSWR = "RM6";      // SWR meter (0-255) — NOTE: RM6 returns stale/wrong values on FTdx101MP; use SetMetersSWR+MeterBoth instead
         public const string SetMetersCompAndSWR = "MS13"; // Select Compression(left) + SWR(right) for RM0 read
+        public const string SetMeterPower       = "MS01"; // Restore the default Power meter on shutdown so the user's radio is left in a normal state
         public const string MeterBoth = "RM0";            // Read both currently-selected meters: RM0LLLRRR;
         public const string MeterALC = "RM4";      // ALC meter (0-255)
         public const string MeterComp = "RM3";     // Compression meter (0-255)
