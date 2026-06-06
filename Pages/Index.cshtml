@@ -209,6 +209,13 @@
                     aria-label="Open memories panel">
                 Mem
             </button>
+            <button id="sMeterHistoryToggleBtn" class="btn btn-sm btn-outline-secondary"
+                    style="padding-top: 1px; padding-bottom: 1px;"
+                    title="Show/hide 30-second S-meter history strip (QSB, noise spikes, noise floor)"
+                    aria-label="Show or hide the S-meter history strip"
+                    aria-pressed="false">
+                S-hist
+            </button>
             <button id="vfoBToggleBtn" class="btn btn-sm btn-outline-secondary"
                     style="padding-top: 1px; padding-bottom: 1px;" title="Show/Hide VFO-B"
                     aria-label="Show or hide VFO B panel">
@@ -440,6 +447,13 @@
                         <div class="flex-shrink-0">
                             <div class="analog-meter-container">
                                 <canvas id="sMeterCanvasA" role="img" aria-hidden="true" aria-label="S meter, VFO A" data-a11y-key="meters.smeterA"></canvas>
+                            </div>
+                            <div id="sMeterHistoryContainerA" class="smeter-history-container" style="display:none; margin-top:-50px; position:relative; z-index:2;">
+                                <canvas id="sMeterHistoryCanvasA"
+                                        role="img" aria-hidden="true"
+                                        aria-label="VFO A S-meter 30-second history"
+                                        data-a11y-key="meters.smeterHistoryA"
+                                        style="display:block; width:100%; height:72px; border-radius:3px;"></canvas>
                             </div>
                             <button id="saveMemBtnA" type="button"
                                     class="btn btn-outline-secondary btn-sm mt-1"
@@ -764,6 +778,13 @@
                         <div class="flex-shrink-0">
                             <div class="analog-meter-container">
                                 <canvas id="sMeterCanvasB" role="img" aria-hidden="true" aria-label="S meter, VFO B" data-a11y-key="meters.smeterB"></canvas>
+                            </div>
+                            <div id="sMeterHistoryContainerB" class="smeter-history-container" style="display:none; margin-top:-50px; position:relative; z-index:2;">
+                                <canvas id="sMeterHistoryCanvasB"
+                                        role="img" aria-hidden="true"
+                                        aria-label="VFO B S-meter 30-second history"
+                                        data-a11y-key="meters.smeterHistoryB"
+                                        style="display:block; width:100%; height:72px; border-radius:3px;"></canvas>
                             </div>
                             <button id="saveMemBtnB" type="button"
                                     class="btn btn-outline-secondary btn-sm mt-1"
@@ -1558,6 +1579,7 @@
     <script>window.bandPlan = '@Model.BandPlan';</script>
     <script type="module">
         import { MeterPanel }           from "/js/guages/meter-panel.js?v=1";
+        import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";
         import { FTdx101Meters }        from "/js/orchestrators/FTdx101Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
@@ -1601,6 +1623,36 @@
                 vdd:         { canvasId: 'vddMeterCanvas' }
             });
             window.ftdx101Meters = new FTdx101Meters(window.meterPanel, window.calibrationEngine);
+
+            // ── S-meter history strip ────────────────────────────────────────
+            // Hidden by default. Toggle via the "S-hist" button in the top
+            // toolbar; visibility persists in localStorage so the choice
+            // survives page reloads.
+            window.sMeterHistoryA = new SMeterHistoryPanel('sMeterHistoryCanvasA');
+            window.sMeterHistoryB = new SMeterHistoryPanel('sMeterHistoryCanvasB');
+            (function () {
+                const btn  = document.getElementById('sMeterHistoryToggleBtn');
+                const conA = document.getElementById('sMeterHistoryContainerA');
+                const conB = document.getElementById('sMeterHistoryContainerB');
+                if (!btn || !conA || !conB) return;
+
+                const KEY = 'ywc.sMeterHistoryVisible';
+                const apply = (visible) => {
+                    conA.style.display = visible ? '' : 'none';
+                    conB.style.display = visible ? '' : 'none';
+                    btn.classList.toggle('active', visible);
+                    btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+                };
+                let visible = false;
+                try { visible = localStorage.getItem(KEY) === '1'; } catch {}
+                apply(visible);
+
+                btn.addEventListener('click', () => {
+                    visible = !visible;
+                    try { localStorage.setItem(KEY, visible ? '1' : '0'); } catch {}
+                    apply(visible);
+                });
+            })();
 
             // ── Spectrum display ─────────────────────────────────────────────
             // SpectrumPanel owns the canvas and all DOM for the spectrum display.

@@ -168,15 +168,31 @@ namespace Yaesu_Web_Control.Controllers
             WindowNativeMethods.SetForegroundWindow(hwnd);
         }
 
+        // Strict contract — the user owns quoting. Two cases:
+        //   (a) starts with " — exe is the contents of the first quoted token,
+        //       everything after the closing " is passed as arguments
+        //   (b) otherwise — exe is everything up to the first space,
+        //       everything after that space is passed as arguments
+        //
+        // No "is the whole string a file path" fallback: that heuristic was
+        // safe for #15 (path with spaces, no args) but cannot distinguish
+        // "path-with-spaces" from "path-no-spaces args-with-spaces", so it
+        // creates more confusion than it removes. Users with spaces in their
+        // path must quote it themselves — SettingsService migrates legacy
+        // unquoted paths on read, and the USER_MANUAL documents the rule.
         private static (string exe, string args) ParseCommandLine(string commandLine)
         {
             commandLine = commandLine.Trim();
+
             if (commandLine.StartsWith('"'))
             {
                 var closeQuote = commandLine.IndexOf('"', 1);
                 if (closeQuote > 0)
                     return (commandLine[1..closeQuote], commandLine[(closeQuote + 1)..].Trim());
+                // Malformed (opening quote, no close) — treat the rest as exe.
+                return (commandLine[1..], string.Empty);
             }
+
             var spaceIndex = commandLine.IndexOf(' ');
             return spaceIndex < 0
                 ? (commandLine, string.Empty)

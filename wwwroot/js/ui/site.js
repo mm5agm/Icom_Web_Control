@@ -1,4 +1,59 @@
-﻿// --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
+﻿// Full-page "server has stopped" overlay. Shown when the SystemTrayService
+// broadcasts ServerShutdown right before stopping the host, so the browser
+// tab doesn't sit on stale data with a frozen meter needle. The page can't
+// reliably close its own tab (browsers only allow window.close() for tabs
+// the page itself opened) — we try it as a courtesy and otherwise leave a
+// clear visual cue.
+function showServerStoppedOverlay() {
+    if (document.getElementById('ywcServerStoppedOverlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'ywcServerStoppedOverlay';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Yaesu Web Control has been closed');
+    overlay.style.cssText = [
+        'position:fixed', 'inset:0', 'z-index:99999',
+        // Fully opaque, not rgba(...,0.96) — at 4% transparency, any canvas
+        // panel that's still self-animating (notably the filter scope, which
+        // runs a 20 fps requestAnimationFrame loop) was ghosting through and
+        // making the page look "frozen except for the filter graphic" instead
+        // of clearly stopped.
+        'background:#141820', 'color:#e0e0e0',
+        'display:flex', 'flex-direction:column',
+        'justify-content:center', 'align-items:center', 'text-align:center',
+        'padding:24px', 'font-family:system-ui,sans-serif'
+    ].join(';');
+    overlay.innerHTML =
+        '<div style="font-size:2rem;margin-bottom:0.5rem">Yaesu Web Control has stopped</div>' +
+        '<div style="font-size:1rem;max-width:520px;line-height:1.5;margin-bottom:1.5rem;color:#aab">' +
+            'The app has been closed from the system-tray icon. The radio is no longer being controlled from this browser tab.' +
+            '<br><br>Once you restart Yaesu Web Control, click <strong>Reload page</strong> below to continue. Or just close this browser tab using its X button.' +
+        '</div>' +
+        '<button type="button" id="ywcServerStoppedReloadBtn" ' +
+            'style="padding:8px 22px;border-radius:6px;border:1px solid #4a8abf;background:#2a4860;color:#e0e0ff;cursor:pointer;font-size:0.95rem">' +
+            '↻ Reload page' +
+        '</button>';
+    document.body.appendChild(overlay);
+    document.getElementById('ywcServerStoppedReloadBtn')?.addEventListener('click', () => {
+        // location.reload() works for any tab regardless of how it was opened.
+        // If YWC isn't back up yet, the reload will fail and the browser shows
+        // its own "can't connect" page — which is still a clearer outcome than
+        // a tab stuck on the overlay.
+        location.reload();
+    });
+
+    // Cleanly stop any panels that drive their own animation timers. The
+    // overlay is opaque so they'd be hidden anyway, but cancelling the RAF
+    // loops avoids burning CPU on a tab the user has clearly walked away
+    // from. Each call is wrapped because some panels may not exist on this
+    // page (e.g. spectrum is only present when an SDR is configured).
+    try { window.filterScopePanelA?.stop?.(); } catch { /* ignore */ }
+    try { window.filterScopePanelB?.stop?.(); } catch { /* ignore */ }
+    try { window.sMeterHistoryA?.stop?.();   } catch { /* ignore */ }
+    try { window.sMeterHistoryB?.stop?.();   } catch { /* ignore */ }
+}
+
+// --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
 document.addEventListener('keydown', function (e) {
     // Ignore if typing in an input, textarea, or contenteditable
     const active = document.activeElement;
@@ -783,6 +838,25 @@ function updateMicGainLabel(mode) {
 // Handles ModeA/B, FrequencyA/B, PowerA/B updates pushed from the backend.
 connection.on("RadioStateUpdate", function (update) {
 
+    // --- SERVER SHUTDOWN ---
+    // Sent by SystemTrayService just before the host stops, so the browser
+    // tab can replace the stale UI with a clear "server has stopped" notice
+    // instead of sitting with a frozen meter. Attempt window.close() as a
+    // courtesy — only works for tabs the page itself opened, but harmless
+    // when it doesn't.
+    if (update.property === "ServerShutdown") {
+        try { showServerStoppedOverlay(); } catch (e) { /* best-effort */ }
+        // Explicitly tear down the SignalR connection so Kestrel doesn't sit
+        // for 5 s waiting for our long-lived hub connection to drain on
+        // server-side shutdown. Without this, `_lifetime.StopApplication()`
+        // on the server was blocking the WinForms STA thread for ~5 s before
+        // returning — a Kestrel "polite drain" issue. Closing the connection
+        // here means Kestrel has nothing to drain.
+        try { connection.stop(); } catch (e) { /* may already be closed */ }
+        try { window.signalRConnection?.stop(); } catch (e) { /* same — different connection */ }
+        return;
+    }
+
     // --- CONNECTION STATE ---
     if (update.property === "IsConnected") {
         const connected = update.value === true || update.value === 'true';
@@ -812,6 +886,21 @@ connection.on("RadioStateUpdate", function (update) {
         }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeB', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('B', update.value);
+    }
+
+    // --- ANTENNA CHANGE ---
+    // The radio does not auto-broadcast AN changes from the front panel,
+    // so MeterPollingService polls AN0/AN1 every couple of seconds and
+    // routes the response through the dispatcher → RadioStateService →
+    // SignalR. The antenna control is a <select>, not a radio-button group,
+    // so we update its .value directly.
+    if (update.property === "AntennaA") {
+        const sel = document.getElementById('antennaSelectA');
+        if (sel) sel.value = update.value;
+    }
+    if (update.property === "AntennaB") {
+        const sel = document.getElementById('antennaSelectB');
+        if (sel) sel.value = update.value;
     }
 
     // --- PROC ---
@@ -1901,7 +1990,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Update ONLY mode and antenna buttons (not bands) - used by polling to avoid overwriting user's band selection
+    // Update ONLY mode and antenna selectors (not bands) - used by polling to avoid overwriting user's band selection
     function updateModeAndAntennaButtons(receiver, mode, antenna) {
         // Mode dropdown
         const modeSelect = document.getElementById(`modeSelect${receiver}`);
@@ -1909,10 +1998,14 @@ document.addEventListener('DOMContentLoaded', function() {
             modeSelect.value = mode;
         }
 
-        // Antenna buttons
-        document.querySelectorAll(`input[name="antenna${receiver}"]`).forEach(btn => {
-            btn.checked = (btn.value === antenna);
-        });
+        // Antenna is a <select> (#antennaSelectA / #antennaSelectB), not a
+        // radio-button group — earlier code queried input[name="antennaA"]
+        // which never matched anything, so polling-based antenna updates
+        // were silently broken.
+        const antennaSelect = document.getElementById(`antennaSelect${receiver}`);
+        if (antennaSelect && antenna) {
+            antennaSelect.value = antenna;
+        }
     }
 
     // Update roofing filter dropdown
@@ -2438,11 +2531,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateSMeter(receiver, value) {
         if (receiver === 'A') {
             if (window.meterPanel) window.meterPanel.update('smeterA', value);
+            if (window.sMeterHistoryA) window.sMeterHistoryA.push(value);
             updateRawSMeterValueA(value);
             const canvasA = document.getElementById('sMeterCanvasA');
             if (canvasA) canvasA.dataset.reading = sMeterLabel(value);
         } else if (receiver === 'B') {
             if (window.meterPanel) window.meterPanel.update('smeterB', value);
+            if (window.sMeterHistoryB) window.sMeterHistoryB.push(value);
             const canvasB = document.getElementById('sMeterCanvasB');
             if (canvasB) canvasB.dataset.reading = sMeterLabel(value);
         }

@@ -35,7 +35,18 @@ export class SdrSpectrumPipeline {
             .withAutomaticReconnect()
             .build();
 
-        conn.on('RadioStateUpdate', (msg) => this._pipeline.handleMessage(msg));
+        conn.on('RadioStateUpdate', (msg) => {
+            // ServerShutdown: tear down our connection so Kestrel has nothing
+            // to drain on server-side shutdown — this matches the matching
+            // logic in site.js's main connection handler. Without it, this
+            // pipeline's long-lived hub connection alone keeps Kestrel
+            // politely waiting for ~5 s on every tray Exit.
+            if (msg && msg.property === 'ServerShutdown') {
+                try { conn.stop(); } catch { /* may already be closed */ }
+                return;
+            }
+            this._pipeline.handleMessage(msg);
+        });
         conn.start().catch(() => { /* reconnect is handled by withAutomaticReconnect */ });
 
         this._connection = conn;

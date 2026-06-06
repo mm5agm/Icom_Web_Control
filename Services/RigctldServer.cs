@@ -391,12 +391,13 @@ namespace Yaesu_Web_Control.Services
 
         private static string GetDumpState()
         {
-            // Minimal Hamlib dump_state response.
-            // Hamlib parses this to understand rig capabilities before sending Test CAT commands.
-            // Format: protocol_version, rig_model, freq_ranges (HF→10m), then terminating zeros.
+            // Minimal Hamlib dump_state response. Same as v2.1.0 shipped —
+            // user reports Log4OM frequency display *was* working in a
+            // previous version with this response, so reverting any
+            // attempted "fixes" until we figure out what actually regressed.
             return string.Join("\n",
-                "0",            // ITU region
-                "2",            // protocol version
+                "0",            // protocol version
+                "2",            // rig model (2 = NET rigctl)
                 "1800000.000000 30000000.000000 0x1ff -1 -1 0x10000003 0x3",  // HF RX range
                 "50000000.000000 54000000.000000 0x1ff -1 -1 0x10000003 0x3", // 6m RX range
                 "0 0 0 0 0 0 0",  // end of RX ranges

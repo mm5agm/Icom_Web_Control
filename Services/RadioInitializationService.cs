@@ -16,17 +16,20 @@ namespace Yaesu_Web_Control.Services
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly BrowserLauncher _browserLauncher;
         private readonly CatMultiplexerService _multiplexer;
+        private readonly HttpPortInfo _portInfo;
 
         public RadioInitializationService(
             IServiceProvider serviceProvider,
             IHubContext<RadioHub> hubContext,
             BrowserLauncher browserLauncher,
-            CatMultiplexerService multiplexer)
+            CatMultiplexerService multiplexer,
+            HttpPortInfo portInfo)
         {
             _serviceProvider = serviceProvider;
             _hubContext = hubContext;
             _browserLauncher = browserLauncher;
             _multiplexer = multiplexer;
+            _portInfo = portInfo;
         }
 
         public async Task InitializeRadioAsync()
@@ -57,7 +60,7 @@ namespace Yaesu_Web_Control.Services
                     if (!Debugger.IsAttached &&
                         string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
                     {
-                        _browserLauncher.OpenOnce("http://localhost:8080/Settings");
+                        _browserLauncher.OpenOnce($"{_portInfo.RootUrl}/Settings");
                     }
                     return;
                 }
@@ -77,7 +80,7 @@ namespace Yaesu_Web_Control.Services
                     if (!Debugger.IsAttached &&
                         string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
                     {
-                        _browserLauncher.OpenOnce("http://localhost:8080/Settings");
+                        _browserLauncher.OpenOnce($"{_portInfo.RootUrl}/Settings");
                     }
                     return;
                 }
@@ -108,7 +111,7 @@ namespace Yaesu_Web_Control.Services
                         if (!Debugger.IsAttached && 
                             string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
                         {
-                            _browserLauncher.OpenOnce("http://localhost:8080/Settings");
+                            _browserLauncher.OpenOnce($"{_portInfo.RootUrl}/Settings");
                         }
                         return;
                     }
@@ -185,23 +188,19 @@ namespace Yaesu_Web_Control.Services
                     stateTasks.Add(multiplexer.SendCommandAsync($"AG1{persistedState.AfGainB:D3};", "Initialization", stoppingToken)
                         .ContinueWith(t => { if (!t.IsFaulted) radioStateService.AfGainB = persistedState.AfGainB; }));
                 }
-                // Restore MIC Gain
-                if (persistedState.MicGain >= 0 && persistedState.MicGain <= 100)
-                {
-                    stateTasks.Add(multiplexer.SendCommandAsync($"MG{persistedState.MicGain:D3};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.MicGain = persistedState.MicGain; }));
-                }
-                // Restore Speech Processor
-                {
-                    string prCmd = persistedState.ProcEnabled ? "PR1;" : "PR0;";
-                    stateTasks.Add(multiplexer.SendCommandAsync(prCmd, "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ProcEnabled = persistedState.ProcEnabled; }));
-                }
-                if (persistedState.ProcLevel >= 0 && persistedState.ProcLevel <= 100)
-                {
-                    stateTasks.Add(multiplexer.SendCommandAsync($"PL{persistedState.ProcLevel:D3};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ProcLevel = persistedState.ProcLevel; }));
-                }
+                // MIC GAIN, Speech Processor ON/OFF, and PROC LEVEL are
+                // deliberately NOT restored from persisted state on connect
+                // (Issue #16, SP3L-Jacek 2026-06-04). These three values
+                // directly affect TX audio quality and are normally tuned
+                // physically on the radio for optimal sound — a fresh YWC
+                // install was writing its default `50` / `50` / off back to
+                // the radio, blowing away the operator's carefully-set
+                // MIC GAIN=33 / PROC LEVEL=100. The radio is the source of
+                // truth: the `MG;`, `PR;`, `PL;` queries in `readQueries`
+                // below will populate YWC's UI with whatever the radio
+                // actually has. If the user changes a value via the YWC
+                // slider afterwards, that sends the command to the radio
+                // and the radio's state changes accordingly.
                 // IF Width is read from the radio on connect (SH queries after stateTasks) — not written here.
                 // Restore IF Shift
                 {
@@ -366,7 +365,7 @@ namespace Yaesu_Web_Control.Services
                 if (!Debugger.IsAttached && 
                     string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
                 {
-                    _browserLauncher.OpenOnce("http://localhost:8080");
+                    _browserLauncher.OpenOnce(_portInfo.RootUrl);
                 }
             }
             catch (Exception ex)
@@ -380,7 +379,7 @@ namespace Yaesu_Web_Control.Services
                 if (!Debugger.IsAttached &&
                     string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
                 {
-                    _browserLauncher.OpenOnce("http://localhost:8080/Settings");
+                    _browserLauncher.OpenOnce($"{_portInfo.RootUrl}/Settings");
                 }
             }
         }
@@ -400,7 +399,7 @@ namespace Yaesu_Web_Control.Services
                 // Try to open Settings page even if initialization completely failed
                 try
                 {
-                    _browserLauncher.OpenOnce("http://localhost:8080/Settings");
+                    _browserLauncher.OpenOnce($"{_portInfo.RootUrl}/Settings");
                 }
                 catch { /* Ignore browser launch errors */ }
             }
@@ -408,8 +407,45 @@ namespace Yaesu_Web_Control.Services
 
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
+            // Log-fence so we can see in the console exactly which stage of
+            // shutdown stalls if anything ever hangs in here.
+            using var scopeForLogger = _serviceProvider.CreateScope();
+            var logger = scopeForLogger.ServiceProvider.GetService<ILogger<RadioInitializationService>>();
+            logger?.LogInformation("[RadioInit] StopAsync entered");
+
+            // FTdx101 power-meter restore (discussion #6, F1ubw). During normal
+            // operation MeterPollingService sets the radio's front-panel meter
+            // to MS13 (Comp + SWR) as the RM0 read workaround; without this
+            // restore, quitting YWC leaves the FTdx101's Power needle hidden
+            // until the operator power-cycles the radio or hits the METER button.
+            //
+            // Best-effort with a 1 s timeout so a hung send (e.g. radio
+            // powered off, COM cable yanked) can't stall host shutdown.
+            // Only FTdx101MP/D set MS13; other radios don't touch the meter.
+            try
+            {
+                var settingsService = scopeForLogger.ServiceProvider.GetRequiredService<ISettingsService>();
+                var settings = await settingsService.GetSettingsAsync();
+                if (settings.RadioModel is "FTdx101MP" or "FTdx101D")
+                {
+                    logger?.LogInformation("[RadioInit] Sending MS01 to restore FTdx101 power meter");
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    cts.CancelAfter(TimeSpan.FromSeconds(1));
+                    await _multiplexer.SendCommandAsync(
+                        CatCommands.SetMeterPower + ";", "RadioInit-Shutdown", cts.Token);
+                    logger?.LogInformation("[RadioInit] MS01 send completed");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "[RadioInit] MS01 send failed — non-fatal");
+            }
+
+            logger?.LogInformation("[RadioInit] Disconnecting multiplexer");
             await _multiplexer.DisconnectAsync();
+            logger?.LogInformation("[RadioInit] Multiplexer disconnected, calling base.StopAsync");
             await base.StopAsync(cancellationToken);
+            logger?.LogInformation("[RadioInit] StopAsync complete");
         }
     }
 }

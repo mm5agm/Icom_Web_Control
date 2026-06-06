@@ -11,6 +11,7 @@ namespace Yaesu_Web_Control.Services
     {
         private readonly CatMultiplexerService _multiplexer;
         private readonly RadioStateService _stateService;
+        private readonly CatMessageDispatcher _dispatcher;
         private readonly ILogger<MeterPollingService> _logger;
         private readonly ISettingsService _settingsService;
 
@@ -19,6 +20,14 @@ namespace Yaesu_Web_Control.Services
         // clear the SWR rolling-average history and cause a momentary spike on the next reading.
         private int _txFalseCount = 0;
         private bool _stableIsTransmitting = false;
+
+        // Antenna sync: the radio doesn't broadcast AN auto-information messages when the
+        // operator changes the antenna on the front panel, so we have to poll. Polling on
+        // every meter-cycle (2 Hz) would be wasteful for a near-static value, so we poll
+        // every Nth cycle (~2 seconds at the current loop cadence). Keeps the YWC antenna
+        // selector in sync with the radio without saturating the serial bus.
+        private int _antennaPollCounter = 0;
+        private const int AntennaPollEvery = 4;
 
         // Connection health: track consecutive null poll responses to detect radio power-off.
         // The serial port stays "open" on Windows when the radio powers off; null responses (timeouts)
@@ -29,11 +38,13 @@ namespace Yaesu_Web_Control.Services
         public MeterPollingService(
             CatMultiplexerService multiplexer,
             RadioStateService stateService,
+            CatMessageDispatcher dispatcher,
             ILogger<MeterPollingService> logger,
             ISettingsService settingsService)
         {
             _multiplexer = multiplexer;
             _stateService = stateService;
+            _dispatcher = dispatcher;
             _logger = logger;
             _settingsService = settingsService;
         }
@@ -198,6 +209,16 @@ namespace Yaesu_Web_Control.Services
                     int temp = CatCommands.ParseMeterReading(tempResponse ?? "");
                     _stateService.Temperature = temp;
 
+                    // Antenna poll (low cadence — see field comment above).
+                    if (++_antennaPollCounter >= AntennaPollEvery)
+                    {
+                        _antennaPollCounter = 0;
+                        var an0 = await _multiplexer.SendCommandAsync("AN0;", "MeterPoll", stoppingToken);
+                        if (!string.IsNullOrEmpty(an0)) _dispatcher.DispatchMessage(an0);
+                        var an1 = await _multiplexer.SendCommandAsync("AN1;", "MeterPoll", stoppingToken);
+                        if (!string.IsNullOrEmpty(an1)) _dispatcher.DispatchMessage(an1);
+                    }
+
                     await Task.Delay(500, stoppingToken);
                 }
                 catch (OperationCanceledException)
@@ -211,5 +232,12 @@ namespace Yaesu_Web_Control.Services
                 }
             }
         }
+
+        // FTdx101 power-meter restore on shutdown (discussion #6, F1ubw) lives
+        // in RadioInitializationService.StopAsync, not here — the hosted-service
+        // reverse-shutdown order means MeterPollingService stops AFTER
+        // RadioInitializationService has already disconnected the multiplexer,
+        // so sending MS01 from this StopAsync would talk to a closed port (at
+        // best a no-op, at worst a hang that stalls host shutdown).
     }
 }

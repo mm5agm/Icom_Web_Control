@@ -89,7 +89,7 @@ namespace Yaesu_Web_Control.Services.Sdr
                 _logger.LogInformation("SDR: Opening '{Key}'", config.SdrDeviceKey);
                 await BroadcastStatus("connecting", stoppingToken).ConfigureAwait(false);
 
-                device = CreateDevice(config.SdrDeviceKey);
+                device = CreateDevice(config.SdrDeviceKey ?? "");
                 device.Configure(config.SdrIfFrequencyHz, config.SdrSampleRateHz, config.SdrFftSize);
                 device.StartStreaming();
 

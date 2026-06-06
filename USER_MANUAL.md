@@ -257,6 +257,14 @@ All meters update in real time at approximately 10 times per second. Meters that
 
 The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your specific radio.
 
+**S-meter history strip.** A small 30-second strip-chart can be shown below each VFO's S-meter. Click the **S-hist** button in the top toolbar to toggle it on (off by default; the choice is remembered between sessions). The strip shows three things at once:
+
+- **Green line** — the actual S-meter trace over the last 30 seconds. Lets you see QSB fading patterns and brief interference spikes that the analog needle barely registered.
+- **Yellow dashed line** — the peak hold for the window, useful for noting a station's actual peak signal during an over without staring at the needle.
+- **Red dashed line** — the noise-floor reference (the 10th-percentile reading in the window). When the line jumps up suddenly, a noise source has switched on — often a useful diagnostic when QRM appears.
+
+The vertical axis is calibrated in S-units (S1, S5, S9, S9+30, S9+60) using the same calibration table as the analog gauge. The horizontal axis runs from **-30s** on the left to **now** on the right. The strip is purely a visual aid — none of the information is sent to the radio.
+
 ---
 
 ### 5.3 Power, Mic Gain and Speech Processor
@@ -277,7 +285,7 @@ The spectrum display is only visible if an SDR device has been configured in Set
 
 **Span buttons** — Click **250k**, **500k**, **1M**, or **2M** to change the visible bandwidth. The display recentres on VFO A.
 
-**Click to tune** — Click anywhere on the spectrum to tune VFO A to that frequency. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
+**Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
 
 **Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune VFO A up or down in 1 kHz steps.
 
@@ -915,10 +923,29 @@ Default command lines:
 |-----|---------|
 | WSJT-X | `C:\WSJT\wsjtx\bin\wsjtx.exe --rig-name=WebApp` |
 | JTAlert | `C:\HamApps\JTAlert\JTAlert.exe` |
-| Log4OM | `C:\Program Files (x86)\Log4OM 2\Log4OM.exe` |
-| GridTracker | `C:\Program Files\GridTracker2\GridTracker2.exe` |
+| Log4OM | `"C:\Program Files (x86)\Log4OM 2\Log4OM.exe"` |
+| GridTracker | `"C:\Program Files\GridTracker2\GridTracker2.exe"` |
 
 Adjust these to match where you have installed each program. GridTracker is **off by default** — tick its **Show** box once you've installed it and confirmed the command line is correct.
+
+#### Path quoting — important
+
+YWC parses each command-line entry into two parts: the **path to the executable** and any **arguments** to pass to it.
+
+- If your **path contains spaces** (anything under `C:\Program Files`, `C:\Program Files (x86)`, etc.), the path **must be wrapped in double quotes** so YWC knows where the path ends and arguments begin.
+- If your path has no spaces, quotes are optional.
+- Anything after the closing quote (or, for unquoted paths, after the first space) is passed to the program as command-line arguments.
+
+Examples:
+
+| Entry | What gets launched |
+|-------|--------------------|
+| `C:\HamApps\JTAlert\JTAlert.exe` | `JTAlert.exe` with no arguments — no spaces in path, no quotes needed |
+| `"C:\Program Files (x86)\HamApps\JTAlertV2\JTAlertV2.exe" /wsjtx` | `JTAlertV2.exe` with the argument `/wsjtx` — path has spaces so the quotes are required; everything after the closing quote is passed as arguments |
+| `C:\Program Files (x86)\HamApps\JTAlertV2\JTAlertV2.exe /wsjtx` | Will **fail to launch** — without quotes, YWC takes everything up to the first space (`C:\Program`) as the path |
+| `"C:\Program Files (x86)\Log4OM 2\Log4OM.exe"` | `Log4OM.exe` with no arguments — quotes required because the path contains spaces |
+
+The four defaults above already follow this rule. If you've upgraded from an earlier release that allowed unquoted paths with spaces, YWC will automatically add the quotes the first time it reads your settings, so existing setups continue to work. If you add command-line arguments later, double-check that the quotes still surround **only the path**, not the whole string.
 
 ---
 
@@ -1092,6 +1119,21 @@ On the **Memories editor page** a confirmation dialog appears before the load (s
 
 **Where the files live** — the starter banks are in `wwwroot/data/starter-bank-*.json` inside the install folder. They're plain JSON; if you want to look at the source data or contribute corrections, the format is one object per entry with frequency in Hz, mode, and the same advanced-field set the in-app memories use.
 
+**Splitting the starter bank into themed banks.** The full starter bank is a mixed bag — FT8, SSB, CW, RTTY, FM and beacons all in one list. If you'd rather have **separate banks per mode** so you can load just FT8 frequencies on a contest weekend, or just CW for a quiet evening, click **Create themed banks…** on the Memory Banks bar. YWC reads the current region's starter bank and writes the contents out as up to six named banks:
+
+| Bank | Contains |
+|---|---|
+| **FT8** | Every entry whose label includes "FT8" — typically 1.840 / 3.573 / 5.357 / 7.074 / 10.136 / 14.074 / 18.100 / 21.074 / 24.915 / 28.074 / 50.313 MHz, plus 70.154 MHz in Region 1 |
+| **FT4** | Every "FT4" entry on the bands where FT4 is active |
+| **CW** | Every entry whose mode is CW-U or CW-L (the band-edge CW DX windows, plus the 10m beacons sub-band) |
+| **SSB** | Every USB/LSB entry that isn't already in FT8/FT4 (i.e. the voice SSB calling and DX windows) |
+| **RTTY** | Every RTTY-L / RTTY-U entry |
+| **FM** | Every FM entry (typically 10m FM at 29.600 MHz) |
+
+Themes that come out empty for your region are quietly skipped. If any of the themed names clash with banks you've already created (e.g. you've hand-built your own "FT8" bank), YWC asks before overwriting them — say "no" and your custom bank is left alone.
+
+Once created, these banks appear in the **Banks** dropdown just like any user-saved bank. Loading "FT8" replaces your working memories with the FT8 entries; loading "SSB" replaces them with the SSB entries; etc. You can edit, rename, or delete them like any other bank, and re-running **Create themed banks…** is safe — it won't touch anything that already exists unless you tell it to.
+
 ---
 
 ### 8.7 What about the radio's PRESET function?
@@ -1161,7 +1203,7 @@ The default command line (`--rig-name=WebApp`) causes WSJT-X to use a separate c
 - Click **Test CAT** — it should show green.
 - Click OK.
 
-![WSJT-X Radio tab settings](pictures/WSJT-X Radio.png)
+![WSJT-X Radio tab settings](pictures/WSJT-X_Radio.png)
 
 **Reporting tab:**
 - UDP Server: `239.255.0.1`
@@ -1171,7 +1213,7 @@ The default command line (`--rig-name=WebApp`) causes WSJT-X to use a separate c
 - Tick: **Accept UDP requests**, **Notify on accepted UDP request**
 - Click OK.
 
-![WSJT-X Reporting tab settings](pictures/WSJT-X Reporting UDP.png)
+![WSJT-X Reporting tab settings](pictures/WSJT-X_Reporting_UDP.png)
 
 These settings are saved in the WebApp profile and used every time WSJT-X is launched from the app button.
 
@@ -1193,23 +1235,46 @@ In JTAlert, go to **Settings → Logging → Log4OM V2** and set:
 
 - **Enable Log4OM V2 Logging:** ticked
 - **Send WSJT-X DX Call to Log4OM:** ticked
-- **IP Address:** `239.255.0.1`
+- **IP Address:** `127.0.0.1`
 - **ADif_MESSAGE Port:** `2236`
 - **Control Port:** `2241`
+- **Log Type:** *Use SQLite File Log* (or whichever matches your Log4OM database)
 
-![JTAlert Log4OM V2 settings](pictures/JTAlert Settings For Log4OM.png)
+![JTAlert Log4OM V2 settings](pictures/JTAlert_Settings_For_Log4OM.png)
 
 ---
 
 ### 9.3 Log4OM
 
-Log4OM can receive QSO data from WSJT-X and JTAlert via UDP multicast, and display the current frequency via rigctld.
+Log4OM can receive QSO data from WSJT-X and JTAlert via UDP multicast, log QSOs with the correct frequency automatically, and (with one current limitation) display the radio's live frequency in its own status bar.
 
 **Do not use Omni-rig.** Yaesu Web Control owns the serial port. If Omni-rig is also configured for the same radio it will conflict with the app and one will fail.
 
+**Known limitation — live frequency display in Log4OM:** Log4OM NextGen's live frequency readout in its main window does not currently update from YWC's rigctld bridge — Log4OM's **CAT Status: OFFLINE** indicator stays red even after the Hamlib settings below are configured. **This is cosmetic only**: when WSJT-X logs a QSO, the correct frequency is captured from the ADIF record and stored in Log4OM's log book without any user action. So the workflow "run WSJT-X, work stations, see them appear correctly in Log4OM's log" works end-to-end; you just don't see a live tuning readout inside Log4OM itself. Tracking on [Issue #18](https://github.com/mm5agm/Yaesu_Web_Control/issues/18); see that issue if you want to follow progress on enabling the live readout.
+
+![Log4OM Hamlib settings showing CAT Status OFFLINE — the documented limitation, not a setup error](pictures/Log4OM_Hamlib.png)
+
+To make this concrete, here is the full logging chain end-to-end. At the end of a QSO, WSJT-X pops up its **Log QSO** confirmation dialog with all the QSO details (callsign, mode, band, grid, reports, start/end times) — clicking OK is the only manual step the operator takes:
+
+![WSJT-X Log QSO confirmation dialog — the single click that kicks off the chain that ends with the QSO in Log4OM](pictures/Log4OM_Confirm_Log.png)
+
+Once confirmed, the QSO immediately appears **in progress** in Log4OM — note the red OFFLINE CAT indicator top-left, yet the QSO panel is fully populated from the ADIF stream:
+
+![Log4OM showing a QSO in progress with CAT OFFLINE — proof the ADIF logging path works independently of the missing live freq display](pictures/Log4OM_QSO_in_progress.png)
+
+And here's the **same QSO after it's logged**, appearing at the top of the Recent QSOs list with the correct frequency, band and mode populated — no manual entry, despite CAT OFFLINE:
+
+![Log4OM showing the QSO landed in the Recent QSOs list with all fields populated correctly](pictures/Log4OM_Final_Logged.png)
+
+Open the logged QSO for editing and **every field is captured** — callsign, name, band, mode, exact frequency (18101.222 kHz here), grid square, country, ITU/CQ zones, DXCC entity, QSO start/end times and signal reports. Nothing has to be typed by hand:
+
+![Log4OM Edit QSO dialog showing every field populated from the ADIF stream — frequency, band, mode, grid, country, ITU/CQ, DXCC, timestamps and reports all captured automatically](pictures/Log4OM_Shows_All_Logging_Fields_Filled_In.png)
+
 #### Step 1 — UDP inbound connections
 
-Go to **Software Integration → Connections** and select the **UDP** tab. Add two UDP INBOUND connections.
+Go to **Software Integration → Connections** and select the **UDP** tab. Add two UDP INBOUND connections. When both are configured the list should look like this:
+
+![Log4OM Connections screen showing two UDP inbound entries — WSJT-X on port 2237 and JTALERT on port 2236](pictures/Log4OM_UDP_Inbound.png)
 
 **For WSJT-X** (receives QSO data directly from WSJT-X):
 - Connection name: `WSJT-X`
@@ -1219,7 +1284,7 @@ Go to **Software Integration → Connections** and select the **UDP** tab. Add t
 - Multicast source IP: `239.255.0.1`
 - Parameters: SAVE_NEW_QSO, USE_EXTERNAL_DATA, UPLOAD_QSO, UPDATE_CQ_ITUZONE
 
-![Log4OM UDP Inbound connection for WSJT-X](pictures/Log4OM UDP Inbound WSJT-X.png)
+![Log4OM UDP Inbound detail for WSJT-X](pictures/Log4OM_WSJT-X_UDP_Inbound.png)
 
 **For JTAlert** (receives QSO data from JTAlert):
 - Connection name: `JTALERT`
@@ -1229,7 +1294,7 @@ Go to **Software Integration → Connections** and select the **UDP** tab. Add t
 - Multicast source IP: `239.255.0.1`
 - Parameters: SAVE_NEW_QSO, USE_EXTERNAL_DATA, UPLOAD_QSO, UPDATE_CQ_ITUZONE
 
-![Log4OM UDP Inbound connection for JTAlert](pictures/JTAlert UDP Inbound.png)
+![Log4OM UDP Inbound detail for JTAlert](pictures/Log4OM_UDP_Inbound_JTALERT.png)
 
 #### Step 2 — Remote control
 
@@ -1241,17 +1306,41 @@ Still in the Connections screen, select the **Remote Control** tab and set:
 
 This allows JTAlert to exchange control messages with Log4OM bidirectionally.
 
-![Log4OM Remote Control settings](pictures/Log4OM Remote Control.png)
+![Log4OM Remote Control settings](pictures/Log4OM_Remote_Control.png)
 
-#### Step 3 — Frequency display (optional)
+#### Step 3 — CAT interface (Hamlib)
 
-If you want Log4OM to display the current frequency independently of WSJT-X, configure the CAT interface. Go to **Hardware Configuration → CAT interface**:
+Configure Log4OM's CAT interface to point at YWC's rigctld bridge. This is the configuration that *should* show the live radio frequency in Log4OM's status bar — see the "Known limitation" callout above for the current state.
+
+Go to **Hardware Configuration → CAT interface → Settings**:
 
 - CAT Engine: **Hamlib**
-- Address: `localhost`
-- Port: `4532`
 
-![Log4OM CAT Management](pictures/Log4OM Cat Management.png)
+![Log4OM CAT Management — Settings tab with CAT Engine set to Hamlib](pictures/Log4OM_Cat_Management.png)
+
+Then switch to the **Hamlib** tab inside CAT Management and set:
+
+- **RIG Model:** *Hamlib NET rigctl Stable*
+- **Network connected radio:** ticked
+- **VFO MODE (supports dual VFO):** ticked
+- **Connect to active HAMLIB instance:** ticked
+- **ADDRESS:** `127.0.0.1`
+- **Port:** `4532`
+
+(See `Log4OM_Hamlib.png` above for what this panel looks like.)
+
+#### Step 4 — ADIF Output (so QSOs reach Log4OM)
+
+The WSJT-X → Log4OM logging path uses the ADIF auto-export file. Go to **User Configuration → ADIF Functions → ADIF Output** and set:
+
+- **Enable ADIF output:** ticked
+- **ADIF file:** the path WSJT-X / GridTracker write to (default `Documents\LOG4OM2\auto_export.adi`)
+
+Log4OM watches this file and imports new QSOs as they're appended.
+
+![Log4OM ADIF Functions Output — note the warning about a 1–2 minute random delay before the file is written](pictures/Log4OM_ADIF_Functions_Output.png)
+
+> **Tip — the 1–2 minute write delay is normal.** Log4OM intentionally delays writing the ADIF output so you can edit or remove a misclicked QSO before it leaves Log4OM. This is documented in the yellow notice in the screenshot. Don't panic if a QSO you just logged isn't in the ADIF file *immediately* — give it up to two minutes.
 
 #### Startup order
 
@@ -1280,6 +1369,14 @@ GridTracker is a separate desktop app that draws a live world map of WSJT-X grid
 **How it works with WSJT-X:** GridTracker reads WSJT-X's UDP feed independently — YWC doesn't forward anything to it. Make sure WSJT-X is set to **multicast** UDP (default `239.255.0.1:2237`) so YWC, JTAlert, and GridTracker can all subscribe to the same feed at once. If WSJT-X is set to unicast (`127.0.0.1:2237`), only one of the three apps will receive packets — this is a WSJT-X limitation, not a YWC one.
 
 **No CAT integration is needed.** GridTracker is a passive listener; it doesn't talk to the radio at all. YWC still controls the radio, WSJT-X still drives QSOs, and GridTracker just paints the picture.
+
+**GridTracker General settings** — the **Receive UDP Messages** block on the top-left of the General tab should be set to multicast `239.255.0.1` on port `2237`, matching WSJT-X.
+
+![GridTracker General settings — multicast 239.255.0.1, port 2237 matching WSJT-X](pictures/Gridtracker_General_Settings.png)
+
+**GridTracker Logging settings** — the **Logging** tab shows where GridTracker forwards finished QSOs. The default *App Log(s)* feed (`wsjtx_log.adi`) is enough for the WSJT-X → Log4OM ADIF path documented in §9.3 — no additional logger needs to be configured here unless you also want GridTracker to push QSOs to QRZ, ClubLog, HRDLOG, etc.
+
+![GridTracker Logging tab](pictures/Gridtracker_Logging.png)
 
 ---
 

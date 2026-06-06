@@ -31,6 +31,7 @@ namespace Yaesu_Web_Control.Controllers
         private readonly RadioStateService _radioStateService;
         private readonly ILogger<MemoryController> _logger;
         private readonly IWebHostEnvironment _env;
+        private readonly MemoryBankService _bankService;
 
         public MemoryController(
             MemoryService memoryService,
@@ -38,7 +39,8 @@ namespace Yaesu_Web_Control.Controllers
             ISettingsService settingsService,
             RadioStateService radioStateService,
             ILogger<MemoryController> logger,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            MemoryBankService bankService)
         {
             _memoryService = memoryService;
             _catClient = catClient;
@@ -46,6 +48,7 @@ namespace Yaesu_Web_Control.Controllers
             _radioStateService = radioStateService;
             _logger = logger;
             _env = env;
+            _bankService = bankService;
         }
 
         // ── CRUD ─────────────────────────────────────────────────────────────
@@ -507,6 +510,107 @@ namespace Yaesu_Web_Control.Controllers
                 _logger.LogError(ex, "Failed to apply starter bank in mode {Mode}", mode);
                 return StatusCode(500, new { error = $"Failed to apply starter bank: {ex.Message}" });
             }
+        }
+
+        // ── Themed starter banks ─────────────────────────────────────────────
+        //
+        // Split the bundled region starter bank into themed banks (FT8, FT4,
+        // CW, SSB, RTTY, FM) and save each non-empty slice via MemoryBankService.
+        // The user then sees them appear in the bank dropdown and can Load any
+        // one to replace the current memories with that theme.
+        //
+        // Entries are tagged to exactly one theme — label-based for the data
+        // modes (FT8/FT4), mode-based for the rest. Empty themes are skipped.
+
+        public class CreateThemedBanksRequest
+        {
+            public bool Overwrite { get; set; } = false;
+        }
+
+        [HttpPost("starter-bank/create-themed-banks")]
+        public async Task<IActionResult> CreateThemedStarterBanks([FromBody] CreateThemedBanksRequest? request)
+        {
+            var overwrite = request?.Overwrite ?? false;
+
+            StarterBankFile? bank;
+            try
+            {
+                bank = await LoadStarterBankFromDiskAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read starter bank file for themed split");
+                return StatusCode(500, new { error = $"Failed to read starter bank: {ex.Message}" });
+            }
+            if (bank == null || bank.Entries.Count == 0)
+                return NotFound(new { error = "Starter bank file not found or empty for the current region." });
+
+            // Partition each entry into at most one themed bucket. Order
+            // matters — FT8/FT4 win over generic SSB even though their CAT
+            // mode is DATA-U (USB-side data). RTTY beats CW. FM is last.
+            var buckets = new Dictionary<string, List<AppMemory>>
+            {
+                ["FT8"]  = new(),
+                ["FT4"]  = new(),
+                ["RTTY"] = new(),
+                ["CW"]   = new(),
+                ["SSB"]  = new(),
+                ["FM"]   = new(),
+            };
+            foreach (var src in bank.Entries)
+            {
+                // Fresh AppMemory per bucket so the bank store doesn't share
+                // references with each other or with MemoryService.
+                var e = new AppMemory
+                {
+                    Label             = src.Label,
+                    FrequencyHz       = src.FrequencyHz,
+                    Mode              = src.Mode,
+                    ClarifierOffsetHz = src.ClarifierOffsetHz,
+                    RxClarOn          = src.RxClarOn,
+                    TxClarOn          = src.TxClarOn,
+                    Antenna           = src.Antenna,
+                    IfWidthCode       = src.IfWidthCode,
+                    IfShiftHz         = src.IfShiftHz,
+                    RoofingCode       = src.RoofingCode,
+                    NbOn              = src.NbOn,
+                    NbLevel           = src.NbLevel,
+                    NrLevel           = src.NrLevel,
+                    AgcMode           = src.AgcMode,
+                    PowerWatts        = src.PowerWatts,
+                    Notes             = src.Notes,
+                };
+
+                var label = (e.Label ?? "").ToUpperInvariant();
+                var mode  = (e.Mode  ?? "").ToUpperInvariant();
+                if (label.Contains("FT8"))            buckets["FT8"].Add(e);
+                else if (label.Contains("FT4"))       buckets["FT4"].Add(e);
+                else if (mode.StartsWith("RTTY"))     buckets["RTTY"].Add(e);
+                else if (mode.StartsWith("CW"))       buckets["CW"].Add(e);
+                else if (mode == "FM")                buckets["FM"].Add(e);
+                else if (mode == "USB" || mode == "LSB") buckets["SSB"].Add(e);
+                // Anything else (e.g. AM beacons) is intentionally dropped —
+                // the themes above cover the everyday operating modes.
+            }
+
+            var created = new List<string>();
+            var skipped = new List<string>();
+            var emptyThemes = new List<string>();
+            foreach (var (name, entries) in buckets)
+            {
+                if (entries.Count == 0) { emptyThemes.Add(name); continue; }
+                var wasCreated = await _bankService.CreateBankWithEntriesAsync(name, entries, overwrite);
+                if (wasCreated) created.Add(name); else skipped.Add(name);
+            }
+
+            return Ok(new
+            {
+                created,
+                skipped,
+                emptyThemes,
+                totalEntries = bank.Entries.Count,
+                regionDescription = bank.Description
+            });
         }
 
         private async Task<StarterBankFile?> LoadStarterBankFromDiskAsync()

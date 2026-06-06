@@ -13,7 +13,7 @@
             <button id="resetViewBtn" class="btn-secondary">Reload From File</button>
             <button id="txBtn" class="btn-tx">TX</button>
             <button id="helpBtn" class="btn-help">? Help</button>
-            <button type="button" onclick="window.open('http://localhost:8080/Diagnostics', 'diagnostics', 'width=1400,height=900,resizable=yes')" class="btn-help">Diagnostics</button>
+            <button type="button" onclick="window.open(window.location.origin + '/Diagnostics', 'diagnostics', 'width=1400,height=900,resizable=yes')" class="btn-help">Diagnostics</button>
             <span id="saveStatus" class="save-status"></span>
         </div>
     </div>
@@ -679,7 +679,7 @@
 
         <h3>Where Calibration Data Is Saved</h3>
         <ul>
-            <li><strong>Installed app:</strong> %APPDATA%\MM5AGM\FTdx101\WebApp\calibration.user.json</li>
+            <li><strong>Installed app:</strong> %APPDATA%\MM5AGM\Yaesu Web Control\calibration.user.json</li>
             <li><strong>Development:</strong> wwwroot/calibration.default.json</li>
         </ul>
         <p>The save path is shown at the top of this page.</p>

@@ -221,10 +221,9 @@ export class SpectrumPanel {
         const x      = e.clientX - rect.left;
         const W      = canvas.width;
 
-        // Only respond to clicks in the spectrum area (top 45%), not the waterfall.
-        const specH = Math.floor(canvas.height * 0.45);
-        const y     = e.clientY - rect.top;
-        if (y > specH * (rect.height / canvas.height)) return;
+        // Click-to-tune is active across the whole panel — both the live
+        // spectrum (top ~45%) and the waterfall (bottom ~55%). Clicking a
+        // signal trail in the waterfall QSYs to that column's frequency.
 
         // Convert canvas-relative x (CSS pixels) to canvas-internal pixels.
         const canvasX = x * (W / rect.width);

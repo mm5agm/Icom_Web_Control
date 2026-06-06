@@ -60,6 +60,27 @@ namespace Yaesu_Web_Control.Services
             finally { _lock.Release(); }
         }
 
+        /// <summary>
+        /// Create a bank from an arbitrary entry list, bypassing the
+        /// "snapshot current memories" pattern of <see cref="SaveBankAsync"/>.
+        /// Used for the themed-starter-bank flow where each themed bank is
+        /// derived from the bundled region JSON, not from whatever the user
+        /// currently has loaded. Returns true if the bank was written,
+        /// false if it already existed and overwrite was false.
+        /// </summary>
+        public async Task<bool> CreateBankWithEntriesAsync(string name, List<AppMemory> entries, bool overwriteIfExists)
+        {
+            await _lock.WaitAsync();
+            try
+            {
+                if (!overwriteIfExists && _banks.ContainsKey(name)) return false;
+                _banks[name] = entries;
+                SaveToDisk();
+                return true;
+            }
+            finally { _lock.Release(); }
+        }
+
         public async Task<bool> LoadBankAsync(string name)
         {
             await _lock.WaitAsync();

@@ -16,10 +16,16 @@ export class FTdx101Meters {
         // TX state
         this._isTransmitting = false;
 
-        // Smoothing: 7-reading rolling average for power and SWR
+        // Smoothing: rolling-average windows for power and SWR.
+        // Power uses a longer window (15 samples ≈ 1.5 s at 10 Hz polling)
+        // because the PWR calibration curve gets steep above 100 W — each raw
+        // ADC unit is ~1.6 W there, so even a few units of ADC noise visibly
+        // jolts the gauge needle. SWR stays at 7 samples (~0.7 s) so the
+        // operator sees a high SWR fault quickly enough to react.
         this._powerHistory        = [];
         this._swrHistory          = [];
-        this._historyLength       = 7;
+        this._powerHistoryLength  = 15;
+        this._swrHistoryLength    = 7;
         this._wasTransmittingPower = false;
         this._wasTransmittingSWR   = false;
 
@@ -101,7 +107,7 @@ export class FTdx101Meters {
         }
         this._wasTransmittingPower = true;
         this._powerHistory.push(raw);
-        if (this._powerHistory.length > this._historyLength) this._powerHistory.shift();
+        if (this._powerHistory.length > this._powerHistoryLength) this._powerHistory.shift();
         const rawAvg      = this._powerHistory.reduce((s, v) => s + v, 0) / this._powerHistory.length;
         const watts       = this._calibration.calibrateNumeric('PWR', rawAvg);
         const clampedWatts = Math.round(Math.max(0, Math.min(watts, 200)));
@@ -121,7 +127,7 @@ export class FTdx101Meters {
         }
         this._wasTransmittingSWR = true;
         this._swrHistory.push(raw);
-        if (this._swrHistory.length > this._historyLength) this._swrHistory.shift();
+        if (this._swrHistory.length > this._swrHistoryLength) this._swrHistory.shift();
         // Require at least 2 readings before displaying — single-reading bursts are likely noise.
         if (this._swrHistory.length < 2) return { skip: true };
         const rawAvg    = this._swrHistory.reduce((s, v) => s + v, 0) / this._swrHistory.length;
