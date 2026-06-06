@@ -133,7 +133,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 
 **Required — radio connection:**
 
-1. Open a browser and go to **http://localhost:8080**
+1. Open a browser and go to **http://localhost:8080**. If port 8080 was already in use on your PC (e.g. Plex, Jenkins, MiniTool ShadowMaker), YWC will have automatically picked the next free port from 8081–8089. **Hover over the YWC tray icon** down by the Windows clock to see the actual URL — or simply double-click the tray icon to have YWC open the right URL in your default browser.
 2. Click the **Settings** link in the navigation bar.
 3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), **FTDX3000** (100 W, dual receiver), **FTdx10** (100 W, single receiver), or **FT-710** (100 W, single receiver).
 4. Set **Serial Port** to the COM port your radio is connected to. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
@@ -157,11 +157,11 @@ None of these are required for basic operation. Get the radio connection working
 
 ## 4. Starting the Application
 
-Double-click the **Yaesu Web Control** shortcut on your desktop. The app starts in the background and your default browser opens to `http://localhost:8080` automatically.
+Double-click the **Yaesu Web Control** shortcut on your desktop. The app starts in the background and your default browser opens automatically to whichever port YWC managed to bind (usually `http://localhost:8080`, but YWC will fall back to 8081–8089 if 8080 was already in use on your PC).
 
 A small **YWC tray icon** appears in the Windows system tray (down by the clock, possibly under the **Show hidden icons ︿** arrow). The tray icon is your "the app is running" indicator and gives you a clean way to manage it without juggling Task Manager:
 
-- **Hover** over the icon — a tooltip confirms the version and `http://localhost:8080`.
+- **Hover** over the icon — a tooltip confirms the version and the actual URL (e.g. `http://localhost:8080` or `http://localhost:8081`). If you ever wonder which port YWC ended up on, this is the fastest way to check.
 - **Double-click** the icon — opens YWC in your default browser (handy if you've closed all browser tabs and need to get back to the app).
 - **Right-click** the icon — opens a menu:
 
@@ -631,9 +631,21 @@ The list of watched calls is saved across app restarts in your user settings fil
 
 The **Mem** button in the toolbar (bold black text) opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. **Click a tile to QSY VFO A to that frequency** — and any of the memory's saved advanced settings (mode, AGC, NB, NR, power, IF Width, IF Shift, antenna, roofing filter) are sent to the radio at the same time. Fields that aren't set in the memory are left as-is on the radio.
 
+![Floating memory panel with the Banks dropdown open — tile grid on the left, banks list on the right, plus the four Load-from-Rig / Save-to-Rig action buttons across the top](pictures/Memories_Floating_Panel.png)
+
 The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions.
 
+**The toolbar at the top of the floating panel** carries the four rig-transfer actions and the Banks dropdown:
+
+![Floating memory panel toolbar — Load from Rig (Replace all / Add new), Save to Rig (Replace all / Add new), and Banks dropdown](pictures/Memories_Banks_Bar.png)
+
+**Right-click any tile** to get a context menu with **Recall**, **Rename**, **Change Mode** and **Delete** — quick edits without having to open the full editor:
+
+![Right-click context menu on a memory tile showing Recall, Rename, Change Mode and Delete options](pictures/Memories_Tile_Closeup.png)
+
 **Save to Mem button** — A **Save to Mem** button appears below the S-meter on both the VFO A and VFO B panels. Click it to save the current VFO frequency, mode and all advanced settings as a new memory. A label input box appears — type a name (up to 12 characters) and press Enter or click Save. The new memory appears immediately in the floating panel.
+
+![The Save to Mem button on a VFO panel, sitting next to the Segment dropdown](pictures/Memories_Save_To_Mem_Button.png)
 
 **Banks dropdown** — a **Banks** dropdown sits in the floating panel's toolbar alongside the Save to Rig buttons. The first entry is always **📥 YWC Starter Bank (built-in)** — the bundled set of common watering-hole memories shipped with the app (§8.5). Below that, any banks you've saved yourself appear (§8.4). Select any entry to switch — the memory list is replaced with that bank's contents and the tiles refresh automatically. The dropdown resets to its placeholder after loading.
 
@@ -968,6 +980,8 @@ The app maintains its own list of memory channels, independent of the radio's bu
 
 Access the full memories editor from **Memories** in the navigation bar.
 
+![The full Memories editor page — Memory Banks bar at the top, Radio Channels bar, ADIF import card, advanced-fields toggle, and the editable memory table](pictures/Memories_Editor_Page.png)
+
 The editor shows all your saved memories in a table. For each memory you can edit:
 
 | Field | Description |
@@ -1024,6 +1038,8 @@ Import reads up to 99 channels and takes up to 30 seconds. A progress indicator 
 ### 8.3 Importing from ADIF
 
 If you already keep a list of favourite frequencies in Log4OM (or any other logger that exports ADIF), you can bring them into YWC as memories without retyping. On the Memories page there is an **ADIF import** card with a single **Import from ADIF…** button.
+
+![The ADIF import card on the Memories page](pictures/Memories_ADIF_Import.png)
 
 **What gets imported.** YWC reads every QSO record in the file and creates one memory per **unique combination** of frequency and mode. So if you've logged a thousand QSOs on 14.074 MHz FT8, you get just one memory called "14.074 DATA-U" — not a thousand duplicates.
 
@@ -1094,6 +1110,8 @@ Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and a
 
 YWC ships with a built-in **starter bank** of common watering-hole memories — pre-populated, region-aware, and ready to load with one click. New users get a useful set of memories without having to type in every FT8 frequency by hand; experienced users can pick and choose which entries to keep.
 
+![Floating Mem panel with the YWC Starter Bank loaded — every common watering-hole frequency for the current region in one bank](pictures/Memories_Starter_Bank_Loaded.png)
+
 **What's in it (typical entry counts vary slightly per region):**
 
 - FT8 calling frequencies on every band from 160m to 6m (plus 4m in Region 1)
@@ -1120,6 +1138,8 @@ On the **Memories editor page** a confirmation dialog appears before the load (s
 **Where the files live** — the starter banks are in `wwwroot/data/starter-bank-*.json` inside the install folder. They're plain JSON; if you want to look at the source data or contribute corrections, the format is one object per entry with frequency in Hz, mode, and the same advanced-field set the in-app memories use.
 
 **Splitting the starter bank into themed banks.** The full starter bank is a mixed bag — FT8, SSB, CW, RTTY, FM and beacons all in one list. If you'd rather have **separate banks per mode** so you can load just FT8 frequencies on a contest weekend, or just CW for a quiet evening, click **Create themed banks…** on the Memory Banks bar. YWC reads the current region's starter bank and writes the contents out as up to six named banks:
+
+![Create themed banks confirmation dialog — names the six banks that will be created (FT8 / FT4 / CW / SSB / RTTY / FM) and confirms existing banks of the same name are left alone](pictures/Memories_Create_Themed_Banks_Dialog.png)
 
 | Bank | Contains |
 |---|---|
