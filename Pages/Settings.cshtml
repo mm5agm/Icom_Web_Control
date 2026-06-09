@@ -348,11 +348,31 @@
             </p>
             @if (Model.Settings.RadioModel == "FTdx10" || Model.Settings.RadioModel == "FT-710")
             {
+                <div class="alert alert-danger border-3" role="alert">
+                    <i class="bi bi-exclamation-octagon-fill me-2"></i>
+                    <strong>⚠️ Risk of destroying your SDR — @Model.Settings.RadioModel has no IF tap.</strong>
+                    Because this radio has no rear-panel IF output, an SDR has to be connected to an antenna port.
+                    <strong>Transmitting on that antenna (or any antenna nearby) will deliver enough RF energy
+                    into the SDR's front end to damage or destroy it.</strong> Either use a dedicated receive-only
+                    antenna for the SDR, fit a coax switch that disconnects the SDR during TX, or fit a
+                    transmit/receive RF relay or PIN-diode T/R switch. Do not transmit with the SDR's coax
+                    plugged into your TX antenna without one of these protections in place.
+                </div>
                 <div class="alert alert-warning" role="alert">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
                     <strong>@Model.Settings.RadioModel:</strong> This radio does not have a rear-panel IF output.
                     SDR spectrum display will show absolute RF frequencies from the connected antenna
                     rather than a VFO-centred view. The IF Frequency setting has no effect.
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Safety note:</strong> The SDR is connected to your radio's <strong>IF output</strong>,
+                    which is an internal low-level signal — safe during TX. <strong>Never connect the SDR
+                    directly to a TX antenna</strong> (or use an antenna very close to one you're transmitting on):
+                    the RF energy can destroy the SDR's front end.
                 </div>
             }
             <div class="row">
