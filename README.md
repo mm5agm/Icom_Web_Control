@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.2.1-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.2.2-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -104,6 +104,52 @@ The application includes a real-time spectrum display and waterfall, intended fo
 ---
 
 ## Release Notes
+
+## 2026-06-09 - v2.2.2
+
+A small hotfix on top of v2.2.1, primarily addressing one reporter-filed
+bug and one regression that v2.2.1 itself introduced.
+
+### Bug fixes
+
+- **Sticky navbar actually works now.** v2.2.1's release notes promised
+  this feature but shipped with `sticky-top` applied to the wrong element
+  — the `<nav>` inside `<header>`, where `position: sticky` couldn't track
+  body scroll. The class is now on `<header>` where it does what was
+  intended. The User Manual no longer needs Page-Up to get back to the
+  nav links.
+
+- **DX cluster examples in Settings replaced** — closes
+  [#27](https://github.com/mm5agm/Yaesu_Web_Control/issues/27) (djrino).
+  The in-line examples (`cluster.dl4ny.de:7300`, `dxc.k4ldc.com:7300`) on
+  the Settings page were both at hostnames whose DNS no longer resolved.
+  Anyone copying them faithfully got a silent failure. v2.2.2 lists five
+  verified-alive clusters led by `dxspider.co.uk:7300`. The USER_MANUAL
+  §6.6 list was already correct.
+
+### New features
+
+- **Test cluster connection button.** Settings → DX Cluster section gains
+  a yellow **Test cluster connection** button. Click it and YWC opens a
+  TCP connection to the host/port/callsign typed into the form (without
+  saving them), sends the callsign, reads ~10 seconds of output, and
+  shows the transcript in a popup. The button turns solid green with a
+  "Cluster connection successful" label after a successful test, so it
+  is unambiguous what's working and what isn't — exactly the diagnostic
+  that would have made the #27 silent-failure obvious in 10 seconds.
+
+### Internal / preparing for v2.3.0
+
+- **SDRplay device key format migrated** to `sdrplay:hw<N>-<serial>` so
+  the upcoming dual-SDR work can distinguish two devices that happen to
+  share a serial — notably the original RSP1's factory-default
+  `0000000001` placeholder. Existing v2.2.x keys (`sdrplay:<serial>`)
+  continue to work and are silently rewritten to the new format on the
+  next Save Settings. No user action required. New FAQ §15.2 explains
+  the background.
+
+- Default `set/qra` example locator updated to `IO85CX` (Colin's actual
+  square). Cosmetic only.
 
 ## 2026-06-09 - v2.2.1
 

@@ -868,7 +868,7 @@ There is **no default cluster server** — pick one you have access to. The conn
 Common things to put in this textarea:
 
 ```
-set/qra IO75JA            # your Maidenhead grid square — improves your spot list
+set/qra IO85CX            # your Maidenhead grid square — improves your spot list
 set/name Colin            # your name as it appears to other users
 set/skimmer               # enable RBN/Skimmer spots on clusters that have an RBN feed (e.g. G6NHU-2)
 set/filter ...            # whatever spot filters you prefer
@@ -1624,6 +1624,21 @@ This is the most common digital-mode setup pitfall and it's not a YWC problem �
 The radio remembers this across power cycles, so it's a once-only change. **Why not configure it from YWC?** An earlier version of YWC tried to send the CAT commands for these menu items automatically, but testing revealed the commands were writing to the wrong menu addresses and never actually worked — the radio appeared to be correctly configured only because operators had set it manually at first install. The auto-config feature was removed rather than ship something misleading.
 
 If you can't find these menu items, your operating manual's index under "DATA MOD SOURCE" or "REAR SELECT" is the authoritative reference for your firmware version.
+
+---
+
+### 15.2 My RSP1 shows serial number `0000000001` — is it broken?
+
+No. The original SDRplay RSP1 (the first-generation receiver, no longer in production) shipped with a placeholder serial number of `0000000001` until later in its production run. SDRplay subsequently released a small utility that lets owners program a real unique serial into the device's flash memory. The RSP1A, RSP1B and all later models ship with a real serial pre-programmed at the factory.
+
+For ordinary single-SDR use, this doesn't matter — YWC opens the only SDR plugged in regardless of what serial it reports.
+
+**It does matter for dual-SDR setups** (one RSP per VFO) because YWC needs a stable identifier to remember "this physical device serves VFO A" across reconnects. YWC handles this from v2.3.0 onwards by composing the device key as `sdrplay:hw<hwVer>-<serial>` — including the hardware version means an RSP1 with the placeholder serial doesn't collide with an RSP1B that happens to use the same number. So:
+
+- **One RSP1 + one RSP1B (Colin's setup)** — works fine, no action needed.
+- **Two of the same model**, both with the placeholder serial — this would still collide. The fix is to program a real serial into at least one device. If SDRplay's Serial Number Update Utility isn't on their downloads page, ask their support: it's a small Windows tool that writes a serial of your choice into the device's flash.
+
+YWC migrates settings from the v2.2.x key format (`sdrplay:<serial>` only) to the new format (`sdrplay:hw<N>-<serial>`) automatically the first time you save Settings on v2.3.0 or later. No user action required.
 
 ---
 
