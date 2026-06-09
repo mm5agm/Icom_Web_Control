@@ -34,8 +34,15 @@
     </script>
 </head>
 <body>
-    <header @(((string?)ViewData["BodyRole"] == "application") ? Html.Raw("aria-hidden=\"true\"") : Html.Raw(""))>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow sticky-top" style="padding-top: 0; padding-bottom: 0; margin-bottom: 2px; min-height: 0;">
+    @* sticky-top is on <header>, not the inner <nav>. Position: sticky tracks
+       the nearest scrolling containing block (here, <body>). If sticky-top is
+       on the nav instead, the containing block becomes <header>, which is only
+       as tall as the nav itself — so the nav scrolls away with the header
+       rather than sticking. v2.2.1 shipped with sticky-top on the nav and
+       didn't actually stick; this layout puts it on the header where it
+       works. *@
+    <header class="sticky-top bg-white" @(((string?)ViewData["BodyRole"] == "application") ? Html.Raw("aria-hidden=\"true\"") : Html.Raw(""))>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow" style="padding-top: 0; padding-bottom: 0; margin-bottom: 2px; min-height: 0;">
             <div class="container">
                 <a class="navbar-brand" asp-area="" asp-page="/Index" data-a11y-key="nav.brand" aria-label="Yaesu Web Control home">Yaesu Web Control <small class="text-muted fw-normal" style="font-size: 0.6em;">v@(AppVersion.Current) &copy; 2025</small></a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"

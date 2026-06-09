@@ -1,3 +1,5 @@
+using System.Net.Sockets;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Yaesu_Web_Control.Services;
 
@@ -14,6 +16,132 @@ namespace Yaesu_Web_Control.Controllers
         {
             _dxCluster = dxCluster;
             _settings = settings;
+        }
+
+        // ── Connection test ────────────────────────────────────────────────
+        // Lets the user verify a host/port/callsign combination on the
+        // Settings page before saving — connects, sends the callsign, reads
+        // ~10 s of output, returns the transcript so the user can see whether
+        // they reached the cluster and what it said.
+
+        public class TestRequest
+        {
+            public string Host { get; set; } = "";
+            public int Port { get; set; } = 7300;
+            public string LoginCallsign { get; set; } = "";
+        }
+
+        public class TestResult
+        {
+            public bool Success { get; set; }
+            public string Status { get; set; } = "";
+            public string Transcript { get; set; } = "";
+            public int LinesReceived { get; set; }
+        }
+
+        [HttpPost("test")]
+        public async Task<IActionResult> TestCluster([FromBody] TestRequest req, CancellationToken ct)
+        {
+            req ??= new TestRequest();
+            req.Host = (req.Host ?? "").Trim();
+            if (req.Host.Length == 0)
+                return Ok(new TestResult { Success = false, Status = "No host given." });
+            if (req.Port <= 0 || req.Port > 65535)
+                return Ok(new TestResult { Success = false, Status = $"Invalid port {req.Port}." });
+
+            var sb = new StringBuilder();
+            int lineCount = 0;
+
+            using var overallCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            overallCts.CancelAfter(TimeSpan.FromSeconds(12));
+
+            using var client = new TcpClient();
+            try
+            {
+                using (var connectCts = CancellationTokenSource.CreateLinkedTokenSource(overallCts.Token))
+                {
+                    connectCts.CancelAfter(TimeSpan.FromSeconds(6));
+                    await client.ConnectAsync(req.Host, req.Port, connectCts.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return Ok(new TestResult
+                {
+                    Success = false,
+                    Status = $"Could not connect to {req.Host}:{req.Port} within 6 seconds. " +
+                             "The host may be down, the port wrong, or your firewall blocking the outbound connection.",
+                });
+            }
+            catch (SocketException ex)
+            {
+                return Ok(new TestResult
+                {
+                    Success = false,
+                    Status = $"Connection refused: {ex.SocketErrorCode}. The host is reachable but nothing is listening on port {req.Port}.",
+                });
+            }
+            catch (Exception ex)
+            {
+                return Ok(new TestResult
+                {
+                    Success = false,
+                    Status = $"Connection failed: {ex.Message}",
+                });
+            }
+
+            try
+            {
+                using var stream = client.GetStream();
+                using var reader = new StreamReader(stream);
+                using var writer = new StreamWriter(stream) { AutoFlush = true, NewLine = "\r\n" };
+
+                // Same proactive-login pattern as the real service — many DXSpider
+                // nodes prompt with "login: " (no newline) so ReadLineAsync would
+                // hang. Send the callsign 1.5 s after connect.
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(1500, overallCts.Token);
+                        if (!string.IsNullOrWhiteSpace(req.LoginCallsign))
+                        {
+                            await writer.WriteLineAsync(req.LoginCallsign.Trim().ToUpperInvariant());
+                            sb.AppendLine($">> {req.LoginCallsign.Trim().ToUpperInvariant()}");
+                        }
+                    }
+                    catch { /* socket may already be closing — fine */ }
+                }, overallCts.Token);
+
+                // Read up to overallCts deadline, accumulating all received bytes.
+                var buf = new char[4096];
+                while (!overallCts.IsCancellationRequested)
+                {
+                    int n;
+                    try { n = await reader.ReadAsync(buf.AsMemory(), overallCts.Token); }
+                    catch (OperationCanceledException) { break; }
+                    catch (IOException) { break; } // socket closed by remote
+                    if (n <= 0) break;
+                    sb.Append(buf, 0, n);
+                    lineCount += new string(buf, 0, n).Count(c => c == '\n');
+                }
+            }
+            catch (Exception ex)
+            {
+                sb.AppendLine($"-- read error: {ex.Message} --");
+            }
+
+            string transcript = sb.ToString().Trim();
+            bool gotAnything = transcript.Length > 0;
+            return Ok(new TestResult
+            {
+                Success = gotAnything,
+                Status = gotAnything
+                    ? $"Connected to {req.Host}:{req.Port}. Received {transcript.Length} characters / {lineCount} lines in ~10 seconds."
+                    : $"Connected to {req.Host}:{req.Port} but no data was received within 10 seconds. The host accepted the TCP connection but isn't speaking DXSpider/AR-Cluster protocol — wrong port, perhaps, or a different service.",
+                Transcript = transcript,
+                LinesReceived = lineCount,
+            });
         }
 
         // ── Watched callsigns ─────────────────────────────────────────────

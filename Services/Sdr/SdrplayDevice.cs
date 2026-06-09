@@ -166,7 +166,14 @@ namespace Yaesu_Web_Control.Services.Sdr
 
         /// <summary>
         /// Creates a device wrapper for the given key.
-        /// Key format: "sdrplay:&lt;serialNumber&gt;"
+        /// <para>
+        /// Key format (v2.3.0+): <c>sdrplay:hw&lt;hwVer&gt;-&lt;serialNumber&gt;</c>
+        /// — e.g. <c>sdrplay:hw6-2405242660</c> for an RSP1B.
+        /// </para>
+        /// <para>
+        /// Legacy format (v2.2.x and earlier): <c>sdrplay:&lt;serialNumber&gt;</c>.
+        /// Still accepted for backward compatibility — matched on serial only.
+        /// </para>
         /// </summary>
         public SdrplayDevice(string key)
         {
@@ -175,6 +182,27 @@ namespace Yaesu_Web_Control.Services.Sdr
 
             Key   = key;
             Label = key;   // Placeholder; updated to the full model name in Configure().
+        }
+
+        /// <summary>
+        /// Parses a device key into hwVer (or null for legacy keys) and serial.
+        /// New: "sdrplay:hw6-2405242660"  → (6, "2405242660")
+        /// Old: "sdrplay:2405242660"      → (null, "2405242660")
+        /// </summary>
+        private static (byte? hwVer, string serial) ParseKey(string key)
+        {
+            string body = key[KeyPrefix.Length..];
+            // New format: "hw<digits>-<serial>"
+            if (body.StartsWith("hw", StringComparison.OrdinalIgnoreCase))
+            {
+                int dash = body.IndexOf('-');
+                if (dash > 2 &&
+                    byte.TryParse(body.AsSpan(2, dash - 2), out byte hw))
+                {
+                    return (hw, body[(dash + 1)..]);
+                }
+            }
+            return (null, body);
         }
 
         // ── Public API ────────────────────────────────────────────────────────────
@@ -280,8 +308,9 @@ namespace Yaesu_Web_Control.Services.Sdr
             ThrowIfError(sdrplay_api_Open(), "sdrplay_api_Open");
             _apiOpen = true;
 
-            // Enumerate and find our device by serial number
-            string serial = Key[KeyPrefix.Length..];
+            // Enumerate and find our device. We support both the new
+            // "sdrplay:hw<N>-<serial>" key format and the legacy serial-only one.
+            var (wantHwVer, serial) = ParseKey(Key);
 
             IntPtr deviceArray = Marshal.AllocHGlobal(DeviceStructSize * MaxDevices);
             try
@@ -289,10 +318,12 @@ namespace Yaesu_Web_Control.Services.Sdr
                 uint count = 0;
                 ThrowIfError(sdrplay_api_GetDevices(deviceArray, ref count, MaxDevices), "GetDevices");
 
-                IntPtr matchPtr = FindDeviceBySerial(deviceArray, count, serial);
+                IntPtr matchPtr = FindDevice(deviceArray, count, wantHwVer, serial);
                 if (matchPtr == IntPtr.Zero)
                     throw new InvalidOperationException(
-                        $"SDRplay device '{serial}' not found. Check it is connected.");
+                        $"SDRplay device '{serial}'" +
+                        (wantHwVer.HasValue ? $" (hwVer {wantHwVer})" : "") +
+                        " not found. Check it is connected.");
 
                 // Update Label now that we know the hardware version.
                 byte hwVer = Marshal.ReadByte(matchPtr, HwVerOffset);
@@ -515,23 +546,49 @@ namespace Yaesu_Web_Control.Services.Sdr
                 string model  = HwVerToModel(hwVer);
                 string label  = $"SDRplay {model} ({serial})";
 
+                // Key format includes hwVer so two devices that happen to share a
+                // serial (notably an RSP1 with the factory-default "0000000001"
+                // placeholder, alongside an RSP1B with a real serial) remain
+                // distinguishable. See USER_MANUAL FAQ "Why does my RSP1 show
+                // serial 0000000001?" for the background.
                 list.Add(new SdrDeviceInfo(
-                    Key:    KeyPrefix + serial,
+                    Key:    $"{KeyPrefix}hw{hwVer}-{serial}",
                     Label:  label,
                     Driver: "sdrplay"));
             }
         }
 
-        private static IntPtr FindDeviceBySerial(IntPtr deviceArray, uint count, string serial)
+        /// <summary>
+        /// Find a device in the enumeration by hwVer+serial (preferred) or by
+        /// serial alone (legacy keys). Falls back to serial-only if no hwVer
+        /// match is found — keeps v2.2.x-saved keys working until the next save
+        /// migrates them to the new format.
+        /// </summary>
+        private static IntPtr FindDevice(IntPtr deviceArray, uint count, byte? wantHwVer, string serial)
         {
+            IntPtr serialOnlyMatch = IntPtr.Zero;
             for (uint i = 0; i < count; i++)
             {
                 IntPtr ptr       = deviceArray + (int)(i * DeviceStructSize);
                 string devSerial = Marshal.PtrToStringAnsi(ptr) ?? string.Empty;
-                if (string.Equals(devSerial, serial, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(devSerial, serial, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (wantHwVer.HasValue)
+                {
+                    byte devHwVer = Marshal.ReadByte(ptr, HwVerOffset);
+                    if (devHwVer == wantHwVer.Value)
+                        return ptr;
+                }
+                else
+                {
+                    // Legacy key — first serial match wins.
                     return ptr;
+                }
+                // Remember a serial-only match in case no hwVer match is found.
+                if (serialOnlyMatch == IntPtr.Zero) serialOnlyMatch = ptr;
             }
-            return IntPtr.Zero;
+            return serialOnlyMatch;
         }
 
         // hwVer codes per the official SDRplay API header

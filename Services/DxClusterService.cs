@@ -219,7 +219,7 @@ namespace Yaesu_Web_Control.Services
             AppendLogFile($">> {settings.DxClusterLoginCallsign}");
             _logger.LogInformation("[DxCluster] Sent proactive login: {Callsign}", settings.DxClusterLoginCallsign);
 
-            // Send any user-configured post-login commands (set/qra IO75JA,
+            // Send any user-configured post-login commands (set/qra IO85CX,
             // set/name Colin, set/filter ... etc.). Pause briefly first so
             // the cluster has time to process the login.
             if (!string.IsNullOrWhiteSpace(settings.DxClusterPostLoginCommands))

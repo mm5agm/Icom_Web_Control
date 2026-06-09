@@ -69,12 +69,17 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 }
 
 function Replace-OrFail([string]$Text, [string]$Pattern, [string]$Replacement, [string]$Label) {
-    $new = [regex]::Replace($Text, $Pattern, $Replacement)
-    if ($new -eq $Text) {
+    # Verify the pattern actually matches somewhere — protects against
+    # silently leaving a file untouched if e.g. the user reformatted the
+    # source and our pattern no longer fits. We do NOT fail if the
+    # replacement happens to equal the original (that's the legitimate
+    # case where the value is already correct, e.g. two releases on the
+    # same day so ReleaseDate doesn't change).
+    if (-not [regex]::IsMatch($Text, $Pattern)) {
         Write-Error "No match for $Label (pattern: $Pattern). File untouched."
         exit 1
     }
-    return $new
+    return [regex]::Replace($Text, $Pattern, $Replacement)
 }
 
 # ---- 1 & 2. Models\AppVersion.cs ----

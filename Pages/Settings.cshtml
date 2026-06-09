@@ -453,10 +453,14 @@
                     <p class="text-muted mb-3">
                         Connect to a DX cluster server to overlay DX spots on the SDR spectrum display.
                         Spots show callsigns at their reported frequencies; click a spot to QSY VFO A to it.
-                        Pick any cluster server you have access to — there is no preset default. Common
-                        examples include <code>cluster.dl4ny.de:7300</code>, <code>ve7cc.net:23</code>,
-                        and <code>dxc.k4ldc.com:7300</code>. The connection is established only after you
-                        enable it below.
+                        Pick any cluster server you have access to — there is no preset default.
+                        Cluster servers come and go; if one stops responding, try another. Verified
+                        active at the time of writing: <code>dxspider.co.uk:7300</code> (Colin's own
+                        regular cluster, recommended starting point), <code>ve7cc.net:23</code>,
+                        <code>ei7mre.ath.cx:7300</code>, <code>cluster.f1led.fr:7300</code>,
+                        <code>dxfun.com:8000</code>. See the User Manual §6.6 for more, and check
+                        the cluster status badge on the spectrum panel for live connection state.
+                        The connection is established only after you enable it below.
                     </p>
                     <div class="row">
                         <div class="col-md-6">
@@ -475,7 +479,7 @@
                             <div class="mb-3">
                                 <label asp-for="Settings.DxClusterHost" class="form-label">Cluster host</label>
                                 <input asp-for="Settings.DxClusterHost" class="form-control"
-                                       placeholder="e.g. cluster.dl4ny.de" autocomplete="off" />
+                                       placeholder="e.g. dxspider.co.uk" autocomplete="off" />
                             </div>
                             <div class="mb-3">
                                 <label asp-for="Settings.DxClusterPort" class="form-label">Port</label>
@@ -514,14 +518,51 @@
                             Post-login commands
                         </label>
                         <textarea asp-for="Settings.DxClusterPostLoginCommands" class="form-control font-monospace"
-                                  rows="4" placeholder="set/qra IO75JA&#10;set/name Colin"></textarea>
+                                  rows="4" placeholder="set/qra IO85CX&#10;set/name Colin"></textarea>
                         <div class="form-text">
                             One DXSpider command per line. Sent each time the app connects, after the callsign
-                            is accepted. Use this to set your Maidenhead grid (<code>set/qra IO75JA</code>),
+                            is accepted. Use this to set your Maidenhead grid (<code>set/qra IO85CX</code>),
                             name (<code>set/name Colin</code>), or any spot filters you prefer. Lines starting
                             with <code>#</code> are ignored. Leading <code>/</code> is stripped.
                         </div>
                     </div>
+
+                    <!-- Test Cluster button — verifies the host/port/callsign without saving.
+                         Connects, sends the callsign, reads ~10 s of output, shows it in a
+                         modal so the user can see whether the cluster actually answers. -->
+                    <div class="mb-2">
+                        <button type="button" class="btn btn-warning fw-bold" id="dxClusterTestBtn"
+                                onclick="testDxCluster()">
+                            <i class="bi bi-broadcast"></i> Test cluster connection
+                        </button>
+                        <small class="text-muted ms-2">
+                            Takes ~10 seconds. Connects to the cluster with the values above
+                            (without saving) and shows what it returns.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DX Cluster Test result modal -->
+    <div class="modal fade" id="dxClusterTestModal" tabindex="-1" aria-labelledby="dxClusterTestModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="dxClusterTestModalLabel">
+                        <i class="bi bi-broadcast"></i> DX Cluster — connection test
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="dxClusterTestStatus" class="alert" role="status" aria-live="polite"></div>
+                    <h6 class="mt-3">Transcript</h6>
+                    <pre id="dxClusterTestTranscript" class="bg-light border rounded p-2 small"
+                         style="max-height: 50vh; overflow: auto; white-space: pre-wrap;"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -713,14 +754,44 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script type="module">
+        // hwVer (per SDRplay API header) → friendly model name. Kept in sync
+        // with the C# HwVerToModel in Services/Sdr/SdrplayDevice.cs.
+        const SDRPLAY_HW_VER_NAMES = {
+            1: 'RSP1', 2: 'RSP2', 3: 'RSPduo', 4: 'RSPdx', 5: 'RSPdx-R2',
+            6: 'RSP1B', 7: 'RSPdxR2', 255: 'RSP1A'
+        };
+
+        // Extract serial (and hwVer if present) from an sdrplay:... key.
+        // New: "sdrplay:hw6-2405242660" → { hwVer: 6, serial: "2405242660" }
+        // Old: "sdrplay:2405242660"      → { hwVer: null, serial: "2405242660" }
+        function parseSdrplayKey(key) {
+            const body = key.slice('sdrplay:'.length);
+            const m = /^hw(\d+)-(.+)$/i.exec(body);
+            if (m) return { hwVer: parseInt(m[1], 10), serial: m[2] };
+            return { hwVer: null, serial: body };
+        }
+
+        // Returns true if either key refers to the same physical device.
+        // Handles "old serial-only saved key matches new hwVer-prefixed scan key".
+        function sdrplayKeysMatch(a, b) {
+            if (!a || !b || !a.startsWith('sdrplay:') || !b.startsWith('sdrplay:')) return false;
+            if (a === b) return true;
+            const ka = parseSdrplayKey(a), kb = parseSdrplayKey(b);
+            return ka.serial === kb.serial;
+        }
+
         // Derives a human-readable label from a saved device key without needing a scan.
-        // sdrplay:0000000001  →  "SDRplay (0000000001) [sdrplay]"
+        // sdrplay:hw6-2405242660   →  "SDRplay RSP1B (2405242660) [sdrplay]"
+        // sdrplay:0000000001       →  "SDRplay (0000000001) [sdrplay]"   (legacy key, no model)
         // driver=rtlsdr,label=Generic RTL2832U,...  →  "Generic RTL2832U [rtlsdr]"
         function keyToLabel(key) {
             if (!key) return '';
             if (key.startsWith('sdrplay:')) {
-                const serial = key.slice('sdrplay:'.length);
-                return `SDRplay (${serial}) [sdrplay]`;
+                const { hwVer, serial } = parseSdrplayKey(key);
+                const model = hwVer != null ? (SDRPLAY_HW_VER_NAMES[hwVer] || `hw${hwVer}`) : null;
+                return model
+                    ? `SDRplay ${model} (${serial}) [sdrplay]`
+                    : `SDRplay (${serial}) [sdrplay]`;
             }
             let label = '', driver = '';
             for (const pair of key.split(',')) {
@@ -782,7 +853,22 @@
                         const opt = document.createElement('option');
                         opt.value       = d.key;
                         opt.textContent = `${d.label} [${d.driver}]`;
-                        if (d.key === savedKey) { opt.selected = true; matched = true; }
+                        // Match against the saved key — exact match, OR an
+                        // sdrplay:... legacy-vs-new format match on serial.
+                        // When we hit the legacy case, normalise the hidden
+                        // input to the new key so the next save migrates the
+                        // settings file format silently.
+                        const sameDevice =
+                            d.key === savedKey ||
+                            sdrplayKeysMatch(d.key, savedKey);
+                        if (sameDevice) {
+                            opt.selected = true;
+                            matched = true;
+                            if (d.key !== savedKey) {
+                                document.getElementById('sdrDeviceKeyInput').value = d.key;
+                                updateDeviceKeyDisplay(d.key);
+                            }
+                        }
                         dropdown.appendChild(opt);
                     });
 
@@ -854,6 +940,60 @@ window.clearSdrDevice = function () {
             const el = document.getElementById('sdrDeviceKeyDisplay');
             el.textContent = key ? `Saved key: ${key}` : 'No device saved.';
         }
+
+        // DX cluster connection test — POSTs the current Settings-page values
+        // (host, port, callsign) to /api/dxcluster/test, which opens a TCP
+        // connection, sends the callsign, reads ~10 s of output, and returns
+        // the transcript. Result is shown in a Bootstrap modal.
+        window.testDxCluster = async function () {
+            const host = document.getElementById('Settings_DxClusterHost').value.trim();
+            const port = parseInt(document.getElementById('Settings_DxClusterPort').value, 10);
+            const callsign = document.getElementById('Settings_DxClusterLoginCallsign').value.trim();
+
+            const statusEl = document.getElementById('dxClusterTestStatus');
+            const transcriptEl = document.getElementById('dxClusterTestTranscript');
+            statusEl.className = 'alert alert-info';
+            statusEl.textContent = `Connecting to ${host}:${port}…  (waits up to ~10 seconds)`;
+            transcriptEl.textContent = '';
+
+            const modalEl = document.getElementById('dxClusterTestModal');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+
+            const btn = document.getElementById('dxClusterTestBtn');
+            // Reset to the "untested" yellow state on every click — so if a
+            // previous click left it green, retesting a different host shows
+            // visual feedback for the new attempt rather than carrying over
+            // a stale result.
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-warning');
+            btn.innerHTML = '<i class="bi bi-broadcast"></i> Test cluster connection';
+            btn.disabled = true;
+            try {
+                const resp = await fetch('/api/dxcluster/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ host, port, loginCallsign: callsign }),
+                });
+                const r = await resp.json();
+                statusEl.className = r.success ? 'alert alert-success' : 'alert alert-danger';
+                statusEl.textContent = r.status || (r.success ? 'OK' : 'Failed');
+                transcriptEl.textContent = r.transcript || '(no data received)';
+                if (r.success) {
+                    // Solid green button + checkmark + confirmation text
+                    // = unambiguous "this cluster is working". Stays green
+                    // until the user clicks the button again.
+                    btn.classList.remove('btn-warning');
+                    btn.classList.add('btn-success');
+                    btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Cluster connection successful';
+                }
+            } catch (e) {
+                statusEl.className = 'alert alert-danger';
+                statusEl.textContent = `Error contacting the test endpoint: ${e.message}`;
+            } finally {
+                btn.disabled = false;
+            }
+        };
     </script>
     <script>
         function copyToClipboard(elementId) {
