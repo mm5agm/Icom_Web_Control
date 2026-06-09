@@ -133,7 +133,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 
 **Required — radio connection:**
 
-1. Open a browser and go to **http://localhost:8080**
+1. Open a browser and go to **http://localhost:8080**. If port 8080 was already in use on your PC (e.g. Plex, Jenkins, MiniTool ShadowMaker), YWC will have automatically picked the next free port from 8081–8089. **Hover over the YWC tray icon** down by the Windows clock to see the actual URL — or simply double-click the tray icon to have YWC open the right URL in your default browser.
 2. Click the **Settings** link in the navigation bar.
 3. Set **Radio Model** to your transceiver: **FTdx101MP** (200 W, dual receiver), **FTdx101D** (100 W, dual receiver), **FTDX3000** (100 W, dual receiver), **FTdx10** (100 W, single receiver), or **FT-710** (100 W, single receiver).
 4. Set **Serial Port** to the COM port your radio is connected to. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
@@ -157,11 +157,11 @@ None of these are required for basic operation. Get the radio connection working
 
 ## 4. Starting the Application
 
-Double-click the **Yaesu Web Control** shortcut on your desktop. The app starts in the background and your default browser opens to `http://localhost:8080` automatically.
+Double-click the **Yaesu Web Control** shortcut on your desktop. The app starts in the background and your default browser opens automatically to whichever port YWC managed to bind (usually `http://localhost:8080`, but YWC will fall back to 8081–8089 if 8080 was already in use on your PC).
 
 A small **YWC tray icon** appears in the Windows system tray (down by the clock, possibly under the **Show hidden icons ︿** arrow). The tray icon is your "the app is running" indicator and gives you a clean way to manage it without juggling Task Manager:
 
-- **Hover** over the icon — a tooltip confirms the version and `http://localhost:8080`.
+- **Hover** over the icon — a tooltip confirms the version and the actual URL (e.g. `http://localhost:8080` or `http://localhost:8081`). If you ever wonder which port YWC ended up on, this is the fastest way to check.
 - **Double-click** the icon — opens YWC in your default browser (handy if you've closed all browser tabs and need to get back to the app).
 - **Right-click** the icon — opens a menu:
 
@@ -631,9 +631,21 @@ The list of watched calls is saved across app restarts in your user settings fil
 
 The **Mem** button in the toolbar (bold black text) opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. **Click a tile to QSY VFO A to that frequency** — and any of the memory's saved advanced settings (mode, AGC, NB, NR, power, IF Width, IF Shift, antenna, roofing filter) are sent to the radio at the same time. Fields that aren't set in the memory are left as-is on the radio.
 
+![Floating memory panel with the Banks dropdown open — tile grid on the left, banks list on the right, plus the four Load-from-Rig / Save-to-Rig action buttons across the top](pictures/Memories_Floating_Panel.png)
+
 The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions.
 
+**The toolbar at the top of the floating panel** carries the four rig-transfer actions and the Banks dropdown:
+
+![Floating memory panel toolbar — Load from Rig (Replace all / Add new), Save to Rig (Replace all / Add new), and Banks dropdown](pictures/Memories_Banks_Bar.png)
+
+**Right-click any tile** to get a context menu with **Recall**, **Rename**, **Change Mode** and **Delete** — quick edits without having to open the full editor:
+
+![Right-click context menu on a memory tile showing Recall, Rename, Change Mode and Delete options](pictures/Memories_Tile_Closeup.png)
+
 **Save to Mem button** — A **Save to Mem** button appears below the S-meter on both the VFO A and VFO B panels. Click it to save the current VFO frequency, mode and all advanced settings as a new memory. A label input box appears — type a name (up to 12 characters) and press Enter or click Save. The new memory appears immediately in the floating panel.
+
+![The Save to Mem button on a VFO panel, sitting next to the Segment dropdown](pictures/Memories_Save_To_Mem_Button.png)
 
 **Banks dropdown** — a **Banks** dropdown sits in the floating panel's toolbar alongside the Save to Rig buttons. The first entry is always **📥 YWC Starter Bank (built-in)** — the bundled set of common watering-hole memories shipped with the app (§8.5). Below that, any banks you've saved yourself appear (§8.4). Select any entry to switch — the memory list is replaced with that bank's contents and the tiles refresh automatically. The dropdown resets to its placeholder after loading.
 
@@ -753,9 +765,28 @@ The Settings page also shows the full URL for each detected network interface so
 
 ### 6.3 SDR Spectrum Display
 
-The spectrum display requires an SDR receiver. On the FTdx101MP, FTdx101D, and FTDX3000 the SDR is connected to the radio's 9 MHz IF output (rear panel RCA socket labelled **IF OUT**), giving a VFO-centred panoramic view of the band. The FTdx10 and FT-710 do not have an IF output — see the note below.
+The spectrum display requires an SDR receiver. On the FTdx101MP, FTdx101D, and FTDX3000 the SDR is connected to the radio's 9 MHz IF output (rear panel RCA socket labelled **IF OUT**), giving a VFO-centred panoramic view of the band. The FTdx10 and FT-710 do not have an IF output — see the warning below.
 
-> **FTdx10 and FT-710 users:** These radios have no rear-panel IF output. You can still use an SDR for spectrum display by connecting it to an antenna port, but the spectrum will show absolute RF frequencies rather than a view centred on your VFO frequency. The IF Frequency setting has no effect when used this way. The Settings page shows a reminder of this when FTdx10 or FT-710 is selected as the radio model.
+> ## ⚠️ Safety — read before connecting an SDR
+>
+> SDR receivers have a very sensitive front end. **Even a small amount of TX RF can permanently damage or destroy them.** Treat the SDR like a precision RX-only instrument, not a piece of TX hardware.
+>
+> **If your radio has an IF output (FTdx101MP / FTdx101D / FTDX3000):**
+> Connect the SDR only to the rear-panel **IF OUT** RCA socket. This is an internal low-level signal, safe to leave connected during TX. **Never** connect the SDR to an antenna port on a radio with IF out — you don't need to, and you'll regret it.
+>
+> **If your radio has no IF output (FTdx10 / FT-710):**
+> The SDR must connect to an antenna port. Transmitting with the SDR's coax wired into your TX antenna **will damage the SDR**. You must do one of:
+> - **Disconnect the SDR coax before every TX.** Crude but reliable. Easy to forget.
+> - **Use a dedicated receive-only antenna**, physically separated from your TX antenna by as much distance as you can manage. Even a few metres of vertical separation helps; opposite ends of the garden is better.
+> - **Fit a T/R relay or PIN-diode T/R switch** between your antenna and the SDR. The relay is keyed by the radio's PTT line so the SDR is automatically disconnected the moment you transmit. This is the standard professional solution; several ham-radio suppliers sell ready-built T/R switch units rated for the SDR's power-handling requirements.
+>
+> **Always remember:** an antenna physically close to your TX antenna can still couple enough RF into the SDR to damage it, even if it's not directly connected. The further apart, the safer.
+>
+> YWC also displays this warning on the Settings page whenever you have an SDR configured, and a more prominent danger banner if your selected radio is an FTdx10 or FT-710 (since those users are obliged to connect to an antenna).
+
+**Spectrum view depends on connection point:**
+- **IF output** (FTdx101 / FTDX3000) — VFO-centred panoramic view of the band you're tuned to, regardless of where on the band you tune. The IF Frequency setting tells YWC which IF the radio is using (9 MHz on FTdx101 series).
+- **Antenna port** (FTdx10 / FT-710) — absolute RF frequencies from the connected antenna. The IF Frequency setting has no effect. The Settings page shows a reminder of this when FTdx10 or FT-710 is selected.
 
 **Supported hardware:**
 - **SDRplay RSP1 and RSP series** — requires the [SDRplay API v3](https://www.sdrplay.com/downloads/) to be installed separately
@@ -968,6 +999,8 @@ The app maintains its own list of memory channels, independent of the radio's bu
 
 Access the full memories editor from **Memories** in the navigation bar.
 
+![The full Memories editor page — Memory Banks bar at the top, Radio Channels bar, ADIF import card, advanced-fields toggle, and the editable memory table](pictures/Memories_Editor_Page.png)
+
 The editor shows all your saved memories in a table. For each memory you can edit:
 
 | Field | Description |
@@ -1024,6 +1057,8 @@ Import reads up to 99 channels and takes up to 30 seconds. A progress indicator 
 ### 8.3 Importing from ADIF
 
 If you already keep a list of favourite frequencies in Log4OM (or any other logger that exports ADIF), you can bring them into YWC as memories without retyping. On the Memories page there is an **ADIF import** card with a single **Import from ADIF…** button.
+
+![The ADIF import card on the Memories page](pictures/Memories_ADIF_Import.png)
 
 **What gets imported.** YWC reads every QSO record in the file and creates one memory per **unique combination** of frequency and mode. So if you've logged a thousand QSOs on 14.074 MHz FT8, you get just one memory called "14.074 DATA-U" — not a thousand duplicates.
 
@@ -1094,6 +1129,8 @@ Banks are stored in `%APPDATA%\MM5AGM\Yaesu Web Control\memory-banks.json` and a
 
 YWC ships with a built-in **starter bank** of common watering-hole memories — pre-populated, region-aware, and ready to load with one click. New users get a useful set of memories without having to type in every FT8 frequency by hand; experienced users can pick and choose which entries to keep.
 
+![Floating Mem panel with the YWC Starter Bank loaded — every common watering-hole frequency for the current region in one bank](pictures/Memories_Starter_Bank_Loaded.png)
+
 **What's in it (typical entry counts vary slightly per region):**
 
 - FT8 calling frequencies on every band from 160m to 6m (plus 4m in Region 1)
@@ -1120,6 +1157,8 @@ On the **Memories editor page** a confirmation dialog appears before the load (s
 **Where the files live** — the starter banks are in `wwwroot/data/starter-bank-*.json` inside the install folder. They're plain JSON; if you want to look at the source data or contribute corrections, the format is one object per entry with frequency in Hz, mode, and the same advanced-field set the in-app memories use.
 
 **Splitting the starter bank into themed banks.** The full starter bank is a mixed bag — FT8, SSB, CW, RTTY, FM and beacons all in one list. If you'd rather have **separate banks per mode** so you can load just FT8 frequencies on a contest weekend, or just CW for a quiet evening, click **Create themed banks…** on the Memory Banks bar. YWC reads the current region's starter bank and writes the contents out as up to six named banks:
+
+![Create themed banks confirmation dialog — names the six banks that will be created (FT8 / FT4 / CW / SSB / RTTY / FM) and confirms existing banks of the same name are left alone](pictures/Memories_Create_Themed_Banks_Dialog.png)
 
 | Bank | Contains |
 |---|---|

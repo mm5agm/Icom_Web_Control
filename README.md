@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.2.0-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.2.1-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -80,6 +80,16 @@ These are one-time steps — once the app is installed you won't see them again.
 
 The application includes a real-time spectrum display and waterfall, intended for use with a Software Defined Radio (SDR) connected to the transceivers 9 MHz IF output on the rear panel if it has one.
 
+> ## ⚠️ SDR safety — read before connecting
+>
+> An SDR receiver's front end is **extremely sensitive** and can be **destroyed by even a small amount of TX RF**.
+>
+> - **FTdx101MP / FTdx101D / FTDX3000** (have IF output): connect the SDR to the rear-panel **IF OUT** RCA socket only. This is an internal low-level signal — safe during TX. Do **not** connect to an antenna port.
+> - **FTdx10 / FT-710** (no IF output): if you connect an SDR to an antenna port you **must** disconnect it during TX, or use a dedicated receive-only antenna well away from your TX antenna, or fit a T/R relay or PIN-diode T/R switch in front of the SDR. Transmitting with the SDR coax wired directly to your TX antenna will damage the SDR.
+> - In all cases, an antenna physically close to your TX antenna can still couple enough RF into the SDR to damage it. When in doubt, disconnect.
+>
+> YWC also shows this warning on the Settings page when an SDR is configured, and a more prominent danger banner appears if your selected radio is an FTdx10 or FT-710.
+
 **Supported SDR devices:**
 
 - **SDRplay RSP1 (and other RSP series)** — supported via the SDRplay API v3. The SDRplay API must be installed separately from [sdrplay.com](https://www.sdrplay.com/downloads/). This is the only SDR the author has tested.
@@ -94,6 +104,46 @@ The application includes a real-time spectrum display and waterfall, intended fo
 ---
 
 ## Release Notes
+
+## 2026-06-09 - v2.2.1
+
+A quick hotfix on top of v2.2.0 — closes one silently-affecting bug, adds a
+hardware-safety warning, and includes two small UX fixes.
+
+### Bug fixes
+
+- **WSJT-X "orange rig" failure** ([#22](https://github.com/mm5agm/Yaesu_Web_Control/issues/22), W1WRH).
+  YWC's rigctld bridge was rejecting Hamlib's `PKTUSB` mode name with
+  `E_MODE: Unsupported mode for this rig.` whenever WSJT-X tried to set
+  the mode at connect time. The result was WSJT-X dropping the rig
+  control indicator to orange and re-trying every 20 seconds in an
+  infinite loop. Bug affects any radio when the WSJT-X profile is set
+  up to push mode explicitly (typical on fresh installs). The
+  **read** path was already translating outbound `DATA-USB` → `PKTUSB`
+  correctly, but the **write** path didn't accept it coming back —
+  inconsistent. Fix accepts `PKTUSB` / `PKTLSB` / `PKTFM` and translates
+  them to `DATA-U` / `DATA-L` / `DATA-FM`. Similar translation added
+  for `CW` / `CW-R` / `RTTY` / `RTTY-R`.
+
+### New features and improvements
+
+- **⚠️ SDR safety warnings.** Connecting an SDR to a TX antenna —
+  or an antenna close to one you're transmitting on — can permanently
+  damage the SDR's front end. README and User Manual §6.3 now carry a
+  prominent safety section explaining the safe connection options
+  (IF output, dedicated RX antenna, or T/R switch). The Settings page
+  shows a corresponding warning whenever an SDR is configured, and a
+  more prominent red **danger** banner if the selected radio is an
+  FTdx10 or FT-710 (no IF tap, SDR must connect to an antenna).
+- **Sticky top navigation bar.** The top nav (About / User Manual /
+  Home / Settings / Application Setup / Meter Calibration / Memories /
+  Accessibility Labels) now stays visible when scrolling. Particularly
+  useful in the long User Manual — no more page-ups to get home.
+- **About page — bug-report links consolidated.** Two slightly-different
+  bug-report links previously caused confusion. The plain "Report a bug"
+  link (no diagnostics) has been removed; only the **Report a bug**
+  button under the Diagnostics block remains, since the diagnostics
+  block is what makes the report actually actionable.
 
 ## 2026-06-06 - v2.2.0
 

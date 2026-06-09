@@ -26,7 +26,25 @@ namespace Yaesu_Web_Control.Services
 
         private static readonly HashSet<string> SupportedModes = new()
         {
-            "LSB", "USB", "CW", "CW-R", "RTTY", "RTTY-R", "AM", "FM"
+            "LSB", "USB", "CW", "CW-R", "RTTY", "RTTY-R", "AM", "FM",
+            // Hamlib "packet" mode names — WSJT-X uses these for digital modes
+            // (PKTUSB = FT8/FT4/PSK on the USB-data side, = Yaesu DATA-U).
+            // GetModeAsync already translates DATA-USB → PKTUSB outbound, so
+            // accepting them on inbound completes the round-trip.
+            "PKTUSB", "PKTLSB", "PKTFM"
+        };
+
+        // Hamlib → Yaesu mode-name mapping for the set-mode path.
+        // Anything not in this map is sent verbatim to CatCommands.FormatMode.
+        private static readonly Dictionary<string, string> HamlibToYaesuMode = new()
+        {
+            { "PKTUSB", "DATA-U"   },
+            { "PKTLSB", "DATA-L"   },
+            { "PKTFM",  "DATA-FM"  },
+            { "CW",     "CW-U"     },
+            { "CW-R",   "CW-L"     },
+            { "RTTY",   "RTTY-L"   },
+            { "RTTY-R", "RTTY-U"   },
         };
 
         private const long MinFrequency = 30000;
@@ -286,10 +304,16 @@ namespace Yaesu_Web_Control.Services
 
         private async Task<string> SetModeAsync(string mode, string? passband, string clientId)
         {
-            if (!SupportedModes.Contains(mode.ToUpper()))
+            var hamlibMode = mode.ToUpper();
+            if (!SupportedModes.Contains(hamlibMode))
                 return "RPRT -1 // E_MODE: Unsupported mode for this rig.";
 
-            var yaesuMode = mode.ToUpper();
+            // Translate Hamlib mode names to Yaesu names where they differ
+            // (PKTUSB → DATA-U, CW → CW-U, etc.). Sending raw Hamlib names to
+            // CatCommands.FormatMode would set an unintended mode on the radio.
+            var yaesuMode = HamlibToYaesuMode.TryGetValue(hamlibMode, out var mapped)
+                ? mapped
+                : hamlibMode;
             var command = CatCommands.FormatMode(yaesuMode, false);
             await _multiplexer.SendCommandAsync(command, clientId);
             return "RPRT 0";
