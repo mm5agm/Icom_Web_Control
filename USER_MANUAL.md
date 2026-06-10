@@ -824,6 +824,16 @@ The spectrum panel appears on the main page when a device is saved. If you want 
 | Sample Rate | 2,048,000 (2M) |
 | FFT Size | 1024 |
 
+#### Dual SDR — one per VFO *(v2.3.0 and later)*
+
+If you have two SDRs (typically two SDRplay RSPs) and a dual-receiver radio (FTdx101MP / FTdx101D), you can wire one SDR to the **IF OUT MAIN** RCA socket (VFO A) and the other to **IF OUT SUB** (VFO B). The Settings page then offers two device dropdowns — **VFO A SDR** and **VFO B SDR** — so YWC knows which physical device serves which VFO. Click **Scan** once; both dropdowns are populated from the same scan. Pick the SDR for each slot, save, and the main page will show two spectrum panels stacked vertically (one for each VFO).
+
+If you only have one SDR, set it in the **VFO A SDR** slot and leave **VFO B SDR** as *(none)*. The main page will show only the VFO A panel exactly as in single-SDR setups before v2.3.0.
+
+> **Note on SDRplay devices specifically:** the SDRplay API service only allows one device per host process. YWC works around this by launching a separate background process (`Yaesu_Sdr_Worker.exe`) for each SDR you configure — you'll see them in Task Manager when YWC is streaming. They start and stop automatically; no user action needed. See [docs/decisions/0001-dual-sdr-architecture.md](docs/decisions/0001-dual-sdr-architecture.md) on GitHub if you're curious about the why.
+
+When both VFOs have an SDR, the main control panel gains a small **VFO A / VFO B / Both** toggle above the spectrum panels so you can quickly hide one panel without changing settings. The choice is remembered across page reloads.
+
 ---
 
 ### 6.4 Roofing Filters
