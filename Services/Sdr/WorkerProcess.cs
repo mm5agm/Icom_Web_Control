@@ -157,14 +157,36 @@ internal sealed class WorkerProcess : IDisposable
         return null;
     }
 
-    // Pick a free TCP port in a fixed range. We use IPGlobalProperties so we see
-    // the OS truth (the same approach v2.2.x took for the HTTP port fallback).
+    // Pick a free TCP port in the worker range (17001-17099).
+    //
+    // The naive "scan OS-in-use ports and pick the first not-in-use" approach
+    // has a race: when SdrManager spawns the A and B workers within a few ms
+    // of each other, the first worker hasn't yet bound its port by the time
+    // the second worker is allocated, so both end up with the same port —
+    // the second worker then dies with "Only one usage of each socket address"
+    // and VFO B never gets a panel.
+    //
+    // Fix: a process-static rolling counter under a lock guarantees each
+    // worker gets a distinct port number even when called concurrently.
+    // We still cross-check IPGlobalProperties to skip ports the OS already
+    // sees as in use (e.g. from a previous YWC run that exited uncleanly).
+    private static int _portCursor = 17000;
+    private static readonly object _portCursorLock = new();
+
     private static int PickFreePort()
     {
         var inUse = new HashSet<int>(
             IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Select(e => e.Port));
-        for (int port = 17001; port < 17100; port++)
-            if (!inUse.Contains(port)) return port;
+
+        lock (_portCursorLock)
+        {
+            for (int attempt = 0; attempt < 200; attempt++)
+            {
+                _portCursor++;
+                if (_portCursor >= 17100) _portCursor = 17001;
+                if (!inUse.Contains(_portCursor)) return _portCursor;
+            }
+        }
         throw new InvalidOperationException("No free TCP port found in 17001-17099 for SDR worker.");
     }
 }
