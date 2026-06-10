@@ -1841,7 +1841,13 @@
                 .catch(() => { /* ignore */ });
 
             spectrumPipeline.connect();
-            window.spectrumPanel = spectrumPanel;
+            // Expose both panels globally for cross-module access (overlay redraws,
+            // band-plan reloads, etc.). window.spectrumPanel kept pointing at the
+            // A panel as a backward-compatible alias for code that may still expect
+            // a single-panel handle.
+            window.spectrumPanelA = spectrumPanelA;
+            window.spectrumPanelB = spectrumPanelB;
+            window.spectrumPanel  = spectrumPanelA;
 
             // ── Filter scope panels ──────────────────────────────────────────
             window.filterScopePanelA = new FilterScopePanel('filterScopeCanvasA', '@Model.RadioModel', {
