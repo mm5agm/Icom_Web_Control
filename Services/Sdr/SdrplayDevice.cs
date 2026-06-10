@@ -615,6 +615,36 @@ namespace Yaesu_Web_Control.Services.Sdr
             _   => $"RSP (hwVer={hwVer})"
         };
 
+        /// <summary>
+        /// Produces a human-readable label for an SDRplay key WITHOUT going
+        /// through the API. Used by SdrController to label devices that
+        /// workers are currently holding (and which therefore can't be
+        /// re-enumerated until the worker releases them).
+        /// Accepts both "sdrplay:&lt;serial&gt;" (legacy) and
+        /// "sdrplay:hw&lt;N&gt;-&lt;serial&gt;" (v2.3.0+) formats.
+        /// </summary>
+        public static string LabelForKey(string key)
+        {
+            if (string.IsNullOrEmpty(key) || !key.StartsWith(KeyPrefix, StringComparison.OrdinalIgnoreCase))
+                return key;
+            string suffix = key.Substring(KeyPrefix.Length);
+            // New format: "hw<N>-<serial>"
+            if (suffix.StartsWith("hw", StringComparison.OrdinalIgnoreCase))
+            {
+                int dash = suffix.IndexOf('-');
+                if (dash > 2)
+                {
+                    if (byte.TryParse(suffix.AsSpan(2, dash - 2), out byte hw))
+                    {
+                        string serial = suffix.Substring(dash + 1);
+                        return $"SDRplay {HwVerToModel(hw)} ({serial})";
+                    }
+                }
+            }
+            // Legacy format: "sdrplay:<serial>" — model unknown without enumeration.
+            return $"SDRplay ({suffix})";
+        }
+
         private static void WriteDouble(IntPtr ptr, int offset, double value)
         {
             Marshal.WriteInt64(ptr, offset, BitConverter.DoubleToInt64Bits(value));

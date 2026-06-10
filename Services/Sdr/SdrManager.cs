@@ -37,6 +37,23 @@ public sealed class SdrManager : BackgroundService
 
     private CancellationTokenSource _restartCts = new();
 
+    // Device keys currently held by spawned workers, keyed by VFO id ("A"/"B").
+    // Used by SdrController.GetDevices so the Settings page Scan can include
+    // devices that workers have Selected (and which therefore disappear from
+    // direct sdrplay_api_GetDevices enumeration). Updated under a lock so the
+    // controller's read is consistent with concurrent session lifecycle.
+    private readonly Dictionary<string, string> _activeDeviceKeys = new();
+    private readonly object _activeLock = new();
+
+    /// <summary>
+    /// Snapshot of which device keys are currently being held by SDR workers.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> GetActiveDeviceKeys()
+    {
+        lock (_activeLock)
+            return _activeDeviceKeys.ToDictionary(kv => kv.Key, kv => kv.Value);
+    }
+
     public SdrManager(
         ISettingsService             settings,
         IHubContext<RadioHub>        hub,
@@ -121,6 +138,8 @@ public sealed class SdrManager : BackgroundService
                 sampleRateHz:  config.SdrSampleRateHz,
                 fftSize:       config.SdrFftSize);
 
+            lock (_activeLock) _activeDeviceKeys[vfo] = deviceKey;
+
             client = await ConnectToWorkerAsync(worker.Port, stoppingToken).ConfigureAwait(false);
             _logger.LogInformation("SDR {Vfo}: connected to worker on localhost:{Port}", vfo, worker.Port);
 
@@ -191,6 +210,7 @@ public sealed class SdrManager : BackgroundService
         }
         finally
         {
+            lock (_activeLock) _activeDeviceKeys.Remove(vfo);
             try { client?.Close(); } catch { }
             if (worker != null)
             {

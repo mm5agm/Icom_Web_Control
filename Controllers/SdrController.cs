@@ -15,14 +15,21 @@ namespace Yaesu_Web_Control.Controllers
     public class SdrController : ControllerBase
     {
         private readonly ILogger<SdrController> _logger;
+        private readonly SdrManager             _sdrManager;
 
-        public SdrController(ILogger<SdrController> logger)
+        public SdrController(ILogger<SdrController> logger, SdrManager sdrManager)
         {
-            _logger = logger;
+            _logger     = logger;
+            _sdrManager = sdrManager;
         }
 
         /// <summary>
         /// Returns connected SDR devices plus plain-English installation notes.
+        /// Devices currently held by running workers get `inUse=true` so the
+        /// Settings page can label them as "in use" rather than misleadingly
+        /// reporting them as missing — the SDRplay API hides Selected devices
+        /// from subsequent GetDevices calls, so this controller can't see
+        /// them through normal enumeration.
         /// Always responds 200.
         /// </summary>
         [HttpGet("devices")]
@@ -88,9 +95,46 @@ namespace Yaesu_Web_Control.Controllers
                 _logger.LogWarning(ex, "SDR: SoapySDR enumeration failed");
             }
 
+            // Merge in devices currently held by running workers. The SDRplay
+            // API hides Selected devices from GetDevices in other processes,
+            // so without this the Settings Scan would report the user's
+            // already-configured device as "not found" while it's actively
+            // streaming — confusing.
+            var enumeratedKeys = new HashSet<string>(all.Select(d => d.Key), StringComparer.OrdinalIgnoreCase);
+            var activeByVfo    = _sdrManager.GetActiveDeviceKeys();   // vfo → key
+            var inUseKeys      = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (vfo, key) in activeByVfo)
+            {
+                inUseKeys.Add(key);
+                if (enumeratedKeys.Contains(key)) continue;   // already in the list
+
+                // Build a synthetic entry from the key alone.
+                string label, driver;
+                if (key.StartsWith(SdrplayDevice.KeyPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    label  = SdrplayDevice.LabelForKey(key);
+                    driver = "sdrplay";
+                }
+                else
+                {
+                    // SoapySDR kwargs string — use it directly as label.
+                    label  = key;
+                    driver = "soapy";
+                }
+                all.Add(new SdrDeviceInfo(key, label, driver));
+                _logger.LogDebug("SDR: surfaced active worker device {Key} (VFO {Vfo}) — direct enumeration hid it", key, vfo);
+            }
+
             return Ok(new
             {
-                devices = all.Select(d => new { d.Key, d.Label, d.Driver }),
+                devices = all.Select(d => new
+                {
+                    d.Key,
+                    d.Label,
+                    d.Driver,
+                    inUse = inUseKeys.Contains(d.Key),
+                }),
                 notes
             });
         }

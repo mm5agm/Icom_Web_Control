@@ -901,7 +901,12 @@
                     devices.forEach(d => {
                         const opt = document.createElement('option');
                         opt.value       = d.key;
-                        opt.textContent = `${d.label} [${d.driver}]`;
+                        // Devices currently held by a running worker get an
+                        // "(in use)" suffix so the user understands why we
+                        // know about them even though they'd be invisible to
+                        // a fresh sdrplay_api_GetDevices call.
+                        const suffix = d.inUse ? ' (in use)' : '';
+                        opt.textContent = `${d.label} [${d.driver}]${suffix}`;
                         const sameDevice =
                             d.key === savedKey ||
                             sdrplayKeysMatch(d.key, savedKey);
@@ -916,11 +921,13 @@
                         dropdown.appendChild(opt);
                     });
 
-                    // Saved key not in scan results — append it so the user's choice isn't lost.
+                    // Saved key not in scan results AND not surfaced by SdrManager
+                    // either — the device is genuinely absent. Append a placeholder
+                    // so the user doesn't lose their saved choice silently.
                     if (savedKey && !matched) {
                         const opt = document.createElement('option');
                         opt.value       = savedKey;
-                        opt.textContent = `${keyToLabel(savedKey)} (not found in scan)`;
+                        opt.textContent = `${keyToLabel(savedKey)} (not plugged in)`;
                         opt.selected    = true;
                         dropdown.appendChild(opt);
                     }
