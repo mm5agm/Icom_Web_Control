@@ -6,6 +6,7 @@ using System.Diagnostics;
 using Yaesu_Web_Control.Hubs;
 using Yaesu_Web_Control.Models;
 using Yaesu_Web_Control.Services;
+using Yaesu_Web_Control.Services.Sdr;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
@@ -19,6 +20,7 @@ namespace Yaesu_Web_Control.Pages
         private readonly IHostApplicationLifetime _lifetime;
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly HttpPortInfo _portInfo;
+        private readonly SdrManager _sdrManager;
 
         /// <summary>
         /// The port YWC is actually listening on right now. This is the port
@@ -54,7 +56,8 @@ namespace Yaesu_Web_Control.Pages
             RadioInitializationService radioInitializationService,
             IHostApplicationLifetime lifetime,
             IHubContext<RadioHub> hubContext,
-            HttpPortInfo portInfo)
+            HttpPortInfo portInfo,
+            SdrManager sdrManager)
         {
             _settingsService = settingsService;
             _logger = logger;
@@ -62,6 +65,7 @@ namespace Yaesu_Web_Control.Pages
             _lifetime = lifetime;
             _hubContext = hubContext;
             _portInfo = portInfo;
+            _sdrManager = sdrManager;
         }
 
         public async Task<IActionResult> OnGetAsync()
@@ -128,6 +132,16 @@ namespace Yaesu_Web_Control.Pages
                 var oldRadioModel = current.RadioModel;
                 var oldWebAddress = current.WebAddress;
                 var oldHttpPort   = current.HttpPort;
+
+                // Capture pre-change SDR values so we can ask SdrManager to
+                // restart its worker(s) when any SDR-related setting changes.
+                // This makes adding/removing a VFO B SDR take effect immediately
+                // instead of needing a full app restart.
+                var oldSdrA       = current.SdrDeviceKeyA ?? string.Empty;
+                var oldSdrB       = current.SdrDeviceKeyB ?? string.Empty;
+                var oldSdrIfHz    = current.SdrIfFrequencyHz;
+                var oldSdrSrHz    = current.SdrSampleRateHz;
+                var oldSdrFft     = current.SdrFftSize;
 
                 current.RadioModel        = Settings.RadioModel;
                 // HttpPort is bound from a number input; clamp to a sane range.
@@ -198,6 +212,23 @@ namespace Yaesu_Web_Control.Pages
 
                 // Automatic retry: trigger radio initialization
                 await _radioInitializationService.InitializeRadioAsync();
+
+                // If any SDR-related setting changed, ask SdrManager to restart its
+                // worker(s) so the new configuration takes effect immediately.
+                // Without this, adding/removing/changing an SDR would silently
+                // require a full app restart — the SdrManager loop only re-reads
+                // settings when its CancellationToken fires.
+                bool sdrChanged =
+                       !string.Equals(oldSdrA, current.SdrDeviceKeyA ?? string.Empty, StringComparison.Ordinal)
+                    || !string.Equals(oldSdrB, current.SdrDeviceKeyB ?? string.Empty, StringComparison.Ordinal)
+                    || oldSdrIfHz  != current.SdrIfFrequencyHz
+                    || oldSdrSrHz  != current.SdrSampleRateHz
+                    || oldSdrFft   != current.SdrFftSize;
+                if (sdrChanged)
+                {
+                    _logger.LogInformation("Settings: SDR settings changed — restarting SdrManager workers");
+                    _sdrManager.RequestRestart();
+                }
 
                 StatusMessage = "✓ Settings saved successfully.";
 
