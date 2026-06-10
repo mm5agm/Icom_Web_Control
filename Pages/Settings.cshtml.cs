@@ -72,6 +72,11 @@ namespace Yaesu_Web_Control.Pages
         {
             Settings = await _settingsService.GetSettingsAsync();
             Settings.BandPlan = Settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
+            // The Settings page binds a single Sample Rate dropdown that
+            // represents 'reset both VFOs to this rate'. Show the current
+            // A-side rate as the pre-selected option so the dropdown reflects
+            // a sensible value rather than the legacy zero placeholder.
+            Settings.SdrSampleRateHz = Settings.SdrSampleRateHzA;
             NetworkAddresses = GetLocalIPAddresses();
             return Page();
         }
@@ -140,7 +145,8 @@ namespace Yaesu_Web_Control.Pages
                 var oldSdrA       = current.SdrDeviceKeyA ?? string.Empty;
                 var oldSdrB       = current.SdrDeviceKeyB ?? string.Empty;
                 var oldSdrIfHz    = current.SdrIfFrequencyHz;
-                var oldSdrSrHz    = current.SdrSampleRateHz;
+                var oldSdrSrHzA   = current.SdrSampleRateHzA;
+                var oldSdrSrHzB   = current.SdrSampleRateHzB;
                 var oldSdrFft     = current.SdrFftSize;
 
                 current.RadioModel        = Settings.RadioModel;
@@ -157,7 +163,15 @@ namespace Yaesu_Web_Control.Pages
                 current.SdrDeviceKeyB     = Settings.SdrDeviceKeyB ?? string.Empty;
                 current.SdrDeviceKey      = string.Empty;  // legacy field — kept blank in v2.3.0+ files
                 current.SdrIfFrequencyHz  = Settings.SdrIfFrequencyHz;
-                current.SdrSampleRateHz   = Settings.SdrSampleRateHz;
+                // Settings page binds a single Sample Rate dropdown — treat that
+                // as a "reset both VFOs to this rate" control. Per-VFO divergence
+                // happens at runtime via the span buttons on the main page.
+                if (Settings.SdrSampleRateHz > 0)
+                {
+                    current.SdrSampleRateHzA = Settings.SdrSampleRateHz;
+                    current.SdrSampleRateHzB = Settings.SdrSampleRateHz;
+                }
+                current.SdrSampleRateHz   = 0;             // legacy field — kept zero in v2.3.0+ files
                 current.SdrFftSize        = Settings.SdrFftSize;
                 current.BandPlan          = Settings.BandPlan;
                 // MP comes fully loaded; D has 600Hz standard plus 1.2kHz/300Hz optional.
@@ -219,11 +233,12 @@ namespace Yaesu_Web_Control.Pages
                 // require a full app restart — the SdrManager loop only re-reads
                 // settings when its CancellationToken fires.
                 bool sdrChanged =
-                       !string.Equals(oldSdrA, current.SdrDeviceKeyA ?? string.Empty, StringComparison.Ordinal)
-                    || !string.Equals(oldSdrB, current.SdrDeviceKeyB ?? string.Empty, StringComparison.Ordinal)
-                    || oldSdrIfHz  != current.SdrIfFrequencyHz
-                    || oldSdrSrHz  != current.SdrSampleRateHz
-                    || oldSdrFft   != current.SdrFftSize;
+                       !string.Equals(oldSdrA,  current.SdrDeviceKeyA ?? string.Empty, StringComparison.Ordinal)
+                    || !string.Equals(oldSdrB,  current.SdrDeviceKeyB ?? string.Empty, StringComparison.Ordinal)
+                    || oldSdrIfHz   != current.SdrIfFrequencyHz
+                    || oldSdrSrHzA  != current.SdrSampleRateHzA
+                    || oldSdrSrHzB  != current.SdrSampleRateHzB
+                    || oldSdrFft    != current.SdrFftSize;
                 if (sdrChanged)
                 {
                     _logger.LogInformation("Settings: SDR settings changed — restarting SdrManager workers");

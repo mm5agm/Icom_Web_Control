@@ -839,6 +839,12 @@ When both VFOs have an SDR, the main control panel gains two small toggle groups
 
 Both choices are remembered across page reloads via your browser's local storage. Click the spectrum on panel A to tune **VFO A**; click panel B to tune **VFO B** — each panel addresses its own receiver.
 
+#### Independent span per VFO
+
+Each spectrum panel header has its own **250k / 500k / 1M / 2M** span buttons. Set VFO A to **2 MHz** for a wide overview of the calling band, and VFO B to **250 kHz** zoomed in on the QSO you're working — both at the same time, independently. Each click restarts only that VFO's worker (the other panel keeps its frame frozen for the brief reconnect window — see the bandwidth-change pause note below).
+
+The Settings page Sample Rate dropdown still exists but now acts as a "reset both VFOs to this default" control. Use it to set a starting point; use the per-panel buttons to diverge from there.
+
 #### Why two SDRs — and why two RSP1Bs rather than one RSPduo
 
 YWC's dual-SDR support is designed for two completely separate receivers — typically two SDRplay RSPs. If you have an FTdx101MP or FTdx101D, both the **MAIN** and **SUB** receivers have their own rear-panel IF OUT sockets — connect one SDR to each and YWC can show both VFOs at once.

@@ -77,7 +77,21 @@
         // converges on the new shape. Do not reference outside SettingsService.
         public string? SdrDeviceKey { get; set; } = string.Empty;
 
-        public double SdrSampleRateHz { get; set; } = 2_048_000;
+        // Per-VFO sample rate (v2.3.0+). Each VFO's SDR can run at a different
+        // span — typically 2 MHz on the calling band and 250 kHz zoomed in on
+        // the working frequency. Default 0 is a "not set" sentinel so the
+        // SettingsService migration can tell whether the value came from the
+        // file or is the property's initial value — see MigrateSdrSampleRate.
+        // After migration these are always > 0.
+        public double SdrSampleRateHzA { get; set; } = 0;
+        public double SdrSampleRateHzB { get; set; } = 0;
+
+        // Legacy v2.2.x single sample rate. KEPT as a hidden migration anchor:
+        // SettingsService reads this and copies into both A and B if those
+        // are still 0, then writes 0 on next save. Do not reference outside
+        // SettingsService.
+        public double SdrSampleRateHz { get; set; } = 0;
+
         public long SdrIfFrequencyHz { get; set; } = 9_000_000;
         public int SdrFftSize { get; set; } = 1024;
 

@@ -433,11 +433,11 @@
                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
                         <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO A</span>
                         <div class="d-flex align-items-center gap-2">
-                            <div class="btn-group btn-group-sm" role="group" aria-label="Spectrum span">
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 250_000 ? "active" : "")" data-hz="250000" data-a11y-key="spectrum.span250k" aria-label="Span 250 kHz" title="Span 250 kHz">250k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 500_000 ? "active" : "")" data-hz="500000" data-a11y-key="spectrum.span500k" aria-label="Span 500 kHz" title="Span 500 kHz">500k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 1_024_000 ? "active" : "")" data-hz="1024000" data-a11y-key="spectrum.span1m" aria-label="Span 1 MHz" title="Span 1 MHz">1M</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 2_048_000 ? "active" : "")" data-hz="2048000" data-a11y-key="spectrum.span2m" aria-label="Span 2 MHz" title="Span 2 MHz">2M</button>
+                            <div class="btn-group btn-group-sm" role="group" aria-label="VFO A spectrum span">
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 250_000 ? "active" : "")" data-hz="250000" data-vfo="A" data-a11y-key="spectrum.spanA250k" aria-label="VFO A span 250 kHz" title="VFO A span 250 kHz">250k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 500_000 ? "active" : "")" data-hz="500000" data-vfo="A" data-a11y-key="spectrum.spanA500k" aria-label="VFO A span 500 kHz" title="VFO A span 500 kHz">500k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span 1 MHz" title="VFO A span 1 MHz">1M</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 2_048_000 ? "active" : "")" data-hz="2048000" data-vfo="A" data-a11y-key="spectrum.spanA2m" aria-label="VFO A span 2 MHz" title="VFO A span 2 MHz">2M</button>
                             </div>
                             <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
                         </div>
@@ -452,6 +452,12 @@
                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
                         <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO B</span>
                         <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="VFO B spectrum span">
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 250_000 ? "active" : "")" data-hz="250000" data-vfo="B" data-a11y-key="spectrum.spanB250k" aria-label="VFO B span 250 kHz" title="VFO B span 250 kHz">250k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 500_000 ? "active" : "")" data-hz="500000" data-vfo="B" data-a11y-key="spectrum.spanB500k" aria-label="VFO B span 500 kHz" title="VFO B span 500 kHz">500k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span 1 MHz" title="VFO B span 1 MHz">1M</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 2_048_000 ? "active" : "")" data-hz="2048000" data-vfo="B" data-a11y-key="spectrum.spanB2m" aria-label="VFO B span 2 MHz" title="VFO B span 2 MHz">2M</button>
+                            </div>
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
@@ -1933,14 +1939,22 @@
                 );
             }
 
-            // Span selector — POST new sample rate and restart the SDR stream.
+            // Span selector — POST new sample rate for this VFO and restart
+            // the corresponding worker. data-vfo on each button tells the
+            // server which VFO to apply the change to so the other panel
+            // keeps its current bandwidth.
             document.querySelectorAll('.span-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
-                    const hz = btn.dataset.hz;
+                    const hz  = btn.dataset.hz;
+                    const vfo = btn.dataset.vfo || 'A';   // default A for safety
                     try {
-                        const res = await fetch(`/api/sdr/span?hz=${hz}`, { method: 'POST' });
+                        const res = await fetch(`/api/sdr/span?hz=${hz}&sdrId=${vfo}`, { method: 'POST' });
                         if (res.ok) {
-                            document.querySelectorAll('.span-btn').forEach(b => b.classList.remove('active'));
+                            // Move active state only among buttons for this VFO,
+                            // leaving the other VFO's group untouched.
+                            document
+                                .querySelectorAll(`.span-btn[data-vfo="${vfo}"]`)
+                                .forEach(b => b.classList.remove('active'));
                             btn.classList.add('active');
                         }
                     } catch { /* network error — ignore */ }

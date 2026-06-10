@@ -73,7 +73,9 @@ namespace Yaesu_Web_Control.Pages
         public string CtcssMode { get; set; } = "00";
         public string CtcssTone { get; set; } = "01";
 
-        public double SdrSampleRateHz { get; set; } = 2_048_000;
+        public double SdrSampleRateHz  { get; set; } = 2_048_000;
+        public double SdrSampleRateHzA { get; set; } = 2_048_000;
+        public double SdrSampleRateHzB { get; set; } = 2_048_000;
         public string BandPlan { get; set; } = "Region1";
         public string RadioModel { get; set; } = "FTdx101MP";
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
@@ -99,7 +101,9 @@ namespace Yaesu_Web_Control.Pages
             App2Name = settings.App2Name;
             App3Name = settings.App3Name;
             App4Name = settings.App4Name;
-            SdrSampleRateHz = settings.SdrSampleRateHz;
+            SdrSampleRateHz  = settings.SdrSampleRateHzA;     // legacy single value, used by old code paths
+            SdrSampleRateHzA = settings.SdrSampleRateHzA;
+            SdrSampleRateHzB = settings.SdrSampleRateHzB;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;

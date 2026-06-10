@@ -130,12 +130,16 @@ public sealed class SdrManager : BackgroundService
         {
             await BroadcastStatus(vfo, "connecting", stoppingToken).ConfigureAwait(false);
 
+            // Per-VFO sample rate so each panel can run at a different span
+            // (e.g. 2 MHz on the calling band, 250 kHz zoomed on the QSO).
+            double sampleRateHz = vfo == "B" ? config.SdrSampleRateHzB : config.SdrSampleRateHzA;
+
             worker = WorkerProcess.Start(
                 _logger,
                 vfo:           vfo,
                 deviceKey:     deviceKey,
                 ifFrequencyHz: config.SdrIfFrequencyHz,
-                sampleRateHz:  config.SdrSampleRateHz,
+                sampleRateHz:  sampleRateHz,
                 fftSize:       config.SdrFftSize);
 
             lock (_activeLock) _activeDeviceKeys[vfo] = deviceKey;

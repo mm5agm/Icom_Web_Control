@@ -97,7 +97,7 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 **Features:**
 - Variable span: 250 kHz, 500 kHz, 1 MHz, or 2 MHz
-- Dual-SDR mode: one SDR per VFO on the FTdx101MP / FTdx101D, with a Mono A / Mono B / Both layout toggle and a Stacked / Side-by-side option
+- Dual-SDR mode: one SDR per VFO on the FTdx101MP / FTdx101D, with a Mono A / Mono B / Both layout toggle, Stacked / Side-by-side option, and independent span per panel
 - Click anywhere on a spectrum panel to tune the corresponding VFO to that frequency (panel A tunes VFO A, panel B tunes VFO B)
 - Mouse wheel over a spectrum panel tunes that VFO up/down in 1 kHz steps
 - Frequency axis labels automatically track each VFO
@@ -153,6 +153,12 @@ panels on the main page.
 - **Two spectrum panels on the main page** when both VFOs are configured,
   each tracking its own VFO's frequency. Click on panel A tunes VFO A;
   click on panel B tunes VFO B.
+- **Independent span per VFO.** Each spectrum panel has its own 250k /
+  500k / 1M / 2M span buttons — set VFO A to 2 MHz for a wide overview
+  of the calling band while VFO B sits at 250 kHz zoomed on the QSO.
+  The Settings page still has a single Sample Rate dropdown but it now
+  acts as a "reset both VFOs to this default" control; runtime per-VFO
+  divergence is set with the buttons above each spectrum.
 - **Layout toggles above the spectrum panels** (only visible when both VFOs
   have an SDR):
   - **VFO A / VFO B / Both** — show just one panel or both side by side.
