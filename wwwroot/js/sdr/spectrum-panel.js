@@ -766,6 +766,16 @@ export class SpectrumPanel {
             return;
         }
 
+        // If we have a previous frame and this is just a brief transition
+        // (span change, SDR restart), keep the existing spectrum visible
+        // instead of wiping to a "connecting…" message. The status badge in
+        // the panel header carries the state info; blanking out a working
+        // spectrum for a 3-second reconnect is jarring.
+        if ((status === 'connecting' || status === 'disconnected') && this._lastBins) {
+            this._render();
+            return;
+        }
+
         const messages = {
             connecting:   'Connecting to SDR device…',
             disconnected: 'SDR device unavailable — retrying every 5 s',
