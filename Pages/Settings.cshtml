@@ -843,7 +843,9 @@
             el.textContent = key ? `Saved key: ${key}` : '';
         }
 
-        // Initialise both dropdowns from saved keys on page load.
+        // Initialise both dropdowns from saved keys on page load, then
+        // auto-scan so the dropdown for the unconfigured side picks up any
+        // available hardware without making the user click Scan again.
         document.addEventListener('DOMContentLoaded', () => {
             for (const slot of ['A', 'B']) {
                 const cfg = sdrSlots[slot];
@@ -869,6 +871,12 @@
                     updateDeviceKeyDisplay(slot);
                 });
             }
+
+            // Kick off an automatic scan so both dropdowns show what's
+            // available without the user having to click Scan first. Cheap
+            // for SDRplay (sub-second) and surfaces in-use devices via the
+            // SdrManager merge in the controller.
+            window.scanSdrDevices();
         });
 
         // Populate BOTH SDR dropdowns from one /api/sdr/devices call. Each
