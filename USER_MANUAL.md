@@ -736,6 +736,18 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 
 Access Settings from the navigation bar or by clicking the settings icon. Changes take effect only after clicking **Save Settings**.
 
+At the top of the page, the **Network Access URLs** card lists the addresses you can use to reach YWC from this PC and from other devices on the LAN; the **Current Configuration** card on the right shows a one-line summary of what YWC is using right now (radio model, serial port, baud rate, network interface, web port, SDR device). The web port shown here is whichever port YWC actually managed to bind — usually 8080 but possibly 8081–8089 if 8080 was already in use on your PC.
+
+![Top of the Settings page — Network Access URLs and Current Configuration cards](pictures/Settings_Network_Config.png)
+
+#### Changes that need a full app restart
+
+Most settings take effect the moment you click **Save Settings**. A few — radio model, network interface, and HTTP port — need a full YWC restart to apply cleanly because they affect how the app is bound to the operating system, or because they change what the server renders into the HTML of every open browser tab. When you change one of these, the Settings page shows a yellow **"Restart Yaesu Web Control to apply your changes"** banner above the rest of the page with a one-click **Restart Now** button:
+
+![Restart Required banner — appears above the rest of the page when a setting that needs a restart is changed; the Restart Now button stops and restarts YWC](pictures/Settings_Restart_Required.png)
+
+Clicking **Restart Now** stops YWC and (when running as the installed exe) automatically relaunches it. The browser briefly shows a "Yaesu Web Control has stopped" overlay during the restart; just reload the tab once YWC is back. When running from source via `dotnet run`, the auto-relaunch is skipped — you'll need to start `dotnet run` again manually.
+
 ### 6.1 Radio Connection
 
 | Setting | Description |
@@ -782,7 +794,9 @@ The spectrum display requires an SDR receiver. On the FTdx101MP, FTdx101D, and F
 >
 > **Always remember:** an antenna physically close to your TX antenna can still couple enough RF into the SDR to damage it, even if it's not directly connected. The further apart, the safer.
 >
-> YWC also displays this warning on the Settings page whenever you have an SDR configured, and a more prominent danger banner if your selected radio is an FTdx10 or FT-710 (since those users are obliged to connect to an antenna).
+> YWC also displays this warning on the Settings page whenever you have an SDR configured, and a more prominent danger banner if your selected radio is an FTdx10 or FT-710 (since those users are obliged to connect to an antenna):
+
+![SDR safety warnings on the Settings page when an FTdx10 is selected — the red banner appears only for FTdx10 and FT-710 (no IF tap); the yellow notice appears for all radios reminding the operator that the IF Frequency setting has no effect when connecting to an antenna](pictures/Settings_SDR_Warning.png)
 
 **Spectrum view depends on connection point:**
 - **IF output** (FTdx101 / FTDX3000) — VFO-centred panoramic view of the band you're tuned to, regardless of where on the band you tune. The IF Frequency setting tells YWC which IF the radio is using (9 MHz on FTdx101 series).
@@ -877,6 +891,8 @@ set/filter ...            # whatever spot filters you prefer
 The app uses a generous parser that accepts spot lines from AR-Cluster, CC-Cluster, and DXSpider format servers. The cluster connection sends the configured callsign 1.5 seconds after the TCP socket opens — this handles servers whose login prompt has no newline (which would otherwise cause our reader to hang silently).
 
 **Test cluster connection** *(v2.2.2 and later)* — a yellow **Test cluster connection** button appears below the Post-login commands textarea. Click it and the app opens a TCP connection to the host/port/callsign you've typed into the form (**without** saving them first), sends your callsign, reads about ten seconds of output, then shows the full transcript in a popup so you can see exactly what the cluster said back. Use it to verify a new cluster before committing to it, to confirm a working cluster is still up after a network change, or to diagnose a connection problem.
+
+![Successful Test cluster connection against dxspider.co.uk:7300 — the modal shows the full login transcript including the cluster's welcome banner, and the button below has turned solid green with the "Cluster connection successful" label](pictures/Settings_Test_Cluster.png)
 
 Outcomes:
 
@@ -1538,7 +1554,7 @@ The fastest way to get a bug fixed is a good report. YWC has three features that
 
 That gives the developer everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
 
-![The About page — Diagnostics block plus the Copy diagnostics and Report a bug on GitHub buttons](pictures/AboutPage.png)
+![The About page — version + release date at top, Resources section, Diagnostics block with the user's environment summary, and the Copy diagnostics + Report a bug buttons that send everything straight into a GitHub bug-report form](pictures/AboutPage.png)
 
 **2. Report a bug on GitHub button** *(recommended)*. Right below the Diagnostics block. Clicking it opens a pre-filled bug-report form on GitHub in a new browser tab. The new tab takes a second or two to load while it negotiates with GitHub — be patient, don't keep clicking. Once it lands you'll see the form with the Diagnostics section already populated; you only need to type a description of what went wrong and, ideally, the steps to reproduce. Submit when ready.
 
