@@ -410,44 +410,54 @@
          SDR is configured for either VFO. -->
     <div id="spectrumContainer" class="row mt-3" style="display:none;">
         <div class="col-12">
-            <!-- Mono A / Mono B / Multi toggle. Hidden when only one side is configured. -->
-            <div id="spectrumModeToggle" class="d-flex justify-content-end mb-2" style="display:none;">
-                <div class="btn-group btn-group-sm" role="group" aria-label="Spectrum layout mode">
+            <!-- Toggles row: VFO selector + layout (stacked vs side-by-side).
+                 Both hidden when only one side is configured. -->
+            <div id="spectrumModeToggle" class="d-flex justify-content-end align-items-center gap-2 mb-2" style="display:none;">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Spectrum panel layout">
+                    <button type="button" class="btn btn-outline-secondary spectrum-layout-btn active" data-layout="stacked" title="Stack panels vertically">Stacked</button>
+                    <button type="button" class="btn btn-outline-secondary spectrum-layout-btn" data-layout="side" title="Place panels side by side">Side&nbsp;by&nbsp;side</button>
+                </div>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Spectrum visible VFO">
                     <button type="button" class="btn btn-outline-secondary spectrum-mode-btn" data-mode="A">VFO A</button>
                     <button type="button" class="btn btn-outline-secondary spectrum-mode-btn" data-mode="B">VFO B</button>
                     <button type="button" class="btn btn-outline-secondary spectrum-mode-btn active" data-mode="Multi">Both</button>
                 </div>
             </div>
 
-            <!-- VFO A spectrum panel -->
-            <div id="spectrumContainerA" class="card border-dark mb-2">
-                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
-                    <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO A</span>
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Spectrum span">
-                            <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 250_000 ? "active" : "")" data-hz="250000" data-a11y-key="spectrum.span250k" aria-label="Span 250 kHz" title="Span 250 kHz">250k</button>
-                            <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 500_000 ? "active" : "")" data-hz="500000" data-a11y-key="spectrum.span500k" aria-label="Span 500 kHz" title="Span 500 kHz">500k</button>
-                            <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 1_024_000 ? "active" : "")" data-hz="1024000" data-a11y-key="spectrum.span1m" aria-label="Span 1 MHz" title="Span 1 MHz">1M</button>
-                            <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 2_048_000 ? "active" : "")" data-hz="2048000" data-a11y-key="spectrum.span2m" aria-label="Span 2 MHz" title="Span 2 MHz">2M</button>
+            <!-- Inner flex container — direction set by JS based on layout toggle.
+                 flex-column (default) = stacked vertically.
+                 flex-row             = side by side, each panel takes half the width. -->
+            <div id="spectrumPanels" class="d-flex flex-column gap-2">
+                <!-- VFO A spectrum panel -->
+                <div id="spectrumContainerA" class="card border-dark flex-fill" style="min-width:0;">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
+                        <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO A</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Spectrum span">
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 250_000 ? "active" : "")" data-hz="250000" data-a11y-key="spectrum.span250k" aria-label="Span 250 kHz" title="Span 250 kHz">250k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 500_000 ? "active" : "")" data-hz="500000" data-a11y-key="spectrum.span500k" aria-label="Span 500 kHz" title="Span 500 kHz">500k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 1_024_000 ? "active" : "")" data-hz="1024000" data-a11y-key="spectrum.span1m" aria-label="Span 1 MHz" title="Span 1 MHz">1M</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 2_048_000 ? "active" : "")" data-hz="2048000" data-a11y-key="spectrum.span2m" aria-label="Span 2 MHz" title="Span 2 MHz">2M</button>
+                            </div>
+                            <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
                         </div>
-                        <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <canvas id="spectrumCanvasA" role="img" aria-hidden="true" aria-label="RF spectrum display VFO A" style="display:block; width:100%;"></canvas>
                     </div>
                 </div>
-                <div class="card-body p-0">
-                    <canvas id="spectrumCanvasA" role="img" aria-hidden="true" aria-label="RF spectrum display VFO A" style="display:block; width:100%;"></canvas>
-                </div>
-            </div>
 
-            <!-- VFO B spectrum panel — hidden by default; shown when SdrDeviceKeyB is configured. -->
-            <div id="spectrumContainerB" class="card border-dark" style="display:none;">
-                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
-                    <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO B</span>
-                    <div class="d-flex align-items-center gap-2">
-                        <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
+                <!-- VFO B spectrum panel — hidden by default; shown when SdrDeviceKeyB is configured. -->
+                <div id="spectrumContainerB" class="card border-dark flex-fill" style="display:none; min-width:0;">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
+                        <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO B</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
+                        </div>
                     </div>
-                </div>
-                <div class="card-body p-0">
-                    <canvas id="spectrumCanvasB" role="img" aria-hidden="true" aria-label="RF spectrum display VFO B" style="display:block; width:100%;"></canvas>
+                    <div class="card-body p-0">
+                        <canvas id="spectrumCanvasB" role="img" aria-hidden="true" aria-label="RF spectrum display VFO B" style="display:block; width:100%;"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1772,6 +1782,36 @@
             document.querySelectorAll('.spectrum-mode-btn').forEach(b => {
                 b.addEventListener('click', () => applyMode(b.dataset.mode));
             });
+
+            // Stacked / Side-by-side layout toggle — persisted in localStorage
+            // so the user's preference sticks across reloads. Default stacked
+            // (matches the v2.3.0 initial layout).
+            const LAYOUT_STORAGE_KEY = 'ywc.spectrumLayout';
+            let currentLayout = localStorage.getItem(LAYOUT_STORAGE_KEY) || 'stacked';
+            function applyLayout(layout) {
+                currentLayout = layout;
+                localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
+                const panels = document.getElementById('spectrumPanels');
+                if (!panels) return;
+                if (layout === 'side') {
+                    panels.classList.remove('flex-column');
+                    panels.classList.add('flex-row');
+                } else {
+                    panels.classList.remove('flex-row');
+                    panels.classList.add('flex-column');
+                }
+                document.querySelectorAll('.spectrum-layout-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.layout === layout);
+                });
+                // Canvas dimensions changed — let ResizeObserver pick up the new width.
+                window.dispatchEvent(new Event('resize'));
+            }
+            document.querySelectorAll('.spectrum-layout-btn').forEach(b => {
+                b.addEventListener('click', () => applyLayout(b.dataset.layout));
+            });
+            // Apply the persisted layout immediately so the page renders in the
+            // user's chosen layout from the first frame.
+            applyLayout(currentLayout);
 
             spectrumPipeline.onStatusChange('A', status => {
                 sdrState.A = status;

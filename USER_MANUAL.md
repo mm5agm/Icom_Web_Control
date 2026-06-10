@@ -832,7 +832,43 @@ If you only have one SDR, set it in the **VFO A SDR** slot and leave **VFO B SDR
 
 > **Note on SDRplay devices specifically:** the SDRplay API service only allows one device per host process. YWC works around this by launching a separate background process (`Yaesu_Sdr_Worker.exe`) for each SDR you configure — you'll see them in Task Manager when YWC is streaming. They start and stop automatically; no user action needed. See [docs/decisions/0001-dual-sdr-architecture.md](docs/decisions/0001-dual-sdr-architecture.md) on GitHub if you're curious about the why.
 
-When both VFOs have an SDR, the main control panel gains a small **VFO A / VFO B / Both** toggle above the spectrum panels so you can quickly hide one panel without changing settings. The choice is remembered across page reloads.
+When both VFOs have an SDR, the main control panel gains two small toggle groups above the spectrum panels:
+
+- **VFO A / VFO B / Both** — quickly hide one panel without changing settings.
+- **Stacked / Side by side** — choose whether the two panels stack vertically (taller, more vertical detail per panel) or sit side by side (each at half-width, both visible at once with less scrolling).
+
+Both choices are remembered across page reloads via your browser's local storage. Click the spectrum on panel A to tune **VFO A**; click panel B to tune **VFO B** — each panel addresses its own receiver.
+
+#### Why two SDRs — and why two RSP1Bs rather than one RSPduo
+
+YWC's dual-SDR support is designed for two completely separate receivers — typically two SDRplay RSPs. If you have an FTdx101MP or FTdx101D, both the **MAIN** and **SUB** receivers have their own rear-panel IF OUT sockets — connect one SDR to each and YWC can show both VFOs at once.
+
+You might assume an SDRplay **RSPduo** (two tuners in one box) would be the natural pick. In practice the author runs two separate **RSP1Bs**, and recommends that for new YWC dual-SDR setups, for three reasons:
+
+1. **Bandwidth.** The RSPduo in dual-tuner mode is limited to roughly **2 MHz total** shared between its two tuners. Two separate RSP1Bs each give you the full chip bandwidth — currently we use 2 MHz spans per side, but the headroom is there if YWC adds wider spans later.
+2. **Cost.** Two RSP1Bs at typical retail prices are only marginally more expensive than one RSPduo.
+3. **Independence.** If one RSP misbehaves, YWC's worker for that side restarts independently. With an RSPduo a glitch can take both tuners out at once.
+
+If you already own an RSPduo, you can still use it — just set it as the VFO A SDR and leave the VFO B slot empty (the second tuner remains available for other software). The dual-tuner mode that lets one RSPduo serve both VFOs is not yet implemented.
+
+#### Why an SDRplay RSP, not a cheap RTL-SDR dongle?
+
+RTL-SDR dongles are supported via the SoapySDR driver path and will function — but for a serious HF-watching setup an RSPplay RSP is a significant step up:
+
+- **Bit depth.** RTL-SDR is 8-bit; RSPplay RSPs are 14-bit. That's about 36 dB more dynamic range — weak signals next to a strong neighbour are far easier to see.
+- **HF coverage.** Most RTL-SDR dongles need a separate upconverter to receive HF. RSPs cover 1 kHz to 2 GHz natively.
+- **Front-end filtering.** RSPs have selectable bandpass filters; dongles have essentially none. With a kilowatt-class transmitter on the next band, a dongle overloads long before an RSP does.
+- **Clock stability.** RSPs use a TCXO; cheap dongles drift visibly during warm-up — the spectrum centred on a 9 MHz IF will appear to slide sideways for the first ten minutes after power-on.
+
+The author's full bench testing has been against the SDRplay path. RTL-SDR users are welcome to experiment and report back.
+
+#### Why is there a brief pause when I change the span?
+
+When you click a different span button (e.g. 250k → 2M) the spectrum visibly freezes for about **three seconds** before resuming at the new bandwidth. The header badge says "Connecting…" during that window.
+
+The delay is **hardware**, not software. Changing the sample rate means YWC asks the SDR worker process to close the device, reopen it at the new rate, and restart streaming. The SDRplay API takes roughly a second to release a device cleanly and another second or so to reinitialise it. With two SDRs running, both restart at once.
+
+YWC keeps the previous spectrum frame visible during the pause rather than blanking out the canvas — the brief frozen image is intentional, not a glitch. It returns to live data as soon as the new sample rate is running.
 
 ---
 
