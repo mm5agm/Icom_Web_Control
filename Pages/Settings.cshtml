@@ -136,13 +136,18 @@
                         </dd>
                         <dt class="col-sm-4">SDR Device:</dt>
                         <dd class="col-sm-8">
-                            @if (string.IsNullOrEmpty(Model.Settings.SdrDeviceKey))
+                            @{
+                                var sdrA = Model.Settings.SdrDeviceKeyA;
+                                var sdrB = Model.Settings.SdrDeviceKeyB;
+                            }
+                            @if (string.IsNullOrEmpty(sdrA) && string.IsNullOrEmpty(sdrB))
                             {
                                 <span class="text-muted">None</span>
                             }
                             else
                             {
-                                <code>@Model.Settings.SdrDeviceKey</code>
+                                @if (!string.IsNullOrEmpty(sdrA)) { <div><strong>VFO A:</strong> <code>@sdrA</code></div> }
+                                @if (!string.IsNullOrEmpty(sdrB)) { <div><strong>VFO B:</strong> <code>@sdrB</code></div> }
                             }
                         </dd>
                     </dl>
@@ -378,22 +383,33 @@
             <div class="row">
                 <div class="col-md-6">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">SDR Device</label>
-                        <div class="input-group">
-                            <select class="form-select" id="sdrDeviceDropdown">
-                                <option value="">— click Scan to detect devices —</option>
-                            </select>
-                            <button type="button" class="btn btn-outline-secondary" id="sdrScanBtn"
+                        <div class="d-flex justify-content-between align-items-end mb-2">
+                            <label class="form-label fw-bold mb-0">SDR Devices</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="sdrScanBtn"
                                     onclick="scanSdrDevices()">
                                 <i class="bi bi-search"></i> Scan
                             </button>
                         </div>
-                        <div class="form-text">
-                            Plug in your SDR before scanning. The selected device key is saved below.
+                        <div class="form-text mb-2">
+                            Plug in your SDR(s) before scanning. Each VFO can have its own SDR — the user
+                            tells YWC which physical SDR is wired to which VFO's IF output. Leave a slot
+                            blank if that VFO has no SDR.
                         </div>
-                        <!-- Hidden field that binds to ApplicationSettings.SdrDeviceKey on POST -->
-                        <input type="hidden" asp-for="Settings.SdrDeviceKey" id="sdrDeviceKeyInput" />
-                        <div id="sdrDeviceKeyDisplay" class="mt-1 font-monospace small text-muted"></div>
+
+                        <label for="sdrDeviceDropdownA" class="form-label small fw-semibold mb-1">VFO A SDR</label>
+                        <select class="form-select form-select-sm mb-1" id="sdrDeviceDropdownA">
+                            <option value="">— (none) —</option>
+                        </select>
+                        <input type="hidden" asp-for="Settings.SdrDeviceKeyA" id="sdrDeviceKeyInput" />
+                        <div id="sdrDeviceKeyDisplay" class="font-monospace small text-muted mb-3"></div>
+
+                        <label for="sdrDeviceDropdownB" class="form-label small fw-semibold mb-1">VFO B SDR</label>
+                        <select class="form-select form-select-sm mb-1" id="sdrDeviceDropdownB">
+                            <option value="">— (none) —</option>
+                        </select>
+                        <input type="hidden" asp-for="Settings.SdrDeviceKeyB" id="sdrDeviceKeyInputB" />
+                        <div id="sdrDeviceKeyDisplayB" class="font-monospace small text-muted"></div>
+
                         <div id="sdrScanNotes" class="mt-2"></div>
                     </div>
                     <div class="mb-3">
@@ -805,59 +821,87 @@
             return label ? `${label}${driver ? ' [' + driver + ']' : ''}` : key;
         }
 
-        // Initialise the SDR device dropdown from the saved key on page load.
+        // ── Dual-SDR device selector (VFO A + VFO B) ─────────────────────────
+        //
+        // Two dropdowns, each with its own hidden input bound to
+        // Settings.SdrDeviceKeyA / SdrDeviceKeyB. One Scan button populates
+        // both dropdowns from the same /api/sdr/devices result. Each VFO can
+        // independently be set to a device or left as (none) — typical
+        // operator has SDR-A wired to the radio's MAIN IF output and may or
+        // may not have a second SDR on the SUB IF output.
+
+        // Slot config keyed by VFO label.
+        const sdrSlots = {
+            A: { dropdownId: 'sdrDeviceDropdownA', inputId: 'sdrDeviceKeyInput',  displayId: 'sdrDeviceKeyDisplay'  },
+            B: { dropdownId: 'sdrDeviceDropdownB', inputId: 'sdrDeviceKeyInputB', displayId: 'sdrDeviceKeyDisplayB' },
+        };
+
+        function updateDeviceKeyDisplay(slot) {
+            const cfg = sdrSlots[slot];
+            const key = document.getElementById(cfg.inputId).value;
+            const el  = document.getElementById(cfg.displayId);
+            el.textContent = key ? `Saved key: ${key}` : '';
+        }
+
+        // Initialise both dropdowns from saved keys on page load.
         document.addEventListener('DOMContentLoaded', () => {
-            const savedKey = document.getElementById('sdrDeviceKeyInput').value;
-            if (savedKey) {
-                const dropdown = document.getElementById('sdrDeviceDropdown');
-                dropdown.innerHTML = '';
-                const noneOpt = document.createElement('option');
-                noneOpt.value = '';
-                noneOpt.textContent = '— Disabled (no spectrum display) —';
-                dropdown.appendChild(noneOpt);
-                const opt = document.createElement('option');
-                opt.value = savedKey;
-                opt.textContent = keyToLabel(savedKey);
-                opt.selected = true;
-                dropdown.appendChild(opt);
+            for (const slot of ['A', 'B']) {
+                const cfg = sdrSlots[slot];
+                const savedKey = document.getElementById(cfg.inputId).value;
+                if (savedKey) {
+                    const dropdown = document.getElementById(cfg.dropdownId);
+                    dropdown.innerHTML = '';
+                    const noneOpt = document.createElement('option');
+                    noneOpt.value = '';
+                    noneOpt.textContent = '— (none) —';
+                    dropdown.appendChild(noneOpt);
+                    const opt = document.createElement('option');
+                    opt.value = savedKey;
+                    opt.textContent = keyToLabel(savedKey);
+                    opt.selected = true;
+                    dropdown.appendChild(opt);
+                }
+                updateDeviceKeyDisplay(slot);
+
+                // Selection change → mirror to the hidden input.
+                document.getElementById(cfg.dropdownId).addEventListener('change', function () {
+                    document.getElementById(cfg.inputId).value = this.value;
+                    updateDeviceKeyDisplay(slot);
+                });
             }
-            updateDeviceKeyDisplay(savedKey);
         });
 
-        // Populate the SDR dropdown by calling the device enumeration API.
+        // Populate BOTH SDR dropdowns from one /api/sdr/devices call. Each
+        // dropdown preserves its own selection across re-scans (matched by
+        // exact key, or by sdrplayKeysMatch for the legacy→new format jump).
         window.scanSdrDevices = async function () {
             const btn      = document.getElementById('sdrScanBtn');
-            const dropdown = document.getElementById('sdrDeviceDropdown');
             const notesDiv = document.getElementById('sdrScanNotes');
-            const savedKey = document.getElementById('sdrDeviceKeyInput').value;
 
-            btn.disabled   = true;
-            btn.innerHTML  = '<span class="spinner-border spinner-border-sm me-1"></span>Scanning…';
+            btn.disabled       = true;
+            btn.innerHTML      = '<span class="spinner-border spinner-border-sm me-1"></span>Scanning…';
             notesDiv.innerHTML = '';
 
             try {
-                const resp                = await fetch('/api/sdr/devices');
-                const { devices, notes }  = await resp.json();
+                const resp               = await fetch('/api/sdr/devices');
+                const { devices, notes } = await resp.json();
 
-                dropdown.innerHTML = '';
+                for (const slot of ['A', 'B']) {
+                    const cfg      = sdrSlots[slot];
+                    const dropdown = document.getElementById(cfg.dropdownId);
+                    const savedKey = document.getElementById(cfg.inputId).value;
 
-                // Always offer an explicit "disable" option at the top.
-                const noneOpt = document.createElement('option');
-                noneOpt.value       = '';
-                noneOpt.textContent = '— Disabled (no spectrum display) —';
-                dropdown.appendChild(noneOpt);
+                    dropdown.innerHTML = '';
+                    const noneOpt = document.createElement('option');
+                    noneOpt.value       = '';
+                    noneOpt.textContent = '— (none) —';
+                    dropdown.appendChild(noneOpt);
 
-                if (devices.length > 0) {
                     let matched = false;
                     devices.forEach(d => {
                         const opt = document.createElement('option');
                         opt.value       = d.key;
                         opt.textContent = `${d.label} [${d.driver}]`;
-                        // Match against the saved key — exact match, OR an
-                        // sdrplay:... legacy-vs-new format match on serial.
-                        // When we hit the legacy case, normalise the hidden
-                        // input to the new key so the next save migrates the
-                        // settings file format silently.
                         const sameDevice =
                             d.key === savedKey ||
                             sdrplayKeysMatch(d.key, savedKey);
@@ -865,8 +909,8 @@
                             opt.selected = true;
                             matched = true;
                             if (d.key !== savedKey) {
-                                document.getElementById('sdrDeviceKeyInput').value = d.key;
-                                updateDeviceKeyDisplay(d.key);
+                                document.getElementById(cfg.inputId).value = d.key;
+                                updateDeviceKeyDisplay(slot);
                             }
                         }
                         dropdown.appendChild(opt);
@@ -878,23 +922,8 @@
                         opt.value       = savedKey;
                         opt.textContent = `${keyToLabel(savedKey)} (not found in scan)`;
                         opt.selected    = true;
-                        matched         = true;
                         dropdown.appendChild(opt);
                     }
-
-                    // Nothing previously saved — auto-select the first found device.
-                    if (!matched) {
-                        dropdown.options[1].selected = true;
-                        document.getElementById('sdrDeviceKeyInput').value = dropdown.options[1].value;
-                        updateDeviceKeyDisplay(dropdown.options[1].value);
-                    }
-                } else if (savedKey) {
-                    // Scan found no devices at all but we have a saved key — keep it visible.
-                    const opt = document.createElement('option');
-                    opt.value       = savedKey;
-                    opt.textContent = `${keyToLabel(savedKey)} (not found in scan)`;
-                    opt.selected    = true;
-                    dropdown.appendChild(opt);
                 }
 
                 // Show any installation notes returned by the server.
@@ -915,31 +944,26 @@
                 }
 
             } catch (e) {
-                dropdown.innerHTML = '<option value="">Error contacting scan API</option>';
+                for (const slot of ['A', 'B']) {
+                    document.getElementById(sdrSlots[slot].dropdownId).innerHTML =
+                        '<option value="">Error contacting scan API</option>';
+                }
             } finally {
                 btn.disabled  = false;
                 btn.innerHTML = '<i class="bi bi-search"></i> Scan';
             }
         };
 
-        // When the user picks a device in the dropdown, update the hidden input.
-        document.getElementById('sdrDeviceDropdown').addEventListener('change', function () {
-            document.getElementById('sdrDeviceKeyInput').value = this.value;
-            updateDeviceKeyDisplay(this.value);
-        });
-
-window.clearSdrDevice = function () {
-            document.getElementById('sdrDeviceKeyInput').value = '';
-            document.getElementById('sdrDeviceDropdown').innerHTML =
-                '<option value="" selected>— Disabled (no spectrum display) —</option>';
+        window.clearSdrDevice = function () {
+            for (const slot of ['A', 'B']) {
+                const cfg = sdrSlots[slot];
+                document.getElementById(cfg.inputId).value = '';
+                document.getElementById(cfg.dropdownId).innerHTML =
+                    '<option value="" selected>— (none) —</option>';
+                updateDeviceKeyDisplay(slot);
+            }
             document.getElementById('sdrScanNotes').innerHTML = '';
-            updateDeviceKeyDisplay('');
         };
-
-        function updateDeviceKeyDisplay(key) {
-            const el = document.getElementById('sdrDeviceKeyDisplay');
-            el.textContent = key ? `Saved key: ${key}` : 'No device saved.';
-        }
 
         // DX cluster connection test — POSTs the current Settings-page values
         // (host, port, callsign) to /api/dxcluster/test, which opens a TCP

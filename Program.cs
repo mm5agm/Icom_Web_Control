@@ -224,8 +224,8 @@ builder.Services.AddHostedService<MeterPollingService>();
 
 // SDR spectrum display — reads IQ samples, computes FFT, broadcasts via SignalR
 // Registered as singleton so the span-change API endpoint can call RequestRestart().
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Sdr.SdrBackgroundService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Sdr.SdrBackgroundService>());
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Sdr.SdrManager>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Sdr.SdrManager>());
 
 // Register the radio state service — reuse the same singleton instance as RadioStateService
 builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<RadioStateService>());
@@ -378,7 +378,7 @@ try
     app.MapPost("/api/sdr/span", async (
         [Microsoft.AspNetCore.Mvc.FromQuery] double hz,
         Yaesu_Web_Control.Services.ISettingsService settings,
-        Yaesu_Web_Control.Services.Sdr.SdrBackgroundService sdr) =>
+        Yaesu_Web_Control.Services.Sdr.SdrManager sdr) =>
     {
         double[] valid = [250_000, 500_000, 1_024_000, 2_048_000, 2_500_000, 3_200_000];
         if (Array.IndexOf(valid, hz) < 0) return Results.BadRequest("Invalid span value.");

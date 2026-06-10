@@ -51,11 +51,32 @@
         // Band Plan
         public string BandPlan { get; set; } = "Region1";
 
-        // SDR Spectrum Display
-        // SdrDeviceKey: the SoapySDR args string identifying the device (e.g. "driver=rtlsdr,serial=00000001").
-        // Nullable so the implicit [Required] from <Nullable>enable</Nullable> isn't applied — empty/null
-        // means no SDR configured and must not block form submission via client-side jQuery validation.
+        // SDR Spectrum Display — per-VFO device assignment (v2.3.0+).
+        //
+        // SdrDeviceKeyA / SdrDeviceKeyB identify which physical SDR is wired
+        // to each VFO's IF output. Each may be empty if that VFO has no SDR.
+        // Both nullable to avoid the implicit [Required] from <Nullable>enable</Nullable>.
+        //
+        // SDRplay-format keys: "sdrplay:hw<N>-<serial>" (v2.3.0+) or the
+        // legacy "sdrplay:<serial>" (still accepted; auto-migrated on save).
+        // SoapySDR-format keys: "driver=rtlsdr,serial=00000001" etc.
+        //
+        // The SDRplay API enforces one device per process, so YWC spawns a
+        // dedicated Yaesu_Sdr_Worker.exe process per SDR — see
+        // docs/decisions/0001-dual-sdr-architecture.md.
+        //
+        // Migration from v2.2.x: SettingsService.AutoMigrateSdrFields auto-
+        // promotes any value found in the legacy SdrDeviceKey property into
+        // SdrDeviceKeyA on first read.
+        public string? SdrDeviceKeyA { get; set; } = string.Empty;
+        public string? SdrDeviceKeyB { get; set; } = string.Empty;
+
+        // Legacy v2.2.x single-device field. KEPT as a hidden migration anchor:
+        // SettingsService reads this and copies into SdrDeviceKeyA if A is empty,
+        // then the next save writes SdrDeviceKey as empty so the file gradually
+        // converges on the new shape. Do not reference outside SettingsService.
         public string? SdrDeviceKey { get; set; } = string.Empty;
+
         public double SdrSampleRateHz { get; set; } = 2_048_000;
         public long SdrIfFrequencyHz { get; set; } = 9_000_000;
         public int SdrFftSize { get; set; } = 1024;

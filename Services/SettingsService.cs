@@ -39,6 +39,7 @@ namespace Yaesu_Web_Control.Services
                     _logger.LogInformation("Settings deserialized: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
                         _cachedSettings.SerialPort, _cachedSettings.BaudRate, _cachedSettings.WebAddress, _cachedSettings.HttpPort);
 
+                    MigrateSdrDeviceKey(_cachedSettings);
                     AutoQuoteCommandLinePaths(_cachedSettings);
                 }
                 else
@@ -107,6 +108,22 @@ namespace Yaesu_Web_Control.Services
             _semaphore.Wait();
             try { _cachedSettings = null; }
             finally { _semaphore.Release(); }
+        }
+
+        // v2.2.x → v2.3.0 migration: the SDR settings split from a single
+        // SdrDeviceKey into per-VFO SdrDeviceKeyA / SdrDeviceKeyB. On read,
+        // if the legacy field has a value and SdrDeviceKeyA does not, promote
+        // the legacy value into A. The legacy field is then cleared on the
+        // next save so the file gradually converges on the new shape.
+        // See docs/decisions/0001-dual-sdr-architecture.md.
+        private static void MigrateSdrDeviceKey(ApplicationSettings s)
+        {
+            if (!string.IsNullOrWhiteSpace(s.SdrDeviceKey) &&
+                string.IsNullOrWhiteSpace(s.SdrDeviceKeyA))
+            {
+                s.SdrDeviceKeyA = s.SdrDeviceKey;
+                s.SdrDeviceKey  = string.Empty;
+            }
         }
 
         // Backward-compat for users whose *CommandLine settings were saved before

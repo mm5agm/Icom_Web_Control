@@ -3,10 +3,15 @@
 //
 // Creates its own SignalR connection to /radioHub and dispatches the three
 // message types the spectrum display needs:
-//   "SpectrumUpdate"  — FFT bin array from SdrBackgroundService
-//   "SdrStatus"       — device lifecycle state ("unconfigured", "connecting",
-//                       "streaming", "disconnected", "nodll")
+//   "SpectrumUpdate"  — FFT bin array from SdrManager (v2.3.0+) — now
+//                       sdrId-tagged so dual-SDR setups route to the right panel
+//   "SdrStatus"       — device lifecycle state, also sdrId-tagged
+//   "SdrError"        — error detail, sdrId-tagged
 //   "FrequencyA/B"    — VFO frequency changes so the axis labels stay correct
+//
+// Per-VFO routing for dual-SDR: register handlers with onSpectrumUpdate('A', …)
+// / onSpectrumUpdate('B', …). The pipeline filters by sdrId on the value
+// envelope before dispatching.
 //
 // Uses the same { property, value } message envelope as the rest of the app
 // so the existing WsUpdatePipeline can be reused for dispatching.
@@ -18,6 +23,29 @@ export class SdrSpectrumPipeline {
     constructor() {
         this._pipeline   = new WsUpdatePipeline();
         this._connection = null;
+
+        // Per-sdrId handler maps for the three SDR-routed messages.
+        // Filled in via onSpectrumUpdate / onStatusChange / onError.
+        this._spectrumHandlers = {};   // sdrId → handler(value)
+        this._statusHandlers   = {};   // sdrId → handler(statusStr)
+        this._errorHandlers    = {};   // sdrId → handler(errorStr)
+
+        // Single bridging handlers that dispatch to the right per-sdrId callback.
+        this._pipeline.register('SpectrumUpdate', (value) => {
+            if (!value || !value.sdrId) return;
+            const h = this._spectrumHandlers[value.sdrId];
+            if (h) h(value);
+        });
+        this._pipeline.register('SdrStatus', (value) => {
+            if (!value || !value.sdrId) return;
+            const h = this._statusHandlers[value.sdrId];
+            if (h) h(value.status);
+        });
+        this._pipeline.register('SdrError', (value) => {
+            if (!value || !value.sdrId) return;
+            const h = this._errorHandlers[value.sdrId];
+            if (h) h(value.error);
+        });
     }
 
     // ── Public API ─────────────────────────────────────────────────���─────────
@@ -53,28 +81,30 @@ export class SdrSpectrumPipeline {
     }
 
     /**
-     * Register a handler for spectrum bin data.
-     * @param {function({ bins: number[], centreHz: number, spanHz: number })} handler
+     * Register a handler for spectrum bin data for a specific VFO.
+     * @param {string} sdrId   "A" or "B"
+     * @param {function({ sdrId, bins, centreHz, spanHz })} handler
      */
-    onSpectrumUpdate(handler) {
-        this._pipeline.register('SpectrumUpdate', handler);
+    onSpectrumUpdate(sdrId, handler) {
+        this._spectrumHandlers[sdrId] = handler;
     }
 
     /**
-     * Register a handler for SDR lifecycle status strings.
-     * @param {function(string)} handler  Receives values such as "streaming", "disconnected", etc.
+     * Register a handler for SDR lifecycle status changes on one VFO.
+     * @param {string} sdrId   "A" or "B"
+     * @param {function(string)} handler  Receives "streaming", "disconnected", etc.
      */
-    onStatusChange(handler) {
-        this._pipeline.register('SdrStatus', handler);
+    onStatusChange(sdrId, handler) {
+        this._statusHandlers[sdrId] = handler;
     }
 
     /**
-     * Register a handler for SDR error detail strings.
-     * Fired alongside "disconnected" status to give a human-readable cause.
+     * Register a handler for SDR error detail strings on one VFO.
+     * @param {string} sdrId   "A" or "B"
      * @param {function(string)} handler
      */
-    onError(handler) {
-        this._pipeline.register('SdrError', handler);
+    onError(sdrId, handler) {
+        this._errorHandlers[sdrId] = handler;
     }
 
     /**

@@ -14,11 +14,16 @@ export class SpectrumPanel {
     /**
      * @param {string} canvasId       ID of the <canvas> element to render into.
      * @param {string} containerId    ID of the wrapper element to show/hide.
-     * @param {number} initialVfoHz   Starting VFO A frequency in Hz.
+     * @param {number} initialVfoHz   Starting VFO frequency in Hz.
+     * @param {string} vfo            "A" or "B" — which VFO this panel represents.
+     *                                Click-to-tune and wheel-tune target the
+     *                                /api/cat/frequency/{a|b} endpoint accordingly.
      */
-    constructor(canvasId, containerId, initialVfoHz = 14_074_000) {
+    constructor(canvasId, containerId, initialVfoHz = 14_074_000, vfo = 'A') {
         this._canvasId    = canvasId;
         this._containerId = containerId;
+        this._vfo         = (vfo === 'B') ? 'B' : 'A';   // normalise + default
+        this._vfoLower    = this._vfo.toLowerCase();      // "a"/"b" for URL paths
         this._vfoHz       = initialVfoHz;
         this._status      = 'unconfigured';
 
@@ -240,7 +245,7 @@ export class SpectrumPanel {
             }
         }
 
-        fetch('/api/cat/frequency/a', {
+        fetch(`/api/cat/frequency/${this._vfoLower}`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ frequencyHz: targetHz }),
@@ -252,7 +257,7 @@ export class SpectrumPanel {
         // by site.js and uses the same CAT path the mode buttons use.
         const targetMode = modeForHz(targetHz);
         if (targetMode && window.setMode) {
-            try { window.setMode('A', targetMode); } catch { /* ignore */ }
+            try { window.setMode(this._vfo, targetMode); } catch { /* ignore */ }
         }
     }
 
@@ -272,7 +277,7 @@ export class SpectrumPanel {
         this._wheelTimer = setTimeout(() => {
             const hz = this._wheelTargetHz;
             this._wheelTargetHz = null;
-            fetch('/api/cat/frequency/a', {
+            fetch(`/api/cat/frequency/${this._vfoLower}`, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({ frequencyHz: hz }),

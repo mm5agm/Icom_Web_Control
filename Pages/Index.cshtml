@@ -404,12 +404,25 @@
         </div>
     </div>
 
-    <!-- Spectrum Display — hidden until SdrBackgroundService reports "streaming" -->
+    <!-- Spectrum Display — dual-VFO layout (v2.3.0+).
+         Each panel has its own canvas. Mono A / Mono B / Multi toggle below
+         hides/shows individual panels. Outer container hides itself when no
+         SDR is configured for either VFO. -->
     <div id="spectrumContainer" class="row mt-3" style="display:none;">
         <div class="col-12">
-            <div class="card border-dark">
+            <!-- Mono A / Mono B / Multi toggle. Hidden when only one side is configured. -->
+            <div id="spectrumModeToggle" class="d-flex justify-content-end mb-2" style="display:none;">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Spectrum layout mode">
+                    <button type="button" class="btn btn-outline-secondary spectrum-mode-btn" data-mode="A">VFO A</button>
+                    <button type="button" class="btn btn-outline-secondary spectrum-mode-btn" data-mode="B">VFO B</button>
+                    <button type="button" class="btn btn-outline-secondary spectrum-mode-btn active" data-mode="Multi">Both</button>
+                </div>
+            </div>
+
+            <!-- VFO A spectrum panel -->
+            <div id="spectrumContainerA" class="card border-dark mb-2">
                 <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
-                    <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum</span>
+                    <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO A</span>
                     <div class="d-flex align-items-center gap-2">
                         <div class="btn-group btn-group-sm" role="group" aria-label="Spectrum span">
                             <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 250_000 ? "active" : "")" data-hz="250000" data-a11y-key="spectrum.span250k" aria-label="Span 250 kHz" title="Span 250 kHz">250k</button>
@@ -417,11 +430,24 @@
                             <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 1_024_000 ? "active" : "")" data-hz="1024000" data-a11y-key="spectrum.span1m" aria-label="Span 1 MHz" title="Span 1 MHz">1M</button>
                             <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHz == 2_048_000 ? "active" : "")" data-hz="2048000" data-a11y-key="spectrum.span2m" aria-label="Span 2 MHz" title="Span 2 MHz">2M</button>
                         </div>
-                        <span id="spectrumStatusBadge" class="badge bg-secondary small">—</span>
+                        <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
                     </div>
                 </div>
                 <div class="card-body p-0">
-                    <canvas id="spectrumCanvas" role="img" aria-hidden="true" data-a11y-key="spectrum.display" aria-label="RF spectrum display" style="display:block; width:100%;"></canvas>
+                    <canvas id="spectrumCanvasA" role="img" aria-hidden="true" aria-label="RF spectrum display VFO A" style="display:block; width:100%;"></canvas>
+                </div>
+            </div>
+
+            <!-- VFO B spectrum panel — hidden by default; shown when SdrDeviceKeyB is configured. -->
+            <div id="spectrumContainerB" class="card border-dark" style="display:none;">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
+                    <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO B</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <canvas id="spectrumCanvasB" role="img" aria-hidden="true" aria-label="RF spectrum display VFO B" style="display:block; width:100%;"></canvas>
                 </div>
             </div>
         </div>
@@ -1654,39 +1680,114 @@
                 });
             })();
 
-            // ── Spectrum display ─────────────────────────────────────────────
-            // SpectrumPanel owns the canvas and all DOM for the spectrum display.
-            // SdrSpectrumPipeline is pure transport/routing — no DOM, no canvas.
-            const spectrumPanel = new SpectrumPanel(
-                'spectrumCanvas',
-                'spectrumContainer',
-                @Model.RadioState.FrequencyA   // server-rendered initial VFO A frequency
+            // ── Spectrum display (dual-VFO, v2.3.0+) ─────────────────────────
+            // One SpectrumPanel per VFO. SdrSpectrumPipeline routes by sdrId.
+            // SdrManager will only spawn worker(s) for VFO(s) actually configured.
+            const spectrumPanelA = new SpectrumPanel(
+                'spectrumCanvasA',
+                'spectrumContainerA',
+                @Model.RadioState.FrequencyA,
+                'A'
+            );
+            const spectrumPanelB = new SpectrumPanel(
+                'spectrumCanvasB',
+                'spectrumContainerB',
+                @Model.RadioState.FrequencyB,
+                'B'
             );
 
-            // Provide the region-specific band plan so the panel can draw FT8/CW/SSB
-            // marker ticks at the standard activity frequencies.
+            // Region-specific band plan for FT8/CW/SSB markers on both panels.
             const _ywcRegion = '@Model.BandPlan';
-            if (BAND_PLANS[_ywcRegion]) spectrumPanel.setBandPlan(BAND_PLANS[_ywcRegion]);
+            if (BAND_PLANS[_ywcRegion]) {
+                spectrumPanelA.setBandPlan(BAND_PLANS[_ywcRegion]);
+                spectrumPanelB.setBandPlan(BAND_PLANS[_ywcRegion]);
+            }
 
             const spectrumPipeline = new SdrSpectrumPipeline();
 
-            spectrumPipeline.onSpectrumUpdate(data  => spectrumPanel.update(data));
-            spectrumPipeline.onStatusChange(status  => {
-                spectrumPanel.setStatus(status);
-                const badge = document.getElementById('spectrumStatusBadge');
-                if (badge) {
-                    const labels = {
-                        unconfigured: ['secondary', 'No SDR'],
-                        connecting:   ['warning',   'Connecting…'],
-                        streaming:    ['success',   'Live'],
-                        disconnected: ['danger',    'Disconnected'],
-                        nodll:        ['danger',    'No SoapySDR'],
-                    };
-                    const [colour, text] = labels[status] ?? ['secondary', status];
-                    badge.className = `badge bg-${colour} small`;
-                    badge.textContent = text;
+            // Per-VFO spectrum routing.
+            spectrumPipeline.onSpectrumUpdate('A', data => spectrumPanelA.update(data));
+            spectrumPipeline.onSpectrumUpdate('B', data => spectrumPanelB.update(data));
+
+            // Per-VFO status routing — drives the panel state + small badge in the header.
+            function setStatusBadge(vfo, status) {
+                const badge = document.getElementById('spectrumStatusBadge' + vfo);
+                if (!badge) return;
+                const labels = {
+                    unconfigured: ['secondary', 'No SDR'],
+                    connecting:   ['warning',   'Connecting…'],
+                    streaming:    ['success',   'Live'],
+                    disconnected: ['danger',    'Disconnected'],
+                    nodll:        ['danger',    'No SoapySDR'],
+                };
+                const [colour, text] = labels[status] ?? ['secondary', status];
+                badge.className = `badge bg-${colour} small`;
+                badge.textContent = text;
+            }
+            // Track per-VFO configured/streaming state so we can show or hide the
+            // outer spectrumContainer and the Mono/Multi toggle as appropriate.
+            const sdrState = { A: 'unconfigured', B: 'unconfigured' };
+            function updateContainerVisibility() {
+                const aConfigured = sdrState.A !== 'unconfigured';
+                const bConfigured = sdrState.B !== 'unconfigured';
+
+                // Outer container visible if either VFO has an SDR configured.
+                document.getElementById('spectrumContainer').style.display =
+                    (aConfigured || bConfigured) ? '' : 'none';
+
+                // Mono/Multi toggle only meaningful when BOTH are configured.
+                const toggleEl = document.getElementById('spectrumModeToggle');
+                if (toggleEl) toggleEl.style.display = (aConfigured && bConfigured) ? '' : 'none';
+
+                // If only one side is configured, force that side visible regardless of mode.
+                if (!bConfigured) {
+                    document.getElementById('spectrumContainerB').style.display = 'none';
+                    document.getElementById('spectrumContainerA').style.display = aConfigured ? '' : 'none';
+                } else if (!aConfigured) {
+                    document.getElementById('spectrumContainerA').style.display = 'none';
+                    document.getElementById('spectrumContainerB').style.display = '';
+                } else {
+                    // Both configured — honour the active mode.
+                    applyMode(currentMode);
                 }
+            }
+
+            // Mono/Multi toggle — persisted in localStorage so the user's
+            // last-used layout sticks across page reloads. Default Multi (both).
+            const MODE_STORAGE_KEY = 'ywc.spectrumMode';
+            let currentMode = localStorage.getItem(MODE_STORAGE_KEY) || 'Multi';
+            function applyMode(mode) {
+                currentMode = mode;
+                localStorage.setItem(MODE_STORAGE_KEY, mode);
+                const showA = (mode === 'A' || mode === 'Multi');
+                const showB = (mode === 'B' || mode === 'Multi');
+                document.getElementById('spectrumContainerA').style.display = showA ? '' : 'none';
+                document.getElementById('spectrumContainerB').style.display = showB ? '' : 'none';
+                document.querySelectorAll('.spectrum-mode-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.mode === mode);
+                });
+                // Trigger canvas resize since the layout just changed.
+                window.dispatchEvent(new Event('resize'));
+            }
+            document.querySelectorAll('.spectrum-mode-btn').forEach(b => {
+                b.addEventListener('click', () => applyMode(b.dataset.mode));
             });
+
+            spectrumPipeline.onStatusChange('A', status => {
+                sdrState.A = status;
+                spectrumPanelA.setStatus(status);
+                setStatusBadge('A', status);
+                updateContainerVisibility();
+            });
+            spectrumPipeline.onStatusChange('B', status => {
+                sdrState.B = status;
+                spectrumPanelB.setStatus(status);
+                setStatusBadge('B', status);
+                updateContainerVisibility();
+            });
+            spectrumPipeline.onError('A', detail => spectrumPanelA.setError(detail));
+            spectrumPipeline.onError('B', detail => spectrumPanelB.setError(detail));
+
             // Stand up the DX Spots list panel BEFORE wiring the pipeline so its
             // handlers can dispatch to it. It works whether or not the SDR is
             // configured — relies only on the DxSpot/FrequencyA event stream.
@@ -1695,38 +1796,48 @@
             window.dxSpotsPanel.setVfoFrequency(@Model.RadioState.FrequencyA);
 
             spectrumPipeline.onFrequencyA(hz => {
-                spectrumPanel.setVfoFrequency(hz);
+                spectrumPanelA.setVfoFrequency(hz);
                 window.dxSpotsPanel.setVfoFrequency(hz);
             });
-            spectrumPipeline.onError(detail => spectrumPanel.setError(detail));
-            // DX cluster spots — incoming SignalR pushes feed both the spectrum
-            // overlay (when visible) and the DX Spots list (always available).
-            // On page load, also fetch the current ring buffer so both views are
-            // populated immediately rather than waiting for the next push.
+            spectrumPipeline.onFrequencyB(hz => {
+                spectrumPanelB.setVfoFrequency(hz);
+            });
+
+            // DX cluster spots — incoming SignalR pushes feed BOTH spectrum
+            // overlays (when visible) plus the DX Spots list (always available).
             spectrumPipeline.onDxSpot(spot => {
-                spectrumPanel.addSpot(spot);
+                spectrumPanelA.addSpot(spot);
+                spectrumPanelB.addSpot(spot);
                 window.dxSpotsPanel.addSpot(spot);
             });
-            spectrumPipeline.onDxClusterStatus(s => spectrumPanel.setDxStatus(s?.status, s?.detail));
+            spectrumPipeline.onDxClusterStatus(s => {
+                spectrumPanelA.setDxStatus(s?.status, s?.detail);
+                spectrumPanelB.setDxStatus(s?.status, s?.detail);
+            });
             spectrumPipeline.onDxAlert(spot => { if (window.handleDxAlert) window.handleDxAlert(spot); });
 
-            // Repaint both DX panels when the "Show only watched callsigns"
-            // toggle changes in the DX Watch popup. Without this, the change
-            // would only become visible on the next spot arrival / band change.
+            // Repaint when "Show only watched callsigns" changes.
             window.addEventListener('dxWatchFilterChanged', () => {
-                try { spectrumPanel.redraw(); } catch {}
+                try { spectrumPanelA.redraw(); } catch {}
+                try { spectrumPanelB.redraw(); } catch {}
                 try { window.dxSpotsPanel && window.dxSpotsPanel.redraw(); } catch {}
             });
             fetch('/api/dxcluster/spots')
                 .then(r => r.ok ? r.json() : [])
                 .then(arr => {
-                    spectrumPanel.setSpots(arr);
+                    spectrumPanelA.setSpots(arr);
+                    spectrumPanelB.setSpots(arr);
                     window.dxSpotsPanel.setSpots(arr);
                 })
                 .catch(() => { /* feature off or backend not ready — ignore */ });
             fetch('/api/dxcluster/status')
                 .then(r => r.ok ? r.json() : null)
-                .then(s => { if (s) spectrumPanel.setDxStatus(s.status, s.detail); })
+                .then(s => {
+                    if (s) {
+                        spectrumPanelA.setDxStatus(s.status, s.detail);
+                        spectrumPanelB.setDxStatus(s.status, s.detail);
+                    }
+                })
                 .catch(() => { /* ignore */ });
 
             spectrumPipeline.connect();

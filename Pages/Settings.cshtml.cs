@@ -74,11 +74,16 @@ namespace Yaesu_Web_Control.Pages
 
         public async Task<IActionResult> OnPostAsync()
         {
-            // SdrDeviceKey is intentionally allowed to be empty (empty = no SDR configured).
-            // Must be removed BEFORE ModelState.IsValid is checked, because the implicit
-            // [Required] from <Nullable>enable</Nullable> would otherwise reject an empty
-            // string and silently prevent the save.
+            // SdrDeviceKeyA / SdrDeviceKeyB are intentionally allowed to be empty
+            // (empty = no SDR configured for that VFO). Must be removed BEFORE
+            // ModelState.IsValid is checked, because the implicit [Required] from
+            // <Nullable>enable</Nullable> would otherwise reject empty strings
+            // and silently prevent the save.
+            // SdrDeviceKey is the legacy v2.2.x field, still on the model so the
+            // migration in SettingsService can carry over old saved values.
             ModelState.Remove("Settings.SdrDeviceKey");
+            ModelState.Remove("Settings.SdrDeviceKeyA");
+            ModelState.Remove("Settings.SdrDeviceKeyB");
             // DX cluster host/callsign also allowed empty (empty = feature disabled).
             ModelState.Remove("Settings.DxClusterHost");
             ModelState.Remove("Settings.DxClusterLoginCallsign");
@@ -134,7 +139,9 @@ namespace Yaesu_Web_Control.Pages
                 current.SerialPort        = Settings.SerialPort;
                 current.BaudRate          = Settings.BaudRate;
                 current.WebAddress        = Settings.WebAddress;
-                current.SdrDeviceKey      = Settings.SdrDeviceKey ?? string.Empty;
+                current.SdrDeviceKeyA     = Settings.SdrDeviceKeyA ?? string.Empty;
+                current.SdrDeviceKeyB     = Settings.SdrDeviceKeyB ?? string.Empty;
+                current.SdrDeviceKey      = string.Empty;  // legacy field — kept blank in v2.3.0+ files
                 current.SdrIfFrequencyHz  = Settings.SdrIfFrequencyHz;
                 current.SdrSampleRateHz   = Settings.SdrSampleRateHz;
                 current.SdrFftSize        = Settings.SdrFftSize;
