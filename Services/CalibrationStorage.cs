@@ -7,7 +7,8 @@ namespace Yaesu_Web_Control.Services;
 public class CalibrationStorage
 {
     private readonly bool _isDevelopment;
-    private readonly string _defaultPath;
+    private readonly ISettingsService _settings;
+    private readonly string _wwwrootPath;
     private readonly string _userPath;
 
     private static readonly JsonSerializerOptions ReadOptions = new()
@@ -20,10 +21,11 @@ public class CalibrationStorage
         WriteIndented = true
     };
 
-    public CalibrationStorage(IHostEnvironment hostEnvironment)
+    public CalibrationStorage(IHostEnvironment hostEnvironment, ISettingsService settings)
     {
         _isDevelopment = hostEnvironment.IsDevelopment();
-        _defaultPath = Path.Combine(hostEnvironment.ContentRootPath, "wwwroot", "calibration.default.json");
+        _settings = settings;
+        _wwwrootPath = Path.Combine(hostEnvironment.ContentRootPath, "wwwroot");
         _userPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "MM5AGM",
@@ -33,13 +35,33 @@ public class CalibrationStorage
 
     public bool IsDevelopmentMode => _isDevelopment;
 
-    public string GetActivePath() => _isDevelopment ? _defaultPath : _userPath;
+    // Per-model default calibration path. When the user has an FTdx10
+    // configured, we look for calibration.default.FTdx10.json first; if
+    // it doesn't exist we fall back to the generic calibration.default.json
+    // (currently a copy of the FTdx101MP-calibrated table — the only model
+    // with measured data so far). This lets us ship per-model placeholders
+    // that improve over time as users send in calibration measurements,
+    // without forcing every install to re-calibrate from scratch.
+    private string GetDefaultPath()
+    {
+        var radioModel = _settings.GetSettingsAsync().GetAwaiter().GetResult().RadioModel ?? "";
+        // Sanitise: only letters/digits/hyphen allowed (model names use these).
+        // Prevents path-traversal even though the value comes from a dropdown.
+        if (System.Text.RegularExpressions.Regex.IsMatch(radioModel, @"^[A-Za-z0-9\-]+$"))
+        {
+            var modelSpecific = Path.Combine(_wwwrootPath, $"calibration.default.{radioModel}.json");
+            if (File.Exists(modelSpecific)) return modelSpecific;
+        }
+        return Path.Combine(_wwwrootPath, "calibration.default.json");
+    }
+
+    public string GetActivePath() => _isDevelopment ? GetDefaultPath() : _userPath;
 
     public CalibrationFile Load()
     {
         if (_isDevelopment)
         {
-            return LoadFromPath(_defaultPath);
+            return LoadFromPath(GetDefaultPath());
         }
 
         EnsureUserCalibrationExists();
@@ -48,7 +70,7 @@ public class CalibrationStorage
 
     public CalibrationFile LoadDefault()
     {
-        return LoadFromPath(_defaultPath);
+        return LoadFromPath(GetDefaultPath());
     }
 
     public void Save(CalibrationFile file)
@@ -75,8 +97,10 @@ public class CalibrationStorage
 
         if (!File.Exists(_userPath))
         {
-            // First run — copy default wholesale
-            File.Copy(_defaultPath, _userPath, overwrite: false);
+            // First run — copy the model-specific default wholesale so a
+            // brand-new FTdx10 user starts with FTdx10 placeholders rather
+            // than the legacy FTdx101MP table.
+            File.Copy(GetDefaultPath(), _userPath, overwrite: false);
             return;
         }
 
@@ -90,7 +114,7 @@ public class CalibrationStorage
         try
         {
             var userFile    = LoadFromPath(_userPath);
-            var defaultFile = LoadFromPath(_defaultPath);
+            var defaultFile = LoadFromPath(GetDefaultPath());
 
             var changed = false;
             foreach (var defaultMeter in defaultFile.Meters)
