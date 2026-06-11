@@ -246,16 +246,47 @@ namespace Yaesu_Web_Control.Services
 
         // --- Command Implementations and Stubs ---
 
-        private async Task<string> GetFrequencyAsync(string clientId)
+        private Task<string> GetFrequencyAsync(string clientId)
+        {
+            // Read from the cached state (RadioStateService) rather than
+            // querying the radio fresh on every get_freq call.
+            //
+            // Why: WSJT-X (and Hamlib in general) polls get_freq immediately
+            // after every set_freq to confirm the change took. If we send a
+            // fresh CAT 'FA;' query at that moment, the response can race
+            // against:
+            //   1. The radio's own ~50 ms internal apply-set delay (some
+            //      Yaesu radios acknowledge FA<newfreq>; before the VFO has
+            //      actually moved, so a FA; query in the same window can
+            //      return the OLD frequency).
+            //   2. YWC's continuous CAT poller, whose response queue may
+            //      deliver an in-flight pre-set reading instead of our
+            //      post-set query result.
+            //
+            // Either way WSJT-X briefly displays the old frequency, then
+            // bounces to the new one a second or two later — exactly the
+            // symptom reported by W1WRH (#22).
+            //
+            // SetFrequencyAsync below updates _radioStateService.FrequencyA
+            // immediately after sending the CAT set, so the cached value is
+            // already correct when WSJT-X polls. Manual knob-turns on the
+            // radio update the cache via the CAT poller within ~100 ms,
+            // much faster than WSJT-X's own typical poll interval — so the
+            // "knob → WSJT-X follows" path stays responsive.
+            //
+            // The CAT fallback is kept only for the bootstrap case (cache
+            // not yet populated at startup). Once the cache is populated
+            // it stays the source of truth for rigctld GETs.
+            if (_radioStateService.FrequencyA > 0)
+                return Task.FromResult(_radioStateService.FrequencyA.ToString());
+            return GetFrequencyFromCatAsync(clientId);
+        }
+
+        private async Task<string> GetFrequencyFromCatAsync(string clientId)
         {
             var response = await _multiplexer.SendCommandAsync("FA", clientId);
             var freq = CatCommands.ParseFrequency(response ?? string.Empty);
-            if (freq > 0)
-                return freq.ToString();
-            // Fallback: use RadioStateService if multiplexer/CAT fails
-            if (_radioStateService.FrequencyA > 0)
-                return _radioStateService.FrequencyA.ToString();
-            return "RPRT -1";
+            return freq > 0 ? freq.ToString() : "RPRT -1";
         }
 
         private async Task<string> SetFrequencyAsync(string freqStr, string clientId)
@@ -272,6 +303,10 @@ namespace Yaesu_Web_Control.Services
             await _multiplexer.SendCommandAsync(command, clientId);
 
             // Update RadioStateService immediately so the UI updates via SignalR
+            // AND so the very next rigctld get_freq from WSJT-X (which always
+            // follows a set_freq) returns the value we just set rather than
+            // racing against the radio's apply-set delay or the CAT poller's
+            // response queue. See GetFrequencyAsync above for the full rationale.
             _radioStateService.FrequencyA = freq;
             _logger.LogInformation("Rigctld set_freq: {Freq} Hz (client: {ClientId})", freq, clientId);
 
