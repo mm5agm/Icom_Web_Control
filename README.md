@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.4-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.5-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -136,6 +136,34 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 ---
 
 ## Release Notes
+
+## 2026-06-11 - v2.3.5
+
+Fixes Test Connection properly. **If you have v2.3.4 installed, please
+update — v2.3.4 made the button safe (no longer crashes) but it still
+reported a false-negative "Radio did not respond" on every click because
+the probe-validation logic was wrong.**
+
+### Bug fixes (all in the Test Connection flow)
+
+- **Probe-validation no longer demands a trailing semicolon.** The CAT
+  multiplexer strips the `;` terminator as part of response parsing, so
+  the validation check `probe.Contains(';')` always failed against the
+  parsed reply (e.g. `ID0682` rather than `ID0682;`). Validation now
+  requires the reply to start with `ID` and be at least 6 characters
+  long — enough to be sure we got back a real radio identifier.
+- **Stay on Settings after success.** Previously a successful Test
+  Connection click redirected the browser to the home page after 1
+  second — leftover behaviour from when this button was "Reinitialize"
+  and made sense as "init then start using the radio". For a
+  confirmation-only Test Connection, the redirect was jarring. Now the
+  button just shows "Connection succeeded — radio ID 0682" for 3
+  seconds and reverts.
+- **Friendlier success message.** Was "Radio responded (ID0682)" —
+  reads like internal debug language. Now reads
+  "Connection succeeded — radio ID 0682".
+
+---
 
 ## 2026-06-11 - v2.3.4
 

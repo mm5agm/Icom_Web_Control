@@ -2,7 +2,7 @@ namespace Yaesu_Web_Control;
 
 public static class AppVersion
 {
-    public const string Current = "2.3.4";
+    public const string Current = "2.3.5";
 
     /// <summary>Date this version was released, ISO format.
     /// Bump on actual release; current value reflects the planned ship date.</summary>
