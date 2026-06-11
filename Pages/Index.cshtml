@@ -1635,7 +1635,7 @@
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
         import { FilterScopePanel }    from "/js/ui/filter-scope-panel.js?v=2";
         import "/js/ui/if-width-tables.js?v=1";
-        import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz } from "/js/ui/band-plan.js?v=4";
+        import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=5";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
         import { initMemoriesPanel }   from "/js/ui/memories.js?v=10";
@@ -1729,6 +1729,22 @@
             // Region-specific band edges (red dashed guard rails). Falls back
             // to the class-static worldwide envelope inside SpectrumPanel if
             // the region key isn't found.
+            // First, overlay any updates from /bandplan.default.json so users
+            // who've dropped in a corrected band plan see them on next reload.
+            // This is fire-and-forget: if the fetch succeeds in time we apply
+            // the result; if not, the panels keep the hardcoded defaults and
+            // we re-apply once the fetch resolves. Net effect: hardcoded
+            // defaults always work; updated JSON applies as soon as it loads.
+            loadBandPlanFromServer().then(loaded => {
+                if (loaded && BAND_PLANS[_ywcRegion]) {
+                    spectrumPanelA.setBandPlan(BAND_PLANS[_ywcRegion]);
+                    spectrumPanelB.setBandPlan(BAND_PLANS[_ywcRegion]);
+                }
+                if (loaded && BAND_EDGES[_ywcRegion]) {
+                    spectrumPanelA.setBandEdges(BAND_EDGES[_ywcRegion]);
+                    spectrumPanelB.setBandEdges(BAND_EDGES[_ywcRegion]);
+                }
+            });
             if (BAND_EDGES[_ywcRegion]) {
                 spectrumPanelA.setBandEdges(BAND_EDGES[_ywcRegion]);
                 spectrumPanelB.setBandEdges(BAND_EDGES[_ywcRegion]);

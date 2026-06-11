@@ -365,6 +365,46 @@ export const BAND_EDGES = {
 BAND_EDGES.UK  = BAND_EDGES.Region1;
 BAND_EDGES.USA = BAND_EDGES.Region2;
 
+// ── External JSON override ──────────────────────────────────────────────────
+//
+// The hardcoded BAND_PLANS / BAND_EDGES above are the shipped defaults — they
+// always work, even if the JSON file is missing, corrupt, or fails to fetch.
+//
+// At startup, Index.cshtml calls loadBandPlanFromServer() to overlay updates
+// from /bandplan.default.json (sitting in the install folder). Operators who
+// notice the RSGB / FCC / JARL has tweaked a band plan can drop in an updated
+// JSON file without waiting for a YWC release — restart the app and the new
+// data takes effect. The format is documented in the file's _comment field.
+//
+// We mutate BAND_PLANS / BAND_EDGES in place rather than re-exporting so
+// existing consumers (Index.cshtml's `BAND_PLANS[region]` access pattern,
+// segmentForHz, getSegments, etc.) pick up the new values automatically.
+export async function loadBandPlanFromServer() {
+    try {
+        // Cache-bust on the URL so users dropping in an updated JSON see it
+        // immediately on next reload rather than the browser's cached copy.
+        const res = await fetch('/bandplan.default.json?t=' + Date.now());
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (data?.bandPlans && typeof data.bandPlans === 'object') {
+            for (const key of Object.keys(BAND_PLANS)) delete BAND_PLANS[key];
+            Object.assign(BAND_PLANS, data.bandPlans);
+            BAND_PLANS.UK  = BAND_PLANS.Region1;
+            BAND_PLANS.USA = BAND_PLANS.Region2;
+        }
+        if (data?.bandEdges && typeof data.bandEdges === 'object') {
+            for (const key of Object.keys(BAND_EDGES)) delete BAND_EDGES[key];
+            Object.assign(BAND_EDGES, data.bandEdges);
+            BAND_EDGES.UK  = BAND_EDGES.Region1;
+            BAND_EDGES.USA = BAND_EDGES.Region2;
+        }
+        return true;
+    } catch {
+        // Network failure / bad JSON — keep the hardcoded defaults.
+        return false;
+    }
+}
+
 export function getSegments(bandPlan, band) {
     const plan = BAND_PLANS[bandPlan] || BAND_PLANS['Region1'];
     return plan[band] || null;
