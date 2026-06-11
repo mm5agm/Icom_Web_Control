@@ -102,6 +102,18 @@ export class SpectrumPanel {
     }
 
     /**
+     * Provide region-specific band edges (lo/hi frequency limits per band).
+     * Used to draw the red dashed guard-rail lines on the spectrum.
+     * Falls back to the class-static SpectrumPanel.BAND_EDGES (worldwide
+     * broadest envelope) if not set.
+     * @param {Array<{name:string, lo:number, hi:number}>} edgesForRegion
+     */
+    setBandEdges(edgesForRegion) {
+        this._bandEdges = Array.isArray(edgesForRegion) ? edgesForRegion : null;
+        if (this._lastBins) this._render();
+    }
+
+    /**
      * Force a re-render with the existing spectrum/state — used when an
      * external setting (e.g. the "only watched" filter toggle in the DX Watch
      * popup) changes and we want the overlay to update immediately rather
@@ -331,12 +343,17 @@ export class SpectrumPanel {
         const leftHz  = this._vfoHz - this._lastSpanHz / 2;
         const rightHz = this._vfoHz + this._lastSpanHz / 2;
 
+        // Per-region edges (set by Index.cshtml from BAND_EDGES[region]) take
+        // priority over the class-static worldwide envelope. Fall back if no
+        // region-specific data has been supplied.
+        const edges = this._bandEdges ?? SpectrumPanel.BAND_EDGES;
+
         ctx.save();
         ctx.strokeStyle = '#ff4040';
         ctx.lineWidth   = 1.5;
         ctx.setLineDash([4, 3]);   // dashed so it's clearly a "guard" not a "marker"
 
-        for (const edge of SpectrumPanel.BAND_EDGES) {
+        for (const edge of edges) {
             for (const hz of [edge.lo, edge.hi]) {
                 if (hz < leftHz || hz > rightHz) continue;
                 const x = ((hz - leftHz) / this._lastSpanHz) * W;

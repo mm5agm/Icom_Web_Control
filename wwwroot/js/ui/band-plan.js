@@ -278,6 +278,93 @@ export const BAND_PLANS = {
 BAND_PLANS.UK  = BAND_PLANS.Region1;
 BAND_PLANS.USA = BAND_PLANS.Region2;
 
+// ── Per-region band envelopes ────────────────────────────────────────────────
+//
+// Lower/upper frequency limits for each amateur band, in Hz. Drawn as red
+// dashed guard-rail lines on the spectrum so operators see at a glance when
+// they tune outside their region's amateur allocation.
+//
+// Sources:
+//   Region 1   — IARU R1 + RSGB (UK) for HF; UK figures for 4m/6m where R1
+//                varies by country
+//   Region 2   — FCC Part 97 (USA)
+//   Region 3   — IARU R3 (varies by country; uses representative limits)
+//   Japan      — JARL band plan
+//
+// Where bands are internally fragmented (Japan 160m and 80m have multiple
+// non-contiguous sub-bands), we ship a single broad envelope from the lowest
+// sub-band's start to the highest sub-band's end. The operator's own local
+// regulator's plan is the authority — these markers are a guide, not legal
+// advice.
+//
+// Externalising this data to a JSON file in the install folder is on the
+// roadmap for the next release so corrections can ship without a YWC update.
+export const BAND_EDGES = {
+    Region1: [
+        { name: '160m', lo:   1810000, hi:   2000000 },
+        { name:  '80m', lo:   3500000, hi:   3800000 },
+        { name:  '60m', lo:   5351500, hi:   5366500 },
+        { name:  '40m', lo:   7000000, hi:   7200000 },
+        { name:  '30m', lo:  10100000, hi:  10150000 },
+        { name:  '20m', lo:  14000000, hi:  14350000 },
+        { name:  '17m', lo:  18068000, hi:  18168000 },
+        { name:  '15m', lo:  21000000, hi:  21450000 },
+        { name:  '12m', lo:  24890000, hi:  24990000 },
+        { name:  '10m', lo:  28000000, hi:  29700000 },
+        { name:   '6m', lo:  50000000, hi:  52000000 },
+        { name:   '4m', lo:  70000000, hi:  70500000 },
+    ],
+    Region2: [
+        { name: '160m', lo:   1800000, hi:   2000000 },
+        { name:  '80m', lo:   3500000, hi:   4000000 },
+        { name:  '60m', lo:   5330500, hi:   5403500 },
+        { name:  '40m', lo:   7000000, hi:   7300000 },
+        { name:  '30m', lo:  10100000, hi:  10150000 },
+        { name:  '20m', lo:  14000000, hi:  14350000 },
+        { name:  '17m', lo:  18068000, hi:  18168000 },
+        { name:  '15m', lo:  21000000, hi:  21450000 },
+        { name:  '12m', lo:  24890000, hi:  24990000 },
+        { name:  '10m', lo:  28000000, hi:  29700000 },
+        { name:   '6m', lo:  50000000, hi:  54000000 },
+        // No 4m allocation in Region 2.
+    ],
+    Region3: [
+        { name: '160m', lo:   1800000, hi:   2000000 },
+        { name:  '80m', lo:   3500000, hi:   3900000 },
+        { name:  '60m', lo:   5351500, hi:   5366500 },
+        { name:  '40m', lo:   7000000, hi:   7300000 },
+        { name:  '30m', lo:  10100000, hi:  10150000 },
+        { name:  '20m', lo:  14000000, hi:  14350000 },
+        { name:  '17m', lo:  18068000, hi:  18168000 },
+        { name:  '15m', lo:  21000000, hi:  21450000 },
+        { name:  '12m', lo:  24890000, hi:  24990000 },
+        { name:  '10m', lo:  28000000, hi:  29700000 },
+        { name:   '6m', lo:  50000000, hi:  54000000 },
+        // No 4m allocation in Region 3.
+    ],
+    Japan: [
+        // 160m in Japan is fragmented: CW/narrow 1810–1825 kHz and phone
+        // 1907.5–1912.5 kHz. We ship one envelope spanning both sub-bands;
+        // operators know the in-between gap is non-amateur.
+        { name: '160m', lo:   1810000, hi:   1912500 },
+        // 80m in Japan is also fragmented (multiple phone segments between
+        // 3535 and 3805 kHz). Envelope captures the legal range.
+        { name:  '80m', lo:   3500000, hi:   3805000 },
+        // No 60m allocation in Japan.
+        { name:  '40m', lo:   7000000, hi:   7200000 },
+        { name:  '30m', lo:  10100000, hi:  10150000 },
+        { name:  '20m', lo:  14000000, hi:  14350000 },
+        { name:  '17m', lo:  18068000, hi:  18168000 },
+        { name:  '15m', lo:  21000000, hi:  21450000 },
+        { name:  '12m', lo:  24890000, hi:  24990000 },
+        { name:  '10m', lo:  28000000, hi:  29700000 },
+        { name:   '6m', lo:  50000000, hi:  54000000 },
+        // No 4m allocation in Japan.
+    ],
+};
+BAND_EDGES.UK  = BAND_EDGES.Region1;
+BAND_EDGES.USA = BAND_EDGES.Region2;
+
 export function getSegments(bandPlan, band) {
     const plan = BAND_PLANS[bandPlan] || BAND_PLANS['Region1'];
     return plan[band] || null;
