@@ -845,6 +845,14 @@ When both VFOs have an SDR, the main control panel gains two small toggle groups
 
 Both choices are remembered across page reloads via your browser's local storage. Click the spectrum on panel A to tune **VFO A**; click panel B to tune **VFO B** — each panel addresses its own receiver.
 
+**Stacked layout** — each panel uses the full width of the page, with a deeper waterfall trail per VFO. Best for spotting weak signals or studying the noise floor on one band while keeping an eye on the other:
+
+![Stacked dual-spectrum layout — VFO A on top, VFO B below, each at full width with full-height waterfall](pictures/Spectrum_Stacked.png)
+
+**Side-by-side layout** — both spectra share the page width 50/50, giving you both bands on screen at once without scrolling. Better for working two bands simultaneously (e.g. SSB on VFO A, FT8 on VFO B):
+
+![Side-by-side dual-spectrum layout — VFO A on the left, VFO B on the right, each at half-width](pictures/Spectrum_Side_By_Side.png)
+
 #### Updating the band plan without a YWC release
 
 From v2.3.0 the band plan data (activity-centre markers like CW / FT8 / SSB, plus the red band-edge guard rails) lives in a JSON file alongside YWC's install folder:
