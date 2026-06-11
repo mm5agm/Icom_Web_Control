@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.1-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.2-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -136,6 +136,32 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 ---
 
 ## Release Notes
+
+## 2026-06-11 - v2.3.2
+
+Small hotfix on top of v2.3.1 — suppresses a startling Windows dialog
+that could pop up on the Settings page for users who have certain other
+SDR software installed.
+
+### Bug fix
+
+- **Windows "Entry Point Not Found" dialog suppressed.** The Settings
+  page's auto-scan (new in v2.3.0) enumerates SoapySDR plugins
+  (HackRF, RTL-SDR, Airspy etc.). If the user has a `hackrf.dll` or
+  similar in `C:\Windows\System32` from another SDR application (SDR#,
+  HRD, SDR Console, etc.), Windows may load that DLL ahead of YWC's
+  bundled one — and if it has different libusb dependencies, the OS
+  pops up a modal "Entry Point Not Found" error dialog. YWC was already
+  handling the underlying plugin-load failure gracefully (the unloadable
+  plugin just doesn't appear in the device list), but the dialog itself
+  is startling. Now suppressed via `SetErrorMode` at process startup;
+  the plugin load still fails silently for users with the conflict, but
+  no dialog interrupts the session.
+
+There are no other changes in v2.3.2 — see v2.3.0 / v2.3.1 below for
+the actual feature set of this release line.
+
+---
 
 ## 2026-06-11 - v2.3.1
 
