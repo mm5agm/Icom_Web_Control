@@ -300,5 +300,30 @@ export class FilterScopePanel {
             const lbl = hz >= 1000 ? (hz / 1000) + 'k' : hz === 0 ? '0' : hz + '';
             ctx.fillText(lbl, lx, H - 1);
         }
+
+        // --- Roofing filter label (top-right corner) ---
+        //
+        // The trapezium shape is the DSP filter (IF Width), not the roofing.
+        // When the roofing filter is WIDER than the DSP filter (e.g. 12k or
+        // 3k roofing with a 2.7 kHz DSP setting in SSB), the trapezium looks
+        // identical for those roofing choices because the DSP is the actual
+        // limit. Without a label, operators can't tell whether they're on
+        // 12k or 3k roofing from the display.
+        //
+        // A small text label removes the ambiguity:
+        //   • Tells the operator which roofing is selected at a glance
+        //   • Doesn't disrupt the existing trapezium UX
+        //   • Only drawn when a roofing filter is actually set
+        const roofHz = this._roofingHz();
+        if (roofHz !== null) {
+            const roofLabel = roofHz >= 1000
+                ? 'Roof ' + (roofHz / 1000).toString().replace(/\.0$/, '') + 'k'
+                : 'Roof ' + roofHz;
+            ctx.fillStyle    = '#aab8c4';
+            ctx.font         = '9px sans-serif';
+            ctx.textAlign    = 'right';
+            ctx.textBaseline = 'top';
+            ctx.fillText(roofLabel, W - 2, 2);
+        }
     }
 }
