@@ -847,11 +847,13 @@ Both choices are remembered across page reloads via your browser's local storage
 
 **Stacked layout** — each panel uses the full width of the page, with a deeper waterfall trail per VFO. Best for spotting weak signals or studying the noise floor on one band while keeping an eye on the other:
 
-![Stacked dual-spectrum layout — VFO A on top, VFO B below, each at full width with full-height waterfall](pictures/Spectrum_Stacked.png)
+![Stacked dual-spectrum layout — VFO A on top streaming live, VFO B below frozen with a HOLD banner in the top-left corner (Hold button yellow, status badge yellow 'Hold'). Holds are per-VFO so one panel can be frozen for study while the other keeps streaming.](pictures/Spectrum_Stacked.png)
 
 **Side-by-side layout** — both spectra share the page width 50/50, giving you both bands on screen at once without scrolling. Better for working two bands simultaneously (e.g. SSB on VFO A, FT8 on VFO B):
 
-![Side-by-side dual-spectrum layout — VFO A on the left, VFO B on the right, each at half-width](pictures/Spectrum_Side_By_Side.png)
+![Side-by-side dual-spectrum layout — VFO A on the left streaming live, VFO B on the right frozen with a HOLD banner. Same independence as the stacked layout; only the geometry differs.](pictures/Spectrum_Side_By_Side.png)
+
+> **Both screenshots above show the Hold feature in action.** VFO A is streaming live with the green "Live" status badge; VFO B is frozen — its Hold button is filled yellow, its status badge says "Hold" in yellow, and a small `HOLD` banner sits in the top-left corner of the frozen canvas. Click the Hold button again to resume.
 
 #### Updating the band plan without a YWC release
 
