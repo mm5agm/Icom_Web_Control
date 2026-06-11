@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.3-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.4-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -136,6 +136,36 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 ---
 
 ## Release Notes
+
+## 2026-06-11 - v2.3.4
+
+Critical hotfix on v2.3.3. **If you have v2.3.3 installed, please update.**
+
+### Bug fix
+
+- **Settings page "Test Connection" button no longer crashes YWC.**
+  v2.3.3 wired Test Connection to run the same heavyweight startup
+  initialization sequence the app uses on launch (multiplexer connect
+  + ~30 CAT read queries + state restoration). That's safe at startup
+  when nothing else is running yet — but on a running system it races
+  with the 10 Hz meter poller, the SDR workers, and any in-flight
+  WebUI commands, and on Colin's bench it consistently crashed the
+  YWC process on the first or second click.
+
+  Replacement: Test Connection now sends just the `ID;` probe through
+  the existing CAT client (which the multiplexer queues correctly
+  alongside the running meter polls). The deep init only runs if the
+  multiplexer is genuinely disconnected — i.e. the original
+  "configure Settings, then verify connection" use case.
+
+Other improvements:
+- Probe timeout raised from 1 s to 2 s so a Test Connection click
+  during a busy multiplexer queue has time to surface the response.
+- Error wording slightly tightened (the message used to talk about
+  "COM port opened but the radio did not respond" — which assumed
+  re-init had run; with the new logic it just talks about CAT).
+
+---
 
 ## 2026-06-11 - v2.3.2
 
