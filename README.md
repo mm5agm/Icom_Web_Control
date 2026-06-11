@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.0-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.1-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -136,6 +136,32 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 ---
 
 ## Release Notes
+
+## 2026-06-11 - v2.3.1
+
+Hotfix on v2.3.0. **No user-facing changes — v2.3.0 itself shipped with a
+broken installer build** and v2.3.1 is the same code with the build
+pipeline fixed. If you've never installed v2.3.0 (no installer was
+produced), just install v2.3.1 and read the v2.3.0 release notes below
+for what's new.
+
+### Build pipeline fix
+
+- **Worker exe was missing from the published installer.** The new
+  `Yaesu_Sdr_Worker.exe` (for the dual-SDR architecture) is built by a
+  separate `.csproj` and copied into YWC's output via `<None Include>` items
+  in the main `.csproj`. The path patterns assumed no `RuntimeIdentifier`
+  was set — true for `dotnet build` / `dotnet run` but false for the CI's
+  `dotnet publish -r win-x64`, where outputs go into a `win-x64`
+  subfolder. CI publish failed with `MSB3030: Could not copy the file
+  Yaesu_Sdr_Worker.exe because it was not found`.
+
+  Fixed with a second `<ItemGroup Condition="'$(RuntimeIdentifier)' != ''"...>`
+  block that uses the RID-suffixed path during publish. Both paths now
+  resolve correctly: local dev `dotnet run` AND CI's
+  `dotnet publish -r win-x64`.
+
+---
 
 ## 2026-06-11 - v2.3.0
 
