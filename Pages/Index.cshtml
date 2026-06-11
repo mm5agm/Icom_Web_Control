@@ -428,8 +428,12 @@
                  flex-column (default) = stacked vertically.
                  flex-row             = side by side, each panel takes half the width. -->
             <div id="spectrumPanels" class="d-flex flex-column gap-2">
-                <!-- VFO A spectrum panel -->
-                <div id="spectrumContainerA" class="card border-dark flex-fill" style="min-width:0;">
+                <!-- VFO A spectrum panel.
+                     flex:1 1 0 (not flex-fill = 1 1 auto) so two side-by-side
+                     panels split evenly regardless of header content width.
+                     Without this, a longer status-badge text on one side
+                     pulls that card wider than the other. -->
+                <div id="spectrumContainerA" class="card border-dark" style="flex: 1 1 0; min-width:0;">
                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
                         <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO A</span>
                         <div class="d-flex align-items-center gap-2">
@@ -447,8 +451,10 @@
                     </div>
                 </div>
 
-                <!-- VFO B spectrum panel — hidden by default; shown when SdrDeviceKeyB is configured. -->
-                <div id="spectrumContainerB" class="card border-dark flex-fill" style="display:none; min-width:0;">
+                <!-- VFO B spectrum panel — hidden by default; shown when SdrDeviceKeyB is configured.
+                     Same flex:1 1 0 + min-width:0 as A so the two panels stay equal-width
+                     in side-by-side layout regardless of badge text content. -->
+                <div id="spectrumContainerB" class="card border-dark" style="display:none; flex: 1 1 0; min-width:0;">
                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-1">
                         <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO B</span>
                         <div class="d-flex align-items-center gap-2">
