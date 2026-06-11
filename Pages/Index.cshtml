@@ -445,6 +445,7 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span 1 MHz" title="VFO A span 1 MHz">1M</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 2_048_000 ? "active" : "")" data-hz="2048000" data-vfo="A" data-a11y-key="spectrum.spanA2m" aria-label="VFO A span 2 MHz" title="VFO A span 2 MHz">2M</button>
                             </div>
+                            <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="A" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
@@ -468,6 +469,7 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span 1 MHz" title="VFO B span 1 MHz">1M</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 2_048_000 ? "active" : "")" data-hz="2048000" data-vfo="B" data-a11y-key="spectrum.spanB2m" aria-label="VFO B span 2 MHz" title="VFO B span 2 MHz">2M</button>
                             </div>
+                            <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
@@ -1971,6 +1973,36 @@
                     '@Model.RadioState.ModeB'
                 );
             }
+
+            // Hold button — toggles whether the panel updates from incoming
+            // SDR frames. While held the spectrum + waterfall freeze at the
+            // last received frame so the operator can study a fleeting
+            // signal. Click again to resume. State is per-VFO.
+            document.querySelectorAll('.spectrum-hold-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const vfo = btn.dataset.vfo;
+                    const panel = vfo === 'B' ? spectrumPanelB : spectrumPanelA;
+                    if (!panel) return;
+                    const nowHeld = !panel.isHeld();
+                    panel.setHold(nowHeld);
+                    // Visual feedback: button goes 'active' (filled) when held.
+                    btn.classList.toggle('active', nowHeld);
+                    btn.classList.toggle('btn-warning', nowHeld);
+                    btn.classList.toggle('btn-outline-light', !nowHeld);
+                    // Reflect in the status badge so the change is obvious
+                    // even when looking at the panel, not just the toolbar.
+                    const badge = document.getElementById('spectrumStatusBadge' + vfo);
+                    if (badge && nowHeld) {
+                        badge.className = 'badge bg-warning small';
+                        badge.textContent = 'Hold';
+                    } else if (badge && !nowHeld) {
+                        // Falls back to whatever the next status update sets;
+                        // until then show "Live" if we were streaming.
+                        badge.className = 'badge bg-success small';
+                        badge.textContent = 'Live';
+                    }
+                });
+            });
 
             // Span selector — POST new sample rate for this VFO and restart
             // the corresponding worker. data-vfo on each button tells the

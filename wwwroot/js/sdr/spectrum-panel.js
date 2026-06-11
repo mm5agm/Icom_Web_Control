@@ -54,6 +54,12 @@ export class SpectrumPanel {
         this._crosshairX  = null;
         this._crosshairY  = null;
 
+        // Persistent cursor: a "bookmarked" frequency the operator dropped
+        // with Shift+click. Stays on the spectrum until cleared even as
+        // the user tunes elsewhere — useful for marking a station you want
+        // to come back to. null when no cursor is set.
+        this._pinnedCursorHz = null;
+
         // Band-plan segment data for marker overlay (CW / FT8 / SSB / RTTY etc.
         // tick marks under the spectrum). Set via setBandPlan(); shape is the
         // region-specific subset of BAND_PLANS, e.g. BAND_PLANS.Region1.
@@ -67,11 +73,33 @@ export class SpectrumPanel {
 
     /** Update the spectrum/waterfall with a new frame of FFT data. */
     update({ bins, centreHz, spanHz }) {
+        // Hold mode (set via setHold(true)) freezes the display at the
+        // last received frame so the operator can inspect a fleeting signal
+        // without it scrolling off the waterfall. Incoming frames are
+        // dropped — _lastBins / _lastCentreHz / _lastSpanHz are not
+        // updated so a forced re-render shows the frozen frame.
+        if (this._hold) return;
         this._lastBins    = bins;
         this._lastCentreHz = centreHz;
         this._lastSpanHz   = spanHz;
         this._render();
     }
+
+    /**
+     * Freeze (true) or resume (false) the display. While held the spectrum
+     * and waterfall stop scrolling and the panel ignores incoming SDR frames.
+     * Click-to-tune, wheel-tune, and cursor tracking still work — only
+     * automatic updates are paused.
+     * @param {boolean} hold
+     */
+    setHold(hold) {
+        this._hold = !!hold;
+        // Force a re-render so the "Held" overlay (if any) shows immediately.
+        if (this._lastBins) this._render();
+    }
+
+    /** Returns the current hold state (true = frozen, false = streaming live). */
+    isHeld() { return !!this._hold; }
 
     /** Store the latest error detail string for display alongside status overlays. */
     setError(detail) {
@@ -245,10 +273,31 @@ export class SpectrumPanel {
         // Convert canvas-relative x (CSS pixels) to canvas-internal pixels.
         const canvasX = x * (W / rect.width);
         const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const clickHz = Math.round(leftHz + (canvasX / W) * this._lastSpanHz);
+
+        // Shift+click → drop / toggle a persistent cursor at the click freq
+        // instead of tuning. The operator can mark a station to come back to
+        // while tuning around with normal clicks.
+        if (e.shiftKey) {
+            // If shift-click lands within 8 internal-pixels of the existing
+            // pinned cursor, treat that as "remove the cursor". Otherwise
+            // (re-)pin at the click frequency.
+            if (this._pinnedCursorHz != null) {
+                const px = ((this._pinnedCursorHz - leftHz) / this._lastSpanHz) * W;
+                if (Math.abs(px - canvasX) <= 8) {
+                    this._pinnedCursorHz = null;
+                    if (this._lastBins) this._render();
+                    return;
+                }
+            }
+            this._pinnedCursorHz = clickHz;
+            if (this._lastBins) this._render();
+            return;
+        }
 
         // If the click is within 8 internal-pixels of a spot's marker, snap
         // to that spot's exact frequency. Otherwise tune to the click x.
-        let targetHz = Math.round(leftHz + (canvasX / W) * this._lastSpanHz);
+        let targetHz = clickHz;
         for (const s of this._spots) {
             const sx = ((s.frequencyHz - leftHz) / this._lastSpanHz) * W;
             if (Math.abs(sx - canvasX) <= 8) {
@@ -327,7 +376,84 @@ export class SpectrumPanel {
         this._drawSpots(ctx, W, specH);
         this._drawDxBadge(ctx, W);
         this._scrollWaterfall(ctx, bins, W, specH, wfH);
+        this._drawPinnedCursor(ctx, W, specH);
         this._drawCrosshair(ctx, W, specH, spanHz);
+        this._drawHoldOverlay(ctx, W, specH);
+    }
+
+    // ── Persistent (pinned) cursor ───────────────────────────────────────────
+    //
+    // A "bookmark" cursor the operator dropped with Shift+click. Distinct
+    // visual from the live mouse crosshair: solid cyan vertical line plus a
+    // boxed frequency label so it stands out. Shift+click on or very near
+    // the existing cursor clears it.
+    _drawPinnedCursor(ctx, W, specH) {
+        if (this._pinnedCursorHz == null || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        const leftHz = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        if (this._pinnedCursorHz < leftHz || this._pinnedCursorHz > rightHz) return;
+
+        const x = ((this._pinnedCursorHz - leftHz) / this._lastSpanHz) * W;
+        const axisH = 20;
+        const specTop = specH - axisH;
+
+        ctx.save();
+
+        // Solid cyan vertical line spanning the whole panel (spectrum + waterfall)
+        // so the marker is visible even when the operator is studying the waterfall.
+        ctx.strokeStyle = '#00d4ff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, specH);
+        ctx.stroke();
+
+        // Frequency label in a boxed background near the top of the spectrum.
+        const label = (this._pinnedCursorHz / 1e6).toFixed(6) + ' MHz';
+        ctx.font = 'bold 11px monospace';
+        const padX = 4, padY = 2;
+        const textWidth = ctx.measureText(label).width;
+        const boxW = textWidth + padX * 2;
+        const boxH = 16;
+        // Prefer the label to the right of the cursor; flip to left near the right edge.
+        const boxX = (x + boxW + 8 < W) ? x + 4 : x - boxW - 4;
+        const boxY = 24;
+
+        ctx.fillStyle = 'rgba(0, 60, 90, 0.9)';
+        ctx.fillRect(boxX, boxY, boxW, boxH);
+        ctx.strokeStyle = '#00d4ff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(label, boxX + padX, boxY + padY);
+
+        ctx.restore();
+    }
+
+    // ── Hold overlay ─────────────────────────────────────────────────────────
+    //
+    // When setHold(true) freezes the spectrum, paint a subtle banner so the
+    // operator sees the display isn't live. The status badge in the panel
+    // header also says "Hold" (yellow), and the canvas is intentionally
+    // not faded — operators want to study what's frozen, not look at
+    // greyed-out data.
+    _drawHoldOverlay(ctx, W, specH) {
+        if (!this._hold) return;
+        ctx.save();
+        ctx.font         = 'bold 12px sans-serif';
+        ctx.textAlign    = 'left';
+        ctx.textBaseline = 'top';
+        const label = 'HOLD';
+        const padX = 6, padY = 3;
+        const textWidth = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(200, 140, 0, 0.85)';
+        ctx.fillRect(4, 4, textWidth + padX * 2, 20);
+        ctx.fillStyle = '#000000';
+        ctx.fillText(label, 4 + padX, 4 + padY);
+        ctx.restore();
     }
 
     // ── Band-edge guard rails ────────────────────────────────────────────────

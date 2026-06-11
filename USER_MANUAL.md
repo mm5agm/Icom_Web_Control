@@ -863,9 +863,21 @@ From v2.3.0 the band plan data (activity-centre markers like CW / FT8 / SSB, plu
 
 If a regulator (RSGB, FCC, JARL, etc.) tweaks a band plan and the change is important to you, download an updated copy of `bandplan.default.json` from the YWC GitHub release page and drop it in over the existing file. Restart YWC and the new values take effect — no need to wait for a full app release. The hardcoded JS defaults shipped inside the app are used as a fallback in case the JSON file is missing or corrupt, so a botched edit can't permanently break anything; just delete the file and YWC reverts to the built-in defaults.
 
+#### Hold — freeze the spectrum at the current frame
+
+Each panel header has a **Hold** button. Click it to freeze that VFO's spectrum + waterfall at the last received frame. While held the panel ignores incoming SDR data, the header badge changes to a yellow **Hold** indicator, and a small `HOLD` banner appears in the top-left of the canvas. Click **Hold** again to resume live streaming.
+
+Useful for studying a fleeting signal without it scrolling off the waterfall, or grabbing a screenshot of a particular moment. Each panel holds independently — you can hold VFO A while VFO B keeps streaming.
+
+#### Persistent cursor — bookmark a frequency
+
+**Shift-click** anywhere on a spectrum panel to drop a persistent cyan cursor at that frequency. The cursor stays visible as you tune around with normal clicks, so you can mark a station you want to come back to. The frequency is shown in a small boxed label near the cursor.
+
+To remove the cursor, **Shift-click on or near it** (within ~10 pixels). Each panel has its own cursor — VFO A and VFO B can each be marking different frequencies.
+
 #### Independent span per VFO
 
-Each spectrum panel header has its own **250k / 500k / 1M / 2M** span buttons. Set VFO A to **2 MHz** for a wide overview of the calling band, and VFO B to **250 kHz** zoomed in on the QSO you're working — both at the same time, independently. Each click restarts only that VFO's worker (the other panel keeps its frame frozen for the brief reconnect window — see the bandwidth-change pause note below).
+Each spectrum panel header has its own **62.5k / 125k / 250k / 500k / 1M / 2M** span buttons. Set VFO A to **2 MHz** for a wide overview of the calling band, and VFO B to **62.5 kHz** zoomed in on the QSO you're working — both at the same time, independently. Each click restarts only that VFO's worker (the other panel keeps its frame frozen for the brief reconnect window — see the bandwidth-change pause note below).
 
 The Settings page Sample Rate dropdown still exists but now acts as a "reset both VFOs to this default" control. Use it to set a starting point; use the per-panel buttons to diverge from there.
 
