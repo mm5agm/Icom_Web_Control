@@ -47,4 +47,23 @@ public class CalibrationController : ControllerBase
             mode = _service.IsDevelopmentMode ? "development" : "user"
         });
     }
+
+    /// <summary>
+    /// Reset the user's calibration file to the model-specific defaults
+    /// shipped with the app. Used when the user has changed radio model in
+    /// Settings (the calibration table that came with the previous model is
+    /// no longer right for the new one) or when they want to wipe their own
+    /// tweaks and start over.
+    /// </summary>
+    [HttpPost("reset")]
+    public IActionResult ResetCalibration()
+    {
+        _service.ResetToDefault();
+        return Ok(new
+        {
+            ok = true,
+            calibration = _service.Current,
+            saveTargetPath = _service.GetSavePath(),
+        });
+    }
 }

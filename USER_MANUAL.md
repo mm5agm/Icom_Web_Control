@@ -1525,7 +1525,7 @@ Calibration is saved to `%APPDATA%\MM5AGM\Yaesu Web Control\calibration.user.jso
 
 **Per-model defaults (v2.3.0 and later):** YWC now ships separate default calibration tables for each supported radio (`calibration.default.FTdx101MP.json`, `…FTdx10.json`, etc.) in the installation folder. On first launch your `calibration.user.json` is created by copying the default for whichever radio you have configured. As of v2.3.0 the only model with measured calibration data is the FTdx101MP; the other models ship with placeholder copies of that table. If you calibrate your own radio (especially S-Meter) and would like to help, please share your `calibration.user.json` on [Discussion #30](https://github.com/mm5agm/Yaesu_Web_Control/discussions/30) — submissions are averaged and shipped as proper per-model defaults in future releases.
 
-> **Changing radio model later:** if you switch to a different radio in Settings, your existing `calibration.user.json` is **not** automatically reset to the new model's defaults — your custom values stay in place. If you want a fresh start tuned for the new radio, close YWC, delete the `calibration.user.json` file, and start YWC again. It will recreate the file from the appropriate per-model default.
+> **Changing radio model later:** if you switch to a different radio in Settings, your existing calibration is **not** automatically reset to the new model's defaults — your custom values stay in place. If you want a fresh start tuned for the new radio, open the **Meter Calibration** page and click the **Reset to Defaults** button. It rebuilds your calibration from the shipped defaults for whichever radio you currently have configured.
 
 ---
 
