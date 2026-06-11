@@ -39,11 +39,14 @@ namespace Yaesu_Web_Control.Services
                     _logger.LogInformation("Settings deserialized: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
                         _cachedSettings.SerialPort, _cachedSettings.BaudRate, _cachedSettings.WebAddress, _cachedSettings.HttpPort);
 
+                    MigrateSdrDeviceKey(_cachedSettings);
+                    MigrateSdrSampleRate(_cachedSettings);
                     AutoQuoteCommandLinePaths(_cachedSettings);
                 }
                 else
                 {
                     _cachedSettings = new ApplicationSettings();
+                    MigrateSdrSampleRate(_cachedSettings);   // fills A/B from defaults when file is brand new
                     _logger.LogWarning("Settings file does not exist at {Path}. Using defaults: SerialPort={SerialPort}, WebAddress={WebAddress}, HttpPort={HttpPort}",
                         _settingsFilePath, _cachedSettings.SerialPort, _cachedSettings.WebAddress, _cachedSettings.HttpPort);
                 }
@@ -107,6 +110,44 @@ namespace Yaesu_Web_Control.Services
             _semaphore.Wait();
             try { _cachedSettings = null; }
             finally { _semaphore.Release(); }
+        }
+
+        // v2.2.x → v2.3.0 migration: the SDR settings split from a single
+        // SdrDeviceKey into per-VFO SdrDeviceKeyA / SdrDeviceKeyB. On read,
+        // if the legacy field has a value and SdrDeviceKeyA does not, promote
+        // the legacy value into A. The legacy field is then cleared on the
+        // next save so the file gradually converges on the new shape.
+        // See docs/decisions/0001-dual-sdr-architecture.md.
+        private static void MigrateSdrDeviceKey(ApplicationSettings s)
+        {
+            if (!string.IsNullOrWhiteSpace(s.SdrDeviceKey) &&
+                string.IsNullOrWhiteSpace(s.SdrDeviceKeyA))
+            {
+                s.SdrDeviceKeyA = s.SdrDeviceKey;
+                s.SdrDeviceKey  = string.Empty;
+            }
+        }
+
+        // v2.3.0+ per-VFO sample rate. The model property defaults are 0
+        // (sentinel for "field not in JSON"), so we can distinguish between
+        // an absent field on disk vs an explicit 0 saved by the user.
+        // Rules:
+        //   - If legacy SdrSampleRateHz has a value and either A or B is 0,
+        //     copy legacy → the missing slot(s). Clear legacy.
+        //   - If A or B is still 0 after that, fall back to the v2.2.x
+        //     default 2_048_000 so a brand-new settings file or one missing
+        //     all three fields still gets sane defaults.
+        private const double DefaultSampleRateHz = 2_048_000;
+        private static void MigrateSdrSampleRate(ApplicationSettings s)
+        {
+            if (s.SdrSampleRateHz > 0)
+            {
+                if (s.SdrSampleRateHzA == 0) s.SdrSampleRateHzA = s.SdrSampleRateHz;
+                if (s.SdrSampleRateHzB == 0) s.SdrSampleRateHzB = s.SdrSampleRateHz;
+                s.SdrSampleRateHz = 0;
+            }
+            if (s.SdrSampleRateHzA == 0) s.SdrSampleRateHzA = DefaultSampleRateHz;
+            if (s.SdrSampleRateHzB == 0) s.SdrSampleRateHzB = DefaultSampleRateHz;
         }
 
         // Backward-compat for users whose *CommandLine settings were saved before

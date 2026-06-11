@@ -71,7 +71,9 @@ RadioInitializationService (IHostedService)
                                                         → RadioStatePersistenceService
 
 MeterPollingService (IHostedService) — polls CAT FA/FB/SM etc. at ~10 Hz
-SdrBackgroundService (IHostedService) — SDR device lifecycle + FFT → SignalR
+SdrManager (IHostedService) — supervises one Yaesu_Sdr_Worker.exe per
+                              configured SDR; reads FFT frames over
+                              localhost TCP and broadcasts via SignalR
 RigctldServer (IHostedService) — exposes rigctld TCP interface for WSJT-X etc.
 ```
 
@@ -80,8 +82,13 @@ RigctldServer (IHostedService) — exposes rigctld TCP interface for WSJT-X etc.
 All real-time updates use a single hub method `RadioStateUpdate` with envelope `{ property, value }`.  
 The frontend's `WsUpdatePipeline` routes on `property`. The same hub carries:
 - CAT state (FrequencyA, FrequencyB, PowerMeter, SMeter, etc.)
-- SDR lifecycle (SdrStatus, SdrError)
-- SDR spectrum frames (SpectrumUpdate `{ bins, centreHz, spanHz }`)
+- SDR lifecycle (sdrId-tagged from v2.3.0):
+  - `SdrStatus`     value = `{ sdrId, status }` — "unconfigured" / "connecting" / "streaming" / "disconnected" / "nodll"
+  - `SdrError`      value = `{ sdrId, error  }` — human-readable detail
+- SDR spectrum frames:
+  - `SpectrumUpdate` value = `{ sdrId, bins, centreHz, spanHz }`
+
+`sdrId` is `"A"` or `"B"`. `SdrSpectrumPipeline` routes by sdrId to the appropriate `SpectrumPanel` instance.
 
 ### CAT Frequency Format
 
@@ -90,11 +97,22 @@ The frontend's `WsUpdatePipeline` routes on `property`. The same hub carries:
 ### Settings
 
 `SettingsService` reads/writes `appsettings.user.json` via a read-modify-write pattern.  
-`Settings.cshtml.cs`: `ModelState.Remove("Settings.SdrDeviceKey")` **must** appear before `ModelState.IsValid` — `<Nullable>enable</Nullable>` adds implicit `[Required]` to non-nullable strings, which silently blocks saves of empty `SdrDeviceKey` otherwise.
+`Settings.cshtml.cs`: `ModelState.Remove("Settings.SdrDeviceKeyA")` and `Settings.SdrDeviceKeyB` **must** appear before `ModelState.IsValid` — `<Nullable>enable</Nullable>` adds implicit `[Required]` to non-nullable strings, which silently blocks saves of empty values otherwise. The legacy `Settings.SdrDeviceKey` is also removed for the same reason; it's kept on the model as a migration anchor only.
 
-### SDR Subsystem (`Services/Sdr/`)
+**v2.2.x → v2.3.0 SDR settings migration:** the single `SdrDeviceKey` split into per-VFO `SdrDeviceKeyA` / `SdrDeviceKeyB`. `SettingsService.MigrateSdrDeviceKey` auto-promotes any legacy value into `SdrDeviceKeyA` on read; the legacy field is cleared on the next save.
 
-- `SdrBackgroundService` — lifecycle loop: open → configure → stream → FFT → broadcast. Retries every 5 s on failure; heartbeats "streaming" status every ~3 s so late-connecting clients receive it.
+### SDR Subsystem — Dual-process architecture (v2.3.0+)
+
+The SDRplay API v3 service enforces one Selected device per host process (confirmed by [scripts/probe/](../scripts/probe/) — see [docs/decisions/0001-dual-sdr-architecture.md](../docs/decisions/0001-dual-sdr-architecture.md) for the four-pattern probe evidence). So:
+
+- **YWC main never opens an SDR directly.**
+- **`SdrManager`** (`Services/Sdr/SdrManager.cs`) spawns one `Yaesu_Sdr_Worker.exe` per configured device, connects to its localhost TCP port, reads FFT frames via `FrameReader`, and broadcasts them via SignalR with sdrId tagging.
+- **`Yaesu_Sdr_Worker`** (`Workers/Yaesu_Sdr_Worker/`) — separate `.exe` per SDR. Each holds exactly one device. File-links the device code from `Services/Sdr/` so one source of truth.
+- **`WorkerProcess`** — spawn/stop/locate the worker exe; picks free TCP port from 17001-17099; pipes worker stderr into the main Serilog stream.
+- **Wire protocol** — length-prefixed binary, big-endian. Three message types: `SpectrumFrame` (sequence + centreHz + spanHz + bins[]), `StatusUpdate` (string), `ErrorReport` (string). See `Workers/Yaesu_Sdr_Worker/WireProtocol.cs` (writer) and `Services/Sdr/FrameReader.cs` (reader).
+- **Build pipeline** — YWC's `.csproj` has a `<ProjectReference>` (no DLL link) so the worker builds first; `<None>` items with `CopyToOutputDirectory`/`CopyToPublishDirectory` land the worker exe alongside YWC's main exe. `installer.nsi` picks it up automatically via `File /r "publish\*"`.
+
+Device code (still in `Services/Sdr/` but linked into both projects):
 - `SdrplayDevice` — P/Invoke into `sdrplay_api.dll` (SDRplay API v3). Critical struct offsets verified against `C:\Program Files\SDRplay\API\inc\sdrplay_api_tuner.h`:
   - `tunerParams.bwType` @ offset 0
   - `tunerParams.gain.gRdB` @ offset 12 (`int`)
@@ -149,11 +167,13 @@ SignalR RadioStateUpdate
   → canvas
 ```
 
-### Spectrum Display
+### Spectrum Display (dual-VFO, v2.3.0+)
 
-`SdrSpectrumPipeline` creates its own SignalR connection. It registers handlers for `SpectrumUpdate`, `SdrStatus`, `SdrError`, `FrequencyA`, `FrequencyB`.
+`SdrSpectrumPipeline` creates its own SignalR connection. It maintains per-sdrId handler maps and dispatches `SpectrumUpdate` / `SdrStatus` / `SdrError` to whichever `SpectrumPanel` registered for that sdrId. Also handles `FrequencyA`, `FrequencyB`, `DxSpot`, `DxClusterStatus`, `DxAlert`.
 
-`SpectrumPanel` frequency axis uses `_vfoHz` (RF frequency in Hz from `FrequencyA` SignalR updates) to label the x-axis with actual RF frequencies. The initial value is server-rendered via `@Model.RadioState.FrequencyA`. If that value is below 100,000 Hz (indicating a stale/corrupt persisted state), the axis shows a "Waiting for VFO frequency…" placeholder until a live update arrives.
+`SpectrumPanel` is instance-able with a `vfo` parameter ("A" or "B") in the constructor. The vfo arg determines which `/api/cat/frequency/{a|b}` endpoint click-to-tune and wheel-tune use, and which `window.setMode('A'|'B', mode)` call follows a click. Each panel's frequency axis uses its own `_vfoHz` from the matching `FrequencyA`/`FrequencyB` SignalR updates.
+
+Index page lays out two card panels (`spectrumContainerA`, `spectrumContainerB`) with a Mono A / Mono B / Both toggle persisted in `localStorage.ywc.spectrumMode`. Outer container hides when neither VFO has an SDR; toggle hides when only one is configured.
 
 ### Razor Pages
 
@@ -170,4 +190,4 @@ SignalR RadioStateUpdate
 - **SDR default sample rate:** 2,048,000 Hz (2 MHz span). Spectrum centred on `SdrIfFrequencyHz` (default 9 MHz); axis labels show RF frequencies derived from VFO-A.
 - **S-meter raw values:** 0–255 → S0 to S9+60 dB via calibration tables.
 - **Meter poll rate:** ~10 Hz via `MeterPollingService`.
-- **SignalR heartbeat:** `SdrBackgroundService` re-broadcasts "streaming" every 30 frames (~3 s) so clients that load after startup receive current status.
+- **SignalR heartbeat:** `SdrManager` re-broadcasts each worker's "streaming" status every 30 frames (~3 s) so clients that load after startup receive the current per-VFO status.

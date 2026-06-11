@@ -82,32 +82,46 @@ export function calibrateSMeterLabel(raw) {
  *
  * The backend returns a dictionary keyed by meter name (e.g. 'S-Meter').
  * backendNameMap translates those names to the table keys used here.
+ * A backend entry can target MULTIPLE local tables — needed for S-meter
+ * specifically, where one backend table ('S-Meter') drives both the
+ * numeric gauge scale ('SMETER') and the snap-to-nearest label set
+ * ('SMETER_LABELS'). Without that, calibrating S-meter only updated the
+ * snap labels and left the gauge needle position on the hardcoded
+ * defaults — Jacek (SP3L) reported the symptom on #29.
  *
- * @param {Object} backendNameMap  e.g. { 'S-Meter': 'SMETER_LABELS' }
+ * @param {Object} backendNameMap  e.g. { 'S-Meter': ['SMETER', 'SMETER_LABELS'] }.
+ *                                 Value can be a string for single-target or
+ *                                 an array for multi-target.
+ * @returns {Promise<boolean>}     true on successful load, false on any failure
  */
 export async function loadFromBackend(backendNameMap = {}) {
     try {
         const response = await fetch('/api/calibration/all');
-        if (!response.ok) return;
+        if (!response.ok) return false;
         const data = await response.json();
         for (const [backendName, points] of Object.entries(data)) {
-            const key = backendNameMap[backendName] ?? backendName;
-            if (!(key in tables)) continue;
-            tables[key] = points.map(p => {
-                const rawVal = p.Raw ?? p.raw ?? 0;
-                // CalibrationPoint serialises the display value as "Radio" (a numeric string).
-                // Fall back through legacy field names before using raw as identity.
-                const radioStr = p.Radio ?? p.Value ?? p.value ?? p.Label ?? p.label;
-                const value = (radioStr !== undefined && radioStr !== null && radioStr !== '')
-                    ? Number(radioStr)
-                    : rawVal;
-                // Preserve the original string as a label when it can't be parsed as a number
-                // (e.g. S-meter points store 'S1', 'S7', '+20' as their Radio value).
-                const label = (radioStr != null && isNaN(Number(radioStr))) ? radioStr : undefined;
-                return { raw: rawVal, value: isNaN(value) ? rawVal : value, ...(label !== undefined && { label }) };
-            });
+            const mapped = backendNameMap[backendName] ?? backendName;
+            const targetKeys = Array.isArray(mapped) ? mapped : [mapped];
+            for (const key of targetKeys) {
+                if (!(key in tables)) continue;
+                tables[key] = points.map(p => {
+                    const rawVal = p.Raw ?? p.raw ?? 0;
+                    // CalibrationPoint serialises the display value as "Radio" (a numeric string).
+                    // Fall back through legacy field names before using raw as identity.
+                    const radioStr = p.Radio ?? p.Value ?? p.value ?? p.Label ?? p.label;
+                    const value = (radioStr !== undefined && radioStr !== null && radioStr !== '')
+                        ? Number(radioStr)
+                        : rawVal;
+                    // Preserve the original string as a label when it can't be parsed as a number
+                    // (e.g. S-meter points store 'S1', 'S7', '+20' as their Radio value).
+                    const label = (radioStr != null && isNaN(Number(radioStr))) ? radioStr : undefined;
+                    return { raw: rawVal, value: isNaN(value) ? rawVal : value, ...(label !== undefined && { label }) };
+                });
+            }
         }
+        return true;
     } catch (e) {
         console.warn('[CalibrationEngine] Backend load failed, using defaults:', e.message);
+        return false;
     }
 }

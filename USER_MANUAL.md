@@ -57,6 +57,11 @@
     - 14.2 [Common problems](#142-common-problems)
 15. [Frequently Asked Questions](#15-frequently-asked-questions)
     - 15.1 [WSJT-X has no TX audio in DATA modes](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode)
+    - 15.2 [My RSP1 shows serial 0000000001 — is it broken?](#152-my-rsp1-shows-serial-number-0000000001--is-it-broken)
+    - 15.3 [Why two SDRplay RSPs instead of one RSPduo?](#153-why-two-sdrplay-rsps-instead-of-one-rspduo)
+    - 15.4 [Why not use an RTL-SDR dongle?](#154-why-not-use-a-25-rtl-sdr-dongle-instead-of-an-rspplay)
+    - 15.5 [Why the 3-second delay when changing spectrum bandwidth?](#155-why-is-there-a-3-second-delay-when-i-change-the-spectrum-bandwidth)
+    - 15.6 [Can I use VSPE / OmniRig / com0com?](#156-can-i-use-vspe-omnirig-com0com-or-a-similar-virtual-com-port-sharer)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -415,9 +420,10 @@ All of these settings are read from the radio when the app connects.
 
 **Filter Function Display** — A compact real-time display positioned alongside the band buttons, between the band button column and the receiver controls column. It shows the shape of the active DSP filter passband, matching the style of the filter scope on the FTdx101MP front panel.
 
-- The **red-bordered trapezoid** represents the active passband. The sloped sides reflect the filter roll-off characteristic at the passband edges.
+- The **red-bordered trapezoid** represents the active **DSP filter passband** (the IF Width setting). The sloped sides reflect the filter roll-off characteristic at the passband edges.
 - **Green animated bars** inside the trapezoid represent signals passing through the filter. No signals are shown outside the passband, making it immediately clear which audio frequencies are being received.
-- **Passband width** reflects the current IF Width setting, automatically constrained by the selected Roofing Filter if it is narrower than the DSP setting.
+- A **"Roof Nk" label** in the top-right corner shows the currently selected roofing filter (e.g. "Roof 3k", "Roof 12k", "Roof 600"). This is useful because the DSP filter is the *active* limit when the roofing filter is wider than the DSP setting — in that case the trapezium looks identical for several roofing choices (12k and 3k both produce the same shape if the DSP filter is set to 3 kHz, since both roofing filters are at least as wide as 3 kHz). The label is the only way to see which roofing is actually in circuit when this happens.
+- **Passband width** reflects the current IF Width setting, automatically constrained by the selected Roofing Filter if it is narrower than the DSP setting. If the roofing filter is wider, the DSP filter is what you see.
 - **Passband position** shifts left or right as the IF Shift slider is adjusted — the display updates live while dragging the slider.
 - A **white downward arrow** appears on the top edge of the passband when the Contour filter is active, indicating the contour centre frequency. It moves as the contour frequency slider is adjusted.
 - The display updates automatically whenever any filter parameter changes, whether adjusted from the browser or from the radio's front panel.
@@ -736,6 +742,18 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 
 Access Settings from the navigation bar or by clicking the settings icon. Changes take effect only after clicking **Save Settings**.
 
+At the top of the page, the **Network Access URLs** card lists the addresses you can use to reach YWC from this PC and from other devices on the LAN; the **Current Configuration** card on the right shows a one-line summary of what YWC is using right now (radio model, serial port, baud rate, network interface, web port, SDR device). The web port shown here is whichever port YWC actually managed to bind — usually 8080 but possibly 8081–8089 if 8080 was already in use on your PC.
+
+![Top of the Settings page — Network Access URLs and Current Configuration cards](pictures/Settings_Network_Config.png)
+
+#### Changes that need a full app restart
+
+Most settings take effect the moment you click **Save Settings**. A few — radio model, network interface, and HTTP port — need a full YWC restart to apply cleanly because they affect how the app is bound to the operating system, or because they change what the server renders into the HTML of every open browser tab. When you change one of these, the Settings page shows a yellow **"Restart Yaesu Web Control to apply your changes"** banner above the rest of the page with a one-click **Restart Now** button:
+
+![Restart Required banner — appears above the rest of the page when a setting that needs a restart is changed; the Restart Now button stops and restarts YWC](pictures/Settings_Restart_Required.png)
+
+Clicking **Restart Now** stops YWC and (when running as the installed exe) automatically relaunches it. The browser briefly shows a "Yaesu Web Control has stopped" overlay during the restart; just reload the tab once YWC is back. When running from source via `dotnet run`, the auto-relaunch is skipped — you'll need to start `dotnet run` again manually.
+
 ### 6.1 Radio Connection
 
 | Setting | Description |
@@ -782,7 +800,9 @@ The spectrum display requires an SDR receiver. On the FTdx101MP, FTdx101D, and F
 >
 > **Always remember:** an antenna physically close to your TX antenna can still couple enough RF into the SDR to damage it, even if it's not directly connected. The further apart, the safer.
 >
-> YWC also displays this warning on the Settings page whenever you have an SDR configured, and a more prominent danger banner if your selected radio is an FTdx10 or FT-710 (since those users are obliged to connect to an antenna).
+> YWC also displays this warning on the Settings page whenever you have an SDR configured, and a more prominent danger banner if your selected radio is an FTdx10 or FT-710 (since those users are obliged to connect to an antenna):
+
+![SDR safety warnings on the Settings page when an FTdx10 is selected — the red banner appears only for FTdx10 and FT-710 (no IF tap); the yellow notice appears for all radios reminding the operator that the IF Frequency setting has no effect when connecting to an antenna](pictures/Settings_SDR_Warning.png)
 
 **Spectrum view depends on connection point:**
 - **IF output** (FTdx101 / FTDX3000) — VFO-centred panoramic view of the band you're tuned to, regardless of where on the band you tune. The IF Frequency setting tells YWC which IF the radio is using (9 MHz on FTdx101 series).
@@ -809,6 +829,90 @@ The spectrum panel appears on the main page when a device is saved. If you want 
 | IF Frequency | 9,000,000 Hz (FTdx101MP, FTdx101D, FTDX3000) — no effect on FTdx10 or FT-710 |
 | Sample Rate | 2,048,000 (2M) |
 | FFT Size | 1024 |
+
+#### Dual SDR — one per VFO *(v2.3.0 and later)*
+
+If you have two SDRs (typically two SDRplay RSPs) and a dual-receiver radio (FTdx101MP / FTdx101D), you can wire one SDR to the **IF OUT MAIN** RCA socket (VFO A) and the other to **IF OUT SUB** (VFO B). The Settings page then offers two device dropdowns — **VFO A SDR** and **VFO B SDR** — so YWC knows which physical device serves which VFO. Click **Scan** once; both dropdowns are populated from the same scan. Pick the SDR for each slot, save, and the main page will show two spectrum panels stacked vertically (one for each VFO).
+
+If you only have one SDR, set it in the **VFO A SDR** slot and leave **VFO B SDR** as *(none)*. The main page will show only the VFO A panel exactly as in single-SDR setups before v2.3.0.
+
+> **Note on SDRplay devices specifically:** the SDRplay API service only allows one device per host process. YWC works around this by launching a separate background process (`Yaesu_Sdr_Worker.exe`) for each SDR you configure — you'll see them in Task Manager when YWC is streaming. They start and stop automatically; no user action needed. See [docs/decisions/0001-dual-sdr-architecture.md](docs/decisions/0001-dual-sdr-architecture.md) on GitHub if you're curious about the why.
+
+When both VFOs have an SDR, the main control panel gains two small toggle groups above the spectrum panels:
+
+- **VFO A / VFO B / Both** — quickly hide one panel without changing settings.
+- **Stacked / Side by side** — choose whether the two panels stack vertically (taller, more vertical detail per panel) or sit side by side (each at half-width, both visible at once with less scrolling).
+
+Both choices are remembered across page reloads via your browser's local storage. Click the spectrum on panel A to tune **VFO A**; click panel B to tune **VFO B** — each panel addresses its own receiver.
+
+**Stacked layout** — each panel uses the full width of the page, with a deeper waterfall trail per VFO. Best for spotting weak signals or studying the noise floor on one band while keeping an eye on the other:
+
+![Stacked dual-spectrum layout — VFO A on top streaming live, VFO B below frozen with a HOLD banner in the top-left corner (Hold button yellow, status badge yellow 'Hold'). Holds are per-VFO so one panel can be frozen for study while the other keeps streaming.](pictures/Spectrum_Stacked.png)
+
+**Side-by-side layout** — both spectra share the page width 50/50, giving you both bands on screen at once without scrolling. Better for working two bands simultaneously (e.g. SSB on VFO A, FT8 on VFO B):
+
+![Side-by-side dual-spectrum layout — VFO A on the left streaming live, VFO B on the right frozen with a HOLD banner. Same independence as the stacked layout; only the geometry differs.](pictures/Spectrum_Side_By_Side.png)
+
+> **Both screenshots above show the Hold feature in action.** VFO A is streaming live with the green "Live" status badge; VFO B is frozen — its Hold button is filled yellow, its status badge says "Hold" in yellow, and a small `HOLD` banner sits in the top-left corner of the frozen canvas. Click the Hold button again to resume.
+
+#### Updating the band plan without a YWC release
+
+From v2.3.0 the band plan data (activity-centre markers like CW / FT8 / SSB, plus the red band-edge guard rails) lives in a JSON file alongside YWC's install folder:
+
+```
+<YWC install folder>\wwwroot\bandplan.default.json
+```
+
+If a regulator (RSGB, FCC, JARL, etc.) tweaks a band plan and the change is important to you, download an updated copy of `bandplan.default.json` from the YWC GitHub release page and drop it in over the existing file. Restart YWC and the new values take effect — no need to wait for a full app release. The hardcoded JS defaults shipped inside the app are used as a fallback in case the JSON file is missing or corrupt, so a botched edit can't permanently break anything; just delete the file and YWC reverts to the built-in defaults.
+
+#### Hold — freeze the spectrum at the current frame
+
+Each panel header has a **Hold** button. Click it to freeze that VFO's spectrum + waterfall at the last received frame. While held the panel ignores incoming SDR data, the header badge changes to a yellow **Hold** indicator, and a small `HOLD` banner appears in the top-left of the canvas. Click **Hold** again to resume live streaming.
+
+Useful for studying a fleeting signal without it scrolling off the waterfall, or grabbing a screenshot of a particular moment. Each panel holds independently — you can hold VFO A while VFO B keeps streaming.
+
+#### Persistent cursor — bookmark a frequency
+
+**Shift-click** anywhere on a spectrum panel to drop a persistent cyan cursor at that frequency. The cursor stays visible as you tune around with normal clicks, so you can mark a station you want to come back to. The frequency is shown in a small boxed label near the cursor.
+
+To remove the cursor, **Shift-click on or near it** (within ~10 pixels). Each panel has its own cursor — VFO A and VFO B can each be marking different frequencies.
+
+#### Independent span per VFO
+
+Each spectrum panel header has its own **62.5k / 125k / 250k / 500k / 1M / 2M** span buttons. Set VFO A to **2 MHz** for a wide overview of the calling band, and VFO B to **62.5 kHz** zoomed in on the QSO you're working — both at the same time, independently. Each click restarts only that VFO's worker (the other panel keeps its frame frozen for the brief reconnect window — see the bandwidth-change pause note below).
+
+The Settings page Sample Rate dropdown still exists but now acts as a "reset both VFOs to this default" control. Use it to set a starting point; use the per-panel buttons to diverge from there.
+
+#### Why two SDRs — and why two RSP1Bs rather than one RSPduo
+
+YWC's dual-SDR support is designed for two completely separate receivers — typically two SDRplay RSPs. If you have an FTdx101MP or FTdx101D, both the **MAIN** and **SUB** receivers have their own rear-panel IF OUT sockets — connect one SDR to each and YWC can show both VFOs at once.
+
+You might assume an SDRplay **RSPduo** (two tuners in one box) would be the natural pick. In practice the author runs two separate **RSP1Bs**, and recommends that for new YWC dual-SDR setups, for three reasons:
+
+1. **Bandwidth.** The RSPduo in dual-tuner mode is limited to roughly **2 MHz total** shared between its two tuners. Two separate RSP1Bs each give you the full chip bandwidth — currently we use 2 MHz spans per side, but the headroom is there if YWC adds wider spans later.
+2. **Cost.** Two RSP1Bs at typical retail prices are only marginally more expensive than one RSPduo.
+3. **Independence.** If one RSP misbehaves, YWC's worker for that side restarts independently. With an RSPduo a glitch can take both tuners out at once.
+
+If you already own an RSPduo, you can still use it — just set it as the VFO A SDR and leave the VFO B slot empty (the second tuner remains available for other software). The dual-tuner mode that lets one RSPduo serve both VFOs is not yet implemented.
+
+#### Why an SDRplay RSP, not a cheap RTL-SDR dongle?
+
+RTL-SDR dongles are supported via the SoapySDR driver path and will function — but for a serious HF-watching setup an RSPplay RSP is a significant step up:
+
+- **Bit depth.** RTL-SDR is 8-bit; RSPplay RSPs are 14-bit. That's about 36 dB more dynamic range — weak signals next to a strong neighbour are far easier to see.
+- **HF coverage.** Most RTL-SDR dongles need a separate upconverter to receive HF. RSPs cover 1 kHz to 2 GHz natively.
+- **Front-end filtering.** RSPs have selectable bandpass filters; dongles have essentially none. With a kilowatt-class transmitter on the next band, a dongle overloads long before an RSP does.
+- **Clock stability.** RSPs use a TCXO; cheap dongles drift visibly during warm-up — the spectrum centred on a 9 MHz IF will appear to slide sideways for the first ten minutes after power-on.
+
+The author's full bench testing has been against the SDRplay path. RTL-SDR users are welcome to experiment and report back.
+
+#### Why is there a brief pause when I change the span?
+
+When you click a different span button (e.g. 250k → 2M) the spectrum visibly freezes for about **three seconds** before resuming at the new bandwidth. The header badge says "Connecting…" during that window.
+
+The delay is **hardware**, not software. Changing the sample rate means YWC asks the SDR worker process to close the device, reopen it at the new rate, and restart streaming. The SDRplay API takes roughly a second to release a device cleanly and another second or so to reinitialise it. With two SDRs running, both restart at once.
+
+YWC keeps the previous spectrum frame visible during the pause rather than blanking out the canvas — the brief frozen image is intentional, not a glitch. It returns to live data as soon as the new sample rate is running.
 
 ---
 
@@ -875,6 +979,17 @@ set/filter ...            # whatever spot filters you prefer
 ```
 
 The app uses a generous parser that accepts spot lines from AR-Cluster, CC-Cluster, and DXSpider format servers. The cluster connection sends the configured callsign 1.5 seconds after the TCP socket opens — this handles servers whose login prompt has no newline (which would otherwise cause our reader to hang silently).
+
+**Test cluster connection** *(v2.2.2 and later)* — a yellow **Test cluster connection** button appears below the Post-login commands textarea. Click it and the app opens a TCP connection to the host/port/callsign you've typed into the form (**without** saving them first), sends your callsign, reads about ten seconds of output, then shows the full transcript in a popup so you can see exactly what the cluster said back. Use it to verify a new cluster before committing to it, to confirm a working cluster is still up after a network change, or to diagnose a connection problem.
+
+![Successful Test cluster connection against dxspider.co.uk:7300 — the modal shows the full login transcript including the cluster's welcome banner, and the button below has turned solid green with the "Cluster connection successful" label](pictures/Settings_Test_Cluster.png)
+
+Outcomes:
+
+- 🟢 **Green button + "Cluster connection successful"** — the cluster accepted the connection and sent data. Safe to Save Settings.
+- 🟡 **Yellow button stays, red error in the popup** — connection failed. The popup's status line explains why: *host unreachable* (DNS or firewall), *connection refused* (host alive but nothing on that port), or *connected but no data within 10 seconds* (port answered but isn't speaking the cluster protocol — probably wrong port).
+
+The button resets to yellow on every click, so retesting after editing the host gives a fresh visual cue rather than carrying over a stale result.
 
 **Status badge on the spectrum panel** — top-right corner of the spectrum canvas shows the live cluster connection state:
 
@@ -1446,6 +1561,10 @@ The gauge interpolates between points to produce smooth readings.
 
 Calibration is saved to `%APPDATA%\MM5AGM\Yaesu Web Control\calibration.user.json`.
 
+**Per-model defaults (v2.3.0 and later):** YWC now ships separate default calibration tables for each supported radio (`calibration.default.FTdx101MP.json`, `…FTdx10.json`, etc.) in the installation folder. On first launch your `calibration.user.json` is created by copying the default for whichever radio you have configured. As of v2.3.0 the only model with measured calibration data is the FTdx101MP; the other models ship with placeholder copies of that table. If you calibrate your own radio (especially S-Meter) and would like to help, please share your `calibration.user.json` on [Discussion #30](https://github.com/mm5agm/Yaesu_Web_Control/discussions/30) — submissions are averaged and shipped as proper per-model defaults in future releases.
+
+> **Changing radio model later:** if you switch to a different radio in Settings, your existing calibration is **not** automatically reset to the new model's defaults — your custom values stay in place. If you want a fresh start tuned for the new radio, open the **Meter Calibration** page and click the **Reset to Defaults** button. It rebuilds your calibration from the shipped defaults for whichever radio you currently have configured.
+
 ---
 
 ## 11. Diagnostics
@@ -1529,7 +1648,7 @@ The fastest way to get a bug fixed is a good report. YWC has three features that
 
 That gives the developer everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
 
-![The About page — Diagnostics block plus the Copy diagnostics and Report a bug on GitHub buttons](pictures/AboutPage.png)
+![The About page — version + release date at top, Resources section, Diagnostics block with the user's environment summary, and the Copy diagnostics + Report a bug buttons that send everything straight into a GitHub bug-report form](pictures/AboutPage.png)
 
 **2. Report a bug on GitHub button** *(recommended)*. Right below the Diagnostics block. Clicking it opens a pre-filled bug-report form on GitHub in a new browser tab. The new tab takes a second or two to load while it negotiates with GitHub — be patient, don't keep clicking. Once it lands you'll see the form with the Diagnostics section already populated; you only need to type a description of what went wrong and, ideally, the steps to reproduce. Submit when ready.
 
@@ -1639,6 +1758,69 @@ For ordinary single-SDR use, this doesn't matter — YWC opens the only SDR plug
 - **Two of the same model**, both with the placeholder serial — this would still collide. The fix is to program a real serial into at least one device. If SDRplay's Serial Number Update Utility isn't on their downloads page, ask their support: it's a small Windows tool that writes a serial of your choice into the device's flash.
 
 YWC migrates settings from the v2.2.x key format (`sdrplay:<serial>` only) to the new format (`sdrplay:hw<N>-<serial>`) automatically the first time you save Settings on v2.3.0 or later. No user action required.
+
+---
+
+### 15.3 Why two SDRplay RSPs instead of one RSPduo?
+
+The dual-SDR support in YWC (v2.3.0+) is designed for two completely separate receivers — typically two SDRplay RSPs, one wired to each of the FTdx101MP/D's IF OUT sockets. You might assume an **RSPduo** (two tuners in one box) would be the natural pick. Three reasons it isn't:
+
+1. **Bandwidth.** A single **RSP1B** can sample up to **10 MHz** of spectrum at once — wide enough to display the full 9 MHz IF in one shot if you wanted to. An RSPduo in dual-tuner mode is limited to roughly **2 MHz total shared** between its two tuners, so each side gets ~1 MHz at best.
+2. **Cost.** At UK retail prices (mid-2026): RSPduo around **£240**, RSP1B around **£125**. Two RSP1Bs come in at roughly the same total cost as one RSPduo, with double the bandwidth and full independence.
+3. **The author's own setup is "I had an old RSP1 sitting unused".** Adding a second SDR meant buying just one new RSP1B (£125) rather than a £240 RSPduo. That happens to be a common situation for hams who've upgraded their SDRplay receivers over the years — chances are there's an RSP1 or RSP2 in a drawer that can serve VFO B perfectly well.
+
+If you already own an RSPduo it will still work — set it as the VFO A SDR and leave VFO B as *(none)*. The dual-tuner mode that lets one RSPduo serve both VFOs is not yet implemented.
+
+---
+
+### 15.4 Why not use a £25 RTL-SDR dongle instead of an RSPplay?
+
+RTL-SDR dongles are supported via SoapySDR and will function — but for a serious HF setup, an SDRplay RSP1B is a significant step up:
+
+- **Bit depth:** RTL-SDR is 8-bit; SDRplay RSPs are 14-bit. That's roughly 36 dB more dynamic range — weak signals next to a strong neighbour are far easier to see.
+- **HF coverage:** Most RTL-SDR dongles need a separate upconverter to receive HF. RSPs cover 1 kHz to 2 GHz natively.
+- **Front-end filtering:** RSPs have selectable bandpass filters; dongles have essentially none. With a kilowatt-class transmitter on the next band, a dongle will overload long before an RSP does.
+- **Clock stability:** RSPs use a TCXO. Cheap dongles drift visibly during warm-up — a spectrum centred on the 9 MHz IF will appear to slide sideways for the first ten minutes after power-on.
+
+For casual VHF/UHF listening an RTL-SDR is fine. For a permanent HF-band-monitoring setup the RSP is the better tool.
+
+---
+
+### 15.5 Why is there a 3-second delay when I change the spectrum bandwidth?
+
+When you click a different span button (e.g. 250k → 2M) the spectrum visibly freezes for about **three seconds** before resuming at the new bandwidth. YWC keeps the previous frame visible during the pause rather than blanking out — the frozen image is intentional, not a glitch.
+
+The delay is **hardware**, not software:
+
+1. YWC sends the new sample-rate request to the SDR's dedicated worker process.
+2. The worker calls **sdrplay_api_Uninit** to release the current device configuration — typically ~500 ms to 1 s.
+3. The worker then calls **sdrplay_api_Init** with the new sample rate — another ~500 ms to 1 s while the SDRplay API service reconfigures the hardware.
+4. Streaming resumes; the frontend's next frame replaces the frozen one.
+
+With two SDRs running in dual-SDR mode, both go through the cycle simultaneously when you change the shared sample rate. Per-VFO bandwidth changes only restart the one worker that changed.
+
+This is normal SDRplay API behaviour, not specific to YWC. The first time you see it you'll blink; from the second time on it's just how RSPs reconfigure.
+
+---
+
+### 15.6 Can I use VSPE, OmniRig, com0com or a similar virtual COM port sharer?
+
+Short answer: **not reliably, and we'd suggest avoiding it**. YWC's CAT layer talks directly to the radio over a regular Windows COM port. Virtual-port sharers sit between YWC and the real port, and even when they're configured correctly they introduce timing and forwarding behaviours that YWC isn't currently tested against.
+
+Symptoms when there's a port sharer in the chain:
+
+- **"Test Connection" fails** with a "COM port opened but the radio did not respond to a CAT probe" error (YWC v2.3.0+ catches this case explicitly).
+- Or worse — the port opens, YWC reports connected, but the frequency/mode displays never follow the radio's actual state. CAT chatter is being swallowed somewhere between YWC and the radio.
+
+Why this happens in practice:
+
+- **VSPE** (Virtual Serial Port Emulator) doesn't always forward client-side port settings (baud rate, parity) through to the underlying physical port. If another app set up the chain at a different baud rate previously, YWC's 38400 setting is applied at the virtual layer only and the physical port stays at whatever rate it was last given. The radio hears garbled bytes and silently drops them.
+- **OmniRig** is designed as a CAT *abstraction* layer for multiple apps to share a radio. Apps that want OmniRig support are expected to use OmniRig's COM-server interface, not pretend to talk to a generic virtual COM port underneath. YWC speaks raw CAT, not OmniRig.
+- **com0com** creates virtual port pairs but doesn't talk to physical ports on its own — you need a separate bridge program (like hub4com) to connect the virtual pair to a real COM port. The chain is easy to misconfigure.
+
+**Recommended setup:** plug your radio's USB-CAT cable in, see what COM port Windows assigns (Device Manager → Ports), set that COM port directly in YWC Settings. If you also want WSJT-X, JTAlert, Log4OM, etc. to control the same radio, point them at YWC's rigctld interface on **localhost:4532** rather than letting them open the COM port themselves. YWC then acts as the single owner of the radio's COM port and serves CAT to every other app over the network.
+
+If you must use a virtual port sharer (e.g. you've already built a working setup around one), the easiest test is to point YWC at the real physical COM port directly while everything else stays on the sharer's virtual ports — and only re-add the sharer to YWC's path if a specific need forces it.
 
 ---
 

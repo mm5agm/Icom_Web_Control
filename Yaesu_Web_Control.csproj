@@ -30,6 +30,19 @@
     <Content Remove="BenchmarkSuite1\**" />
     <EmbeddedResource Remove="BenchmarkSuite1\**" />
     <None Remove="BenchmarkSuite1\**" />
+    <!-- Workers/ is its own .csproj subtree (separate exe per SDR for the
+         dual-SDR architecture — see docs/decisions/0001-dual-sdr-architecture.md).
+         Exclude it from this project's compilation so main YWC doesn't try to
+         absorb the worker's Program.cs and double-define AssemblyInfo. -->
+    <Compile Remove="Workers\**" />
+    <Content Remove="Workers\**" />
+    <EmbeddedResource Remove="Workers\**" />
+    <None Remove="Workers\**" />
+    <!-- scripts/probe/ is also its own .csproj (the SDRplay probe) -->
+    <Compile Remove="scripts\probe\**" />
+    <Content Remove="scripts\probe\**" />
+    <EmbeddedResource Remove="scripts\probe\**" />
+    <None Remove="scripts\probe\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -57,6 +70,51 @@
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="System.IO.Ports" Version="10.0.1" />
+  </ItemGroup>
+
+  <!--
+    Yaesu_Sdr_Worker is a separate-process companion (see
+    docs/decisions/0001-dual-sdr-architecture.md). YWC main spawns it at
+    runtime to hold each SDR. ReferenceOutputAssembly=false because the
+    worker is an .exe, not a library — we don't want to link against it,
+    we just want MSBuild to build it before us and the post-build copy
+    target below to land its output next to YWC's exe.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="Workers\Yaesu_Sdr_Worker\Yaesu_Sdr_Worker.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Make the worker's build output participate in YWC's standard
+       output + publish copy. CopyToOutputDirectory lands it in bin/
+       for `dotnet run`; CopyToPublishDirectory lands it in publish/
+       for `dotnet publish` (used by installer.nsi). The worker's
+       ProjectReference above guarantees these files exist by the
+       time YWC's copy runs. -->
+  <ItemGroup>
+    <None Include="Workers\Yaesu_Sdr_Worker\bin\$(Configuration)\net10.0-windows\Yaesu_Sdr_Worker.exe" Visible="false">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>Yaesu_Sdr_Worker.exe</Link>
+    </None>
+    <None Include="Workers\Yaesu_Sdr_Worker\bin\$(Configuration)\net10.0-windows\Yaesu_Sdr_Worker.dll" Visible="false">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>Yaesu_Sdr_Worker.dll</Link>
+    </None>
+    <None Include="Workers\Yaesu_Sdr_Worker\bin\$(Configuration)\net10.0-windows\Yaesu_Sdr_Worker.deps.json" Visible="false">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>Yaesu_Sdr_Worker.deps.json</Link>
+    </None>
+    <None Include="Workers\Yaesu_Sdr_Worker\bin\$(Configuration)\net10.0-windows\Yaesu_Sdr_Worker.runtimeconfig.json" Visible="false">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>Yaesu_Sdr_Worker.runtimeconfig.json</Link>
+    </None>
   </ItemGroup>
 
   <PropertyGroup>

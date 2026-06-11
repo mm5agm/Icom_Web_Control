@@ -141,8 +141,11 @@ FTdx101 WebApp_Setup.exe
 FTdx101_WebApp_Setup_*.exe
 Yaesu_Web_Control_Setup*.exe
 
-# Local reference documents — not committed to repo
-docs/
+# Local reference documents — not committed to repo (Yaesu manual PDFs etc.)
+docs/*
+# …but architecture decision records ARE part of the repo
+!docs/decisions/
+!docs/decisions/**
 
 # Runtime logs
 *.log

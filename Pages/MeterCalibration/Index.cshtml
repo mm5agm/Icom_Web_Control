@@ -11,6 +11,7 @@
         <div class="header-actions">
             <button id="saveAllBtn" class="btn-save">Save Calibration</button>
             <button id="resetViewBtn" class="btn-secondary">Reload From File</button>
+            <button id="resetDefaultsBtn" class="btn-secondary" title="Discard your customisations and reload the calibration shipped with YWC for your radio model">Reset to Defaults</button>
             <button id="txBtn" class="btn-tx">TX</button>
             <button id="helpBtn" class="btn-help">? Help</button>
             <button type="button" onclick="window.open(window.location.origin + '/Diagnostics', 'diagnostics', 'width=1400,height=900,resizable=yes')" class="btn-help">Diagnostics</button>
@@ -331,6 +332,32 @@
 
         document.getElementById("saveAllBtn").addEventListener("click", () => saveCalibration());
         document.getElementById("resetViewBtn").addEventListener("click", loadCalibration);
+        document.getElementById("resetDefaultsBtn").addEventListener("click", async () => {
+            // Confirm because this discards user customisations.
+            const ok = confirm(
+                "Reset calibration to the defaults shipped with YWC for your radio?\n\n" +
+                "Any meter values you've adjusted yourself will be discarded.\n" +
+                "Use this after switching to a different radio model in Settings, " +
+                "or to start a fresh calibration from the shipped defaults."
+            );
+            if (!ok) return;
+            try {
+                const res = await fetch('/api/calibration/reset', { method: 'POST' });
+                if (!res.ok) {
+                    alert('Reset failed: ' + res.status);
+                    return;
+                }
+                // Reload the page-side state from the freshly-reset file.
+                await loadCalibration();
+                const status = document.getElementById('saveStatus');
+                if (status) {
+                    status.textContent = 'Reset to shipped defaults for this radio';
+                    setTimeout(() => { status.textContent = ''; }, 4000);
+                }
+            } catch (e) {
+                alert('Reset failed: ' + e.message);
+            }
+        });
 
         // Help modal
         const helpModal = document.getElementById("helpModal");

@@ -857,6 +857,18 @@ connection.on("RadioStateUpdate", function (update) {
         return;
     }
 
+    // --- CALIBRATION UPDATED ---
+    // Server broadcasts this when CalibrationService.Save runs (i.e. someone
+    // hit Save Calibration on the Meter Calibration page). All open browser
+    // tabs reload their in-memory calibration tables so the meters reflect
+    // the new values immediately without a full page reload.
+    // Fixes Jacek's #29 follow-up where saved calibration was being ignored
+    // until the user pressed F5.
+    if (update.property === "CalibrationUpdated") {
+        try { window.calibrationEngine?.reload?.(); } catch (e) { /* best-effort */ }
+        return;
+    }
+
     // --- CONNECTION STATE ---
     if (update.property === "IsConnected") {
         const connected = update.value === true || update.value === 'true';

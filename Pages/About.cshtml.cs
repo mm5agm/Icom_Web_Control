@@ -37,8 +37,14 @@ namespace Yaesu_Web_Control.Pages
             BaudRate    = s.BaudRate;
             IsConnected = _radioStateService.IsConnected;
 
-            if (!string.IsNullOrWhiteSpace(s.SdrDeviceKey))
-                SdrDevice = s.SdrDeviceKey;
+            // Diagnostics shows whichever SDR(s) are configured. Two VFOs as
+            // of v2.3.0; bug reports from users with one configured still show
+            // the right device.
+            var sdrKeys = new List<string>();
+            if (!string.IsNullOrWhiteSpace(s.SdrDeviceKeyA)) sdrKeys.Add($"A: {s.SdrDeviceKeyA}");
+            if (!string.IsNullOrWhiteSpace(s.SdrDeviceKeyB)) sdrKeys.Add($"B: {s.SdrDeviceKeyB}");
+            if (sdrKeys.Count > 0)
+                SdrDevice = string.Join("   ", sdrKeys);
             if (s.DxClusterEnabled && !string.IsNullOrWhiteSpace(s.DxClusterHost))
                 DxClusterHost = $"{s.DxClusterHost}:{s.DxClusterPort}";
             if (!string.IsNullOrWhiteSpace(s.DxClusterLoginCallsign))
