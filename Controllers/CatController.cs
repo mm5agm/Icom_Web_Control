@@ -1759,9 +1759,20 @@ namespace Yaesu_Web_Control.Controllers
                     _logger.LogWarning(probeEx, "Test Connection: ID; probe threw");
                 }
 
+                // Probe must start with 'ID' and include at least the 4-character
+                // radio-identifier code (e.g. 'ID0682' for FTdx101MP, 'ID0570'
+                // for FTdx101D, etc). We do NOT require a trailing semicolon —
+                // the multiplexer strips the CAT terminator as part of response
+                // parsing, so what we see here is e.g. 'ID0682' even though the
+                // wire response was 'ID0682;'. v2.3.3/v2.3.4 had a Contains(';')
+                // check that always failed against the multiplexer's parsed
+                // output — producing the false-negative "Radio did not respond"
+                // even when CAT was working perfectly. Reported by Colin via
+                // the log at 18:16, after the v2.3.4 crash fix landed but the
+                // probe still reported failure.
                 bool probeOk = !string.IsNullOrEmpty(probe)
                     && probe.StartsWith("ID", StringComparison.Ordinal)
-                    && probe.Contains(';');
+                    && probe.Length >= 6;
                 if (!probeOk)
                 {
                     _logger.LogWarning(
@@ -1777,8 +1788,9 @@ namespace Yaesu_Web_Control.Controllers
                     });
                 }
 
+                var idCode = probe!.StartsWith("ID", StringComparison.Ordinal) ? probe.Substring(2).TrimEnd(';') : probe;
                 _logger.LogInformation("Test Connection: probe OK — radio replied '{Probe}'", probe);
-                return Ok(new { success = true, message = $"Radio responded ({probe!.TrimEnd(';')})" });
+                return Ok(new { success = true, message = $"Connection succeeded — radio ID {idCode}" });
             }
             catch (Exception ex)
             {
