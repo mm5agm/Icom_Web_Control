@@ -1711,10 +1711,49 @@ namespace Yaesu_Web_Control.Controllers
                 _logger.LogInformation("Manual re-initialization requested from Settings page");
                 await _radioInitService.InitializeRadioAsync();
 
-                // Update status to complete so Index page polling sees it
-                AppStatus.InitializationStatus = "complete";
+                // Verify the radio is actually responding — not just that the COM
+                // port opened. Send the standard Yaesu identification probe ID;
+                // and require a parseable reply that starts with 'ID' and includes
+                // a semicolon (e.g. 'ID0570;' from an FTdx101MP).
+                //
+                // Without this check the Test Connection button reported success
+                // whenever SerialPort.Open() succeeded, even when the radio was
+                // not actually responding to CAT (Juergen / WB4EM, Disc #14:
+                // a virtual-port-sharer in the chain swallowed the chatter but
+                // Open() still succeeded, so the user was falsely reassured).
+                string? probe = null;
+                try
+                {
+                    probe = await _catClient.SendCommandAsync("ID;", "TestConnection", CancellationToken.None, timeoutMs: 1000);
+                }
+                catch (Exception probeEx)
+                {
+                    _logger.LogWarning(probeEx, "Test Connection: ID; probe threw");
+                }
 
-                return Ok(new { success = true, message = "Radio connected successfully" });
+                bool probeOk = !string.IsNullOrEmpty(probe)
+                    && probe.StartsWith("ID", StringComparison.Ordinal)
+                    && probe.Contains(';');
+                if (!probeOk)
+                {
+                    AppStatus.InitializationStatus = "error";
+                    _logger.LogWarning(
+                        "Test Connection: port opened but radio did not respond to ID; probe. " +
+                        "Reply='{Probe}' (null/empty/garbled means CAT is not actually reaching the radio).",
+                        probe ?? "(null)");
+                    return Ok(new
+                    {
+                        success = false,
+                        message = "COM port opened but the radio did not respond to a CAT probe. " +
+                                  "Check the radio is powered on, CAT is enabled in the radio's menu, " +
+                                  "and the COM port is connected directly to the radio (not via a " +
+                                  "virtual-port sharer like VSPE, OmniRig or com0com).",
+                    });
+                }
+
+                AppStatus.InitializationStatus = "complete";
+                _logger.LogInformation("Test Connection: probe OK — radio replied '{Probe}'", probe);
+                return Ok(new { success = true, message = $"Radio responded ({probe!.TrimEnd(';')})" });
             }
             catch (Exception ex)
             {
