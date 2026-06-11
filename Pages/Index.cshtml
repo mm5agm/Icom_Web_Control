@@ -438,6 +438,7 @@
                         <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO A</span>
                         <div class="d-flex align-items-center gap-2">
                             <div class="btn-group btn-group-sm" role="group" aria-label="VFO A spectrum span">
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 125_000 ? "active" : "")" data-hz="125000" data-vfo="A" data-a11y-key="spectrum.spanA125k" aria-label="VFO A span 125 kHz" title="VFO A span 125 kHz — best for narrow bands like 30m / 60m">125k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 250_000 ? "active" : "")" data-hz="250000" data-vfo="A" data-a11y-key="spectrum.spanA250k" aria-label="VFO A span 250 kHz" title="VFO A span 250 kHz">250k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 500_000 ? "active" : "")" data-hz="500000" data-vfo="A" data-a11y-key="spectrum.spanA500k" aria-label="VFO A span 500 kHz" title="VFO A span 500 kHz">500k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span 1 MHz" title="VFO A span 1 MHz">1M</button>
@@ -459,6 +460,7 @@
                         <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO B</span>
                         <div class="d-flex align-items-center gap-2">
                             <div class="btn-group btn-group-sm" role="group" aria-label="VFO B spectrum span">
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 125_000 ? "active" : "")" data-hz="125000" data-vfo="B" data-a11y-key="spectrum.spanB125k" aria-label="VFO B span 125 kHz" title="VFO B span 125 kHz — best for narrow bands like 30m / 60m">125k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 250_000 ? "active" : "")" data-hz="250000" data-vfo="B" data-a11y-key="spectrum.spanB250k" aria-label="VFO B span 250 kHz" title="VFO B span 250 kHz">250k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 500_000 ? "active" : "")" data-hz="500000" data-vfo="B" data-a11y-key="spectrum.spanB500k" aria-label="VFO B span 500 kHz" title="VFO B span 500 kHz">500k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span 1 MHz" title="VFO B span 1 MHz">1M</button>
