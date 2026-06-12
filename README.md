@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.5-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.6-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -136,6 +136,78 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 ---
 
 ## Release Notes
+
+## 2026-06-12 - v2.3.6
+
+Two reporter-driven bug fixes plus a significant calibration improvement.
+Recommended update for everyone running v2.3.5.
+
+### Bug fixes
+
+- **YWC no longer changes the radio's frequency on startup or tab
+  navigation.** Reported by Jacek SP3L (#33), reproduced on Colin's
+  FTdx101MP. On every Index-page load, YWC was auto-tuning the radio
+  to the last-clicked band segment for each VFO (e.g. snapping to the
+  saved FT8 frequency on 20m even if you'd just manually tuned the rig
+  somewhere else). The auto-tune call has been removed; the segment
+  dropdown still restores its visual value, but YWC no longer pushes a
+  frequency back to the radio. The rig's current frequency is the
+  source of truth.
+
+- **S-meter calibration now correctly drives the gauge needle.**
+  Reported by Jacek SP3L (#29), reproduced and traced on Colin's
+  FTdx101MP. The v2.3.3 fix wired the SignalR refresh and the
+  numeric-table loader, but two further bugs prevented the needle from
+  moving correctly:
+
+  1. **Label-to-number translation was missing.** S-meter calibration
+     files store labels as strings ("S0", "S1", "+10", "+60"). The
+     loader was falling back to identity (raw ADC value) for those,
+     so the gauge needle ended up on a raw 0-255 scale instead of
+     the calibrated S-unit 0-60 scale.
+  2. **Static gauge tick positions didn't match the visual labels.**
+     The gauge labels are drawn at *evenly-spaced* angles on the
+     dial, but our needle-position mapping assumed they sat at the
+     numeric `majorTicks` values. Calibrating raw→S5 put the needle
+     at a position that visually corresponded to S3 — exactly Jacek's
+     "2 S-units low" complaint.
+
+  Both fixed. Calibration changes now reach the gauge needle live via
+  SignalR push, and the needle points at the correct S-unit label.
+
+### Other fixes
+
+- **`0+60` typo** in the last S-Meter entry of all 6 shipped
+  calibration default files corrected to `+60`. Colin noticed this
+  while bench-testing #29.
+
+- **Dev-mode no longer corrupts the shipped calibration files.**
+  When running from source (`dotnet run`), the calibration Save
+  endpoint was writing to `wwwroot/calibration.default.<model>.json`
+  instead of the user's APPDATA file. That meant a developer doing
+  routine calibration testing would silently overwrite the shipped
+  defaults committed to the repo. Now both dev and release builds
+  always write to the user's APPDATA file.
+
+### Documentation
+
+- **USER_MANUAL §10 expanded** with a proper step-by-step calibration
+  procedure:
+  - §10.1 S-Meter calibration walkthrough — emphasises the
+    [RF/SQL] knob must be in "RF" mode (not SQL), uses the **lower**
+    of the two FTdx101MP front-panel knobs (MAIN AF / RF-SQL), and
+    describes the dummy-load + RF-gain-walk technique that needs no
+    extra test equipment.
+  - §10.2 Power meter calibration via known TX power levels.
+  - §10.3 Brief notes for ALC / SWR / Compression / IDD / VPA / TPA.
+
+  The S-Meter writeup was prompted by Colin discovering the on-rig
+  meter behaviour during calibration: the S-meter is displayed
+  automatically during receive on the FTdx101MP/D, and is NOT
+  selectable from the touchscreen meter chooser (which is for
+  TX-time meters only).
+
+---
 
 ## 2026-06-11 - v2.3.5
 

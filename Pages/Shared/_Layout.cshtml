@@ -18,11 +18,11 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
 
     <!-- Calibration engine — exposes window.calibrationEngine for site.js -->
-    <!-- v=12: bump this when calibration-engine.js or calibration-tables.js changes -->
+    <!-- v=15: bump this when calibration-engine.js or calibration-tables.js changes -->
     <script type="module">
-        import { calibrateNumeric, calibrateSMeterLabel, loadFromBackend } from '/js/calibration/calibration-engine.js?v=12';
+        import { calibrateNumeric, calibrateSMeterLabel, calibrateSMeterForGauge, loadFromBackend } from '/js/calibration/calibration-engine.js?v=15';
         // Expose immediately with default tables so site.js never gets undefined.
-        window.calibrationEngine = { calibrateNumeric, calibrateSMeterLabel };
+        window.calibrationEngine = { calibrateNumeric, calibrateSMeterLabel, calibrateSMeterForGauge };
         // S-Meter calibration drives BOTH the gauge needle position (SMETER
         // table) AND the snap-to-nearest label ("S7", "+20") (SMETER_LABELS).
         // Without targeting both, calibrating the S-meter only fixed the
