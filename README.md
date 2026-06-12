@@ -135,6 +135,16 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 
 ---
 
+## Project direction
+
+Active development is currently focused on bug fixes and polish for the supported radios. The next significant new direction is **voice control via Amazon Alexa**, primarily as an accessibility tool for partially sighted and blind operators — hands-free band changes, frequency entry, and mode switching without needing to see the screen. That work lives on the `feature/alexa-voice-control` branch and won't disturb the main release line until it's ready to ship. See [VOICE_CONTROL.md](VOICE_CONTROL.md) for setup details and an honest assessment of what it takes to run.
+
+### Which radios get tested?
+
+YWC supports the FTdx101MP, FTdx101D, FTdx10, FT-710, and FTDX3000. The developer owns and tests on the FTdx101MP; support for the other four models is implemented against the published CAT documentation and refined when users on those models report. **If you use one of the other four models, please consider dropping a one-liner on the [Discussions tab](https://github.com/mm5agm/Yaesu_Web_Control/discussions)** — even just "works fine on my FT-710" is useful. It tells the developer which models have actual users behind them and where to focus calibration improvements.
+
+---
+
 ## Release Notes
 
 ## 2026-06-12 - v2.3.6
