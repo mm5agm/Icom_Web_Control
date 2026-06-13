@@ -6,6 +6,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Yaesu_Web_Control.Hubs;
+using Yaesu_Web_Control.Models;
 using System.Diagnostics; // Place at the top of the file if not already present
 
 namespace Yaesu_Web_Control.Services
@@ -344,6 +345,50 @@ namespace Yaesu_Web_Control.Services
                 radioStateService.SetBand("A", bandA);
                 radioStateService.SetBand("B", bandB);
                 logger.LogInformation("[RadioInitializationService] Bands set: A={BandA}, B={BandB}", bandA, bandB);
+
+                // Backfill per-band antenna profiles when empty. Older
+                // appsettings.user.json files have BandProfile entries that
+                // pre-date the per-band antenna feature (Antenna="" by default)
+                // — without this, users would see Antenna fields stay empty
+                // until they manually clicked an antenna button on each band.
+                // We only fill if Antenna is empty, never overwriting an
+                // existing valid selection.
+                try
+                {
+                    var profilesChanged = false;
+                    if (!string.IsNullOrEmpty(bandA) && !string.IsNullOrEmpty(radioStateService.AntennaA))
+                    {
+                        if (!settings.BandProfilesA.TryGetValue(bandA, out var profA))
+                            profA = new BandProfile();
+                        if (string.IsNullOrEmpty(profA.Antenna))
+                        {
+                            profA.Antenna = radioStateService.AntennaA!;
+                            settings.BandProfilesA[bandA] = profA;
+                            profilesChanged = true;
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(bandB) && !string.IsNullOrEmpty(radioStateService.AntennaB))
+                    {
+                        if (!settings.BandProfilesB.TryGetValue(bandB, out var profB))
+                            profB = new BandProfile();
+                        if (string.IsNullOrEmpty(profB.Antenna))
+                        {
+                            profB.Antenna = radioStateService.AntennaB!;
+                            settings.BandProfilesB[bandB] = profB;
+                            profilesChanged = true;
+                        }
+                    }
+                    if (profilesChanged)
+                    {
+                        await settingsService.SaveSettingsAsync(settings);
+                        logger.LogInformation("[RadioInitializationService] Backfilled empty Antenna fields for current bands (A={BandA}/Ant{AntA}, B={BandB}/Ant{AntB})",
+                            bandA, radioStateService.AntennaA, bandB, radioStateService.AntennaB);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "[RadioInitializationService] Per-band antenna backfill failed (non-fatal)");
+                }
 
                 // 6. Enable auto information
                 await multiplexer.EnableAutoInformationAsync();

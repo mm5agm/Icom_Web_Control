@@ -424,7 +424,8 @@ namespace Yaesu_Web_Control.Controllers
                     {
                         IfWidthCode = _radioStateService.IfWidthA,
                         IfShiftHz   = _radioStateService.IfShiftA,
-                        Mode        = _radioStateService.ModeA ?? ""
+                        Mode        = _radioStateService.ModeA ?? "",
+                        Antenna     = _radioStateService.AntennaA ?? ""
                     };
                     await _settingsService.SaveSettingsAsync(settings);
                 }
@@ -451,6 +452,11 @@ namespace Yaesu_Web_Control.Controllers
                     {
                         await _catClient.SendCommandAsync(CatCommands.FormatMode(profile.Mode, false), "WebUI", CancellationToken.None);
                         _radioStateService.ModeA = profile.Mode;
+                    }
+                    if (!string.IsNullOrEmpty(profile.Antenna))
+                    {
+                        await _catClient.SendCommandAsync($"AN0{profile.Antenna};", "WebUI", CancellationToken.None);
+                        _radioStateService.AntennaA = profile.Antenna;
                     }
                 }
 
@@ -492,7 +498,8 @@ namespace Yaesu_Web_Control.Controllers
                     {
                         IfWidthCode = _radioStateService.IfWidthB,
                         IfShiftHz   = _radioStateService.IfShiftB,
-                        Mode        = _radioStateService.ModeB ?? ""
+                        Mode        = _radioStateService.ModeB ?? "",
+                        Antenna     = _radioStateService.AntennaB ?? ""
                     };
                     await _settingsService.SaveSettingsAsync(settings);
                 }
@@ -519,6 +526,11 @@ namespace Yaesu_Web_Control.Controllers
                     {
                         await _catClient.SendCommandAsync(CatCommands.FormatMode(profile.Mode, true), "WebUI", CancellationToken.None);
                         _radioStateService.ModeB = profile.Mode;
+                    }
+                    if (!string.IsNullOrEmpty(profile.Antenna))
+                    {
+                        await _catClient.SendCommandAsync($"AN1{profile.Antenna};", "WebUI", CancellationToken.None);
+                        _radioStateService.AntennaB = profile.Antenna;
                     }
                 }
 
@@ -552,6 +564,21 @@ namespace Yaesu_Web_Control.Controllers
 
                 _radioStateService.AntennaA = request.Antenna;
 
+                // Persist immediately into the current band's profile.
+                // Without this, the antenna selection only lands in
+                // settings.BandProfilesA when the user switches AWAY from
+                // the band — so a shutdown mid-band would lose the choice.
+                var bandA = _radioStateService.BandA;
+                if (!string.IsNullOrEmpty(bandA))
+                {
+                    var settings = await _settingsService.GetSettingsAsync();
+                    if (!settings.BandProfilesA.TryGetValue(bandA, out var prof))
+                        prof = new BandProfile();
+                    prof.Antenna = request.Antenna;
+                    settings.BandProfilesA[bandA] = prof;
+                    await _settingsService.SaveSettingsAsync(settings);
+                }
+
                 _logger.LogInformation("Set Main antenna to {Antenna}", request.Antenna);
                 return Ok(new { message = $"Antenna {request.Antenna} selected" });
             }
@@ -581,6 +608,19 @@ namespace Yaesu_Web_Control.Controllers
                 await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
 
                 _radioStateService.AntennaB = request.Antenna;
+
+                // Persist immediately into the current band's profile.
+                // See SetAntennaA for the rationale.
+                var bandB = _radioStateService.BandB;
+                if (!string.IsNullOrEmpty(bandB))
+                {
+                    var settings = await _settingsService.GetSettingsAsync();
+                    if (!settings.BandProfilesB.TryGetValue(bandB, out var prof))
+                        prof = new BandProfile();
+                    prof.Antenna = request.Antenna;
+                    settings.BandProfilesB[bandB] = prof;
+                    await _settingsService.SaveSettingsAsync(settings);
+                }
 
                 _logger.LogInformation("Set Sub antenna to {Antenna}", request.Antenna);
                 return Ok(new { message = $"Antenna {request.Antenna} selected" });
