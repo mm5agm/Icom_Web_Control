@@ -15,6 +15,15 @@
     bool isFt710   = Model.RadioModel == "FT-710";
     bool isFtdx3000 = Model.RadioModel == "FTDX3000";
 
+    // Single-receiver radios (FTdx10, FT-710, FTDX3000) store per-VFO RX
+    // settings but expose only the active VFO's state via CAT — see
+    // docs/decisions/0003-single-vs-dual-receiver-ui.md. The home page
+    // greys out the inactive VFO panel on these radios to reflect that
+    // editing it via CAT would silently swap the radio's active VFO.
+    // Dual-receiver radios (FTdx101MP/D) keep both panels active because
+    // each VFO is its own physical receiver chain.
+    bool isSingleReceiver = Yaesu_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
+
     string clarModeInit = (Model.RadioState.RxClarOn, Model.RadioState.TxClarOn) switch
     {
         (true, true)  => "rxtx",
@@ -115,6 +124,35 @@
 <link rel="stylesheet" href="~/css/closer-to-raw-power.css?v=20260226n" />
 <style>
     #saveMemBtnA, #saveMemBtnB { font-weight: 700 !important; font-size: 0.85rem !important; color: #212529 !important; }
+
+    /* Single-receiver radios (FTdx10, FT-710, FTDX3000): the inactive VFO
+       panel and its corresponding spectrum panel are greyed and made
+       non-interactive. Editing any control on the inactive section via
+       CAT would silently swap the radio's active VFO, which is jarring
+       UX — better to disable visually and require an explicit A/B swap
+       on the rig first.
+       Single rule kills ALL pointer interactions (clicks, wheel, hover,
+       focus) so band buttons, frequency-display wheel-tuning, spectrum
+       click-to-tune, and every form control all become inert together.
+       The text/numbers remain VISIBLE — only interaction is suppressed.
+       See docs/decisions/0003-single-vs-dual-receiver-ui.md
+       Reported by Jacek SP3L on #34. */
+    .vfo-inactive {
+        opacity: 0.55;
+        filter: grayscale(0.5);
+        pointer-events: none;
+        transition: opacity 0.25s ease, filter 0.25s ease;
+    }
+    /* Hide live receive indicators on the inactive VFO panel — on a real
+       single-receiver radio there is no signal data for the inactive VFO,
+       so showing a moving S-meter and a scrolling history would be
+       misleading (suggests a signal is being received when nothing is).
+       Display:none rather than visibility:hidden so the panel shrinks
+       and the active panel's prominence is reinforced. */
+    .vfo-inactive .analog-meter-container,
+    .vfo-inactive .smeter-history-container {
+        display: none !important;
+    }
 </style>
 
 <!-- Message Box Modal (Windows-style) -->
@@ -481,7 +519,7 @@
         </div>
     </div>
 
-    <div class="row g-3 flex-wrap" id="vfoRow" data-radio-model="@Model.RadioModel">
+    <div class="row g-3 flex-wrap" id="vfoRow" data-radio-model="@Model.RadioModel" data-single-receiver="@(isSingleReceiver ? "true" : "false")">
         <!-- VFO A Panel -->
         <div class="col-lg-6 col-12" id="vfoACol">
             <div class="card border-primary h-100 receiver-card">
@@ -1780,15 +1818,39 @@
             const sdrState = { A: 'unconfigured', B: 'unconfigured' };
             function updateContainerVisibility() {
                 const aConfigured = sdrState.A !== 'unconfigured';
-                const bConfigured = sdrState.B !== 'unconfigured';
+                let bConfigured = sdrState.B !== 'unconfigured';
+
+                // Single-receiver radios (FTdx10, FT-710, FTDX3000) only have
+                // ONE IF output, so the second spectrum panel is never
+                // meaningful regardless of what's in Settings. Force B
+                // as unconfigured here so the Mono/Multi toggle and the
+                // spectrum-B panel are both hidden, leaving just one
+                // spectrum + a show/hide control (#34 follow-up,
+                // 2026-06-13).
+                const vfoRow = document.getElementById('vfoRow');
+                if (vfoRow?.dataset.singleReceiver === 'true') {
+                    bConfigured = false;
+                }
 
                 // Outer container visible if either VFO has an SDR configured.
                 document.getElementById('spectrumContainer').style.display =
                     (aConfigured || bConfigured) ? '' : 'none';
 
                 // Mono/Multi toggle only meaningful when BOTH are configured.
+                // Note: spectrumModeToggle has Bootstrap's d-flex class which
+                // applies display: flex !important — so plain
+                // `style.display = 'none'` is silently ignored. Use
+                // setProperty with priority='important' to actually win.
+                // For the show case, just remove the inline override and
+                // let d-flex take over.
                 const toggleEl = document.getElementById('spectrumModeToggle');
-                if (toggleEl) toggleEl.style.display = (aConfigured && bConfigured) ? '' : 'none';
+                if (toggleEl) {
+                    if (aConfigured && bConfigured) {
+                        toggleEl.style.removeProperty('display');
+                    } else {
+                        toggleEl.style.setProperty('display', 'none', 'important');
+                    }
+                }
 
                 // If only one side is configured, force that side visible regardless of mode.
                 if (!bConfigured) {

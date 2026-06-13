@@ -662,6 +662,71 @@ document.addEventListener('DOMContentLoaded', function() {
 // ---------------------------------------------------------------------------
 let isTransmitting = false;
 let txVfo = 0; // 0 = VFO A, 1 = VFO B
+
+// Apply the .vfo-inactive class to whichever VFO panel is NOT the active
+// (TX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
+// Dual-receiver radios (FTdx101MP/D) leave both panels active because each
+// VFO is its own physical receiver chain. The data-single-receiver
+// attribute on #vfoRow is rendered server-side from RadioCapabilities.cs.
+// See docs/decisions/0003-single-vs-dual-receiver-ui.md.
+function applyVfoActiveStyling() {
+    const vfoRow = document.getElementById('vfoRow');
+    if (!vfoRow) return;
+    const aCol = document.getElementById('vfoACol');
+    const bCol = document.getElementById('vfoBCol');
+    if (!aCol || !bCol) return;
+
+    // Spectrum panels live OUTSIDE the VFO columns in their own
+    // #spectrumContainer section — so they need the class applied
+    // separately to be greyed when their corresponding VFO is inactive.
+    // Note these can be absent (only one SDR configured, or none).
+    const aSpec = document.getElementById('spectrumContainerA');
+    const bSpec = document.getElementById('spectrumContainerB');
+
+    const singleReceiver = vfoRow.dataset.singleReceiver === 'true';
+    if (!singleReceiver) {
+        // Dual-receiver: both panels are real receivers, both stay active.
+        aCol.classList.remove('vfo-inactive');
+        bCol.classList.remove('vfo-inactive');
+        aSpec?.classList.remove('vfo-inactive');
+        bSpec?.classList.remove('vfo-inactive');
+        return;
+    }
+
+    // Single-receiver: grey out whichever VFO is not the current TX VFO.
+    // The spectrum panel is NOT greyed — on single-receiver radios the
+    // single spectrum always shows the live receive signal, which by
+    // definition tracks the active VFO. The second spectrum panel is
+    // hidden permanently by updateContainerVisibility() so there's no
+    // inactive spectrum to grey here.
+    // In split mode TxVfo and listening VFO can differ; first-pass
+    // treats TxVfo as the "active" VFO. Refine if someone reports
+    // split-mode awkwardness.
+    if (txVfo === 0) {
+        aCol.classList.remove('vfo-inactive');
+        bCol.classList.add('vfo-inactive');
+    } else {
+        aCol.classList.add('vfo-inactive');
+        bCol.classList.remove('vfo-inactive');
+    }
+    // Make sure neither spectrum carries a stale inactive class from a
+    // previous render — in case the user switched RadioModel from
+    // dual-receiver to single-receiver mid-session.
+    aSpec?.classList.remove('vfo-inactive');
+    bSpec?.classList.remove('vfo-inactive');
+}
+
+// Apply the styling at page-load time too, before any SignalR update has
+// arrived. This handles the case where the radio is already on a stable
+// VFO and YWC's TxVfo state is correct by the time the DOM is ready.
+document.addEventListener('DOMContentLoaded', () => {
+    // Defer to next tick so other DOMContentLoaded handlers run first
+    // (the VFO panels need to be in the DOM, which they always are at
+    // this point — but the txVfo global may not have been set from
+    // server state yet, in which case the default 0 applies and gets
+    // corrected by the first SignalR update).
+    setTimeout(applyVfoActiveStyling, 0);
+});
 let splitMode = 0; // 0 = OFF, 1 = ON (VFO A=RX / VFO B=TX), 2 = ON+5kHz Quick Split
 
 let clarVfo = 'A';
@@ -1013,6 +1078,7 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "TxVfo") {
         txVfo = update.value;
         updateTxButton();
+        applyVfoActiveStyling();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('txVfo', update.value);
     }
 
