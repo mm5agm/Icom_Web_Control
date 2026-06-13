@@ -1,8 +1,45 @@
 # ADR 0003 — Per-model UI layout for single-receiver vs dual-receiver radios
 
-**Status:** Accepted — 2026-06-12
+**Status:** SUPERSEDED — 2026-06-13. See "Revision" section below.
 **Decision-makers:** Colin (MM5AGM), with implementation planning support
 **Driven by:** [Issue #34](https://github.com/mm5agm/Yaesu_Web_Control/issues/34) (Jacek SP3L) — FTdx10 VFO A/B swap UI mismatch
+
+---
+
+## Revision (2026-06-13) — empirical correction from real-hardware testing
+
+The analysis below concluded that single-receiver radios (FTdx10, FT-710, FTDX3000) have only **one set** of RX controls, based on the CAT manual showing `P1: 0 (Fixed)` for every receiver-side command. **That conclusion was wrong.**
+
+Jacek SP3L (issue #34, [follow-up comments](https://github.com/mm5agm/Yaesu_Web_Control/issues/34) on 2026-06-13) verified on his FTdx10 that the radio **does** store per-VFO state for ATT, IPO, AGC, NR, NB, IF Width and the rest — and the settings travel with the VFO across swap. Example: set ATT=6dB / IPO=AMP1 on VFO-A, switch to VFO-B, set ATT=12dB / IPO=AMP2, switch back to VFO-A → both values return to 6dB / AMP1.
+
+The CAT manual's `P1: 0 (Fixed)` was telling us about the **command parameter format** ("the CAT interface has no parameter slot to pick which VFO"), not the radio's **internal state model** ("the radio stores one set of values"). The CAT command always implicitly addresses the currently-active VFO.
+
+This is a classic case of "the manual is technically accurate but misleading about the deeper model" — and exactly the kind of thing only empirical hands-on hardware testing surfaces. Jacek's testing on his own FTdx10 caught the misreading before any of the architectural refactor work started — saving a substantial multi-session implementation that would have been wrong.
+
+### Revised fix (replaces §Decision below)
+
+YWC's current dual-VFO layout (each section holds its own RX controls) is actually **correct** for single-receiver radios too — it maps the radio's real state model. What's missing is active-VFO awareness:
+
+1. Track which VFO is currently active on the radio (read on connect via `FT;` or equivalent, listen for swap events via auto-information)
+2. Grey out the inactive VFO panel visually
+3. Disable the controls in the inactive VFO panel — editing one via CAT would silently swap the radio's active VFO, which is jarring UX
+4. PTT button placement follows the active VFO (still right — only one transmitter on single-receiver radios)
+
+No shared "Receiver Controls" panel. No layout split. No template refactor. The change is essentially a CSS/JS layer over the existing layout plus the active-VFO state tracking.
+
+### What this means for the implementation plan in §Implementation below
+
+Steps 2–4 of the original plan (extract partials, build shared layout, rewire JS for P1 routing) are **dropped**. Step 5 (active/standby CSS + SignalR wiring) remains, and step 1 (a tiny `RadioCapabilities.IsDualReceiver` check) still useful — dual-receiver radios don't need the disable-inactive behaviour, so the capability lookup is still the gate. The overall investment drops from ~6 commit-sized steps to perhaps 2–3.
+
+### Why this revision is kept inline rather than as ADR 0004
+
+ADR practice often prefers a new ADR superseding the old one. Here the correction is targeted (it changes the conclusion, not the architectural framing) and the historical analysis below remains valuable as a record of how the misreading arose. Keeping the revision inline at the top, with the original text preserved below, makes it easier for future readers to see what was wrong and why.
+
+---
+
+## Original analysis (2026-06-12) — retained as historical record
+
+> **The conclusions in the rest of this document are wrong.** See the Revision above for the corrected understanding. The text below is retained because the CAT-manual evidence it cites is real, the reasoning is traceable, and future readers may need to understand how the misreading happened.
 
 ## Context
 
