@@ -1334,7 +1334,16 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- ATU ---
     if (update.property === "AtuEnabled") {
-        if (window.updateAtuButton) window.updateAtuButton(update.value === true || update.value === 'true');
+        const enabled = update.value === true || update.value === 'true';
+        // Track latest known state in a data attribute so that when an
+        // auto-tune cycle finishes we can restore the correct on/off look.
+        const btn = document.getElementById('atuBtn');
+        if (btn) btn.dataset.atuEnabled = enabled ? 'true' : 'false';
+        if (window.updateAtuButton) window.updateAtuButton(enabled);
+    }
+    if (update.property === "AtuTuning") {
+        const tuning = update.value === true || update.value === 'true';
+        if (window.updateAtuTuningState) window.updateAtuTuningState(tuning);
     }
 
     // --- NB LEVEL ---

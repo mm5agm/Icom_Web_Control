@@ -391,9 +391,9 @@
                                onchange="setProcLevel(this.value);">
                         <button id="atuBtn"
                                 class="btn btn-sm ms-2 @(Model.AtuEnabled ? "btn-success" : "btn-outline-secondary")"
-                                aria-label="Antenna tuner"
-                                title="Toggle antenna tuner (ATU) on/off"
-                                onclick="toggleAtu()">@(Model.AtuEnabled ? "ATU On" : "ATU Off")</button>
+                                aria-label="Antenna tuner — short tap toggles on/off, long press starts auto-tune"
+                                title="Tap to toggle ATU on/off; press and hold to start auto-tune"
+                                style="touch-action: manipulation; user-select: none;">@(Model.AtuEnabled ? "ATU On" : "ATU Off")</button>
                         <button id="monitorOnBtn"
                                 class="btn btn-sm ms-2 @(Model.MonitorOn ? "btn-warning" : "btn-outline-secondary")"
                                 aria-label="TX monitor — currently @(Model.MonitorOn ? "on" : "off")"
@@ -2347,6 +2347,16 @@
         });
 
         // --- ATU ---
+        // Short tap toggles ATU on/off. Press-and-hold (>= 500 ms) starts
+        // the radio's auto-tune cycle (CAT command AC002;). Sending AC002;
+        // a second time stops it — so during a running tune cycle, any
+        // tap on the button also stops it. The Yaesu radios use a single
+        // physical button with the same short/long behaviour, so this
+        // matches the radio's UX exactly.
+        const ATU_LONG_PRESS_MS = 500;
+        let atuPressTimer = null;
+        let atuLongFired = false;
+
         async function toggleAtu() {
             const btn = document.getElementById('atuBtn');
             const enabled = btn.classList.contains('btn-success');
@@ -2358,13 +2368,120 @@
                 updateAtuButton(!enabled);
             } catch (e) { console.error('toggleAtu error:', e); }
         }
+        // Yaesu's CAT spec doesn't report tuning-in-progress (AC P2 is
+        // "Fixed at 0" in the manual), so the "Tuning…" UI state is driven
+        // entirely on the client. We mark the button as tuning immediately
+        // after sending AC002;, then auto-clear after a safe upper bound
+        // (typical tune cycles are 2-7 s; 8 s is a reasonable margin) and
+        // GET /api/cat/atu to sync the settled on/off state.
+        const ATU_TUNE_AUTOCLEAR_MS = 8000;
+        let atuAutoclearTimer = null;
+
+        // Shared end-of-tune cleanup: query the radio for the settled ATU
+        // state and use the response body directly to update the button.
+        // We deliberately don't rely on btn.dataset.atuEnabled here because
+        // it's only updated when SignalR delivers an AtuEnabled change —
+        // and there's an inherent race between the SignalR push and this
+        // function reading the dataset. Using the GET response body removes
+        // the race entirely.
+        async function refreshAtuAfterTune() {
+            let finalEnabled = null;
+            try {
+                const r = await fetch('/api/cat/atu');
+                if (r.ok) {
+                    const data = await r.json();
+                    finalEnabled = (data.atuEnabled === true);
+                }
+            } catch (e) { console.error('refreshAtuAfterTune fetch error:', e); }
+            const btn = document.getElementById('atuBtn');
+            if (btn && finalEnabled !== null) {
+                btn.dataset.atuEnabled = finalEnabled ? 'true' : 'false';
+            }
+            updateAtuTuningState(false);
+        }
+
+        async function startAtuTune() {
+            try {
+                await fetch('/api/cat/atu/tune', { method: 'POST' });
+                updateAtuTuningState(true);
+                clearTimeout(atuAutoclearTimer);
+                atuAutoclearTimer = setTimeout(refreshAtuAfterTune, ATU_TUNE_AUTOCLEAR_MS);
+            } catch (e) { console.error('startAtuTune error:', e); }
+        }
+
+        // User tapped the button while a tune cycle was running. Send the
+        // AC002; toggle again to stop the radio, cancel the auto-clear
+        // timer, then refresh + clear the UI after a brief settle period.
+        // We don't await fetch() — fire-and-forget so the UI clears quickly
+        // regardless of HTTP latency.
+        async function stopAtuTune() {
+            try { fetch('/api/cat/atu/tune', { method: 'POST' }); } catch (e) {}
+            clearTimeout(atuAutoclearTimer);
+            atuAutoclearTimer = null;
+            setTimeout(refreshAtuAfterTune, 500);
+        }
         function updateAtuButton(enabled) {
             const btn = document.getElementById('atuBtn');
             if (!btn) return;
+            // Only restyle the on/off appearance if we're not mid-tune; the
+            // tuning state owns the button look while it's running.
+            if (btn.dataset.tuning === 'true') return;
             btn.classList.toggle('btn-success', enabled);
             btn.classList.toggle('btn-outline-secondary', !enabled);
             btn.textContent = enabled ? 'ATU On' : 'ATU Off';
         }
+        // Drives the "Tuning..." visual when the radio reports an auto-tune
+        // cycle in progress (AC P2 = 1). Called from the SignalR AtuTuning
+        // route in site.js.
+        function updateAtuTuningState(tuning) {
+            const btn = document.getElementById('atuBtn');
+            if (!btn) return;
+            if (tuning) {
+                btn.dataset.tuning = 'true';
+                btn.classList.remove('btn-success', 'btn-outline-secondary');
+                btn.classList.add('btn-danger');   // red while tuning
+                btn.textContent = 'Tuning…';
+            } else {
+                btn.dataset.tuning = 'false';
+                btn.classList.remove('btn-danger');
+                // Restore on/off styling from current state.
+                const onNow = btn.dataset.atuEnabled === 'true';
+                updateAtuButton(onNow);
+            }
+        }
+        // Wire short-tap vs long-press behaviour. Using pointer events
+        // covers mouse, touch, and pen with one code path.
+        document.addEventListener('DOMContentLoaded', function() {
+            const atuBtn = document.getElementById('atuBtn');
+            if (!atuBtn) return;
+            atuBtn.addEventListener('pointerdown', function(e) {
+                atuLongFired = false;
+                clearTimeout(atuPressTimer);
+                atuPressTimer = setTimeout(() => {
+                    atuLongFired = true;
+                    startAtuTune();
+                }, ATU_LONG_PRESS_MS);
+            });
+            const cancelPress = function() {
+                clearTimeout(atuPressTimer);
+                atuPressTimer = null;
+            };
+            atuBtn.addEventListener('pointerup', function(e) {
+                clearTimeout(atuPressTimer);
+                atuPressTimer = null;
+                if (!atuLongFired) {
+                    // Short tap — toggle on/off if idle, or stop the
+                    // running tune cycle if one is in progress.
+                    if (atuBtn.dataset.tuning === 'true') {
+                        stopAtuTune();
+                    } else {
+                        toggleAtu();
+                    }
+                }
+            });
+            atuBtn.addEventListener('pointerleave', cancelPress);
+            atuBtn.addEventListener('pointercancel', cancelPress);
+        });
 
         // --- MONITOR ON/OFF + LEVEL ---
         let _monitorOn = @(Model.MonitorOn ? "true" : "false");
@@ -3322,6 +3439,10 @@
         window.toggleProc    = toggleProc;
         window.setProcLevel  = setProcLevel;
         window.toggleAtu        = toggleAtu;
+        window.startAtuTune     = startAtuTune;
+        window.stopAtuTune      = stopAtuTune;
+        window.updateAtuButton  = updateAtuButton;
+        window.updateAtuTuningState = updateAtuTuningState;
         window.toggleMonitor    = toggleMonitor;
         window._updateMonitorBtn = _updateMonitorBtn;
         window.setMonitorLevel  = setMonitorLevel;

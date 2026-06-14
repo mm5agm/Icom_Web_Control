@@ -370,9 +370,25 @@
                             _stateService.TxVfo = txVfo;
                         break;
                     case "AC":
-                        // AC{P1}{P2}{P3}; P1=0=bypass/1=ATU on, P2=0=not tuning/1=tuning, P3=misc
+                        // AC{P1}{P2}{P3}; per FTdx10 / FTdx101MP CAT manual page 6:
+                        //   P1: 0 Fixed         (not a state bit)
+                        //   P2: 0 = not tuning, 1 = auto-tune cycle in progress
+                        //   P3: 0 = Tuner OFF, 1 = Tuner ON, 2 = Tuning Start/Stop
+                        // The multiplexer strips the trailing ';', so we receive
+                        // "AC001" / "AC011" / "AC100" etc — length 5 with index
+                        // positions: [0]='A' [1]='C' [2]=P1 [3]=P2 [4]=P3.
+                        //
+                        // Note: earlier code read message[2] (P1) for on/off,
+                        // which is always '0 Fixed'. That bug meant front-panel
+                        // ATU toggles never propagated to YWC's UI — only YWC-
+                        // initiated toggles showed because SetAtu sets state
+                        // directly without going through this parser. Fixed
+                        // 2026-06-14 alongside the long-press auto-tune feature.
                         if (message.Length >= 5)
-                            _stateService.AtuEnabled = message[2] == '1';
+                        {
+                            _stateService.AtuEnabled = message[4] == '1';
+                            _stateService.AtuTuning  = message[3] == '1';
+                        }
                         break;
                     case "NL":
                         // NL{vfo}{nnn}; — NB level 001-020 per VFO
