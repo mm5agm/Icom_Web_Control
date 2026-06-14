@@ -200,8 +200,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Debounce timers for aria attribute updates — one per VFO (A/B).
 // Visual updates (innerHTML) happen immediately; screen-reader attributes
-// are only written after 300 ms of no further changes so the reader
+// are only written after 500 ms of no further changes so the reader
 // announces the final frequency rather than every scroll-wheel step.
+// Bumped from 300 ms (2026-06-14) — OZ1JTE on #20 reported still hearing
+// intermediate frequencies during rapid wheel scrolling. The visible
+// digit spans are aria-hidden so the spinbutton's accessible value comes
+// only from aria-valuenow, which this debounce gates.
 const _ariaDebounceTimers = {};
 
 // Frequency display renderer (outer version, used by outer updateFrequencyDisplay)
@@ -225,7 +229,7 @@ function updateFrequencyDisplay(receiver, freqHz) {
             display.setAttribute('aria-valuenow', mhz);
             display.setAttribute('aria-label', `VFO ${receiver}: ${mhz} MHz`);
             display.setAttribute('title', `VFO ${receiver}: ${mhz} MHz`);
-        }, 300);
+        }, 500);
     }
 }
 
@@ -3004,7 +3008,15 @@ pollInitStatus();
 (function () {
     const liveRegion = document.createElement('div');
     liveRegion.id = '_sr_live';
-    liveRegion.setAttribute('aria-live', 'polite');
+    // ASSERTIVE (not polite): each new announcement interrupts the
+    // previous one rather than queueing behind it. This addresses
+    // OZ1JTE's feedback on #20 — when sweeping the mouse across many
+    // interactive elements (memory channels, settings inputs) the
+    // screen reader was reading every passed-over button in turn
+    // because polite-mode queued them all. Assertive plus the longer
+    // debounce below means only the element the mouse rests on
+    // actually gets announced.
+    liveRegion.setAttribute('aria-live', 'assertive');
     liveRegion.setAttribute('aria-atomic', 'true');
     liveRegion.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;white-space:nowrap;';
     document.body.appendChild(liveRegion);
@@ -3064,11 +3076,16 @@ pollInitStatus();
         if (!label) return;
         if (label === lastLabel) return;
         clearTimeout(timer);
+        // 400 ms (was 200 ms) so the screen reader doesn't announce every
+        // interactive element the mouse sweeps over on its way to the
+        // intended target. OZ1JTE reported this on the Memories page in
+        // particular, where dense rows of inputs/buttons make a quick
+        // sweep noisy. 400 ms requires a genuine pause-and-hover.
         timer = setTimeout(function () {
             lastLabel = label;
             liveRegion.textContent = '';
             requestAnimationFrame(function () { liveRegion.textContent = label; });
-        }, 200);
+        }, 400);
     });
     // No mouseout handler — resetting lastLabel in the mouseover null-el branch is sufficient
     // and avoids the aggressive clearing that mouseout on every child element causes.

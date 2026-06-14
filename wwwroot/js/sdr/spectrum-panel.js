@@ -967,9 +967,11 @@ export class SpectrumPanel {
         let lr = document.getElementById('_sr_live');
         if (!lr) {
             // Fallback: create a local live region if site.js hasn't run yet.
+            // assertive (matching site.js's primary live region) so new
+            // cursor announcements interrupt rather than queue.
             lr = document.createElement('div');
             lr.id = '_sr_live';
-            lr.setAttribute('aria-live', 'polite');
+            lr.setAttribute('aria-live', 'assertive');
             lr.setAttribute('aria-atomic', 'true');
             lr.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;';
             document.body.appendChild(lr);
