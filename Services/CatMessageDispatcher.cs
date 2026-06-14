@@ -371,19 +371,26 @@
                         break;
                     case "AC":
                         // AC{P1}{P2}{P3}; per FTdx10 / FTdx101MP CAT manual page 6:
-                        //   P1: 0 Fixed         (not a state bit)
-                        //   P2: 0 = not tuning, 1 = auto-tune cycle in progress
+                        //   P1: 0 Fixed
+                        //   P2: 0 Fixed
                         //   P3: 0 = Tuner OFF, 1 = Tuner ON, 2 = Tuning Start/Stop
                         // The multiplexer strips the trailing ';', so we receive
-                        // "AC001" / "AC011" / "AC100" etc — length 5 with index
+                        // "AC001" / "AC100" / "AC002" etc — length 5 with index
                         // positions: [0]='A' [1]='C' [2]=P1 [3]=P2 [4]=P3.
                         //
-                        // Note: earlier code read message[2] (P1) for on/off,
-                        // which is always '0 Fixed'. That bug meant front-panel
-                        // ATU toggles never propagated to YWC's UI — only YWC-
-                        // initiated toggles showed because SetAtu sets state
-                        // directly without going through this parser. Fixed
-                        // 2026-06-14 alongside the long-press auto-tune feature.
+                        // We read P3 (message[4]) for on/off, and ALSO read P2
+                        // defensively into AtuTuning. The manual says P2 is
+                        // Fixed at 0, but if a firmware revision ever starts
+                        // reporting tuning-in-progress in P2 we'll pick it up
+                        // automatically. With current firmware, AtuTuning gets
+                        // set to false on every AC message — harmless, the
+                        // tuning-state UI is driven client-side anyway.
+                        //
+                        // Note: pre-2026-06-14 code read message[2] (P1) for
+                        // on/off, which is always '0 Fixed'. That bug silently
+                        // dropped every front-panel ATU toggle — only YWC-
+                        // initiated toggles showed in the UI because SetAtu
+                        // sets state directly without going through this parser.
                         if (message.Length >= 5)
                         {
                             _stateService.AtuEnabled = message[4] == '1';
