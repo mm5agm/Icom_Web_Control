@@ -145,6 +145,27 @@ YWC supports the FTdx101MP, FTdx101D, FTdx10, FT-710, and FTDX3000. The develope
 
 ---
 
+## Staying informed about updates
+
+Recent versions of YWC include an in-app update check that pops up a banner the first time you run it after a new release lands. If you're already running v2.2.x or later you'll get those notifications automatically — no action needed.
+
+If you're on an older version that pre-dates the update check, or you want to know about a new release before you've launched the app, **any one of these will keep you in the loop**:
+
+- **GitHub release notifications** (most reliable, free, no spam):
+  1. Make sure you're signed in to GitHub
+  2. Visit https://github.com/mm5agm/Yaesu_Web_Control
+  3. Click the **Watch** dropdown at the top-right of the page
+  4. Choose **Custom** and tick only **Releases**
+  5. Save — you'll get one email per release, and nothing in between
+
+- **Join the [Yaesu Web Control Groups.io list](https://groups.io/g/Yaesu-Web-Control)** — a small, low-traffic mailing list where new releases are announced alongside Q&A from other users. Good for hams who prefer email lists to GitHub.
+
+- **RSS / Atom feed** — if you use a feed reader (Feedly, NewsBlur, Inoreader, Thunderbird, etc.), subscribe to https://github.com/mm5agm/Yaesu_Web_Control/releases.atom — new releases appear in your reader without any account or email signup.
+
+If you're talking to another Yaesu operator running an older YWC, **a heads-up that a new version exists is the most reliable way it reaches them**. Word of mouth still works — there's no email list of all downloaders and no way to reach the very early users who don't fall into any of the channels above.
+
+---
+
 ## Release Notes
 
 ## 2026-06-15 - v2.3.7
