@@ -200,8 +200,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Debounce timers for aria attribute updates — one per VFO (A/B).
 // Visual updates (innerHTML) happen immediately; screen-reader attributes
-// are only written after 300 ms of no further changes so the reader
+// are only written after 500 ms of no further changes so the reader
 // announces the final frequency rather than every scroll-wheel step.
+// Bumped from 300 ms (2026-06-14) — OZ1JTE on #20 reported still hearing
+// intermediate frequencies during rapid wheel scrolling. The visible
+// digit spans are aria-hidden so the spinbutton's accessible value comes
+// only from aria-valuenow, which this debounce gates.
 const _ariaDebounceTimers = {};
 
 // Frequency display renderer (outer version, used by outer updateFrequencyDisplay)
@@ -225,7 +229,7 @@ function updateFrequencyDisplay(receiver, freqHz) {
             display.setAttribute('aria-valuenow', mhz);
             display.setAttribute('aria-label', `VFO ${receiver}: ${mhz} MHz`);
             display.setAttribute('title', `VFO ${receiver}: ${mhz} MHz`);
-        }, 300);
+        }, 500);
     }
 }
 
@@ -645,12 +649,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-    // Update powerValue label live as slider moves (outer/global version)
+    // Update powerValue label live as slider moves (outer/global version).
+    // NOTE: deliberately no longer initialises the label from slider.value
+    // on page load. The slider has step=5 so the browser snaps the
+    // server-rendered exact value (e.g. 91 W from the radio) to the
+    // nearest step (90 W). Reading that back into the label gave the
+    // operator a label that disagreed with what the radio is actually
+    // doing — Jacek SP3L reported this on #35 follow-up. The Razor
+    // template now renders the actual Power into the label directly;
+    // SignalR Power pushes update the label using the exact value, not
+    // the rounded slider position. The 'input' listener below only fires
+    // on user interaction (programmatic .value sets don't trigger it),
+    // so user-moves-slider still updates the label to the chosen step.
     const slider = document.getElementById('powerSlider');
     const display = document.getElementById('powerValue');
     if (slider && display) {
-        // Initialize label to slider value on page load
-        display.textContent = window.MeterFormatters.powerLabel(slider.value);
         slider.addEventListener('input', function () {
             display.textContent = window.MeterFormatters.powerLabel(slider.value);
         });
@@ -662,6 +675,71 @@ document.addEventListener('DOMContentLoaded', function() {
 // ---------------------------------------------------------------------------
 let isTransmitting = false;
 let txVfo = 0; // 0 = VFO A, 1 = VFO B
+
+// Apply the .vfo-inactive class to whichever VFO panel is NOT the active
+// (TX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
+// Dual-receiver radios (FTdx101MP/D) leave both panels active because each
+// VFO is its own physical receiver chain. The data-single-receiver
+// attribute on #vfoRow is rendered server-side from RadioCapabilities.cs.
+// See docs/decisions/0003-single-vs-dual-receiver-ui.md.
+function applyVfoActiveStyling() {
+    const vfoRow = document.getElementById('vfoRow');
+    if (!vfoRow) return;
+    const aCol = document.getElementById('vfoACol');
+    const bCol = document.getElementById('vfoBCol');
+    if (!aCol || !bCol) return;
+
+    // Spectrum panels live OUTSIDE the VFO columns in their own
+    // #spectrumContainer section — so they need the class applied
+    // separately to be greyed when their corresponding VFO is inactive.
+    // Note these can be absent (only one SDR configured, or none).
+    const aSpec = document.getElementById('spectrumContainerA');
+    const bSpec = document.getElementById('spectrumContainerB');
+
+    const singleReceiver = vfoRow.dataset.singleReceiver === 'true';
+    if (!singleReceiver) {
+        // Dual-receiver: both panels are real receivers, both stay active.
+        aCol.classList.remove('vfo-inactive');
+        bCol.classList.remove('vfo-inactive');
+        aSpec?.classList.remove('vfo-inactive');
+        bSpec?.classList.remove('vfo-inactive');
+        return;
+    }
+
+    // Single-receiver: grey out whichever VFO is not the current TX VFO.
+    // The spectrum panel is NOT greyed — on single-receiver radios the
+    // single spectrum always shows the live receive signal, which by
+    // definition tracks the active VFO. The second spectrum panel is
+    // hidden permanently by updateContainerVisibility() so there's no
+    // inactive spectrum to grey here.
+    // In split mode TxVfo and listening VFO can differ; first-pass
+    // treats TxVfo as the "active" VFO. Refine if someone reports
+    // split-mode awkwardness.
+    if (txVfo === 0) {
+        aCol.classList.remove('vfo-inactive');
+        bCol.classList.add('vfo-inactive');
+    } else {
+        aCol.classList.add('vfo-inactive');
+        bCol.classList.remove('vfo-inactive');
+    }
+    // Make sure neither spectrum carries a stale inactive class from a
+    // previous render — in case the user switched RadioModel from
+    // dual-receiver to single-receiver mid-session.
+    aSpec?.classList.remove('vfo-inactive');
+    bSpec?.classList.remove('vfo-inactive');
+}
+
+// Apply the styling at page-load time too, before any SignalR update has
+// arrived. This handles the case where the radio is already on a stable
+// VFO and YWC's TxVfo state is correct by the time the DOM is ready.
+document.addEventListener('DOMContentLoaded', () => {
+    // Defer to next tick so other DOMContentLoaded handlers run first
+    // (the VFO panels need to be in the DOM, which they always are at
+    // this point — but the txVfo global may not have been set from
+    // server state yet, in which case the default 0 applies and gets
+    // corrected by the first SignalR update).
+    setTimeout(applyVfoActiveStyling, 0);
+});
 let splitMode = 0; // 0 = OFF, 1 = ON (VFO A=RX / VFO B=TX), 2 = ON+5kHz Quick Split
 
 let clarVfo = 'A';
@@ -982,8 +1060,21 @@ connection.on("RadioStateUpdate", function (update) {
     }
     if (update.property === "Power") {
         if (typeof window.updatePowerDisplay === 'function') window.updatePowerDisplay("A", update.value);
+        // Update both the per-VFO slider (dual-receiver layout) AND the
+        // unified `powerSlider` used on single-receiver radio layouts.
+        // The old code only updated powerSliderA, so on FTdx10 a front-
+        // panel power change moved the displayed value but left the slider
+        // visually frozen at the previous position — reported by SP3L-Jacek
+        // as #36 on v2.3.6.
         const sliderA = document.getElementById('powerSliderA');
         if (sliderA) sliderA.value = update.value;
+        const slider = document.getElementById('powerSlider');
+        if (slider) {
+            slider.value = update.value;
+            // Repaint the fill-percentage CSS custom property so the
+            // visual progress track matches the new position.
+            if (typeof updateSliderFill === 'function') updateSliderFill(slider);
+        }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('power', update.value);
     }
 
@@ -1013,6 +1104,7 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "TxVfo") {
         txVfo = update.value;
         updateTxButton();
+        applyVfoActiveStyling();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('txVfo', update.value);
     }
 
@@ -1268,7 +1360,16 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- ATU ---
     if (update.property === "AtuEnabled") {
-        if (window.updateAtuButton) window.updateAtuButton(update.value === true || update.value === 'true');
+        const enabled = update.value === true || update.value === 'true';
+        // Track latest known state in a data attribute so that when an
+        // auto-tune cycle finishes we can restore the correct on/off look.
+        const btn = document.getElementById('atuBtn');
+        if (btn) btn.dataset.atuEnabled = enabled ? 'true' : 'false';
+        if (window.updateAtuButton) window.updateAtuButton(enabled);
+    }
+    if (update.property === "AtuTuning") {
+        const tuning = update.value === true || update.value === 'true';
+        if (window.updateAtuTuningState) window.updateAtuTuningState(tuning);
     }
 
     // --- NB LEVEL ---
@@ -2929,7 +3030,15 @@ pollInitStatus();
 (function () {
     const liveRegion = document.createElement('div');
     liveRegion.id = '_sr_live';
-    liveRegion.setAttribute('aria-live', 'polite');
+    // ASSERTIVE (not polite): each new announcement interrupts the
+    // previous one rather than queueing behind it. This addresses
+    // OZ1JTE's feedback on #20 — when sweeping the mouse across many
+    // interactive elements (memory channels, settings inputs) the
+    // screen reader was reading every passed-over button in turn
+    // because polite-mode queued them all. Assertive plus the longer
+    // debounce below means only the element the mouse rests on
+    // actually gets announced.
+    liveRegion.setAttribute('aria-live', 'assertive');
     liveRegion.setAttribute('aria-atomic', 'true');
     liveRegion.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;white-space:nowrap;';
     document.body.appendChild(liveRegion);
@@ -2989,11 +3098,16 @@ pollInitStatus();
         if (!label) return;
         if (label === lastLabel) return;
         clearTimeout(timer);
+        // 400 ms (was 200 ms) so the screen reader doesn't announce every
+        // interactive element the mouse sweeps over on its way to the
+        // intended target. OZ1JTE reported this on the Memories page in
+        // particular, where dense rows of inputs/buttons make a quick
+        // sweep noisy. 400 ms requires a genuine pause-and-hover.
         timer = setTimeout(function () {
             lastLabel = label;
             liveRegion.textContent = '';
             requestAnimationFrame(function () { liveRegion.textContent = label; });
-        }, 200);
+        }, 400);
     });
     // No mouseout handler — resetting lastLabel in the mouseover null-el branch is sufficient
     // and avoids the aggressive clearing that mouseout on every child element causes.

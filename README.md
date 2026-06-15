@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.6-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.7-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -96,7 +96,7 @@ The application includes a real-time spectrum display and waterfall, intended fo
 - **RTL-SDR, Airspy, and HackRF** — supported via the bundled SoapySDR driver interface. No separate SoapySDR installation is required — the necessary drivers are included in the installer. *These devices have not been tested by the author — feedback from users is very welcome.*
 
 **Features:**
-- Variable span: 250 kHz, 500 kHz, 1 MHz, or 2 MHz
+- Variable span: 62.5 kHz, 125 kHz, 250 kHz, 500 kHz, 1 MHz, or 2 MHz
 - Dual-SDR mode: one SDR per VFO on the FTdx101MP / FTdx101D, with a Mono A / Mono B / Both layout toggle, Stacked / Side-by-side option, and independent span per panel
 - Click anywhere on a spectrum panel to tune the corresponding VFO to that frequency (panel A tunes VFO A, panel B tunes VFO B)
 - Mouse wheel over a spectrum panel tunes that VFO up/down in 1 kHz steps
@@ -146,6 +146,69 @@ YWC supports the FTdx101MP, FTdx101D, FTdx10, FT-710, and FTDX3000. The develope
 ---
 
 ## Release Notes
+
+## 2026-06-15 - v2.3.7
+
+Reporter-driven release across five contributors — Jacek SP3L, Thomas OZ1JTE, Ken KN2D, plus Colin's own bench testing. The biggest single change is a UI overhaul for single-receiver radios (FTdx10, FT-710, FTDX3000) driven by Jacek's hands-on testing. Eight new features and improvements; six bug fixes; one calibration update; one accessibility improvement specifically for screen-reader users; the v1 of the Voice Control documentation lands as a preview.
+
+### New features
+
+- **Per-band antenna memory.** Each band now remembers which antenna (Ant 1 / 2 / 3) you last used on it, independently per VFO. Set Ant 1 on 20 m, Ant 2 on 6 m once, and from then on switching bands restores the right antenna automatically. The Yaesu radios don't recall this internally when frequency is changed via CAT (only via the front-panel BAND button), so YWC now does the remembering. Setting an antenna writes immediately to disk, and a startup backfill auto-populates empty fields on existing installs so you don't have to manually click through every band.
+
+- **ATU long-press auto-tune trigger** (Jacek SP3L, #34). Press and hold the ATU button for ≥500 ms to start the radio's auto-tune cycle (CAT command `AC002;`). Button turns red "Tuning…" for the duration; tap during a running tune to stop it early. Short tap still toggles ATU on/off as before — matches the radio's own front-panel TUNE button.
+
+- **Per-VFO ATU state sync** (Jacek SP3L, #34). On single-receiver radios the ATU on/off state is remembered per VFO by the radio firmware and re-applied when you swap A/B. YWC now re-queries the ATU state after a VFO swap so its button matches.
+
+- **Diagnostics block now shows host CPU and Memory.** The About page's "Copy diagnostics" output (which feeds bug reports automatically) now includes the CPU model + logical core count and total physical RAM of the host PC. Useful for triaging performance-related reports — particularly relevant now that dual-SDR support means a shack PC might be running two SDR worker processes plus radio polling plus spectrum render.
+
+### User interface — single-receiver radios
+
+- **VFO panels reflect what's actually possible on the radio** (Jacek SP3L, #34). On FTdx10, FT-710, and FTDX3000, only one physical receiver chain exists inside the radio — VFO B is effectively a frequency/mode memory slot, not a real sub-receiver. The UI now greys out the inactive VFO panel on these radios to make this clear: its receive-side controls (AGC, NB, NR, IF Width, etc.) are still editable but only take effect once you swap that VFO to be active via the A↔B button. On dual-receiver radios (FTdx101MP/D) both panels remain fully active because each VFO genuinely is its own receiver.
+
+- **Single spectrum panel on single-receiver radios.** The spectrum display layout used to show a single panel on single-receiver radios but kept the "Stacked / Side-by-side / VFO A / VFO B / Both" toggle visible. The toggle is now hidden when only one physical receiver exists; the single panel always tracks the active VFO.
+
+### Accessibility
+
+- **Spectrum tick / crosshair / segment label font sizes increased.** The MHz frequency tick labels under the spectrum (10 → 13 px), the dB-scale Y-axis labels (10 → 12 px), the band-plan segment markers like FT8/CW/SSB (11 → 13 px), and the hover-crosshair frequency readout (11 → 14 px) are all larger so they're readable without a magnifying glass.
+
+- **Screen reader announcements made less talkative** (Thomas OZ1JTE, #20). Three changes addressing his feedback that the screen reader was reading every passed-over button on the way to the target:
+  - ARIA live region changed from `polite` (queues announcements) to `assertive` (each new announcement interrupts the previous) — directly matches Thomas's request that "the speech queue should be cleared/cancelled whenever a new reading is triggered".
+  - Hover-to-announce debounce 200 ms → 400 ms — Memories table sweeps now only announce the element you deliberately pause on.
+  - Frequency display ARIA debounce 300 ms → 500 ms — rapid wheel scrolling announces only the settled value, not intermediates.
+
+### Bug fixes
+
+- **Installer no longer fails with file-lock errors when upgrading** (Ken KN2D). The NSIS installer's Install section had no provision for stopping a running YWC before copying new files — so upgrading on top of a running app produced "Error opening file for writing: ...Accessibility.dll" with Abort/Retry/Ignore, repeating for every locked DLL. Added a `taskkill` of `Yaesu_Web_Control.exe` and `Yaesu_Sdr_Worker.exe` at the start of Install with a 1.5 s settle delay.
+
+- **RF Power no longer reset on YWC startup** (Jacek SP3L, #35). YWC was overwriting whatever Power you'd set on the radio's front panel while YWC was off, with its own last-saved value. Same anti-pattern as the MIC GAIN / Speech Processor fix from #16 in v2.2.0. The radio is now the source of truth on connect; YWC reads the current Power via the `PC;` query and the UI follows.
+
+- **RF Power slider now follows front-panel changes** (Jacek SP3L, #36). The SignalR Power handler was updating the per-VFO `powerSliderA` element but not the unified `powerSlider` used on single-receiver radio layouts, so a front-panel power change moved the numerical label but left the slider visually frozen. Also: "100W" → "100 W" with a space, per Jacek's closing note on #36.
+
+- **RF Power label now shows the exact radio value, not the snapped slider position.** Edge case caught while bench-testing #35: if the radio is set to an odd value like 91 W, the slider has step=5 so it snaps to position 90 — and the label was reading from the snapped slider position, showing "90 W" while the radio was at 91 W. The label now reflects the exact value the radio reports; the slider position is a visual approximation.
+
+- **Front-panel TUNE button state now propagates to YWC.** Pre-existing parser bug: `CatMessageDispatcher` was reading byte P1 of the `AC` reply for ATU on/off state, when the Yaesu CAT manual defines P1 as "Fixed at 0" — the actual state lives in P3. Send-side was always correct (YWC's ATU button commands worked fine), but radio-initiated changes silently failed to update the UI. Fixed.
+
+- **Direct CAT command replies now flow through state correctly.** Pre-existing bug uncovered while implementing the ATU work: `CatMultiplexerService.OnMessageReceived` consumes replies to outgoing commands BEFORE the dispatcher sees them, so any post-command state queries (like the new post-swap `AC;` refresh) silently returned a value to the controller but never updated state. The affected paths now parse the reply in the controller directly.
+
+### Calibration
+
+- **FTdx10 default S-meter calibration updated** with real-world measurement from Jacek SP3L (Discussion #30). The shipped default's +40 dB point moved from raw=208 to raw=213 to match what Jacek measured on his radio. PWR / SWR / Compression / ALC / TPA / IDD / VPA all agreed with the existing default, so only this one point changed.
+
+### Documentation
+
+- **"Project direction" section added to README.** A short evergreen statement about how YWC develops, which radios get tested, and how reporter-driven the project is. Aimed at new users and prospective sponsors.
+
+- **VOICE_CONTROL.md preview included.** A 700+ line document covering the in-progress voice control feature (Alexa via Cloudflare Tunnel). The feature itself is not shipping in v2.3.7 — it's still gated on an open Amazon support case. The docs ship as a preview so interested users can review the setup commitment and judge whether they'll want voice control once the feature lands. The document includes a clear "not yet shipped" banner at the top.
+
+- **Spectrum span list typo fixed** in README. The spectrum-display feature list was missing the 62.5 kHz and 125 kHz spans.
+
+- **USER_MANUAL aligned with all of the above.** Seven sections updated to describe the new behaviour: Power section (radio-as-source-of-truth), VFO Panels (single-receiver greying), ATU button (short tap vs long press), Antenna control (per-band memory), Backup & Restore table (Antenna added to per-band list), Diagnostics (CPU/Memory mention), Screen Reader Support (assertive + debounces).
+
+### Known issues
+
+- **#20 — FTdx10 IF Width dropdown 3.0 kHz entry.** Thomas (OZ1JTE) reports that selecting "3.0 kHz" in YWC's IF Width dropdown delivers something other than 3000 Hz on his FTdx10, with the misalignment continuing above 2900 Hz. Jacek SP3L ran the same test on his own FTdx10 and could not reproduce — for him every dropdown entry maps correctly. The two radios likely differ in firmware version. We've asked Thomas to share his firmware versions so we can compare against Jacek's; pending that data we have no actionable change to make. If you're on an FTdx10 and notice the same issue, please share your firmware versions on #20.
+
+---
 
 ## 2026-06-12 - v2.3.6
 
