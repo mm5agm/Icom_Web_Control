@@ -225,9 +225,9 @@ Reporter-driven release across five contributors — Jacek SP3L, Thomas OZ1JTE, 
 
 - **USER_MANUAL aligned with all of the above.** Seven sections updated to describe the new behaviour: Power section (radio-as-source-of-truth), VFO Panels (single-receiver greying), ATU button (short tap vs long press), Antenna control (per-band memory), Backup & Restore table (Antenna added to per-band list), Diagnostics (CPU/Memory mention), Screen Reader Support (assertive + debounces).
 
-### Known issues
+### Update post-release
 
-- **#20 — FTdx10 IF Width dropdown 3.0 kHz entry.** Thomas (OZ1JTE) reports that selecting "3.0 kHz" in YWC's IF Width dropdown delivers something other than 3000 Hz on his FTdx10, with the misalignment continuing above 2900 Hz. Jacek SP3L ran the same test on his own FTdx10 and could not reproduce — for him every dropdown entry maps correctly. The two radios likely differ in firmware version. We've asked Thomas to share his firmware versions so we can compare against Jacek's; pending that data we have no actionable change to make. If you're on an FTdx10 and notice the same issue, please share your firmware versions on #20.
+- **#20 — FTdx10 IF Width dropdown 3.0 kHz entry — RESOLVED.** Thomas OZ1JTE re-tested v2.3.6 after restarting YWC and found the 3.0 kHz dropdown entry was present and all step increments tracked correctly. The original report appears to have been a stale-state issue (browser cache, in-memory state, or a UI not refreshing) that cleared with a restart. Issue #20 closed 2026-06-15. No code change in v2.3.7 was related to this; the dropdown table was unchanged.
 
 ---
 
