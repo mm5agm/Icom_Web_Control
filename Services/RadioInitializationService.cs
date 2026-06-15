@@ -161,11 +161,15 @@ namespace Yaesu_Web_Control.Services
                     stateTasks.Add(multiplexer.SendCommandAsync(CatCommands.FormatMode(persistedState.ModeB, true), "Initialization", stoppingToken)
                         .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ModeB = persistedState.ModeB; }));
                 }
-                if (persistedState.Power > 0)
-                {
-                    stateTasks.Add(multiplexer.SendCommandAsync($"PC{persistedState.Power};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.Power = persistedState.Power; }));
-                }
+                // RF Power is deliberately NOT restored from persisted state
+                // on connect (Issue #35, SP3L-Jacek 2026-06-14). The radio is
+                // the source of truth: if the operator changed the front-panel
+                // power knob while YWC was closed, restoring YWC's last-saved
+                // value would silently overwrite their setting. Same pattern
+                // as MIC GAIN / Speech Processor / PROC LEVEL (Issue #16).
+                // The PC; query in readQueries below populates YWC's UI with
+                // whatever the radio currently has. Front-panel changes while
+                // YWC is running flow through the dispatcher's "PC" case.
                 if (!string.IsNullOrEmpty(persistedState.AntennaA))
                 {
                     stateTasks.Add(multiplexer.SendCommandAsync($"AN0{persistedState.AntennaA};", "Initialization", stoppingToken)
@@ -319,6 +323,8 @@ namespace Yaesu_Web_Control.Services
                     "MG;",                   // MIC Gain
                     "PR;",                   // Speech Processor on/off
                     "PL;",                   // Processor Level
+                    "PC;",                   // RF Power (Issue #35) — radio is
+                                             //   source of truth on connect
                     "ML0;", "ML1;",          // Monitor on/off / level
                     // CW
                     "KP;",                   // CW Pitch

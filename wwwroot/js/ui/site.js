@@ -1051,8 +1051,21 @@ connection.on("RadioStateUpdate", function (update) {
     }
     if (update.property === "Power") {
         if (typeof window.updatePowerDisplay === 'function') window.updatePowerDisplay("A", update.value);
+        // Update both the per-VFO slider (dual-receiver layout) AND the
+        // unified `powerSlider` used on single-receiver radio layouts.
+        // The old code only updated powerSliderA, so on FTdx10 a front-
+        // panel power change moved the displayed value but left the slider
+        // visually frozen at the previous position — reported by SP3L-Jacek
+        // as #36 on v2.3.6.
         const sliderA = document.getElementById('powerSliderA');
         if (sliderA) sliderA.value = update.value;
+        const slider = document.getElementById('powerSlider');
+        if (slider) {
+            slider.value = update.value;
+            // Repaint the fill-percentage CSS custom property so the
+            // visual progress track matches the new position.
+            if (typeof updateSliderFill === 'function') updateSliderFill(slider);
+        }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('power', update.value);
     }
 
