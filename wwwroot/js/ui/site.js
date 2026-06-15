@@ -649,12 +649,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-    // Update powerValue label live as slider moves (outer/global version)
+    // Update powerValue label live as slider moves (outer/global version).
+    // NOTE: deliberately no longer initialises the label from slider.value
+    // on page load. The slider has step=5 so the browser snaps the
+    // server-rendered exact value (e.g. 91 W from the radio) to the
+    // nearest step (90 W). Reading that back into the label gave the
+    // operator a label that disagreed with what the radio is actually
+    // doing — Jacek SP3L reported this on #35 follow-up. The Razor
+    // template now renders the actual Power into the label directly;
+    // SignalR Power pushes update the label using the exact value, not
+    // the rounded slider position. The 'input' listener below only fires
+    // on user interaction (programmatic .value sets don't trigger it),
+    // so user-moves-slider still updates the label to the chosen step.
     const slider = document.getElementById('powerSlider');
     const display = document.getElementById('powerValue');
     if (slider && display) {
-        // Initialize label to slider value on page load
-        display.textContent = window.MeterFormatters.powerLabel(slider.value);
         slider.addEventListener('input', function () {
             display.textContent = window.MeterFormatters.powerLabel(slider.value);
         });
