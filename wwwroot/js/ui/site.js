@@ -413,30 +413,45 @@ window.setAntenna = async function (receiver, antenna) {
     }
 };
 
+// Centralised radio -> max-power mapping. Source of truth used by both
+// updatePowerSliderMax implementations. Without this, only the two FTdx101
+// variants were named explicitly and other 100 W radios (FTdx10, FT-710,
+// FTDX3000, FT-991A) fell through to a 200 W cap (#37, SP3L-Jacek 2026-06-16).
+function modelMaxPower(model) {
+    if (!model) return 200;
+    switch (model.toLowerCase()) {
+        case "ftdx101mp": return 200;
+        case "ftdx101d":
+        case "ftdx10":
+        case "ft-710":
+        case "ftdx3000":
+        case "ft-991a":
+            return 100;
+        default: return 200;
+    }
+}
+window.modelMaxPower = modelMaxPower;
+
 // Outer power slider max updater
 function updatePowerSliderMax(maxPower) {
     const slider = document.getElementById('powerSlider');
     const labelMax = document.getElementById('powerMaxLabel');
+    const model = (window.state && window.state.radioModel) || null;
+    const actualMax = model
+        ? modelMaxPower(model)
+        : (typeof maxPower === "number" ? maxPower : 200);
 
-    // Always enforce correct max for FTdx101D and FTdx101MP
-    let actualMax = 200;
-    if (window.state && window.state.radioModel) {
-        const model = window.state.radioModel.toLowerCase();
-        if (model === "ftdx101d") {
-            actualMax = 100;
-        } else if (model === "ftdx101mp") {
-            actualMax = 200;
-        } else if (typeof maxPower === "number") {
-            actualMax = maxPower;
+    if (slider) {
+        slider.max = actualMax;
+        slider.min = 5;
+        if (parseInt(slider.value, 10) > actualMax) {
+            slider.value = actualMax;
+            const display = document.getElementById('powerValue');
+            if (display && window.MeterFormatters) {
+                display.textContent = window.MeterFormatters.powerLabel(actualMax);
+            }
         }
-    } else if (typeof maxPower === "number") {
-        actualMax = maxPower;
     }
-    // Always enforce correct max for FTdx101D
-    if (window.state && window.state.radioModel && window.state.radioModel.toLowerCase() === "ftdx101d") {
-        actualMax = 100;
-    }
-    if (slider) slider.max = actualMax;
     if (labelMax) labelMax.textContent = window.MeterFormatters.powerLabel(actualMax);
 }
 
@@ -2625,26 +2640,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updatePowerSliderMax(maxPower) {
-        // Enforce correct min/max for FTdx101D and FTdx101MP
         const slider = document.getElementById('powerSlider');
         const labelMax = document.getElementById('powerMaxLabel');
-        let actualMax = 200;
-        let actualMin = 5;
-        if (state.radioModel) {
-            const model = state.radioModel.toLowerCase();
-            if (model === "ftdx101d") {
-                actualMax = 100;
-            } else if (model === "ftdx101mp") {
-                actualMax = 200;
-            } else if (typeof maxPower === "number") {
-                actualMax = maxPower;
-            }
-        } else if (typeof maxPower === "number") {
-            actualMax = maxPower;
-        }
+        const actualMax = state.radioModel
+            ? window.modelMaxPower(state.radioModel)
+            : (typeof maxPower === "number" ? maxPower : 200);
+
         if (slider) {
             slider.max = actualMax;
-            slider.min = actualMin;
+            slider.min = 5;
+            if (parseInt(slider.value, 10) > actualMax) {
+                slider.value = actualMax;
+                const display = document.getElementById('powerValue');
+                if (display) display.textContent = window.MeterFormatters.powerLabel(actualMax);
+            }
             updateSliderFill(slider);
         }
         if (labelMax) labelMax.textContent = window.MeterFormatters.powerLabel(actualMax);
