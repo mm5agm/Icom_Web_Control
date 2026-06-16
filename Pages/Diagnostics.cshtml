@@ -88,7 +88,7 @@
                             <option value="VDDMeter">VDDMeter</option>
                             <option value="Temperature">Temperature</option>
                         </optgroup>
-                        <optgroup label="VFO / Split">
+                        <optgroup label="VFO state">
                             <option value="SplitMode">SplitMode</option>
                             <option value="TxVfo">TxVfo</option>
                             <option value="FrequencyA">FrequencyA</option>
@@ -210,17 +210,13 @@
         indicator.style.color = capturing ? '#dc3545' : '';
     }
 
-    // Preset: "Split investigation set" selects all VFO/split-related properties
-    // at once. The dropdown stores the sentinel value __SPLIT_INVESTIGATION__
-    // which renderLog() expands into the list below at match time.
+    // Preset: "Split investigation set" — the minimal set of properties
+    // that actually fire during split toggle and A<->B swap, plus
+    // IsTransmitting to confirm which VFO keyed during a test transmit.
     const SPLIT_INVESTIGATION_PROPS = new Set([
         'SplitMode', 'TxVfo',
         'FrequencyA', 'FrequencyB',
         'ModeA', 'ModeB',
-        'BandA', 'BandB',
-        'AntennaA', 'AntennaB',
-        'AtuEnabled', 'AtuTuning',
-        'RxClarOn', 'TxClarOn',
         'IsTransmitting'
     ]);
 
