@@ -354,7 +354,7 @@ namespace Yaesu_Web_Control.Services
                     "VD;",                   // VOX Delay
                 };
                 foreach (var q in readQueries)
-                    await multiplexer.SendCommandAsync(q, "Initialization", stoppingToken);
+                    await multiplexer.SendCommandAndDispatchAsync(q, "Initialization", stoppingToken);
 
                 // 5. Set IsInitialized = true FIRST to allow property changes to be persisted and broadcast
                 radioStateService.IsInitialized = true;
