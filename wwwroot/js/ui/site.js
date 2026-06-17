@@ -742,14 +742,17 @@ function applyVfoActiveStyling() {
     // single spectrum always shows the live receive signal. The second
     // spectrum panel is hidden permanently by updateContainerVisibility().
     const splitOn = splitMode > 0;
-    const inactiveIsB = splitOn ? (txVfo === 1) : (txVfo === 0);
-    if (inactiveIsB) {
-        aCol.classList.remove('vfo-inactive');
-        bCol.classList.add('vfo-inactive');
-    } else {
-        aCol.classList.add('vfo-inactive');
-        bCol.classList.remove('vfo-inactive');
-    }
+    const inactiveCol = (splitOn ? (txVfo === 1) : (txVfo === 0)) ? bCol : aCol;
+    const activeCol   = (inactiveCol === aCol) ? bCol : aCol;
+
+    activeCol.classList.remove('vfo-inactive', 'vfo-tx-editable');
+    inactiveCol.classList.add('vfo-inactive');
+    // R10/R11: in split mode the grey panel IS the TX VFO — operators must
+    // still be able to set the TX frequency from YWC without un-splitting.
+    // The .vfo-tx-editable class re-enables pointer-events on the frequency
+    // display while leaving every other control on the grey panel read-only.
+    inactiveCol.classList.toggle('vfo-tx-editable', splitOn);
+
     // Make sure neither spectrum carries a stale inactive class from a
     // previous render — in case the user switched RadioModel from
     // dual-receiver to single-receiver mid-session.

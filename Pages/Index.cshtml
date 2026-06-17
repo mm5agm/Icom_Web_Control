@@ -143,6 +143,21 @@
         pointer-events: none;
         transition: opacity 0.25s ease, filter 0.25s ease;
     }
+    /* R10/R11 (Jacek SP3L #34): in split mode the grey panel IS the TX VFO
+       and its frequency must remain interactive so operators can set the TX
+       frequency from YWC without un-splitting first. The .vfo-tx-editable
+       class is added by applyVfoActiveStyling() only to the inactive panel
+       and only when splitMode>0; it carves out an exception to .vfo-inactive
+       for the frequency display + up/down controls. Every other control on
+       the grey panel stays at the parent's reduced opacity + pointer-events:
+       none so it shows-but-doesn't-respond (R5/R9 read-only-but-displaying). */
+    .vfo-inactive.vfo-tx-editable .frequency-display,
+    .vfo-inactive.vfo-tx-editable [id$="-controls"] {
+        pointer-events: auto;
+        opacity: 1;
+        filter: none;
+    }
+
     /* Hide live receive indicators on the inactive VFO panel — on a real
        single-receiver radio there is no signal data for the inactive VFO,
        so showing a moving S-meter and a scrolling history would be
