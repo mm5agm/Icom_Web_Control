@@ -721,16 +721,29 @@ function applyVfoActiveStyling() {
         return;
     }
 
-    // Single-receiver: grey out whichever VFO is not the current TX VFO.
+    // Single-receiver: which panel is "inactive" depends on whether split
+    // mode is on (per SP3L Jacek's R1-R12 spec in #34):
+    //
+    //   Normal mode (R2): white = active VFO (TxVfo), grey = the other.
+    //                     Operator can only receive on the active VFO; the
+    //                     inactive one is just stored frequency/mode state.
+    //
+    //   Split mode  (R7): white = RX VFO (NOT TxVfo), grey = TX VFO.
+    //                     The radio receives on the white VFO and transmits
+    //                     on the grey VFO. The TX VFO is "inactive" from a
+    //                     receive perspective even though it's the one that
+    //                     will key when PTT engages — hence still grey.
+    //
+    // The TX button and SPLIT badge land on the grey panel in split mode
+    // (R8) automatically since updateTxButton() positions the button on
+    // TxVfo's column, which is now the grey one.
+    //
     // The spectrum panel is NOT greyed — on single-receiver radios the
-    // single spectrum always shows the live receive signal, which by
-    // definition tracks the active VFO. The second spectrum panel is
-    // hidden permanently by updateContainerVisibility() so there's no
-    // inactive spectrum to grey here.
-    // In split mode TxVfo and listening VFO can differ; first-pass
-    // treats TxVfo as the "active" VFO. Refine if someone reports
-    // split-mode awkwardness.
-    if (txVfo === 0) {
+    // single spectrum always shows the live receive signal. The second
+    // spectrum panel is hidden permanently by updateContainerVisibility().
+    const splitOn = splitMode > 0;
+    const inactiveIsB = splitOn ? (txVfo === 1) : (txVfo === 0);
+    if (inactiveIsB) {
         aCol.classList.remove('vfo-inactive');
         bCol.classList.add('vfo-inactive');
     } else {
@@ -838,6 +851,11 @@ async function setSplit(mode) {
             const data = await r.json();
             splitMode = data.splitMode;
             updateSplitButton();
+            // R7: greying flips between normal and split — refresh after the
+            // local toggle even though the radio will also auto-info-broadcast
+            // SplitMode and trigger applyVfoActiveStyling that way (covers the
+            // window before the broadcast arrives).
+            applyVfoActiveStyling();
         }
     } catch {}
 }
@@ -1127,6 +1145,9 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "SplitMode") {
         splitMode = update.value;
         updateSplitButton();
+        // R7 (Jacek SP3L #34): greying flips when split toggles — the inactive
+        // panel becomes the TX VFO (grey) and the RX VFO becomes white.
+        applyVfoActiveStyling();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('split', update.value);
     }
 
