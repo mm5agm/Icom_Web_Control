@@ -126,6 +126,23 @@ namespace Yaesu_Web_Control.Services
                 radioStateService.RadioPowerOn = true;
                 logger.LogInformation("[RadioInitializationService] Radio responded to FA;: {Response}", faResponse);
 
+                // Safety: force the radio into RX before doing anything else.
+                // Yaesu HF rigs preserve MOX/TX state across power cycles in
+                // some firmwares, so a radio powered off mid-transmit (by YWC,
+                // WSJT-X via rigctld, or a stuck PTT) can come back up still
+                // transmitting. If we don't clear it here, the next operation
+                // happens on a live carrier.
+                try
+                {
+                    await multiplexer.SendCommandAsync("TX0;", "Initialization", stoppingToken);
+                    radioStateService.IsTransmitting = false;
+                    logger.LogInformation("[RadioInitializationService] Sent TX0; safety RX-enforce on connect");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "[RadioInitializationService] TX0; safety RX-enforce failed (non-fatal)");
+                }
+
                 // Send initialization commands and wait for DT0 response (with timeout)
                 logger.LogInformation("[RadioInitializationService] Sending full initialization sequence and waiting for DT0 (timeout 5s)...");
 
@@ -337,7 +354,7 @@ namespace Yaesu_Web_Control.Services
                     "VD;",                   // VOX Delay
                 };
                 foreach (var q in readQueries)
-                    await multiplexer.SendCommandAsync(q, "Initialization", stoppingToken);
+                    await multiplexer.SendCommandAndDispatchAsync(q, "Initialization", stoppingToken);
 
                 // 5. Set IsInitialized = true FIRST to allow property changes to be persisted and broadcast
                 radioStateService.IsInitialized = true;
@@ -463,6 +480,23 @@ namespace Yaesu_Web_Control.Services
             using var scopeForLogger = _serviceProvider.CreateScope();
             var logger = scopeForLogger.ServiceProvider.GetService<ILogger<RadioInitializationService>>();
             logger?.LogInformation("[RadioInit] StopAsync entered");
+
+            // Safety: send TX0; before disconnecting so YWC never leaves the
+            // radio in transmit. Some Yaesu firmwares preserve MOX/TX state
+            // across power cycles, so a shutdown mid-transmit could otherwise
+            // result in the radio coming back up still keying. Best-effort
+            // with a 1 s timeout so a hung send can't stall host shutdown.
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(TimeSpan.FromSeconds(1));
+                await _multiplexer.SendCommandAsync("TX0;", "RadioInit-Shutdown", cts.Token);
+                logger?.LogInformation("[RadioInit] TX0; safety RX-enforce sent on shutdown");
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "[RadioInit] TX0; on shutdown failed — non-fatal");
+            }
 
             // FTdx101 power-meter restore (discussion #6, F1ubw). During normal
             // operation MeterPollingService sets the radio's front-panel meter

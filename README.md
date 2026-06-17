@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.7-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.8-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -137,7 +137,11 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 
 ## Project direction
 
-Active development is currently focused on bug fixes and polish for the supported radios. The next significant new direction is **voice control via Amazon Alexa**, primarily as an accessibility tool for partially sighted and blind operators — hands-free band changes, frequency entry, and mode switching without needing to see the screen. That work lives on the `feature/alexa-voice-control` branch and won't disturb the main release line until it's ready to ship. See [VOICE_CONTROL.md](VOICE_CONTROL.md) for setup details and an honest assessment of what it takes to run.
+Active development is currently focused on bug fixes and polish for the supported radios. The next significant new direction is **voice control via Amazon Alexa**, primarily as an accessibility tool for partially sighted and blind operators — hands-free band changes, frequency entry, mode switching, and rig status without needing to see the screen.
+
+**Proof of concept succeeded 2026-06-17.** A real Echo device successfully sent voice commands (over a Cloudflare tunnel to a local YWC install) and got spoken responses back — full signature verification, no bypasses. The current focus is making the setup easier for users: the present procedure (custom Alexa Skill, Amazon Developer Console wizard, Cloudflare tunnel install, etc.) is too involved for most hams. The goal is an in-app setup wizard that drives the whole flow end-to-end with the user only providing account credentials.
+
+That work continues on the `feature/alexa-voice-control` branch and won't disturb the main release line until the setup-wizard polish is done. See [VOICE_CONTROL.md](VOICE_CONTROL.md) for the current setup procedure (including a one-paste JSON model upload that already removes about 30 minutes of manual Skill configuration).
 
 ### Which radios get tested?
 
@@ -158,8 +162,6 @@ If you're on an older version that pre-dates the update check, or you want to kn
   4. Choose **Custom** and tick only **Releases**
   5. Save — you'll get one email per release, and nothing in between
 
-- **Join the [Yaesu Web Control Groups.io list](https://groups.io/g/Yaesu-Web-Control)** — a small, low-traffic mailing list where new releases are announced alongside Q&A from other users. Good for hams who prefer email lists to GitHub.
-
 - **RSS / Atom feed** — if you use a feed reader (Feedly, NewsBlur, Inoreader, Thunderbird, etc.), subscribe to https://github.com/mm5agm/Yaesu_Web_Control/releases.atom — new releases appear in your reader without any account or email signup.
 
 If you're talking to another Yaesu operator running an older YWC, **a heads-up that a new version exists is the most reliable way it reaches them**. Word of mouth still works — there's no email list of all downloaders and no way to reach the very early users who don't fall into any of the channels above.
@@ -167,6 +169,43 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 ---
 
 ## Release Notes
+
+## 2026-06-17 - v2.3.8
+
+A quick follow-up to v2.3.7 (two days ago) — we don't normally ship this close together, but Jacek SP3L's hands-on testing on his FTdx10 surfaced a UI behaviour problem that the Yaesu manual was too ambiguous to anticipate. Working out what single-receiver VFO panels should *do* in normal mode versus split mode needed empirical testing: which VFO is "active", which controls respond, what happens when split is engaged via the front panel versus YWC, what about the frequency field on the inactive panel? Jacek wrote a 12-point spec (R1–R12) describing the answers from his point of view, [posted on #34](https://github.com/mm5agm/Yaesu_Web_Control/issues/34), and v2.3.8 implements it. Plus a few filter-scope improvements that came out of the testing.
+
+### Single-receiver radio UI rework (FTdx10, FT-710, FTDX3000, FT-991A)
+
+Driven by Jacek SP3L's R1–R12 spec in [#34](https://github.com/mm5agm/Yaesu_Web_Control/issues/34).
+
+- **Split-mode greying flipped.** In normal mode the inactive VFO is grey (as before). In split mode the **TX** VFO is grey and the **RX** VFO is white — the opposite. The TX-side controls are read-only-but-displayed; the RX side is where the operator's attention belongs. Previously the same greying applied regardless of split, which left the operator looking at a greyed-out RX VFO they actually needed to interact with.
+- **TX button and SPLIT badge follow the grey panel in split mode.** Implicit from the new greying logic — both already track the TX VFO.
+- **TX frequency editable on the grey panel in split.** When in split mode the grey panel IS the TX VFO; you need to be able to set the TX frequency without un-splitting first. Click a digit and scroll the mouse wheel, or use the keyboard-icon button next to MHz to type one in. Other controls (mode, IF Width, notch, etc.) stay read-only on the grey panel — they show their stored values for reference but can't be edited.
+- **Antenna selector hidden on radios with a single antenna jack** — FTdx10 and FT-991A. Showing a per-VFO antenna dropdown on a radio with one ANT jack was visual noise.
+
+### Filter scope display improvements
+
+- **Wide CW filters now fit on the canvas.** At 3 kHz and 12 kHz CW the audio passband centres on +700 Hz and extends into negative Hz on the lower side; the axis previously ran 0–3.5 kHz and clipped the left half of the trapezium right off the canvas edge. The axis now tracks the current passband, so the full trapezium with both red slope lines is visible at every IF Width.
+- **Trapezium fills more of the canvas at narrow filters.** Where a 300 Hz CW filter previously occupied ~10 % of the panel width with the rest empty, the axis now zooms to the passband at all widths — making the trapezium, contour arrowhead, manual notch marker, and APF marker proportionally bigger and easier to read.
+- **Contour slider range matches the current passband.** Setting contour to 2 kHz on a 300 Hz CW filter has no audible effect — the contour position is outside the filter. The slider now restricts to the current passband's audio range (clamped to the radio's hard CAT range as an outer bound), so every position on the slider has an audible effect. When the IF Width narrows past the current contour value, the value is clamped in place and pushed to the radio automatically.
+
+### Other fixes
+
+- **Filter-scope axis labels at the canvas edges no longer get clipped.** The leftmost "-1k" label was rendering as just "k" on wide CW because the centred text placement put half the label off-screen — now the first and last labels are left- / right-aligned to the canvas edges.
+- **TX0; safety command** sent to the radio on both connect and disconnect, so YWC never leaves the radio in transmit even if the operator closes mid-transmit. Some Yaesu firmwares preserve MOX/TX state across power cycles, so a radio powered off mid-transmit could otherwise come back up still keying.
+
+### Bug fix
+- **#35 take 2 (Jacek SP3L) — RF Power read-back on connect.** The v2.3.7 fix added `PC;` to YWC's "read these properties from the radio on startup" list, but the loop that processes that list discarded responses instead of routing them through the state dispatcher — so YWC kept showing the persisted Power value (e.g. 5 W) on startup instead of reading the radio's current value (e.g. 33 W). The same loop was silently failing for ~20 other properties too (MIC Gain, Speech Processor, AGC, IPO, Attenuator, NR, NB, NB Level, Auto Notch, RF Gain, Squelch, AF Gain, Monitor, CW Pitch/Speed/Break-in, VOX) which now all populate correctly on startup.
+- **#37 (Jacek SP3L) — RF Power slider max on non-FTdx101MP radios.** The slider's max value only named the two FTdx101 variants explicitly; every other 100 W radio (FTdx10, FT-710, FTDX3000, FT-991A) fell through to a 200 W default, letting operators drag the slider to 150 W on a 100 W radio. The slider now reads its max from a single radio-model lookup, and clamps the displayed value if it ever exceeds the new max (e.g. when changing radio model in Settings during a session).
+
+### Diagnostics page improvements
+
+A few quality-of-life changes during the FTdx10 testing this round:
+
+- **Start / Stop capture instead of always-on.** The Diagnostics page no longer fills its event-log buffer continuously while you're not looking — press **Start** to begin capturing, **Stop** to halt. An idle Diagnostics tab now uses zero buffer and zero render work.
+- **Inline COM Ports / CAT Status panels.** The two buttons used to open new browser tabs (and the back arrow didn't return you to Diagnostics); they now expand collapsible panels inline on the Diagnostics page itself. New `/api/ports` endpoint backs the COM Ports panel.
+- **Render throttling and pre-filtering.** With a filter set, the log buffer fills only with matching events, and the on-screen render runs at most 10 Hz — both make rare events (like SplitMode toggles) survive long enough to be inspected at meter-poll rates.
+- **VFO / Split investigation preset.** New "Split investigation set" entry in the filter dropdown selects the minimal set of properties that actually fire during a split toggle and A↔B swap test — useful when capturing diagnostics for a split-mode bug report.
 
 ## 2026-06-15 - v2.3.7
 
@@ -788,7 +827,7 @@ A "tidy up the seams" release on the back of v2.0.0 — adds the About page, sys
 
 ### Reminder
 - YWC is **Windows-only**.
-- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)), not Groups.io — searchable, threaded, traceable. With v2.1.0, the About page's **Report a bug on GitHub** button makes this near-frictionless.
+- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)) — searchable, threaded, traceable. With v2.1.0, the About page's **Report a bug on GitHub** button makes this near-frictionless.
 - The **user manual** is comprehensive: read it from inside the app via the **User Manual** link in the top nav (full screenshots), or on GitHub at [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -842,7 +881,7 @@ A major-version release covering ~20 user-facing features added since v1.8.0. Wo
 
 ### Reminder
 - YWC is **Windows-only**.
-- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)), not Groups.io — searchable, threaded, traceable.
+- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)) — searchable, threaded, traceable.
 - The **user manual** is comprehensive: read it from inside the app via the **User Manual** link in the top nav (full screenshots), or on GitHub at [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -876,7 +915,7 @@ I personally operate SSB and FT8 on the FTdx101MP only. **I still need testers f
 - **FT-710, FTdx10, FTDX3000** — basic operation, split, memories, and all controls
 - **VOX**, **CW Keyer**, and **FM Repeater** — I don't use these myself; please test the popup panels and report whether the controls match the radio's behaviour
 
-Please report any issues or feedback on the [Groups.io discussion group](https://groups.io/g/Yaesu-Web-Control/topics) or the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues). Even a quick "works fine on FT-710" is genuinely helpful.
+Please report any issues or feedback on the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues). Even a quick "works fine on FT-710" is genuinely helpful.
 
 ### Fixed
 
@@ -915,7 +954,7 @@ I personally operate SSB and FT8 on the FTdx101MP only. **I need testers for:**
 - **CW Keyer** — I don't operate CW; please test speed, break-in modes, semi break-in delay, and the M1–M5 memory keyer buttons
 - **FM Repeater** — I don't use FM repeaters; please test shift, offset, CTCSS encode/decode, and the Apply button
 
-Please report any issues or feedback on the [Groups.io discussion group](https://groups.io/g/Yaesu-Web-Control/topics) or the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues). Even a quick "works fine on FT-710" is genuinely helpful — it tells me what I can stop worrying about.
+Please report any issues or feedback on the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues). Even a quick "works fine on FT-710" is genuinely helpful — it tells me what I can stop worrying about.
 
 ### Fixed
 
@@ -1219,7 +1258,7 @@ Please report any issues or feedback on the [Groups.io discussion group](https:/
 
 ## 2026-04-17 - v0.9.0 RC1
 
-This is a release candidate for what may be the final major release. Please test and report any issues via the Groups.io group.
+This is a release candidate for what may be the final major release. Please test and report any issues via the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues).
 
 ### Added
 
@@ -1281,13 +1320,6 @@ This is a release candidate for what may be the final major release. Please test
 ### Changed
 
 - Minor fixes and improvements
-
-
-## 2026-04-05 - v0.7.3
-
-### Changed
-
-- Add groups.io community link to README
 
 
 ## 2026-04-05 - v0.7.2

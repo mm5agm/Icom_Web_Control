@@ -22,7 +22,8 @@
     // editing it via CAT would silently swap the radio's active VFO.
     // Dual-receiver radios (FTdx101MP/D) keep both panels active because
     // each VFO is its own physical receiver chain.
-    bool isSingleReceiver = Yaesu_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
+    bool isSingleReceiver  = Yaesu_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
+    bool hasAntennaSelector = Yaesu_Web_Control.Services.RadioCapabilities.HasAntennaSelector(Model.RadioModel);
 
     string clarModeInit = (Model.RadioState.RxClarOn, Model.RadioState.TxClarOn) switch
     {
@@ -143,6 +144,28 @@
         pointer-events: none;
         transition: opacity 0.25s ease, filter 0.25s ease;
     }
+    /* R10/R11 (Jacek SP3L #34): in split mode the grey panel IS the TX VFO
+       and its frequency must remain interactive so operators can set the TX
+       frequency from YWC without un-splitting first. The .vfo-tx-editable
+       class is added by applyVfoActiveStyling() only to the inactive panel
+       and only when splitMode>0; it carves out an exception to .vfo-inactive
+       for the frequency display + up/down controls. Every other control on
+       the grey panel stays at the parent's reduced opacity + pointer-events:
+       none so it shows-but-doesn't-respond (R5/R9 read-only-but-displaying). */
+    .vfo-inactive.vfo-tx-editable .frequency-display,
+    .vfo-inactive.vfo-tx-editable [id$="-controls"],
+    .vfo-inactive.vfo-tx-editable .fkb-open-btn {
+        /* !important is necessary on the button specifically: the freq
+           display (a <span>) accepts the override at normal specificity,
+           but the <button> computes pointer-events: none even with the
+           same selector pattern -- suspected interaction with a UA or
+           Bootstrap rule that beats ordinary specificity on <button>
+           elements. Forcing the carve-out is the pragmatic fix.  */
+        pointer-events: auto !important;
+        opacity: 1 !important;
+        filter: none !important;
+    }
+
     /* Hide live receive indicators on the inactive VFO panel — on a real
        single-receiver radio there is no signal data for the inactive VFO,
        so showing a moving S-meter and a scrolling history would be
@@ -577,22 +600,25 @@
                                         }
                                     }
                                 </select>
-                                <select class="form-select form-select-sm vfo-ant-select" id="antennaSelectA"
-                                        aria-label="VFO A antenna"
-                                        title="VFO A antenna"
-                                        onchange="window.radioControl.setAntenna('A', this.value)">
-                                    @foreach (var ant in new[] { "1", "2", "3" })
-                                    {
-                                        @if (Model.RadioState.AntennaA == ant)
+                                @if (hasAntennaSelector)
+                                {
+                                    <select class="form-select form-select-sm vfo-ant-select" id="antennaSelectA"
+                                            aria-label="VFO A antenna"
+                                            title="VFO A antenna"
+                                            onchange="window.radioControl.setAntenna('A', this.value)">
+                                        @foreach (var ant in new[] { "1", "2", "3" })
                                         {
-                                            <option value="@ant" selected>ANT @ant</option>
+                                            @if (Model.RadioState.AntennaA == ant)
+                                            {
+                                                <option value="@ant" selected>ANT @ant</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@ant">ANT @ant</option>
+                                            }
                                         }
-                                        else
-                                        {
-                                            <option value="@ant">ANT @ant</option>
-                                        }
-                                    }
-                                </select>
+                                    </select>
+                                }
                             </div>
                         </div>
                         <!-- Filter scope display VFO A — sits between band buttons and AGC column -->
@@ -908,22 +934,25 @@
                                         }
                                     }
                                 </select>
-                                <select class="form-select form-select-sm vfo-ant-select" id="antennaSelectB"
-                                        aria-label="VFO B antenna"
-                                        title="VFO B antenna"
-                                        onchange="window.radioControl.setAntenna('B', this.value)">
-                                    @foreach (var ant in new[] { "1", "2", "3" })
-                                    {
-                                        @if (Model.RadioState.AntennaB == ant)
+                                @if (hasAntennaSelector)
+                                {
+                                    <select class="form-select form-select-sm vfo-ant-select" id="antennaSelectB"
+                                            aria-label="VFO B antenna"
+                                            title="VFO B antenna"
+                                            onchange="window.radioControl.setAntenna('B', this.value)">
+                                        @foreach (var ant in new[] { "1", "2", "3" })
                                         {
-                                            <option value="@ant" selected>ANT @ant</option>
+                                            @if (Model.RadioState.AntennaB == ant)
+                                            {
+                                                <option value="@ant" selected>ANT @ant</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@ant">ANT @ant</option>
+                                            }
                                         }
-                                        else
-                                        {
-                                            <option value="@ant">ANT @ant</option>
-                                        }
-                                    }
-                                </select>
+                                    </select>
+                                }
                             </div>
                         </div>
                         <!-- Filter scope display VFO B — sits between band buttons and AGC column -->
@@ -2017,6 +2046,14 @@
                 apfFreqHz:          @Model.RadioState.ApfFreqB,
                 mode:              '@Model.RadioState.ModeB'
             });
+
+            // Tighten the contour sliders' ranges to the current passband
+            // now that the panels (which compute the passband) are ready.
+            // Subsequent recomputes happen on mode / IF Width / roofing changes.
+            if (typeof window.updateContourSliderBounds === 'function') {
+                window.updateContourSliderBounds('A');
+                window.updateContourSliderBounds('B');
+            }
 
             // ── Mode-aware IF Width dropdown ─────────────────────────────────
             // Populate the IF Width dropdowns based on the current mode. The

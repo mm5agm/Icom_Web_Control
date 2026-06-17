@@ -413,30 +413,45 @@ window.setAntenna = async function (receiver, antenna) {
     }
 };
 
+// Centralised radio -> max-power mapping. Source of truth used by both
+// updatePowerSliderMax implementations. Without this, only the two FTdx101
+// variants were named explicitly and other 100 W radios (FTdx10, FT-710,
+// FTDX3000, FT-991A) fell through to a 200 W cap (#37, SP3L-Jacek 2026-06-16).
+function modelMaxPower(model) {
+    if (!model) return 200;
+    switch (model.toLowerCase()) {
+        case "ftdx101mp": return 200;
+        case "ftdx101d":
+        case "ftdx10":
+        case "ft-710":
+        case "ftdx3000":
+        case "ft-991a":
+            return 100;
+        default: return 200;
+    }
+}
+window.modelMaxPower = modelMaxPower;
+
 // Outer power slider max updater
 function updatePowerSliderMax(maxPower) {
     const slider = document.getElementById('powerSlider');
     const labelMax = document.getElementById('powerMaxLabel');
+    const model = (window.state && window.state.radioModel) || null;
+    const actualMax = model
+        ? modelMaxPower(model)
+        : (typeof maxPower === "number" ? maxPower : 200);
 
-    // Always enforce correct max for FTdx101D and FTdx101MP
-    let actualMax = 200;
-    if (window.state && window.state.radioModel) {
-        const model = window.state.radioModel.toLowerCase();
-        if (model === "ftdx101d") {
-            actualMax = 100;
-        } else if (model === "ftdx101mp") {
-            actualMax = 200;
-        } else if (typeof maxPower === "number") {
-            actualMax = maxPower;
+    if (slider) {
+        slider.max = actualMax;
+        slider.min = 5;
+        if (parseInt(slider.value, 10) > actualMax) {
+            slider.value = actualMax;
+            const display = document.getElementById('powerValue');
+            if (display && window.MeterFormatters) {
+                display.textContent = window.MeterFormatters.powerLabel(actualMax);
+            }
         }
-    } else if (typeof maxPower === "number") {
-        actualMax = maxPower;
     }
-    // Always enforce correct max for FTdx101D
-    if (window.state && window.state.radioModel && window.state.radioModel.toLowerCase() === "ftdx101d") {
-        actualMax = 100;
-    }
-    if (slider) slider.max = actualMax;
     if (labelMax) labelMax.textContent = window.MeterFormatters.powerLabel(actualMax);
 }
 
@@ -706,22 +721,38 @@ function applyVfoActiveStyling() {
         return;
     }
 
-    // Single-receiver: grey out whichever VFO is not the current TX VFO.
+    // Single-receiver: which panel is "inactive" depends on whether split
+    // mode is on (per SP3L Jacek's R1-R12 spec in #34):
+    //
+    //   Normal mode (R2): white = active VFO (TxVfo), grey = the other.
+    //                     Operator can only receive on the active VFO; the
+    //                     inactive one is just stored frequency/mode state.
+    //
+    //   Split mode  (R7): white = RX VFO (NOT TxVfo), grey = TX VFO.
+    //                     The radio receives on the white VFO and transmits
+    //                     on the grey VFO. The TX VFO is "inactive" from a
+    //                     receive perspective even though it's the one that
+    //                     will key when PTT engages — hence still grey.
+    //
+    // The TX button and SPLIT badge land on the grey panel in split mode
+    // (R8) automatically since updateTxButton() positions the button on
+    // TxVfo's column, which is now the grey one.
+    //
     // The spectrum panel is NOT greyed — on single-receiver radios the
-    // single spectrum always shows the live receive signal, which by
-    // definition tracks the active VFO. The second spectrum panel is
-    // hidden permanently by updateContainerVisibility() so there's no
-    // inactive spectrum to grey here.
-    // In split mode TxVfo and listening VFO can differ; first-pass
-    // treats TxVfo as the "active" VFO. Refine if someone reports
-    // split-mode awkwardness.
-    if (txVfo === 0) {
-        aCol.classList.remove('vfo-inactive');
-        bCol.classList.add('vfo-inactive');
-    } else {
-        aCol.classList.add('vfo-inactive');
-        bCol.classList.remove('vfo-inactive');
-    }
+    // single spectrum always shows the live receive signal. The second
+    // spectrum panel is hidden permanently by updateContainerVisibility().
+    const splitOn = splitMode > 0;
+    const inactiveCol = (splitOn ? (txVfo === 1) : (txVfo === 0)) ? bCol : aCol;
+    const activeCol   = (inactiveCol === aCol) ? bCol : aCol;
+
+    activeCol.classList.remove('vfo-inactive', 'vfo-tx-editable');
+    inactiveCol.classList.add('vfo-inactive');
+    // R10/R11: in split mode the grey panel IS the TX VFO — operators must
+    // still be able to set the TX frequency from YWC without un-splitting.
+    // The .vfo-tx-editable class re-enables pointer-events on the frequency
+    // display while leaving every other control on the grey panel read-only.
+    inactiveCol.classList.toggle('vfo-tx-editable', splitOn);
+
     // Make sure neither spectrum carries a stale inactive class from a
     // previous render — in case the user switched RadioModel from
     // dual-receiver to single-receiver mid-session.
@@ -823,6 +854,11 @@ async function setSplit(mode) {
             const data = await r.json();
             splitMode = data.splitMode;
             updateSplitButton();
+            // R7: greying flips between normal and split — refresh after the
+            // local toggle even though the radio will also auto-info-broadcast
+            // SplitMode and trigger applyVfoActiveStyling that way (covers the
+            // window before the broadcast arrives).
+            applyVfoActiveStyling();
         }
     } catch {}
 }
@@ -958,6 +994,7 @@ connection.on("RadioStateUpdate", function (update) {
         updateModeSelect('A', update.value);
         updateMicGainLabel(update.value);
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ mode: update.value });
+        updateContourSliderBounds('A');
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('A', update.value);
         if (window.IfWidth && window._radioModel) {
             window.IfWidth.rebuildIfWidthSelect(
@@ -969,6 +1006,7 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ mode: update.value });
+        updateContourSliderBounds('B');
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('B', update.value);
         if (window.IfWidth && window._radioModel) {
             window.IfWidth.rebuildIfWidthSelect(
@@ -1112,6 +1150,9 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "SplitMode") {
         splitMode = update.value;
         updateSplitButton();
+        // R7 (Jacek SP3L #34): greying flips when split toggles — the inactive
+        // panel becomes the TX VFO (grey) and the RX VFO becomes white.
+        applyVfoActiveStyling();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('split', update.value);
     }
 
@@ -1134,11 +1175,13 @@ connection.on("RadioStateUpdate", function (update) {
         const selectEl = document.getElementById('roofingFilterSelectA');
         if (selectEl) selectEl.value = update.value;
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ roofingCode: update.value });
+        updateContourSliderBounds('A');
     }
     if (update.property === "RoofingFilterB") {
         const selectEl = document.getElementById('roofingFilterSelectB');
         if (selectEl) selectEl.value = update.value;
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ roofingCode: update.value });
+        updateContourSliderBounds('B');
     }
 
     // --- AGC ---
@@ -1223,6 +1266,7 @@ connection.on("RadioStateUpdate", function (update) {
             if (exists) el.value = update.value;
         }
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifWidthCode: update.value });
+        updateContourSliderBounds('A');
     }
     if (update.property === "IfWidthB") {
         const el = document.getElementById('ifWidthSelectB');
@@ -1231,6 +1275,7 @@ connection.on("RadioStateUpdate", function (update) {
             if (exists) el.value = update.value;
         }
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifWidthCode: update.value });
+        updateContourSliderBounds('B');
     }
 
     // --- IF SHIFT ---
@@ -1989,6 +2034,52 @@ async function setContourFreq(vfo, hz) {
 }
 window.setContourFreq = setContourFreq;
 
+// Recompute the contour slider's min/max for a VFO based on the current
+// passband (mode + IF Width + roofing). The radio's hard CAT range is
+// preserved as an outer clamp via the slider's initial min/max values,
+// so we never let the user set a value the radio can't accept. If the
+// existing contour value falls outside the new (narrower) range, clamp
+// it in place and send the clamped value to the radio.
+//
+// Called from the SignalR handlers for ModeA/ModeB, IfWidthA/IfWidthB,
+// and the per-VFO roofing-filter changes; also once at startup after the
+// FilterScopePanel instances are constructed.
+function updateContourSliderBounds(vfo) {
+    const panel = window['filterScopePanel' + vfo];
+    if (!panel || typeof panel.getPassband !== 'function') return;
+    const slider = document.getElementById('contourFreqSlider' + vfo);
+    if (!slider) return;
+
+    // Cache the radio's hard limits on first run (the values rendered
+    // server-side from the radio model: 100..3200 for FTdx101, 100..4000
+    // for FTDX3000). After that, future updates only narrow within those.
+    if (slider._hardMin == null) slider._hardMin = parseInt(slider.min);
+    if (slider._hardMax == null) slider._hardMax = parseInt(slider.max);
+
+    const { lo, hi } = panel.getPassband();
+    const newMin = Math.max(slider._hardMin, Math.round(lo));
+    const newMax = Math.min(slider._hardMax, Math.round(hi));
+    if (newMin >= newMax) return;
+
+    // Capture the OLD value before changing min/max — once we set the new
+    // max, the browser auto-clamps slider.value to fit, so reading it
+    // afterwards would always give the clamped (= new max) value and we'd
+    // never realise the value had actually moved.
+    const oldVal  = parseInt(slider.value);
+    const clamped = Math.max(newMin, Math.min(newMax, oldVal));
+
+    slider.min = newMin;
+    slider.max = newMax;
+
+    if (clamped !== oldVal) {
+        slider.value = clamped;
+        const label = document.getElementById('contourFreqValue' + vfo);
+        if (label) label.textContent = clamped + ' Hz';
+        setContourFreq(vfo, clamped);  // updates panel state + sends CAT
+    }
+}
+window.updateContourSliderBounds = updateContourSliderBounds;
+
 async function toggleApf(vfo) {
     const newOn = !apfState[vfo].on;
     apfState[vfo].on = newOn;
@@ -2625,26 +2716,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updatePowerSliderMax(maxPower) {
-        // Enforce correct min/max for FTdx101D and FTdx101MP
         const slider = document.getElementById('powerSlider');
         const labelMax = document.getElementById('powerMaxLabel');
-        let actualMax = 200;
-        let actualMin = 5;
-        if (state.radioModel) {
-            const model = state.radioModel.toLowerCase();
-            if (model === "ftdx101d") {
-                actualMax = 100;
-            } else if (model === "ftdx101mp") {
-                actualMax = 200;
-            } else if (typeof maxPower === "number") {
-                actualMax = maxPower;
-            }
-        } else if (typeof maxPower === "number") {
-            actualMax = maxPower;
-        }
+        const actualMax = state.radioModel
+            ? window.modelMaxPower(state.radioModel)
+            : (typeof maxPower === "number" ? maxPower : 200);
+
         if (slider) {
             slider.max = actualMax;
-            slider.min = actualMin;
+            slider.min = 5;
+            if (parseInt(slider.value, 10) > actualMax) {
+                slider.value = actualMax;
+                const display = document.getElementById('powerValue');
+                if (display) display.textContent = window.MeterFormatters.powerLabel(actualMax);
+            }
             updateSliderFill(slider);
         }
         if (labelMax) labelMax.textContent = window.MeterFormatters.powerLabel(actualMax);
