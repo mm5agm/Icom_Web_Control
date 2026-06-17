@@ -22,7 +22,8 @@
     // editing it via CAT would silently swap the radio's active VFO.
     // Dual-receiver radios (FTdx101MP/D) keep both panels active because
     // each VFO is its own physical receiver chain.
-    bool isSingleReceiver = Yaesu_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
+    bool isSingleReceiver  = Yaesu_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
+    bool hasAntennaSelector = Yaesu_Web_Control.Services.RadioCapabilities.HasAntennaSelector(Model.RadioModel);
 
     string clarModeInit = (Model.RadioState.RxClarOn, Model.RadioState.TxClarOn) switch
     {
@@ -592,22 +593,25 @@
                                         }
                                     }
                                 </select>
-                                <select class="form-select form-select-sm vfo-ant-select" id="antennaSelectA"
-                                        aria-label="VFO A antenna"
-                                        title="VFO A antenna"
-                                        onchange="window.radioControl.setAntenna('A', this.value)">
-                                    @foreach (var ant in new[] { "1", "2", "3" })
-                                    {
-                                        @if (Model.RadioState.AntennaA == ant)
+                                @if (hasAntennaSelector)
+                                {
+                                    <select class="form-select form-select-sm vfo-ant-select" id="antennaSelectA"
+                                            aria-label="VFO A antenna"
+                                            title="VFO A antenna"
+                                            onchange="window.radioControl.setAntenna('A', this.value)">
+                                        @foreach (var ant in new[] { "1", "2", "3" })
                                         {
-                                            <option value="@ant" selected>ANT @ant</option>
+                                            @if (Model.RadioState.AntennaA == ant)
+                                            {
+                                                <option value="@ant" selected>ANT @ant</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@ant">ANT @ant</option>
+                                            }
                                         }
-                                        else
-                                        {
-                                            <option value="@ant">ANT @ant</option>
-                                        }
-                                    }
-                                </select>
+                                    </select>
+                                }
                             </div>
                         </div>
                         <!-- Filter scope display VFO A — sits between band buttons and AGC column -->
@@ -923,22 +927,25 @@
                                         }
                                     }
                                 </select>
-                                <select class="form-select form-select-sm vfo-ant-select" id="antennaSelectB"
-                                        aria-label="VFO B antenna"
-                                        title="VFO B antenna"
-                                        onchange="window.radioControl.setAntenna('B', this.value)">
-                                    @foreach (var ant in new[] { "1", "2", "3" })
-                                    {
-                                        @if (Model.RadioState.AntennaB == ant)
+                                @if (hasAntennaSelector)
+                                {
+                                    <select class="form-select form-select-sm vfo-ant-select" id="antennaSelectB"
+                                            aria-label="VFO B antenna"
+                                            title="VFO B antenna"
+                                            onchange="window.radioControl.setAntenna('B', this.value)">
+                                        @foreach (var ant in new[] { "1", "2", "3" })
                                         {
-                                            <option value="@ant" selected>ANT @ant</option>
+                                            @if (Model.RadioState.AntennaB == ant)
+                                            {
+                                                <option value="@ant" selected>ANT @ant</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@ant">ANT @ant</option>
+                                            }
                                         }
-                                        else
-                                        {
-                                            <option value="@ant">ANT @ant</option>
-                                        }
-                                    }
-                                </select>
+                                    </select>
+                                }
                             </div>
                         </div>
                         <!-- Filter scope display VFO B — sits between band buttons and AGC column -->

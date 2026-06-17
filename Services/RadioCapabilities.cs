@@ -35,4 +35,16 @@ public static class RadioCapabilities
     /// (no P1 band parameter on the receiver-side commands).
     /// </summary>
     public static bool IsSingleReceiver(string radioModel) => !IsDualReceiver(radioModel);
+
+    /// <summary>
+    /// True when the radio has more than one antenna jack and YWC should
+    /// expose a per-VFO antenna selector. Single-antenna radios get the
+    /// selector hidden (Jacek SP3L #34, FTdx10 has one ANT jack — showing
+    /// a selector for a control that does nothing is just visual noise).
+    /// </summary>
+    public static bool HasAntennaSelector(string radioModel) => radioModel switch
+    {
+        "FTdx10" or "FT-991A" => false,
+        _                     => true
+    };
 }
