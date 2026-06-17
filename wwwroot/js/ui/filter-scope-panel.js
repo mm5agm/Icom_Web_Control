@@ -112,30 +112,25 @@ export class FilterScopePanel {
     // canvas edge because the previous fixed [0, rangeHz] axis couldn't
     // represent negative audio Hz.
     _displayBounds() {
-        const mode = (this._state.mode || '').toUpperCase();
-        let lo = 0;
-        let hi;
-        if (mode === 'AM' || mode === 'AM-N') {
-            hi = 6000;
-        } else if (mode === 'FM' || mode === 'FM-N' || mode === 'DATA-FM' || mode === 'DATA-FM-N') {
-            hi = 10000;
-        } else {
-            hi = 3500;
-        }
-        // If the passband fits inside the default range with ≥200 Hz margin
-        // on both sides, keep the default range (so the axis stays consistent
-        // across reasonable IF Widths). Otherwise switch to TIGHT bounds
-        // around the passband — keeps the trapezium horizontally centred
-        // rather than leaving dead space on one side, which is what the
-        // original "just extend the overflowing side" approach produced.
+        // Axis tracks the current passband with margin on each side, so the
+        // trapezium fills most of the canvas at every IF Width. This makes
+        // the contour / notch / APF markers proportionally bigger and easier
+        // to read at narrow filters (e.g. 300 Hz CW) where the trapezium
+        // previously occupied only ~10% of the canvas. The labels adapt to
+        // whatever range we're showing.
         const margin = 300;
         const ifWidthHz = this._ifWidthHz();
         const { lo: pbLo, hi: pbHi } = this._passbandEdges(ifWidthHz);
-        if (pbLo < lo + margin || pbHi > hi - margin) {
-            lo = pbLo - margin;
-            hi = pbHi + margin;
-        }
-        return { lo, hi };
+        return { lo: pbLo - margin, hi: pbHi + margin };
+    }
+
+    /**
+     * Returns the current audio passband edges, in Hz, as {lo, hi}. Exposed
+     * so site.js can use the same calculation for the contour slider's
+     * dynamic min/max without duplicating the passband formula.
+     */
+    getPassband() {
+        return this._passbandEdges(this._ifWidthHz());
     }
 
     _hzToX(hz, W, loHz, hiHz) {

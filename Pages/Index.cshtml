@@ -2047,6 +2047,14 @@
                 mode:              '@Model.RadioState.ModeB'
             });
 
+            // Tighten the contour sliders' ranges to the current passband
+            // now that the panels (which compute the passband) are ready.
+            // Subsequent recomputes happen on mode / IF Width / roofing changes.
+            if (typeof window.updateContourSliderBounds === 'function') {
+                window.updateContourSliderBounds('A');
+                window.updateContourSliderBounds('B');
+            }
+
             // ── Mode-aware IF Width dropdown ─────────────────────────────────
             // Populate the IF Width dropdowns based on the current mode. The
             // SH command codes are mode-dependent: same code = different Hz

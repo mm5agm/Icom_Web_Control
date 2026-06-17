@@ -994,6 +994,7 @@ connection.on("RadioStateUpdate", function (update) {
         updateModeSelect('A', update.value);
         updateMicGainLabel(update.value);
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ mode: update.value });
+        updateContourSliderBounds('A');
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('A', update.value);
         if (window.IfWidth && window._radioModel) {
             window.IfWidth.rebuildIfWidthSelect(
@@ -1005,6 +1006,7 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ mode: update.value });
+        updateContourSliderBounds('B');
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('B', update.value);
         if (window.IfWidth && window._radioModel) {
             window.IfWidth.rebuildIfWidthSelect(
@@ -1173,11 +1175,13 @@ connection.on("RadioStateUpdate", function (update) {
         const selectEl = document.getElementById('roofingFilterSelectA');
         if (selectEl) selectEl.value = update.value;
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ roofingCode: update.value });
+        updateContourSliderBounds('A');
     }
     if (update.property === "RoofingFilterB") {
         const selectEl = document.getElementById('roofingFilterSelectB');
         if (selectEl) selectEl.value = update.value;
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ roofingCode: update.value });
+        updateContourSliderBounds('B');
     }
 
     // --- AGC ---
@@ -1262,6 +1266,7 @@ connection.on("RadioStateUpdate", function (update) {
             if (exists) el.value = update.value;
         }
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifWidthCode: update.value });
+        updateContourSliderBounds('A');
     }
     if (update.property === "IfWidthB") {
         const el = document.getElementById('ifWidthSelectB');
@@ -1270,6 +1275,7 @@ connection.on("RadioStateUpdate", function (update) {
             if (exists) el.value = update.value;
         }
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifWidthCode: update.value });
+        updateContourSliderBounds('B');
     }
 
     // --- IF SHIFT ---
@@ -2027,6 +2033,47 @@ async function setContourFreq(vfo, hz) {
     } catch (e) { console.error('Contour freq failed:', e); }
 }
 window.setContourFreq = setContourFreq;
+
+// Recompute the contour slider's min/max for a VFO based on the current
+// passband (mode + IF Width + roofing). The radio's hard CAT range is
+// preserved as an outer clamp via the slider's initial min/max values,
+// so we never let the user set a value the radio can't accept. If the
+// existing contour value falls outside the new (narrower) range, clamp
+// it in place and send the clamped value to the radio.
+//
+// Called from the SignalR handlers for ModeA/ModeB, IfWidthA/IfWidthB,
+// and the per-VFO roofing-filter changes; also once at startup after the
+// FilterScopePanel instances are constructed.
+function updateContourSliderBounds(vfo) {
+    const panel = window['filterScopePanel' + vfo];
+    if (!panel || typeof panel.getPassband !== 'function') return;
+    const slider = document.getElementById('contourFreqSlider' + vfo);
+    if (!slider) return;
+
+    // Cache the radio's hard limits on first run (the values rendered
+    // server-side from the radio model: 100..3200 for FTdx101, 100..4000
+    // for FTDX3000). After that, future updates only narrow within those.
+    if (slider._hardMin == null) slider._hardMin = parseInt(slider.min);
+    if (slider._hardMax == null) slider._hardMax = parseInt(slider.max);
+
+    const { lo, hi } = panel.getPassband();
+    const newMin = Math.max(slider._hardMin, Math.round(lo));
+    const newMax = Math.min(slider._hardMax, Math.round(hi));
+    if (newMin >= newMax) return;
+
+    slider.min = newMin;
+    slider.max = newMax;
+
+    const currentVal = parseInt(slider.value);
+    const clamped = Math.max(newMin, Math.min(newMax, currentVal));
+    if (clamped !== currentVal) {
+        slider.value = clamped;
+        const label = document.getElementById('contourFreqValue' + vfo);
+        if (label) label.textContent = clamped + ' Hz';
+        setContourFreq(vfo, clamped);  // updates panel state + sends CAT
+    }
+}
+window.updateContourSliderBounds = updateContourSliderBounds;
 
 async function toggleApf(vfo) {
     const newOn = !apfState[vfo].on;
