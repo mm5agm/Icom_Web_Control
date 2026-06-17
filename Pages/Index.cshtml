@@ -155,9 +155,15 @@
     .vfo-inactive.vfo-tx-editable .frequency-display,
     .vfo-inactive.vfo-tx-editable [id$="-controls"],
     .vfo-inactive.vfo-tx-editable .fkb-open-btn {
-        pointer-events: auto;
-        opacity: 1;
-        filter: none;
+        /* !important is necessary on the button specifically: the freq
+           display (a <span>) accepts the override at normal specificity,
+           but the <button> computes pointer-events: none even with the
+           same selector pattern -- suspected interaction with a UA or
+           Bootstrap rule that beats ordinary specificity on <button>
+           elements. Forcing the carve-out is the pragmatic fix.  */
+        pointer-events: auto !important;
+        opacity: 1 !important;
+        filter: none !important;
     }
 
     /* Hide live receive indicators on the inactive VFO panel — on a real
