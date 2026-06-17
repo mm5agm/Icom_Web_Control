@@ -325,9 +325,18 @@ A second small badge in the **top-right corner of the spectrum canvas** shows th
 There are two VFO panels side by side:
 
 - **VFO A** (blue border) — the main receiver, present on all supported radios.
-- **VFO B** (green border) — on the FTdx101MP and FTdx101D this is a fully independent sub-receiver. On single-receiver radios (**FTdx10, FT-710, FTDX3000**) there is only one physical receiver chain inside the radio, so VFO B is effectively a frequency / mode memory slot through which the one receiver is steered. YWC reflects this difference: on single-receiver radios the inactive VFO panel is **greyed out** to make clear that its receive-side controls (AGC, NB, NR, IF Width etc.) won't take effect until you swap it to be the active VFO via the **A↔B** button.
+- **VFO B** (green border) — on the FTdx101MP and FTdx101D this is a fully independent sub-receiver. On single-receiver radios (**FTdx10, FT-710, FTDX3000, FT-991A**) there is only one physical receiver chain inside the radio, so VFO B is a frequency / mode memory slot through which the single receiver is steered.
 
-Both panels have identical controls. All settings are independent — changing a control in VFO A does not affect VFO B. On dual-receiver radios both VFOs can be active at once; on single-receiver radios the greyed VFO's controls are still editable for future use but only take effect once that VFO becomes active.
+**Greying behaviour on single-receiver radios** (FTdx10, FT-710, FTDX3000, FT-991A):
+
+- **Normal mode** (split off): the **active** VFO is white, the **inactive** VFO is grey. The grey VFO's controls (Mode, IF Width, Notch, etc.) still display their stored values for reference, but cannot be edited — those values only apply when you swap that VFO to be active via the **A↔B** button.
+- **Split mode**: the **receive** VFO is white, the **transmit** VFO is grey — opposite of normal mode. This makes sense because in split you spend most of your time receiving on the white panel and only occasionally transmit on the grey one. The grey (TX) panel's **frequency field is still editable** so you can set the TX frequency from YWC without un-splitting first — click a digit and scroll the mouse wheel, or use the keyboard icon next to MHz to type one in. The TX button and the SPLIT badge appear on the grey panel.
+
+On **dual-receiver radios** (FTdx101MP / FTdx101D) neither panel is greyed at any time — both VFOs are real physical receiver chains and are always independently usable.
+
+**Antenna selector visibility:** the per-VFO antenna dropdown is hidden on radios with a single antenna jack (**FTdx10, FT-991A**) since there is nothing to select between. Radios with multiple antenna jacks (FTdx101MP, FTdx101D, FT-710, FTDX3000) keep the selector.
+
+Both panels have identical controls — changing a control on the white panel writes to the radio immediately; changing a control on the grey panel does nothing (apart from the TX frequency in split, as noted).
 
 **VFO-B toggle** — the **VFO-B** button in the toolbar shows or hides the VFO B panel. The last state is remembered across sessions.
 
