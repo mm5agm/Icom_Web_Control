@@ -137,7 +137,11 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 
 ## Project direction
 
-Active development is currently focused on bug fixes and polish for the supported radios. The next significant new direction is **voice control via Amazon Alexa**, primarily as an accessibility tool for partially sighted and blind operators — hands-free band changes, frequency entry, and mode switching without needing to see the screen. That work lives on the `feature/alexa-voice-control` branch and won't disturb the main release line until it's ready to ship. See [VOICE_CONTROL.md](VOICE_CONTROL.md) for setup details and an honest assessment of what it takes to run.
+Active development is currently focused on bug fixes and polish for the supported radios. The next significant new direction is **voice control via Amazon Alexa**, primarily as an accessibility tool for partially sighted and blind operators — hands-free band changes, frequency entry, mode switching, and rig status without needing to see the screen.
+
+**Proof of concept succeeded 2026-06-17.** A real Echo device successfully sent voice commands (over a Cloudflare tunnel to a local YWC install) and got spoken responses back — full signature verification, no bypasses. The current focus is making the setup easier for users: the present procedure (custom Alexa Skill, Amazon Developer Console wizard, Cloudflare tunnel install, etc.) is too involved for most hams. The goal is an in-app setup wizard that drives the whole flow end-to-end with the user only providing account credentials.
+
+That work continues on the `feature/alexa-voice-control` branch and won't disturb the main release line until the setup-wizard polish is done. See [VOICE_CONTROL.md](VOICE_CONTROL.md) for the current setup procedure (including a one-paste JSON model upload that already removes about 30 minutes of manual Skill configuration).
 
 ### Which radios get tested?
 
@@ -157,8 +161,6 @@ If you're on an older version that pre-dates the update check, or you want to kn
   3. Click the **Watch** dropdown at the top-right of the page
   4. Choose **Custom** and tick only **Releases**
   5. Save — you'll get one email per release, and nothing in between
-
-- **Join the [Yaesu Web Control Groups.io list](https://groups.io/g/Yaesu-Web-Control)** — a small, low-traffic mailing list where new releases are announced alongside Q&A from other users. Good for hams who prefer email lists to GitHub.
 
 - **RSS / Atom feed** — if you use a feed reader (Feedly, NewsBlur, Inoreader, Thunderbird, etc.), subscribe to https://github.com/mm5agm/Yaesu_Web_Control/releases.atom — new releases appear in your reader without any account or email signup.
 
@@ -825,7 +827,7 @@ A "tidy up the seams" release on the back of v2.0.0 — adds the About page, sys
 
 ### Reminder
 - YWC is **Windows-only**.
-- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)), not Groups.io — searchable, threaded, traceable. With v2.1.0, the About page's **Report a bug on GitHub** button makes this near-frictionless.
+- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)) — searchable, threaded, traceable. With v2.1.0, the About page's **Report a bug on GitHub** button makes this near-frictionless.
 - The **user manual** is comprehensive: read it from inside the app via the **User Manual** link in the top nav (full screenshots), or on GitHub at [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -879,7 +881,7 @@ A major-version release covering ~20 user-facing features added since v1.8.0. Wo
 
 ### Reminder
 - YWC is **Windows-only**.
-- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)), not Groups.io — searchable, threaded, traceable.
+- Bug reports and discussion belong on **GitHub** ([Issues](https://github.com/mm5agm/Yaesu_Web_Control/issues) / [Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions)) — searchable, threaded, traceable.
 - The **user manual** is comprehensive: read it from inside the app via the **User Manual** link in the top nav (full screenshots), or on GitHub at [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -913,7 +915,7 @@ I personally operate SSB and FT8 on the FTdx101MP only. **I still need testers f
 - **FT-710, FTdx10, FTDX3000** — basic operation, split, memories, and all controls
 - **VOX**, **CW Keyer**, and **FM Repeater** — I don't use these myself; please test the popup panels and report whether the controls match the radio's behaviour
 
-Please report any issues or feedback on the [Groups.io discussion group](https://groups.io/g/Yaesu-Web-Control/topics) or the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues). Even a quick "works fine on FT-710" is genuinely helpful.
+Please report any issues or feedback on the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues). Even a quick "works fine on FT-710" is genuinely helpful.
 
 ### Fixed
 
@@ -952,7 +954,7 @@ I personally operate SSB and FT8 on the FTdx101MP only. **I need testers for:**
 - **CW Keyer** — I don't operate CW; please test speed, break-in modes, semi break-in delay, and the M1–M5 memory keyer buttons
 - **FM Repeater** — I don't use FM repeaters; please test shift, offset, CTCSS encode/decode, and the Apply button
 
-Please report any issues or feedback on the [Groups.io discussion group](https://groups.io/g/Yaesu-Web-Control/topics) or the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues). Even a quick "works fine on FT-710" is genuinely helpful — it tells me what I can stop worrying about.
+Please report any issues or feedback on the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues). Even a quick "works fine on FT-710" is genuinely helpful — it tells me what I can stop worrying about.
 
 ### Fixed
 
@@ -1256,7 +1258,7 @@ Please report any issues or feedback on the [Groups.io discussion group](https:/
 
 ## 2026-04-17 - v0.9.0 RC1
 
-This is a release candidate for what may be the final major release. Please test and report any issues via the Groups.io group.
+This is a release candidate for what may be the final major release. Please test and report any issues via the [GitHub issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues).
 
 ### Added
 
@@ -1318,13 +1320,6 @@ This is a release candidate for what may be the final major release. Please test
 ### Changed
 
 - Minor fixes and improvements
-
-
-## 2026-04-05 - v0.7.3
-
-### Changed
-
-- Add groups.io community link to README
 
 
 ## 2026-04-05 - v0.7.2
