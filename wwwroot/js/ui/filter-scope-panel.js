@@ -122,10 +122,19 @@ export class FilterScopePanel {
         } else {
             hi = 3500;
         }
+        // If the passband fits inside the default range with ≥200 Hz margin
+        // on both sides, keep the default range (so the axis stays consistent
+        // across reasonable IF Widths). Otherwise switch to TIGHT bounds
+        // around the passband — keeps the trapezium horizontally centred
+        // rather than leaving dead space on one side, which is what the
+        // original "just extend the overflowing side" approach produced.
+        const margin = 300;
         const ifWidthHz = this._ifWidthHz();
         const { lo: pbLo, hi: pbHi } = this._passbandEdges(ifWidthHz);
-        if (pbLo < lo + 200) lo = pbLo - 200;
-        if (pbHi > hi - 200) hi = pbHi + 200;
+        if (pbLo < lo + margin || pbHi > hi - margin) {
+            lo = pbLo - margin;
+            hi = pbHi + margin;
+        }
         return { lo, hi };
     }
 
@@ -316,15 +325,21 @@ export class FilterScopePanel {
         // --- Frequency axis ---
         ctx.fillStyle = '#8899aa';
         ctx.font      = '9px sans-serif';
-        ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         const firstLabelHz = Math.ceil(rangeLo / step) * step;
+        const lastLabelHz  = Math.floor(rangeHi / step) * step;
         for (let hz = firstLabelHz; hz <= rangeHi; hz += step) {
             const lx  = x(hz);
             const absHz = Math.abs(hz);
             const lbl = absHz >= 1000 ? (hz / 1000) + 'k'
                       : hz === 0      ? '0'
                       :                  hz + '';
+            // Left-align the leftmost label and right-align the rightmost
+            // so neither gets clipped at the canvas edges (was "-1k"
+            // rendering as just "k" when centred on the left edge).
+            if (hz === firstLabelHz)     ctx.textAlign = 'left';
+            else if (hz === lastLabelHz) ctx.textAlign = 'right';
+            else                          ctx.textAlign = 'center';
             ctx.fillText(lbl, lx, H - 1);
         }
 
