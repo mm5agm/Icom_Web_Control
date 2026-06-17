@@ -2061,12 +2061,17 @@ function updateContourSliderBounds(vfo) {
     const newMax = Math.min(slider._hardMax, Math.round(hi));
     if (newMin >= newMax) return;
 
+    // Capture the OLD value before changing min/max — once we set the new
+    // max, the browser auto-clamps slider.value to fit, so reading it
+    // afterwards would always give the clamped (= new max) value and we'd
+    // never realise the value had actually moved.
+    const oldVal  = parseInt(slider.value);
+    const clamped = Math.max(newMin, Math.min(newMax, oldVal));
+
     slider.min = newMin;
     slider.max = newMax;
 
-    const currentVal = parseInt(slider.value);
-    const clamped = Math.max(newMin, Math.min(newMax, currentVal));
-    if (clamped !== currentVal) {
+    if (clamped !== oldVal) {
         slider.value = clamped;
         const label = document.getElementById('contourFreqValue' + vfo);
         if (label) label.textContent = clamped + ' Hz';
