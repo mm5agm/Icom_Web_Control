@@ -146,6 +146,9 @@ docs/*
 # …but architecture decision records ARE part of the repo
 !docs/decisions/
 !docs/decisions/**
+# …and the in-app voice control planning / contributor docs
+!docs/VoiceControl/
+!docs/VoiceControl/**
 
 # Runtime logs
 *.log
