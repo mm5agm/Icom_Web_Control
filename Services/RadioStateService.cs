@@ -85,11 +85,30 @@ namespace Yaesu_Web_Control.Services
             }
         }
 
-        // Call this after DT0; is received
+        // Call this after DT0; is received -- marks the fast-init burst phase
+        // complete and lets subsequent SetField calls persist to disk.
+        //
+        // Historically this also called ReloadFromPersistence() with the
+        // comment "Load the latest persisted state into memory". That was
+        // actively harmful: the fast-init burst (AI1; + InitializationCommands
+        // + DT0;) is the FIRST chance to read the radio's actual state, and
+        // those responses had already arrived and populated RadioStateService
+        // by the time DT0 came back. Reloading from disk at that moment
+        // overwrote every fresh radio value with stale last-session values.
+        // RadioInitializationService.readQueries then re-read most of them,
+        // but anything where the response timed out (150 ms) silently kept
+        // the stale value -- which is why Jacek SP3L's #40-#46 still showed
+        // wrong values in v2.3.9-pre1 even after all the other fixes:
+        // every property in those reports is one where the persisted-state
+        // overwrite won the race for at least some users.
+        //
+        // The radio is the source of truth on connect. Persisted state was
+        // already loaded in the constructor as a fallback for properties the
+        // radio does not report (or hasn't reported yet). Once init starts,
+        // we should never reload it.
         public void CompleteInitialization()
         {
             IsInitialized = true;
-            ReloadFromPersistence(); // Load the latest persisted state into memory
             // Do NOT call Save() here!
         }
 
@@ -587,53 +606,6 @@ namespace Yaesu_Web_Control.Services
         public void UpdateFrequencyB(long freq)
         {
             _frequencyB = freq;
-        }
-
-        public void ReloadFromPersistence()
-        {
-            var state = _statePersistence.Load();
-            FrequencyA = state.FrequencyA;
-            FrequencyB = state.FrequencyB;
-            BandA = state.BandA ?? string.Empty;
-            BandB = state.BandB ?? string.Empty;
-            ModeA = state.ModeA ?? string.Empty;
-            ModeB = state.ModeB ?? string.Empty;
-            AntennaA = state.AntennaA ?? string.Empty;
-            AntennaB = state.AntennaB ?? string.Empty;
-            RoofingFilterA = state.RoofingFilterA ?? string.Empty;
-            RoofingFilterB = state.RoofingFilterB ?? string.Empty;
-            Power = state.Power;
-            AfGainA = state.AfGainA;
-            AfGainB = state.AfGainB;
-            MicGain = state.MicGain;
-            ProcEnabled = state.ProcEnabled;
-            ProcLevel = state.ProcLevel;
-            AgcA = state.AgcA ?? "2";
-            AgcB = state.AgcB ?? "2";
-            IpoA = state.IpoA ?? "0";
-            IpoB = state.IpoB ?? "0";
-            AttA = state.AttA ?? "00";
-            AttB = state.AttB ?? "00";
-            NrA = state.NrA ?? "0";
-            NrB = state.NrB ?? "0";
-            AutoNotchA = state.AutoNotchA ?? "0";
-            AutoNotchB = state.AutoNotchB ?? "0";
-            ManualNotchA = state.ManualNotchA ?? "0";
-            ManualNotchB = state.ManualNotchB ?? "0";
-            IfWidthA = state.IfWidthA ?? "8";
-            IfWidthB = state.IfWidthB ?? "8";
-            IfShiftA = state.IfShiftA;
-            IfShiftB = state.IfShiftB;
-            ClarifierOffsetA = state.ClarifierOffsetA;
-            ClarifierOffsetB = state.ClarifierOffsetB;
-            ContourOnA = state.ContourOnA;
-            ContourOnB = state.ContourOnB;
-            ContourFreqA = state.ContourFreqA > 0 ? state.ContourFreqA : 800;
-            ContourFreqB = state.ContourFreqB > 0 ? state.ContourFreqB : 800;
-            ApfOnA = state.ApfOnA;
-            ApfOnB = state.ApfOnB;
-            ApfFreqA = state.ApfFreqA;
-            ApfFreqB = state.ApfFreqB;
         }
 
         public RadioState ToRadioState()
