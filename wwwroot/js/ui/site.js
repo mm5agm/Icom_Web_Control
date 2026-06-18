@@ -405,22 +405,47 @@ function initializeDigitInteraction(receiver) {
         }
     });
 
-    if (isTouchDevice() && controls) {
+    // Wire ▲ / ▼ buttons whenever they exist in the DOM. Previously gated
+    // on isTouchDevice(); now also driven by Settings > Accessibility >
+    // Show frequency arrow buttons (Yuri W4YSW). When the setting is on,
+    // the buttons are rendered on every device (head-tracking + on-screen
+    // keyboard users need them on desktop too).
+    if (controls) {
+        // Auto-select the kHz digit on first click if nothing is selected,
+        // so the very first ▲ press moves something meaningful.
+        function ensureSelection() {
+            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            if (digits.length === 0) return;
+            const cur = state.selectedIdx[receiver];
+            if (cur === null || cur === undefined || !digits[cur]) {
+                const defaultIdx = Math.max(0, digits.length - 4);
+                digits.forEach(d => d.classList.remove('selected'));
+                digits[defaultIdx].classList.add('selected');
+                state.selectedIdx[receiver] = defaultIdx;
+            }
+        }
         if (upBtn) {
             upBtn.onclick = function (e) {
                 e.preventDefault();
-                changeSelectedDigit(receiver, 1);
+                ensureSelection();
+                stepSelectedDigit(1);
             };
         }
         if (downBtn) {
             downBtn.onclick = function (e) {
                 e.preventDefault();
-                changeSelectedDigit(receiver, -1);
+                ensureSelection();
+                stepSelectedDigit(-1);
             };
         }
     }
 
-    display.addEventListener('mouseleave', function () {
+    display.addEventListener('mouseleave', function (e) {
+        // Don't clear selection when the mouse moves to our own controls
+        // (the ▲/▼ buttons live just outside the display element). Without
+        // this guard, a user clicks a digit then reaches for ▲ and the
+        // mouseleave clears their selection before the click registers.
+        if (controls && e.relatedTarget && controls.contains(e.relatedTarget)) return;
         if (state.editing[receiver]) {
             state.selectedIdx[receiver] = null;
             state.editing[receiver] = false;

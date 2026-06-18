@@ -80,6 +80,11 @@ namespace Yaesu_Web_Control.Pages
         public string RadioModel { get; set; } = "FTdx101MP";
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
 
+        // Accessibility — show ▲/▼ arrow buttons beside each VFO's frequency
+        // display for users who can't use a scroll wheel (Yuri W4YSW, etc.).
+        // Default false; user enables via Settings > Accessibility.
+        public bool ShowFrequencyArrowButtons { get; set; } = false;
+
         public RadioStateService RadioState => _radioStateService;
 
         public RadioStateViewModel State { get; set; } = new RadioStateViewModel();
@@ -97,6 +102,7 @@ namespace Yaesu_Web_Control.Pages
             ShowApp2Button = settings.ShowJtalertButton;
             ShowApp3Button = settings.ShowLog4omButton;
             ShowApp4Button = settings.ShowGridtrackerButton;
+            ShowFrequencyArrowButtons = settings.ShowFrequencyArrowButtons;
             App1Name = settings.App1Name;
             App2Name = settings.App2Name;
             App3Name = settings.App3Name;

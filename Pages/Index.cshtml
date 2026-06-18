@@ -784,9 +784,9 @@
                     <div class="d-flex align-items-center flex-wrap gap-2 mb-1" style="margin-top: -2px;">
                         <span id="freqA" class="fw-bold frequency-display digit-display" role="spinbutton" aria-label="VFO A frequency" title="VFO A frequency" data-a11y-key="vfo.a.frequency" tabindex="0" aria-valuemin="0.03" aria-valuemax="75" aria-valuenow="0"></span>
                         <span class="frequency-display digit-display">MHz</span>
-                        <div id="freqA-controls" style="display:none;">
-                            <button id="freqA-up" class="btn btn-secondary btn-sm" aria-label="VFO A frequency up" title="VFO A frequency up">▲</button>
-                            <button id="freqA-down" class="btn btn-secondary btn-sm" aria-label="VFO A frequency down" title="VFO A frequency down">▼</button>
+                        <div id="freqA-controls" class="freq-step-controls" style="display:@(Model.ShowFrequencyArrowButtons ? "inline-flex" : "none");">
+                            <button type="button" id="freqA-up" class="btn btn-secondary btn-sm" aria-label="Step VFO A selected digit up" title="Step VFO A selected digit up (↑)">▲</button>
+                            <button type="button" id="freqA-down" class="btn btn-secondary btn-sm" aria-label="Step VFO A selected digit down" title="Step VFO A selected digit down (↓)">▼</button>
                         </div>
                         <button class="btn btn-outline-secondary btn-sm fkb-open-btn"
                                 data-freq-keyboard="A"
@@ -1118,9 +1118,9 @@
                     <div class="d-flex align-items-center flex-wrap gap-2 mb-1" style="margin-top: -2px;">
                         <span id="freqB" class="fw-bold frequency-display digit-display" role="spinbutton" aria-label="VFO B frequency" title="VFO B frequency" data-a11y-key="vfo.b.frequency" tabindex="0" aria-valuemin="0.03" aria-valuemax="75" aria-valuenow="0"></span>
                         <span class="frequency-display digit-display">MHz</span>
-                        <div id="freqB-controls" style="display:none;">
-                            <button id="freqB-up" class="btn btn-secondary btn-sm" aria-label="VFO B frequency up" title="VFO B frequency up">▲</button>
-                            <button id="freqB-down" class="btn btn-secondary btn-sm" aria-label="VFO B frequency down" title="VFO B frequency down">▼</button>
+                        <div id="freqB-controls" class="freq-step-controls" style="display:@(Model.ShowFrequencyArrowButtons ? "inline-flex" : "none");">
+                            <button type="button" id="freqB-up" class="btn btn-secondary btn-sm" aria-label="Step VFO B selected digit up" title="Step VFO B selected digit up (↑)">▲</button>
+                            <button type="button" id="freqB-down" class="btn btn-secondary btn-sm" aria-label="Step VFO B selected digit down" title="Step VFO B selected digit down (↓)">▼</button>
                         </div>
                         <button class="btn btn-outline-secondary btn-sm fkb-open-btn"
                                 data-freq-keyboard="B"

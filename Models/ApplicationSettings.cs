@@ -129,6 +129,15 @@
         // "6"=12kHz and "7"=3kHz are always fitted. "8"=1.2kHz, "9"=600Hz, "A"=300Hz are optional.
         // FTdx10 has fixed roofing filters and ignores this setting.
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
+
+        // ── Accessibility ─────────────────────────────────────────────────
+        // When true, the VFO frequency displays show up/down arrow buttons
+        // alongside the digit display so users who can't use a mouse wheel
+        // (head-tracking + on-screen keyboard, mouse-only users with reduced
+        // dexterity) can step the selected digit by clicking. Default OFF
+        // so users with mouse wheels see the uncluttered default layout.
+        // Yuri W4YSW request 2026-06-17.
+        public bool ShowFrequencyArrowButtons { get; set; } = false;
     }
 
     public class RadioState

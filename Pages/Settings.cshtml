@@ -203,16 +203,31 @@
 
     <form method="post">
 
-    <!-- Accessibility section (placeholder — toggles will be added as accessibility features ship) -->
+    <!-- Accessibility section -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
         <summary><i class="bi bi-universal-access" aria-hidden="true"></i>&nbsp;Accessibility</summary>
         <div class="section-body">
-            <p class="text-muted mb-0">
-                Settings to make Yaesu Web Control easier to use for operators with disabilities will appear here as they ship.
-                Got a suggestion? Please open a
-                <a href="https://github.com/mm5agm/Yaesu_Web_Control/discussions" target="_blank" rel="noopener">GitHub discussion</a>
-                or send an email — the more concrete the use case, the more useful the result.
+            <p class="text-muted small mb-3">
+                Settings to make Yaesu Web Control easier to use for operators with disabilities.
+                The frequency display is fully keyboard-driven: focus it with Tab, then use ↑/↓ to step
+                the selected digit, ←/→ to move the selection, PageUp/PageDown for 10× steps, and
+                Home/End to jump to the most/least significant digit. Got a suggestion?
+                <a href="https://github.com/mm5agm/Yaesu_Web_Control/discussions" target="_blank" rel="noopener">Open a GitHub discussion</a>.
             </p>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="showFrequencyArrowButtons" asp-for="Settings.ShowFrequencyArrowButtons" />
+                <label class="form-check-label" for="showFrequencyArrowButtons">
+                    Show frequency up/down arrow buttons
+                </label>
+                <div class="form-text">
+                    Adds ▲ ▼ buttons next to each VFO's frequency display. Each click steps the
+                    currently selected digit by 1 (the same action as the scroll-wheel or the ↑ / ↓
+                    keys). Useful if you cannot use a mouse wheel — e.g. head-tracking input,
+                    on-screen keyboard users, reduced-dexterity operators. Off by default to keep
+                    the main screen uncluttered for users who don't need them.
+                </div>
+            </div>
         </div>
     </details>
 
