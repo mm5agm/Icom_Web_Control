@@ -167,26 +167,15 @@ namespace Yaesu_Web_Control.Services
 
                 // 3. Send only non-empty/non-zero values to the radio (parallelized)
                 var stateTasks = new List<Task>();
-                if (!string.IsNullOrEmpty(persistedState.ModeA))
-                {
-                    logger.LogInformation("About to send ModeA={ModeA} to radio", persistedState.ModeA);
-                    stateTasks.Add(multiplexer.SendCommandAsync(CatCommands.FormatMode(persistedState.ModeA, false), "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ModeA = persistedState.ModeA; }));
-                }
-                if (!string.IsNullOrEmpty(persistedState.ModeB))
-                {
-                    stateTasks.Add(multiplexer.SendCommandAsync(CatCommands.FormatMode(persistedState.ModeB, true), "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ModeB = persistedState.ModeB; }));
-                }
-                // RF Power is deliberately NOT restored from persisted state
-                // on connect (Issue #35, SP3L-Jacek 2026-06-14). The radio is
-                // the source of truth: if the operator changed the front-panel
-                // power knob while YWC was closed, restoring YWC's last-saved
-                // value would silently overwrite their setting. Same pattern
-                // as MIC GAIN / Speech Processor / PROC LEVEL (Issue #16).
-                // The PC; query in readQueries below populates YWC's UI with
-                // whatever the radio currently has. Front-panel changes while
-                // YWC is running flow through the dispatcher's "PC" case.
+                // Mode (MD) is deliberately NOT restored from persisted state on
+                // connect (Issue #38, SP3L-Jacek 2026-06-18). The radio is the
+                // source of truth: if the operator changed mode on the front
+                // panel while YWC was closed, restoring YWC's last-saved value
+                // would silently overwrite their setting.
+                // The MD0;/MD1; queries (sent during InitializeRadioAsync's
+                // fast burst, and again in readQueries below) populate YWC's UI
+                // with whatever the radio currently has. Same anti-pattern as
+                // RF Power (#35), MIC GAIN / Speech Processor / PROC LEVEL (#16).
                 if (!string.IsNullOrEmpty(persistedState.AntennaA))
                 {
                     stateTasks.Add(multiplexer.SendCommandAsync($"AN0{persistedState.AntennaA};", "Initialization", stoppingToken)
@@ -223,20 +212,11 @@ namespace Yaesu_Web_Control.Services
                 // actually has. If the user changes a value via the YWC
                 // slider afterwards, that sends the command to the radio
                 // and the radio's state changes accordingly.
-                // IF Width is read from the radio on connect (SH queries after stateTasks) — not written here.
-                // Restore IF Shift
-                {
-                    var signA = persistedState.IfShiftA >= 0 ? '+' : '-';
-                    var absA = Math.Abs(persistedState.IfShiftA);
-                    stateTasks.Add(multiplexer.SendCommandAsync($"IS00{signA}{absA:D4};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.IfShiftA = persistedState.IfShiftA; }));
-                }
-                {
-                    var signB = persistedState.IfShiftB >= 0 ? '+' : '-';
-                    var absB = Math.Abs(persistedState.IfShiftB);
-                    stateTasks.Add(multiplexer.SendCommandAsync($"IS10{signB}{absB:D4};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.IfShiftB = persistedState.IfShiftB; }));
-                }
+                // IF Width is read from the radio on connect (SH queries below) — not written here.
+                // IF Shift is also deliberately NOT restored from persisted state
+                // on connect (Issue #41, SP3L-Jacek 2026-06-18). Same anti-pattern
+                // as Mode / RF Power / MIC Gain. The IS0;/IS1; queries below
+                // populate YWC's UI with the radio's actual current values.
                 await Task.WhenAll(stateTasks);
 
                 // 4. Read actual radio state (frequencies, band, etc.) before marking initialized
@@ -314,8 +294,18 @@ namespace Yaesu_Web_Control.Services
                 // These overwrite any defaults or persisted values with what the radio actually has.
                 var readQueries = new[]
                 {
+                    // Mode (#38 — added 2026-06-18 to ensure mode is always read
+                    // from the radio after the persisted-mode write was removed)
+                    "MD0;", "MD1;",          // Mode A/B
                     // IF / filter
-                    "SH00;", "SH10;",       // IF Width A/B
+                    // SH is read with "SH{vfo};" — NOT "SH{vfo}0;". The leading-
+                    // zero form "SH00;" / "SH10;" is interpreted by Yaesu radios
+                    // as a SET-to-zero on that VFO, which is silently ignored
+                    // (or worse). Reported as #40 by SP3L-Jacek 2026-06-18.
+                    "SH0;", "SH1;",          // IF Width A/B
+                    "IS0;", "IS1;",          // IF Shift A/B (#41 — was being
+                                             //   overwritten with persisted value
+                                             //   in stateTasks, now read instead)
                     // Receive controls A
                     "GT0;",                  // AGC A
                     "PA0;",                  // IPO/AMP A
@@ -332,6 +322,18 @@ namespace Yaesu_Web_Control.Services
                     "NB1;",                  // Noise Blanker B
                     "NL1;",                  // NB Level B
                     "BC1;",                  // Auto Notch B
+                    // Manual Notch (#46 — never queried before, default 1000 Hz / OFF
+                    // was shown regardless of radio state).
+                    // BP{vfo}0{xxx}; reads the on/off; BP{vfo}1{xxx}; reads the
+                    // frequency. The radio responds with the full BP message
+                    // including parameter and value.
+                    "BP00;", "BP01;",        // Manual Notch on/off + freq, VFO A
+                    "BP10;", "BP11;",        // Manual Notch on/off + freq, VFO B
+                    // Contour (#39 — never queried before, persisted value was
+                    // always shown). CO command has four sub-parameters per VFO:
+                    // 0=Contour on/off, 1=Contour freq, 2=APF on/off, 3=APF freq.
+                    "CO00;", "CO01;", "CO02;", "CO03;",   // Contour + APF, VFO A
+                    "CO10;", "CO11;", "CO12;", "CO13;",   // Contour + APF, VFO B
                     // RF Gain / Squelch
                     "RG0;", "RG1;",
                     "SQ0;", "SQ1;",
