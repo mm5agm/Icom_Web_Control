@@ -291,22 +291,26 @@ function initializeDigitInteraction(receiver) {
         e.preventDefault();
     });
 
-    display.addEventListener('wheel', function (e) {
+    // Shared digit-step routine used by the wheel and keyboard handlers.
+    // `step` is the signed amount to add to the digit at the selected
+    // position; carries propagate left through more-significant digits.
+    function stepSelectedDigit(step) {
         let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
         let idx = state.selectedIdx[receiver];
         if (idx === null || !digits[idx]) return;
         let freqArr = digits.map(d => parseInt(d.textContent));
-        let carry = e.deltaY < 0 ? 1 : -1;
+        let carry = step;
         let i = idx;
         while (carry !== 0 && i >= 0 && i < freqArr.length) {
             let newVal = freqArr[i] + carry;
             if (newVal > 9) {
-                freqArr[i] = 0;
-                carry = 1;
+                freqArr[i] = newVal % 10;
+                carry = Math.floor(newVal / 10);
                 i--;
             } else if (newVal < 0) {
-                freqArr[i] = 9;
-                carry = -1;
+                // Borrow: -1 + 10 = 9, carry -1; -2 + 10 = 8, carry -1; etc.
+                freqArr[i] = ((newVal % 10) + 10) % 10;
+                carry = Math.floor(newVal / 10);
                 i--;
             } else {
                 freqArr[i] = newVal;
@@ -316,6 +320,7 @@ function initializeDigitInteraction(receiver) {
         let newFreq = parseInt(freqArr.join(''));
         newFreq = Math.max(30000, Math.min(75000000, newFreq));
         state.localFreq[receiver] = newFreq;
+        state.editing[receiver] = true;
         updateFrequencyDisplay(receiver, newFreq);
         clearTimeout(display._debounceTimer);
         display._debounceTimer = setTimeout(() => {
@@ -324,8 +329,81 @@ function initializeDigitInteraction(receiver) {
             state.editing[receiver] = false;
             updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
         }, 200);
+    }
+
+    display.addEventListener('wheel', function (e) {
+        if (state.selectedIdx[receiver] === null) return;
+        stepSelectedDigit(e.deltaY < 0 ? 1 : -1);
         e.preventDefault();
     }, { passive: false });
+
+    // Keyboard navigation — primary accessibility path for operators who
+    // can't use a mouse wheel (head-tracking users, on-screen-keyboard
+    // users). The freq display is already focusable (role="spinbutton",
+    // tabindex="0"); these key bindings make it fully usable from the
+    // keyboard alone:
+    //
+    //   ArrowUp / ArrowDown          step the selected digit by 1
+    //   PageUp   / PageDown          step the selected digit by 10
+    //   ArrowLeft / ArrowRight       move the selected-digit cursor
+    //   Home / End                   jump to the most / least significant digit
+    //
+    // Selection auto-bootstraps to the kHz digit (or the last digit if the
+    // frequency is shorter) when no digit is selected yet, so the first
+    // ArrowUp press immediately does something visible rather than
+    // silently failing.
+    display.addEventListener('keydown', function (e) {
+        const allDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+        if (allDigits.length === 0) return;
+
+        if (state.selectedIdx[receiver] === null || state.selectedIdx[receiver] === undefined ||
+            !allDigits[state.selectedIdx[receiver]]) {
+            // Default to the kHz position (4th from right for 8-digit, 3rd
+            // for 7-digit, etc.) so the first keystroke moves something
+            // meaningful rather than a 1-Hz tick the user can't hear.
+            const defaultIdx = Math.max(0, allDigits.length - 4);
+            allDigits.forEach(d => d.classList.remove('selected'));
+            allDigits[defaultIdx].classList.add('selected');
+            state.selectedIdx[receiver] = defaultIdx;
+        }
+
+        switch (e.key) {
+            case 'ArrowUp':   stepSelectedDigit(1);   e.preventDefault(); break;
+            case 'ArrowDown': stepSelectedDigit(-1);  e.preventDefault(); break;
+            case 'PageUp':    stepSelectedDigit(10);  e.preventDefault(); break;
+            case 'PageDown':  stepSelectedDigit(-10); e.preventDefault(); break;
+            case 'ArrowLeft':
+                if (state.selectedIdx[receiver] > 0) {
+                    const newIdx = state.selectedIdx[receiver] - 1;
+                    allDigits.forEach(d => d.classList.remove('selected'));
+                    allDigits[newIdx].classList.add('selected');
+                    state.selectedIdx[receiver] = newIdx;
+                }
+                e.preventDefault();
+                break;
+            case 'ArrowRight':
+                if (state.selectedIdx[receiver] < allDigits.length - 1) {
+                    const newIdx = state.selectedIdx[receiver] + 1;
+                    allDigits.forEach(d => d.classList.remove('selected'));
+                    allDigits[newIdx].classList.add('selected');
+                    state.selectedIdx[receiver] = newIdx;
+                }
+                e.preventDefault();
+                break;
+            case 'Home':
+                allDigits.forEach(d => d.classList.remove('selected'));
+                allDigits[0].classList.add('selected');
+                state.selectedIdx[receiver] = 0;
+                e.preventDefault();
+                break;
+            case 'End':
+                allDigits.forEach(d => d.classList.remove('selected'));
+                allDigits[allDigits.length - 1].classList.add('selected');
+                state.selectedIdx[receiver] = allDigits.length - 1;
+                e.preventDefault();
+                break;
+        }
+    });
 
     if (isTouchDevice() && controls) {
         if (upBtn) {
