@@ -1987,6 +1987,33 @@ namespace Yaesu_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        // --- NR LEVEL (DNR algorithm on FTdx10) ---
+        public class NrLevelRequest { public int Level { get; set; } = 1; }
+
+        [HttpPost("nrlevel/{receiver}")]
+        public async Task<IActionResult> SetNrLevel(string receiver, [FromBody] NrLevelRequest request)
+        {
+            if (request.Level < 1 || request.Level > 15)
+                return BadRequest(new { error = "NR level must be 1–15" });
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
+                await _catClient.SendCommandAsync($"RL{vfo}{request.Level:D2};", "WebUI", CancellationToken.None);
+                if (vfo == "0") _radioStateService.NrLevelA = request.Level;
+                else            _radioStateService.NrLevelB = request.Level;
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting NR level");
+                return StatusCode(500, new { error = "Failed to set NR level" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
         // --- CW PITCH ---
         public class CwPitchRequest { public int Code { get; set; } = 30; }
 

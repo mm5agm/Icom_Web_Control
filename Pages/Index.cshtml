@@ -666,14 +666,32 @@
                                 </select>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">NR</label>
+                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR" : "NR")</label>
                                 <select class="form-select form-select-sm" id="nrSelectA"
-                                        aria-label="VFO A noise reduction"
-                                        title="VFO A noise reduction"
+                                        aria-label="VFO A @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
+                                        title="VFO A @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
                                         onchange="window.radioControl.setNr('A', this.value)">
                                     <option value="0" selected="@(Model.RadioState.NrA == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.NrA == "1" ? "selected" : null)">NR1</option>
-                                    <option value="2" selected="@(Model.RadioState.NrA == "2" ? "selected" : null)">NR2</option>
+                                    @if (isFtdx10 || isFt710)
+                                    {
+                                        <option value="1" selected="@(Model.RadioState.NrA == "1" ? "selected" : null)">ON</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="1" selected="@(Model.RadioState.NrA == "1" ? "selected" : null)">NR1</option>
+                                        <option value="2" selected="@(Model.RadioState.NrA == "2" ? "selected" : null)">NR2</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR Lvl" : "NR Lvl")</label>
+                                <select class="form-select form-select-sm" id="nrLevelSelectA"
+                                        aria-label="VFO A @(isFtdx10 || isFt710 ? "DNR algorithm" : "NR level") (1-15)"
+                                        title="VFO A @(isFtdx10 || isFt710 ? "DNR algorithm (1=lightest, 15=heaviest)" : "NR depth (1=light, 15=heavy)")"
+                                        onchange="setNrLevel('A', this.value)">
+                                    @for (int i = 1; i <= 15; i++) {
+                                        <option value="@i" selected="@(Model.RadioState.NrLevelA == i ? "selected" : null)">@i</option>
+                                    }
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -1000,14 +1018,32 @@
                                 </select>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">NR</label>
+                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR" : "NR")</label>
                                 <select class="form-select form-select-sm" id="nrSelectB"
-                                        aria-label="VFO B noise reduction"
-                                        title="VFO B noise reduction"
+                                        aria-label="VFO B @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
+                                        title="VFO B @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
                                         onchange="window.radioControl.setNr('B', this.value)">
                                     <option value="0" selected="@(Model.RadioState.NrB == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.NrB == "1" ? "selected" : null)">NR1</option>
-                                    <option value="2" selected="@(Model.RadioState.NrB == "2" ? "selected" : null)">NR2</option>
+                                    @if (isFtdx10 || isFt710)
+                                    {
+                                        <option value="1" selected="@(Model.RadioState.NrB == "1" ? "selected" : null)">ON</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="1" selected="@(Model.RadioState.NrB == "1" ? "selected" : null)">NR1</option>
+                                        <option value="2" selected="@(Model.RadioState.NrB == "2" ? "selected" : null)">NR2</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR Lvl" : "NR Lvl")</label>
+                                <select class="form-select form-select-sm" id="nrLevelSelectB"
+                                        aria-label="VFO B @(isFtdx10 || isFt710 ? "DNR algorithm" : "NR level") (1-15)"
+                                        title="VFO B @(isFtdx10 || isFt710 ? "DNR algorithm (1=lightest, 15=heaviest)" : "NR depth (1=light, 15=heavy)")"
+                                        onchange="setNrLevel('B', this.value)">
+                                    @for (int i = 1; i <= 15; i++) {
+                                        <option value="@i" selected="@(Model.RadioState.NrLevelB == i ? "selected" : null)">@i</option>
+                                    }
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -2559,6 +2595,16 @@
             } catch (e) { console.error('setNbLevel error:', e); }
         }
 
+        // --- NR LEVEL (DNR algorithm on FTdx10) ---
+        async function setNrLevel(receiver, level) {
+            try {
+                await fetch(`/api/cat/nrlevel/${receiver.toLowerCase()}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: parseInt(level) })
+                });
+            } catch (e) { console.error('setNrLevel error:', e); }
+        }
+
         // --- RF GAIN ---
         async function setRfGain(receiver, value) {
             try {
@@ -3484,6 +3530,7 @@
         window._updateMonitorBtn = _updateMonitorBtn;
         window.setMonitorLevel  = setMonitorLevel;
         window.setNbLevel      = setNbLevel;
+        window.setNrLevel      = setNrLevel;
         window.setRfGain                  = setRfGain;
         window.setSquelch                 = setSquelch;
         window._updateSquelchVisibility   = _updateSquelchVisibility;

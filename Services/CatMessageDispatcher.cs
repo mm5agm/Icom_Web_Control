@@ -405,6 +405,17 @@
                             else if (message[2] == '1') _stateService.NbLevelB = Math.Clamp(nlVal, 1, 20);
                         }
                         break;
+                    case "RL":
+                        // RL{vfo}{nn}; — NR Level / DNR algorithm 01-15 per VFO.
+                        // FTdx10 / FT-710 are single-receiver so only VFO A
+                        // matters, but the wire format is the same as FTdx101
+                        // where both VFOs have independent levels.
+                        if (message.Length >= 5 && int.TryParse(message.Substring(3, 2), out int rlVal))
+                        {
+                            if (message[2] == '0') _stateService.NrLevelA = Math.Clamp(rlVal, 1, 15);
+                            else if (message[2] == '1') _stateService.NrLevelB = Math.Clamp(rlVal, 1, 15);
+                        }
+                        break;
                     case "ML":
                         // ML0{nnn}; — monitor on/off (000=off, 001=on)
                         // ML1{nnn}; — monitor level 001-100

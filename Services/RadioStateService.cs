@@ -450,6 +450,17 @@ namespace Yaesu_Web_Control.Services
         private int _nbLevelB = 10;
         public int NbLevelB { get => _nbLevelB; set => SetField(ref _nbLevelB, value); }
 
+        // NR Level (RL command) per VFO: 1–15.
+        // On FTdx10 / FT-710 this is the DNR algorithm selector (Jacek
+        // SP3L #47 -- the FTdx10 has no NR1/NR2 distinction, only ON/OFF
+        // plus this 1–15 algorithm number, semantically like "NB Level").
+        // On FTdx101 this is the level that applies to whichever NR type
+        // (NR1 or NR2) is currently selected.
+        private int _nrLevelA = 1;
+        public int NrLevelA { get => _nrLevelA; set => SetField(ref _nrLevelA, value); }
+        private int _nrLevelB = 1;
+        public int NrLevelB { get => _nrLevelB; set => SetField(ref _nrLevelB, value); }
+
         // CW Pitch: code 0–75 = 300–1050 Hz in 10 Hz steps (KP command)
         private int _cwPitch = 30; // default code 30 = 600 Hz
         public int CwPitch { get => _cwPitch; set => SetField(ref _cwPitch, value); }

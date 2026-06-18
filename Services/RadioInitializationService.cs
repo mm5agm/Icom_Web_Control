@@ -311,6 +311,7 @@ namespace Yaesu_Web_Control.Services
                     "PA0;",                  // IPO/AMP A
                     "RA0;",                  // Attenuator A
                     "NR0;",                  // Noise Reduction A
+                    "RL0;",                  // NR Level / DNR algorithm A (#47)
                     "NB0;",                  // Noise Blanker A
                     "NL0;",                  // NB Level A
                     "BC0;",                  // Auto Notch A
@@ -319,6 +320,7 @@ namespace Yaesu_Web_Control.Services
                     "PA1;",                  // IPO/AMP B
                     "RA1;",                  // Attenuator B
                     "NR1;",                  // Noise Reduction B
+                    "RL1;",                  // NR Level / DNR algorithm B (#47)
                     "NB1;",                  // Noise Blanker B
                     "NL1;",                  // NB Level B
                     "BC1;",                  // Auto Notch B

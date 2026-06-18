@@ -1530,6 +1530,16 @@ connection.on("RadioStateUpdate", function (update) {
         if (el) el.value = update.value;
     }
 
+    // --- NR LEVEL (DNR algorithm on FTdx10) ---
+    if (update.property === "NrLevelA") {
+        const el = document.getElementById('nrLevelSelectA');
+        if (el) el.value = update.value;
+    }
+    if (update.property === "NrLevelB") {
+        const el = document.getElementById('nrLevelSelectB');
+        if (el) el.value = update.value;
+    }
+
     // --- RF GAIN ---
     if (update.property === "RfGainA") {
         const s = document.getElementById('rfGainSliderA'); const l = document.getElementById('rfGainValueA');
