@@ -635,11 +635,11 @@
                                         aria-label="VFO A AGC"
                                         title="VFO A AGC"
                                         onchange="window.radioControl.setAgc('A', this.value)">
-                                    <option value="0">OFF</option>
-                                    <option value="1">FAST</option>
-                                    <option value="2" selected>MID</option>
-                                    <option value="3">SLOW</option>
-                                    <option value="4">AUTO</option>
+                                    <option value="0" selected="@(Model.RadioState.AgcA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.AgcA == "1" ? "selected" : null)">FAST</option>
+                                    <option value="2" selected="@(Model.RadioState.AgcA == "2" ? "selected" : null)">MID</option>
+                                    <option value="3" selected="@(Model.RadioState.AgcA == "3" ? "selected" : null)">SLOW</option>
+                                    <option value="4" selected="@(Model.RadioState.AgcA == "4" ? "selected" : null)">AUTO</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -648,9 +648,9 @@
                                         aria-label="VFO A IPO amp"
                                         title="VFO A IPO / amplifier"
                                         onchange="window.radioControl.setIpo('A', this.value)">
-                                    <option value="0" selected>IPO</option>
-                                    <option value="1">AMP1</option>
-                                    <option value="2">AMP2</option>
+                                    <option value="0" selected="@(Model.RadioState.IpoA == "0" ? "selected" : null)">IPO</option>
+                                    <option value="1" selected="@(Model.RadioState.IpoA == "1" ? "selected" : null)">AMP1</option>
+                                    <option value="2" selected="@(Model.RadioState.IpoA == "2" ? "selected" : null)">AMP2</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -659,10 +659,10 @@
                                         aria-label="VFO A attenuator"
                                         title="VFO A attenuator"
                                         onchange="window.radioControl.setAttenuator('A', this.value)">
-                                    <option value="00" selected>OFF</option>
-                                    <option value="06">6 dB</option>
-                                    <option value="12">12 dB</option>
-                                    <option value="18">18 dB</option>
+                                    <option value="00" selected="@(Model.RadioState.AttA == "00" ? "selected" : null)">OFF</option>
+                                    <option value="06" selected="@(Model.RadioState.AttA == "06" ? "selected" : null)">6 dB</option>
+                                    <option value="12" selected="@(Model.RadioState.AttA == "12" ? "selected" : null)">12 dB</option>
+                                    <option value="18" selected="@(Model.RadioState.AttA == "18" ? "selected" : null)">18 dB</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -671,9 +671,9 @@
                                         aria-label="VFO A noise reduction"
                                         title="VFO A noise reduction"
                                         onchange="window.radioControl.setNr('A', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">NR1</option>
-                                    <option value="2">NR2</option>
+                                    <option value="0" selected="@(Model.RadioState.NrA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.NrA == "1" ? "selected" : null)">NR1</option>
+                                    <option value="2" selected="@(Model.RadioState.NrA == "2" ? "selected" : null)">NR2</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -682,8 +682,8 @@
                                         aria-label="VFO A noise blanker"
                                         title="VFO A noise blanker"
                                         onchange="window.radioControl.setNoiseBlanker('A', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.NbA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.NbA == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -703,8 +703,8 @@
                                         aria-label="VFO A auto notch"
                                         title="VFO A auto notch"
                                         onchange="window.radioControl.setAutoNotch('A', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.AutoNotchA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.AutoNotchA == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -713,16 +713,16 @@
                                         aria-label="VFO A manual notch"
                                         title="VFO A manual notch"
                                         onchange="window.radioControl.setManualNotch('A', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.ManualNotchA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.ManualNotchA == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">Notch Hz</label>
-                                <input type="range" id="manualNotchFreqA" aria-label="VFO A manual notch frequency" title="VFO A manual notch frequency" min="10" max="3200" step="10" value="1000"
+                                <input type="range" id="manualNotchFreqA" aria-label="VFO A manual notch frequency" title="VFO A manual notch frequency" min="10" max="3200" step="10" value="@Model.RadioState.ManualNotchFreqA"
                                        style="flex: 1; height: 16px;"
                                        oninput="document.getElementById('manualNotchFreqValueA').textContent = this.value + ' Hz'; window.radioControl.setManualNotchFreq('A', this.value)">
-                                <span id="manualNotchFreqValueA" class="vfo-control-label" style="min-width: 52px; text-align: right;">1000 Hz</span>
+                                <span id="manualNotchFreqValueA" class="vfo-control-label" style="min-width: 52px; text-align: right;">@Model.RadioState.ManualNotchFreqA Hz</span>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">RF Gain</label>
@@ -969,11 +969,11 @@
                                         aria-label="VFO B AGC"
                                         title="VFO B AGC"
                                         onchange="window.radioControl.setAgc('B', this.value)">
-                                    <option value="0">OFF</option>
-                                    <option value="1">FAST</option>
-                                    <option value="2" selected>MID</option>
-                                    <option value="3">SLOW</option>
-                                    <option value="4">AUTO</option>
+                                    <option value="0" selected="@(Model.RadioState.AgcB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.AgcB == "1" ? "selected" : null)">FAST</option>
+                                    <option value="2" selected="@(Model.RadioState.AgcB == "2" ? "selected" : null)">MID</option>
+                                    <option value="3" selected="@(Model.RadioState.AgcB == "3" ? "selected" : null)">SLOW</option>
+                                    <option value="4" selected="@(Model.RadioState.AgcB == "4" ? "selected" : null)">AUTO</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -982,9 +982,9 @@
                                         aria-label="VFO B IPO amp"
                                         title="VFO B IPO / amplifier"
                                         onchange="window.radioControl.setIpo('B', this.value)">
-                                    <option value="0" selected>IPO</option>
-                                    <option value="1">AMP1</option>
-                                    <option value="2">AMP2</option>
+                                    <option value="0" selected="@(Model.RadioState.IpoB == "0" ? "selected" : null)">IPO</option>
+                                    <option value="1" selected="@(Model.RadioState.IpoB == "1" ? "selected" : null)">AMP1</option>
+                                    <option value="2" selected="@(Model.RadioState.IpoB == "2" ? "selected" : null)">AMP2</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -993,10 +993,10 @@
                                         aria-label="VFO B attenuator"
                                         title="VFO B attenuator"
                                         onchange="window.radioControl.setAttenuator('B', this.value)">
-                                    <option value="00" selected>OFF</option>
-                                    <option value="06">6 dB</option>
-                                    <option value="12">12 dB</option>
-                                    <option value="18">18 dB</option>
+                                    <option value="00" selected="@(Model.RadioState.AttB == "00" ? "selected" : null)">OFF</option>
+                                    <option value="06" selected="@(Model.RadioState.AttB == "06" ? "selected" : null)">6 dB</option>
+                                    <option value="12" selected="@(Model.RadioState.AttB == "12" ? "selected" : null)">12 dB</option>
+                                    <option value="18" selected="@(Model.RadioState.AttB == "18" ? "selected" : null)">18 dB</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -1005,9 +1005,9 @@
                                         aria-label="VFO B noise reduction"
                                         title="VFO B noise reduction"
                                         onchange="window.radioControl.setNr('B', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">NR1</option>
-                                    <option value="2">NR2</option>
+                                    <option value="0" selected="@(Model.RadioState.NrB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.NrB == "1" ? "selected" : null)">NR1</option>
+                                    <option value="2" selected="@(Model.RadioState.NrB == "2" ? "selected" : null)">NR2</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -1016,8 +1016,8 @@
                                         aria-label="VFO B noise blanker"
                                         title="VFO B noise blanker"
                                         onchange="window.radioControl.setNoiseBlanker('B', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.NbB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.NbB == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -1037,8 +1037,8 @@
                                         aria-label="VFO B auto notch"
                                         title="VFO B auto notch"
                                         onchange="window.radioControl.setAutoNotch('B', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.AutoNotchB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.AutoNotchB == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -1047,16 +1047,16 @@
                                         aria-label="VFO B manual notch"
                                         title="VFO B manual notch"
                                         onchange="window.radioControl.setManualNotch('B', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.ManualNotchB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.ManualNotchB == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">Notch Hz</label>
-                                <input type="range" id="manualNotchFreqB" aria-label="VFO B manual notch frequency" title="VFO B manual notch frequency" min="10" max="3200" step="10" value="1000"
+                                <input type="range" id="manualNotchFreqB" aria-label="VFO B manual notch frequency" title="VFO B manual notch frequency" min="10" max="3200" step="10" value="@Model.RadioState.ManualNotchFreqB"
                                        style="flex: 1; height: 16px;"
                                        oninput="document.getElementById('manualNotchFreqValueB').textContent = this.value + ' Hz'; window.radioControl.setManualNotchFreq('B', this.value)">
-                                <span id="manualNotchFreqValueB" class="vfo-control-label" style="min-width: 52px; text-align: right;">1000 Hz</span>
+                                <span id="manualNotchFreqValueB" class="vfo-control-label" style="min-width: 52px; text-align: right;">@Model.RadioState.ManualNotchFreqB Hz</span>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">RF Gain</label>
