@@ -219,6 +219,9 @@ namespace Yaesu_Web_Control.Pages
                 current.DxSpotAgeMinutes         = Settings.DxSpotAgeMinutes > 0 ? Settings.DxSpotAgeMinutes : 15;
                 current.DxClusterPostLoginCommands = Settings.DxClusterPostLoginCommands ?? "";
 
+                // Accessibility
+                current.ShowFrequencyArrowButtons = Settings.ShowFrequencyArrowButtons;
+
                 await _settingsService.SaveSettingsAsync(current);
 
                 // Reset initialization status so app will try again
