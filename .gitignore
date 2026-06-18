@@ -146,9 +146,12 @@ docs/*
 # …but architecture decision records ARE part of the repo
 !docs/decisions/
 !docs/decisions/**
-# …and the in-app voice control planning / contributor docs
+# …and the in-app voice control planning / contributor docs.
+# Only markdown is tracked — anyone's rough .txt scratch notes (e.g. Colin's
+# brainstorming files) stay local. Final docs are always written as .md.
 !docs/VoiceControl/
-!docs/VoiceControl/**
+docs/VoiceControl/*
+!docs/VoiceControl/*.md
 
 # Runtime logs
 *.log
