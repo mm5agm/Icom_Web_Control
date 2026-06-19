@@ -53,6 +53,20 @@
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow" style="padding-top: 0; padding-bottom: 0; margin-bottom: 2px; min-height: 0;">
             <div class="container">
                 <a class="navbar-brand" asp-area="" asp-page="/Index" data-a11y-key="nav.brand" aria-label="Yaesu Web Control home">Yaesu Web Control <small class="text-muted fw-normal" style="font-size: 0.6em;">v@(AppVersion.Current) &copy; 2025</small></a>
+                <!-- Voice control PTT button (Step 4 of v1 plan). Hidden by
+                     default; Step 5 will gate visibility behind the Settings
+                     toggle. -->
+                <button id="voiceMicBtn" type="button"
+                        class="btn btn-sm btn-outline-secondary mx-2"
+                        style="display:none;"
+                        title="Hold to give a voice command"
+                        aria-label="Voice command — hold to speak">
+                    <i class="bi bi-mic-fill" aria-hidden="true"></i>
+                </button>
+                <span id="voiceLastHeard"
+                      class="text-muted small d-none d-md-inline"
+                      style="margin-left: .25rem; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                      aria-live="polite"></span>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -103,6 +117,7 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <script src="~/js/ui/site.js" asp-append-version="true"></script>
+    <script src="~/js/ui/voice-control.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     @await RenderSectionAsync("Scripts", required: false)
 </body>
