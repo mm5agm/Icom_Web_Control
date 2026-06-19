@@ -14,6 +14,14 @@ namespace Yaesu_Web_Control.Services
 
         public bool IsInitialized { get; set; } = false;
 
+        // True when the configured radio model has a single physical receiver
+        // (FTdx10 / FT-710 / FTDX3000 / FT-991A). Set by RadioInitialization-
+        // Service at startup from RadioCapabilities. The dispatcher uses this
+        // to route P1=0 ("Fixed" on single-receiver radios) responses to
+        // whichever VFO is currently active (per VS), instead of always
+        // writing to *A state — see #34 R2 controls-bleed-across-panels fix.
+        public bool IsSingleReceiver { get; set; } = false;
+
         private RadioState _initialState;
 
         public RadioStateService(

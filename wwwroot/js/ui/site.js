@@ -924,12 +924,22 @@ function updateTxButton() {
     const btnA = document.getElementById('txButtonA');
     const btnB = document.getElementById('txButtonB');
 
+    // On single-receiver radios in normal mode, the TX VFO IS the active
+    // (RX) VFO -- pressing A/B on the front panel changes which VFO will
+    // key when PTT engages, but the FT command stays at 0. So position
+    // the TX button by activeVfo in normal mode and txVfo in split mode.
+    // On dual-receiver radios txVfo is correct in both modes.
+    // SP3L Jacek #34 follow-up after pre3 -- "TX button does not move".
+    const vfoRow = document.getElementById('vfoRow');
+    const isSingleReceiver = vfoRow?.dataset.singleReceiver === 'true';
+    const positionVfo = (isSingleReceiver && splitMode === 0) ? activeVfo : txVfo;
+
     // Show only on TX VFO
-    if (btnA) btnA.style.display = (txVfo === 0) ? 'inline-block' : 'none';
-    if (btnB) btnB.style.display = (txVfo === 1) ? 'inline-block' : 'none';
+    if (btnA) btnA.style.display = (positionVfo === 0) ? 'inline-block' : 'none';
+    if (btnB) btnB.style.display = (positionVfo === 1) ? 'inline-block' : 'none';
 
     // Update button state
-    const activeBtn = (txVfo === 0) ? btnA : btnB;
+    const activeBtn = (positionVfo === 0) ? btnA : btnB;
     if (activeBtn) {
         if (isTransmitting) {
             activeBtn.className = 'btn btn-danger btn-sm';
@@ -1263,6 +1273,9 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ActiveVfo") {
         activeVfo = update.value;
         applyVfoActiveStyling();
+        // In normal mode on a single-receiver radio, the TX button position
+        // follows activeVfo (the TX VFO IS the active VFO; FT doesn't move).
+        updateTxButton();
     }
 
     // --- SPLIT MODE ---
