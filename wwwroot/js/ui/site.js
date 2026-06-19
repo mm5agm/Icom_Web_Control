@@ -792,7 +792,13 @@ document.addEventListener('DOMContentLoaded', function() {
 // TX Button Toggle
 // ---------------------------------------------------------------------------
 let isTransmitting = false;
-let txVfo = 0; // 0 = VFO A, 1 = VFO B
+let txVfo = 0; // 0 = VFO A, 1 = VFO B (the TX VFO — only flips with split)
+// activeVfo tracks which VFO is the operating (RX) VFO -- changes when the
+// user presses A/B on the radio front panel in normal mode. Distinct from
+// txVfo. SP3L Jacek #34 R2 root cause was that the normal-mode greying
+// logic was watching txVfo (which doesn't change on A/B normal-mode swap)
+// instead of activeVfo.
+let activeVfo = 0;
 
 // Apply the .vfo-inactive class to whichever VFO panel is NOT the active
 // (TX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
@@ -827,15 +833,21 @@ function applyVfoActiveStyling() {
     // Single-receiver: which panel is "inactive" depends on whether split
     // mode is on (per SP3L Jacek's R1-R12 spec in #34):
     //
-    //   Normal mode (R2): white = active VFO (TxVfo), grey = the other.
-    //                     Operator can only receive on the active VFO; the
-    //                     inactive one is just stored frequency/mode state.
+    //   Normal mode (R2): white = active (RX) VFO, grey = the other.
+    //                     Driven by activeVfo (VS command). On single-
+    //                     receiver radios this is the VFO that's actually
+    //                     receiving; the other one just stores frequency/
+    //                     mode state. Fixed in #34 — pre-pre3 used txVfo
+    //                     here, which doesn't change on a front-panel A/B
+    //                     press in normal mode.
     //
     //   Split mode  (R7): white = RX VFO (NOT TxVfo), grey = TX VFO.
     //                     The radio receives on the white VFO and transmits
     //                     on the grey VFO. The TX VFO is "inactive" from a
     //                     receive perspective even though it's the one that
     //                     will key when PTT engages — hence still grey.
+    //                     Driven by txVfo (FT command) which IS reliable in
+    //                     split mode.
     //
     // The TX button and SPLIT badge land on the grey panel in split mode
     // (R8) automatically since updateTxButton() positions the button on
@@ -845,7 +857,7 @@ function applyVfoActiveStyling() {
     // single spectrum always shows the live receive signal. The second
     // spectrum panel is hidden permanently by updateContainerVisibility().
     const splitOn = splitMode > 0;
-    const inactiveCol = (splitOn ? (txVfo === 1) : (txVfo === 0)) ? bCol : aCol;
+    const inactiveCol = (splitOn ? (txVfo === 1) : (activeVfo === 0)) ? bCol : aCol;
     const activeCol   = (inactiveCol === aCol) ? bCol : aCol;
 
     activeCol.classList.remove('vfo-inactive', 'vfo-tx-editable');
@@ -1247,6 +1259,10 @@ connection.on("RadioStateUpdate", function (update) {
         updateTxButton();
         applyVfoActiveStyling();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('txVfo', update.value);
+    }
+    if (update.property === "ActiveVfo") {
+        activeVfo = update.value;
+        applyVfoActiveStyling();
     }
 
     // --- SPLIT MODE ---

@@ -254,7 +254,7 @@
         public static readonly string[] InitializationCommands = new[]
         {
             // Frequencies and VFO
-            "FA;", "FB;", "FT;",
+            "FA;", "FB;", "FT;", "VS;",
             // Mode
             "MD0;", "MD1;",
             // Power and RF

@@ -545,6 +545,15 @@ namespace Yaesu_Web_Control.Services
         private int _txVfo = 0;
         public int TxVfo { get => _txVfo; set => SetField(ref _txVfo, value); }
 
+        // VS command — VFO SELECT, indicates which VFO is currently the
+        // operating (RX) VFO. Distinct from TxVfo (FT) which only tracks
+        // the TX VFO in split mode. On single-receiver radios the front-
+        // panel A/B button changes ActiveVfo but does NOT change TxVfo
+        // (Jacek SP3L #34 R2 — fixed by switching normal-mode greying
+        // from TxVfo to ActiveVfo). 0 = VFO A, 1 = VFO B.
+        private int _activeVfo = 0;
+        public int ActiveVfo { get => _activeVfo; set => SetField(ref _activeVfo, value); }
+
         // Split mode: 0 = OFF, 1 = ON (VFO A = RX, VFO B = TX), 2 = ON + Quick Split (+5 kHz)
         private int _splitMode = 0;
         public int SplitMode { get => _splitMode; set => SetField(ref _splitMode, value); }

@@ -269,6 +269,12 @@ namespace Yaesu_Web_Control.Services
                     }
                 }
 
+                // Query VS (VFO Select) — which VFO is the active operating
+                // (RX) VFO. Required for the single-receiver normal-mode
+                // greying to flip when the user presses A/B on the radio's
+                // front panel. See #34 R2 / dispatcher VS case.
+                await multiplexer.SendCommandAndDispatchAsync("VS;", "Initialization", stoppingToken);
+
                 // Query RX/TX clarifier on/off state (all models)
                 var rtResponse = await multiplexer.SendCommandAsync("RT;", "Initialization", stoppingToken);
                 if (!string.IsNullOrWhiteSpace(rtResponse) && rtResponse.StartsWith("RT"))

@@ -369,6 +369,17 @@
                         if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int txVfo))
                             _stateService.TxVfo = txVfo;
                         break;
+                    case "VS":
+                        // VS{n}; — VFO SELECT: 0=VFO-A active (operating/RX),
+                        // 1=VFO-B active. On single-receiver radios this is
+                        // what changes when the user presses A/B on the front
+                        // panel in normal mode (TxVfo / FT does NOT — that
+                        // only flips when split mode toggles). Jacek SP3L #34
+                        // R2 root cause: dispatcher had no case for VS so the
+                        // radio's broadcast was silently dropped.
+                        if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int activeVfo))
+                            _stateService.ActiveVfo = activeVfo;
+                        break;
                     case "AC":
                         // AC{P1}{P2}{P3}; per FTdx10 / FTdx101MP CAT manual page 6:
                         //   P1: 0 Fixed
