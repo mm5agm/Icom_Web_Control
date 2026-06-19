@@ -70,6 +70,21 @@
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="System.IO.Ports" Version="10.0.1" />
+    <!-- System.Speech: Windows SAPI 5 grammar-based speech recognition.
+         In-process voice control, replaces the parked Alexa work. See
+         docs/VoiceControl/v1-plan.md. Windows-only — the surrounding
+         project is already net10.0-windows so no portability change. -->
+    <PackageReference Include="System.Speech" Version="10.0.1" />
+  </ItemGroup>
+
+  <!-- Voice control grammar files shipped alongside the exe so
+       VoiceControlService can load them at startup. Only .srgs is shipped;
+       the README in this folder is documentation, not loaded by code. -->
+  <ItemGroup>
+    <Content Include="Grammars\*.srgs">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <!--

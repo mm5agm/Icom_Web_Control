@@ -318,6 +318,14 @@ builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryBankService>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.DxClusterService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.DxClusterService>());
 
+// Voice control (in-process SAPI). VoiceControlService is the IHostedService
+// that owns the SpeechRecognitionEngine; IntentDispatcher maps recognised
+// intents to CAT actions; VoiceController exposes /api/voice/*. See
+// docs/VoiceControl/v1-plan.md.
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.IntentDispatcher>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceControlService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Voice.VoiceControlService>());
+
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and
 // the file sink captures Information+ globally so we can read what happened
