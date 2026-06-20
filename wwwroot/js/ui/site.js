@@ -1029,6 +1029,40 @@ connection.on("ShowSettingsPage", function () {
     window.location.href = "/Settings";
 });
 
+// "Reading radio settings…" overlay shown during single-receiver ping-pong
+// (see RadioInitializationService.cs comments around the VS swap block).
+// Backend broadcasts a status string; empty string means clear/hide.
+connection.on("RadioInfoStatus", function (message) {
+    let overlay = document.getElementById('radioInfoStatusOverlay');
+    if (!message) {
+        if (overlay) overlay.style.display = 'none';
+        return;
+    }
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'radioInfoStatusOverlay';
+        overlay.setAttribute('role', 'status');
+        overlay.setAttribute('aria-live', 'polite');
+        overlay.style.cssText = [
+            'position: fixed',
+            'top: 1rem',
+            'left: 50%',
+            'transform: translateX(-50%)',
+            'z-index: 9999',
+            'background: rgba(20, 24, 32, 0.92)',
+            'color: #fff',
+            'padding: 0.75rem 1.25rem',
+            'border-radius: 0.5rem',
+            'font-size: 0.95rem',
+            'box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35)',
+            'pointer-events: none'
+        ].join(';');
+        document.body.appendChild(overlay);
+    }
+    overlay.textContent = message;
+    overlay.style.display = '';
+});
+
 
 
 

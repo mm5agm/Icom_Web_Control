@@ -372,6 +372,77 @@ namespace Yaesu_Web_Control.Services
                 foreach (var q in readQueries)
                     await multiplexer.SendCommandAndDispatchAsync(q, "Initialization", stoppingToken);
 
+                // 4b. Single-receiver "ping-pong" -- read the OTHER VFO's
+                // P1=0-Fixed receive controls so YWC has both *A and *B
+                // populated. Without this, the inactive panel shows defaults
+                // (Jacek SP3L #34 pre5 — his proposed fix). Skipped on
+                // dual-receiver since FTdx101 reports per-VFO via P1.
+                if (radioStateService.IsSingleReceiver)
+                {
+                    var origVfo = radioStateService.ActiveVfo;
+                    var otherVfo = 1 - origVfo;
+                    logger.LogInformation(
+                        "[RadioInitializationService] Single-receiver ping-pong: temporarily switching to VFO {Other} to read its stored receive controls",
+                        otherVfo == 0 ? "A" : "B");
+
+                    await _hubContext.Clients.All.SendAsync(
+                        "VoiceStatusUpdate",
+                        new { State = "ReadingRadioSettings", Message = $"Reading VFO {(otherVfo == 0 ? "A" : "B")} settings…" },
+                        stoppingToken);
+                    await _hubContext.Clients.All.SendAsync(
+                        "RadioInfoStatus",
+                        $"Reading VFO {(otherVfo == 0 ? "A" : "B")} settings…",
+                        stoppingToken);
+
+                    // Switch active VFO. The dispatcher's VS case updates
+                    // RadioStateService.ActiveVfo synchronously when the
+                    // response is dispatched.
+                    await multiplexer.SendCommandAndDispatchAsync($"VS{otherVfo};", "Initialization", stoppingToken);
+                    await Task.Delay(150, stoppingToken); // settle
+
+                    // Re-query the P1=0-Fixed receive controls. Each response
+                    // routes through SetPerVfo's 300 ms buffer; by the time
+                    // the buffer flushes, ActiveVfo is still = otherVfo, so
+                    // they land in the right slot.
+                    string[] perVfoQueries = {
+                        "MD0;",          // mode is per-VFO at the CAT level but the radio
+                                         // updates display mode on swap so re-read for safety
+                        "GT0;",          // AGC
+                        "PA0;",          // IPO/AMP
+                        "RA0;",          // Attenuator
+                        "NR0;", "RL0;",  // NR + DNR level
+                        "NB0;", "NL0;",  // NB + NB level
+                        "BC0;",          // Auto Notch
+                        "BP00;", "BP01;",// Manual Notch on/off + freq
+                        "CO00;", "CO01;", "CO02;", "CO03;", // Contour + APF
+                        "SH0;",          // IF Width
+                        "IS0;",          // IF Shift
+                        "AG0;",          // AF Gain
+                        "RG0;",          // RF Gain
+                        "SQ0;",          // Squelch
+                    };
+                    foreach (var q in perVfoQueries)
+                        await multiplexer.SendCommandAndDispatchAsync(q, "Initialization", stoppingToken);
+
+                    // Wait for the buffered dispatches to drain (BufferDelayMs
+                    // in CatMessageDispatcher = 300 ms) plus a little headroom.
+                    await Task.Delay(400, stoppingToken);
+
+                    // Swap back to the original VFO.
+                    await multiplexer.SendCommandAndDispatchAsync($"VS{origVfo};", "Initialization", stoppingToken);
+                    await Task.Delay(150, stoppingToken);
+
+                    // Drain any belated broadcasts from the swap-back so they
+                    // land in origVfo's slot before we mark init complete.
+                    await Task.Delay(400, stoppingToken);
+
+                    await _hubContext.Clients.All.SendAsync(
+                        "RadioInfoStatus", "", stoppingToken);
+
+                    logger.LogInformation(
+                        "[RadioInitializationService] Ping-pong complete; both VFOs' receive-control state populated.");
+                }
+
                 // 5. Set IsInitialized = true FIRST to allow property changes to be persisted and broadcast
                 radioStateService.IsInitialized = true;
 
