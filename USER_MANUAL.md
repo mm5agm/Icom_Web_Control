@@ -1917,6 +1917,26 @@ If you must use a virtual port sharer (e.g. you've already built a working setup
 
 ---
 
+### 15.7 What is the TX button for? When I press it the radio goes into TX mode but there's no audio from my microphone.
+
+The TX button in YWC sends the `TX1;` CAT command, which puts the radio into transmit mode (PTT engaged) but **does not route any audio into the radio**. With nothing modulating the carrier, what actually goes on-air depends on the current mode:
+
+- **CW** — an unmodulated carrier (a steady tone). Useful for tune-up, SWR measurement, or driving an external tuner / amplifier into its tune cycle.
+- **SSB / AM / FM** — the TX path is open but no audio is being injected, so the on-air signal is effectively silent.
+- **DATA / digital modes** — the same as SSB until something else (WSJT-X via the rear DATA jack or USB audio) is feeding audio in.
+
+In short, the TX button is "key the radio for testing", not "open the mic". The radio's microphone input is only routed to the TX path when the mic's own **PTT button** (or footswitch, or VOX) triggers TX. YWC doesn't intercept or route audio at all — that side is between your mic and the radio.
+
+What people use it for in practice:
+
+1. **Tune-up.** Switch to CW, click TX, watch your SWR or let your ATU find a match.
+2. **Driving an external amplifier or antenna tuner** into its auto-tune cycle.
+3. **Digital-mode keying tests.** When WSJT-X (or similar) is feeding audio into the rear DATA jack, the TX button gives you a CAT-driven way to verify the keying side of the path without starting a real QSO.
+
+To transmit voice from your microphone, press the PTT button on the mic itself.
+
+---
+
 ## 16. Accessibility and Screen Readers
 
 ### 16.1 Making Everything Bigger
