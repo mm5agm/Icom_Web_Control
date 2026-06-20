@@ -13,12 +13,11 @@ export class MeterPanel {
      *
      * Config object shape:
      *   { canvasId: 'swrMeterCanvas' }          — key is used as gauge type
-     *   { type: 'smeter', canvasId: 'sMeterCanvasA' }  — explicit type overrides key
+     *   { type: 'smeter', canvasId: 'sMeterCanvas' }  — explicit type overrides key
      *
      * Example:
      *   {
-     *     smeterA:     { type: 'smeter', canvasId: 'sMeterCanvasA' },
-     *     smeterB:     { type: 'smeter', canvasId: 'sMeterCanvasB' },
+     *     smeter:      { type: 'smeter', canvasId: 'sMeterCanvas' },
      *     power:       { canvasId: 'powerMeterCanvas' },
      *     swr:         { canvasId: 'swrMeterCanvas' },
      *     alc:         { canvasId: 'alcMeterCanvas' },

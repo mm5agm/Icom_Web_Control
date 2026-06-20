@@ -242,12 +242,13 @@ The line shows the current band, mode and frequency, with transmit power appende
 
 ### 5.2 Meters
 
-A scrollable row of meters is displayed above the VFO panels. The meters shown depend on your radio model:
+A scrollable row of meters is displayed above the VFO panels. The leftmost slot is the S-meter (and its optional history strip — see below). To the right of the S-meter come the transmit-related meters, which depend on your radio model:
 
-**FTdx101MP, FTdx101D, FTDX3000** — seven meters:
+**FTdx101MP, FTdx101D, FTDX3000** — S-meter plus seven TX meters:
 
 | Meter | What it shows |
 |-------|--------------|
+| S-meter | Receive signal strength on VFO A (the radio's only calibrated S-meter) — always live |
 | SWR | Standing wave ratio on the antenna — only active during transmit |
 | Power | Output power in watts — only active during transmit |
 | Compression | Speech compression in dB — only active during transmit |
@@ -256,13 +257,13 @@ A scrollable row of meters is displayed above the VFO panels. The meters shown d
 | IDD | PA drain current in amps |
 | VDD | PA supply voltage in volts |
 
-**FTdx10, FT-710** — four meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.
+**FTdx10, FT-710** — S-meter plus four TX meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.
 
-All meters update in real time at approximately 10 times per second. Meters that only apply to transmit automatically read zero when the radio is receiving.
+All meters update in real time at approximately 10 times per second. Meters that only apply to transmit automatically read zero when the radio is receiving. The S-meter is always live.
 
 The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your specific radio.
 
-**S-meter history strip.** A small 30-second strip-chart can be shown below each VFO's S-meter. Click the **S-hist** button in the top toolbar to toggle it on (off by default; the choice is remembered between sessions). The strip shows three things at once:
+**S-meter history strip.** A small 30-second strip-chart can be shown to the left of the S-meter gauge in the top meter row. Click the **S-hist** button in the top toolbar to toggle it on (off by default; the choice is remembered between sessions). The strip shows three things at once:
 
 - **Green line** — the actual S-meter trace over the last 30 seconds. Lets you see QSB fading patterns and brief interference spikes that the analog needle barely registered.
 - **Yellow dashed line** — the peak hold for the window, useful for noting a station's actual peak signal during an over without staring at the needle.
@@ -333,6 +334,12 @@ There are two VFO panels side by side:
 - **Split mode**: the **receive** VFO is white, the **transmit** VFO is grey — opposite of normal mode. This makes sense because in split you spend most of your time receiving on the white panel and only occasionally transmit on the grey one. The grey (TX) panel's **frequency field is still editable** so you can set the TX frequency from YWC without un-splitting first — click a digit and scroll the mouse wheel, or use the keyboard icon next to MHz to type one in. The TX button and the SPLIT badge appear on the grey panel.
 
 On **dual-receiver radios** (FTdx101MP / FTdx101D) neither panel is greyed at any time — both VFOs are real physical receiver chains and are always independently usable.
+
+**S-meter location — not in the VFO panels.** From v2.3.9 the S-meter and its 30-second history strip live in the **top meter row** (just below the toolbar), not inside the VFO A / VFO B panels. There is **one** S-meter gauge and **one** history strip, shown at the leftmost end of the meter row.
+
+Why: Yaesu radios only have one calibrated S-meter — on dual-receiver models (FTdx101MP / FTdx101D) it is hardwired to the MAIN (VFO-A) chain, and the SUB chain has only an uncalibrated activity bar on the spectrum display with no S-meter readout exposed over CAT. On single-receiver models (FTdx10 / FT-710 / FTDX3000 / FT-991A) there is only one physical receiver chain. Showing a separate S-meter gauge per VFO would be duplicate information at best and a misleading stuck reading at worst, so YWC presents the truthful single gauge once at the top.
+
+If you operate dual-receive on an FTdx101, watch the spectrum panel for SUB activity rather than the (no-longer-existent) VFO B S-meter gauge.
 
 **Antenna selector visibility:** the per-VFO antenna dropdown is hidden on radios with a single antenna jack (**FTdx10, FT-991A**) since there is nothing to select between. Radios with multiple antenna jacks (FTdx101MP, FTdx101D, FT-710, FTDX3000) keep the selector.
 

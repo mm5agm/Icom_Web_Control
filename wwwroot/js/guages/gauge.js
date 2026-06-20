@@ -176,7 +176,18 @@ class SMeterGauge extends Gauge {
             animationDuration: 400,
             animationRule: "linear",
             value: 0,
-            gaugeTitleShow: false
+            // Title label under the gauge, matching SWR / Power / Temp etc.
+            // Added in v2.3.9 when the S-meter moved into the top meter row
+            // (out of the per-VFO panels) -- having a "S-Meter S5" label
+            // makes it visually consistent with the neighbouring gauges.
+            // The text is updated by site.js updateSMeter() with the
+            // calibrated S-unit (e.g. "S5", "S9+20").
+            gaugeTitleShow: true,
+            gaugeTitle: 'S-Meter',
+            gaugeTitleId: 'sMeterValue',
+            gaugeTitleDefault: 'S0',
+            gaugeTitleBg: '#198754',
+            gaugeTitleColor: '#ffffff'
         }, options);
 
         super(canvasId, config);

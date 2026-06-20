@@ -104,26 +104,15 @@ namespace Yaesu_Web_Control.Services
                     int sMeterA = CatCommands.ParseSMeter(smAResponse ?? "");
                     _stateService.SMeterA = sMeterA;
 
-                    if (_stateService.IsSingleReceiver)
-                    {
-                        // Single-receiver radios (FTdx10 / FT-710 / FTDX3000 /
-                        // FT-991A) have no SUB receiver. SM1; isn't a valid
-                        // query — it returns nothing, leaving SMeterB stuck
-                        // at S0 forever. Mirror SMeterA so panel B's gauge
-                        // tracks the radio's actual (single) S-meter. The
-                        // grey-out treatment from the single-receiver UI
-                        // makes which VFO is active obvious already.
-                        // Jacek SP3L #34 follow-up after pre5.
-                        _stateService.SMeterB = sMeterA;
-                    }
-                    else
-                    {
-                        _logger.LogInformation("[MeterPolling][DEBUG] Polling S-Meter B...");
-                        var smBResponse = await _multiplexer.SendCommandAsync(CatCommands.SMeterSub + ";", "MeterPoll", stoppingToken);
-                        _logger.LogInformation("[MeterPolling][DEBUG] S-Meter B response: {0}", smBResponse);
-                        int sMeterB = CatCommands.ParseSMeter(smBResponse ?? "");
-                        _stateService.SMeterB = sMeterB;
-                    }
+                    // SMeterB is no longer displayed -- v2.3.9 moved the S-meter
+                    // (and its history strip) into the top meter row as a
+                    // single shared gauge. Yaesu radios only have one calibrated
+                    // S-meter: on dual-receiver FTdx101MP/D it's tied to MAIN,
+                    // on single-receiver radios there's only one receiver. So
+                    // we skip the SM1; query entirely (it returns junk on
+                    // FTdx101 and nothing on single-receiver radios anyway).
+                    // SMeterB stays at its default for any leftover consumers
+                    // (rigctld doesn't read it); the front-end ignores it.
 
                     _logger.LogInformation("[MeterPolling][DEBUG] Polling Power Meter...");
                     var powerResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterPower + ";", "MeterPoll", stoppingToken);

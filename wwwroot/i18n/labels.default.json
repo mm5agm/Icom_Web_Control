@@ -17,8 +17,8 @@
   },
 
   "meters": {
-    "smeterA":      "S meter, VFO A",
-    "smeterB":      "S meter, VFO B",
+    "smeter":         "S meter",
+    "smeterHistory":  "S meter 30-second history",
     "power":        "Power output meter",
     "swr":          "SWR meter",
     "alc":          "ALC meter",

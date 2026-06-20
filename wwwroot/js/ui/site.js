@@ -49,8 +49,7 @@ function showServerStoppedOverlay() {
     // page (e.g. spectrum is only present when an SDR is configured).
     try { window.filterScopePanelA?.stop?.(); } catch { /* ignore */ }
     try { window.filterScopePanelB?.stop?.(); } catch { /* ignore */ }
-    try { window.sMeterHistoryA?.stop?.();   } catch { /* ignore */ }
-    try { window.sMeterHistoryB?.stop?.();   } catch { /* ignore */ }
+    try { window.sMeterHistory?.stop?.();    } catch { /* ignore */ }
 }
 
 // --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
@@ -2912,6 +2911,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateSMeter(receiver, value) {
+        // v2.3.9: the S-meter and its history strip moved out of the VFO
+        // panels into the top meter row -- single shared gauge and single
+        // history because Yaesu radios only have one calibrated S-meter
+        // (tied to MAIN on FTdx101 family; only physical receiver on
+        // single-receiver rigs). The `receiver` parameter is preserved
+        // for call-site compatibility but ignored: only the 'A' value
+        // (MAIN) actually drives the gauge.
+        if (receiver !== 'A') return;
+
         // The S-meter gauge has hardcoded tick positions on a 0-255 scale and
         // ignores calibration tables for needle placement. To make the user's
         // calibration actually affect where the needle sits, translate the raw
@@ -2924,18 +2932,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const gaugePos = window.calibrationEngine?.calibrateSMeterForGauge
             ? window.calibrationEngine.calibrateSMeterForGauge(value)
             : value;
-        if (receiver === 'A') {
-            if (window.meterPanel) window.meterPanel.update('smeterA', gaugePos);
-            if (window.sMeterHistoryA) window.sMeterHistoryA.push(value);
-            updateRawSMeterValueA(value);
-            const canvasA = document.getElementById('sMeterCanvasA');
-            if (canvasA) canvasA.dataset.reading = sMeterLabel(value);
-        } else if (receiver === 'B') {
-            if (window.meterPanel) window.meterPanel.update('smeterB', gaugePos);
-            if (window.sMeterHistoryB) window.sMeterHistoryB.push(value);
-            const canvasB = document.getElementById('sMeterCanvasB');
-            if (canvasB) canvasB.dataset.reading = sMeterLabel(value);
-        }
+        if (window.meterPanel) window.meterPanel.update('smeter', gaugePos);
+        if (window.sMeterHistory) window.sMeterHistory.push(value);
+        if (typeof updateRawSMeterValueA === 'function') updateRawSMeterValueA(value);
+        const canvas = document.getElementById('sMeterCanvas');
+        const sUnit = sMeterLabel(value);
+        if (canvas) canvas.dataset.reading = sUnit;
+        // Update the "S-Meter S5" title label under the gauge (matches SWR /
+        // Power / Temp / etc. format). Element is rendered by SMeterGauge
+        // when gaugeTitleShow is true (set in gauge.js).
+        const sLabel = document.getElementById('sMeterValue');
+        if (sLabel) sLabel.textContent = sUnit;
     }
 
     // Update MIC bar meter (0-255 raw value)

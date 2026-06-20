@@ -331,6 +331,32 @@
                 <div class="card-body py-2">
                     <!-- Gauges row -->
                     <div class="d-flex justify-content-start align-items-start flex-wrap" style="margin-left: 0; gap: 0; margin-bottom: 0.2rem !important;">
+                        <!-- S-Meter rolling history strip — leftmost so the live trace
+                             reads left-to-right toward the S-meter needle. Hidden
+                             until the toolbar's S-hist toggle is on. Sized to match
+                             the meter cells alongside it. Moved from inside the VFO
+                             panels in v2.3.9 (Jacek SP3L #34 / Colin's design call):
+                             the radio only has ONE calibrated S-meter (tied to MAIN
+                             on FTdx101; only physical receiver on single-receiver
+                             rigs), so showing it once at the top is the honest
+                             presentation. -->
+                        <div id="sMeterHistoryContainer"
+                             class="text-center smeter-history-container"
+                             style="display:none; position: relative; height: 135px; min-width: 260px; margin: 0; padding: 0;">
+                            <canvas id="sMeterHistoryCanvas"
+                                    role="img" aria-hidden="true"
+                                    aria-label="S-meter 30-second history"
+                                    data-a11y-key="meters.smeterHistory"
+                                    style="display:block; width:100%; height:100%; border-radius:3px;"></canvas>
+                        </div>
+                        <!-- S-Meter — moved from per-VFO panels to the top row
+                             in v2.3.9. Always live (unlike SWR/Power/etc which
+                             are TX-only). -->
+                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                            <div class="analog-meter-container">
+                                <canvas id="sMeterCanvas" role="img" aria-hidden="true" aria-label="S meter" data-a11y-key="meters.smeter"></canvas>
+                            </div>
+                        </div>
                         <!-- SWR Meter -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
@@ -376,8 +402,18 @@
                         </div>
                         }
                     </div>
-                    <!-- Power and MIC Gain on one row -->
-                    <div class="d-flex align-items-center gap-2 mb-2 closer-to-raw-power" style="margin-top: -18px !important; flex-wrap: wrap;">
+                    <!-- Power and MIC Gain on one row.
+                         padding-left: 260px reserves the same width as the
+                         S-meter history strip in the meter row above (whether
+                         the strip is currently visible or not), so the Power
+                         label always sits directly under the S-meter gauge
+                         rather than under the (sometimes-hidden) history
+                         strip. v2.3.9 layout change.
+                         Padding on the flex container itself rather than a
+                         spacer child -- a child element would have its own
+                         flex slot and (with flex-wrap on) the spillover items
+                         would wrap to a new line at x=0, defeating the point. -->
+                    <div class="d-flex align-items-center gap-2 mb-2 closer-to-raw-power" style="margin-top: -18px !important; flex-wrap: wrap; padding-left: 280px;">
                         <label class="mb-0 text-nowrap">Power: <span id="powerValue" class="fw-bold">@Model.RadioState.Power W</span></label>
                         <input type="range" class="flex-shrink-0" id="powerSlider"
                                aria-label="Transmit power"
@@ -556,22 +592,16 @@
                     </button>
                 </div>
                 <div class="card-body p-2">
-                    <!-- Receiver Controls Group: S-Meter, Band buttons, Mode select -->
+                    <!-- Receiver Controls Group: Save-to-Mem, Band buttons, Mode select.
+                         The S-meter and its history strip moved to the top meter row
+                         in v2.3.9 (Jacek SP3L #34, Colin's design call) -- the radio
+                         has only one calibrated S-meter, so showing it once at the
+                         top is honest. -->
                     <div class="receiver-controls-group d-flex flex-nowrap mb-0 gap-2 align-items-start">
-                        <!-- Left: S-Meter only -->
+                        <!-- Left: Save-to-Mem button (S-meter moved to top row) -->
                         <div class="flex-shrink-0">
-                            <div class="analog-meter-container">
-                                <canvas id="sMeterCanvasA" role="img" aria-hidden="true" aria-label="S meter, VFO A" data-a11y-key="meters.smeterA"></canvas>
-                            </div>
-                            <div id="sMeterHistoryContainerA" class="smeter-history-container" style="display:none; margin-top:-50px; position:relative; z-index:2;">
-                                <canvas id="sMeterHistoryCanvasA"
-                                        role="img" aria-hidden="true"
-                                        aria-label="VFO A S-meter 30-second history"
-                                        data-a11y-key="meters.smeterHistoryA"
-                                        style="display:block; width:100%; height:72px; border-radius:3px;"></canvas>
-                            </div>
                             <button id="saveMemBtnA" type="button"
-                                    class="btn btn-outline-secondary btn-sm mt-1"
+                                    class="btn btn-outline-secondary btn-sm"
                                     style="padding:1px 4px;"
                                     onclick="saveVfoToMemory('A')"
                                     aria-label="Save VFO A to memories"
@@ -908,22 +938,13 @@
                     </div>
                 </div>
                 <div class="card-body p-2">
-                    <!-- Receiver Controls Group: S-Meter, Band buttons, Mode select -->
+                    <!-- Receiver Controls Group: Save-to-Mem, Band buttons, Mode select.
+                         S-meter moved to top meter row in v2.3.9 (see VFO A panel). -->
                     <div class="receiver-controls-group d-flex flex-nowrap mb-0 gap-2 align-items-start">
-                        <!-- Left: S-Meter only -->
+                        <!-- Left: Save-to-Mem button (S-meter moved to top row) -->
                         <div class="flex-shrink-0">
-                            <div class="analog-meter-container">
-                                <canvas id="sMeterCanvasB" role="img" aria-hidden="true" aria-label="S meter, VFO B" data-a11y-key="meters.smeterB"></canvas>
-                            </div>
-                            <div id="sMeterHistoryContainerB" class="smeter-history-container" style="display:none; margin-top:-50px; position:relative; z-index:2;">
-                                <canvas id="sMeterHistoryCanvasB"
-                                        role="img" aria-hidden="true"
-                                        aria-label="VFO B S-meter 30-second history"
-                                        data-a11y-key="meters.smeterHistoryB"
-                                        style="display:block; width:100%; height:72px; border-radius:3px;"></canvas>
-                            </div>
                             <button id="saveMemBtnB" type="button"
-                                    class="btn btn-outline-secondary btn-sm mt-1"
+                                    class="btn btn-outline-secondary btn-sm"
                                     style="padding:1px 4px;"
                                     onclick="saveVfoToMemory('B')"
                                     aria-label="Save VFO B to memories"
@@ -1769,8 +1790,12 @@
                 setInterval(tick, 1000);
             }
             window.meterPanel = new MeterPanel({
-                smeterA:     { type: 'smeter', canvasId: 'sMeterCanvasA' },
-                smeterB:     { type: 'smeter', canvasId: 'sMeterCanvasB' },
+                // v2.3.9: S-meter moved from per-VFO panels into the top meter
+                // row. Yaesu radios only have one calibrated S-meter (tied to
+                // MAIN on the FTdx101 family; only physical receiver on
+                // single-receiver rigs), so a single gauge is the truthful
+                // presentation. Old smeterA/smeterB keys are gone.
+                smeter:      { type: 'smeter', canvasId: 'sMeterCanvas' },
                 power:       { canvasId: 'powerMeterCanvas' },
                 swr:         { canvasId: 'swrMeterCanvas' },
                 compression: { canvasId: 'compressionMeterCanvas' },
@@ -1784,19 +1809,17 @@
             // ── S-meter history strip ────────────────────────────────────────
             // Hidden by default. Toggle via the "S-hist" button in the top
             // toolbar; visibility persists in localStorage so the choice
-            // survives page reloads.
-            window.sMeterHistoryA = new SMeterHistoryPanel('sMeterHistoryCanvasA');
-            window.sMeterHistoryB = new SMeterHistoryPanel('sMeterHistoryCanvasB');
+            // survives page reloads. Single strip in the top meter row,
+            // leftmost so the trace reads left-to-right toward the S-meter.
+            window.sMeterHistory = new SMeterHistoryPanel('sMeterHistoryCanvas');
             (function () {
-                const btn  = document.getElementById('sMeterHistoryToggleBtn');
-                const conA = document.getElementById('sMeterHistoryContainerA');
-                const conB = document.getElementById('sMeterHistoryContainerB');
-                if (!btn || !conA || !conB) return;
+                const btn = document.getElementById('sMeterHistoryToggleBtn');
+                const con = document.getElementById('sMeterHistoryContainer');
+                if (!btn || !con) return;
 
                 const KEY = 'ywc.sMeterHistoryVisible';
                 const apply = (visible) => {
-                    conA.style.display = visible ? '' : 'none';
-                    conB.style.display = visible ? '' : 'none';
+                    con.style.display = visible ? '' : 'none';
                     btn.classList.toggle('active', visible);
                     btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
                 };
