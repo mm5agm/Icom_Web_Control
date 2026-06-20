@@ -157,6 +157,9 @@ docs/VoiceControl/*
 *.log
 run.log
 
+# Local scratch / temp files (test plans, draft notes, etc.)
+.tmp_*
+
 # Local backup scripts
 Backup*.ps1
 
