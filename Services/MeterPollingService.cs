@@ -35,6 +35,19 @@ namespace Yaesu_Web_Control.Services
         private int _consecutiveNullCount = 0;
         private const int DisconnectThreshold = 5;
 
+        // S-meter zero-flash debounce. Yaesu radios occasionally respond to
+        // SM0; with a transient zero — typically when the radio is busy
+        // emitting FA auto-info during a frequency-dial turn — even though
+        // the actual signal is unchanged. Without debouncing, the S-meter
+        // needle briefly drops to S0 then snaps back, producing the visible
+        // "flash" Jacek SP3L reported on #34 pre6.
+        //
+        // The debounce: only propagate a zero reading after we've seen N
+        // consecutive zero responses. Non-zero readings propagate immediately
+        // (so the meter remains snappy when signal is actually present).
+        private int _sMeterZeroCount = 0;
+        private const int SMeterZeroThreshold = 3;
+
         public MeterPollingService(
             CatMultiplexerService multiplexer,
             RadioStateService stateService,
@@ -102,7 +115,22 @@ namespace Yaesu_Web_Control.Services
                     var smAResponse = await _multiplexer.SendCommandAsync(CatCommands.SMeterMain + ";", "MeterPoll", stoppingToken);
                     _logger.LogInformation("[MeterPolling][DEBUG] S-Meter A response: {0}", smAResponse);
                     int sMeterA = CatCommands.ParseSMeter(smAResponse ?? "");
-                    _stateService.SMeterA = sMeterA;
+
+                    // Zero-flash debounce (see _sMeterZeroCount comment). Apply
+                    // a non-zero reading immediately, but only propagate a zero
+                    // after SMeterZeroThreshold consecutive zeros.
+                    if (sMeterA == 0)
+                    {
+                        _sMeterZeroCount++;
+                        if (_sMeterZeroCount >= SMeterZeroThreshold)
+                            _stateService.SMeterA = 0;
+                        // else: hold the previous SMeterA value, don't overwrite.
+                    }
+                    else
+                    {
+                        _sMeterZeroCount = 0;
+                        _stateService.SMeterA = sMeterA;
+                    }
 
                     // SMeterB is no longer displayed -- v2.3.9 moved the S-meter
                     // (and its history strip) into the top meter row as a

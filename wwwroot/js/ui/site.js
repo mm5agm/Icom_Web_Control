@@ -923,15 +923,30 @@ function updateTxButton() {
     const btnA = document.getElementById('txButtonA');
     const btnB = document.getElementById('txButtonB');
 
-    // On single-receiver radios in normal mode, the TX VFO IS the active
-    // (RX) VFO -- pressing A/B on the front panel changes which VFO will
-    // key when PTT engages, but the FT command stays at 0. So position
-    // the TX button by activeVfo in normal mode and txVfo in split mode.
-    // On dual-receiver radios txVfo is correct in both modes.
-    // SP3L Jacek #34 follow-up after pre3 -- "TX button does not move".
+    // TX button position rules:
+    //
+    //  Single-receiver normal mode: TX VFO IS the active (RX) VFO.
+    //    Pressing A/B on the front panel changes which VFO will key, but the
+    //    FT command stays at 0. Position by activeVfo. (Pre3 fix.)
+    //
+    //  Single-receiver split mode: the TX VFO is the OPPOSITE of the active
+    //    (RX) VFO -- the radio receives on activeVfo and transmits on the
+    //    other one. FT often doesn't move on FTdx10 when split engages, so
+    //    don't rely on txVfo here. Pre7 fix (Jacek SP3L #34, pre6 follow-up
+    //    "TX button stays on white panel after split enabled").
+    //
+    //  Dual-receiver (any mode): txVfo (FT command) is reliable. Use it.
+    //
     const vfoRow = document.getElementById('vfoRow');
     const isSingleReceiver = vfoRow?.dataset.singleReceiver === 'true';
-    const positionVfo = (isSingleReceiver && splitMode === 0) ? activeVfo : txVfo;
+    let positionVfo;
+    if (isSingleReceiver) {
+        positionVfo = (splitMode > 0)
+            ? (activeVfo === 0 ? 1 : 0)   // split: TX = opposite of active
+            : activeVfo;                   // normal: TX = active
+    } else {
+        positionVfo = txVfo;
+    }
 
     // Show only on TX VFO
     if (btnA) btnA.style.display = (positionVfo === 0) ? 'inline-block' : 'none';
@@ -1318,6 +1333,11 @@ connection.on("RadioStateUpdate", function (update) {
         // R7 (Jacek SP3L #34): greying flips when split toggles — the inactive
         // panel becomes the TX VFO (grey) and the RX VFO becomes white.
         applyVfoActiveStyling();
+        // Pre7 fix: also re-evaluate the TX button position. On single-receiver
+        // radios, enabling split changes which panel the TX button should sit
+        // on (becomes "opposite of activeVfo") but FT often doesn't move on
+        // FTdx10 to trigger the TxVfo handler -- so do it here too.
+        updateTxButton();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('split', update.value);
     }
 
