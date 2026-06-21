@@ -586,10 +586,13 @@
                     <h5 class="mb-0">
                         <span id="receiverAHeading">VFO A</span>
                     </h5>
-                    <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
-                            onclick="toggleTx()" title="Toggle Transmit">
-                        <i class="bi bi-broadcast" aria-hidden="true"></i> TX
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="splitTxBadgeA" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                        <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
+                                onclick="toggleTx()" title="Toggle Transmit">
+                            <i class="bi bi-broadcast" aria-hidden="true"></i> TX
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body p-2">
                     <!-- Receiver Controls Group: Save-to-Mem, Band buttons, Mode select.
@@ -930,7 +933,7 @@
                         <span id="receiverBHeading">VFO B</span>
                     </h5>
                     <div class="d-flex align-items-center gap-2">
-                        <span id="splitTxBadge" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                        <span id="splitTxBadgeB" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
                         <button id="txButtonB" class="btn btn-warning btn-sm" style="display:none;"
                                 onclick="toggleTx()" title="Toggle Transmit">
                             <i class="bi bi-broadcast" aria-hidden="true"></i> TX

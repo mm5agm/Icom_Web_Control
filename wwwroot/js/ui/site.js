@@ -829,35 +829,34 @@ function applyVfoActiveStyling() {
         return;
     }
 
-    // Single-receiver: which panel is "inactive" depends on whether split
-    // mode is on (per SP3L Jacek's R1-R12 spec in #34):
+    // Single-receiver: white = active VFO (the one currently RECEIVING),
+    // grey = the other one. This is true in BOTH normal and split mode:
     //
-    //   Normal mode (R2): white = active (RX) VFO, grey = the other.
-    //                     Driven by activeVfo (VS command). On single-
-    //                     receiver radios this is the VFO that's actually
-    //                     receiving; the other one just stores frequency/
-    //                     mode state. Fixed in #34 — pre-pre3 used txVfo
-    //                     here, which doesn't change on a front-panel A/B
-    //                     press in normal mode.
+    //   Normal mode (R2): white = active VFO (RX), grey = the other.
+    //                     Pressing A/B on the radio swaps which is RX.
     //
-    //   Split mode  (R7): white = RX VFO (NOT TxVfo), grey = TX VFO.
-    //                     The radio receives on the white VFO and transmits
-    //                     on the grey VFO. The TX VFO is "inactive" from a
-    //                     receive perspective even though it's the one that
-    //                     will key when PTT engages — hence still grey.
-    //                     Driven by txVfo (FT command) which IS reliable in
-    //                     split mode.
+    //   Split mode  (R7): white = active VFO (RX), grey = TX VFO.
+    //                     Radio receives on active VFO, transmits on the
+    //                     opposite VFO.
+    //
+    // In both cases, "inactive" (= grey) = whichever VFO is NOT the active
+    // RX one. We previously drove split-mode greying from txVfo (FT
+    // command) because the spec implied FT tracks the TX VFO — but the
+    // FTdx10 doesn't reliably move FT when split engages while VFO-B is
+    // the active VFO (Jacek SP3L 2026-06-21 #34 R7 fail). Using activeVfo
+    // (VS command) for both cases is deterministic and matches what the
+    // radio is actually doing.
     //
     // The TX button and SPLIT badge land on the grey panel in split mode
-    // (R8) automatically since updateTxButton() positions the button on
-    // TxVfo's column, which is now the grey one.
+    // (R8) automatically because updateTxButton / updateSplitButton derive
+    // the TX position as "opposite of active" on single-receiver radios.
     //
     // The spectrum panel is NOT greyed — on single-receiver radios the
     // single spectrum always shows the live receive signal. The second
     // spectrum panel is hidden permanently by updateContainerVisibility().
     const splitOn = splitMode > 0;
-    const inactiveCol = (splitOn ? (txVfo === 1) : (activeVfo === 0)) ? bCol : aCol;
-    const activeCol   = (inactiveCol === aCol) ? bCol : aCol;
+    const inactiveCol = (activeVfo === 0) ? bCol : aCol;
+    const activeCol   = (activeVfo === 0) ? aCol : bCol;
 
     activeCol.classList.remove('vfo-inactive', 'vfo-tx-editable');
     inactiveCol.classList.add('vfo-inactive');
@@ -968,10 +967,14 @@ function updateTxButton() {
 }
 
 function updateSplitButton() {
-    const btn     = document.getElementById('splitBtn');
-    const badge   = document.getElementById('splitTxBadge');
-    const vfoBCard = document.querySelector('#vfoBCol .card');
-    const active  = splitMode > 0;
+    const btn        = document.getElementById('splitBtn');
+    const badgeA     = document.getElementById('splitTxBadgeA');
+    const badgeB     = document.getElementById('splitTxBadgeB');
+    const vfoACard   = document.querySelector('#vfoACol .card');
+    const vfoBCard   = document.querySelector('#vfoBCol .card');
+    const vfoRow     = document.getElementById('vfoRow');
+    const isSingleReceiver = vfoRow?.dataset.singleReceiver === 'true';
+    const active     = splitMode > 0;
 
     if (btn) {
         btn.className = active ? 'btn btn-sm btn-danger' : 'btn btn-sm btn-outline-secondary';
@@ -979,10 +982,35 @@ function updateSplitButton() {
         btn.style.paddingBottom = '1px';
         btn.textContent = active ? 'Split ON' : 'Split';
     }
-    if (badge)    badge.style.display = active ? 'inline-block' : 'none';
-    if (vfoBCard) {
-        vfoBCard.classList.toggle('border-danger',  active);
-        vfoBCard.classList.toggle('border-success', !active);
+
+    // R8: the SPLIT TX badge belongs on the TX VFO's header — the grey
+    // panel. On single-receiver radios the TX VFO is the OPPOSITE of the
+    // active VFO; on dual-receiver radios it's whichever VFO the FT
+    // command points to. Show one badge, hide the other.
+    let txVfoIdx;
+    if (isSingleReceiver) {
+        txVfoIdx = (activeVfo === 0) ? 1 : 0;   // opposite of RX
+    } else {
+        txVfoIdx = txVfo;
+    }
+    if (badgeA) badgeA.style.display = (active && txVfoIdx === 0) ? 'inline-block' : 'none';
+    if (badgeB) badgeB.style.display = (active && txVfoIdx === 1) ? 'inline-block' : 'none';
+
+    // Card border colour: red on the TX VFO when split is on, green on the
+    // other one. Pre-fix this only ever touched #vfoBCol, so when VFO-B
+    // was the active RX the colours ended up on the wrong card
+    // (Jacek SP3L #34 R7 fail 2026-06-21).
+    const txCard    = (txVfoIdx === 0) ? vfoACard : vfoBCard;
+    const otherCard = (txVfoIdx === 0) ? vfoBCard : vfoACard;
+    if (txCard) {
+        txCard.classList.toggle('border-danger', active);
+        txCard.classList.toggle('border-success', !active);
+    }
+    if (otherCard) {
+        // The non-TX card is never red; clear any leftover from a previous
+        // split state where this card WAS the TX one.
+        otherCard.classList.remove('border-danger');
+        otherCard.classList.toggle('border-success', !active);
     }
 }
 
@@ -1324,6 +1352,10 @@ connection.on("RadioStateUpdate", function (update) {
         // In normal mode on a single-receiver radio, the TX button position
         // follows activeVfo (the TX VFO IS the active VFO; FT doesn't move).
         updateTxButton();
+        // R8 (Jacek SP3L #34, 2026-06-21): in split mode the TX VFO is the
+        // opposite of active, so the SPLIT TX badge and the red border have
+        // to switch panels whenever the active VFO changes.
+        updateSplitButton();
     }
 
     // --- SPLIT MODE ---
