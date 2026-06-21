@@ -117,6 +117,22 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <script src="~/js/ui/site.js" asp-append-version="true"></script>
+    @{
+        // Voice Control: server-render the enable flag so voice-control.js
+        // can decide whether to show the navbar mic button before any user
+        // interaction. The toggle lives in ApplicationSettings.VoiceControlEnabled
+        // (Settings page > Voice Control section). Default off.
+        var _ywcSettingsService = (Yaesu_Web_Control.Services.ISettingsService)Context.RequestServices
+            .GetService(typeof(Yaesu_Web_Control.Services.ISettingsService))!;
+        var _ywcVoiceEnabled = false;
+        try
+        {
+            var _ywcSettings = await _ywcSettingsService.GetSettingsAsync();
+            _ywcVoiceEnabled = _ywcSettings.VoiceControlEnabled;
+        }
+        catch { /* settings unavailable -> default off */ }
+    }
+    <script>window.ywcVoiceEnabled = @(_ywcVoiceEnabled ? "true" : "false");</script>
     <script src="~/js/ui/voice-control.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     @await RenderSectionAsync("Scripts", required: false)

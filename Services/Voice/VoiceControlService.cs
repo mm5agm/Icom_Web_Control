@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.Speech.Recognition;
 using Yaesu_Web_Control.Hubs;
+using Yaesu_Web_Control.Services;
 
 namespace Yaesu_Web_Control.Services.Voice
 {
@@ -35,6 +36,7 @@ namespace Yaesu_Web_Control.Services.Voice
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly IntentDispatcher _intentDispatcher;
         private readonly IWebHostEnvironment _env;
+        private readonly ISettingsService _settings;
 
         private readonly object _engineLock = new();
         private SpeechRecognitionEngine? _engine;
@@ -50,17 +52,32 @@ namespace Yaesu_Web_Control.Services.Voice
             ILogger<VoiceControlService> logger,
             IHubContext<RadioHub> hubContext,
             IntentDispatcher intentDispatcher,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            ISettingsService settings)
         {
             _logger = logger;
             _hubContext = hubContext;
             _intentDispatcher = intentDispatcher;
             _env = env;
+            _settings = settings;
         }
 
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
-            TryInitialiseEngine();
+            // Honour the Settings toggle. If voice control is disabled the
+            // engine is never constructed -- no SAPI load, no mic permission
+            // grab, no holding the recogniser in memory. The user can flip
+            // the toggle in Settings and restart YWC to enable.
+            var settings = await _settings.GetSettingsAsync();
+            if (settings.VoiceControlEnabled)
+            {
+                TryInitialiseEngine();
+            }
+            else
+            {
+                _logger.LogInformation("[Voice] Disabled in Settings -- skipping SAPI engine construction.");
+                UpdateStatus(VoiceState.Idle);
+            }
             await base.StartAsync(cancellationToken);
         }
 

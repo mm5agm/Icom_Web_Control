@@ -222,6 +222,9 @@ namespace Yaesu_Web_Control.Pages
                 // Accessibility
                 current.ShowFrequencyArrowButtons = Settings.ShowFrequencyArrowButtons;
 
+                // Voice Control (v1)
+                current.VoiceControlEnabled = Settings.VoiceControlEnabled;
+
                 await _settingsService.SaveSettingsAsync(current);
 
                 // Reset initialization status so app will try again

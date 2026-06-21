@@ -231,6 +231,98 @@
         </div>
     </details>
 
+    <!-- Voice Control section -->
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-mic-fill" aria-hidden="true"></i>&nbsp;Voice Control</summary>
+        <div class="section-body">
+            <p class="text-muted small mb-3">
+                Hands-free control of YWC via a PC microphone. Uses Windows' built-in speech recognition
+                (SAPI 5), so audio never leaves your computer.
+                A small mic button appears in the top navbar when enabled — press and hold it, speak a
+                command, release. The recognised text is interpreted as a CAT action (set frequency,
+                change band, set mode, swap VFO, tune up/down).
+            </p>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="voiceControlEnabled" asp-for="Settings.VoiceControlEnabled" />
+                <label class="form-check-label" for="voiceControlEnabled">
+                    Enable voice control
+                </label>
+                <div class="form-text">
+                    Off by default. When enabled, YWC loads the Windows speech recogniser at startup
+                    and shows the mic button in the navbar. Disable to hide the button and free the
+                    recogniser. Requires the English (UK) speech pack to be installed in Windows
+                    (Settings → Time &amp; Language → Speech).
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Language</label>
+                <select class="form-select form-select-sm" disabled>
+                    <option selected>English (UK)</option>
+                </select>
+                <div class="form-text">
+                    Only English (UK) ships in v1. Multi-language support (drop in your own
+                    <code>Commands.&lt;culture&gt;.srgs</code> file) is on the roadmap for v2.
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Diagnostics</label>
+                <div id="voiceDiagnostics" class="border rounded p-2 small bg-light">
+                    <em class="text-muted">Loading…</em>
+                </div>
+                <div class="form-text">
+                    Shows whether the en-GB SAPI engine is available, the current state of the
+                    recogniser, and the last error (if any).
+                </div>
+            </div>
+            <div class="mb-3">
+                <button type="button" id="openGrammarsFolderBtn" class="btn btn-sm btn-outline-secondary"
+                        onclick="ywcOpenGrammarsFolder()">
+                    <i class="bi bi-folder2-open" aria-hidden="true"></i>&nbsp;Open user grammars folder
+                </button>
+                <div class="form-text">
+                    Opens <code>%APPDATA%\MM5AGM\Yaesu Web Control\Grammars\</code> in Explorer.
+                    Drop a <code>Commands.&lt;culture&gt;.srgs</code> file here (v2+) to add a new
+                    language without touching the install directory.
+                </div>
+            </div>
+        </div>
+        <script>
+            // Pull /api/voice/status once on Settings load to populate diagnostics.
+            (async function () {
+                const el = document.getElementById('voiceDiagnostics');
+                if (!el) return;
+                try {
+                    const r = await fetch('/api/voice/status');
+                    if (!r.ok) { el.innerHTML = '<span class="text-danger">Status endpoint returned ' + r.status + '</span>'; return; }
+                    const s = await r.json();
+                    const rows = [
+                        ['State',        s.state ?? '—'],
+                        ['Last heard',   s.lastHeard  ? '&ldquo;' + escapeHtml(s.lastHeard)  + '&rdquo;' : '—'],
+                        ['Last intent',  s.lastIntent ?? '—'],
+                        ['Last error',   s.errorMessage ? '<span class="text-danger">' + escapeHtml(s.errorMessage) + '</span>' : '—'],
+                    ];
+                    el.innerHTML = '<table class="table table-sm mb-0">' +
+                        rows.map(([k, v]) => '<tr><th style="width: 30%">' + k + '</th><td>' + v + '</td></tr>').join('') +
+                        '</table>';
+                } catch (e) {
+                    el.innerHTML = '<span class="text-danger">Could not query voice status: ' + escapeHtml(String(e)) + '</span>';
+                }
+            })();
+            function escapeHtml(s) {
+                return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            }
+            async function ywcOpenGrammarsFolder() {
+                try {
+                    const r = await fetch('/api/voice/open-grammars-folder', { method: 'POST' });
+                    if (!r.ok) alert('Could not open grammars folder (status ' + r.status + ')');
+                } catch (e) {
+                    alert('Could not open grammars folder: ' + e);
+                }
+            }
+        </script>
+    </details>
+
     <!-- Radio & CAT -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
         <summary><i class="bi bi-broadcast" aria-hidden="true"></i>&nbsp;Radio &amp; CAT</summary>

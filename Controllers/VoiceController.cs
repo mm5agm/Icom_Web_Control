@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 using Yaesu_Web_Control.Services.Voice;
 
 namespace Yaesu_Web_Control.Controllers
@@ -15,10 +16,12 @@ namespace Yaesu_Web_Control.Controllers
     public sealed class VoiceController : ControllerBase
     {
         private readonly VoiceControlService _voice;
+        private readonly ILogger<VoiceController> _logger;
 
-        public VoiceController(VoiceControlService voice)
+        public VoiceController(VoiceControlService voice, ILogger<VoiceController> logger)
         {
             _voice = voice;
+            _logger = logger;
         }
 
         [HttpPost("start")]
@@ -39,5 +42,33 @@ namespace Yaesu_Web_Control.Controllers
 
         [HttpGet("status")]
         public IActionResult Status() => Ok(_voice.CurrentStatus);
+
+        /// <summary>
+        /// Opens the user grammars folder in Windows Explorer. Used by the
+        /// "Open user grammars folder" button in Settings -> Voice Control.
+        /// The folder is created if missing so the user lands in a real
+        /// location even on a fresh install.
+        /// </summary>
+        [HttpPost("open-grammars-folder")]
+        public IActionResult OpenGrammarsFolder()
+        {
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var path = Path.Combine(appData, "MM5AGM", "Yaesu Web Control", "Grammars");
+                Directory.CreateDirectory(path);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true,
+                });
+                return Ok(new { path });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Voice] Failed to open grammars folder");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
     }
 }
