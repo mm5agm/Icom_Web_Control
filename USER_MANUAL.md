@@ -77,6 +77,7 @@
     - 17.4 [Troubleshooting](#174-troubleshooting)
     - 17.5 [Privacy](#175-privacy)
     - 17.6 [Adding your own commands](#176-adding-your-own-commands)
+    - 17.7 [Roadmap: more languages](#177-roadmap-more-languages)
 
 ---
 
@@ -2264,6 +2265,31 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 The voice command grammar is currently built in code (`Services/Voice/VoiceGrammar.cs`) using the Windows GrammarBuilder API. The original human-readable design lives at `Grammars/Commands.en-GB.srgs` — that's an SRGS XML file describing every intent, vocabulary, and tag in a single document. It's not loaded at runtime on .NET 10 (the in-process SRGS compiler isn't shipped with the modern `System.Speech` NuGet) but it remains the reference spec for the grammar.
 
 For v1 we're not exposing a "drop in your own grammar" extension point; the **Settings → Voice Control → Open user grammars folder** button creates the folder at `%APPDATA%\MM5AGM\Yaesu Web Control\Grammars\` for the v2 plan, but anything you put there isn't picked up yet. If there's a particular command or phrasing you'd like added, please file it as a GitHub issue or discussion.
+
+### 17.7 Roadmap: more languages
+
+Only **English (UK)** ships today. The language code is hard-wired in `VoiceControlService` and the grammar is hard-wired in `VoiceGrammar.cs`. Adding another language has three moving parts:
+
+1. **The Windows speech pack for that language must be installed** on the operator's PC. Windows → Settings → Time &amp; Language → Speech → Add a language. Microsoft ships full recognition packs for US English, French, German, Spanish, Italian, Japanese, Mandarin Chinese, Brazilian Portuguese and Australian English (the list does shift between Windows releases). Some other languages only ship voice synthesis, not recognition — those can't be used for voice control regardless of what YWC does.
+2. **A translated grammar.** Phrases are language-specific; "go to twenty metres" doesn't help a French operator. Each new language needs its own builder methods translating the verbs, the band words ("vingt mètres"), the mode words, the digit words. The semantic keys (`intent`, `mhz_whole`, `metres`, `mode`, `direction`) stay identical so the dispatcher needs no changes.
+3. **A user-facing language picker.** The Settings → Voice Control section has a disabled "English (UK)" dropdown as a placeholder; v2 turns that into a real selector listing whichever languages YWC has grammars for, persists the choice, and `VoiceControlService` constructs the recogniser for the chosen culture at startup.
+
+**Likely path for v1.x** (adding one extra language quickly):
+
+- Add `VoiceGrammar.BuildEsEs()` (or `BuildFrFr()`, `BuildDeDe()` …) returning a translated grammar with the same intents.
+- Add a `BuildForCulture(string culture)` switch in `VoiceGrammar`.
+- Make the Settings dropdown live and persisted.
+- The language pack install remains the user's responsibility, documented in §17.2.
+
+Each additional language is roughly a day of work — most of it translation, not code. The semantic dispatcher stays untouched, so once a translator has provided the words there's no further engineering.
+
+**Larger v2 ambition** (community-supplied grammars without recompiling YWC):
+
+- Define a simple JSON grammar format we can ship and translate to `GrammarBuilder` calls at runtime. (We can't use SRGS for this — the in-process SRGS compiler isn't shipped with the modern `System.Speech` NuGet, which is why our own grammar is built in code.)
+- The user grammars folder created by the **Open user grammars folder** button becomes the load location: drop in `Commands.de-DE.json` and YWC picks it up next launch.
+- A contributor who wants German support can hand-author the JSON without touching C# code.
+
+This is bigger work and only worth doing once we have evidence of demand. If you'd like a particular language prioritised, please open a GitHub discussion or issue and mention it.
 
 ---
 
