@@ -239,6 +239,27 @@ body {
     vertical-align: middle;
 }
 
+/* Highlight the currently-selected digit inside a frequency display.
+   The `selected` class is added by site.js when the user clicks a digit,
+   wheels over one, or uses ArrowUp/Down on a focused display -- it marks
+   which digit will be stepped by ▲/▼, ArrowUp/Down, and PageUp/PageDown.
+   Without this rule the selection was invisible. */
+.frequency-display .digit.selected {
+    background-color: #ffe066;
+    color: #000;
+    border-radius: 0.15em;
+    box-shadow: inset 0 0 0 1px #b58900;
+    padding: 0 0.05em;
+}
+
+/* Focus ring on the freq display itself -- helps keyboard-only users
+   see that the display is focused (so ArrowUp/Down will step a digit). */
+.frequency-display:focus,
+.frequency-display:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
 /* Band/mode/antenna buttons - optimized for 2-line layout with good touch targets */
 .btn-outline-primary.btn-sm,
 .btn-outline-success.btn-sm {

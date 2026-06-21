@@ -251,219 +251,6 @@ function renderFrequencyDigits(freq, selIdx) {
     return html;
 }
 
-// Outer digit interaction initializer (touch/pointer support)
-function initializeDigitInteraction(receiver) {
-    const display = document.getElementById('freq' + receiver);
-    const controls = document.getElementById('freq' + receiver + '-controls');
-    const upBtn = document.getElementById('freq' + receiver + '-up');
-    const downBtn = document.getElementById('freq' + receiver + '-down');
-    if (!display) return;
-    if (display._initialized) return;
-    display._initialized = true;
-
-    display.addEventListener('pointerdown', function (e) {
-        let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-        let idx = -1;
-        if (e.target.classList.contains('digit') && e.target.textContent !== '.') {
-            idx = digits.indexOf(e.target);
-        } else {
-            let x = e.clientX;
-            let minDist = Infinity;
-            digits.forEach((d, i) => {
-                let digitRect = d.getBoundingClientRect();
-                let digitCenter = digitRect.left + digitRect.width / 2;
-                let dist = Math.abs(x - digitCenter);
-                if (dist < minDist) {
-                    minDist = dist;
-                    idx = i;
-                }
-            });
-        }
-        if (idx !== -1 && window.radioControl && window.radioControl._state) {
-            digits.forEach(d => d.classList.remove('selected'));
-            window.radioControl._state.selectedIdx[receiver] = idx;
-            digits[idx].classList.add('selected');
-            window.radioControl._state.editing[receiver] = true;
-            window.radioControl._state.localFreq[receiver] = parseInt(digits.map(d => d.textContent).join(''));
-            updateFrequencyDisplay(receiver, window.radioControl._state.localFreq[receiver]);
-        }
-        e.preventDefault();
-    });
-
-    // Shared digit-step routine used by the wheel and keyboard handlers.
-    // `step` is the signed amount to add to the digit at the selected
-    // position; carries propagate left through more-significant digits.
-    function stepSelectedDigit(step) {
-        let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-        let idx = state.selectedIdx[receiver];
-        if (idx === null || !digits[idx]) return;
-        let freqArr = digits.map(d => parseInt(d.textContent));
-        let carry = step;
-        let i = idx;
-        while (carry !== 0 && i >= 0 && i < freqArr.length) {
-            let newVal = freqArr[i] + carry;
-            if (newVal > 9) {
-                freqArr[i] = newVal % 10;
-                carry = Math.floor(newVal / 10);
-                i--;
-            } else if (newVal < 0) {
-                // Borrow: -1 + 10 = 9, carry -1; -2 + 10 = 8, carry -1; etc.
-                freqArr[i] = ((newVal % 10) + 10) % 10;
-                carry = Math.floor(newVal / 10);
-                i--;
-            } else {
-                freqArr[i] = newVal;
-                carry = 0;
-            }
-        }
-        let newFreq = parseInt(freqArr.join(''));
-        newFreq = Math.max(30000, Math.min(75000000, newFreq));
-        state.localFreq[receiver] = newFreq;
-        state.editing[receiver] = true;
-        updateFrequencyDisplay(receiver, newFreq);
-        clearTimeout(display._debounceTimer);
-        display._debounceTimer = setTimeout(() => {
-            setFrequency(receiver, newFreq);
-            state.localFreq[receiver] = null;
-            state.editing[receiver] = false;
-            updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
-        }, 200);
-    }
-
-    display.addEventListener('wheel', function (e) {
-        if (state.selectedIdx[receiver] === null) return;
-        stepSelectedDigit(e.deltaY < 0 ? 1 : -1);
-        e.preventDefault();
-    }, { passive: false });
-
-    // Keyboard navigation — primary accessibility path for operators who
-    // can't use a mouse wheel (head-tracking users, on-screen-keyboard
-    // users). The freq display is already focusable (role="spinbutton",
-    // tabindex="0"); these key bindings make it fully usable from the
-    // keyboard alone:
-    //
-    //   ArrowUp / ArrowDown          step the selected digit by 1
-    //   PageUp   / PageDown          step the selected digit by 10
-    //   ArrowLeft / ArrowRight       move the selected-digit cursor
-    //   Home / End                   jump to the most / least significant digit
-    //
-    // Selection auto-bootstraps to the kHz digit (or the last digit if the
-    // frequency is shorter) when no digit is selected yet, so the first
-    // ArrowUp press immediately does something visible rather than
-    // silently failing.
-    display.addEventListener('keydown', function (e) {
-        const allDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-        if (allDigits.length === 0) return;
-
-        if (state.selectedIdx[receiver] === null || state.selectedIdx[receiver] === undefined ||
-            !allDigits[state.selectedIdx[receiver]]) {
-            // Default to the kHz position (4th from right for 8-digit, 3rd
-            // for 7-digit, etc.) so the first keystroke moves something
-            // meaningful rather than a 1-Hz tick the user can't hear.
-            const defaultIdx = Math.max(0, allDigits.length - 4);
-            allDigits.forEach(d => d.classList.remove('selected'));
-            allDigits[defaultIdx].classList.add('selected');
-            state.selectedIdx[receiver] = defaultIdx;
-        }
-
-        switch (e.key) {
-            case 'ArrowUp':   stepSelectedDigit(1);   e.preventDefault(); break;
-            case 'ArrowDown': stepSelectedDigit(-1);  e.preventDefault(); break;
-            case 'PageUp':    stepSelectedDigit(10);  e.preventDefault(); break;
-            case 'PageDown':  stepSelectedDigit(-10); e.preventDefault(); break;
-            case 'ArrowLeft':
-                if (state.selectedIdx[receiver] > 0) {
-                    const newIdx = state.selectedIdx[receiver] - 1;
-                    allDigits.forEach(d => d.classList.remove('selected'));
-                    allDigits[newIdx].classList.add('selected');
-                    state.selectedIdx[receiver] = newIdx;
-                }
-                e.preventDefault();
-                break;
-            case 'ArrowRight':
-                if (state.selectedIdx[receiver] < allDigits.length - 1) {
-                    const newIdx = state.selectedIdx[receiver] + 1;
-                    allDigits.forEach(d => d.classList.remove('selected'));
-                    allDigits[newIdx].classList.add('selected');
-                    state.selectedIdx[receiver] = newIdx;
-                }
-                e.preventDefault();
-                break;
-            case 'Home':
-                allDigits.forEach(d => d.classList.remove('selected'));
-                allDigits[0].classList.add('selected');
-                state.selectedIdx[receiver] = 0;
-                e.preventDefault();
-                break;
-            case 'End':
-                allDigits.forEach(d => d.classList.remove('selected'));
-                allDigits[allDigits.length - 1].classList.add('selected');
-                state.selectedIdx[receiver] = allDigits.length - 1;
-                e.preventDefault();
-                break;
-        }
-    });
-
-    // Wire ▲ / ▼ buttons whenever they exist in the DOM. Previously gated
-    // on isTouchDevice(); now also driven by Settings > Accessibility >
-    // Show frequency arrow buttons (Yuri W4YSW). When the setting is on,
-    // the buttons are rendered on every device (head-tracking + on-screen
-    // keyboard users need them on desktop too).
-    if (controls) {
-        // Auto-select the kHz digit on first click if nothing is selected,
-        // so the very first ▲ press moves something meaningful.
-        function ensureSelection() {
-            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-            if (digits.length === 0) return;
-            const cur = state.selectedIdx[receiver];
-            if (cur === null || cur === undefined || !digits[cur]) {
-                const defaultIdx = Math.max(0, digits.length - 4);
-                digits.forEach(d => d.classList.remove('selected'));
-                digits[defaultIdx].classList.add('selected');
-                state.selectedIdx[receiver] = defaultIdx;
-            }
-        }
-        if (upBtn) {
-            upBtn.onclick = function (e) {
-                e.preventDefault();
-                ensureSelection();
-                stepSelectedDigit(1);
-            };
-        }
-        if (downBtn) {
-            downBtn.onclick = function (e) {
-                e.preventDefault();
-                ensureSelection();
-                stepSelectedDigit(-1);
-            };
-        }
-    }
-
-    display.addEventListener('mouseleave', function (e) {
-        // Don't clear selection when the mouse moves to our own controls
-        // (the ▲/▼ buttons live just outside the display element). Without
-        // this guard, a user clicks a digit then reaches for ▲ and the
-        // mouseleave clears their selection before the click registers.
-        if (controls && e.relatedTarget && controls.contains(e.relatedTarget)) return;
-        if (state.editing[receiver]) {
-            state.selectedIdx[receiver] = null;
-            state.editing[receiver] = false;
-            state.localFreq[receiver] = null;
-            updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
-        }
-    });
-
-    document.addEventListener('pointerdown', function (e) {
-        if (!display.contains(e.target) && (!controls || !controls.contains(e.target))) {
-            if (state.editing[receiver]) {
-                state.selectedIdx[receiver] = null;
-                state.editing[receiver] = false;
-                state.localFreq[receiver] = null;
-                updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
-            }
-        }
-    });
-}
 
 // Outer band setter - called from Razor inline onchange on band buttons
 window.setBand = async function (receiver, band) {
@@ -2457,55 +2244,33 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initializeDigitInteraction(receiver) {
-        const display = document.getElementById('freq' + receiver);
-        if (!display) {
-            // ...removed debug logging...
-            return;
-        }
+        const display  = document.getElementById('freq' + receiver);
+        const controls = document.getElementById('freq' + receiver + '-controls');
+        const upBtn    = document.getElementById('freq' + receiver + '-up');
+        const downBtn  = document.getElementById('freq' + receiver + '-down');
+        if (!display) return;
         if (display._initialized) return;
         display._initialized = true;
 
-        display.addEventListener('click', function (e) {
-            if (!e.target.classList.contains('digit') || e.target.textContent === '.') return;
-            let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-            digits.forEach(d => d.classList.remove('selected'));
-            state.selectedIdx[receiver] = digits.indexOf(e.target);
-            if (state.selectedIdx[receiver] !== -1) {
-                digits[state.selectedIdx[receiver]].classList.add('selected');
-                state.editing[receiver] = true;
-                state.localFreq[receiver] = parseInt(digits.map(d => d.textContent).join(''));
-            }
-        });
-
-        display.addEventListener('wheel', function (e) {
-            let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-            let idx = state.selectedIdx[receiver];
-            // If the cursor is directly over a digit span, use that digit regardless of
-            // what was previously selected — this makes wheeling position-sensitive.
-            if (e.target.classList.contains('digit') && e.target.textContent !== '.') {
-                const hovered = digits.indexOf(e.target);
-                if (hovered !== -1) idx = hovered;
-            }
-            // Fall back to auto-selecting the 1 kHz digit (index 4) when not over any digit.
-            if (idx === null || !digits[idx]) {
-                idx = Math.min(4, digits.length - 1);
-            }
-            state.selectedIdx[receiver] = idx;
-            digits.forEach(d => d.classList.remove('selected'));
-            if (digits[idx]) digits[idx].classList.add('selected');
-            state.editing[receiver] = true;
-            let freqArr = digits.map(d => parseInt(d.textContent));
-            let carry = e.deltaY < 0 ? 1 : -1;
+        // Shared digit-step routine used by wheel, keyboard, and ▲/▼ buttons.
+        // `step` is the signed amount to add to the digit at the selected
+        // position; carries propagate left through more-significant digits.
+        function stepSelectedDigit(step) {
+            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            const idx = state.selectedIdx[receiver];
+            if (idx === null || idx === undefined || !digits[idx]) return;
+            const freqArr = digits.map(d => parseInt(d.textContent));
+            let carry = step;
             let i = idx;
             while (carry !== 0 && i >= 0 && i < freqArr.length) {
-                let newVal = freqArr[i] + carry;
+                const newVal = freqArr[i] + carry;
                 if (newVal > 9) {
-                    freqArr[i] = 0;
-                    carry = 1;
+                    freqArr[i] = newVal % 10;
+                    carry = Math.floor(newVal / 10);
                     i--;
                 } else if (newVal < 0) {
-                    freqArr[i] = 9;
-                    carry = -1;
+                    freqArr[i] = ((newVal % 10) + 10) % 10;
+                    carry = Math.floor(newVal / 10);
                     i--;
                 } else {
                     freqArr[i] = newVal;
@@ -2515,29 +2280,197 @@ document.addEventListener('DOMContentLoaded', function() {
             let newFreq = parseInt(freqArr.join(''));
             newFreq = Math.max(30000, Math.min(75000000, newFreq));
             state.localFreq[receiver] = newFreq;
+            state.editing[receiver] = true;
             updateFrequencyDisplay(receiver, newFreq);
-            let newDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            // Re-find digits after re-render and keep selection on the same index.
+            const newDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
             newDigits.forEach(d => d.classList.remove('selected'));
-            if (state.selectedIdx[receiver] !== null && newDigits[state.selectedIdx[receiver]]) {
-                newDigits[state.selectedIdx[receiver]].classList.add('selected');
-            }
+            if (newDigits[idx]) newDigits[idx].classList.add('selected');
             clearTimeout(display._debounceTimer);
             display._debounceTimer = setTimeout(() => {
                 setFrequency(receiver, newFreq);
                 state.lastSentFreq[receiver] = newFreq;
                 state.localFreq[receiver] = null;
-                state.editing[receiver] = false;
+                // IMPORTANT: keep state.editing=true here. The polling tick
+                // at ~500 ms will reset it to false once it sees the radio
+                // confirm data.vfoA.frequency === state.lastSentFreq.A (see
+                // the reset block in fetchRadioStatus). If we clear editing
+                // now, the very next polling tick re-renders the display
+                // with whatever frequency the radio is still reporting --
+                // typically the OLD value, because we just sent the new one
+                // ~tens of ms ago and the radio hasn't echoed back yet.
+                // That race shows up as the digit "flipping back then
+                // settling on the new value" the user reported.
             }, 600);
+        }
+
+        // Auto-select the kHz position when the user hits an arrow / ▲ / ▼
+        // without first picking a digit. Defaults to "4th from the right"
+        // so the first action moves something audible rather than a 1 Hz
+        // tick the user can't hear.
+        function ensureSelection() {
+            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            if (digits.length === 0) return;
+            const cur = state.selectedIdx[receiver];
+            if (cur === null || cur === undefined || !digits[cur]) {
+                const defaultIdx = Math.max(0, digits.length - 4);
+                digits.forEach(d => d.classList.remove('selected'));
+                digits[defaultIdx].classList.add('selected');
+                state.selectedIdx[receiver] = defaultIdx;
+            }
+        }
+
+        display.addEventListener('click', function (e) {
+            if (!e.target.classList.contains('digit') || e.target.textContent === '.') return;
+            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            digits.forEach(d => d.classList.remove('selected'));
+            state.selectedIdx[receiver] = digits.indexOf(e.target);
+            if (state.selectedIdx[receiver] !== -1) {
+                digits[state.selectedIdx[receiver]].classList.add('selected');
+                state.editing[receiver] = true;
+                state.localFreq[receiver] = parseInt(digits.map(d => d.textContent).join(''));
+            }
+            // Explicitly focus the display so the very next ArrowUp/Down
+            // press is delivered here instead of bubbling to body. The
+            // digit spans are tabindex=-1 so a span click does NOT
+            // automatically focus the display in every browser.
+            display.focus({ preventScroll: true });
+        });
+
+        display.addEventListener('wheel', function (e) {
+            // Wheel is position-sensitive: cursor over a digit picks that digit.
+            if (e.target.classList.contains('digit') && e.target.textContent !== '.') {
+                const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+                const hovered = digits.indexOf(e.target);
+                if (hovered !== -1) {
+                    digits.forEach(d => d.classList.remove('selected'));
+                    digits[hovered].classList.add('selected');
+                    state.selectedIdx[receiver] = hovered;
+                }
+            }
+            ensureSelection();
+            stepSelectedDigit(e.deltaY < 0 ? 1 : -1);
             e.preventDefault();
         }, { passive: false });
 
-        document.addEventListener('click', function (e) {
-            if (!display.contains(e.target)) {
-                state.selectedIdx[receiver] = null;
-                state.editing[receiver] = false;
-                state.localFreq[receiver] = null;
-                updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
+        // Keyboard navigation — primary accessibility path for users who
+        // can't use a mouse wheel (head-tracking input, on-screen-keyboard
+        // users, reduced-dexterity operators). The freq display is
+        // role="spinbutton" tabindex="0" so it accepts focus from Tab.
+        //
+        //   ArrowUp / ArrowDown          step the selected digit by 1
+        //   PageUp   / PageDown          step the selected digit by 10
+        //   ArrowLeft / ArrowRight       move the selected-digit cursor
+        //   Home / End                   jump to the most / least significant digit
+        //
+        // First-press semantics: if no digit is currently selected (e.g. the
+        // polling reset cleared it after a previous edit completed, or the
+        // user's click missed and landed on a "." separator), the very
+        // first arrow press just SHOWS the selection at the kHz digit and
+        // does NOT step. A second press then actually steps. This avoids
+        // the surprise where ArrowUp silently changes a digit the user
+        // can't see is selected.
+        display.addEventListener('keydown', function (e) {
+            const ourKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown',
+                             'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+            if (!ourKeys.includes(e.key)) return;
+
+            const allDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            if (allDigits.length === 0) return;
+
+            // "Is anything currently visibly selected?" -- the truth is in
+            // the DOM, not in state. state.selectedIdx can hold a stale
+            // index left over from a previous interaction; the visible
+            // highlight is what the user can actually see. Bootstrap only
+            // when no digit is highlighted on screen.
+            const visiblySelected = display.querySelector('.digit.selected');
+            if (!visiblySelected) {
+                ensureSelection();
+                e.preventDefault();
+                return;
             }
+            // Re-sync state from DOM if they disagree (defensive). The DOM
+            // class is the source of truth for "which digit is selected";
+            // state mirrors it so stepSelectedDigit / move-cursor logic can
+            // work in terms of an integer index.
+            const cur = allDigits.indexOf(visiblySelected);
+            state.selectedIdx[receiver] = cur;
+
+            switch (e.key) {
+                case 'ArrowUp':   stepSelectedDigit(1);   e.preventDefault(); break;
+                case 'ArrowDown': stepSelectedDigit(-1);  e.preventDefault(); break;
+                case 'PageUp':    stepSelectedDigit(10);  e.preventDefault(); break;
+                case 'PageDown':  stepSelectedDigit(-10); e.preventDefault(); break;
+                case 'ArrowLeft':
+                    if (cur > 0) {
+                        const newIdx = cur - 1;
+                        allDigits.forEach(d => d.classList.remove('selected'));
+                        allDigits[newIdx].classList.add('selected');
+                        state.selectedIdx[receiver] = newIdx;
+                    }
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    if (cur < allDigits.length - 1) {
+                        const newIdx = cur + 1;
+                        allDigits.forEach(d => d.classList.remove('selected'));
+                        allDigits[newIdx].classList.add('selected');
+                        state.selectedIdx[receiver] = newIdx;
+                    }
+                    e.preventDefault();
+                    break;
+                case 'Home':
+                    allDigits.forEach(d => d.classList.remove('selected'));
+                    allDigits[0].classList.add('selected');
+                    state.selectedIdx[receiver] = 0;
+                    e.preventDefault();
+                    break;
+                case 'End':
+                    allDigits.forEach(d => d.classList.remove('selected'));
+                    allDigits[allDigits.length - 1].classList.add('selected');
+                    state.selectedIdx[receiver] = allDigits.length - 1;
+                    e.preventDefault();
+                    break;
+            }
+        });
+
+        // ▲ / ▼ buttons — visible when Settings > Accessibility >
+        // Show frequency arrow buttons is on (Yuri W4YSW request). Each
+        // click steps the currently-selected digit by 1 — same action as
+        // ArrowUp / ArrowDown and the mouse wheel.
+        if (upBtn) {
+            upBtn.onclick = function (e) {
+                e.preventDefault();
+                ensureSelection();
+                stepSelectedDigit(1);
+            };
+        }
+        if (downBtn) {
+            downBtn.onclick = function (e) {
+                e.preventDefault();
+                ensureSelection();
+                stepSelectedDigit(-1);
+            };
+        }
+
+        document.addEventListener('click', function (e) {
+            // Don't clear selection on clicks inside the display OR inside
+            // our own ▲/▼ controls — those should keep the digit selected
+            // so a button click can act on it.
+            if (display.contains(e.target)) return;
+            if (controls && controls.contains(e.target)) return;
+            // Selection is persistent across polling cycles (so an
+            // accessibility user can press ArrowUp / ▲ in rapid sequence
+            // without having to re-select each time). The user explicitly
+            // ends a selection by clicking somewhere else on the page --
+            // that's the cue handled here.
+            const hadSelection = state.selectedIdx[receiver] !== null && state.selectedIdx[receiver] !== undefined;
+            const wasEditing = state.editing[receiver];
+            if (!hadSelection && !wasEditing) return;
+            state.selectedIdx[receiver] = null;
+            state.editing[receiver] = false;
+            state.localFreq[receiver] = null;
+            updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver] ?? 0);
         });
     }
 
@@ -2823,14 +2756,19 @@ document.addEventListener('DOMContentLoaded', function() {
             updatePowerSlider(null, powerValue);
             // TX meter (updatePowerMeter) will use RM5 during transmit only
 
-            // Stop showing local frequency once backend confirms our sent value
+            // Stop showing local frequency once backend confirms our sent value.
+            // IMPORTANT: do NOT clear state.selectedIdx here. The user's
+            // digit selection should survive a successful step so the next
+            // ArrowUp / ▲ press acts on the same digit -- accessibility
+            // users press these in rapid sequence and re-selecting every
+            // time would be unusable. Selection is cleared explicitly when
+            // the user clicks outside the display (see the document.click
+            // handler inside initializeDigitInteraction).
             if (state.editing.A && state.lastSentFreq.A !== null && state.localFreq.A === null && data.vfoA.frequency === state.lastSentFreq.A) {
                 state.editing.A = false;
-                state.selectedIdx.A = null;
             }
             if (state.editing.B && state.lastSentFreq.B !== null && state.localFreq.B === null && data.vfoB.frequency === state.lastSentFreq.B) {
                 state.editing.B = false;
-                state.selectedIdx.B = null;
             }
 
             if (!state.editing.A) {
