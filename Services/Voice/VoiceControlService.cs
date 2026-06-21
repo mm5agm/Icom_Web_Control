@@ -181,26 +181,19 @@ namespace Yaesu_Web_Control.Services.Voice
                 engine.SpeechRecognitionRejected += OnSpeechRejected;
                 engine.RecognizeCompleted += OnRecognizeCompleted;
 
-                var grammarPath = Path.Combine(_env.ContentRootPath, "Grammars", "Commands.en-GB.srgs");
-                if (!File.Exists(grammarPath))
-                {
-                    _logger.LogWarning(
-                        "[Voice] Grammar file not found at {Path}. The recogniser is constructed but " +
-                        "won't match anything until a grammar is added.",
-                        grammarPath);
-                    UpdateStatus(VoiceState.Error, error: $"Grammar file missing: {grammarPath}");
-                    // Keep the engine — Step 2 will add the grammar file and it
-                    // will load on next process start.
-                    _engine = engine;
-                    return;
-                }
-
-                var grammar = new Grammar(grammarPath);
+                // Grammar is built programmatically via VoiceGrammar.BuildEnGb().
+                // We can't load Grammars/Commands.en-GB.srgs at runtime because
+                // System.Speech on .NET 6+ throws PlatformNotSupportedException
+                // from Grammar.LoadCfg -- the in-process SAPI 5 SRGS compiler
+                // isn't shipped with the modern NuGet. The SRGS XML file lives
+                // in Grammars/ as the human-readable spec; VoiceGrammar.cs
+                // mirrors it using GrammarBuilder + Choices.
+                var grammar = VoiceGrammar.BuildEnGb();
                 engine.LoadGrammar(grammar);
                 _engine = engine;
                 _logger.LogInformation(
                     "[Voice] SAPI recogniser ready (culture={Culture}, grammar={Grammar})",
-                    culture.Name, Path.GetFileName(grammarPath));
+                    culture.Name, grammar.Name);
                 UpdateStatus(VoiceState.Idle);
             }
             catch (Exception ex)
@@ -253,6 +246,16 @@ namespace Yaesu_Web_Control.Services.Voice
                 args[key.Key] = key.Value?.Value ?? string.Empty;
             }
 
+            // Normalise grammar-specific intents to the dispatcher's API.
+            // The programmatic grammar can't compute hz from mhz/frac digits
+            // at recognition time, and can't attach two semantic keys to a
+            // single NudgeUp/NudgeDown phrase, so we patch those up here:
+            //   * SetFrequency: derive args["hz"] from mhz_whole and the
+            //     fractional digit words parsed out of `heard` text.
+            //   * NudgeUp/NudgeDown: rewrite to intent="NudgeFrequency"
+            //     with args["direction"] = ±1
+            (intent, args) = NormaliseIntent(intent, args, heard);
+
             UpdateStatus(VoiceState.Heard, heard: heard, intent: intent);
             UpdateStatus(VoiceState.Executing, heard: heard, intent: intent);
             try
@@ -265,6 +268,70 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogError(ex, "[Voice] Intent dispatch failed for '{Intent}'", intent);
                 UpdateStatus(VoiceState.Error, heard: heard, intent: intent, error: ex.Message);
             }
+        }
+
+        private static (string intent, Dictionary<string, object> args) NormaliseIntent(
+            string intent, Dictionary<string, object> args, string heard)
+        {
+            if (string.Equals(intent, "SetFrequency", StringComparison.Ordinal))
+            {
+                long mhz = TryGetLong(args, "mhz_whole");
+                args.Remove("mhz_whole");
+                long fracHz = ParseFractionalHzFromText(heard);
+                args["hz"] = mhz * 1_000_000 + fracHz;
+                return (intent, args);
+            }
+            if (string.Equals(intent, "NudgeUp", StringComparison.Ordinal))
+            {
+                args["direction"] = 1L;
+                return ("NudgeFrequency", args);
+            }
+            if (string.Equals(intent, "NudgeDown", StringComparison.Ordinal))
+            {
+                args["direction"] = -1L;
+                return ("NudgeFrequency", args);
+            }
+            return (intent, args);
+        }
+
+        // Maps digit-word -> kHz contribution at the first-fractional position.
+        // "fourteen point zero seven four" -> tokens after "point": zero, seven, four.
+        //   zero * 100_000 + seven * 10_000 + four * 1_000 = 74_000 Hz fractional.
+        private static readonly Dictionary<string, int> _digitWords =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["zero"]  = 0, ["oh"]    = 0,
+                ["one"]   = 1, ["two"]   = 2, ["three"] = 3, ["four"]  = 4,
+                ["five"]  = 5, ["six"]   = 6, ["seven"] = 7, ["eight"] = 8,
+                ["nine"]  = 9,
+            };
+
+        private static long ParseFractionalHzFromText(string heard)
+        {
+            if (string.IsNullOrEmpty(heard)) return 0;
+            var tokens = heard.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            int pointIdx = Array.FindIndex(tokens,
+                t => string.Equals(t, "point", StringComparison.OrdinalIgnoreCase));
+            if (pointIdx < 0) return 0;
+
+            long fracHz = 0;
+            long multiplier = 100_000; // first frac digit = hundreds of kHz
+            for (int i = pointIdx + 1; i < tokens.Length && multiplier >= 1_000; i++)
+            {
+                if (!_digitWords.TryGetValue(tokens[i], out var d)) break; // hit "megahertz" or other non-digit
+                fracHz += d * multiplier;
+                multiplier /= 10;
+            }
+            return fracHz;
+        }
+
+        private static long TryGetLong(IReadOnlyDictionary<string, object> args, string key)
+            => args.TryGetValue(key, out var v) ? ConvertToLong(v) : 0L;
+
+        private static long ConvertToLong(object? v)
+        {
+            try { return v == null ? 0L : Convert.ToInt64(v); }
+            catch { return 0L; }
         }
 
         private void OnSpeechRejected(object? sender, SpeechRecognitionRejectedEventArgs e)
