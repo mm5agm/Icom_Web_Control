@@ -221,12 +221,32 @@ namespace Yaesu_Web_Control.Services.Voice
             }
         }
 
+        // Reject any recognition below this confidence. SAPI in command-and-
+        // control mode will happily mis-fit arbitrary audio to the closest
+        // grammar rule -- e.g. "nudge up" gets mapped to "mode U S B" --
+        // which would silently fire a destructive CAT command. The default
+        // confidence threshold is very permissive; we want commands that
+        // change radio state to require a clear match. 0.6 is the
+        // conservative starting point (SAPI confidences run 0.0 - 1.0 and a
+        // good match typically sits at 0.85+). Tune downward if too many
+        // legitimate phrases get rejected, upward if more misfits slip
+        // through.
+        private const float MinConfidence = 0.6f;
+
         private async void OnSpeechRecognized(object? sender, SpeechRecognizedEventArgs e)
         {
-            // Pull the semantic intent from the SRGS <tag>out.intent="..."</tag>.
-            // If the grammar doesn't tag anything, fall back to logging the raw
-            // phrase only — useful while authoring the grammar.
             string heard = e.Result.Text;
+            float confidence = e.Result.Confidence;
+
+            if (confidence < MinConfidence)
+            {
+                _logger.LogInformation(
+                    "[Voice] Low-confidence match ({Conf:F2}) for '{Heard}' -- ignoring",
+                    confidence, heard);
+                UpdateStatus(VoiceState.Unrecognised, heard: heard);
+                return;
+            }
+
             string? intent = TryGetSemanticString(e.Result.Semantics, "intent");
 
             if (intent == null)

@@ -190,6 +190,8 @@ namespace Yaesu_Web_Control.Services.Voice
             phrases.Add(new SemanticResultValue("frequency up", "NudgeUp"));
             phrases.Add(new SemanticResultValue("up one step", "NudgeUp"));
             phrases.Add(new SemanticResultValue("tune higher", "NudgeUp"));
+            phrases.Add(new SemanticResultValue("nudge up", "NudgeUp"));
+            phrases.Add(new SemanticResultValue("nudge higher", "NudgeUp"));
 
             var gb = new GrammarBuilder();
             gb.Append(new SemanticResultKey("intent", phrases));
@@ -205,6 +207,8 @@ namespace Yaesu_Web_Control.Services.Voice
             phrases.Add(new SemanticResultValue("frequency down", "NudgeDown"));
             phrases.Add(new SemanticResultValue("down one step", "NudgeDown"));
             phrases.Add(new SemanticResultValue("tune lower", "NudgeDown"));
+            phrases.Add(new SemanticResultValue("nudge down", "NudgeDown"));
+            phrases.Add(new SemanticResultValue("nudge lower", "NudgeDown"));
 
             var gb = new GrammarBuilder();
             gb.Append(new SemanticResultKey("intent", phrases));

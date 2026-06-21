@@ -2201,8 +2201,8 @@ The first release covers six command families, all operating on **VFO A**:
 | Change band | "go to twenty metres", "switch to forty metres" | VFO A → that band's default frequency (e.g. 20 m → 14.074 MHz, 40 m → 7.074 MHz — the common FT8 hangouts) |
 | Set mode | "set mode U S B", "mode L S B", "set mode C W" | VFO A mode change |
 | Swap VFOs | "swap V F O", "swap A and B" | A ↔ B |
-| Step up | "tune up", "step up", "frequency up" | VFO A +1 kHz |
-| Step down | "tune down", "step down", "frequency down" | VFO A −1 kHz |
+| Step up | "tune up", "step up", "frequency up", "nudge up" | VFO A +1 kHz |
+| Step down | "tune down", "step down", "frequency down", "nudge down" | VFO A −1 kHz |
 
 A few notes on phrasing:
 
@@ -2232,6 +2232,8 @@ The mic button is a **press-and-hold** control — it doesn't latch.
 5. Small grey text under the button shows the **last phrase recognised** — useful for spotting misrecognitions ("set frequency to forty metres" instead of "go to forty metres", say).
 
 If you change your mind mid-phrase, just release the button without speaking. Nothing is sent to the radio unless a full grammar match is found.
+
+**Low-confidence matches are rejected.** If you say something the engine isn't sure about — a phrase outside the grammar, background noise during PTT, an ambient TV in the room — the recognition is dropped rather than fitted to the closest rule. This stops random audio from accidentally firing a "set mode" or "go to band" command that would change the radio's state without you intending it. The "Last heard" hint under the mic button shows what the engine almost picked up; the Diagnostics block on the Settings page logs it as "Low-confidence match".
 
 The Settings page → Voice Control section has a **Diagnostics** block that shows the current state of the engine, the last phrase heard, the last intent matched, and any error message. Open it in another browser tab if you want a live view of what voice control is doing.
 
