@@ -18,14 +18,55 @@ namespace Yaesu_Web_Control.Controllers
         private readonly RadioInitializationService _radioInitService;
         private static readonly SemaphoreSlim _requestSemaphore = new(1, 1);
 
+        // -- P1=0-Fixed outgoing-command helpers -------------------------------
+        //
+        // On single-receiver radios (FTdx10 / FT-710 / FTDX3000 / FT-991A)
+        // every P1=0-Fixed receive-control CAT command (GT, PA, RA, NR, NB,
+        // NL, BC, BP, CO, SH, IS, SL, RL, AG, RG, SQ) must use P1=0 -- the
+        // radio's firmware hard-codes that position to 0, and silently
+        // rejects commands sent with P1=1 (which is what YWC was doing when
+        // the user clicked a control on panel B). On dual-receiver (FTdx101)
+        // P1 genuinely addresses MAIN vs SUB.
+        //
+        // SP3L Jacek #34 pre7: this is the outbound match for the inbound
+        // dispatcher fix we did in pre5/pre6 (SetPerVfo). Without it, Jacek
+        // saw "VFO-B active, Contour switching does not work, IF width does
+        // not work" -- because CO1... and SH1... were being sent and the
+        // FTdx10 was ignoring them.
+
+        /// <summary>
+        /// Returns the P1 character for a per-VFO CAT command, given the
+        /// user's clicked receiver ("A" or "B"). On single-receiver radios
+        /// always "0"; on dual-receiver "0" for A, "1" for B.
+        /// </summary>
+        private string VfoP1Outgoing(string receiver) =>
+            _radioStateService.IsSingleReceiver
+                ? "0"
+                : (receiver.Equals("B", StringComparison.OrdinalIgnoreCase) ? "1" : "0");
+
+        /// <summary>
+        /// Returns true if the per-VFO state write should target *B (vs *A)
+        /// for a user-clicked receiver. On single-receiver the radio applies
+        /// the change to whichever VFO is currently active (ActiveVfo), so we
+        /// mirror that into state to stay consistent with the hardware --
+        /// the user's clicked panel is a hint, not an addressable target.
+        /// On dual-receiver the user's choice wins.
+        /// </summary>
+        private bool VfoIsB(string receiver) =>
+            _radioStateService.IsSingleReceiver
+                ? _radioStateService.ActiveVfo == 1
+                : receiver.Equals("B", StringComparison.OrdinalIgnoreCase);
+
         [HttpPost("afgain/a")]
         public async Task<IActionResult> SetAfGainA([FromBody] int value)
         {
             if (value < 0 || value > 255)
                 return BadRequest(new { error = "AF Gain value out of range (0-255)" });
             await EnsureConnectedAsync();
-            await _catClient.SendCommandAsync($"AG0{value:D3};", "WebUI", CancellationToken.None);
-            _radioStateService.AfGainA = value;
+            // VfoP1Outgoing("A") = "0" on both single and dual receivers
+            await _catClient.SendCommandAsync($"AG{VfoP1Outgoing("A")}{value:D3};", "WebUI", CancellationToken.None);
+            if (VfoIsB("A")) _radioStateService.AfGainB = value;
+            else             _radioStateService.AfGainA = value;
             return Ok(new { message = $"AF Gain {value} set for Receiver A" });
         }
 
@@ -35,8 +76,11 @@ namespace Yaesu_Web_Control.Controllers
             if (value < 0 || value > 255)
                 return BadRequest(new { error = "AF Gain value out of range (0-255)" });
             await EnsureConnectedAsync();
-            await _catClient.SendCommandAsync($"AG1{value:D3};", "WebUI", CancellationToken.None);
-            _radioStateService.AfGainB = value;
+            // VfoP1Outgoing("B") = "0" on single-receiver (radio rejects AG1...),
+            // "1" on dual-receiver (FTdx101 has independent SUB AF gain).
+            await _catClient.SendCommandAsync($"AG{VfoP1Outgoing("B")}{value:D3};", "WebUI", CancellationToken.None);
+            if (VfoIsB("B")) _radioStateService.AfGainB = value;
+            else             _radioStateService.AfGainA = value;
             return Ok(new { message = $"AF Gain {value} set for Receiver B" });
         }
 
@@ -854,7 +898,9 @@ namespace Yaesu_Web_Control.Controllers
                 // radio to restore its per-mode Contour/APF settings, overriding what we have set.
                 var modeSettings = await _settingsService.GetSettingsAsync();
                 bool isFtdx3000 = modeSettings.RadioModel == "FTDX3000";
-                string p1 = (!isFtdx3000 && !vfoIsA) ? "1" : "0";
+                // P1=0 on FTDX3000 (special CO format) and on every single-receiver
+                // model (P1 Fixed=0). Dual-receiver -> P1 by VFO.
+                string p1 = isFtdx3000 ? "0" : VfoP1Outgoing(vfoIsA ? "A" : "B");
 
                 if (isFtdx3000)
                 {
@@ -1085,11 +1131,10 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.Equals("A", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
-                await _catClient.SendCommandAsync($"GT{vfo}{request.Code};", "WebUI", CancellationToken.None);
+                await _catClient.SendCommandAsync($"GT{VfoP1Outgoing(receiver)}{request.Code};", "WebUI", CancellationToken.None);
 
-                if (vfo == "0") _radioStateService.AgcA = request.Code;
-                else            _radioStateService.AgcB = request.Code;
+                if (VfoIsB(receiver)) _radioStateService.AgcB = request.Code;
+                else                  _radioStateService.AgcA = request.Code;
 
                 return Ok(new { message = $"AGC {receiver} set to {request.Code}" });
             }
@@ -1117,11 +1162,10 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.Equals("A", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
-                await _catClient.SendCommandAsync($"PA{vfo}{request.Code};", "WebUI", CancellationToken.None);
+                await _catClient.SendCommandAsync($"PA{VfoP1Outgoing(receiver)}{request.Code};", "WebUI", CancellationToken.None);
 
-                if (vfo == "0") _radioStateService.IpoA = request.Code;
-                else            _radioStateService.IpoB = request.Code;
+                if (VfoIsB(receiver)) _radioStateService.IpoB = request.Code;
+                else                  _radioStateService.IpoA = request.Code;
 
                 return Ok(new { message = $"IPO/AMP {receiver} set to {request.Code}" });
             }
@@ -1146,11 +1190,10 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.Equals("A", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
-                await _catClient.SendCommandAsync($"BC{vfo}{request.Code};", "WebUI", CancellationToken.None);
+                await _catClient.SendCommandAsync($"BC{VfoP1Outgoing(receiver)}{request.Code};", "WebUI", CancellationToken.None);
 
-                if (vfo == "0") _radioStateService.AutoNotchA = request.Code;
-                else            _radioStateService.AutoNotchB = request.Code;
+                if (VfoIsB(receiver)) _radioStateService.AutoNotchB = request.Code;
+                else                  _radioStateService.AutoNotchA = request.Code;
 
                 return Ok(new { message = $"Auto Notch {receiver} set to {request.Code}" });
             }
@@ -1175,11 +1218,10 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.Equals("A", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
-                await _catClient.SendCommandAsync($"NR{vfo}{request.Code};", "WebUI", CancellationToken.None);
+                await _catClient.SendCommandAsync($"NR{VfoP1Outgoing(receiver)}{request.Code};", "WebUI", CancellationToken.None);
 
-                if (vfo == "0") _radioStateService.NrA = request.Code;
-                else            _radioStateService.NrB = request.Code;
+                if (VfoIsB(receiver)) _radioStateService.NrB = request.Code;
+                else                  _radioStateService.NrA = request.Code;
 
                 return Ok(new { message = $"NR {receiver} set to {request.Code}" });
             }
@@ -1204,12 +1246,11 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.Equals("A", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
                 var catCode = request.Code switch { "00" => "0", "06" => "1", "12" => "2", "18" => "3", _ => "0" };
-                await _catClient.SendCommandAsync($"RA{vfo}{catCode};", "WebUI", CancellationToken.None);
+                await _catClient.SendCommandAsync($"RA{VfoP1Outgoing(receiver)}{catCode};", "WebUI", CancellationToken.None);
 
-                if (vfo == "0") _radioStateService.AttA = request.Code;
-                else            _radioStateService.AttB = request.Code;
+                if (VfoIsB(receiver)) _radioStateService.AttB = request.Code;
+                else                  _radioStateService.AttA = request.Code;
 
                 return Ok(new { message = $"Attenuator {receiver} set to {request.Code}" });
             }
@@ -1234,12 +1275,11 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.Equals("A", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
                 var val = request.Enabled == "1" ? "001" : "000";
-                await _catClient.SendCommandAsync($"BP{vfo}0{val};", "WebUI", CancellationToken.None);
+                await _catClient.SendCommandAsync($"BP{VfoP1Outgoing(receiver)}0{val};", "WebUI", CancellationToken.None);
 
-                if (vfo == "0") _radioStateService.ManualNotchA = request.Enabled;
-                else            _radioStateService.ManualNotchB = request.Enabled;
+                if (VfoIsB(receiver)) _radioStateService.ManualNotchB = request.Enabled;
+                else                  _radioStateService.ManualNotchA = request.Enabled;
 
                 return Ok(new { message = $"Manual Notch {receiver} set to {request.Enabled}" });
             }
@@ -1263,12 +1303,11 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.Equals("A", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
                 var catValue = request.FrequencyHz / 10;
-                await _catClient.SendCommandAsync($"BP{vfo}1{catValue:D3};", "WebUI", CancellationToken.None);
+                await _catClient.SendCommandAsync($"BP{VfoP1Outgoing(receiver)}1{catValue:D3};", "WebUI", CancellationToken.None);
 
-                if (vfo == "0") _radioStateService.ManualNotchFreqA = request.FrequencyHz;
-                else            _radioStateService.ManualNotchFreqB = request.FrequencyHz;
+                if (VfoIsB(receiver)) _radioStateService.ManualNotchFreqB = request.FrequencyHz;
+                else                  _radioStateService.ManualNotchFreqA = request.FrequencyHz;
 
                 return Ok(new { message = $"Manual Notch freq {receiver} set to {request.FrequencyHz} Hz" });
             }
@@ -1292,11 +1331,10 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.Equals("A", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
-                await _catClient.SendCommandAsync($"NB{vfo}{request.Enabled};", "WebUI", CancellationToken.None);
+                await _catClient.SendCommandAsync($"NB{VfoP1Outgoing(receiver)}{request.Enabled};", "WebUI", CancellationToken.None);
 
-                if (vfo == "0") _radioStateService.NbA = request.Enabled;
-                else            _radioStateService.NbB = request.Enabled;
+                if (VfoIsB(receiver)) _radioStateService.NbB = request.Enabled;
+                else                  _radioStateService.NbA = request.Enabled;
 
                 return Ok(new { message = $"Noise Blanker {receiver} set to {request.Enabled}" });
             }
@@ -1321,10 +1359,10 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
-                var response = await _catClient.SendCommandAsync($"SH{vfo};", "WebUI", CancellationToken.None);
+                var p1 = VfoP1Outgoing(receiver);
+                var response = await _catClient.SendCommandAsync($"SH{p1};", "WebUI", CancellationToken.None);
                 // The dispatcher will have updated RadioStateService.IfWidthA/B by now.
-                var current = vfo == "0" ? _radioStateService.IfWidthA : _radioStateService.IfWidthB;
+                var current = VfoIsB(receiver) ? _radioStateService.IfWidthB : _radioStateService.IfWidthA;
                 return Ok(new { vfo = receiver.ToUpper(), code = current, rawResponse = response });
             }
             catch (Exception ex)
@@ -1347,10 +1385,9 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
-                await _catClient.SendCommandAsync($"SH{vfo}0{int.Parse(request.Code):D2};", "WebUI", CancellationToken.None);
-                if (vfo == "0") _radioStateService.IfWidthA = request.Code;
-                else            _radioStateService.IfWidthB = request.Code;
+                await _catClient.SendCommandAsync($"SH{VfoP1Outgoing(receiver)}0{int.Parse(request.Code):D2};", "WebUI", CancellationToken.None);
+                if (VfoIsB(receiver)) _radioStateService.IfWidthB = request.Code;
+                else                  _radioStateService.IfWidthA = request.Code;
                 return Ok();
             }
             catch (Exception ex)
@@ -1372,12 +1409,11 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
                 var sign = request.ShiftHz >= 0 ? '+' : '-';
                 var abs = Math.Abs(request.ShiftHz);
-                await _catClient.SendCommandAsync($"IS{vfo}0{sign}{abs:D4};", "WebUI", CancellationToken.None);
-                if (vfo == "0") _radioStateService.IfShiftA = request.ShiftHz;
-                else            _radioStateService.IfShiftB = request.ShiftHz;
+                await _catClient.SendCommandAsync($"IS{VfoP1Outgoing(receiver)}0{sign}{abs:D4};", "WebUI", CancellationToken.None);
+                if (VfoIsB(receiver)) _radioStateService.IfShiftB = request.ShiftHz;
+                else                  _radioStateService.IfShiftA = request.ShiftHz;
                 return Ok();
             }
             catch (Exception ex)
@@ -1424,7 +1460,13 @@ namespace Yaesu_Web_Control.Controllers
                 await EnsureConnectedAsync();
                 var settings = await _settingsService.GetSettingsAsync();
                 bool isFtdx3000 = settings.RadioModel == "FTDX3000";
-                string p1 = (!isFtdx3000 && receiver.ToUpper() == "B") ? "1" : "0";
+                // VfoP1Outgoing forces "0" on every single-receiver model
+                // (including FTDX3000 which is also single-receiver per
+                // RadioCapabilities), so the FTDX3000 special-case can use
+                // it too -- the original code's special-case existed because
+                // the CO command itself has a different shape on FTDX3000,
+                // not because of P1 routing differences.
+                string p1 = isFtdx3000 ? "0" : VfoP1Outgoing(receiver);
 
                 if (isFtdx3000)
                 {
@@ -1441,8 +1483,8 @@ namespace Yaesu_Web_Control.Controllers
                     await _catClient.SendCommandAsync($"CO{p1}1{freq:D4};", "WebUI", CancellationToken.None);
                 }
 
-                if (receiver.ToUpper() == "B") { _radioStateService.ContourOnB = request.On; _radioStateService.ContourFreqB = request.FreqHz; }
-                else                           { _radioStateService.ContourOnA = request.On; _radioStateService.ContourFreqA = request.FreqHz; }
+                if (VfoIsB(receiver)) { _radioStateService.ContourOnB = request.On; _radioStateService.ContourFreqB = request.FreqHz; }
+                else                  { _radioStateService.ContourOnA = request.On; _radioStateService.ContourFreqA = request.FreqHz; }
 
                 if (isFtdx3000 && request.On)
                 {
@@ -1470,7 +1512,7 @@ namespace Yaesu_Web_Control.Controllers
                 await EnsureConnectedAsync();
                 var settings = await _settingsService.GetSettingsAsync();
                 bool isFtdx3000 = settings.RadioModel == "FTDX3000";
-                string p1 = (!isFtdx3000 && receiver.ToUpper() == "B") ? "1" : "0";
+                string p1 = isFtdx3000 ? "0" : VfoP1Outgoing(receiver);
 
                 if (isFtdx3000)
                 {
@@ -1486,8 +1528,8 @@ namespace Yaesu_Web_Control.Controllers
                     await _catClient.SendCommandAsync($"CO{p1}3{vvvv:D4};", "WebUI", CancellationToken.None);
                 }
 
-                if (receiver.ToUpper() == "B") { _radioStateService.ApfOnB = request.On; _radioStateService.ApfFreqB = request.FreqHz; }
-                else                           { _radioStateService.ApfOnA = request.On; _radioStateService.ApfFreqA = request.FreqHz; }
+                if (VfoIsB(receiver)) { _radioStateService.ApfOnB = request.On; _radioStateService.ApfFreqB = request.FreqHz; }
+                else                  { _radioStateService.ApfOnA = request.On; _radioStateService.ApfFreqA = request.FreqHz; }
 
                 if (isFtdx3000 && request.On)
                 {
@@ -1973,10 +2015,9 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
-                await _catClient.SendCommandAsync($"NL{vfo}{request.Level:D3};", "WebUI", CancellationToken.None);
-                if (vfo == "0") _radioStateService.NbLevelA = request.Level;
-                else            _radioStateService.NbLevelB = request.Level;
+                await _catClient.SendCommandAsync($"NL{VfoP1Outgoing(receiver)}{request.Level:D3};", "WebUI", CancellationToken.None);
+                if (VfoIsB(receiver)) _radioStateService.NbLevelB = request.Level;
+                else                  _radioStateService.NbLevelA = request.Level;
                 return Ok();
             }
             catch (Exception ex)
@@ -2000,10 +2041,9 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
-                await _catClient.SendCommandAsync($"RL{vfo}{request.Level:D2};", "WebUI", CancellationToken.None);
-                if (vfo == "0") _radioStateService.NrLevelA = request.Level;
-                else            _radioStateService.NrLevelB = request.Level;
+                await _catClient.SendCommandAsync($"RL{VfoP1Outgoing(receiver)}{request.Level:D2};", "WebUI", CancellationToken.None);
+                if (VfoIsB(receiver)) _radioStateService.NrLevelB = request.Level;
+                else                  _radioStateService.NrLevelA = request.Level;
                 return Ok();
             }
             catch (Exception ex)
@@ -2052,10 +2092,9 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
-                await _catClient.SendCommandAsync($"RG{vfo}{request.Value:D3};", "WebUI", CancellationToken.None);
-                if (vfo == "0") _radioStateService.RfGainA = request.Value;
-                else            _radioStateService.RfGainB = request.Value;
+                await _catClient.SendCommandAsync($"RG{VfoP1Outgoing(receiver)}{request.Value:D3};", "WebUI", CancellationToken.None);
+                if (VfoIsB(receiver)) _radioStateService.RfGainB = request.Value;
+                else                  _radioStateService.RfGainA = request.Value;
                 return Ok();
             }
             catch (Exception ex)
@@ -2079,10 +2118,9 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
-                await _catClient.SendCommandAsync($"SQ{vfo}{request.Value:D3};", "WebUI", CancellationToken.None);
-                if (vfo == "0") _radioStateService.SquelchA = request.Value;
-                else            _radioStateService.SquelchB = request.Value;
+                await _catClient.SendCommandAsync($"SQ{VfoP1Outgoing(receiver)}{request.Value:D3};", "WebUI", CancellationToken.None);
+                if (VfoIsB(receiver)) _radioStateService.SquelchB = request.Value;
+                else                  _radioStateService.SquelchA = request.Value;
                 return Ok();
             }
             catch (Exception ex)
@@ -2414,10 +2452,9 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 await EnsureConnectedAsync();
-                var vfo = receiver.ToUpper() == "A" ? "0" : "1";
-                await _catClient.SendCommandAsync($"SL{vfo}0{codeNum:D2};", "WebUI", CancellationToken.None);
-                if (vfo == "0") _radioStateService.IfLowCutA = request.Code;
-                else            _radioStateService.IfLowCutB = request.Code;
+                await _catClient.SendCommandAsync($"SL{VfoP1Outgoing(receiver)}0{codeNum:D2};", "WebUI", CancellationToken.None);
+                if (VfoIsB(receiver)) _radioStateService.IfLowCutB = request.Code;
+                else                  _radioStateService.IfLowCutA = request.Code;
                 return Ok();
             }
             catch (Exception ex)

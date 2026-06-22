@@ -13,6 +13,69 @@
         public CatMessageDispatcher(RadioStateService stateService)
         {
             _stateService = stateService;
+            _ = ProcessPendingAsync();
+        }
+
+        // -- P1=0-Fixed receive-control buffering --------------------------
+        //
+        // On single-receiver radios (FTdx10 / FT-710 / FTDX3000 / FT-991A)
+        // the receive-control CAT commands (GT, PA, RA, NR, NB, NL, BC, SH,
+        // IS, BP, CO, RL, AG, RG, SQ, SL) all use "P1: 0 Fixed". The radio
+        // has one physical set of controls and the command's P1 doesn't
+        // identify a VFO. When the user presses A/B on the front panel,
+        // the radio broadcasts the new VFO's receive-control values BEFORE
+        // it broadcasts VS, so a naive "route by current ActiveVfo" would
+        // write the new VFO's values to the OLD ActiveVfo's slot.
+        //
+        // Pre5 fix (Jacek SP3L #34, after pre4): buffer single-receiver
+        // P1=0-Fixed broadcasts for 300 ms before applying. If VS arrives
+        // during the buffer window (indicating a swap), the queued updates
+        // route to the NEW ActiveVfo when they're applied. Dual-receiver
+        // (FTdx101) routes immediately by P1 -- no race possible there.
+        //
+        // Items process in arrival order on a single consumer task so
+        // last-write-wins semantics for the same property are preserved.
+
+        private const int BufferDelayMs = 300;
+
+        private sealed record PendingDispatch(DateTimeOffset EnqueuedAt, Action<bool> Apply);
+
+        private readonly System.Threading.Channels.Channel<PendingDispatch> _pending
+            = System.Threading.Channels.Channel.CreateUnbounded<PendingDispatch>();
+
+        private async Task ProcessPendingAsync()
+        {
+            await foreach (var item in _pending.Reader.ReadAllAsync())
+            {
+                var age = DateTimeOffset.UtcNow - item.EnqueuedAt;
+                var wait = TimeSpan.FromMilliseconds(BufferDelayMs) - age;
+                if (wait > TimeSpan.Zero) await Task.Delay(wait);
+                try { item.Apply(_stateService.ActiveVfo == 1); }
+                catch { /* per-item failures shouldn't break the consumer */ }
+            }
+        }
+
+        /// <summary>
+        /// Apply a per-VFO receive-control update. On dual-receiver radios,
+        /// writes immediately using the message's P1. On single-receiver
+        /// radios, buffers the update for 300 ms then applies using whichever
+        /// ActiveVfo is current at apply-time (after any VS broadcast that
+        /// arrived during the buffer window). See class comment above.
+        /// </summary>
+        /// <param name="p1Char">The P1 character from the CAT message (used
+        /// on dual-receiver only).</param>
+        /// <param name="apply">Action that takes a bool "route to B" and
+        /// writes the value to the right RadioStateService slot.</param>
+        private void SetPerVfo(char p1Char, Action<bool> apply)
+        {
+            if (_stateService.IsSingleReceiver)
+            {
+                _pending.Writer.TryWrite(new PendingDispatch(DateTimeOffset.UtcNow, apply));
+            }
+            else
+            {
+                apply(p1Char == '1');
+            }
         }
 
         /// <summary>
@@ -135,23 +198,27 @@
                         // GT0P2; or GT1P2; — P2: 0=OFF 1=FAST 2=MID 3=SLOW 4=AUTO 5/6=AUTO variant
                         // Values 5 and 6 (AUTO-FAST / AUTO-MID / AUTO-SLOW) are read-only settled
                         // states; normalise them to "4" (AUTO) so the UI dropdown stays consistent.
+                        // Single-receiver: P1 is "0 Fixed" — routes via SetPerVfo's 300 ms buffer
+                        // so that A/B-press broadcasts land on the new ActiveVfo (#34 pre5).
                         if (message.Length >= 4)
                         {
-                            var agcVfo = message[2];
                             var agcCode = message[3].ToString();
                             if (agcCode == "5" || agcCode == "6") agcCode = "4";
-                            if (agcVfo == '0') _stateService.AgcA = agcCode;
-                            else if (agcVfo == '1') _stateService.AgcB = agcCode;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.AgcB = agcCode;
+                                else _stateService.AgcA = agcCode;
+                            });
                         }
                         break;
                     case "PA":
                         // PA{vfo}{code}; — vfo: 0=Main 1=Sub; code: 0=IPO 1=AMP1 2=AMP2
                         if (message.Length >= 4)
                         {
-                            var vfo = message[2];
                             var code = message[3].ToString();
-                            if (vfo == '0') _stateService.IpoA = code;
-                            else if (vfo == '1') _stateService.IpoB = code;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.IpoB = code;
+                                else _stateService.IpoA = code;
+                            });
                         }
                         break;
                     case "AN":
@@ -173,41 +240,45 @@
                         // BC{vfo}{code}; — vfo: 0=Main 1=Sub; code: 0=OFF 1=ON
                         if (message.Length >= 4)
                         {
-                            var vfo = message[2];
                             var code = message[3].ToString();
-                            if (vfo == '0') _stateService.AutoNotchA = code;
-                            else if (vfo == '1') _stateService.AutoNotchB = code;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.AutoNotchB = code;
+                                else _stateService.AutoNotchA = code;
+                            });
                         }
                         break;
                     case "NR":
                         // NR{vfo}{code}; — vfo: 0=Main 1=Sub; code: 0=OFF 1=NR1 2=NR2
                         if (message.Length >= 4)
                         {
-                            var vfo = message[2];
                             var code = message[3].ToString();
-                            if (vfo == '0') _stateService.NrA = code;
-                            else if (vfo == '1') _stateService.NrB = code;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.NrB = code;
+                                else _stateService.NrA = code;
+                            });
                         }
                         break;
                     case "NB":
                         // NB{vfo}{code}; — vfo: 0=Main 1=Sub; code: 0=OFF 1=ON
                         if (message.Length >= 4)
                         {
-                            var vfo = message[2];
                             var code = message[3].ToString();
-                            if (vfo == '0') _stateService.NbA = code;
-                            else if (vfo == '1') _stateService.NbB = code;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.NbB = code;
+                                else _stateService.NbA = code;
+                            });
                         }
                         break;
                     case "RA":
                         // RA{vfo}{n}; — vfo: 0=Main 1=Sub; n: 0=OFF 1=6dB 2=12dB 3=18dB
                         if (message.Length >= 4)
                         {
-                            var vfo = message[2];
                             var catCode = message[3].ToString();
                             var code = catCode switch { "0" => "00", "1" => "06", "2" => "12", "3" => "18", _ => "00" };
-                            if (vfo == '0') _stateService.AttA = code;
-                            else if (vfo == '1') _stateService.AttB = code;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.AttB = code;
+                                else _stateService.AttA = code;
+                            });
                         }
                         break;
                     case "BP":
@@ -216,20 +287,23 @@
                         // param 1 = frequency: value × 10 = Hz (001=10Hz … 320=3200Hz)
                         if (message.Length >= 7)
                         {
-                            var vfo = message[2];
                             var param = message[3];
                             var val = message.Substring(4, 3);
                             if (param == '0')
                             {
                                 var isOn = val == "001" ? "1" : "0";
-                                if (vfo == '0') _stateService.ManualNotchA = isOn;
-                                else if (vfo == '1') _stateService.ManualNotchB = isOn;
+                                SetPerVfo(message[2], routeB => {
+                                    if (routeB) _stateService.ManualNotchB = isOn;
+                                    else _stateService.ManualNotchA = isOn;
+                                });
                             }
                             else if (param == '1' && int.TryParse(val, out int raw) && raw > 0)
                             {
                                 var hz = raw * 10;
-                                if (vfo == '0') _stateService.ManualNotchFreqA = hz;
-                                else if (vfo == '1') _stateService.ManualNotchFreqB = hz;
+                                SetPerVfo(message[2], routeB => {
+                                    if (routeB) _stateService.ManualNotchFreqB = hz;
+                                    else _stateService.ManualNotchFreqA = hz;
+                                });
                             }
                         }
                         break;
@@ -237,24 +311,26 @@
                         // SH{vfo}0{nn}; — vfo: 0=Main 1=Sub; [3]='0' fixed; [4-5]=2-digit code
                         if (message.Length >= 6)
                         {
-                            var vfo = message[2];
                             var rawCode = message.Substring(4, 2).TrimStart('0');
                             var code = string.IsNullOrEmpty(rawCode) ? "0" : rawCode;
-                            if (vfo == '0') _stateService.IfWidthA = code;
-                            else if (vfo == '1') _stateService.IfWidthB = code;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.IfWidthB = code;
+                                else _stateService.IfWidthA = code;
+                            });
                         }
                         break;
                     case "IS":
                         // IS{vfo}0{sign}{nnnn}; — sign '+'/'-', nnnn=absolute Hz
                         if (message.Length >= 9)
                         {
-                            var vfo = message[2];
                             var sign = message[4];
                             if (int.TryParse(message.Substring(5, 4), out int absHz))
                             {
                                 var shiftHz = sign == '-' ? -absHz : absHz;
-                                if (vfo == '0') _stateService.IfShiftA = shiftHz;
-                                else if (vfo == '1') _stateService.IfShiftB = shiftHz;
+                                SetPerVfo(message[2], routeB => {
+                                    if (routeB) _stateService.IfShiftB = shiftHz;
+                                    else _stateService.IfShiftA = shiftHz;
+                                });
                             }
                         }
                         break;
@@ -322,30 +398,31 @@
                         else if (message.Length >= 9)
                         {
                             // FTdx101/FTdx10/FT-710 format
-                            bool vfoB = message[2] == '1';
-                            char p2   = message[3];
+                            char p2 = message[3];
                             if (int.TryParse(message.Substring(4, 4), out int coVvvv))
                             {
-                                switch (p2)
-                                {
-                                    case '0':
-                                        if (vfoB) _stateService.ContourOnB = coVvvv == 1;
-                                        else       _stateService.ContourOnA = coVvvv == 1;
-                                        break;
-                                    case '1':
-                                        if (vfoB) _stateService.ContourFreqB = coVvvv;
-                                        else       _stateService.ContourFreqA = coVvvv;
-                                        break;
-                                    case '2':
-                                        if (vfoB) _stateService.ApfOnB = coVvvv == 1;
-                                        else       _stateService.ApfOnA = coVvvv == 1;
-                                        break;
-                                    case '3':
-                                        int apfHz = (coVvvv - 25) * 10;
-                                        if (vfoB) _stateService.ApfFreqB = apfHz;
-                                        else       _stateService.ApfFreqA = apfHz;
-                                        break;
-                                }
+                                SetPerVfo(message[2], routeB => {
+                                    switch (p2)
+                                    {
+                                        case '0':
+                                            if (routeB) _stateService.ContourOnB = coVvvv == 1;
+                                            else        _stateService.ContourOnA = coVvvv == 1;
+                                            break;
+                                        case '1':
+                                            if (routeB) _stateService.ContourFreqB = coVvvv;
+                                            else        _stateService.ContourFreqA = coVvvv;
+                                            break;
+                                        case '2':
+                                            if (routeB) _stateService.ApfOnB = coVvvv == 1;
+                                            else        _stateService.ApfOnA = coVvvv == 1;
+                                            break;
+                                        case '3':
+                                            int apfHz = (coVvvv - 25) * 10;
+                                            if (routeB) _stateService.ApfFreqB = apfHz;
+                                            else        _stateService.ApfFreqA = apfHz;
+                                            break;
+                                    }
+                                });
                             }
                         }
                         break;
@@ -368,6 +445,17 @@
                         // FT{n}; — 0=VFO A is TX, 1=VFO B is TX
                         if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int txVfo))
                             _stateService.TxVfo = txVfo;
+                        break;
+                    case "VS":
+                        // VS{n}; — VFO SELECT: 0=VFO-A active (operating/RX),
+                        // 1=VFO-B active. On single-receiver radios this is
+                        // what changes when the user presses A/B on the front
+                        // panel in normal mode (TxVfo / FT does NOT — that
+                        // only flips when split mode toggles). Jacek SP3L #34
+                        // R2 root cause: dispatcher had no case for VS so the
+                        // radio's broadcast was silently dropped.
+                        if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int activeVfo))
+                            _stateService.ActiveVfo = activeVfo;
                         break;
                     case "AC":
                         // AC{P1}{P2}{P3}; per FTdx10 / FTdx101MP CAT manual page 6:
@@ -401,19 +489,22 @@
                         // NL{vfo}{nnn}; — NB level 001-020 per VFO
                         if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int nlVal))
                         {
-                            if (message[2] == '0') _stateService.NbLevelA = Math.Clamp(nlVal, 1, 20);
-                            else if (message[2] == '1') _stateService.NbLevelB = Math.Clamp(nlVal, 1, 20);
+                            var clamped = Math.Clamp(nlVal, 1, 20);
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.NbLevelB = clamped;
+                                else _stateService.NbLevelA = clamped;
+                            });
                         }
                         break;
                     case "RL":
                         // RL{vfo}{nn}; — NR Level / DNR algorithm 01-15 per VFO.
-                        // FTdx10 / FT-710 are single-receiver so only VFO A
-                        // matters, but the wire format is the same as FTdx101
-                        // where both VFOs have independent levels.
                         if (message.Length >= 5 && int.TryParse(message.Substring(3, 2), out int rlVal))
                         {
-                            if (message[2] == '0') _stateService.NrLevelA = Math.Clamp(rlVal, 1, 15);
-                            else if (message[2] == '1') _stateService.NrLevelB = Math.Clamp(rlVal, 1, 15);
+                            var clamped = Math.Clamp(rlVal, 1, 15);
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.NrLevelB = clamped;
+                                else _stateService.NrLevelA = clamped;
+                            });
                         }
                         break;
                     case "ML":
@@ -434,24 +525,33 @@
                         // RG{V}{NNN}; — RF Gain 000-255 per VFO (V=0=Main, V=1=Sub)
                         if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int rgVal))
                         {
-                            if (message[2] == '0') _stateService.RfGainA = Math.Clamp(rgVal, 0, 255);
-                            else if (message[2] == '1') _stateService.RfGainB = Math.Clamp(rgVal, 0, 255);
+                            var clamped = Math.Clamp(rgVal, 0, 255);
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.RfGainB = clamped;
+                                else _stateService.RfGainA = clamped;
+                            });
                         }
                         break;
                     case "SQ":
                         // SQ{V}{NNN}; — Squelch 000-255 per VFO (V=0=Main, V=1=Sub)
                         if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int sqVal))
                         {
-                            if (message[2] == '0') _stateService.SquelchA = Math.Clamp(sqVal, 0, 255);
-                            else if (message[2] == '1') _stateService.SquelchB = Math.Clamp(sqVal, 0, 255);
+                            var clamped = Math.Clamp(sqVal, 0, 255);
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.SquelchB = clamped;
+                                else _stateService.SquelchA = clamped;
+                            });
                         }
                         break;
                     case "AG":
                         // AG{V}{NNN}; — AF Gain 000-255 per VFO (V=0=Main, V=1=Sub)
                         if (message.Length >= 6 && int.TryParse(message.Substring(3, 3), out int agVal))
                         {
-                            if (message[2] == '0') _stateService.AfGainA = Math.Clamp(agVal, 0, 255);
-                            else if (message[2] == '1') _stateService.AfGainB = Math.Clamp(agVal, 0, 255);
+                            var clamped = Math.Clamp(agVal, 0, 255);
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.AfGainB = clamped;
+                                else _stateService.AfGainA = clamped;
+                            });
                         }
                         break;
                     case "MG":
@@ -513,11 +613,12 @@
                         // SL{vfo}0{nn}; — IF low cut code per VFO (mirrors SH structure)
                         if (message.Length >= 6)
                         {
-                            var slVfo = message[2];
                             var slRaw = message.Substring(4, 2).TrimStart('0');
                             var slCode = string.IsNullOrEmpty(slRaw) ? "0" : slRaw;
-                            if (slVfo == '0') _stateService.IfLowCutA = slCode;
-                            else if (slVfo == '1') _stateService.IfLowCutB = slCode;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.IfLowCutB = slCode;
+                                else _stateService.IfLowCutA = slCode;
+                            });
                         }
                         break;
                     // No debug logging for unhandled commands

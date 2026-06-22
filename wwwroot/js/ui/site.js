@@ -49,8 +49,7 @@ function showServerStoppedOverlay() {
     // page (e.g. spectrum is only present when an SDR is configured).
     try { window.filterScopePanelA?.stop?.(); } catch { /* ignore */ }
     try { window.filterScopePanelB?.stop?.(); } catch { /* ignore */ }
-    try { window.sMeterHistoryA?.stop?.();   } catch { /* ignore */ }
-    try { window.sMeterHistoryB?.stop?.();   } catch { /* ignore */ }
+    try { window.sMeterHistory?.stop?.();    } catch { /* ignore */ }
 }
 
 // --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
@@ -252,219 +251,6 @@ function renderFrequencyDigits(freq, selIdx) {
     return html;
 }
 
-// Outer digit interaction initializer (touch/pointer support)
-function initializeDigitInteraction(receiver) {
-    const display = document.getElementById('freq' + receiver);
-    const controls = document.getElementById('freq' + receiver + '-controls');
-    const upBtn = document.getElementById('freq' + receiver + '-up');
-    const downBtn = document.getElementById('freq' + receiver + '-down');
-    if (!display) return;
-    if (display._initialized) return;
-    display._initialized = true;
-
-    display.addEventListener('pointerdown', function (e) {
-        let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-        let idx = -1;
-        if (e.target.classList.contains('digit') && e.target.textContent !== '.') {
-            idx = digits.indexOf(e.target);
-        } else {
-            let x = e.clientX;
-            let minDist = Infinity;
-            digits.forEach((d, i) => {
-                let digitRect = d.getBoundingClientRect();
-                let digitCenter = digitRect.left + digitRect.width / 2;
-                let dist = Math.abs(x - digitCenter);
-                if (dist < minDist) {
-                    minDist = dist;
-                    idx = i;
-                }
-            });
-        }
-        if (idx !== -1 && window.radioControl && window.radioControl._state) {
-            digits.forEach(d => d.classList.remove('selected'));
-            window.radioControl._state.selectedIdx[receiver] = idx;
-            digits[idx].classList.add('selected');
-            window.radioControl._state.editing[receiver] = true;
-            window.radioControl._state.localFreq[receiver] = parseInt(digits.map(d => d.textContent).join(''));
-            updateFrequencyDisplay(receiver, window.radioControl._state.localFreq[receiver]);
-        }
-        e.preventDefault();
-    });
-
-    // Shared digit-step routine used by the wheel and keyboard handlers.
-    // `step` is the signed amount to add to the digit at the selected
-    // position; carries propagate left through more-significant digits.
-    function stepSelectedDigit(step) {
-        let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-        let idx = state.selectedIdx[receiver];
-        if (idx === null || !digits[idx]) return;
-        let freqArr = digits.map(d => parseInt(d.textContent));
-        let carry = step;
-        let i = idx;
-        while (carry !== 0 && i >= 0 && i < freqArr.length) {
-            let newVal = freqArr[i] + carry;
-            if (newVal > 9) {
-                freqArr[i] = newVal % 10;
-                carry = Math.floor(newVal / 10);
-                i--;
-            } else if (newVal < 0) {
-                // Borrow: -1 + 10 = 9, carry -1; -2 + 10 = 8, carry -1; etc.
-                freqArr[i] = ((newVal % 10) + 10) % 10;
-                carry = Math.floor(newVal / 10);
-                i--;
-            } else {
-                freqArr[i] = newVal;
-                carry = 0;
-            }
-        }
-        let newFreq = parseInt(freqArr.join(''));
-        newFreq = Math.max(30000, Math.min(75000000, newFreq));
-        state.localFreq[receiver] = newFreq;
-        state.editing[receiver] = true;
-        updateFrequencyDisplay(receiver, newFreq);
-        clearTimeout(display._debounceTimer);
-        display._debounceTimer = setTimeout(() => {
-            setFrequency(receiver, newFreq);
-            state.localFreq[receiver] = null;
-            state.editing[receiver] = false;
-            updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
-        }, 200);
-    }
-
-    display.addEventListener('wheel', function (e) {
-        if (state.selectedIdx[receiver] === null) return;
-        stepSelectedDigit(e.deltaY < 0 ? 1 : -1);
-        e.preventDefault();
-    }, { passive: false });
-
-    // Keyboard navigation — primary accessibility path for operators who
-    // can't use a mouse wheel (head-tracking users, on-screen-keyboard
-    // users). The freq display is already focusable (role="spinbutton",
-    // tabindex="0"); these key bindings make it fully usable from the
-    // keyboard alone:
-    //
-    //   ArrowUp / ArrowDown          step the selected digit by 1
-    //   PageUp   / PageDown          step the selected digit by 10
-    //   ArrowLeft / ArrowRight       move the selected-digit cursor
-    //   Home / End                   jump to the most / least significant digit
-    //
-    // Selection auto-bootstraps to the kHz digit (or the last digit if the
-    // frequency is shorter) when no digit is selected yet, so the first
-    // ArrowUp press immediately does something visible rather than
-    // silently failing.
-    display.addEventListener('keydown', function (e) {
-        const allDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-        if (allDigits.length === 0) return;
-
-        if (state.selectedIdx[receiver] === null || state.selectedIdx[receiver] === undefined ||
-            !allDigits[state.selectedIdx[receiver]]) {
-            // Default to the kHz position (4th from right for 8-digit, 3rd
-            // for 7-digit, etc.) so the first keystroke moves something
-            // meaningful rather than a 1-Hz tick the user can't hear.
-            const defaultIdx = Math.max(0, allDigits.length - 4);
-            allDigits.forEach(d => d.classList.remove('selected'));
-            allDigits[defaultIdx].classList.add('selected');
-            state.selectedIdx[receiver] = defaultIdx;
-        }
-
-        switch (e.key) {
-            case 'ArrowUp':   stepSelectedDigit(1);   e.preventDefault(); break;
-            case 'ArrowDown': stepSelectedDigit(-1);  e.preventDefault(); break;
-            case 'PageUp':    stepSelectedDigit(10);  e.preventDefault(); break;
-            case 'PageDown':  stepSelectedDigit(-10); e.preventDefault(); break;
-            case 'ArrowLeft':
-                if (state.selectedIdx[receiver] > 0) {
-                    const newIdx = state.selectedIdx[receiver] - 1;
-                    allDigits.forEach(d => d.classList.remove('selected'));
-                    allDigits[newIdx].classList.add('selected');
-                    state.selectedIdx[receiver] = newIdx;
-                }
-                e.preventDefault();
-                break;
-            case 'ArrowRight':
-                if (state.selectedIdx[receiver] < allDigits.length - 1) {
-                    const newIdx = state.selectedIdx[receiver] + 1;
-                    allDigits.forEach(d => d.classList.remove('selected'));
-                    allDigits[newIdx].classList.add('selected');
-                    state.selectedIdx[receiver] = newIdx;
-                }
-                e.preventDefault();
-                break;
-            case 'Home':
-                allDigits.forEach(d => d.classList.remove('selected'));
-                allDigits[0].classList.add('selected');
-                state.selectedIdx[receiver] = 0;
-                e.preventDefault();
-                break;
-            case 'End':
-                allDigits.forEach(d => d.classList.remove('selected'));
-                allDigits[allDigits.length - 1].classList.add('selected');
-                state.selectedIdx[receiver] = allDigits.length - 1;
-                e.preventDefault();
-                break;
-        }
-    });
-
-    // Wire ▲ / ▼ buttons whenever they exist in the DOM. Previously gated
-    // on isTouchDevice(); now also driven by Settings > Accessibility >
-    // Show frequency arrow buttons (Yuri W4YSW). When the setting is on,
-    // the buttons are rendered on every device (head-tracking + on-screen
-    // keyboard users need them on desktop too).
-    if (controls) {
-        // Auto-select the kHz digit on first click if nothing is selected,
-        // so the very first ▲ press moves something meaningful.
-        function ensureSelection() {
-            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-            if (digits.length === 0) return;
-            const cur = state.selectedIdx[receiver];
-            if (cur === null || cur === undefined || !digits[cur]) {
-                const defaultIdx = Math.max(0, digits.length - 4);
-                digits.forEach(d => d.classList.remove('selected'));
-                digits[defaultIdx].classList.add('selected');
-                state.selectedIdx[receiver] = defaultIdx;
-            }
-        }
-        if (upBtn) {
-            upBtn.onclick = function (e) {
-                e.preventDefault();
-                ensureSelection();
-                stepSelectedDigit(1);
-            };
-        }
-        if (downBtn) {
-            downBtn.onclick = function (e) {
-                e.preventDefault();
-                ensureSelection();
-                stepSelectedDigit(-1);
-            };
-        }
-    }
-
-    display.addEventListener('mouseleave', function (e) {
-        // Don't clear selection when the mouse moves to our own controls
-        // (the ▲/▼ buttons live just outside the display element). Without
-        // this guard, a user clicks a digit then reaches for ▲ and the
-        // mouseleave clears their selection before the click registers.
-        if (controls && e.relatedTarget && controls.contains(e.relatedTarget)) return;
-        if (state.editing[receiver]) {
-            state.selectedIdx[receiver] = null;
-            state.editing[receiver] = false;
-            state.localFreq[receiver] = null;
-            updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
-        }
-    });
-
-    document.addEventListener('pointerdown', function (e) {
-        if (!display.contains(e.target) && (!controls || !controls.contains(e.target))) {
-            if (state.editing[receiver]) {
-                state.selectedIdx[receiver] = null;
-                state.editing[receiver] = false;
-                state.localFreq[receiver] = null;
-                updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
-            }
-        }
-    });
-}
 
 // Outer band setter - called from Razor inline onchange on band buttons
 window.setBand = async function (receiver, band) {
@@ -792,7 +578,13 @@ document.addEventListener('DOMContentLoaded', function() {
 // TX Button Toggle
 // ---------------------------------------------------------------------------
 let isTransmitting = false;
-let txVfo = 0; // 0 = VFO A, 1 = VFO B
+let txVfo = 0; // 0 = VFO A, 1 = VFO B (the TX VFO — only flips with split)
+// activeVfo tracks which VFO is the operating (RX) VFO -- changes when the
+// user presses A/B on the radio front panel in normal mode. Distinct from
+// txVfo. SP3L Jacek #34 R2 root cause was that the normal-mode greying
+// logic was watching txVfo (which doesn't change on A/B normal-mode swap)
+// instead of activeVfo.
+let activeVfo = 0;
 
 // Apply the .vfo-inactive class to whichever VFO panel is NOT the active
 // (TX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
@@ -824,29 +616,34 @@ function applyVfoActiveStyling() {
         return;
     }
 
-    // Single-receiver: which panel is "inactive" depends on whether split
-    // mode is on (per SP3L Jacek's R1-R12 spec in #34):
+    // Single-receiver: white = active VFO (the one currently RECEIVING),
+    // grey = the other one. This is true in BOTH normal and split mode:
     //
-    //   Normal mode (R2): white = active VFO (TxVfo), grey = the other.
-    //                     Operator can only receive on the active VFO; the
-    //                     inactive one is just stored frequency/mode state.
+    //   Normal mode (R2): white = active VFO (RX), grey = the other.
+    //                     Pressing A/B on the radio swaps which is RX.
     //
-    //   Split mode  (R7): white = RX VFO (NOT TxVfo), grey = TX VFO.
-    //                     The radio receives on the white VFO and transmits
-    //                     on the grey VFO. The TX VFO is "inactive" from a
-    //                     receive perspective even though it's the one that
-    //                     will key when PTT engages — hence still grey.
+    //   Split mode  (R7): white = active VFO (RX), grey = TX VFO.
+    //                     Radio receives on active VFO, transmits on the
+    //                     opposite VFO.
+    //
+    // In both cases, "inactive" (= grey) = whichever VFO is NOT the active
+    // RX one. We previously drove split-mode greying from txVfo (FT
+    // command) because the spec implied FT tracks the TX VFO — but the
+    // FTdx10 doesn't reliably move FT when split engages while VFO-B is
+    // the active VFO (Jacek SP3L 2026-06-21 #34 R7 fail). Using activeVfo
+    // (VS command) for both cases is deterministic and matches what the
+    // radio is actually doing.
     //
     // The TX button and SPLIT badge land on the grey panel in split mode
-    // (R8) automatically since updateTxButton() positions the button on
-    // TxVfo's column, which is now the grey one.
+    // (R8) automatically because updateTxButton / updateSplitButton derive
+    // the TX position as "opposite of active" on single-receiver radios.
     //
     // The spectrum panel is NOT greyed — on single-receiver radios the
     // single spectrum always shows the live receive signal. The second
     // spectrum panel is hidden permanently by updateContainerVisibility().
     const splitOn = splitMode > 0;
-    const inactiveCol = (splitOn ? (txVfo === 1) : (txVfo === 0)) ? bCol : aCol;
-    const activeCol   = (inactiveCol === aCol) ? bCol : aCol;
+    const inactiveCol = (activeVfo === 0) ? bCol : aCol;
+    const activeCol   = (activeVfo === 0) ? aCol : bCol;
 
     activeCol.classList.remove('vfo-inactive', 'vfo-tx-editable');
     inactiveCol.classList.add('vfo-inactive');
@@ -912,12 +709,37 @@ function updateTxButton() {
     const btnA = document.getElementById('txButtonA');
     const btnB = document.getElementById('txButtonB');
 
+    // TX button position rules:
+    //
+    //  Single-receiver normal mode: TX VFO IS the active (RX) VFO.
+    //    Pressing A/B on the front panel changes which VFO will key, but the
+    //    FT command stays at 0. Position by activeVfo. (Pre3 fix.)
+    //
+    //  Single-receiver split mode: the TX VFO is the OPPOSITE of the active
+    //    (RX) VFO -- the radio receives on activeVfo and transmits on the
+    //    other one. FT often doesn't move on FTdx10 when split engages, so
+    //    don't rely on txVfo here. Pre7 fix (Jacek SP3L #34, pre6 follow-up
+    //    "TX button stays on white panel after split enabled").
+    //
+    //  Dual-receiver (any mode): txVfo (FT command) is reliable. Use it.
+    //
+    const vfoRow = document.getElementById('vfoRow');
+    const isSingleReceiver = vfoRow?.dataset.singleReceiver === 'true';
+    let positionVfo;
+    if (isSingleReceiver) {
+        positionVfo = (splitMode > 0)
+            ? (activeVfo === 0 ? 1 : 0)   // split: TX = opposite of active
+            : activeVfo;                   // normal: TX = active
+    } else {
+        positionVfo = txVfo;
+    }
+
     // Show only on TX VFO
-    if (btnA) btnA.style.display = (txVfo === 0) ? 'inline-block' : 'none';
-    if (btnB) btnB.style.display = (txVfo === 1) ? 'inline-block' : 'none';
+    if (btnA) btnA.style.display = (positionVfo === 0) ? 'inline-block' : 'none';
+    if (btnB) btnB.style.display = (positionVfo === 1) ? 'inline-block' : 'none';
 
     // Update button state
-    const activeBtn = (txVfo === 0) ? btnA : btnB;
+    const activeBtn = (positionVfo === 0) ? btnA : btnB;
     if (activeBtn) {
         if (isTransmitting) {
             activeBtn.className = 'btn btn-danger btn-sm';
@@ -932,10 +754,14 @@ function updateTxButton() {
 }
 
 function updateSplitButton() {
-    const btn     = document.getElementById('splitBtn');
-    const badge   = document.getElementById('splitTxBadge');
-    const vfoBCard = document.querySelector('#vfoBCol .card');
-    const active  = splitMode > 0;
+    const btn        = document.getElementById('splitBtn');
+    const badgeA     = document.getElementById('splitTxBadgeA');
+    const badgeB     = document.getElementById('splitTxBadgeB');
+    const vfoACard   = document.querySelector('#vfoACol .card');
+    const vfoBCard   = document.querySelector('#vfoBCol .card');
+    const vfoRow     = document.getElementById('vfoRow');
+    const isSingleReceiver = vfoRow?.dataset.singleReceiver === 'true';
+    const active     = splitMode > 0;
 
     if (btn) {
         btn.className = active ? 'btn btn-sm btn-danger' : 'btn btn-sm btn-outline-secondary';
@@ -943,10 +769,35 @@ function updateSplitButton() {
         btn.style.paddingBottom = '1px';
         btn.textContent = active ? 'Split ON' : 'Split';
     }
-    if (badge)    badge.style.display = active ? 'inline-block' : 'none';
-    if (vfoBCard) {
-        vfoBCard.classList.toggle('border-danger',  active);
-        vfoBCard.classList.toggle('border-success', !active);
+
+    // R8: the SPLIT TX badge belongs on the TX VFO's header — the grey
+    // panel. On single-receiver radios the TX VFO is the OPPOSITE of the
+    // active VFO; on dual-receiver radios it's whichever VFO the FT
+    // command points to. Show one badge, hide the other.
+    let txVfoIdx;
+    if (isSingleReceiver) {
+        txVfoIdx = (activeVfo === 0) ? 1 : 0;   // opposite of RX
+    } else {
+        txVfoIdx = txVfo;
+    }
+    if (badgeA) badgeA.style.display = (active && txVfoIdx === 0) ? 'inline-block' : 'none';
+    if (badgeB) badgeB.style.display = (active && txVfoIdx === 1) ? 'inline-block' : 'none';
+
+    // Card border colour: red on the TX VFO when split is on, green on the
+    // other one. Pre-fix this only ever touched #vfoBCol, so when VFO-B
+    // was the active RX the colours ended up on the wrong card
+    // (Jacek SP3L #34 R7 fail 2026-06-21).
+    const txCard    = (txVfoIdx === 0) ? vfoACard : vfoBCard;
+    const otherCard = (txVfoIdx === 0) ? vfoBCard : vfoACard;
+    if (txCard) {
+        txCard.classList.toggle('border-danger', active);
+        txCard.classList.toggle('border-success', !active);
+    }
+    if (otherCard) {
+        // The non-TX card is never red; clear any leftover from a previous
+        // split state where this card WAS the TX one.
+        otherCard.classList.remove('border-danger');
+        otherCard.classList.toggle('border-success', !active);
     }
 }
 
@@ -1005,6 +856,40 @@ const connection = new signalR.HubConnectionBuilder()
 // Redirect to Settings page if the backend signals an init failure
 connection.on("ShowSettingsPage", function () {
     window.location.href = "/Settings";
+});
+
+// "Reading radio settings…" overlay shown during single-receiver ping-pong
+// (see RadioInitializationService.cs comments around the VS swap block).
+// Backend broadcasts a status string; empty string means clear/hide.
+connection.on("RadioInfoStatus", function (message) {
+    let overlay = document.getElementById('radioInfoStatusOverlay');
+    if (!message) {
+        if (overlay) overlay.style.display = 'none';
+        return;
+    }
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'radioInfoStatusOverlay';
+        overlay.setAttribute('role', 'status');
+        overlay.setAttribute('aria-live', 'polite');
+        overlay.style.cssText = [
+            'position: fixed',
+            'top: 1rem',
+            'left: 50%',
+            'transform: translateX(-50%)',
+            'z-index: 9999',
+            'background: rgba(20, 24, 32, 0.92)',
+            'color: #fff',
+            'padding: 0.75rem 1.25rem',
+            'border-radius: 0.5rem',
+            'font-size: 0.95rem',
+            'box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35)',
+            'pointer-events: none'
+        ].join(';');
+        document.body.appendChild(overlay);
+    }
+    overlay.textContent = message;
+    overlay.style.display = '';
 });
 
 
@@ -1248,6 +1133,17 @@ connection.on("RadioStateUpdate", function (update) {
         applyVfoActiveStyling();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('txVfo', update.value);
     }
+    if (update.property === "ActiveVfo") {
+        activeVfo = update.value;
+        applyVfoActiveStyling();
+        // In normal mode on a single-receiver radio, the TX button position
+        // follows activeVfo (the TX VFO IS the active VFO; FT doesn't move).
+        updateTxButton();
+        // R8 (Jacek SP3L #34, 2026-06-21): in split mode the TX VFO is the
+        // opposite of active, so the SPLIT TX badge and the red border have
+        // to switch panels whenever the active VFO changes.
+        updateSplitButton();
+    }
 
     // --- SPLIT MODE ---
     if (update.property === "SplitMode") {
@@ -1256,6 +1152,11 @@ connection.on("RadioStateUpdate", function (update) {
         // R7 (Jacek SP3L #34): greying flips when split toggles — the inactive
         // panel becomes the TX VFO (grey) and the RX VFO becomes white.
         applyVfoActiveStyling();
+        // Pre7 fix: also re-evaluate the TX button position. On single-receiver
+        // radios, enabling split changes which panel the TX button should sit
+        // on (becomes "opposite of activeVfo") but FT often doesn't move on
+        // FTdx10 to trigger the TxVfo handler -- so do it here too.
+        updateTxButton();
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('split', update.value);
     }
 
@@ -2343,55 +2244,33 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initializeDigitInteraction(receiver) {
-        const display = document.getElementById('freq' + receiver);
-        if (!display) {
-            // ...removed debug logging...
-            return;
-        }
+        const display  = document.getElementById('freq' + receiver);
+        const controls = document.getElementById('freq' + receiver + '-controls');
+        const upBtn    = document.getElementById('freq' + receiver + '-up');
+        const downBtn  = document.getElementById('freq' + receiver + '-down');
+        if (!display) return;
         if (display._initialized) return;
         display._initialized = true;
 
-        display.addEventListener('click', function (e) {
-            if (!e.target.classList.contains('digit') || e.target.textContent === '.') return;
-            let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-            digits.forEach(d => d.classList.remove('selected'));
-            state.selectedIdx[receiver] = digits.indexOf(e.target);
-            if (state.selectedIdx[receiver] !== -1) {
-                digits[state.selectedIdx[receiver]].classList.add('selected');
-                state.editing[receiver] = true;
-                state.localFreq[receiver] = parseInt(digits.map(d => d.textContent).join(''));
-            }
-        });
-
-        display.addEventListener('wheel', function (e) {
-            let digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
-            let idx = state.selectedIdx[receiver];
-            // If the cursor is directly over a digit span, use that digit regardless of
-            // what was previously selected — this makes wheeling position-sensitive.
-            if (e.target.classList.contains('digit') && e.target.textContent !== '.') {
-                const hovered = digits.indexOf(e.target);
-                if (hovered !== -1) idx = hovered;
-            }
-            // Fall back to auto-selecting the 1 kHz digit (index 4) when not over any digit.
-            if (idx === null || !digits[idx]) {
-                idx = Math.min(4, digits.length - 1);
-            }
-            state.selectedIdx[receiver] = idx;
-            digits.forEach(d => d.classList.remove('selected'));
-            if (digits[idx]) digits[idx].classList.add('selected');
-            state.editing[receiver] = true;
-            let freqArr = digits.map(d => parseInt(d.textContent));
-            let carry = e.deltaY < 0 ? 1 : -1;
+        // Shared digit-step routine used by wheel, keyboard, and ▲/▼ buttons.
+        // `step` is the signed amount to add to the digit at the selected
+        // position; carries propagate left through more-significant digits.
+        function stepSelectedDigit(step) {
+            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            const idx = state.selectedIdx[receiver];
+            if (idx === null || idx === undefined || !digits[idx]) return;
+            const freqArr = digits.map(d => parseInt(d.textContent));
+            let carry = step;
             let i = idx;
             while (carry !== 0 && i >= 0 && i < freqArr.length) {
-                let newVal = freqArr[i] + carry;
+                const newVal = freqArr[i] + carry;
                 if (newVal > 9) {
-                    freqArr[i] = 0;
-                    carry = 1;
+                    freqArr[i] = newVal % 10;
+                    carry = Math.floor(newVal / 10);
                     i--;
                 } else if (newVal < 0) {
-                    freqArr[i] = 9;
-                    carry = -1;
+                    freqArr[i] = ((newVal % 10) + 10) % 10;
+                    carry = Math.floor(newVal / 10);
                     i--;
                 } else {
                     freqArr[i] = newVal;
@@ -2401,29 +2280,197 @@ document.addEventListener('DOMContentLoaded', function() {
             let newFreq = parseInt(freqArr.join(''));
             newFreq = Math.max(30000, Math.min(75000000, newFreq));
             state.localFreq[receiver] = newFreq;
+            state.editing[receiver] = true;
             updateFrequencyDisplay(receiver, newFreq);
-            let newDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            // Re-find digits after re-render and keep selection on the same index.
+            const newDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
             newDigits.forEach(d => d.classList.remove('selected'));
-            if (state.selectedIdx[receiver] !== null && newDigits[state.selectedIdx[receiver]]) {
-                newDigits[state.selectedIdx[receiver]].classList.add('selected');
-            }
+            if (newDigits[idx]) newDigits[idx].classList.add('selected');
             clearTimeout(display._debounceTimer);
             display._debounceTimer = setTimeout(() => {
                 setFrequency(receiver, newFreq);
                 state.lastSentFreq[receiver] = newFreq;
                 state.localFreq[receiver] = null;
-                state.editing[receiver] = false;
+                // IMPORTANT: keep state.editing=true here. The polling tick
+                // at ~500 ms will reset it to false once it sees the radio
+                // confirm data.vfoA.frequency === state.lastSentFreq.A (see
+                // the reset block in fetchRadioStatus). If we clear editing
+                // now, the very next polling tick re-renders the display
+                // with whatever frequency the radio is still reporting --
+                // typically the OLD value, because we just sent the new one
+                // ~tens of ms ago and the radio hasn't echoed back yet.
+                // That race shows up as the digit "flipping back then
+                // settling on the new value" the user reported.
             }, 600);
+        }
+
+        // Auto-select the kHz position when the user hits an arrow / ▲ / ▼
+        // without first picking a digit. Defaults to "4th from the right"
+        // so the first action moves something audible rather than a 1 Hz
+        // tick the user can't hear.
+        function ensureSelection() {
+            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            if (digits.length === 0) return;
+            const cur = state.selectedIdx[receiver];
+            if (cur === null || cur === undefined || !digits[cur]) {
+                const defaultIdx = Math.max(0, digits.length - 4);
+                digits.forEach(d => d.classList.remove('selected'));
+                digits[defaultIdx].classList.add('selected');
+                state.selectedIdx[receiver] = defaultIdx;
+            }
+        }
+
+        display.addEventListener('click', function (e) {
+            if (!e.target.classList.contains('digit') || e.target.textContent === '.') return;
+            const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            digits.forEach(d => d.classList.remove('selected'));
+            state.selectedIdx[receiver] = digits.indexOf(e.target);
+            if (state.selectedIdx[receiver] !== -1) {
+                digits[state.selectedIdx[receiver]].classList.add('selected');
+                state.editing[receiver] = true;
+                state.localFreq[receiver] = parseInt(digits.map(d => d.textContent).join(''));
+            }
+            // Explicitly focus the display so the very next ArrowUp/Down
+            // press is delivered here instead of bubbling to body. The
+            // digit spans are tabindex=-1 so a span click does NOT
+            // automatically focus the display in every browser.
+            display.focus({ preventScroll: true });
+        });
+
+        display.addEventListener('wheel', function (e) {
+            // Wheel is position-sensitive: cursor over a digit picks that digit.
+            if (e.target.classList.contains('digit') && e.target.textContent !== '.') {
+                const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+                const hovered = digits.indexOf(e.target);
+                if (hovered !== -1) {
+                    digits.forEach(d => d.classList.remove('selected'));
+                    digits[hovered].classList.add('selected');
+                    state.selectedIdx[receiver] = hovered;
+                }
+            }
+            ensureSelection();
+            stepSelectedDigit(e.deltaY < 0 ? 1 : -1);
             e.preventDefault();
         }, { passive: false });
 
-        document.addEventListener('click', function (e) {
-            if (!display.contains(e.target)) {
-                state.selectedIdx[receiver] = null;
-                state.editing[receiver] = false;
-                state.localFreq[receiver] = null;
-                updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver]);
+        // Keyboard navigation — primary accessibility path for users who
+        // can't use a mouse wheel (head-tracking input, on-screen-keyboard
+        // users, reduced-dexterity operators). The freq display is
+        // role="spinbutton" tabindex="0" so it accepts focus from Tab.
+        //
+        //   ArrowUp / ArrowDown          step the selected digit by 1
+        //   PageUp   / PageDown          step the selected digit by 10
+        //   ArrowLeft / ArrowRight       move the selected-digit cursor
+        //   Home / End                   jump to the most / least significant digit
+        //
+        // First-press semantics: if no digit is currently selected (e.g. the
+        // polling reset cleared it after a previous edit completed, or the
+        // user's click missed and landed on a "." separator), the very
+        // first arrow press just SHOWS the selection at the kHz digit and
+        // does NOT step. A second press then actually steps. This avoids
+        // the surprise where ArrowUp silently changes a digit the user
+        // can't see is selected.
+        display.addEventListener('keydown', function (e) {
+            const ourKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown',
+                             'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+            if (!ourKeys.includes(e.key)) return;
+
+            const allDigits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
+            if (allDigits.length === 0) return;
+
+            // "Is anything currently visibly selected?" -- the truth is in
+            // the DOM, not in state. state.selectedIdx can hold a stale
+            // index left over from a previous interaction; the visible
+            // highlight is what the user can actually see. Bootstrap only
+            // when no digit is highlighted on screen.
+            const visiblySelected = display.querySelector('.digit.selected');
+            if (!visiblySelected) {
+                ensureSelection();
+                e.preventDefault();
+                return;
             }
+            // Re-sync state from DOM if they disagree (defensive). The DOM
+            // class is the source of truth for "which digit is selected";
+            // state mirrors it so stepSelectedDigit / move-cursor logic can
+            // work in terms of an integer index.
+            const cur = allDigits.indexOf(visiblySelected);
+            state.selectedIdx[receiver] = cur;
+
+            switch (e.key) {
+                case 'ArrowUp':   stepSelectedDigit(1);   e.preventDefault(); break;
+                case 'ArrowDown': stepSelectedDigit(-1);  e.preventDefault(); break;
+                case 'PageUp':    stepSelectedDigit(10);  e.preventDefault(); break;
+                case 'PageDown':  stepSelectedDigit(-10); e.preventDefault(); break;
+                case 'ArrowLeft':
+                    if (cur > 0) {
+                        const newIdx = cur - 1;
+                        allDigits.forEach(d => d.classList.remove('selected'));
+                        allDigits[newIdx].classList.add('selected');
+                        state.selectedIdx[receiver] = newIdx;
+                    }
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    if (cur < allDigits.length - 1) {
+                        const newIdx = cur + 1;
+                        allDigits.forEach(d => d.classList.remove('selected'));
+                        allDigits[newIdx].classList.add('selected');
+                        state.selectedIdx[receiver] = newIdx;
+                    }
+                    e.preventDefault();
+                    break;
+                case 'Home':
+                    allDigits.forEach(d => d.classList.remove('selected'));
+                    allDigits[0].classList.add('selected');
+                    state.selectedIdx[receiver] = 0;
+                    e.preventDefault();
+                    break;
+                case 'End':
+                    allDigits.forEach(d => d.classList.remove('selected'));
+                    allDigits[allDigits.length - 1].classList.add('selected');
+                    state.selectedIdx[receiver] = allDigits.length - 1;
+                    e.preventDefault();
+                    break;
+            }
+        });
+
+        // ▲ / ▼ buttons — visible when Settings > Accessibility >
+        // Show frequency arrow buttons is on (Yuri W4YSW request). Each
+        // click steps the currently-selected digit by 1 — same action as
+        // ArrowUp / ArrowDown and the mouse wheel.
+        if (upBtn) {
+            upBtn.onclick = function (e) {
+                e.preventDefault();
+                ensureSelection();
+                stepSelectedDigit(1);
+            };
+        }
+        if (downBtn) {
+            downBtn.onclick = function (e) {
+                e.preventDefault();
+                ensureSelection();
+                stepSelectedDigit(-1);
+            };
+        }
+
+        document.addEventListener('click', function (e) {
+            // Don't clear selection on clicks inside the display OR inside
+            // our own ▲/▼ controls — those should keep the digit selected
+            // so a button click can act on it.
+            if (display.contains(e.target)) return;
+            if (controls && controls.contains(e.target)) return;
+            // Selection is persistent across polling cycles (so an
+            // accessibility user can press ArrowUp / ▲ in rapid sequence
+            // without having to re-select each time). The user explicitly
+            // ends a selection by clicking somewhere else on the page --
+            // that's the cue handled here.
+            const hadSelection = state.selectedIdx[receiver] !== null && state.selectedIdx[receiver] !== undefined;
+            const wasEditing = state.editing[receiver];
+            if (!hadSelection && !wasEditing) return;
+            state.selectedIdx[receiver] = null;
+            state.editing[receiver] = false;
+            state.localFreq[receiver] = null;
+            updateFrequencyDisplay(receiver, state.lastBackendFreq[receiver] ?? 0);
         });
     }
 
@@ -2709,14 +2756,19 @@ document.addEventListener('DOMContentLoaded', function() {
             updatePowerSlider(null, powerValue);
             // TX meter (updatePowerMeter) will use RM5 during transmit only
 
-            // Stop showing local frequency once backend confirms our sent value
+            // Stop showing local frequency once backend confirms our sent value.
+            // IMPORTANT: do NOT clear state.selectedIdx here. The user's
+            // digit selection should survive a successful step so the next
+            // ArrowUp / ▲ press acts on the same digit -- accessibility
+            // users press these in rapid sequence and re-selecting every
+            // time would be unusable. Selection is cleared explicitly when
+            // the user clicks outside the display (see the document.click
+            // handler inside initializeDigitInteraction).
             if (state.editing.A && state.lastSentFreq.A !== null && state.localFreq.A === null && data.vfoA.frequency === state.lastSentFreq.A) {
                 state.editing.A = false;
-                state.selectedIdx.A = null;
             }
             if (state.editing.B && state.lastSentFreq.B !== null && state.localFreq.B === null && data.vfoB.frequency === state.lastSentFreq.B) {
                 state.editing.B = false;
-                state.selectedIdx.B = null;
             }
 
             if (!state.editing.A) {
@@ -2849,6 +2901,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateSMeter(receiver, value) {
+        // v2.3.9: the S-meter and its history strip moved out of the VFO
+        // panels into the top meter row -- single shared gauge and single
+        // history because Yaesu radios only have one calibrated S-meter
+        // (tied to MAIN on FTdx101 family; only physical receiver on
+        // single-receiver rigs). The `receiver` parameter is preserved
+        // for call-site compatibility but ignored: only the 'A' value
+        // (MAIN) actually drives the gauge.
+        if (receiver !== 'A') return;
+
         // The S-meter gauge has hardcoded tick positions on a 0-255 scale and
         // ignores calibration tables for needle placement. To make the user's
         // calibration actually affect where the needle sits, translate the raw
@@ -2861,18 +2922,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const gaugePos = window.calibrationEngine?.calibrateSMeterForGauge
             ? window.calibrationEngine.calibrateSMeterForGauge(value)
             : value;
-        if (receiver === 'A') {
-            if (window.meterPanel) window.meterPanel.update('smeterA', gaugePos);
-            if (window.sMeterHistoryA) window.sMeterHistoryA.push(value);
-            updateRawSMeterValueA(value);
-            const canvasA = document.getElementById('sMeterCanvasA');
-            if (canvasA) canvasA.dataset.reading = sMeterLabel(value);
-        } else if (receiver === 'B') {
-            if (window.meterPanel) window.meterPanel.update('smeterB', gaugePos);
-            if (window.sMeterHistoryB) window.sMeterHistoryB.push(value);
-            const canvasB = document.getElementById('sMeterCanvasB');
-            if (canvasB) canvasB.dataset.reading = sMeterLabel(value);
-        }
+        if (window.meterPanel) window.meterPanel.update('smeter', gaugePos);
+        if (window.sMeterHistory) window.sMeterHistory.push(value);
+        if (typeof updateRawSMeterValueA === 'function') updateRawSMeterValueA(value);
+        const canvas = document.getElementById('sMeterCanvas');
+        const sUnit = sMeterLabel(value);
+        if (canvas) canvas.dataset.reading = sUnit;
+        // Update the "S-Meter S5" title label under the gauge (matches SWR /
+        // Power / Temp / etc. format). Element is rendered by SMeterGauge
+        // when gaugeTitleShow is true (set in gauge.js).
+        const sLabel = document.getElementById('sMeterValue');
+        if (sLabel) sLabel.textContent = sUnit;
     }
 
     // Update MIC bar meter (0-255 raw value)

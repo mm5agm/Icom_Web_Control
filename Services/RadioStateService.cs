@@ -14,6 +14,14 @@ namespace Yaesu_Web_Control.Services
 
         public bool IsInitialized { get; set; } = false;
 
+        // True when the configured radio model has a single physical receiver
+        // (FTdx10 / FT-710 / FTDX3000 / FT-991A). Set by RadioInitialization-
+        // Service at startup from RadioCapabilities. The dispatcher uses this
+        // to route P1=0 ("Fixed" on single-receiver radios) responses to
+        // whichever VFO is currently active (per VS), instead of always
+        // writing to *A state — see #34 R2 controls-bleed-across-panels fix.
+        public bool IsSingleReceiver { get; set; } = false;
+
         private RadioState _initialState;
 
         public RadioStateService(
@@ -544,6 +552,15 @@ namespace Yaesu_Web_Control.Services
         // TX VFO: 0 = VFO A is TX, 1 = VFO B is TX
         private int _txVfo = 0;
         public int TxVfo { get => _txVfo; set => SetField(ref _txVfo, value); }
+
+        // VS command — VFO SELECT, indicates which VFO is currently the
+        // operating (RX) VFO. Distinct from TxVfo (FT) which only tracks
+        // the TX VFO in split mode. On single-receiver radios the front-
+        // panel A/B button changes ActiveVfo but does NOT change TxVfo
+        // (Jacek SP3L #34 R2 — fixed by switching normal-mode greying
+        // from TxVfo to ActiveVfo). 0 = VFO A, 1 = VFO B.
+        private int _activeVfo = 0;
+        public int ActiveVfo { get => _activeVfo; set => SetField(ref _activeVfo, value); }
 
         // Split mode: 0 = OFF, 1 = ON (VFO A = RX, VFO B = TX), 2 = ON + Quick Split (+5 kHz)
         private int _splitMode = 0;
