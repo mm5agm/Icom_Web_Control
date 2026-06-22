@@ -2245,9 +2245,10 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 - If Diagnostics shows `Error: en-GB Windows speech pack not installed`, install it (Windows → Settings → Time &amp; Language → Speech → Add a language → English (United Kingdom)).
 
 **Mic button is there but commands don't do anything.**
-- Open YWC's log file at `%APPDATA%\MM5AGM\Yaesu Web Control\logs\ywc-YYYYMMDD.log` (`%APPDATA%` is `C:\Users\<you>\AppData\Roaming`).
-- Search for `[Voice]` lines. You should see `SAPI recogniser ready` at startup and a `Rejected (best alt: '…')` line for each unmatched press. The "best alt" is the engine's best guess at what you said — if it's wildly wrong, the mic itself may have a problem (try Windows Sound settings → Input → speak and see if the level meter responds).
+- Open the **Diagnostics page** (`http://localhost:8080/Diagnostics`), click the **Voice Control Log** button at the top, then click **Refresh**. This shows the recent voice events (start / stop / heard / rejected / dispatched) from today's log without you having to find or parse the raw log file. Click **Copy to clipboard** to grab them for a bug report.
+- You should see `SAPI recogniser ready` shortly after YWC startup and a `Rejected (best alt: '…')` line for each unmatched press. The "best alt" is the engine's best guess at what you said — if it's wildly wrong, the mic itself may have a problem (try Windows Sound settings → Input → speak and see if the level meter responds).
 - If the log shows `Rejected (best alt: '<your phrase>')` and your phrase looks correct, the grammar wording isn't matching what you said. Try one of the alternative phrasings listed in [§17.1](#171-what-you-can-say), or open a [GitHub discussion](https://github.com/mm5agm/Yaesu_Web_Control/discussions) and propose a new phrasing.
+- The raw log file lives at `%APPDATA%\MM5AGM\Yaesu Web Control\logs\ywc-YYYYMMDD.log` if you ever need the unfiltered version (e.g. CAT command traffic, SDR worker status, etc.), but the Diagnostics page is the right tool for voice-specific issues.
 
 **"Tune up" doesn't seem to do much.**
 - It does — VFO A steps up by exactly **10 kHz** per command. Watch the **VFO A panel**, not VFO B (voice control always targets VFO A in this release). If you need bigger jumps use "set frequency to …" or "go to … metres".
