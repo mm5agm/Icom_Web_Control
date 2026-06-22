@@ -519,6 +519,20 @@
         if (!open && !voiceLoaded) loadVoiceLog();
     });
     document.getElementById('diag-voice-refresh').addEventListener('click', loadVoiceLog);
+
+    // Auto-refresh on every voice event so the user doesn't need to remember
+    // to press Refresh after each test press. Each PTT generates a small
+    // burst (Listening -> Heard -> Executing -> Idle), so we debounce ~500 ms
+    // and refresh once when the burst settles. Only refreshes while the
+    // panel is visible, to avoid churning the API for users who don't have
+    // the log panel open.
+    let voiceRefreshDebounce = null;
+    function scheduleVoiceRefresh() {
+        if (voicePanel.hidden) return;       // panel not visible -- skip
+        clearTimeout(voiceRefreshDebounce);
+        voiceRefreshDebounce = setTimeout(loadVoiceLog, 500);
+    }
+    conn.on('VoiceStatusUpdate', scheduleVoiceRefresh);
     document.getElementById('diag-voice-copy').addEventListener('click', async () => {
         const text = voiceBody.textContent || '';
         if (!text.trim()) return;
@@ -538,6 +552,7 @@
             alert('Could not copy: ' + e.message);
         }
     });
+
 
     refreshIndicator();
 
