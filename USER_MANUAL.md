@@ -69,6 +69,7 @@
     - 16.4 [NVDA](#164-nvda)
     - 16.5 [Windows Narrator](#165-windows-narrator)
     - 16.6 [Customising Accessible Labels](#166-customising-screen-reader-labels)
+    - 16.7 [Frequency tuning by keyboard or buttons](#167-frequency-tuning-by-keyboard-or-buttons)
 
 ---
 
@@ -242,12 +243,13 @@ The line shows the current band, mode and frequency, with transmit power appende
 
 ### 5.2 Meters
 
-A scrollable row of meters is displayed above the VFO panels. The meters shown depend on your radio model:
+A scrollable row of meters is displayed above the VFO panels. The leftmost slot is the S-meter (and its optional history strip — see below). To the right of the S-meter come the transmit-related meters, which depend on your radio model:
 
-**FTdx101MP, FTdx101D, FTDX3000** — seven meters:
+**FTdx101MP, FTdx101D, FTDX3000** — S-meter plus seven TX meters:
 
 | Meter | What it shows |
 |-------|--------------|
+| S-meter | Receive signal strength on VFO A (the radio's only calibrated S-meter) — always live |
 | SWR | Standing wave ratio on the antenna — only active during transmit |
 | Power | Output power in watts — only active during transmit |
 | Compression | Speech compression in dB — only active during transmit |
@@ -256,13 +258,13 @@ A scrollable row of meters is displayed above the VFO panels. The meters shown d
 | IDD | PA drain current in amps |
 | VDD | PA supply voltage in volts |
 
-**FTdx10, FT-710** — four meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.
+**FTdx10, FT-710** — S-meter plus four TX meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.
 
-All meters update in real time at approximately 10 times per second. Meters that only apply to transmit automatically read zero when the radio is receiving.
+All meters update in real time at approximately 10 times per second. Meters that only apply to transmit automatically read zero when the radio is receiving. The S-meter is always live.
 
 The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your specific radio.
 
-**S-meter history strip.** A small 30-second strip-chart can be shown below each VFO's S-meter. Click the **S-hist** button in the top toolbar to toggle it on (off by default; the choice is remembered between sessions). The strip shows three things at once:
+**S-meter history strip.** A small 30-second strip-chart can be shown to the left of the S-meter gauge in the top meter row. Click the **S-hist** button in the top toolbar to toggle it on (off by default; the choice is remembered between sessions). The strip shows three things at once:
 
 - **Green line** — the actual S-meter trace over the last 30 seconds. Lets you see QSB fading patterns and brief interference spikes that the analog needle barely registered.
 - **Yellow dashed line** — the peak hold for the window, useful for noting a station's actual peak signal during an over without staring at the needle.
@@ -333,6 +335,12 @@ There are two VFO panels side by side:
 - **Split mode**: the **receive** VFO is white, the **transmit** VFO is grey — opposite of normal mode. This makes sense because in split you spend most of your time receiving on the white panel and only occasionally transmit on the grey one. The grey (TX) panel's **frequency field is still editable** so you can set the TX frequency from YWC without un-splitting first — click a digit and scroll the mouse wheel, or use the keyboard icon next to MHz to type one in. The TX button and the SPLIT badge appear on the grey panel.
 
 On **dual-receiver radios** (FTdx101MP / FTdx101D) neither panel is greyed at any time — both VFOs are real physical receiver chains and are always independently usable.
+
+**S-meter location — not in the VFO panels.** From v2.3.9 the S-meter and its 30-second history strip live in the **top meter row** (just below the toolbar), not inside the VFO A / VFO B panels. There is **one** S-meter gauge and **one** history strip, shown at the leftmost end of the meter row.
+
+Why: Yaesu radios only have one calibrated S-meter — on dual-receiver models (FTdx101MP / FTdx101D) it is hardwired to the MAIN (VFO-A) chain, and the SUB chain has only an uncalibrated activity bar on the spectrum display with no S-meter readout exposed over CAT. On single-receiver models (FTdx10 / FT-710 / FTDX3000 / FT-991A) there is only one physical receiver chain. Showing a separate S-meter gauge per VFO would be duplicate information at best and a misleading stuck reading at worst, so YWC presents the truthful single gauge once at the top.
+
+If you operate dual-receive on an FTdx101, watch the spectrum panel for SUB activity rather than the (no-longer-existent) VFO B S-meter gauge.
 
 **Antenna selector visibility:** the per-VFO antenna dropdown is hidden on radios with a single antenna jack (**FTdx10, FT-991A**) since there is nothing to select between. Radios with multiple antenna jacks (FTdx101MP, FTdx101D, FT-710, FTDX3000) keep the selector.
 
@@ -1688,8 +1696,6 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 |---|---|
 | **F** | Enter full-screen mode |
 | **Esc** | Exit full-screen mode |
-| Click a frequency digit | Select that digit for editing |
-| Mouse wheel (on selected digit) | Increment or decrement the digit |
 | Mouse wheel (on spectrum) | Tune VFO A up or down in 1 kHz steps |
 | Click on spectrum | Tune VFO A to the clicked frequency |
 | **Tab** (in band buttons) | Move focus into the band button group |
@@ -1701,6 +1707,27 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 | **Delete** (frequency keyboard open) | Clear all digits |
 | **↵ Enter** (frequency keyboard open) | Send the entered frequency to the radio |
 | **Esc** (frequency keyboard open) | Close the keyboard without changing frequency |
+
+**Frequency display — changing the value digit by digit.** Every VFO frequency display is a "digit-pickable" control. You select a digit (it highlights yellow), then step it up or down. Three input methods reach the same set of actions, so pick whichever suits you:
+
+| Input | Action | What happens |
+|---|---|---|
+| **Click** a digit | Select | That digit highlights yellow. The next step / arrow / button action acts on it. |
+| **Mouse wheel** over a digit | Select + step | Wheels up = +1, wheels down = −1 on the digit under the cursor. |
+| **Tab** into the freq display | Focus the display | A blue outline appears around the whole display. Now the keyboard keys below act on it. |
+| **ArrowUp** / **ArrowDown** | Step selected digit by ±1 | If no digit is currently highlighted, the first press just highlights the kHz digit (4th from the right) — a second press then steps it. This avoids accidentally changing a digit you can't see is selected. |
+| **PageUp** / **PageDown** | Step selected digit by ±10 | Carries propagate up — "9 + 1" rolls over into the next digit left. |
+| **ArrowLeft** / **ArrowRight** | Move the selection cursor | Highlights the digit to the left / right. Does not change the frequency. |
+| **Home** | Jump to the most-significant digit | Selection moves to the **leftmost** digit (tens of MHz). |
+| **End** | Jump to the least-significant digit | Selection moves to the **rightmost** digit (Hz). |
+| **▲ / ▼** buttons | Step the selected digit by ±1 | Only visible if Settings → Accessibility → **Show frequency up/down arrow buttons** is on. Each click does the same as one ArrowUp / ArrowDown. If no digit is selected, the first click auto-selects the kHz digit and steps it in one go (buttons are a deliberate action — unlike the keyboard, they don't need a "show me the cursor" first press). |
+| Click anywhere outside the display + arrow buttons | Deselect | The selection is cleared; the next ArrowUp will start over with the "first press picks the kHz digit" behaviour. |
+
+A few extra notes:
+
+- **Click-tuned changes are debounced** — when you stop wheeling / pressing for ~600 ms, the new frequency is sent to the radio. Holding ArrowUp for a sustained step (autorepeat) works fine; it sends one CAT command per ~600 ms of stillness rather than one per keystroke.
+- **Selection persists** across polling cycles — you can press ArrowUp repeatedly and the selection stays on the same digit. The radio's confirmation of one step doesn't blow your selection away.
+- **The selected digit highlights yellow** when an actual digit is selected. The whole display also gains a blue focus ring when it has keyboard focus (e.g. you tabbed into it).
 
 **Browser zoom — make everything bigger or smaller.** YWC is a web page, so it honours your browser's standard zoom keyboard shortcuts. This is the easiest way to make controls more readable on a high-resolution monitor or to fit more on a small tablet screen:
 
@@ -1907,6 +1934,26 @@ Why this happens in practice:
 **Recommended setup:** plug your radio's USB-CAT cable in, see what COM port Windows assigns (Device Manager → Ports), set that COM port directly in YWC Settings. If you also want WSJT-X, JTAlert, Log4OM, etc. to control the same radio, point them at YWC's rigctld interface on **localhost:4532** rather than letting them open the COM port themselves. YWC then acts as the single owner of the radio's COM port and serves CAT to every other app over the network.
 
 If you must use a virtual port sharer (e.g. you've already built a working setup around one), the easiest test is to point YWC at the real physical COM port directly while everything else stays on the sharer's virtual ports — and only re-add the sharer to YWC's path if a specific need forces it.
+
+---
+
+### 15.7 What is the TX button for? When I press it the radio goes into TX mode but there's no audio from my microphone.
+
+The TX button in YWC sends the `TX1;` CAT command, which puts the radio into transmit mode (PTT engaged) but **does not route any audio into the radio**. With nothing modulating the carrier, what actually goes on-air depends on the current mode:
+
+- **CW** — an unmodulated carrier (a steady tone). Useful for tune-up, SWR measurement, or driving an external tuner / amplifier into its tune cycle.
+- **SSB / AM / FM** — the TX path is open but no audio is being injected, so the on-air signal is effectively silent.
+- **DATA / digital modes** — the same as SSB until something else (WSJT-X via the rear DATA jack or USB audio) is feeding audio in.
+
+In short, the TX button is "key the radio for testing", not "open the mic". The radio's microphone input is only routed to the TX path when the mic's own **PTT button** (or footswitch, or VOX) triggers TX. YWC doesn't intercept or route audio at all — that side is between your mic and the radio.
+
+What people use it for in practice:
+
+1. **Tune-up.** Switch to CW, click TX, watch your SWR or let your ATU find a match.
+2. **Driving an external amplifier or antenna tuner** into its auto-tune cycle.
+3. **Digital-mode keying tests.** When WSJT-X (or similar) is feeding audio into the rear DATA jack, the TX button gives you a CAT-driven way to verify the keying side of the path without starting a real QSO.
+
+To transmit voice from your microphone, press the PTT button on the mic itself.
 
 ---
 
@@ -2149,6 +2196,27 @@ On the Accessibility Labels page, replace each label value with the French equiv
 | Spectrum Display | Span 1 MHz button | Spændvidde 1 MHz |
 | Spectrum Display | Span 2 MHz button | Spændvidde 2 MHz |
 | Navigation | Application name / home link | Yaesu Web Control startside |
+
+---
+
+### 16.7 Frequency tuning by keyboard or buttons
+
+If you can't use a mouse wheel — head-tracking input, on-screen keyboard users, reduced-dexterity operators — the VFO frequency display is fully keyboard-driven. You can also enable two on-screen ▲ / ▼ buttons that step the selected digit by one.
+
+**Enable the on-screen ▲ / ▼ buttons (off by default):** Settings → Accessibility → tick **Show frequency up/down arrow buttons** → Save. Two small buttons appear next to each VFO's frequency display.
+
+**The full keyboard / button reference is in §13 Keyboard Shortcuts** under "Frequency display — changing the value digit by digit". The short version:
+
+- **Tab** into the frequency display to focus it (blue outline appears).
+- **ArrowUp / ArrowDown** step the selected digit by ±1.
+- **PageUp / PageDown** step by ±10.
+- **ArrowLeft / ArrowRight** move the selection cursor sideways.
+- **Home / End** jump the selection to the **leftmost** (most significant — tens of MHz) or **rightmost** (least significant — Hz) digit.
+- The first arrow press when nothing is selected just highlights the kHz digit — a second press then steps it. This protects against an accidental ArrowUp changing the radio without you realising a digit was selected.
+- Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown).
+- Clicking outside the display deselects.
+
+Originally requested by Yuri W4YSW. Shipped in v2.3.9.
 
 ---
 

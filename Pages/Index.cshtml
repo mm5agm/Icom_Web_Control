@@ -331,6 +331,32 @@
                 <div class="card-body py-2">
                     <!-- Gauges row -->
                     <div class="d-flex justify-content-start align-items-start flex-wrap" style="margin-left: 0; gap: 0; margin-bottom: 0.2rem !important;">
+                        <!-- S-Meter rolling history strip — leftmost so the live trace
+                             reads left-to-right toward the S-meter needle. Hidden
+                             until the toolbar's S-hist toggle is on. Sized to match
+                             the meter cells alongside it. Moved from inside the VFO
+                             panels in v2.3.9 (Jacek SP3L #34 / Colin's design call):
+                             the radio only has ONE calibrated S-meter (tied to MAIN
+                             on FTdx101; only physical receiver on single-receiver
+                             rigs), so showing it once at the top is the honest
+                             presentation. -->
+                        <div id="sMeterHistoryContainer"
+                             class="text-center smeter-history-container"
+                             style="display:none; position: relative; height: 135px; min-width: 260px; margin: 0; padding: 0;">
+                            <canvas id="sMeterHistoryCanvas"
+                                    role="img" aria-hidden="true"
+                                    aria-label="S-meter 30-second history"
+                                    data-a11y-key="meters.smeterHistory"
+                                    style="display:block; width:100%; height:100%; border-radius:3px;"></canvas>
+                        </div>
+                        <!-- S-Meter — moved from per-VFO panels to the top row
+                             in v2.3.9. Always live (unlike SWR/Power/etc which
+                             are TX-only). -->
+                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                            <div class="analog-meter-container">
+                                <canvas id="sMeterCanvas" role="img" aria-hidden="true" aria-label="S meter" data-a11y-key="meters.smeter"></canvas>
+                            </div>
+                        </div>
                         <!-- SWR Meter -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
@@ -376,8 +402,18 @@
                         </div>
                         }
                     </div>
-                    <!-- Power and MIC Gain on one row -->
-                    <div class="d-flex align-items-center gap-2 mb-2 closer-to-raw-power" style="margin-top: -18px !important; flex-wrap: wrap;">
+                    <!-- Power and MIC Gain on one row.
+                         padding-left: 260px reserves the same width as the
+                         S-meter history strip in the meter row above (whether
+                         the strip is currently visible or not), so the Power
+                         label always sits directly under the S-meter gauge
+                         rather than under the (sometimes-hidden) history
+                         strip. v2.3.9 layout change.
+                         Padding on the flex container itself rather than a
+                         spacer child -- a child element would have its own
+                         flex slot and (with flex-wrap on) the spillover items
+                         would wrap to a new line at x=0, defeating the point. -->
+                    <div class="d-flex align-items-center gap-2 mb-2 closer-to-raw-power" style="margin-top: -18px !important; flex-wrap: wrap; padding-left: 280px;">
                         <label class="mb-0 text-nowrap">Power: <span id="powerValue" class="fw-bold">@Model.RadioState.Power W</span></label>
                         <input type="range" class="flex-shrink-0" id="powerSlider"
                                aria-label="Transmit power"
@@ -550,28 +586,25 @@
                     <h5 class="mb-0">
                         <span id="receiverAHeading">VFO A</span>
                     </h5>
-                    <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
-                            onclick="toggleTx()" title="Toggle Transmit">
-                        <i class="bi bi-broadcast" aria-hidden="true"></i> TX
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="splitTxBadgeA" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                        <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
+                                onclick="toggleTx()" title="Toggle Transmit">
+                            <i class="bi bi-broadcast" aria-hidden="true"></i> TX
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body p-2">
-                    <!-- Receiver Controls Group: S-Meter, Band buttons, Mode select -->
+                    <!-- Receiver Controls Group: Save-to-Mem, Band buttons, Mode select.
+                         The S-meter and its history strip moved to the top meter row
+                         in v2.3.9 (Jacek SP3L #34, Colin's design call) -- the radio
+                         has only one calibrated S-meter, so showing it once at the
+                         top is honest. -->
                     <div class="receiver-controls-group d-flex flex-nowrap mb-0 gap-2 align-items-start">
-                        <!-- Left: S-Meter only -->
+                        <!-- Left: Save-to-Mem button (S-meter moved to top row) -->
                         <div class="flex-shrink-0">
-                            <div class="analog-meter-container">
-                                <canvas id="sMeterCanvasA" role="img" aria-hidden="true" aria-label="S meter, VFO A" data-a11y-key="meters.smeterA"></canvas>
-                            </div>
-                            <div id="sMeterHistoryContainerA" class="smeter-history-container" style="display:none; margin-top:-50px; position:relative; z-index:2;">
-                                <canvas id="sMeterHistoryCanvasA"
-                                        role="img" aria-hidden="true"
-                                        aria-label="VFO A S-meter 30-second history"
-                                        data-a11y-key="meters.smeterHistoryA"
-                                        style="display:block; width:100%; height:72px; border-radius:3px;"></canvas>
-                            </div>
                             <button id="saveMemBtnA" type="button"
-                                    class="btn btn-outline-secondary btn-sm mt-1"
+                                    class="btn btn-outline-secondary btn-sm"
                                     style="padding:1px 4px;"
                                     onclick="saveVfoToMemory('A')"
                                     aria-label="Save VFO A to memories"
@@ -635,11 +668,11 @@
                                         aria-label="VFO A AGC"
                                         title="VFO A AGC"
                                         onchange="window.radioControl.setAgc('A', this.value)">
-                                    <option value="0">OFF</option>
-                                    <option value="1">FAST</option>
-                                    <option value="2" selected>MID</option>
-                                    <option value="3">SLOW</option>
-                                    <option value="4">AUTO</option>
+                                    <option value="0" selected="@(Model.RadioState.AgcA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.AgcA == "1" ? "selected" : null)">FAST</option>
+                                    <option value="2" selected="@(Model.RadioState.AgcA == "2" ? "selected" : null)">MID</option>
+                                    <option value="3" selected="@(Model.RadioState.AgcA == "3" ? "selected" : null)">SLOW</option>
+                                    <option value="4" selected="@(Model.RadioState.AgcA == "4" ? "selected" : null)">AUTO</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -648,9 +681,9 @@
                                         aria-label="VFO A IPO amp"
                                         title="VFO A IPO / amplifier"
                                         onchange="window.radioControl.setIpo('A', this.value)">
-                                    <option value="0" selected>IPO</option>
-                                    <option value="1">AMP1</option>
-                                    <option value="2">AMP2</option>
+                                    <option value="0" selected="@(Model.RadioState.IpoA == "0" ? "selected" : null)">IPO</option>
+                                    <option value="1" selected="@(Model.RadioState.IpoA == "1" ? "selected" : null)">AMP1</option>
+                                    <option value="2" selected="@(Model.RadioState.IpoA == "2" ? "selected" : null)">AMP2</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -659,21 +692,39 @@
                                         aria-label="VFO A attenuator"
                                         title="VFO A attenuator"
                                         onchange="window.radioControl.setAttenuator('A', this.value)">
-                                    <option value="00" selected>OFF</option>
-                                    <option value="06">6 dB</option>
-                                    <option value="12">12 dB</option>
-                                    <option value="18">18 dB</option>
+                                    <option value="00" selected="@(Model.RadioState.AttA == "00" ? "selected" : null)">OFF</option>
+                                    <option value="06" selected="@(Model.RadioState.AttA == "06" ? "selected" : null)">6 dB</option>
+                                    <option value="12" selected="@(Model.RadioState.AttA == "12" ? "selected" : null)">12 dB</option>
+                                    <option value="18" selected="@(Model.RadioState.AttA == "18" ? "selected" : null)">18 dB</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">NR</label>
+                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR" : "NR")</label>
                                 <select class="form-select form-select-sm" id="nrSelectA"
-                                        aria-label="VFO A noise reduction"
-                                        title="VFO A noise reduction"
+                                        aria-label="VFO A @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
+                                        title="VFO A @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
                                         onchange="window.radioControl.setNr('A', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">NR1</option>
-                                    <option value="2">NR2</option>
+                                    <option value="0" selected="@(Model.RadioState.NrA == "0" ? "selected" : null)">OFF</option>
+                                    @if (isFtdx10 || isFt710)
+                                    {
+                                        <option value="1" selected="@(Model.RadioState.NrA == "1" ? "selected" : null)">ON</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="1" selected="@(Model.RadioState.NrA == "1" ? "selected" : null)">NR1</option>
+                                        <option value="2" selected="@(Model.RadioState.NrA == "2" ? "selected" : null)">NR2</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR No." : "NR Lvl")</label>
+                                <select class="form-select form-select-sm" id="nrLevelSelectA"
+                                        aria-label="VFO A @(isFtdx10 || isFt710 ? "DNR algorithm" : "NR level") (1-15)"
+                                        title="VFO A @(isFtdx10 || isFt710 ? "DNR algorithm (1=lightest, 15=heaviest)" : "NR depth (1=light, 15=heavy)")"
+                                        onchange="setNrLevel('A', this.value)">
+                                    @for (int i = 1; i <= 15; i++) {
+                                        <option value="@i" selected="@(Model.RadioState.NrLevelA == i ? "selected" : null)">@i</option>
+                                    }
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -682,8 +733,8 @@
                                         aria-label="VFO A noise blanker"
                                         title="VFO A noise blanker"
                                         onchange="window.radioControl.setNoiseBlanker('A', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.NbA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.NbA == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -703,8 +754,8 @@
                                         aria-label="VFO A auto notch"
                                         title="VFO A auto notch"
                                         onchange="window.radioControl.setAutoNotch('A', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.AutoNotchA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.AutoNotchA == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -713,16 +764,16 @@
                                         aria-label="VFO A manual notch"
                                         title="VFO A manual notch"
                                         onchange="window.radioControl.setManualNotch('A', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.ManualNotchA == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.ManualNotchA == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">Notch Hz</label>
-                                <input type="range" id="manualNotchFreqA" aria-label="VFO A manual notch frequency" title="VFO A manual notch frequency" min="10" max="3200" step="10" value="1000"
+                                <input type="range" id="manualNotchFreqA" aria-label="VFO A manual notch frequency" title="VFO A manual notch frequency" min="10" max="3200" step="10" value="@Model.RadioState.ManualNotchFreqA"
                                        style="flex: 1; height: 16px;"
                                        oninput="document.getElementById('manualNotchFreqValueA').textContent = this.value + ' Hz'; window.radioControl.setManualNotchFreq('A', this.value)">
-                                <span id="manualNotchFreqValueA" class="vfo-control-label" style="min-width: 52px; text-align: right;">1000 Hz</span>
+                                <span id="manualNotchFreqValueA" class="vfo-control-label" style="min-width: 52px; text-align: right;">@Model.RadioState.ManualNotchFreqA Hz</span>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">RF Gain</label>
@@ -784,9 +835,9 @@
                     <div class="d-flex align-items-center flex-wrap gap-2 mb-1" style="margin-top: -2px;">
                         <span id="freqA" class="fw-bold frequency-display digit-display" role="spinbutton" aria-label="VFO A frequency" title="VFO A frequency" data-a11y-key="vfo.a.frequency" tabindex="0" aria-valuemin="0.03" aria-valuemax="75" aria-valuenow="0"></span>
                         <span class="frequency-display digit-display">MHz</span>
-                        <div id="freqA-controls" style="display:none;">
-                            <button id="freqA-up" class="btn btn-secondary btn-sm" aria-label="VFO A frequency up" title="VFO A frequency up">▲</button>
-                            <button id="freqA-down" class="btn btn-secondary btn-sm" aria-label="VFO A frequency down" title="VFO A frequency down">▼</button>
+                        <div id="freqA-controls" class="freq-step-controls" style="display:@(Model.ShowFrequencyArrowButtons ? "inline-flex" : "none");">
+                            <button type="button" id="freqA-up" class="btn btn-secondary btn-sm" aria-label="Step VFO A selected digit up" title="Step VFO A selected digit up (↑)">▲</button>
+                            <button type="button" id="freqA-down" class="btn btn-secondary btn-sm" aria-label="Step VFO A selected digit down" title="Step VFO A selected digit down (↓)">▼</button>
                         </div>
                         <button class="btn btn-outline-secondary btn-sm fkb-open-btn"
                                 data-freq-keyboard="A"
@@ -882,7 +933,7 @@
                         <span id="receiverBHeading">VFO B</span>
                     </h5>
                     <div class="d-flex align-items-center gap-2">
-                        <span id="splitTxBadge" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                        <span id="splitTxBadgeB" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
                         <button id="txButtonB" class="btn btn-warning btn-sm" style="display:none;"
                                 onclick="toggleTx()" title="Toggle Transmit">
                             <i class="bi bi-broadcast" aria-hidden="true"></i> TX
@@ -890,22 +941,13 @@
                     </div>
                 </div>
                 <div class="card-body p-2">
-                    <!-- Receiver Controls Group: S-Meter, Band buttons, Mode select -->
+                    <!-- Receiver Controls Group: Save-to-Mem, Band buttons, Mode select.
+                         S-meter moved to top meter row in v2.3.9 (see VFO A panel). -->
                     <div class="receiver-controls-group d-flex flex-nowrap mb-0 gap-2 align-items-start">
-                        <!-- Left: S-Meter only -->
+                        <!-- Left: Save-to-Mem button (S-meter moved to top row) -->
                         <div class="flex-shrink-0">
-                            <div class="analog-meter-container">
-                                <canvas id="sMeterCanvasB" role="img" aria-hidden="true" aria-label="S meter, VFO B" data-a11y-key="meters.smeterB"></canvas>
-                            </div>
-                            <div id="sMeterHistoryContainerB" class="smeter-history-container" style="display:none; margin-top:-50px; position:relative; z-index:2;">
-                                <canvas id="sMeterHistoryCanvasB"
-                                        role="img" aria-hidden="true"
-                                        aria-label="VFO B S-meter 30-second history"
-                                        data-a11y-key="meters.smeterHistoryB"
-                                        style="display:block; width:100%; height:72px; border-radius:3px;"></canvas>
-                            </div>
                             <button id="saveMemBtnB" type="button"
-                                    class="btn btn-outline-secondary btn-sm mt-1"
+                                    class="btn btn-outline-secondary btn-sm"
                                     style="padding:1px 4px;"
                                     onclick="saveVfoToMemory('B')"
                                     aria-label="Save VFO B to memories"
@@ -969,11 +1011,11 @@
                                         aria-label="VFO B AGC"
                                         title="VFO B AGC"
                                         onchange="window.radioControl.setAgc('B', this.value)">
-                                    <option value="0">OFF</option>
-                                    <option value="1">FAST</option>
-                                    <option value="2" selected>MID</option>
-                                    <option value="3">SLOW</option>
-                                    <option value="4">AUTO</option>
+                                    <option value="0" selected="@(Model.RadioState.AgcB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.AgcB == "1" ? "selected" : null)">FAST</option>
+                                    <option value="2" selected="@(Model.RadioState.AgcB == "2" ? "selected" : null)">MID</option>
+                                    <option value="3" selected="@(Model.RadioState.AgcB == "3" ? "selected" : null)">SLOW</option>
+                                    <option value="4" selected="@(Model.RadioState.AgcB == "4" ? "selected" : null)">AUTO</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -982,9 +1024,9 @@
                                         aria-label="VFO B IPO amp"
                                         title="VFO B IPO / amplifier"
                                         onchange="window.radioControl.setIpo('B', this.value)">
-                                    <option value="0" selected>IPO</option>
-                                    <option value="1">AMP1</option>
-                                    <option value="2">AMP2</option>
+                                    <option value="0" selected="@(Model.RadioState.IpoB == "0" ? "selected" : null)">IPO</option>
+                                    <option value="1" selected="@(Model.RadioState.IpoB == "1" ? "selected" : null)">AMP1</option>
+                                    <option value="2" selected="@(Model.RadioState.IpoB == "2" ? "selected" : null)">AMP2</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -993,21 +1035,39 @@
                                         aria-label="VFO B attenuator"
                                         title="VFO B attenuator"
                                         onchange="window.radioControl.setAttenuator('B', this.value)">
-                                    <option value="00" selected>OFF</option>
-                                    <option value="06">6 dB</option>
-                                    <option value="12">12 dB</option>
-                                    <option value="18">18 dB</option>
+                                    <option value="00" selected="@(Model.RadioState.AttB == "00" ? "selected" : null)">OFF</option>
+                                    <option value="06" selected="@(Model.RadioState.AttB == "06" ? "selected" : null)">6 dB</option>
+                                    <option value="12" selected="@(Model.RadioState.AttB == "12" ? "selected" : null)">12 dB</option>
+                                    <option value="18" selected="@(Model.RadioState.AttB == "18" ? "selected" : null)">18 dB</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">NR</label>
+                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR" : "NR")</label>
                                 <select class="form-select form-select-sm" id="nrSelectB"
-                                        aria-label="VFO B noise reduction"
-                                        title="VFO B noise reduction"
+                                        aria-label="VFO B @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
+                                        title="VFO B @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
                                         onchange="window.radioControl.setNr('B', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">NR1</option>
-                                    <option value="2">NR2</option>
+                                    <option value="0" selected="@(Model.RadioState.NrB == "0" ? "selected" : null)">OFF</option>
+                                    @if (isFtdx10 || isFt710)
+                                    {
+                                        <option value="1" selected="@(Model.RadioState.NrB == "1" ? "selected" : null)">ON</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="1" selected="@(Model.RadioState.NrB == "1" ? "selected" : null)">NR1</option>
+                                        <option value="2" selected="@(Model.RadioState.NrB == "2" ? "selected" : null)">NR2</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR No." : "NR Lvl")</label>
+                                <select class="form-select form-select-sm" id="nrLevelSelectB"
+                                        aria-label="VFO B @(isFtdx10 || isFt710 ? "DNR algorithm" : "NR level") (1-15)"
+                                        title="VFO B @(isFtdx10 || isFt710 ? "DNR algorithm (1=lightest, 15=heaviest)" : "NR depth (1=light, 15=heavy)")"
+                                        onchange="setNrLevel('B', this.value)">
+                                    @for (int i = 1; i <= 15; i++) {
+                                        <option value="@i" selected="@(Model.RadioState.NrLevelB == i ? "selected" : null)">@i</option>
+                                    }
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -1016,8 +1076,8 @@
                                         aria-label="VFO B noise blanker"
                                         title="VFO B noise blanker"
                                         onchange="window.radioControl.setNoiseBlanker('B', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.NbB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.NbB == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -1037,8 +1097,8 @@
                                         aria-label="VFO B auto notch"
                                         title="VFO B auto notch"
                                         onchange="window.radioControl.setAutoNotch('B', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.AutoNotchB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.AutoNotchB == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item">
@@ -1047,16 +1107,16 @@
                                         aria-label="VFO B manual notch"
                                         title="VFO B manual notch"
                                         onchange="window.radioControl.setManualNotch('B', this.value)">
-                                    <option value="0" selected>OFF</option>
-                                    <option value="1">ON</option>
+                                    <option value="0" selected="@(Model.RadioState.ManualNotchB == "0" ? "selected" : null)">OFF</option>
+                                    <option value="1" selected="@(Model.RadioState.ManualNotchB == "1" ? "selected" : null)">ON</option>
                                 </select>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">Notch Hz</label>
-                                <input type="range" id="manualNotchFreqB" aria-label="VFO B manual notch frequency" title="VFO B manual notch frequency" min="10" max="3200" step="10" value="1000"
+                                <input type="range" id="manualNotchFreqB" aria-label="VFO B manual notch frequency" title="VFO B manual notch frequency" min="10" max="3200" step="10" value="@Model.RadioState.ManualNotchFreqB"
                                        style="flex: 1; height: 16px;"
                                        oninput="document.getElementById('manualNotchFreqValueB').textContent = this.value + ' Hz'; window.radioControl.setManualNotchFreq('B', this.value)">
-                                <span id="manualNotchFreqValueB" class="vfo-control-label" style="min-width: 52px; text-align: right;">1000 Hz</span>
+                                <span id="manualNotchFreqValueB" class="vfo-control-label" style="min-width: 52px; text-align: right;">@Model.RadioState.ManualNotchFreqB Hz</span>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">RF Gain</label>
@@ -1118,9 +1178,9 @@
                     <div class="d-flex align-items-center flex-wrap gap-2 mb-1" style="margin-top: -2px;">
                         <span id="freqB" class="fw-bold frequency-display digit-display" role="spinbutton" aria-label="VFO B frequency" title="VFO B frequency" data-a11y-key="vfo.b.frequency" tabindex="0" aria-valuemin="0.03" aria-valuemax="75" aria-valuenow="0"></span>
                         <span class="frequency-display digit-display">MHz</span>
-                        <div id="freqB-controls" style="display:none;">
-                            <button id="freqB-up" class="btn btn-secondary btn-sm" aria-label="VFO B frequency up" title="VFO B frequency up">▲</button>
-                            <button id="freqB-down" class="btn btn-secondary btn-sm" aria-label="VFO B frequency down" title="VFO B frequency down">▼</button>
+                        <div id="freqB-controls" class="freq-step-controls" style="display:@(Model.ShowFrequencyArrowButtons ? "inline-flex" : "none");">
+                            <button type="button" id="freqB-up" class="btn btn-secondary btn-sm" aria-label="Step VFO B selected digit up" title="Step VFO B selected digit up (↑)">▲</button>
+                            <button type="button" id="freqB-down" class="btn btn-secondary btn-sm" aria-label="Step VFO B selected digit down" title="Step VFO B selected digit down (↓)">▼</button>
                         </div>
                         <button class="btn btn-outline-secondary btn-sm fkb-open-btn"
                                 data-freq-keyboard="B"
@@ -1733,8 +1793,12 @@
                 setInterval(tick, 1000);
             }
             window.meterPanel = new MeterPanel({
-                smeterA:     { type: 'smeter', canvasId: 'sMeterCanvasA' },
-                smeterB:     { type: 'smeter', canvasId: 'sMeterCanvasB' },
+                // v2.3.9: S-meter moved from per-VFO panels into the top meter
+                // row. Yaesu radios only have one calibrated S-meter (tied to
+                // MAIN on the FTdx101 family; only physical receiver on
+                // single-receiver rigs), so a single gauge is the truthful
+                // presentation. Old smeterA/smeterB keys are gone.
+                smeter:      { type: 'smeter', canvasId: 'sMeterCanvas' },
                 power:       { canvasId: 'powerMeterCanvas' },
                 swr:         { canvasId: 'swrMeterCanvas' },
                 compression: { canvasId: 'compressionMeterCanvas' },
@@ -1748,19 +1812,17 @@
             // ── S-meter history strip ────────────────────────────────────────
             // Hidden by default. Toggle via the "S-hist" button in the top
             // toolbar; visibility persists in localStorage so the choice
-            // survives page reloads.
-            window.sMeterHistoryA = new SMeterHistoryPanel('sMeterHistoryCanvasA');
-            window.sMeterHistoryB = new SMeterHistoryPanel('sMeterHistoryCanvasB');
+            // survives page reloads. Single strip in the top meter row,
+            // leftmost so the trace reads left-to-right toward the S-meter.
+            window.sMeterHistory = new SMeterHistoryPanel('sMeterHistoryCanvas');
             (function () {
-                const btn  = document.getElementById('sMeterHistoryToggleBtn');
-                const conA = document.getElementById('sMeterHistoryContainerA');
-                const conB = document.getElementById('sMeterHistoryContainerB');
-                if (!btn || !conA || !conB) return;
+                const btn = document.getElementById('sMeterHistoryToggleBtn');
+                const con = document.getElementById('sMeterHistoryContainer');
+                if (!btn || !con) return;
 
                 const KEY = 'ywc.sMeterHistoryVisible';
                 const apply = (visible) => {
-                    conA.style.display = visible ? '' : 'none';
-                    conB.style.display = visible ? '' : 'none';
+                    con.style.display = visible ? '' : 'none';
                     btn.classList.toggle('active', visible);
                     btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
                 };
@@ -2557,6 +2619,16 @@
                     body: JSON.stringify({ level: parseInt(level) })
                 });
             } catch (e) { console.error('setNbLevel error:', e); }
+        }
+
+        // --- NR LEVEL (DNR algorithm on FTdx10) ---
+        async function setNrLevel(receiver, level) {
+            try {
+                await fetch(`/api/cat/nrlevel/${receiver.toLowerCase()}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: parseInt(level) })
+                });
+            } catch (e) { console.error('setNrLevel error:', e); }
         }
 
         // --- RF GAIN ---
@@ -3484,6 +3556,7 @@
         window._updateMonitorBtn = _updateMonitorBtn;
         window.setMonitorLevel  = setMonitorLevel;
         window.setNbLevel      = setNbLevel;
+        window.setNrLevel      = setNrLevel;
         window.setRfGain                  = setRfGain;
         window.setSquelch                 = setSquelch;
         window._updateSquelchVisibility   = _updateSquelchVisibility;

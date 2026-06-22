@@ -124,6 +124,12 @@ namespace Yaesu_Web_Control.Services
 
                 // Radio responded - it's ON
                 radioStateService.RadioPowerOn = true;
+                // Tell RadioStateService whether this is a single-receiver
+                // model. The dispatcher uses this to route P1=0 ("Fixed" on
+                // single-receiver radios) responses to whichever VFO is
+                // currently active per VS, instead of always writing to *A
+                // state. See #34 R2 controls-bleed fix.
+                radioStateService.IsSingleReceiver = RadioCapabilities.IsSingleReceiver(settings.RadioModel);
                 logger.LogInformation("[RadioInitializationService] Radio responded to FA;: {Response}", faResponse);
 
                 // Safety: force the radio into RX before doing anything else.
@@ -167,26 +173,15 @@ namespace Yaesu_Web_Control.Services
 
                 // 3. Send only non-empty/non-zero values to the radio (parallelized)
                 var stateTasks = new List<Task>();
-                if (!string.IsNullOrEmpty(persistedState.ModeA))
-                {
-                    logger.LogInformation("About to send ModeA={ModeA} to radio", persistedState.ModeA);
-                    stateTasks.Add(multiplexer.SendCommandAsync(CatCommands.FormatMode(persistedState.ModeA, false), "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ModeA = persistedState.ModeA; }));
-                }
-                if (!string.IsNullOrEmpty(persistedState.ModeB))
-                {
-                    stateTasks.Add(multiplexer.SendCommandAsync(CatCommands.FormatMode(persistedState.ModeB, true), "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.ModeB = persistedState.ModeB; }));
-                }
-                // RF Power is deliberately NOT restored from persisted state
-                // on connect (Issue #35, SP3L-Jacek 2026-06-14). The radio is
-                // the source of truth: if the operator changed the front-panel
-                // power knob while YWC was closed, restoring YWC's last-saved
-                // value would silently overwrite their setting. Same pattern
-                // as MIC GAIN / Speech Processor / PROC LEVEL (Issue #16).
-                // The PC; query in readQueries below populates YWC's UI with
-                // whatever the radio currently has. Front-panel changes while
-                // YWC is running flow through the dispatcher's "PC" case.
+                // Mode (MD) is deliberately NOT restored from persisted state on
+                // connect (Issue #38, SP3L-Jacek 2026-06-18). The radio is the
+                // source of truth: if the operator changed mode on the front
+                // panel while YWC was closed, restoring YWC's last-saved value
+                // would silently overwrite their setting.
+                // The MD0;/MD1; queries (sent during InitializeRadioAsync's
+                // fast burst, and again in readQueries below) populate YWC's UI
+                // with whatever the radio currently has. Same anti-pattern as
+                // RF Power (#35), MIC GAIN / Speech Processor / PROC LEVEL (#16).
                 if (!string.IsNullOrEmpty(persistedState.AntennaA))
                 {
                     stateTasks.Add(multiplexer.SendCommandAsync($"AN0{persistedState.AntennaA};", "Initialization", stoppingToken)
@@ -223,20 +218,11 @@ namespace Yaesu_Web_Control.Services
                 // actually has. If the user changes a value via the YWC
                 // slider afterwards, that sends the command to the radio
                 // and the radio's state changes accordingly.
-                // IF Width is read from the radio on connect (SH queries after stateTasks) — not written here.
-                // Restore IF Shift
-                {
-                    var signA = persistedState.IfShiftA >= 0 ? '+' : '-';
-                    var absA = Math.Abs(persistedState.IfShiftA);
-                    stateTasks.Add(multiplexer.SendCommandAsync($"IS00{signA}{absA:D4};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.IfShiftA = persistedState.IfShiftA; }));
-                }
-                {
-                    var signB = persistedState.IfShiftB >= 0 ? '+' : '-';
-                    var absB = Math.Abs(persistedState.IfShiftB);
-                    stateTasks.Add(multiplexer.SendCommandAsync($"IS10{signB}{absB:D4};", "Initialization", stoppingToken)
-                        .ContinueWith(t => { if (!t.IsFaulted) radioStateService.IfShiftB = persistedState.IfShiftB; }));
-                }
+                // IF Width is read from the radio on connect (SH queries below) — not written here.
+                // IF Shift is also deliberately NOT restored from persisted state
+                // on connect (Issue #41, SP3L-Jacek 2026-06-18). Same anti-pattern
+                // as Mode / RF Power / MIC Gain. The IS0;/IS1; queries below
+                // populate YWC's UI with the radio's actual current values.
                 await Task.WhenAll(stateTasks);
 
                 // 4. Read actual radio state (frequencies, band, etc.) before marking initialized
@@ -289,6 +275,12 @@ namespace Yaesu_Web_Control.Services
                     }
                 }
 
+                // Query VS (VFO Select) — which VFO is the active operating
+                // (RX) VFO. Required for the single-receiver normal-mode
+                // greying to flip when the user presses A/B on the radio's
+                // front panel. See #34 R2 / dispatcher VS case.
+                await multiplexer.SendCommandAndDispatchAsync("VS;", "Initialization", stoppingToken);
+
                 // Query RX/TX clarifier on/off state (all models)
                 var rtResponse = await multiplexer.SendCommandAsync("RT;", "Initialization", stoppingToken);
                 if (!string.IsNullOrWhiteSpace(rtResponse) && rtResponse.StartsWith("RT"))
@@ -314,13 +306,24 @@ namespace Yaesu_Web_Control.Services
                 // These overwrite any defaults or persisted values with what the radio actually has.
                 var readQueries = new[]
                 {
+                    // Mode (#38 — added 2026-06-18 to ensure mode is always read
+                    // from the radio after the persisted-mode write was removed)
+                    "MD0;", "MD1;",          // Mode A/B
                     // IF / filter
-                    "SH00;", "SH10;",       // IF Width A/B
+                    // SH is read with "SH{vfo};" — NOT "SH{vfo}0;". The leading-
+                    // zero form "SH00;" / "SH10;" is interpreted by Yaesu radios
+                    // as a SET-to-zero on that VFO, which is silently ignored
+                    // (or worse). Reported as #40 by SP3L-Jacek 2026-06-18.
+                    "SH0;", "SH1;",          // IF Width A/B
+                    "IS0;", "IS1;",          // IF Shift A/B (#41 — was being
+                                             //   overwritten with persisted value
+                                             //   in stateTasks, now read instead)
                     // Receive controls A
                     "GT0;",                  // AGC A
                     "PA0;",                  // IPO/AMP A
                     "RA0;",                  // Attenuator A
                     "NR0;",                  // Noise Reduction A
+                    "RL0;",                  // NR Level / DNR algorithm A (#47)
                     "NB0;",                  // Noise Blanker A
                     "NL0;",                  // NB Level A
                     "BC0;",                  // Auto Notch A
@@ -329,9 +332,22 @@ namespace Yaesu_Web_Control.Services
                     "PA1;",                  // IPO/AMP B
                     "RA1;",                  // Attenuator B
                     "NR1;",                  // Noise Reduction B
+                    "RL1;",                  // NR Level / DNR algorithm B (#47)
                     "NB1;",                  // Noise Blanker B
                     "NL1;",                  // NB Level B
                     "BC1;",                  // Auto Notch B
+                    // Manual Notch (#46 — never queried before, default 1000 Hz / OFF
+                    // was shown regardless of radio state).
+                    // BP{vfo}0{xxx}; reads the on/off; BP{vfo}1{xxx}; reads the
+                    // frequency. The radio responds with the full BP message
+                    // including parameter and value.
+                    "BP00;", "BP01;",        // Manual Notch on/off + freq, VFO A
+                    "BP10;", "BP11;",        // Manual Notch on/off + freq, VFO B
+                    // Contour (#39 — never queried before, persisted value was
+                    // always shown). CO command has four sub-parameters per VFO:
+                    // 0=Contour on/off, 1=Contour freq, 2=APF on/off, 3=APF freq.
+                    "CO00;", "CO01;", "CO02;", "CO03;",   // Contour + APF, VFO A
+                    "CO10;", "CO11;", "CO12;", "CO13;",   // Contour + APF, VFO B
                     // RF Gain / Squelch
                     "RG0;", "RG1;",
                     "SQ0;", "SQ1;",
@@ -355,6 +371,77 @@ namespace Yaesu_Web_Control.Services
                 };
                 foreach (var q in readQueries)
                     await multiplexer.SendCommandAndDispatchAsync(q, "Initialization", stoppingToken);
+
+                // 4b. Single-receiver "ping-pong" -- read the OTHER VFO's
+                // P1=0-Fixed receive controls so YWC has both *A and *B
+                // populated. Without this, the inactive panel shows defaults
+                // (Jacek SP3L #34 pre5 — his proposed fix). Skipped on
+                // dual-receiver since FTdx101 reports per-VFO via P1.
+                if (radioStateService.IsSingleReceiver)
+                {
+                    var origVfo = radioStateService.ActiveVfo;
+                    var otherVfo = 1 - origVfo;
+                    logger.LogInformation(
+                        "[RadioInitializationService] Single-receiver ping-pong: temporarily switching to VFO {Other} to read its stored receive controls",
+                        otherVfo == 0 ? "A" : "B");
+
+                    await _hubContext.Clients.All.SendAsync(
+                        "VoiceStatusUpdate",
+                        new { State = "ReadingRadioSettings", Message = $"Reading VFO {(otherVfo == 0 ? "A" : "B")} settings…" },
+                        stoppingToken);
+                    await _hubContext.Clients.All.SendAsync(
+                        "RadioInfoStatus",
+                        $"Reading VFO {(otherVfo == 0 ? "A" : "B")} settings…",
+                        stoppingToken);
+
+                    // Switch active VFO. The dispatcher's VS case updates
+                    // RadioStateService.ActiveVfo synchronously when the
+                    // response is dispatched.
+                    await multiplexer.SendCommandAndDispatchAsync($"VS{otherVfo};", "Initialization", stoppingToken);
+                    await Task.Delay(150, stoppingToken); // settle
+
+                    // Re-query the P1=0-Fixed receive controls. Each response
+                    // routes through SetPerVfo's 300 ms buffer; by the time
+                    // the buffer flushes, ActiveVfo is still = otherVfo, so
+                    // they land in the right slot.
+                    string[] perVfoQueries = {
+                        "MD0;",          // mode is per-VFO at the CAT level but the radio
+                                         // updates display mode on swap so re-read for safety
+                        "GT0;",          // AGC
+                        "PA0;",          // IPO/AMP
+                        "RA0;",          // Attenuator
+                        "NR0;", "RL0;",  // NR + DNR level
+                        "NB0;", "NL0;",  // NB + NB level
+                        "BC0;",          // Auto Notch
+                        "BP00;", "BP01;",// Manual Notch on/off + freq
+                        "CO00;", "CO01;", "CO02;", "CO03;", // Contour + APF
+                        "SH0;",          // IF Width
+                        "IS0;",          // IF Shift
+                        "AG0;",          // AF Gain
+                        "RG0;",          // RF Gain
+                        "SQ0;",          // Squelch
+                    };
+                    foreach (var q in perVfoQueries)
+                        await multiplexer.SendCommandAndDispatchAsync(q, "Initialization", stoppingToken);
+
+                    // Wait for the buffered dispatches to drain (BufferDelayMs
+                    // in CatMessageDispatcher = 300 ms) plus a little headroom.
+                    await Task.Delay(400, stoppingToken);
+
+                    // Swap back to the original VFO.
+                    await multiplexer.SendCommandAndDispatchAsync($"VS{origVfo};", "Initialization", stoppingToken);
+                    await Task.Delay(150, stoppingToken);
+
+                    // Drain any belated broadcasts from the swap-back so they
+                    // land in origVfo's slot before we mark init complete.
+                    await Task.Delay(400, stoppingToken);
+
+                    await _hubContext.Clients.All.SendAsync(
+                        "RadioInfoStatus", "", stoppingToken);
+
+                    logger.LogInformation(
+                        "[RadioInitializationService] Ping-pong complete; both VFOs' receive-control state populated.");
+                }
 
                 // 5. Set IsInitialized = true FIRST to allow property changes to be persisted and broadcast
                 radioStateService.IsInitialized = true;

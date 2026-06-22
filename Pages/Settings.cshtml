@@ -1,6 +1,51 @@
 ﻿@page
 @model Yaesu_Web_Control.Pages.SettingsModel
 
+<style>
+    /* Collapsible Settings sections — native <details>/<summary> for
+       built-in keyboard accessibility (Enter/Space to toggle), built-in
+       screen-reader support (announces "expanded"/"collapsed"), and no
+       JavaScript required. Styled to look like Bootstrap cards. */
+    details.settings-section {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        margin-bottom: 1rem;
+        background: #fff;
+        overflow: hidden;
+    }
+    details.settings-section > summary {
+        padding: 0.75rem 1rem;
+        background: rgba(0,0,0,0.03);
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1.15rem;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        user-select: none;
+    }
+    details.settings-section > summary::-webkit-details-marker { display: none; }
+    details.settings-section > summary::before {
+        content: "▸";
+        display: inline-block;
+        transition: transform 0.15s ease;
+        font-size: 0.85em;
+        color: #6c757d;
+        flex-shrink: 0;
+    }
+    details.settings-section[open] > summary::before { transform: rotate(90deg); }
+    details.settings-section > summary:hover { background: rgba(0,0,0,0.06); }
+    details.settings-section > summary:focus-visible {
+        outline: 2px solid #0d6efd;
+        outline-offset: -2px;
+    }
+    details.settings-section > .section-body {
+        padding: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+</style>
+
 <div class="mt-4">
 
     @if (!string.IsNullOrEmpty(Model.StatusMessage))
@@ -157,14 +202,40 @@
     </div>
 
     <form method="post">
-    <div class="card">
-        <div class="card-header">
-            <h3>Configuration</h3>
+
+    <!-- Accessibility section -->
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-universal-access" aria-hidden="true"></i>&nbsp;Accessibility</summary>
+        <div class="section-body">
+            <p class="text-muted small mb-3">
+                Settings to make Yaesu Web Control easier to use for operators with disabilities.
+                The frequency display is fully keyboard-driven: focus it with Tab, then use ↑/↓ to step
+                the selected digit, ←/→ to move the selection, PageUp/PageDown for 10× steps, and
+                Home/End to jump to the most/least significant digit. Got a suggestion?
+                <a href="https://github.com/mm5agm/Yaesu_Web_Control/discussions" target="_blank" rel="noopener">Open a GitHub discussion</a>.
+            </p>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="showFrequencyArrowButtons" asp-for="Settings.ShowFrequencyArrowButtons" />
+                <label class="form-check-label" for="showFrequencyArrowButtons">
+                    Show frequency up/down arrow buttons
+                </label>
+                <div class="form-text">
+                    Adds ▲ ▼ buttons next to each VFO's frequency display. Each click steps the
+                    currently selected digit by 1 (the same action as the scroll-wheel or the ↑ / ↓
+                    keys). Useful if you cannot use a mouse wheel — e.g. head-tracking input,
+                    on-screen keyboard users, reduced-dexterity operators. Off by default to keep
+                    the main screen uncluttered for users who don't need them.
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h5 class="mb-3">Radio Connection</h5>
+    </details>
+
+    <!-- Radio & CAT -->
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-broadcast" aria-hidden="true"></i>&nbsp;Radio &amp; CAT</summary>
+        <div class="section-body">
+                <h5 class="mb-3">Radio Connection</h5>
                         <div class="mb-3">
                             <label asp-for="Settings.RadioModel" class="form-label">Radio Model</label>
                             <select asp-for="Settings.RadioModel" class="form-select">
@@ -290,9 +361,14 @@
                             </div>
                             <span asp-validation-for="Settings.BandPlan" class="text-danger"></span>
                         </div>
-                    </div>
-                    <div class="col-md-6">
-                        <h5 class="mb-3">Web Server</h5>
+        </div>
+    </details>
+
+    <!-- Web / HTTP -->
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-globe" aria-hidden="true"></i>&nbsp;Web / HTTP</summary>
+        <div class="section-body">
+                <h5 class="mb-3">Web Server</h5>
                         <div class="mb-3">
                             <label class="form-label">Network Interface</label>
                             <select asp-for="Settings.WebAddress" class="form-select" id="webAddressSelect">
@@ -330,23 +406,23 @@
                         </div>
                         <div class="alert alert-info" role="alert">
                             <i class="bi bi-app-indicator"></i>
-                            <strong>External Applications:</strong> Configure WSJT-X, JTAlert, and Log4OM on the 
+                            <strong>External Applications:</strong> Configure WSJT-X, JTAlert, and Log4OM on the
                             <a asp-page="/ApplicationSetup" class="alert-link">Application Setup</a> page.
                         </div>
-                    </div>
-                </div>
         </div>
-    </div>
+    </details>
+
     <!-- SDR Spectrum Display -->
-    <div class="card mt-4">
-        <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
-            <h4 class="mb-0"><i class="bi bi-broadcast-pin"></i> SDR Spectrum Display</h4>
-            <button type="button" class="btn btn-outline-light btn-sm"
-                    data-bs-toggle="modal" data-bs-target="#sdrHelpModal">
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary>
+            <i class="bi bi-broadcast-pin" aria-hidden="true"></i>&nbsp;SDR Spectrum Display
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
+                    data-bs-toggle="modal" data-bs-target="#sdrHelpModal"
+                    onclick="event.stopPropagation();">
                 <i class="bi bi-question-circle"></i> Help
             </button>
-        </div>
-        <div class="card-body">
+        </summary>
+        <div class="section-body">
             <p class="text-muted mb-3">
                 Connect your radio's <strong>IF output (RCA)</strong> to an SDR receiver. The spectrum
                 display shows the band around your current VFO frequency in real time.
@@ -461,16 +537,12 @@
                 </div>
             </div>
         </div>
-    </div>
+    </details>
 
     <!-- DX Cluster -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0"><i class="bi bi-globe2"></i> DX Cluster</h4>
-                </div>
-                <div class="card-body">
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-globe2" aria-hidden="true"></i>&nbsp;DX Cluster</summary>
+        <div class="section-body">
                     <p class="text-muted mb-3">
                         Connect to a DX cluster server to overlay DX spots on the SDR spectrum display.
                         Spots show callsigns at their reported frequencies; click a spot to QSY VFO A to it.
@@ -561,10 +633,8 @@
                             (without saving) and shows what it returns.
                         </small>
                     </div>
-                </div>
-            </div>
         </div>
-    </div>
+    </details>
 
     <!-- DX Cluster Test result modal -->
     <div class="modal fade" id="dxClusterTestModal" tabindex="-1" aria-labelledby="dxClusterTestModalLabel" aria-hidden="true">
@@ -590,13 +660,9 @@
     </div>
 
     <!-- CW Memory Messages -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0"><i class="bi bi-keyboard"></i> CW Memory Messages (M1–M5)</h4>
-                </div>
-                <div class="card-body">
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-keyboard" aria-hidden="true"></i>&nbsp;CW Memory Messages (M1–M5)</summary>
+        <div class="section-body">
                     <p class="text-muted small mb-3">
                         These messages can be sent from the CW panel on the main control page using the M1–M5 buttons.
                         Use <code>{CALL}</code> as a placeholder for your callsign (set in WSJT-X or similar software).
@@ -614,10 +680,8 @@
                                    placeholder="Message @(i+1)" />
                         </div>
                     }
-                </div>
-            </div>
         </div>
-    </div>
+    </details>
 
     <div class="mt-4 mb-4">
         <button type="submit" class="btn btn-primary btn-lg">
@@ -633,27 +697,30 @@
     </form>
 
     <!-- Backup / Restore — outside the main form so the import button doesn't trigger a save -->
-    <hr class="my-4" />
-    <h4><i class="bi bi-box-arrow-up"></i> Backup &amp; Restore</h4>
-    <p class="text-muted">
-        Download a single zip file containing everything you've customised in YWC — settings, memories, memory banks, calibration, and accessible-label overrides.
-        Use it to safeguard your configuration, move to a new PC, or share a setup with another operator.
-    </p>
-    <div class="d-flex flex-wrap gap-2 align-items-center">
-        <a class="btn btn-outline-primary" href="/api/backup/export">
-            <i class="bi bi-download"></i> Export full backup
-        </a>
-        <label class="btn btn-outline-warning mb-0" for="backupImportFile">
-            <i class="bi bi-upload"></i> Import full backup…
-        </label>
-        <input type="file" id="backupImportFile" accept="application/zip,.zip" hidden>
-        <span id="backupImportStatus" class="ms-2 small"></span>
-    </div>
-    <p class="text-muted small mt-2 mb-0">
-        Import overwrites the matching files in your user-data folder. Each replaced file is kept as a <code>.bak</code> so you can recover.
-        After importing, <strong>restart the app</strong> so the radio-connection, DX-cluster, SDR and rigctld services pick up the new values.
-        Radio state (live frequency, mode etc.) is not included in the backup — it resets to whatever the radio reports on next connect.
-    </p>
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-box-arrow-up" aria-hidden="true"></i>&nbsp;Backup &amp; Restore</summary>
+        <div class="section-body">
+            <p class="text-muted">
+                Download a single zip file containing everything you've customised in YWC — settings, memories, memory banks, calibration, and accessible-label overrides.
+                Use it to safeguard your configuration, move to a new PC, or share a setup with another operator.
+            </p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a class="btn btn-outline-primary" href="/api/backup/export">
+                    <i class="bi bi-download"></i> Export full backup
+                </a>
+                <label class="btn btn-outline-warning mb-0" for="backupImportFile">
+                    <i class="bi bi-upload"></i> Import full backup…
+                </label>
+                <input type="file" id="backupImportFile" accept="application/zip,.zip" hidden>
+                <span id="backupImportStatus" class="ms-2 small"></span>
+            </div>
+            <p class="text-muted small mt-2 mb-0">
+                Import overwrites the matching files in your user-data folder. Each replaced file is kept as a <code>.bak</code> so you can recover.
+                After importing, <strong>restart the app</strong> so the radio-connection, DX-cluster, SDR and rigctld services pick up the new values.
+                Radio state (live frequency, mode etc.) is not included in the backup — it resets to whatever the radio reports on next connect.
+            </p>
+        </div>
+    </details>
 </div>
 
 <script>

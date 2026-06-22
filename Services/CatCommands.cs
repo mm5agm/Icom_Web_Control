@@ -254,7 +254,7 @@
         public static readonly string[] InitializationCommands = new[]
         {
             // Frequencies and VFO
-            "FA;", "FB;", "FT;",
+            "FA;", "FB;", "FT;", "VS;",
             // Mode
             "MD0;", "MD1;",
             // Power and RF
@@ -268,7 +268,7 @@
             // AF and Mic gain
             "AG0;", "AG1;", "MG;",
             // Noise reduction and blanker
-            "NR0;", "NR1;", "NB0;", "NB1;", "NL0;",
+            "NR0;", "NR1;", "RL0;", "RL1;", "NB0;", "NB1;", "NL0;", "NL1;",
             // Notch (auto and manual)
             "CT0;", "CT1;", "ML0;", "ML1;",
             // DSP filter width and IF shift (future: DSP filter controls)
