@@ -64,13 +64,19 @@
     async function stopListening() {
         if (!pressed) return;
         pressed = false;
+        // Reset the visual locally as the user releases the button. We used
+        // to wait for SignalR to deliver an Idle VoiceStatusUpdate, but if
+        // the broadcast doesn't reach this client (connection blip, race
+        // with the .on() handler attaching, etc.) the button stays blue
+        // forever. Local idle now; any in-flight recognition that's still
+        // about to come back will briefly retint the button as Heard ->
+        // Executing -> Idle, which is fine.
+        setIdleVisual();
         try {
             await fetch('/api/voice/stop', { method: 'POST' });
         } catch (e) {
             console.error('[voice] stop failed', e);
         }
-        // Visual state settles back to idle when SignalR delivers the
-        // Idle status update (after the engine drains any pending audio).
     }
 
     btn.addEventListener('mousedown', startListening);

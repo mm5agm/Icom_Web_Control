@@ -2201,8 +2201,8 @@ The first release covers six command families, all operating on **VFO A**:
 | Change band | "go to twenty metres", "switch to forty metres" | VFO A → that band's default frequency (e.g. 20 m → 14.074 MHz, 40 m → 7.074 MHz — the common FT8 hangouts) |
 | Set mode | "set mode U S B", "mode L S B", "set mode C W" | VFO A mode change |
 | Swap VFOs | "swap V F O", "swap A and B" | A ↔ B |
-| Step up | "tune up", "step up", "frequency up", "nudge up" | VFO A +1 kHz |
-| Step down | "tune down", "step down", "frequency down", "nudge down" | VFO A −1 kHz |
+| Step up | "tune up", "step up", "frequency up", "nudge up" | VFO A +10 kHz |
+| Step down | "tune down", "step down", "frequency down", "nudge down" | VFO A −10 kHz |
 
 A few notes on phrasing:
 
@@ -2250,8 +2250,8 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 - If the log shows `Rejected (best alt: '<your phrase>')` and your phrase looks correct, the grammar wording isn't matching what you said. Try one of the alternative phrasings listed in [§17.1](#171-what-you-can-say), or open a [GitHub discussion](https://github.com/mm5agm/Yaesu_Web_Control/discussions) and propose a new phrasing.
 
 **"Tune up" doesn't seem to do much.**
-- It does — VFO A steps up by exactly **1 kHz** per command. On a 14.074 MHz display only the last kHz digit changes, which is easy to miss. Watch the **VFO A panel**, not VFO B (voice control always targets VFO A in this release).
-- A larger step size is on the roadmap for v2; for big tuning jumps use "set frequency to …" instead.
+- It does — VFO A steps up by exactly **10 kHz** per command. Watch the **VFO A panel**, not VFO B (voice control always targets VFO A in this release). If you need bigger jumps use "set frequency to …" or "go to … metres".
+- A "step by your currently-selected digit" mode is on the roadmap for v2; for now the step is fixed at 10 kHz.
 
 **Speech engine works for a while then stops responding.**
 - Restart YWC. The engine is held alive across recognitions, and on rare Windows audio-stack hiccups it can lose its mic handle. Restart is the cleanest fix; if you see this often, report it on GitHub with the log.

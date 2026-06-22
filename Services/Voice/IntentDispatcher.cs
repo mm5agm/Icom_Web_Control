@@ -191,9 +191,13 @@ namespace Yaesu_Web_Control.Services.Voice
         // -- NudgeFrequency ------------------------------------------------
 
         // Fixed step for v1. Future: read the frontend's currently-selected
-        // digit and use that step. For now 1 kHz is a sensible default that
-        // matches the common "step the kHz digit" workflow.
-        private const long NudgeStepHz = 1_000;
+        // digit and use that step. 10 kHz was picked over 1 kHz so each
+        // "tune up" / "nudge up" press produces a visible movement on the
+        // display -- 1 kHz only changes the rightmost-but-three digit and
+        // is easy to miss when you're driving by voice rather than watching
+        // the screen. If 10 kHz turns out to be too coarse for SSB use, the
+        // v2 "step by selected digit" plan is the proper fix.
+        private const long NudgeStepHz = 10_000;
 
         private async Task<bool> NudgeFrequencyAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
