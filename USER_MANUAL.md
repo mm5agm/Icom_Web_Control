@@ -69,6 +69,7 @@
     - 16.4 [NVDA](#164-nvda)
     - 16.5 [Windows Narrator](#165-windows-narrator)
     - 16.6 [Customising Accessible Labels](#166-customising-screen-reader-labels)
+    - 16.7 [Frequency tuning by keyboard or buttons](#167-frequency-tuning-by-keyboard-or-buttons)
 
 ---
 
@@ -1695,8 +1696,6 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 |---|---|
 | **F** | Enter full-screen mode |
 | **Esc** | Exit full-screen mode |
-| Click a frequency digit | Select that digit for editing |
-| Mouse wheel (on selected digit) | Increment or decrement the digit |
 | Mouse wheel (on spectrum) | Tune VFO A up or down in 1 kHz steps |
 | Click on spectrum | Tune VFO A to the clicked frequency |
 | **Tab** (in band buttons) | Move focus into the band button group |
@@ -1708,6 +1707,27 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 | **Delete** (frequency keyboard open) | Clear all digits |
 | **↵ Enter** (frequency keyboard open) | Send the entered frequency to the radio |
 | **Esc** (frequency keyboard open) | Close the keyboard without changing frequency |
+
+**Frequency display — changing the value digit by digit.** Every VFO frequency display is a "digit-pickable" control. You select a digit (it highlights yellow), then step it up or down. Three input methods reach the same set of actions, so pick whichever suits you:
+
+| Input | Action | What happens |
+|---|---|---|
+| **Click** a digit | Select | That digit highlights yellow. The next step / arrow / button action acts on it. |
+| **Mouse wheel** over a digit | Select + step | Wheels up = +1, wheels down = −1 on the digit under the cursor. |
+| **Tab** into the freq display | Focus the display | A blue outline appears around the whole display. Now the keyboard keys below act on it. |
+| **ArrowUp** / **ArrowDown** | Step selected digit by ±1 | If no digit is currently highlighted, the first press just highlights the kHz digit (4th from the right) — a second press then steps it. This avoids accidentally changing a digit you can't see is selected. |
+| **PageUp** / **PageDown** | Step selected digit by ±10 | Carries propagate up — "9 + 1" rolls over into the next digit left. |
+| **ArrowLeft** / **ArrowRight** | Move the selection cursor | Highlights the digit to the left / right. Does not change the frequency. |
+| **Home** | Jump to the most-significant digit | Selection moves to the **leftmost** digit (tens of MHz). |
+| **End** | Jump to the least-significant digit | Selection moves to the **rightmost** digit (Hz). |
+| **▲ / ▼** buttons | Step the selected digit by ±1 | Only visible if Settings → Accessibility → **Show frequency up/down arrow buttons** is on. Each click does the same as one ArrowUp / ArrowDown. If no digit is selected, the first click auto-selects the kHz digit and steps it in one go (buttons are a deliberate action — unlike the keyboard, they don't need a "show me the cursor" first press). |
+| Click anywhere outside the display + arrow buttons | Deselect | The selection is cleared; the next ArrowUp will start over with the "first press picks the kHz digit" behaviour. |
+
+A few extra notes:
+
+- **Click-tuned changes are debounced** — when you stop wheeling / pressing for ~600 ms, the new frequency is sent to the radio. Holding ArrowUp for a sustained step (autorepeat) works fine; it sends one CAT command per ~600 ms of stillness rather than one per keystroke.
+- **Selection persists** across polling cycles — you can press ArrowUp repeatedly and the selection stays on the same digit. The radio's confirmation of one step doesn't blow your selection away.
+- **The selected digit highlights yellow** when an actual digit is selected. The whole display also gains a blue focus ring when it has keyboard focus (e.g. you tabbed into it).
 
 **Browser zoom — make everything bigger or smaller.** YWC is a web page, so it honours your browser's standard zoom keyboard shortcuts. This is the easiest way to make controls more readable on a high-resolution monitor or to fit more on a small tablet screen:
 
@@ -2176,6 +2196,27 @@ On the Accessibility Labels page, replace each label value with the French equiv
 | Spectrum Display | Span 1 MHz button | Spændvidde 1 MHz |
 | Spectrum Display | Span 2 MHz button | Spændvidde 2 MHz |
 | Navigation | Application name / home link | Yaesu Web Control startside |
+
+---
+
+### 16.7 Frequency tuning by keyboard or buttons
+
+If you can't use a mouse wheel — head-tracking input, on-screen keyboard users, reduced-dexterity operators — the VFO frequency display is fully keyboard-driven. You can also enable two on-screen ▲ / ▼ buttons that step the selected digit by one.
+
+**Enable the on-screen ▲ / ▼ buttons (off by default):** Settings → Accessibility → tick **Show frequency up/down arrow buttons** → Save. Two small buttons appear next to each VFO's frequency display.
+
+**The full keyboard / button reference is in §13 Keyboard Shortcuts** under "Frequency display — changing the value digit by digit". The short version:
+
+- **Tab** into the frequency display to focus it (blue outline appears).
+- **ArrowUp / ArrowDown** step the selected digit by ±1.
+- **PageUp / PageDown** step by ±10.
+- **ArrowLeft / ArrowRight** move the selection cursor sideways.
+- **Home / End** jump the selection to the **leftmost** (most significant — tens of MHz) or **rightmost** (least significant — Hz) digit.
+- The first arrow press when nothing is selected just highlights the kHz digit — a second press then steps it. This protects against an accidental ArrowUp changing the radio without you realising a digit was selected.
+- Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown).
+- Clicking outside the display deselects.
+
+Originally requested by Yuri W4YSW. Shipped in v2.3.9.
 
 ---
 
