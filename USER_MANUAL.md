@@ -1768,8 +1768,11 @@ The fastest way to get a bug fixed is a good report. YWC has three features that
 - DX cluster host and your cluster login callsign (if configured)
 - Browser and version
 - .NET runtime version and Windows version
+- The firmware versions of the developer's bench radio (so you can compare against yours — see below)
 
 That gives the developer everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
+
+**Radio firmware versions worth knowing.** Above the Diagnostics block on the About page there's a section titled **Developer's tested radio firmware** that lists Colin's bench radio firmware values. Some YWC behaviours depend on the radio's firmware version — for example, the FTdx101's IF Width dropdown gained 3.5 kHz and 4.0 kHz options only in firmware released after the 2023 CAT manual was published. If you're hitting a CAT-related bug, comparing your firmware against the listed values quickly tells you whether a Yaesu firmware difference might be involved. To read your own firmware on an FTdx101MP / FTdx101D: **Func → Extension Settings → Soft Version** on the radio's front panel. Include any firmware mismatch in your bug report.
 
 ![The About page — version + release date at top, Resources section, Diagnostics block with the user's environment summary, and the Copy diagnostics + Report a bug buttons that send everything straight into a GitHub bug-report form](pictures/AboutPage.png)
 

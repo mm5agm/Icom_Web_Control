@@ -54,6 +54,38 @@
 
     <hr/>
 
+    <h5>Developer's tested radio firmware</h5>
+    <p class="text-muted small">
+        YWC is developed and tested against my own bench radio. Some YWC behaviours
+        depend on the radio's firmware version &mdash; for example, the FTdx101's IF Width
+        dropdown gained 3.5 kHz and 4.0 kHz options only in firmware released after the
+        2023 CAT manual was published. If you hit a CAT-related bug, comparing your
+        firmware versions against the ones below helps work out whether a Yaesu firmware
+        difference is involved before raising a bug report.
+    </p>
+    <p class="text-muted small mb-2">
+        <strong>Where to find your firmware versions:</strong>
+        on the FTdx101MP / FTdx101D, press <strong>Func &rarr; Extension Settings &rarr; Soft Version</strong>
+        on the radio's front panel.
+    </p>
+    @foreach (var radio in Model.TestedFirmware)
+    {
+        <div class="card mb-3">
+            <div class="card-header py-1 small fw-semibold">@radio.Key (developer's radio)</div>
+            <div class="card-body py-2">
+                <dl class="row mb-0 small">
+                    @foreach (var v in radio.Value)
+                    {
+                        <dt class="col-sm-4">@v.Key</dt>
+                        <dd class="col-sm-8"><code>@v.Value</code></dd>
+                    }
+                </dl>
+            </div>
+        </div>
+    }
+
+    <hr/>
+
     <h5>Diagnostics</h5>
     <p class="text-muted small">
         Click <strong>Copy diagnostics</strong> below and paste the result into any bug report &mdash;
@@ -71,7 +103,8 @@ Browser        <span id="diagBrowser">(detecting…)</span>
 .NET runtime   @Model.DotNetVersion
 Operating sys  @Model.OsDescription
 CPU            @Model.Cpu
-Memory         @Model.Memory</pre>
+Memory         @Model.Memory
+Tested fw      @Model.TestedFirmwareSummary</pre>
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <button type="button" class="btn btn-sm btn-primary" id="copyDiagBtn">Copy diagnostics</button>
         <button type="button" class="btn btn-sm btn-outline-danger" id="reportBugBtn"

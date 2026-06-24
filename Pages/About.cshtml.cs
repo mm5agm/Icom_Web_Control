@@ -31,6 +31,17 @@ namespace Yaesu_Web_Control.Pages
         public string OsDescription     { get; private set; } = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
         public string Cpu               { get; private set; } = ReadCpuInfo();
         public string Memory            { get; private set; } = ReadMemoryInfo();
+        public IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> TestedFirmware { get; }
+            = AppVersion.TestedFirmware;
+
+        /// <summary>
+        /// One-line summary used in the diagnostics text block (which gets
+        /// pasted into bug reports). Format: "FTdx101MP: Main=V01-28 Display=V01-51 ...".
+        /// Multiple radios joined with " | " on the same line.
+        /// </summary>
+        public string TestedFirmwareSummary => string.Join(" | ",
+            AppVersion.TestedFirmware.Select(r =>
+                $"{r.Key}: {string.Join(" ", r.Value.Select(kv => $"{kv.Key.Replace(" ", "")}={kv.Value}"))}"));
 
         public async Task OnGetAsync()
         {
