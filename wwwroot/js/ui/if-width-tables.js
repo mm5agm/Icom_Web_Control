@@ -37,16 +37,26 @@ function modeGroup(mode) {
 const TABLES = {
     'FTdx101MP': {
         ssb: {
+            // Codes 0-21 per the 2308-L CAT manual; codes 22 and 23 verified
+            // empirically on Colin's FTdx101MP (issue #50) — current firmware
+            // extends the SSB filter set to 3.5 kHz and 4 kHz.
             0: 'default',
             1: 300, 2: 400, 3: 600, 4: 850, 5: 1100, 6: 1200, 7: 1500, 8: 1650,
             9: 1800, 10: 1950, 11: 2100, 12: 2200, 13: 2300, 14: 2400, 15: 2500,
-            16: 2600, 17: 2700, 18: 2800, 19: 2900, 20: 3000, 21: 3200
+            16: 2600, 17: 2700, 18: 2800, 19: 2900, 20: 3000, 21: 3200,
+            22: 3500, 23: 4000
         },
         cw: {
+            // Codes 0-18 per the 2308-L CAT manual; codes 19/20/21 verified
+            // empirically on Colin's FTdx101MP (issue #50) — current firmware
+            // extends the CW filter set to 3.2 / 3.5 / 4.0 kHz. Same kHz
+            // values as SSB codes 21/22/23 but at different code numbers
+            // (the SH command is mode-aware, not a flat code→Hz lookup).
             0: 'default',
             1: 50, 2: 100, 3: 150, 4: 200, 5: 250, 6: 300, 7: 350, 8: 400,
             9: 450, 10: 500, 11: 600, 12: 800, 13: 1200, 14: 1400, 15: 1700,
-            16: 2000, 17: 2400, 18: 3000
+            16: 2000, 17: 2400, 18: 3000,
+            19: 3200, 20: 3500, 21: 4000
         }
     },
     'FTdx10': {

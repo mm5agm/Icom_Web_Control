@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.8-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.9-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -169,6 +169,54 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 ---
 
 ## Release Notes
+
+## 2026-06-22 - v2.3.9
+
+The release that finally closes out Jacek SP3L's R1–R12 single-receiver UI spec on [#34](https://github.com/mm5agm/Yaesu_Web_Control/issues/34) (a saga that ran from pre1 to pre8 across eight pre-release iterations — thank you Jacek), plus a major frequency-keyboard accessibility round driven by Yuri W4YSW, plus the radio-state init cluster (#38–#47) that was making YWC start up out of sync with the radio on a bunch of controls.
+
+### Single-receiver radio UI — R1–R12 fully landed
+
+The v2.3.8 release implemented Jacek SP3L's R1–R12 spec for the FTdx10 / FT-710 / FTDX3000 / FT-991A single-receiver path. Eight pre-releases of v2.3.9 closed out the rough edges that Jacek's hands-on testing surfaced:
+
+- **VFO-B-as-active case (R7/R8).** Pressing Split with VFO-B as the receive VFO was showing panel A as white (should be grey — TX) and panel B as grey (should be white — RX), inverted from what the radio was actually doing. The fix is a simpler invariant — white = active RX VFO, grey = the other one, in both normal and split mode — applied to panel coloring, SPLIT TX badge position, and red card border.
+- **Outbound P1=0 routing.** When the user clicked a receive-control on a single-receiver radio (Contour, APF, IF Width, IF Shift, AF Gain, NR, NB, NB Level, NR Level, Auto Notch, Manual Notch on/off + freq, AGC, IPO, Attenuator, RF Gain, Squelch, IF Low Cut), the command was being sent with the wrong P1 parameter on radios where P1 is hardcoded to 0. Thirteen endpoints fixed in one pass.
+- **TX button position in split mode.** The TX button now sits on the TX VFO's panel even when the FT command doesn't move (FTdx10 split-mode quirk).
+- **SPLIT TX badge follows the actual TX VFO.** Was previously hardcoded to VFO B's header and never shown/hidden by code.
+- **S-meter relocated to the top meter row.** Yaesu radios only have one calibrated S-meter (tied to MAIN on FTdx101, the only physical receiver on single-receiver rigs), so showing it once at the top is the honest presentation. The per-VFO S-meter gauges are gone; the 30-second history strip moves with it.
+- **Transient S-meter zero-flash debounced.** The radio occasionally returns a transient zero to `SM0;` during FA auto-info bursts (typically while the dial is being turned). Three-consecutive-zeros debounce on the *zero* path only — non-zero readings still propagate instantly so the needle stays snappy when there's signal.
+
+### Frequency display accessibility — Yuri W4YSW
+
+The VFO frequency display is now fully keyboard-driven. Tab into a display (a blue focus ring appears), then:
+
+- **ArrowUp / ArrowDown** — step the selected digit by ±1.
+- **PageUp / PageDown** — step the selected digit by ±10.
+- **ArrowLeft / ArrowRight** — move the selection cursor.
+- **Home / End** — jump to the leftmost (most significant, tens of MHz) or rightmost (least significant, Hz) digit.
+
+First arrow-press with no digit selected just highlights the kHz digit — a second press steps it. This protects against an accidental ArrowUp changing the radio without you realising a digit was selected.
+
+Optional on-screen **▲/▼ buttons** sit next to each VFO's frequency display when **Settings → Accessibility → Show frequency up/down arrow buttons** is on. Each click steps the selected digit by 1, the same as a single ArrowUp/ArrowDown. Off by default so users with mouse wheels see the uncluttered default. Useful for head-tracking input, on-screen keyboard users, and reduced-dexterity operators.
+
+The selected digit highlights yellow. Selection persists across the ~10 Hz polling cycles so you can press ArrowUp ten times in a row and the selection stays put. Click outside the display + ▲/▼ controls to deselect.
+
+USER_MANUAL chapter 13 (Keyboard Shortcuts) has the full reference table; §16.7 covers the accessibility-focused summary.
+
+### Radio-state init fixes (Jacek SP3L #38–#47)
+
+A cluster of bug reports from Jacek showing YWC starting up displaying stale values for things that the radio actually had set differently — IPO/AMP showing OFF when the radio was on AMP1, Auto Notch showing OFF, Manual Notch showing OFF, NB OFF, NR OFF, etc.
+
+- **Radio init no longer overwrites radio state on connect.** Root cause of #40–#46. YWC was reading the radio state correctly during connect, then immediately overwriting most of it from persisted-state-on-disk. Fixed: persisted state is now a fallback only for fields the radio doesn't report, not a blanket overwrite.
+- **Dropdowns render with actual radio state on first paint.** Was rendering the persisted state and only updating after the first SignalR push, leading to a visible flicker.
+- **NR / DNR Level (RL command) added, with FTdx10-aware UI rework (#47).** The level slider was missing; the FTdx10 has just one NR with a level whereas FTdx101 has NR1 / NR2 modes. UI now adapts per model.
+- **DNR label.** Was rendered as "no." rather than "No." (the proper abbreviation of "Number").
+
+### Other improvements
+
+- **Settings page reorganised as collapsible sections.** Each settings category is a native HTML `<details>`/`<summary>` block — built-in keyboard accessibility, screen-reader support, and no JavaScript required. The Accessibility section is the first one, just below the network access URLs.
+- **USER_MANUAL §15.7 — what the TX button does.** Common confusion for new users (raised by Luis LU1CBQ on Groups.io): the TX button sends `TX1;` to the radio to put it in transmit mode without engaging YWC's audio routing, useful for tune-up / external amplifier testing / digital-mode latency checks. The §15.7 FAQ entry explains this.
+
+---
 
 ## 2026-06-17 - v2.3.8
 

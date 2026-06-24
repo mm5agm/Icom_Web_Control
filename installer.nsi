@@ -1,6 +1,6 @@
 !define APPNAME "Yaesu Web Control"
 !define COMPANY "MM5AGM"
-!define VERSION "2.3.9-pre8"
+!define VERSION "2.3.9"
 !define INSTALLDIR "$PROGRAMFILES64\${COMPANY}\${APPNAME}"
 Name "${APPNAME} ${VERSION}"
 OutFile "Yaesu_Web_Control_Setup.exe"
