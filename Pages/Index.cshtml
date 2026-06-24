@@ -67,17 +67,19 @@
         }
         : new (string Value, string Label)[]
         {
-            // FTdx101MP/D SH codes per Table 3 of the CAT manual.
-            // Code 0 is the radio's mode-dependent default (3 kHz with a 3 kHz roofing filter
-            // in SSB); codes 1-21 run narrow→wide. Same command structure as the FTdx10
-            // but with slightly different bandwidths at the wide end.
+            // FTdx101MP/D SH codes. The 2308-L CAT manual documents 0-21; current
+            // firmware (verified empirically by Colin on the FTdx101MP, #50)
+            // extends to code 23 = 4.0 kHz, with code 22 = 3.5 kHz between them.
+            // Code 0 is the radio's mode-dependent default (3 kHz with a 3 kHz
+            // roofing filter in SSB); codes 1-21 run narrow→wide as per the
+            // manual, then 22/23 add the wider SSB filters.
             ("0","3.0 kHz"),
             ("1","300 Hz"), ("2","400 Hz"), ("3","600 Hz"), ("4","850 Hz"),
             ("5","1.1 kHz"), ("6","1.2 kHz"), ("7","1.5 kHz"), ("8","1.65 kHz"),
             ("9","1.8 kHz"), ("10","1.95 kHz"), ("11","2.1 kHz"), ("12","2.2 kHz"),
             ("13","2.3 kHz"), ("14","2.4 kHz"), ("15","2.5 kHz"), ("16","2.6 kHz"),
             ("17","2.7 kHz"), ("18","2.8 kHz"), ("19","2.9 kHz"), ("20","3.0 kHz"),
-            ("21","3.2 kHz")
+            ("21","3.2 kHz"), ("22","3.5 kHz"), ("23","4.0 kHz")
         };
     string ifWidthDefaultA = isFtdx10 ? "0" : isFt710 ? "12" : isFtdx3000 ? "14" : "0";
     string ifWidthDefaultB = isFtdx10 ? "0" : isFt710 ? "12" : isFtdx3000 ? "14" : "0";
@@ -1765,7 +1767,7 @@
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
         import { FilterScopePanel }    from "/js/ui/filter-scope-panel.js?v=2";
-        import "/js/ui/if-width-tables.js?v=1";
+        import "/js/ui/if-width-tables.js?v=3";
         import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=5";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
