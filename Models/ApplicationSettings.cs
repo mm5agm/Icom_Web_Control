@@ -138,6 +138,24 @@
         // so users with mouse wheels see the uncluttered default layout.
         // Yuri W4YSW request 2026-06-17.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
+
+        // ── Voice Control (in-process SAPI) ───────────────────────────────
+        // When true, the navbar mic button is shown and the SAPI recogniser
+        // engages on PTT. Default OFF -- voice control is opt-in so users
+        // who didn't ask for it don't get surprise mic-permission prompts
+        // and don't pay the small CPU cost of holding a SAPI engine alive.
+        // v2.4.0 feature (replaces the parked Alexa work). See
+        // docs/VoiceControl/v1-plan.md.
+        public bool VoiceControlEnabled { get; set; } = false;
+
+        // After every recognised voice command, speak a confirmation phrase
+        // ("Move to fourteen point zero seven four megahertz, successful")
+        // back through the PC's default audio output. Default ON when voice
+        // control is enabled -- key accessibility feature for partially-
+        // sighted operators (Yuri W4YSW, Thomas OZ1JTE) who can't see the
+        // screen to know whether a CAT command landed. Users who find it
+        // chatty can disable here without disabling voice control itself.
+        public bool VoiceSpokenConfirmationEnabled { get; set; } = true;
     }
 
     public class RadioState
