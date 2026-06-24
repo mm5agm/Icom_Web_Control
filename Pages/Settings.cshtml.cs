@@ -224,6 +224,7 @@ namespace Yaesu_Web_Control.Pages
 
                 // Voice Control (v1)
                 current.VoiceControlEnabled = Settings.VoiceControlEnabled;
+                current.VoiceSpokenConfirmationEnabled = Settings.VoiceSpokenConfirmationEnabled;
 
                 await _settingsService.SaveSettingsAsync(current);
 

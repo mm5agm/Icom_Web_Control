@@ -147,6 +147,15 @@
         // v2.4.0 feature (replaces the parked Alexa work). See
         // docs/VoiceControl/v1-plan.md.
         public bool VoiceControlEnabled { get; set; } = false;
+
+        // After every recognised voice command, speak a confirmation phrase
+        // ("Move to fourteen point zero seven four megahertz, successful")
+        // back through the PC's default audio output. Default ON when voice
+        // control is enabled -- key accessibility feature for partially-
+        // sighted operators (Yuri W4YSW, Thomas OZ1JTE) who can't see the
+        // screen to know whether a CAT command landed. Users who find it
+        // chatty can disable here without disabling voice control itself.
+        public bool VoiceSpokenConfirmationEnabled { get; set; } = true;
     }
 
     public class RadioState

@@ -320,9 +320,10 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.
 
 // Voice control (in-process SAPI). VoiceControlService is the IHostedService
 // that owns the SpeechRecognitionEngine; IntentDispatcher maps recognised
-// intents to CAT actions; VoiceController exposes /api/voice/*. See
-// docs/VoiceControl/v1-plan.md.
+// intents to CAT actions; VoiceTtsService speaks confirmation phrases;
+// VoiceController exposes /api/voice/*. See docs/VoiceControl/v1-plan.md.
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.IntentDispatcher>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceTtsService>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceControlService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Voice.VoiceControlService>());
 

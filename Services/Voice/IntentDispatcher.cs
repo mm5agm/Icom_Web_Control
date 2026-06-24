@@ -34,7 +34,7 @@ namespace Yaesu_Web_Control.Services.Voice
         /// known AND successfully sent to the radio; false if the intent
         /// name is unknown or arguments are invalid.
         /// </summary>
-        public async Task<bool> DispatchAsync(
+        public async Task<DispatchResult> DispatchAsync(
             string intent,
             IReadOnlyDictionary<string, object> parameters,
             CancellationToken cancellationToken = default)
@@ -54,37 +54,38 @@ namespace Yaesu_Web_Control.Services.Voice
                     case "NudgeFrequency": return await NudgeFrequencyAsync(parameters, cancellationToken);
                     default:
                         _logger.LogWarning("[IntentDispatcher] Unknown intent: {Intent}", intent);
-                        return false;
+                        return new DispatchResult(false, "Unknown command");
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[IntentDispatcher] Failed to dispatch intent {Intent}", intent);
-                return false;
+                return new DispatchResult(false, intent);
             }
         }
 
         // -- SetFrequency --------------------------------------------------
 
-        private async Task<bool> SetFrequencyAsync(
+        private async Task<DispatchResult> SetFrequencyAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!TryGetLong(args, "hz", out var hz))
             {
                 _logger.LogWarning("[Voice] SetFrequency missing/invalid hz parameter");
-                return false;
+                return new DispatchResult(false, "Set frequency");
             }
+            var phrase = $"Move to {FormatFrequencyForSpeech(hz)}";
             // 30 kHz - 75 MHz: same bounds as the HTTP SetFrequencyA endpoint.
             if (hz < 30_000 || hz > 75_000_000)
             {
                 _logger.LogWarning("[Voice] SetFrequency {Hz} out of range", hz);
-                return false;
+                return new DispatchResult(false, phrase);
             }
             var command = $"FA{hz:D9};";
             await _catClient.SendCommandAsync(command, "Voice", ct);
             _state.FrequencyA = hz;
             _logger.LogInformation("[Voice] SetFrequency -> {Hz} Hz", hz);
-            return true;
+            return new DispatchResult(true, phrase);
         }
 
         // -- SetBand -------------------------------------------------------
@@ -110,35 +111,36 @@ namespace Yaesu_Web_Control.Services.Voice
             [4]   = 70_154_000,
         };
 
-        private async Task<bool> SetBandAsync(
+        private async Task<DispatchResult> SetBandAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!TryGetLong(args, "metres", out var metres))
             {
                 _logger.LogWarning("[Voice] SetBand missing/invalid metres parameter");
-                return false;
+                return new DispatchResult(false, "Change band");
             }
+            var phrase = $"Move to {metres} metres";
             if (!BandDefaultsHz.TryGetValue(metres, out var hz))
             {
                 _logger.LogWarning("[Voice] SetBand: no default frequency for {Metres}m", metres);
-                return false;
+                return new DispatchResult(false, phrase);
             }
             var command = $"FA{hz:D9};";
             await _catClient.SendCommandAsync(command, "Voice", ct);
             _state.FrequencyA = hz;
             _logger.LogInformation("[Voice] SetBand -> {Metres}m -> {Hz} Hz", metres, hz);
-            return true;
+            return new DispatchResult(true, phrase);
         }
 
         // -- SetMode -------------------------------------------------------
 
-        private async Task<bool> SetModeAsync(
+        private async Task<DispatchResult> SetModeAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!args.TryGetValue("mode", out var modeObj) || modeObj is not string mode)
             {
                 _logger.LogWarning("[Voice] SetMode missing/invalid mode parameter");
-                return false;
+                return new DispatchResult(false, "Set mode");
             }
             // CatCommands.FormatMode handles the Yaesu-mode-string -> MD code
             // translation. Voice always targets VFO A in v1.
@@ -146,15 +148,16 @@ namespace Yaesu_Web_Control.Services.Voice
             await _catClient.SendCommandAsync(command, "Voice", ct);
             _state.ModeA = mode;
             _logger.LogInformation("[Voice] SetMode -> {Mode}", mode);
-            return true;
+            return new DispatchResult(true, $"Mode {ModeForSpeech(mode)}");
         }
 
         // -- SwapVFO -------------------------------------------------------
 
-        private async Task<bool> SwapVfoAsync(CancellationToken ct)
+        private async Task<DispatchResult> SwapVfoAsync(CancellationToken ct)
         {
             var settings = await _settings.GetSettingsAsync();
             var isSingleReceiver = RadioCapabilities.IsSingleReceiver(settings.RadioModel);
+            const string phrase = "Swap V F O";
 
             if (isSingleReceiver)
             {
@@ -169,14 +172,14 @@ namespace Yaesu_Web_Control.Services.Voice
                     !TryParseFreqResponse(fbRaw, "FB", out var fb))
                 {
                     _logger.LogWarning("[Voice] SwapVFO: couldn't parse FA/FB readback");
-                    return false;
+                    return new DispatchResult(false, phrase);
                 }
                 await _catClient.SendCommandAsync($"FA{fb:D9};", "Voice", ct);
                 await _catClient.SendCommandAsync($"FB{fa:D9};", "Voice", ct);
                 _state.FrequencyA = fb;
                 _state.FrequencyB = fa;
                 _logger.LogInformation("[Voice] SwapVFO (fake) -> A={A}, B={B}", fb, fa);
-                return true;
+                return new DispatchResult(true, phrase);
             }
             else
             {
@@ -184,7 +187,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 // swap and broadcasts new FA/FB via auto-info.
                 await _catClient.SendCommandAsync("SV;", "Voice", ct);
                 _logger.LogInformation("[Voice] SwapVFO (SV;)");
-                return true;
+                return new DispatchResult(true, phrase);
             }
         }
 
@@ -199,26 +202,27 @@ namespace Yaesu_Web_Control.Services.Voice
         // v2 "step by selected digit" plan is the proper fix.
         private const long NudgeStepHz = 10_000;
 
-        private async Task<bool> NudgeFrequencyAsync(
+        private async Task<DispatchResult> NudgeFrequencyAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!TryGetLong(args, "direction", out var direction) || (direction != 1 && direction != -1))
             {
                 _logger.LogWarning("[Voice] NudgeFrequency invalid direction");
-                return false;
+                return new DispatchResult(false, "Tune");
             }
+            var phrase = direction > 0 ? "Tune up" : "Tune down";
             var current = _state.FrequencyA;
             var next = current + direction * NudgeStepHz;
             if (next < 30_000 || next > 75_000_000)
             {
                 _logger.LogWarning("[Voice] NudgeFrequency would go out of range ({Next})", next);
-                return false;
+                return new DispatchResult(false, phrase);
             }
             await _catClient.SendCommandAsync($"FA{next:D9};", "Voice", ct);
             _state.FrequencyA = next;
             _logger.LogInformation("[Voice] NudgeFrequency {Dir} -> {Hz} Hz",
                 direction > 0 ? "up" : "down", next);
-            return true;
+            return new DispatchResult(true, phrase);
         }
 
         // -- helpers -------------------------------------------------------
@@ -253,5 +257,83 @@ namespace Yaesu_Web_Control.Services.Voice
             if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
             return long.TryParse(trimmed.AsSpan(prefix.Length), out hz);
         }
+
+        // ── Speech-formatting helpers for the spoken confirmation ─────────
+        //
+        // TTS handles raw numbers ("14.074 megahertz") inconsistently across
+        // installed voices -- one voice says "fourteen point oh seven four",
+        // another says "fourteen point seventy-four". We spell the value out
+        // digit-by-digit so the spoken confirmation matches what the user
+        // said (digit-by-digit fractional MHz is the YWC v1 grammar).
+
+        private static string FormatFrequencyForSpeech(long hz)
+        {
+            var mhz = hz / 1_000_000;
+            var fracKhz = (hz % 1_000_000) / 1000;  // 0-999
+            if (fracKhz == 0)
+                return $"{NumberWord(mhz)} megahertz";
+            // Pad to 3 digits and speak each digit separately so "074" reads
+            // as "zero seven four", matching the grammar's digit-by-digit
+            // form ("point zero seven four").
+            var fracDigits = fracKhz.ToString("D3");
+            var spelled = string.Join(" ", fracDigits.Select(c => DigitWord(c - '0')));
+            return $"{NumberWord(mhz)} point {spelled} megahertz";
+        }
+
+        private static string DigitWord(int d) => d switch
+        {
+            0 => "zero", 1 => "one", 2 => "two", 3 => "three", 4 => "four",
+            5 => "five", 6 => "six", 7 => "seven", 8 => "eight", 9 => "nine",
+            _ => d.ToString()
+        };
+
+        // Whole-MHz number names, matching VoiceGrammar.MhzWholeChoices so
+        // the confirmation echoes the same words the user said. Numbers not
+        // in the grammar (e.g. 23, 25) just speak as themselves.
+        private static string NumberWord(long n) => n switch
+        {
+            0  => "zero",     1  => "one",      2  => "two",      3  => "three",
+            4  => "four",     5  => "five",     6  => "six",      7  => "seven",
+            8  => "eight",    9  => "nine",     10 => "ten",      11 => "eleven",
+            12 => "twelve",   13 => "thirteen", 14 => "fourteen", 15 => "fifteen",
+            16 => "sixteen",  17 => "seventeen",18 => "eighteen", 19 => "nineteen",
+            20 => "twenty",   21 => "twenty one", 24 => "twenty four",
+            28 => "twenty eight", 29 => "twenty nine", 30 => "thirty",
+            50 => "fifty",    51 => "fifty one", 52 => "fifty two",
+            70 => "seventy",  71 => "seventy one",
+            _  => n.ToString()
+        };
+
+        // Letter modes ("USB", "LSB", "AM", "FM", "CW-U" etc.) read more
+        // clearly when spelled out letter-by-letter, same as the grammar
+        // input form. "DATA-U" -> "data U", "RTTY-L" -> "R T T Y L".
+        private static string ModeForSpeech(string mode) => mode switch
+        {
+            "USB"      => "U S B",
+            "LSB"      => "L S B",
+            "AM"       => "A M",
+            "FM"       => "F M",
+            "AM-N"     => "A M narrow",
+            "FM-N"     => "F M narrow",
+            "CW-U"     => "C W upper",
+            "CW-L"     => "C W lower",
+            "RTTY-U"   => "R T T Y upper",
+            "RTTY-L"   => "R T T Y lower",
+            "DATA-U"   => "data upper",
+            "DATA-L"   => "data lower",
+            "DATA-FM"  => "data F M",
+            "DATA-FM-N"=> "data F M narrow",
+            "PSK"      => "P S K",
+            _          => mode
+        };
     }
+
+    /// <summary>
+    /// Result of dispatching a voice intent. <c>Success</c> drives the
+    /// spoken-confirmation status ("successful" vs "unsuccessful");
+    /// <c>ConfirmationPhrase</c> is the human-readable description of what
+    /// the command tried to do, with parameter values folded in
+    /// (e.g. "Move to fourteen point zero seven four megahertz", "Mode U S B").
+    /// </summary>
+    public record DispatchResult(bool Success, string ConfirmationPhrase);
 }

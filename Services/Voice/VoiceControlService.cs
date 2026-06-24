@@ -37,6 +37,7 @@ namespace Yaesu_Web_Control.Services.Voice
         private readonly IntentDispatcher _intentDispatcher;
         private readonly IWebHostEnvironment _env;
         private readonly ISettingsService _settings;
+        private readonly VoiceTtsService _tts;
 
         private readonly object _engineLock = new();
         private SpeechRecognitionEngine? _engine;
@@ -53,13 +54,15 @@ namespace Yaesu_Web_Control.Services.Voice
             IHubContext<RadioHub> hubContext,
             IntentDispatcher intentDispatcher,
             IWebHostEnvironment env,
-            ISettingsService settings)
+            ISettingsService settings,
+            VoiceTtsService tts)
         {
             _logger = logger;
             _hubContext = hubContext;
             _intentDispatcher = intentDispatcher;
             _env = env;
             _settings = settings;
+            _tts = tts;
         }
 
         public override async Task StartAsync(CancellationToken cancellationToken)
@@ -280,8 +283,23 @@ namespace Yaesu_Web_Control.Services.Voice
             UpdateStatus(VoiceState.Executing, heard: heard, intent: intent);
             try
             {
-                await _intentDispatcher.DispatchAsync(intent, args);
-                UpdateStatus(VoiceState.Idle, heard: heard, intent: intent);
+                var result = await _intentDispatcher.DispatchAsync(intent, args);
+                UpdateStatus(result.Success ? VoiceState.Idle : VoiceState.Error,
+                             heard: heard, intent: intent,
+                             error: result.Success ? null : "Command did not complete");
+
+                // Spoken confirmation via TTS, if enabled in Settings. Phrase
+                // template is "<intent description>, successful/unsuccessful"
+                // so a listener hears the whole command echoed back along
+                // with the outcome -- key for accessibility (Yuri W4YSW,
+                // Thomas OZ1JTE) where the operator may not be watching the
+                // screen for visual confirmation.
+                var settings = await _settings.GetSettingsAsync();
+                if (settings.VoiceSpokenConfirmationEnabled && !string.IsNullOrWhiteSpace(result.ConfirmationPhrase))
+                {
+                    var status = result.Success ? "successful" : "unsuccessful";
+                    _tts.Speak($"{result.ConfirmationPhrase}, {status}");
+                }
             }
             catch (Exception ex)
             {

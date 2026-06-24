@@ -74,13 +74,18 @@ namespace Yaesu_Web_Control.Services.Voice
         // ---- SetFrequency variants ---------------------------------------
 
         // "set frequency to fourteen [megahertz]"
+        // "megahertz" is OPTIONAL -- the bare numeric form ("tune to
+        // fourteen") also matches. Optional via a GrammarBuilder wrapper
+        // appended with 0..1 repeat. Single optional at the very end of
+        // the builder is safe; the SAPI compiler bug we hit earlier was
+        // with NESTED optionals or multiple consecutive SemanticResultKeys.
         private static GrammarBuilder BuildSetFrequency_Whole()
         {
             var gb = new GrammarBuilder();
             gb.Append(new SemanticResultKey("intent", SetFrequencyVerbChoices()));
             gb.Append(new Choices("to", "tae"));
             gb.Append(new SemanticResultKey("mhz_whole", MhzWholeChoices()));
-            gb.Append(new Choices("megahertz", "mega hertz"));
+            gb.Append(MegahertzOptional(), 0, 1);
             return gb;
         }
 
@@ -98,7 +103,7 @@ namespace Yaesu_Web_Control.Services.Voice
             gb.Append(new SemanticResultKey("mhz_whole", MhzWholeChoices()));
             gb.Append("point");
             gb.Append(FracDigitPhrases());
-            gb.Append(new Choices("megahertz", "mega hertz"));
+            gb.Append(MegahertzOptional(), 0, 1);
             return gb;
         }
 
@@ -117,9 +122,15 @@ namespace Yaesu_Web_Control.Services.Voice
             gb.Append(FracDigitPhrases());
             gb.Append(FracDigitPhrases());
             gb.Append(FracDigitPhrases());
-            gb.Append(new Choices("megahertz", "mega hertz"));
+            gb.Append(MegahertzOptional(), 0, 1);
             return gb;
         }
+
+        // "megahertz" / "mega hertz" -- shared so the optional appendage
+        // is consistent across all SetFrequency variants. Wrapped in a
+        // GrammarBuilder so Append(..., 0, 1) accepts it.
+        private static GrammarBuilder MegahertzOptional() =>
+            new GrammarBuilder(new Choices("megahertz", "mega hertz"));
 
         private static Choices FracDigitPhrases() =>
             new Choices("zero", "oh", "one", "two", "three", "four",

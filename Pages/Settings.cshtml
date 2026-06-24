@@ -255,6 +255,19 @@
                     (Settings → Time &amp; Language → Speech).
                 </div>
             </div>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="voiceSpokenConfirmationEnabled" asp-for="Settings.VoiceSpokenConfirmationEnabled" />
+                <label class="form-check-label" for="voiceSpokenConfirmationEnabled">
+                    Speak confirmation after each voice command
+                </label>
+                <div class="form-text">
+                    When on, YWC speaks a short confirmation through the PC's default audio output after
+                    every recognised voice command — e.g. <em>"Move to fourteen point zero seven four megahertz, successful"</em>.
+                    Key accessibility feature for operators who can't see the screen to verify whether a
+                    command landed. Default on; turn off here if you find it chatty.
+                </div>
+            </div>
             <div class="mb-3">
                 <label class="form-label">Language</label>
                 <select class="form-select form-select-sm" disabled>
