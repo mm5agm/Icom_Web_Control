@@ -714,7 +714,11 @@ For full memory management — editing labels and frequencies, reordering, impor
 
 ### 5.16 Voice Announcements
 
-Click the **Voice** button in the toolbar to open the voice-announcements panel. This makes the app speak when key things change — useful for partially sighted operators, or for anyone who wants to be told what the radio is doing without having to look at the screen.
+> **Where's the on/off toggle?** It is **not** on the Settings page. The master switch for voice announcements lives in the **Voice** dialog — click the **Voice** button in the main-page toolbar (in the same row as **DX Watch** and **DX Spots**) and untick **Enable voice announcements** to turn them off (or tick to turn them on). The dialog also has the voice picker, rate, volume, per-category toggles and a Test button.
+>
+> Not the same as **Voice Control** (§17): voice *announcements* are the app **speaking to you** (band changes, mode changes, DX alerts), while voice *control* is **you speaking to the app** (press-and-hold mic button to issue commands). They are independent features with separate on/off switches.
+
+Voice announcements make the app speak when key things change — useful for partially sighted operators, or for anyone who wants to be told what the radio is doing without having to look at the screen.
 
 The feature uses your browser's built-in text-to-speech engine (Web Speech API), so any SAPI 5 voices already installed on Windows are available in the Voice picker.
 
@@ -2267,6 +2271,8 @@ Originally requested by Yuri W4YSW. Shipped in v2.3.9.
 ---
 
 ## 17. Voice Control
+
+> **Not the same as Voice Announcements (§5.16).** Voice *control* (this section) is **you speaking to the app** — a press-and-hold mic button in the navbar that lets you issue spoken commands. Voice *announcements* (§5.16) is **the app speaking to you** — automatic spoken cues for band, mode, TX state, DX alerts, etc., useful as an accessibility feature. They are independent features with separate on/off switches. If you're looking for the toggle to silence YWC's automatic speech, you want §5.16.
 
 YWC includes hands-free voice control of common operating actions. A small microphone button appears in the navbar; press and hold it, speak a command, release, and the radio responds. Recognition happens entirely on your PC via Windows' built-in speech engine — your audio never leaves your computer. See [§15.7](#157-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method) for the reasoning behind this approach and the Alexa method that was considered and dropped.
 
