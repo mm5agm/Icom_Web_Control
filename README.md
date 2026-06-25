@@ -170,6 +170,25 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Release Notes
 
+## Unreleased — develop
+
+Changes queued for the next public release (v2.4.0 will also include the voice-control work currently in v2.4.0-pre1).
+
+### Spectrum display — draggable splitter and dB range presets
+
+Two improvements to each SDR spectrum panel:
+
+- **Draggable splitter between spectrum trace and waterfall.** Hover the boundary; the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room (useful for low-signal work), drag down to give the waterfall more history. The ratio is persisted per-VFO in browser localStorage. Default is unchanged (45 % spectrum / 55 % waterfall), so users who don't touch it see no difference.
+- **Spectrum dB-range dropdown** beside the Hold button. Four presets: **0/-120** (default, matches prior behaviour), **-40/-120**, **-60/-120**, **-80/-120**. Tighter ranges zoom into the lower part of the scale where weak signals live and stop them being squashed into the bottom row of pixels. Choice is persisted per-VFO.
+
+Both controls operate independently per VFO panel, so on a dual-SDR setup the two panels can be sized and ranged differently to suit each receiver.
+
+### Fldigi launch button ([#52](https://github.com/mm5agm/Yaesu_Web_Control/issues/52))
+
+YWC now has a fifth external-app slot for **Fldigi**, requested by Bill W1WRH. Same pattern as the existing WSJT-X / JTAlert / Log4OM / GridTracker buttons: configure the path in **Application Setup**, tick **Show**, save, and the launch button appears on the main page after GridTracker. Defaults to hidden so existing users see no change until they opt in. Process detection uses the `fldigi.exe` task-manager name.
+
+---
+
 ## 2026-06-22 - v2.3.9
 
 The release that finally closes out Jacek SP3L's R1–R12 single-receiver UI spec on [#34](https://github.com/mm5agm/Yaesu_Web_Control/issues/34) (a saga that ran from pre1 to pre8 across eight pre-release iterations — thank you Jacek), plus a major frequency-keyboard accessibility round driven by Yuri W4YSW, plus the radio-state init cluster (#38–#47) that was making YWC start up out of sync with the radio on a bunch of controls.

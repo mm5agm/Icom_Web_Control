@@ -312,6 +312,15 @@ The spectrum display is only visible if an SDR device has been configured in Set
 
 **Frequency crosshair** — Move the mouse over the spectrum to see the exact RF frequency at the cursor position displayed above the waterfall.
 
+**Resize spectrum vs waterfall** — Hover the horizontal boundary between the spectrum trace (top) and the waterfall (bottom); the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room — useful when you're hunting weak signals close to the noise floor. Drag down to give the waterfall more history. The ratio is remembered per VFO across browser reloads, so the next time you open YWC the panel is back the way you left it. Two short grey grip-bars at the centre of the boundary mark the handle; they turn cyan while you're dragging.
+
+**dB range** — The dropdown beside the **Hold** button picks the vertical scale of the spectrum trace, in dBFS:
+
+- **0/-120** (default) — the full SDR range; signals span the whole vertical height of the spectrum panel.
+- **-40/-120**, **-60/-120**, **-80/-120** — progressively zoom into the lower part of the scale, where weak signals normally sit. The strongest signals get clipped at the top of the panel, but the noise floor and anything just above it spreads out vertically and is much easier to see.
+
+Pick whichever lets you see your noise floor without weak signals being squashed into the bottom row of pixels. The choice is remembered per VFO.
+
 **DX cluster spots** — If you have configured a DX cluster server in Settings (see §6.6), incoming spots are overlaid as small yellow callsign labels along the top of the spectrum at each spot's frequency. Clicking on a spot (within a few pixels of its marker) tunes VFO A exactly to that frequency. Spots outside the current span are not drawn; spots older than the configured age (default 15 minutes) are removed automatically.
 
 **How spots are filtered for display** — the spectrum panel shows any spot whose frequency falls inside the currently visible window (VFO A ± half the span). When you change band, VFO A moves and the spectrum recentres, so the visible spots change automatically to match the new band. There is no explicit band filter — just a "is this spot inside the visible window?" check. In practice this means you see only the current band, because amateur bands have large gaps between them. If you zoom out to a 2 MHz span you'd technically see a wider chunk, but adjacent bands rarely overlap that window.
