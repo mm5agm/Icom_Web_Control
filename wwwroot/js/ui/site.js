@@ -991,6 +991,7 @@ connection.on("RadioStateUpdate", function (update) {
         }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeA', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('A', update.value);
+        if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('A', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
@@ -1003,6 +1004,7 @@ connection.on("RadioStateUpdate", function (update) {
         }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeB', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('B', update.value);
+        if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('B', update.value);
     }
 
     // --- ANTENNA CHANGE ---
@@ -1519,13 +1521,6 @@ connection.on("RadioStateUpdate", function (update) {
         const el = document.getElementById('ctcssToneSelect'); if (el) el.value = update.value;
     }
 
-    // --- IF LOW CUT ---
-    if (update.property === "IfLowCutA") {
-        const el = document.getElementById('ifLowCutSelectA'); if (el) el.value = update.value;
-    }
-    if (update.property === "IfLowCutB") {
-        const el = document.getElementById('ifLowCutSelectB'); if (el) el.value = update.value;
-    }
 });
 
 // SignalR connection is started once below (after the IIFE) with a .catch() error handler.
@@ -1649,10 +1644,6 @@ window.radioControl = {
     setIfShift: async function (receiver, shiftHz) {
         await fetch(`/api/cat/ifshift/${receiver.toLowerCase()}`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftHz: parseInt(shiftHz) }) });
-    },
-    setIfLowCut: async function (receiver, code) {
-        await fetch(`/api/cat/iflowcut/${receiver.toLowerCase()}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
     }
 };
 

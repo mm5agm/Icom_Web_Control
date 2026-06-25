@@ -427,9 +427,14 @@
                         }
                         break;
                     case "PR":
-                        // PR{n}; — n=0=OFF, n=1=ON (speech processor)
-                        if (message.Length >= 4 && (message[2] == '0' || message[2] == '1'))
-                            _stateService.ProcEnabled = message[2] == '1';
+                        // PR{P1}{P2}; — P1=0 Speech Processor (we ignore P1=1
+                        // Parametric Mic EQ), P2=0 OFF / P2=1 ON. The CAT
+                        // manual incorrectly lists P2 as 1=OFF/2=ON; bench
+                        // testing on the FTdx101MP (2026-06-25) confirmed
+                        // the real values are 0=OFF/1=ON.
+                        if (message.Length >= 5 && message[2] == '0'
+                            && (message[3] == '0' || message[3] == '1'))
+                            _stateService.ProcEnabled = message[3] == '1';
                         break;
                     case "PL":
                         // PL{PPP}; — speech processor level 000-100
@@ -608,18 +613,6 @@
                         // SD{nnnn}; — semi BK-IN delay 0000-2500 ms
                         if (message.Length >= 7 && int.TryParse(message.Substring(2, 4), out int sdVal))
                             _stateService.CwBreakInDelay = Math.Clamp(sdVal, 0, 2500);
-                        break;
-                    case "SL":
-                        // SL{vfo}0{nn}; — IF low cut code per VFO (mirrors SH structure)
-                        if (message.Length >= 6)
-                        {
-                            var slRaw = message.Substring(4, 2).TrimStart('0');
-                            var slCode = string.IsNullOrEmpty(slRaw) ? "0" : slRaw;
-                            SetPerVfo(message[2], routeB => {
-                                if (routeB) _stateService.IfLowCutB = slCode;
-                                else _stateService.IfLowCutA = slCode;
-                            });
-                        }
                         break;
                     // No debug logging for unhandled commands
                 }

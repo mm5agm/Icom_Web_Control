@@ -235,6 +235,11 @@ builder.Services.AddHostedService<RigctldServer>();
 // Register your settings service
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 
+// Audio filter EX address map — loaded once at startup from
+// wwwroot/data/audio-filter-ex-map.json; used by the Audio Filter popout
+// controller endpoints to translate per-radio menu addresses.
+builder.Services.AddSingleton<AudioFilterMapService>();
+
 
 // Add after existing service registrations
 builder.Services.AddHostedService<MeterPollingService>();
