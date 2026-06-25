@@ -553,6 +553,12 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span 1 MHz" title="VFO A span 1 MHz">1M</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 2_048_000 ? "active" : "")" data-hz="2048000" data-vfo="A" data-a11y-key="spectrum.spanA2m" aria-label="VFO A span 2 MHz" title="VFO A span 2 MHz">2M</button>
                             </div>
+                            <select class="form-select form-select-sm spectrum-dbrange-select" data-vfo="A" aria-label="VFO A spectrum dB range" title="Vertical range of the spectrum trace. Tighter ranges reveal weak signals; the default (0/-120) shows the full scale." style="width:auto; min-width:6.5rem;">
+                                <option value="0/-120">0/-120 dB</option>
+                                <option value="-40/-120">-40/-120 dB</option>
+                                <option value="-60/-120">-60/-120 dB</option>
+                                <option value="-80/-120">-80/-120 dB</option>
+                            </select>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="A" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
                         </div>
@@ -577,6 +583,12 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span 1 MHz" title="VFO B span 1 MHz">1M</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 2_048_000 ? "active" : "")" data-hz="2048000" data-vfo="B" data-a11y-key="spectrum.spanB2m" aria-label="VFO B span 2 MHz" title="VFO B span 2 MHz">2M</button>
                             </div>
+                            <select class="form-select form-select-sm spectrum-dbrange-select" data-vfo="B" aria-label="VFO B spectrum dB range" title="Vertical range of the spectrum trace. Tighter ranges reveal weak signals; the default (0/-120) shows the full scale." style="width:auto; min-width:6.5rem;">
+                                <option value="0/-120">0/-120 dB</option>
+                                <option value="-40/-120">-40/-120 dB</option>
+                                <option value="-60/-120">-60/-120 dB</option>
+                                <option value="-80/-120">-80/-120 dB</option>
+                            </select>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
                         </div>
@@ -2173,6 +2185,21 @@
                         badge.className = 'badge bg-success small';
                         badge.textContent = 'Live';
                     }
+                });
+            });
+
+            // Spectrum dB-range dropdown — vertical scale of the spectrum trace.
+            // Initial value comes from the panel (which already loaded its
+            // persisted range), so the dropdown reflects the in-effect setting.
+            document.querySelectorAll('.spectrum-dbrange-select').forEach(sel => {
+                const vfo = sel.dataset.vfo;
+                const panel = vfo === 'B' ? spectrumPanelB : spectrumPanelA;
+                if (!panel) return;
+                const cur = panel.getDbRange();
+                sel.value = `${cur.dbMax}/${cur.dbMin}`;
+                sel.addEventListener('change', () => {
+                    const [maxStr, minStr] = sel.value.split('/');
+                    panel.setDbRange(parseFloat(maxStr), parseFloat(minStr));
                 });
             });
 

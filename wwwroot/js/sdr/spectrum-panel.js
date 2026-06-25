@@ -66,7 +66,82 @@ export class SpectrumPanel {
         this._bandPlan = null;
 
         this._resizeObserver = null;
+
+        // Spectrum/waterfall split ratio — fraction of canvas height given to
+        // the spectrum trace (top zone); remainder goes to the waterfall.
+        // Persisted per-VFO in localStorage so the operator can give the
+        // spectrum more vertical room for low-signal work without losing
+        // the setting on reload.
+        this._splitRatio = this._loadSplitRatio();
+        this._splitterDragging = false;
+
+        // dB range — vertical scale of the spectrum trace, in dBFS.
+        // Persisted per-VFO. Default matches pre-existing hardcoded behaviour.
+        const range = this._loadDbRange();
+        this._dbMin = range.dbMin;
+        this._dbMax = range.dbMax;
+
         this._init();
+    }
+
+    // Load persisted split ratio for this VFO. Clamped to a reasonable band
+    // so a corrupt value can't make either zone vanish entirely.
+    _loadSplitRatio() {
+        try {
+            const raw = localStorage.getItem('ywc.spectrumSplit.' + this._vfo);
+            const v = parseFloat(raw);
+            if (isFinite(v) && v >= 0.15 && v <= 0.85) return v;
+        } catch (e) { /* localStorage may be unavailable */ }
+        return 0.45;
+    }
+
+    _saveSplitRatio() {
+        try {
+            localStorage.setItem('ywc.spectrumSplit.' + this._vfo, this._splitRatio.toFixed(3));
+        } catch (e) { /* localStorage may be unavailable */ }
+    }
+
+    // Load persisted dB range. Stored as "dbMax/dbMin" e.g. "0/-120".
+    _loadDbRange() {
+        const fallback = { dbMin: -120, dbMax: 0 };
+        try {
+            const raw = localStorage.getItem('ywc.spectrumDbRange.' + this._vfo);
+            if (!raw) return fallback;
+            const [maxStr, minStr] = raw.split('/');
+            const dbMax = parseFloat(maxStr);
+            const dbMin = parseFloat(minStr);
+            if (isFinite(dbMax) && isFinite(dbMin) && dbMax > dbMin) {
+                return { dbMin, dbMax };
+            }
+        } catch (e) { /* localStorage may be unavailable */ }
+        return fallback;
+    }
+
+    _saveDbRange() {
+        try {
+            localStorage.setItem(
+                'ywc.spectrumDbRange.' + this._vfo,
+                this._dbMax + '/' + this._dbMin
+            );
+        } catch (e) { /* localStorage may be unavailable */ }
+    }
+
+    /**
+     * Set the spectrum dB range. Called from the UI dropdown.
+     * @param {number} dbMax  Top of the scale (e.g. 0, -40, -60, -80).
+     * @param {number} dbMin  Bottom of the scale (e.g. -120).
+     */
+    setDbRange(dbMax, dbMin) {
+        if (!isFinite(dbMax) || !isFinite(dbMin) || dbMax <= dbMin) return;
+        this._dbMax = dbMax;
+        this._dbMin = dbMin;
+        this._saveDbRange();
+        if (this._lastBins) this._render();
+    }
+
+    /** Current dB range, used by the UI to set the dropdown's initial value. */
+    getDbRange() {
+        return { dbMax: this._dbMax, dbMin: this._dbMin };
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -226,11 +301,47 @@ export class SpectrumPanel {
         // { passive: false } required so preventDefault() suppresses page scroll.
         canvas.addEventListener('wheel', (e) => this._onCanvasWheel(e), { passive: false });
 
-        // Crosshair tracking.
+        // Splitter drag — mousedown on the handle starts a drag; subsequent
+        // mousemove updates while the button is held are tracked on window
+        // so the drag continues even if the cursor leaves the canvas.
+        canvas.addEventListener('mousedown', (e) => {
+            const y = this._canvasYFromEvent(e, canvas);
+            if (this._isOnSplitter(y, canvas.height)) {
+                this._splitterDragging = true;
+                e.preventDefault();
+                if (this._lastBins) this._render();
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!this._splitterDragging) return;
+            const c = document.getElementById(this._canvasId);
+            if (!c) return;
+            const y = this._canvasYFromEvent(e, c);
+            const ratio = Math.max(0.15, Math.min(0.85, y / c.height));
+            this._splitRatio = ratio;
+            if (this._lastBins) this._render();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (!this._splitterDragging) return;
+            this._splitterDragging = false;
+            this._saveSplitRatio();
+            if (this._lastBins) this._render();
+        });
+
+        // Crosshair tracking + splitter-hover cursor change.
         canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
             this._crosshairX = (e.clientX - rect.left) * (canvas.width  / rect.width);
             this._crosshairY = (e.clientY - rect.top)  * (canvas.height / rect.height);
+
+            // Swap cursor to row-resize when over the splitter so the
+            // affordance is obvious before the user tries to drag.
+            canvas.style.cursor = this._isOnSplitter(this._crosshairY, canvas.height)
+                ? 'row-resize'
+                : 'crosshair';
+
             if (this._lastBins) this._render();
             // Announce cursor frequency to screen readers via a live region (debounced to 1 s).
             if (this._lastSpanHz > 0 && this._vfoHz > 0) {
@@ -258,10 +369,25 @@ export class SpectrumPanel {
         canvas.style.cursor = 'crosshair';
     }
 
+    // Convert a mouse event's clientY to internal-canvas pixel coordinates.
+    _canvasYFromEvent(e, canvas) {
+        const rect = canvas.getBoundingClientRect();
+        return (e.clientY - rect.top) * (canvas.height / rect.height);
+    }
+
+    // Hit test for the splitter — ±6 internal pixels of the boundary.
+    _isOnSplitter(canvasY, canvasH) {
+        const splitY = Math.floor(canvasH * this._splitRatio);
+        return Math.abs(canvasY - splitY) <= 6;
+    }
+
     _onCanvasClick(e) {
         if (!this._lastBins || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
 
         const canvas = document.getElementById(this._canvasId);
+        // Clicks on the splitter handle are for resizing, not tuning.
+        if (this._isOnSplitter(this._canvasYFromEvent(e, canvas), canvas.height)) return;
+
         const rect   = canvas.getBoundingClientRect();
         const x      = e.clientX - rect.left;
         const W      = canvas.width;
@@ -363,8 +489,8 @@ export class SpectrumPanel {
         const ctx         = canvas.getContext('2d');
         const W           = canvas.width;
         const H           = canvas.height;
-        const specH       = Math.floor(H * 0.45);
-        const wfH         = H - specH;
+        const specH       = Math.max(1, Math.floor(H * this._splitRatio));
+        const wfH         = Math.max(1, H - specH);
         const bins        = this._lastBins;
         const centreHz    = this._lastCentreHz;
         const spanHz      = this._lastSpanHz;
@@ -379,6 +505,23 @@ export class SpectrumPanel {
         this._drawPinnedCursor(ctx, W, specH);
         this._drawCrosshair(ctx, W, specH, spanHz);
         this._drawHoldOverlay(ctx, W, specH);
+        this._drawSplitterHandle(ctx, W, specH);
+    }
+
+    // Horizontal handle the user can grab to resize the spectrum vs waterfall.
+    // Drawn on top of everything so it stays visible against the waterfall.
+    _drawSplitterHandle(ctx, W, specH) {
+        ctx.save();
+        ctx.fillStyle = this._splitterDragging ? 'rgba(0, 200, 255, 0.85)'
+                                                : 'rgba(120, 140, 160, 0.55)';
+        ctx.fillRect(0, specH - 1, W, 2);
+        // Centre grip indicator — two short bars so the affordance is obvious.
+        const gripW = 28, gripH = 2, cx = Math.floor(W / 2);
+        ctx.fillStyle = this._splitterDragging ? 'rgba(0, 200, 255, 1)'
+                                                : 'rgba(200, 210, 220, 0.85)';
+        ctx.fillRect(cx - gripW / 2,     specH - 3, gripW, gripH);
+        ctx.fillRect(cx - gripW / 2,     specH + 1, gripW, gripH);
+        ctx.restore();
     }
 
     // ── Persistent (pinned) cursor ───────────────────────────────────────────
@@ -679,8 +822,8 @@ export class SpectrumPanel {
 
     _drawSpectrum(ctx, bins, W, H) {
         const N      = bins.length;
-        const dbMin  = -120;
-        const dbMax  = 0;
+        const dbMin  = this._dbMin;
+        const dbMax  = this._dbMax;
         const range  = dbMax - dbMin;
 
         // Background
