@@ -73,6 +73,23 @@ namespace Yaesu_Web_Control.Controllers
             return Ok(new { running });
         }
 
+        [HttpPost("fldigi/launch")]
+        public async Task<IActionResult> LaunchFldigi()
+        {
+            return await LaunchExternalApp("Fldigi", "fldigi", async () =>
+            {
+                var settings = await _settingsService.GetSettingsAsync();
+                return settings.FldigiCommandLine;
+            });
+        }
+
+        [HttpGet("fldigi/status")]
+        public IActionResult FldigiStatus()
+        {
+            var running = _processStatusCache.IsProcessRunning("fldigi");
+            return Ok(new { running });
+        }
+
         private async Task<IActionResult> LaunchExternalApp(string appName, string processName, Func<Task<string>> getCommandLine)
         {
             // Check if the app is already running

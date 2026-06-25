@@ -25,12 +25,14 @@
         public string JtalertCommandLine { get; set; } = @"C:\HamApps\JTAlert\JTAlert.exe";
         public string Log4omCommandLine { get; set; } = @"""C:\Program Files (x86)\Log4OM 2\Log4OM.exe""";
         public string GridtrackerCommandLine { get; set; } = @"""C:\Program Files\GridTracker2\GridTracker2.exe""";
+        public string FldigiCommandLine { get; set; } = @"""C:\Program Files\Fldigi-4.2.11\fldigi.exe""";
 
         // External Applications - Custom Names (user can rename buttons)
         public string App1Name { get; set; } = "WSJT-X";
         public string App2Name { get; set; } = "JTAlert";
         public string App3Name { get; set; } = "Log4OM";
         public string App4Name { get; set; } = "GridTracker";
+        public string App5Name { get; set; } = "Fldigi";
 
         // External Applications - Show/Hide buttons (optional apps)
         public bool ShowWsjtxButton { get; set; } = true;
@@ -38,6 +40,8 @@
         public bool ShowLog4omButton { get; set; } = true;
         // Default off — most users won't have GridTracker installed
         public bool ShowGridtrackerButton { get; set; } = false;
+        // Default off — most users won't have Fldigi installed
+        public bool ShowFldigiButton { get; set; } = false;
 
         // WSJT-X UDP Settings
         // Default: Use the same multicast address as configured in WSJT-X

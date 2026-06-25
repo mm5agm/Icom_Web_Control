@@ -43,10 +43,12 @@ namespace Yaesu_Web_Control.Pages
         public bool ShowApp2Button { get; set; } = true;
         public bool ShowApp3Button { get; set; } = true;
         public bool ShowApp4Button { get; set; } = false;
+        public bool ShowApp5Button { get; set; } = false;
         public string App1Name { get; set; } = "WSJT-X";
         public string App2Name { get; set; } = "JTAlert";
         public string App3Name { get; set; } = "Log4OM";
         public string App4Name { get; set; } = "GridTracker";
+        public string App5Name { get; set; } = "Fldigi";
 
         // MIC Gain persisted value
         public int MicGain { get; set; } = 50;
@@ -102,11 +104,13 @@ namespace Yaesu_Web_Control.Pages
             ShowApp2Button = settings.ShowJtalertButton;
             ShowApp3Button = settings.ShowLog4omButton;
             ShowApp4Button = settings.ShowGridtrackerButton;
+            ShowApp5Button = settings.ShowFldigiButton;
             ShowFrequencyArrowButtons = settings.ShowFrequencyArrowButtons;
             App1Name = settings.App1Name;
             App2Name = settings.App2Name;
             App3Name = settings.App3Name;
             App4Name = settings.App4Name;
+            App5Name = settings.App5Name;
             SdrSampleRateHz  = settings.SdrSampleRateHzA;     // legacy single value, used by old code paths
             SdrSampleRateHzA = settings.SdrSampleRateHzA;
             SdrSampleRateHzB = settings.SdrSampleRateHzB;

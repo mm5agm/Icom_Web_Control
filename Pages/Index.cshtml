@@ -254,6 +254,15 @@
                 </button>
             </div>
         }
+        @if (Model.ShowApp5Button)
+        {
+            <div class="col-auto">
+                <button id="fldigiBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
+                        onclick="launchFldigi()" title="Launch @Model.App5Name" aria-label="Launch @Model.App5Name">
+                    @Model.App5Name
+                </button>
+            </div>
+        }
         <div class="col-auto ms-auto d-flex gap-2 align-items-center">
             <span id="utcClock"
                   class="font-monospace fw-bold px-2"
@@ -2387,6 +2396,52 @@
         updateGridtrackerStatus();
         setInterval(updateGridtrackerStatus, 5000);
 
+        // Fldigi launch and status functions
+        async function launchFldigi() {
+            try {
+                const response = await fetch('/api/fldigi/launch', { method: 'POST' });
+                const btn = document.getElementById('fldigiBtn');
+                if (response.ok) {
+                    const data = await response.json();
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-success');
+                    btn.title = 'Fldigi is running';
+                    if (data.alreadyRunning) {
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = 'Fldigi Already Running';
+                        setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+                    }
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to launch Fldigi');
+                }
+            } catch (e) {
+                alert('Error launching Fldigi: ' + e.message);
+            }
+        }
+
+        async function updateFldigiStatus() {
+            try {
+                const response = await fetch('/api/fldigi/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    const btn = document.getElementById('fldigiBtn');
+                    if (!btn) return;
+                    btn.classList.remove('btn-secondary', 'btn-success', 'btn-warning', 'btn-danger');
+                    if (data.running) {
+                        btn.classList.add('btn-success');
+                        btn.title = 'Fldigi is running';
+                    } else {
+                        btn.classList.add('btn-danger');
+                        btn.title = 'Fldigi is not running';
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        updateFldigiStatus();
+        setInterval(updateFldigiStatus, 5000);
+
         async function setMicGain(value) {
             console.log('[setMicGain] Called with value:', value);
             try {
@@ -3546,6 +3601,7 @@
         window.launchJtalert = launchJtalert;
         window.launchLog4om  = launchLog4om;
         window.launchGridtracker = launchGridtracker;
+        window.launchFldigi      = launchFldigi;
         window.setMicGain    = setMicGain;
         window.toggleProc    = toggleProc;
         window.setProcLevel  = setProcLevel;
