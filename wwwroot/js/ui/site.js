@@ -57,8 +57,9 @@ document.addEventListener('keydown', function (e) {
     // Ignore if typing in an input, textarea, or contenteditable
     const active = document.activeElement;
     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
-    if (e.key === 'f' || e.key === 'F') {
-        // Enter fullscreen on the <body> element (entire app)
+    if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Bare F only — guarding against modifiers stops YWC from stealing
+        // Ctrl+F (browser find-in-page) and Cmd+F on Mac.
         const body = document.body;
         if (body && !document.fullscreenElement) {
             body.requestFullscreen && body.requestFullscreen();

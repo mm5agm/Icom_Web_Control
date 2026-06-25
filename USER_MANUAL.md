@@ -1,5 +1,7 @@
 # Yaesu Web Control — User Manual
 
+> 🔍 **Searching this manual:** press **Ctrl + F** (Windows / Linux) or **⌘ + F** (Mac) to open your browser's find-in-page box. Type any term — a band name like "60m", a control like "Speech Processor", an error message you've hit — to jump straight to the relevant section.
+
 ## Table of Contents
 
 1. [Introduction](#1-introduction)

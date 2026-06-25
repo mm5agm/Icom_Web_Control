@@ -183,6 +183,10 @@ Two improvements to each SDR spectrum panel:
 
 Both controls operate independently per VFO panel, so on a dual-SDR setup the two panels can be sized and ranged differently to suit each receiver.
 
+### Fullscreen shortcut no longer hijacks browser find (Ctrl+F)
+
+YWC's fullscreen toggle is **F** (bare letter, no modifiers) per [§13 Keyboard Shortcuts](USER_MANUAL.md#13-keyboard-shortcuts). The handler had a missing-modifier-check bug that also fired on **Ctrl+F**, which meant the browser's find-in-page box never appeared on any YWC page — Ctrl+F just put the app fullscreen. Fixed: the handler now only triggers on bare F, so Ctrl+F (Windows/Linux) and ⌘+F (Mac) pass through to the browser as the user expects.
+
 ### Fldigi launch button ([#52](https://github.com/mm5agm/Yaesu_Web_Control/issues/52))
 
 YWC now has a fifth external-app slot for **Fldigi**, requested by Bill W1WRH. Same pattern as the existing WSJT-X / JTAlert / Log4OM / GridTracker buttons: configure the path in **Application Setup**, tick **Show**, save, and the launch button appears on the main page after GridTracker. Defaults to hidden so existing users see no change until they opt in. Process detection uses the `fldigi.exe` task-manager name.
