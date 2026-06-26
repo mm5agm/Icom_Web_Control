@@ -5,6 +5,8 @@
 // regardless of whether an SDR is configured — relies only on the SignalR
 // DxSpot event stream, which flows unconditionally.
 
+import { modeForHz } from './band-plan.js';
+
 const LS_KEY     = 'dxSpotsPanel';
 const AGE_MAX_MS = 15 * 60 * 1000;   // matches DxSpotAgeMinutes default
 const TICK_MS    = 30 * 1000;        // re-render to age out stale rows
@@ -271,6 +273,14 @@ export class DxSpotsPanel {
                 const hz = parseInt(tr.dataset.hz, 10);
                 if (hz && window.radioControl && typeof window.radioControl.setFrequency === 'function') {
                     window.radioControl.setFrequency('A', hz);
+                    // Match the spectrum-panel click behaviour — follow the
+                    // QSY with a band-plan-aware mode change so clicking
+                    // an FT8 spot from a phone spot also flips USB→DATA-U.
+                    // modeForHz returns the mode name window.setMode accepts.
+                    const targetMode = modeForHz(hz);
+                    if (targetMode && typeof window.setMode === 'function') {
+                        try { window.setMode('A', targetMode); } catch { /* ignore */ }
+                    }
                 }
             });
             this._rowClickWired = true;
