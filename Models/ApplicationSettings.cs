@@ -99,6 +99,14 @@
         public long SdrIfFrequencyHz { get; set; } = 9_000_000;
         public int SdrFftSize { get; set; } = 1024;
 
+        // Optional user override for the SDRplay API install directory
+        // (the folder that contains the x64\sdrplay_api.dll subfolder).
+        // Leave blank for auto-detect: SdrplayDllResolver tries the app
+        // directory, then standard Program Files locations. Only needed
+        // when the SDRplay API was installed to a non-default location
+        // AND its bin folder wasn't added to PATH.
+        public string SdrplayInstallPath { get; set; } = string.Empty;
+
         // CW keyer message memories M1-M5 (sent via KY command)
         public List<string> CwMessages { get; set; } = new() { "CQ CQ DE {CALL}", "TU 73", "QRZ?", "UR 5NN", "DE {CALL}" };
 

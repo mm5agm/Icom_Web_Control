@@ -602,6 +602,80 @@
                             ELAD FDM-DUO via USB: set to match the device's IQ centre frequency.
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label asp-for="Settings.SdrplayInstallPath" class="form-label fw-bold">SDRplay install path (advanced)</label>
+                        <div class="input-group">
+                            <input asp-for="Settings.SdrplayInstallPath" class="form-control" type="text"
+                                   id="sdrplayInstallPathInput"
+                                   placeholder="@(Model.DetectedSdrplayInstallPath ?? "e.g. C:\\Program Files\\SDRplay\\API")" />
+                            <button type="button" class="btn btn-outline-secondary" id="sdrplayBrowseBtn"
+                                    title="Open a folder browser to select the SDRplay install folder">
+                                Browse…
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            @if (!string.IsNullOrEmpty(Model.DetectedSdrplayInstallPath))
+                            {
+                                <span class="text-success">
+                                    <strong>Auto-detected:</strong> <code>@Model.DetectedSdrplayInstallPath</code>
+                                </span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="sdrplayUseDetectedBtn">
+                                    Use this path
+                                </button>
+                                <br />
+                            }
+                            else
+                            {
+                                <span class="text-warning"><strong>No SDRplay install auto-detected.</strong></span><br />
+                            }
+                            Leave blank for auto-detect. Only needed if the SDRplay API was installed
+                            to a non-default location and its <code>x64</code> folder isn't on the
+                            Windows PATH. Point this at the SDRplay API folder containing the
+                            <code>x64\sdrplay_api.dll</code> subfolder. If your SDR shows in
+                            other apps but not here, try setting this.
+                        </div>
+                    </div>
+                    <script>
+                        (function () {
+                            const input    = document.getElementById('sdrplayInstallPathInput');
+                            const browseBn = document.getElementById('sdrplayBrowseBtn');
+                            const useDetBn = document.getElementById('sdrplayUseDetectedBtn');
+                            const detected = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DetectedSdrplayInstallPath ?? ""));
+
+                            if (useDetBn) {
+                                useDetBn.addEventListener('click', () => {
+                                    if (detected) input.value = detected;
+                                });
+                            }
+                            if (browseBn) {
+                                browseBn.addEventListener('click', async () => {
+                                    const start = (input.value || detected || '').trim();
+                                    browseBn.disabled = true;
+                                    const original  = browseBn.textContent;
+                                    browseBn.textContent = 'Opening…';
+                                    try {
+                                        const resp = await fetch('/api/sdr/sdrplay/pick-installdir', {
+                                            method:  'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body:    JSON.stringify({ startPath: start })
+                                        });
+                                        if (resp.ok) {
+                                            const data = await resp.json();
+                                            if (data.picked) input.value = data.picked;
+                                        } else {
+                                            const data = await resp.json().catch(() => ({}));
+                                            alert('Folder picker failed: ' + (data.error || resp.statusText));
+                                        }
+                                    } catch (e) {
+                                        alert('Folder picker error: ' + e.message);
+                                    } finally {
+                                        browseBn.disabled    = false;
+                                        browseBn.textContent = original;
+                                    }
+                                });
+                            }
+                        })();
+                    </script>
                 </div>
                 <div class="col-md-6">
                     <div class="mb-3">

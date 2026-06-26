@@ -145,10 +145,18 @@ static int LoadConfiguredHttpPort()
 // bundled libusb.
 NativeWin32.SetErrorMode(NativeWin32.SEM_FAILCRITICALERRORS | NativeWin32.SEM_NOOPENFILEERRORBOX);
 
-// ── SoapySDR native library resolver ────────────────────────────────────────
-// .NET P/Invoke on Windows does not search PATH directories by default.
-// Resolve SoapySDR.dll explicitly from its install location so the P/Invoke
-// declarations in SoapySdrInterop are satisfied without relying on PATH.
+// ── Native library resolver (SoapySDR + sdrplay_api) ────────────────────────
+// .NET P/Invoke on Windows does not search PATH directories by default, so
+// DLLs that aren't next to the app or in System32 silently fail to load.
+// One resolver lambda handles both DLLs — SetDllImportResolver can only be
+// called *once* per assembly, so anything we want to resolve has to share
+// this single registration.
+//
+// SDRplay history: observed on IK2XRW Alessandro's system (#53, 2026-06-26)
+// where the SDRplay install didn't add its bin folder to PATH, so the SDR
+// scan returned nothing. SdrplayDllResolver.TryResolve tries the user-
+// configured path, the app directory, then the standard Program Files
+// locations before falling back to default search.
 NativeLibrary.SetDllImportResolver(
     System.Reflection.Assembly.GetExecutingAssembly(),
     static (name, _, _) =>
@@ -161,6 +169,11 @@ NativeLibrary.SetDllImportResolver(
             if (!File.Exists(path))
                 path = @"C:\SoapySDR\bin\SoapySDR.dll";
             if (File.Exists(path) && NativeLibrary.TryLoad(path, out IntPtr h))
+                return h;
+        }
+        else if (name == Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.DllName)
+        {
+            if (Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.TryResolve(out IntPtr h))
                 return h;
         }
         return IntPtr.Zero;   // fall back to default resolution for all other DLLs

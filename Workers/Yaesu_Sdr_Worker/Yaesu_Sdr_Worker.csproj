@@ -25,12 +25,13 @@
     library; for now linking keeps the diff small.
   -->
   <ItemGroup>
-    <Compile Include="..\..\Services\Sdr\ISdrDevice.cs"      Link="LinkedSdr\ISdrDevice.cs"      />
-    <Compile Include="..\..\Services\Sdr\SdrDeviceInfo.cs"   Link="LinkedSdr\SdrDeviceInfo.cs"   />
-    <Compile Include="..\..\Services\Sdr\SdrplayDevice.cs"   Link="LinkedSdr\SdrplayDevice.cs"   />
-    <Compile Include="..\..\Services\Sdr\SoapySdrDevice.cs"  Link="LinkedSdr\SoapySdrDevice.cs"  />
-    <Compile Include="..\..\Services\Sdr\SoapySdrInterop.cs" Link="LinkedSdr\SoapySdrInterop.cs" />
-    <Compile Include="..\..\Services\Sdr\FftProcessor.cs"    Link="LinkedSdr\FftProcessor.cs"    />
+    <Compile Include="..\..\Services\Sdr\ISdrDevice.cs"        Link="LinkedSdr\ISdrDevice.cs"        />
+    <Compile Include="..\..\Services\Sdr\SdrDeviceInfo.cs"     Link="LinkedSdr\SdrDeviceInfo.cs"     />
+    <Compile Include="..\..\Services\Sdr\SdrplayDevice.cs"     Link="LinkedSdr\SdrplayDevice.cs"     />
+    <Compile Include="..\..\Services\Sdr\SdrplayDllResolver.cs" Link="LinkedSdr\SdrplayDllResolver.cs" />
+    <Compile Include="..\..\Services\Sdr\SoapySdrDevice.cs"    Link="LinkedSdr\SoapySdrDevice.cs"    />
+    <Compile Include="..\..\Services\Sdr\SoapySdrInterop.cs"   Link="LinkedSdr\SoapySdrInterop.cs"   />
+    <Compile Include="..\..\Services\Sdr\FftProcessor.cs"      Link="LinkedSdr\FftProcessor.cs"      />
   </ItemGroup>
 
 </Project>
