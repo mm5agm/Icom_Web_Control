@@ -2382,6 +2382,39 @@ namespace Yaesu_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        // CW Auto Zero In — fire-and-forget trigger. Radio nudges the VFO so
+        // the received CW signal sits exactly at the operator's preferred CW
+        // pitch (the value set via KP). Requested by IK2XRW Alessandro (#55).
+        //
+        // Yaesu format: ZI{P1};
+        //   P1 = 0  MAIN band (= VFO A on dual-receiver, the only receiver
+        //           on single-receiver radios)
+        //   P1 = 1  SUB band (FTdx101 only; rejected on single-receiver)
+        //
+        // On dual-receiver radios we target whichever VFO is currently
+        // "active" per VS so the user just clicks once without having to
+        // pick a side. On single-receiver radios P1 is hard-coded to 0
+        // (the radio firmware refuses anything else for P1=0-Fixed
+        // commands — see the helper-block comment near the top of this
+        // file).
+        [HttpPost("cw/zin")]
+        public async Task<IActionResult> CwZeroIn()
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                string p1 = _radioStateService.IsSingleReceiver
+                    ? "0"
+                    : (_radioStateService.ActiveVfo == 1 ? "1" : "0");
+                await _catClient.SendCommandAsync($"ZI{p1};", "WebUI", CancellationToken.None);
+                return Ok();
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error sending CW Zero In"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
         [HttpPost("cw/breakin")]
         public async Task<IActionResult> SetCwBreakIn([FromBody] CwBreakInRequest request)
         {

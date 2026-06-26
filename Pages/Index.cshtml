@@ -1477,6 +1477,10 @@
                    oninput="document.getElementById('cwSpeedValue').textContent = this.value"
                    onchange="setCwSpeed(this.value)"
                    aria-label="CW keyer speed" title="CW keyer speed in WPM">
+            <button type="button" class="btn btn-sm btn-outline-light flex-shrink-0"
+                    onclick="cwZeroIn()"
+                    title="CW Auto Zero In — nudges the active VFO so the received CW signal sits at your preferred pitch"
+                    aria-label="CW Auto Zero In">ZIN</button>
         </div>
         <div class="d-flex align-items-center gap-2">
             <label class="mb-0 text-nowrap" style="min-width:100px;">Break-in:</label>
@@ -3641,6 +3645,12 @@
             try { await fetch('/api/cat/cw/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed: parseInt(v) }) }); }
             catch (e) { console.error('setCwSpeed error:', e); }
         }
+        async function cwZeroIn() {
+            // Fire-and-forget: radio decides on its own whether a CW signal
+            // is in range; no response to parse here.
+            try { await fetch('/api/cat/cw/zin', { method: 'POST' }); }
+            catch (e) { console.error('cwZeroIn error:', e); }
+        }
         async function setCwBreakIn(v) {
             try { await fetch('/api/cat/cw/breakin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: v }) }); }
             catch (e) { console.error('setCwBreakIn error:', e); }
@@ -3888,6 +3898,7 @@
         window.saveFmRepeater  = saveFmRepeater;
         window.setCwPitch      = setCwPitch;
         window.setCwSpeed      = setCwSpeed;
+        window.cwZeroIn        = cwZeroIn;
         window.setCwBreakIn    = setCwBreakIn;
         window.setCwBreakInDelay = setCwBreakInDelay;
         window.sendCwMessage   = sendCwMessage;
