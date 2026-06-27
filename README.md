@@ -226,7 +226,16 @@ For most users with a standard SDRplay install the change is invisible: the SDR 
 
 ### ZIN button for CW ([#55](https://github.com/mm5agm/Yaesu_Web_Control/issues/55))
 
-Requested by IK2XRW Alessandro. Small **ZIN** button on the Speed WPM row of the CW Keyer popout triggers the radio's CW Auto-Zero-In function (`ZI` CAT command) — the radio nudges the VFO so the received CW signal sits exactly at the operator's preferred CW pitch. Targets whichever VFO is currently active per VS, so a single click does the right thing on both single- and dual-receiver radios.
+Requested by IK2XRW Alessandro. Triggers the radio's CW Auto-Zero-In function (`ZI` CAT command) — the radio nudges the VFO so the received CW signal sits exactly at the operator's preferred CW pitch.
+
+After Alessandro's feedback that S&P-mode operating doesn't fit well with popout-only controls, ZIN appears in **two places**:
+
+- **One ZIN button in each VFO panel's header** — always visible, no popup needed. Each button targets its own VFO explicitly: VFO A's button fires `ZI0;` (MAIN); VFO B's fires `ZI1;` (SUB on the FTdx101 family; silently maps to MAIN on single-receiver radios).
+- **Plus the existing ZIN button on the Speed WPM row of the CW Keyer popout** — kept because some operators prefer keeping their CW controls clustered. This one follows whichever VFO is currently active per VS.
+
+### Spectrum click — crosshair follows the clicked frequency
+
+When you click the spectrum to QSY, the spectrum recentres on the new VFO frequency. The live crosshair (the vertical line that tracks your mouse position) used to stay at its pixel position — which meant the *frequency* under the cursor briefly shifted by hundreds of Hz after the click, until you next moved the mouse. The crosshair now jumps to the canvas centre at click time, where the clicked frequency now sits, so the readout label stays on the frequency you just picked. The next real mouse movement resumes normal tracking.
 
 ### DX Spots list — click now sets mode as well as frequency ([#57](https://github.com/mm5agm/Yaesu_Web_Control/issues/57))
 

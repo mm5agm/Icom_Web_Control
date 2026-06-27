@@ -617,7 +617,7 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 | Control | Description |
 |---------|-------------|
 | Speed | Keyer speed in WPM (4–60) |
-| ZIN | CW Auto Zero In. One click sends the Yaesu `ZI` command; the radio nudges the VFO so the received CW signal sits exactly at your configured CW pitch (set via the Pitch control). Much faster than chasing the signal with the VFO knob. Targets whichever VFO is currently active on dual-receiver radios. |
+| ZIN | CW Auto Zero In. One click sends the Yaesu `ZI` command; the radio nudges the VFO so the received CW signal sits exactly at your configured CW pitch (set via the Pitch control). Much faster than chasing the signal with the VFO knob. Targets whichever VFO is currently active on dual-receiver radios. **Also available as a per-VFO ZIN button in each VFO panel's header** — handy for Search-and-Pounce operating when you don't want to open the popout for every signal. The per-VFO buttons target their specific VFO regardless of which is currently focused. |
 | Break-in | **Off** (keyer only), **Semi** (semi break-in), or **Full** (QSK full break-in) |
 | Delay | Semi break-in delay (0–2500 ms) — only relevant in Semi mode |
 | Pitch | CW sidetone pitch frequency (300–1050 Hz in 10 Hz steps). Also sets the CW receive offset so the radio zero-beats at this tone. Read from the radio on connect. |
