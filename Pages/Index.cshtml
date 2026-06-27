@@ -603,6 +603,10 @@
                     </h5>
                     <div class="d-flex align-items-center gap-2">
                         <span id="splitTxBadgeA" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                        <button type="button" id="zinBtnA" class="btn btn-outline-light btn-sm"
+                                onclick="cwZeroIn('A')"
+                                aria-label="VFO A CW Auto Zero In"
+                                title="CW Auto Zero In on VFO A — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
                         <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
                                 onclick="toggleTx()" title="Toggle Transmit">
                             <i class="bi bi-broadcast" aria-hidden="true"></i> TX
@@ -945,6 +949,10 @@
                     </h5>
                     <div class="d-flex align-items-center gap-2">
                         <span id="splitTxBadgeB" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                        <button type="button" id="zinBtnB" class="btn btn-outline-light btn-sm"
+                                onclick="cwZeroIn('B')"
+                                aria-label="VFO B CW Auto Zero In"
+                                title="CW Auto Zero In on VFO B — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
                         <button id="txButtonB" class="btn btn-warning btn-sm" style="display:none;"
                                 onclick="toggleTx()" title="Toggle Transmit">
                             <i class="bi bi-broadcast" aria-hidden="true"></i> TX
@@ -3645,10 +3653,13 @@
             try { await fetch('/api/cat/cw/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed: parseInt(v) }) }); }
             catch (e) { console.error('setCwSpeed error:', e); }
         }
-        async function cwZeroIn() {
-            // Fire-and-forget: radio decides on its own whether a CW signal
-            // is in range; no response to parse here.
-            try { await fetch('/api/cat/cw/zin', { method: 'POST' }); }
+        // vfo argument: 'a', 'b', or 'active'. Fire-and-forget. The CW Keyer
+        // popup button passes 'active' so it follows whichever VFO is in
+        // focus; the per-VFO buttons on each VFO panel pass their own letter
+        // so they always target that specific receiver.
+        async function cwZeroIn(vfo) {
+            const target = (vfo === 'A' || vfo === 'B') ? vfo.toLowerCase() : 'active';
+            try { await fetch(`/api/cat/cw/zin/${target}`, { method: 'POST' }); }
             catch (e) { console.error('cwZeroIn error:', e); }
         }
         async function setCwBreakIn(v) {

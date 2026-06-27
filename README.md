@@ -191,6 +191,47 @@ YWC's fullscreen toggle is **F** (bare letter, no modifiers) per [§13 Keyboard 
 
 YWC now has a fifth external-app slot for **Fldigi**, requested by Bill W1WRH. Same pattern as the existing WSJT-X / JTAlert / Log4OM / GridTracker buttons: configure the path in **Application Setup**, tick **Show**, save, and the launch button appears on the main page after GridTracker. Defaults to hidden so existing users see no change until they opt in. Process detection uses the `fldigi.exe` task-manager name.
 
+### PROC button + level slider now actually drive the radio ([#51](https://github.com/mm5agm/Yaesu_Web_Control/issues/51))
+
+Reported by solson888 on the FTdx10, confirmed on the FTdx101MP too — the universal bug was that YWC was sending `PR0;`/`PR1;` for the speech-processor on/off button, but per the Yaesu CAT manual that's a **read** command, not a set. The radio dutifully read back its state and changed nothing. YWC now sends the correct `PR00;`/`PR01;` set commands. (Bench testing also confirmed the manual's P2 values are wrong — the documented `1=OFF / 2=ON` is actually `0=OFF / 1=ON`. The CAT manual will be reporting itself shortly.) The PROC level slider now reads the value back from the radio after each write so the on-screen number is always what the radio really has, not just what YWC sent.
+
+### Audio Filter popout (replaces broken IF Low Cut)
+
+The "IF Low Cut" dropdown on each VFO panel was sending the `SL` CAT command — which is not documented for any current Yaesu HF transceiver (FTdx101MP/D, FTdx10, FT-710, FTDX3000, FT-991A). The radio silently ignored it, so the control was a phantom: changing the dropdown looked like it was doing something but nothing actually reached the radio. Confirmed by Jacek SP3L on FTdx10 (#48) and the developer's own FTdx101MP.
+
+The fix replaces the dropdown with a new **Audio Filter** button on each VFO panel that opens a dedicated popout dialog exposing the full per-mode passband shaping the radio actually has:
+
+- **LCUT FREQ** — low-cut cutoff frequency, OFF or 100–1000 Hz in 50 Hz steps
+- **LCUT SLOPE** — 6 dB/oct or 18 dB/oct
+- **HCUT FREQ** — high-cut cutoff frequency, OFF or 700–4000 Hz in 50 Hz steps
+- **HCUT SLOPE** — 6 dB/oct or 18 dB/oct
+
+The radio stores these values **per mode class** (one set per SSB / AM / FM / PSK-DATA / RTTY / CW), so changing mode automatically restores that mode's stored settings. The dialog reads the current mode's values when opened and writes back via the Yaesu `EX` (menu) command; on the FTdx101 family the values are shared between MAIN and SUB when both receivers are in the same mode (the dialog shows a discreet "VFO B is also in SSB" note when that's the case). On older radios where some entries aren't exposed via CAT — e.g. FT-991A in FM has no LCUT/HCUT settings, FTDX3000 in RTTY has no LCUT SLOPE — the corresponding control is greyed out.
+
+One **Audio Filter** button per VFO panel; both dialogs can be open simultaneously on dual-receiver radios. Each dialog is independently draggable and remembers its position. Per-radio EX address tables for all five supported models are bundled in `wwwroot/data/audio-filter-ex-map.json`.
+
+### SDRplay API auto-detect + install-path Settings field ([#53](https://github.com/mm5agm/Yaesu_Web_Control/issues/53))
+
+IK2XRW Alessandro discovered that on his system YWC couldn't find `sdrplay_api.dll` even though the SDRplay API was installed, because Windows P/Invoke search doesn't reach the SDRplay install folder unless its `x64` directory was added to `PATH` (which it wasn't on his machine). YWC now actively searches for the DLL rather than relying on `PATH`:
+
+1. A new user-configurable **SDRplay install path** field in **Settings → SDR Spectrum Display** (advanced, blank = auto-detect)
+2. YWC's app directory next to `Yaesu_Web_Control.exe`
+3. `C:\Program Files\SDRplay\API\x64\sdrplay_api.dll`
+4. `C:\Program Files (x86)\SDRplay\API\x64\sdrplay_api.dll`
+5. Fall back to default Windows DLL search (which honours `PATH`)
+
+The Settings page also shows what the auto-detect resolved to (`Auto-detected: <path>` in green) or a warning if nothing was found, and includes a **Browse…** button that opens a native Windows folder picker on the YWC host's desktop. The picker refuses (with a clear error) when called from a remote browser, since the dialog only appears on the host machine.
+
+For most users with a standard SDRplay install the change is invisible: the SDR just works without needing to touch `PATH`. For users like Alessandro who had to copy the DLL into YWC's folder as a workaround, the copy is no longer needed.
+
+### ZIN button for CW ([#55](https://github.com/mm5agm/Yaesu_Web_Control/issues/55))
+
+Requested by IK2XRW Alessandro. Small **ZIN** button on the Speed WPM row of the CW Keyer popout triggers the radio's CW Auto-Zero-In function (`ZI` CAT command) — the radio nudges the VFO so the received CW signal sits exactly at the operator's preferred CW pitch. Targets whichever VFO is currently active per VS, so a single click does the right thing on both single- and dual-receiver radios.
+
+### DX Spots list — click now sets mode as well as frequency ([#57](https://github.com/mm5agm/Yaesu_Web_Control/issues/57))
+
+Requested by IK2XRW Alessandro. Clicking a row in the DX Spots popup now follows the QSY with a band-plan-aware mode change, matching what spectrum-panel clicks have always done. Click an FT8 spot from USB and the radio flips to DATA-U; click a CW spot from FT8 and it flips to CW-U; and so on. The mode is derived from the band-plan (not from the spot's free-text comment) so it's consistent and reliable.
+
 ---
 
 ## 2026-06-22 - v2.3.9

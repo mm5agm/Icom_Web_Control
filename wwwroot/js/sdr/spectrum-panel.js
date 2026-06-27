@@ -446,6 +446,15 @@ export class SpectrumPanel {
         if (targetMode && window.setMode) {
             try { window.setMode(this._vfo, targetMode); } catch { /* ignore */ }
         }
+
+        // Snap the live crosshair to the canvas centre so it visually
+        // "follows" the clicked frequency once the spectrum recentres on
+        // the new VFO. Without this the user's mouse hasn't moved but the
+        // frequency under it has shifted left/right, so the crosshair label
+        // would briefly show the wrong frequency until the next mousemove.
+        // The next real mousemove resets _crosshairX to wherever the mouse
+        // actually is, so this is a one-shot visual fixup, not persistent.
+        this._crosshairX = Math.floor(W / 2);
     }
 
     _onCanvasWheel(e) {

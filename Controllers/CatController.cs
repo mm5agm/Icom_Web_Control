@@ -2391,23 +2391,42 @@ namespace Yaesu_Web_Control.Controllers
         //           on single-receiver radios)
         //   P1 = 1  SUB band (FTdx101 only; rejected on single-receiver)
         //
-        // On dual-receiver radios we target whichever VFO is currently
-        // "active" per VS so the user just clicks once without having to
-        // pick a side. On single-receiver radios P1 is hard-coded to 0
-        // (the radio firmware refuses anything else for P1=0-Fixed
-        // commands — see the helper-block comment near the top of this
-        // file).
-        [HttpPost("cw/zin")]
-        public async Task<IActionResult> CwZeroIn()
+        // {vfo} URL segment selects which VFO:
+        //   "a"      → P1=0 explicitly                    (VFO A button)
+        //   "b"      → P1=1 on dual-receiver, P1=0 forced on single-receiver
+        //              (which silently rejects P1=1 on P1=0-Fixed commands)
+        //   "active" → follow VS / single-receiver fall-back. Used by the
+        //              CW Keyer popup button so one click does the right
+        //              thing without needing to know which side is in focus.
+        [HttpPost("cw/zin/{vfo}")]
+        public async Task<IActionResult> CwZeroIn(string vfo)
         {
+            string v = (vfo ?? "").Trim().ToLowerInvariant();
+            if (v != "a" && v != "b" && v != "active")
+                return BadRequest(new { error = "VFO must be 'a', 'b', or 'active'" });
+
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
                 await EnsureConnectedAsync();
-                string p1 = _radioStateService.IsSingleReceiver
-                    ? "0"
-                    : (_radioStateService.ActiveVfo == 1 ? "1" : "0");
+                string p1;
+                if (v == "active")
+                {
+                    p1 = _radioStateService.IsSingleReceiver
+                        ? "0"
+                        : (_radioStateService.ActiveVfo == 1 ? "1" : "0");
+                }
+                else
+                {
+                    // Explicit per-VFO targeting. On single-receiver radios
+                    // P1=1 is silently ignored by the radio firmware, so the
+                    // VFO B button is functionally a no-op there — that's
+                    // accurate to how the hardware behaves.
+                    p1 = _radioStateService.IsSingleReceiver
+                        ? "0"
+                        : (v == "b" ? "1" : "0");
+                }
                 await _catClient.SendCommandAsync($"ZI{p1};", "WebUI", CancellationToken.None);
                 return Ok();
             }

@@ -16,7 +16,7 @@
    - 5.5 [VFO Panels](#55-vfo-panels)
    - 5.6 [Frequency Display and Tuning](#56-frequency-display-and-tuning)
    - 5.7 [Receiver Controls](#57-receiver-controls)
-   - 5.8 [IF Width, IF Low Cut, IF Shift, and AF Gain](#58-if-width-if-low-cut-if-shift-and-af-gain)
+   - 5.8 [IF Width, Audio Filter, IF Shift, and AF Gain](#58-if-width-audio-filter-if-shift-and-af-gain)
    - 5.9 [Band and Segment Selection](#59-band-and-segment-selection)
    - 5.10 [Transmit Controls](#510-transmit-controls)
    - 5.11 [VOX Panel](#511-vox-panel)
@@ -26,6 +26,7 @@
    - 5.15 [Memory Panel](#515-memory-panel)
    - 5.16 [Voice Announcements](#516-voice-announcements)
    - 5.17 [DX Spots List](#517-dx-spots-list)
+   - 5.18 [Audio Filter popout](#518-audio-filter-popout)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -188,7 +189,7 @@ A small **YWC tray icon** appears in the Windows system tray (down by the clock,
 | Open Yaesu Web Control | Opens YWC in your default browser. |
 | About — version vX.Y.Z | Shows version, release date, and licence. The browser About page (top nav bar) has full details and a Copy diagnostics button. |
 | Open user data folder | Opens `%APPDATA%\MM5AGM\Yaesu Web Control\` in File Explorer — handy for grabbing the backup zip after export, or inspecting/editing JSON files. |
-| Exit Yaesu Web Control | Confirms then shuts the app down cleanly. WSJT-X / Log4OM / JTAlert / GridTracker lose their CAT connection until you restart YWC. |
+| Exit Yaesu Web Control | Confirms then shuts the app down cleanly. WSJT-X / Log4OM / JTAlert / GridTracker / Fldigi lose their CAT connection until you restart YWC. |
 
 ![YWC tray icon with right-click menu open, showing Open / About / Open user data folder / Exit](pictures/SystemTrayIcon.png)
 
@@ -211,7 +212,7 @@ The top bar contains navigation links, external application buttons, and the rad
 
 **Update notification** — on startup the app silently checks the GitHub releases page for a newer version. If one is available, a small banner appears in the bottom-right corner with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 
-**External app buttons** (WSJT-X, JTAlert, Log4OM) appear if they are enabled in Application Setup. The colour of each button indicates status:
+**External app buttons** (WSJT-X, JTAlert, Log4OM, GridTracker, Fldigi) appear if they are enabled in Application Setup. The colour of each button indicates status:
 
 | Colour | Meaning |
 |--------|---------|
@@ -476,7 +477,7 @@ All of these settings are read from the radio when the app connects.
 
 ---
 
-### 5.8 IF Width, IF Low Cut, IF Shift, and AF Gain
+### 5.8 IF Width, Audio Filter, IF Shift, and AF Gain
 
 **IF Width** — Sets the DSP filter bandwidth.
 
@@ -488,11 +489,11 @@ The IF Width dropdown is **mode-aware**: the SH command code sent to the radio i
 
 The first entry in the dropdown ("Default") is the radio's mode-dependent default, which varies by the selected roofing filter. The current width is read from the radio on connect; selecting a new value sends it immediately.
 
+**Audio Filter button** — Opens the **Audio Filter** popout dialog for this VFO, where you can adjust the per-mode LCUT FREQ, LCUT SLOPE, HCUT FREQ and HCUT SLOPE. See [§5.18](#518-audio-filter-popout) for the full description. Replaces the IF Low Cut dropdown that was in this row in v2.3.9 and earlier — that control was sending a CAT command no current Yaesu HF radio actually supports, so it was a no-op. The new Audio Filter popout uses EX menu commands that the radio honours.
+
 > **About the FTdx101 "4 kHz" firmware update** — Yaesu's 2023 firmware release notes mention *"Increased RX IF Band WIDTH up to 4000 Hz"* for SSB, CW, RTTY, PSK and DATA. This is **not** an extension of the IF Width dropdown's range. The FTdx101's IF DSP filter (SH command) still tops out at 3.2 kHz in SSB and 3.0 kHz in CW — the dropdown values in this app are correct and match the Yaesu CAT manual.
 >
-> What the firmware *did* extend is **HCUT** — the audio high-cut filter that shapes audio inside the IF passband. HCUT now goes up to 4000 Hz (was 3000 Hz). HCUT is an EX menu setting on the radio's own touch screen — set it once on the radio and it stays. The app does not control HCUT directly. If you want fuller audio (e.g. 4 kHz HCUT for SSB ESSB-style audio), set it via your radio's **Function → Radio Setting → Mode SSB → HCUT FREQ** menu.
-
-**IF Low Cut** — Sets the lower edge of the DSP passband (SL command). Options: OFF, 100 Hz, 200 Hz, 300 Hz, 400 Hz, 500 Hz, 600 Hz, 700 Hz, 800 Hz, 900 Hz, 1.0 kHz, 1.1 kHz. Use this to cut low-frequency audio or interference — for example, 300 Hz in SSB to reduce hum and LF splatter. This setting is independent per VFO.
+> What the firmware *did* extend is **HCUT** — the audio high-cut filter that shapes audio inside the IF passband. HCUT now goes up to 4000 Hz (was 3000 Hz). You can now adjust HCUT directly from YWC's **Audio Filter** popout (§5.18) — no need to dig through the radio's own touch-screen menu.
 
 **IF Shift** — Shifts the passband centre ±1000 Hz in 20 Hz steps. Drag the slider or use the keyboard arrow keys. The current offset is shown next to the slider.
 
@@ -616,6 +617,7 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 | Control | Description |
 |---------|-------------|
 | Speed | Keyer speed in WPM (4–60) |
+| ZIN | CW Auto Zero In. One click sends the Yaesu `ZI` command; the radio nudges the VFO so the received CW signal sits exactly at your configured CW pitch (set via the Pitch control). Much faster than chasing the signal with the VFO knob. Targets whichever VFO is currently active on dual-receiver radios. |
 | Break-in | **Off** (keyer only), **Semi** (semi break-in), or **Full** (QSK full break-in) |
 | Delay | Semi break-in delay (0–2500 ms) — only relevant in Semi mode |
 | Pitch | CW sidetone pitch frequency (300–1050 Hz in 10 Hz steps). Also sets the CW receive offset so the radio zero-beats at this tone. Read from the radio on connect. |
@@ -768,7 +770,7 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 | Spotter | The station that reported the spot |
 | Comment | Free-text comment from the spotter |
 
-**Click any row** to QSY VFO A to that spot's frequency.
+**Click any row** to QSY VFO A to that spot's frequency **and switch mode** to match the band-plan segment the frequency falls into (FT8 → DATA-U, CW → CW-U, phone segments → USB or LSB as appropriate, etc.). This matches the click-to-tune behaviour on the spectrum panel — so clicking an FT8 spot from a phone segment flips the radio to DATA-U in one step rather than leaving you on the wrong mode.
 
 **Click any column header** to sort by that column; click again to reverse the sort direction. The current sort is shown by a ▲ or ▼ next to the column name.
 
@@ -792,6 +794,37 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 **Position and persistence** — drag the title bar to move the panel anywhere on screen. Panel position, size, sort column, sort direction, and the All bands setting are all saved per browser so the panel returns to where you left it next session.
 
 **Empty state** — if you see "No spots on this band", either no spots are in the buffer yet (cluster just connected, give it a few seconds), or the DX cluster feature isn't configured at all (see §6.6).
+
+---
+
+### 5.18 Audio Filter popout
+
+The **Audio Filter** button on each VFO panel (where the old "IF Low Cut" dropdown used to be) opens a popout dialog for adjusting the receive audio passband shape for the VFO's current mode.
+
+Four controls in each dialog:
+
+| Control | What it does |
+|---|---|
+| **LCUT FREQ** | Low-cut filter frequency. OFF, or 100 Hz – 1 kHz in 50 Hz steps. Sliders show Hz; tick **Off** to disable the filter entirely. |
+| **LCUT SLOPE** | Toggle button: **6 dB/oct** (gentle) or **18 dB/oct** (steep). |
+| **HCUT FREQ** | High-cut filter frequency. OFF, or 700 Hz – 4 kHz in 50 Hz steps. |
+| **HCUT SLOPE** | Toggle button: **6 dB/oct** or **18 dB/oct**. |
+
+**Per-mode storage.** The radio internally remembers a separate set of four values for each mode class — SSB, AM, FM, PSK/DATA, RTTY, CW. Switching mode automatically restores that mode's stored values; the dialog re-queries when the mode changes and the sliders jump to the new mode's settings. So you can have (for example) LCUT 200 Hz / HCUT 2.7 kHz for SSB and LCUT 500 Hz / HCUT 1 kHz for CW, and the radio swaps them in and out automatically as you change mode.
+
+**FTdx101 dual-receiver — both VFOs at once.** On the FTdx101 family you can open both VFO A's and VFO B's Audio Filter dialogs simultaneously; each opens with one click of its own button and can be dragged anywhere on screen, with positions remembered independently. When both VFOs happen to be in the same mode class, the dialogs show a small note ("VFO B is also in SSB — these settings affect both VFOs") because the radio shares the values between the two receivers for the same mode.
+
+**Replaces the old IF Low Cut dropdown.** The dropdown that was there in v2.3.9 sent a CAT command (`SL`) that turned out not to exist on any of YWC's supported radios — so it was a phantom control that *looked* like it was doing something but never actually reached the radio. The Audio Filter popout uses the radio's `EX` (menu) command path, which all five supported radios honour, so the values you set actually take effect on the audio.
+
+**Per-radio support.** Per-mode CAT availability varies:
+
+- **FTdx101MP / D**, **FTdx10**, **FT-710** — full support for all four controls in every mode.
+- **FTDX3000** — full support except RTTY LCUT SLOPE (the radio's CAT menu doesn't expose it; the corresponding control is greyed out).
+- **FT-991A** — full support in SSB / AM / DATA / RTTY / CW. In FM mode the radio doesn't expose any of the four via CAT, so all controls are greyed out.
+
+When a control is greyed out for the current mode + radio combination, the explanation is that the radio's CAT command set simply doesn't include that setting for that mode — you'd need to set it on the radio's front-panel menu instead (if it's adjustable there at all).
+
+**How the writes are confirmed.** Each slider change reads the value back from the radio after writing, so the on-screen value reflects what the radio actually stored — not just what YWC sent. This catches the rare cases where the radio clamps or refuses a value.
 
 ---
 
@@ -894,6 +927,12 @@ If you have two SDRs (typically two SDRplay RSPs) and a dual-receiver radio (FTd
 If you only have one SDR, set it in the **VFO A SDR** slot and leave **VFO B SDR** as *(none)*. The main page will show only the VFO A panel exactly as in single-SDR setups before v2.3.0.
 
 > **Note on SDRplay devices specifically:** the SDRplay API service only allows one device per host process. YWC works around this by launching a separate background process (`Yaesu_Sdr_Worker.exe`) for each SDR you configure — you'll see them in Task Manager when YWC is streaming. They start and stop automatically; no user action needed. See [docs/decisions/0001-dual-sdr-architecture.md](docs/decisions/0001-dual-sdr-architecture.md) on GitHub if you're curious about the why.
+
+> **If YWC can't find your SDRplay device:** YWC needs to be able to load `sdrplay_api.dll` from the SDRplay install folder. For a standard install at `C:\Program Files\SDRplay\API\x64\sdrplay_api.dll` this just works — YWC auto-detects the path on startup. If you installed SDRplay to a non-standard location and your Windows `PATH` doesn't include its `x64` folder, YWC may fail to find the DLL.
+>
+> A new **SDRplay install path** field on the Settings page (in the same SDR Spectrum Display section as the IF Frequency) lets you point YWC explicitly at your SDRplay API folder. Leave it blank for auto-detect — the field shows the auto-detected path in green below it (or an amber warning if nothing was found), with a one-click **Use this path** link to fill the field, and a **Browse…** button that opens a native Windows folder picker.
+>
+> The Browse… picker opens on the same PC running YWC; if you're operating from a tablet over the LAN, the picker can't appear on your screen and you'll be told to come to the YWC host PC (or type the path into the field manually).
 
 When both VFOs have an SDR, the main control panel gains two small toggle groups above the spectrum panels:
 
@@ -1114,7 +1153,7 @@ Access Application Setup from the navigation bar. This page configures the exter
 
 ### 7.1 External App Buttons
 
-Up to four buttons can appear in the top bar to launch external applications. For each button you can set:
+Up to five buttons can appear in the top bar to launch external applications. For each button you can set:
 
 - **Show / Hide** — whether the button appears on the main page
 - **Button Name** — the label shown on the button (e.g., "WSJT-X")
@@ -1128,8 +1167,9 @@ Default command lines:
 | JTAlert | `C:\HamApps\JTAlert\JTAlert.exe` |
 | Log4OM | `"C:\Program Files (x86)\Log4OM 2\Log4OM.exe"` |
 | GridTracker | `"C:\Program Files\GridTracker2\GridTracker2.exe"` |
+| Fldigi | `"C:\Program Files\Fldigi-4.2.11\fldigi.exe"` (version may differ) |
 
-Adjust these to match where you have installed each program. GridTracker is **off by default** — tick its **Show** box once you've installed it and confirmed the command line is correct.
+Adjust these to match where you have installed each program. GridTracker and Fldigi are **off by default** — tick the **Show** box for each once you've installed it and confirmed the command line is correct. The Fldigi button was added in v2.4.0 at the request of Bill W1WRH ([#52](https://github.com/mm5agm/Yaesu_Web_Control/issues/52)); the process detection uses the `fldigi.exe` task-manager name.
 
 #### Path quoting — important
 
