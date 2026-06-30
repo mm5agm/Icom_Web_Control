@@ -78,6 +78,17 @@ namespace Yaesu_Web_Control.Pages
         public double SdrSampleRateHz  { get; set; } = 2_048_000;
         public double SdrSampleRateHzA { get; set; } = 2_048_000;
         public double SdrSampleRateHzB { get; set; } = 2_048_000;
+
+        // Per-VFO spectrum DSP knobs — initial values for the Low/High/Zoom
+        // sliders on each spectrum panel. Persisted server-side; see
+        // ApplicationSettings.SdrSpectrum* and Controllers/SdrController dsp endpoint.
+        public float SdrSpectrumGainA   { get; set; } = 1.0f;
+        public float SdrSpectrumGainB   { get; set; } = 1.0f;
+        public float SdrSpectrumLowDbA  { get; set; } = -120f;
+        public float SdrSpectrumLowDbB  { get; set; } = -120f;
+        public float SdrSpectrumHighDbA { get; set; } = 0f;
+        public float SdrSpectrumHighDbB { get; set; } = 0f;
+
         public string BandPlan { get; set; } = "Region1";
         public string RadioModel { get; set; } = "FTdx101MP";
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
@@ -114,6 +125,12 @@ namespace Yaesu_Web_Control.Pages
             SdrSampleRateHz  = settings.SdrSampleRateHzA;     // legacy single value, used by old code paths
             SdrSampleRateHzA = settings.SdrSampleRateHzA;
             SdrSampleRateHzB = settings.SdrSampleRateHzB;
+            SdrSpectrumGainA   = settings.SdrSpectrumGainA;
+            SdrSpectrumGainB   = settings.SdrSpectrumGainB;
+            SdrSpectrumLowDbA  = settings.SdrSpectrumLowDbA;
+            SdrSpectrumLowDbB  = settings.SdrSpectrumLowDbB;
+            SdrSpectrumHighDbA = settings.SdrSpectrumHighDbA;
+            SdrSpectrumHighDbB = settings.SdrSpectrumHighDbB;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;

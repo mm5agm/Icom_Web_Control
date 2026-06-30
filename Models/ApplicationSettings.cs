@@ -99,6 +99,22 @@
         public long SdrIfFrequencyHz { get; set; } = 9_000_000;
         public int SdrFftSize { get; set; } = 1024;
 
+        // Per-VFO spectrum DSP knobs (see SpectrumProcessor). Live-controlled
+        // from the three sliders on each spectrum panel; persisted here so
+        // settings survive YWC restarts and re-apply to a new worker session.
+        //
+        //   Gain    — pre-dB linear gain G (design doc §4.1). 1.0 = no boost.
+        //   LowDb   — display clamp lower bound (SDR Console "Low"). Bins below
+        //             this are pinned. Default -120 = full SDR range.
+        //   HighDb  — display clamp upper bound (SDR Console "High"). Default
+        //             0 = full SDR range.
+        public float SdrSpectrumGainA   { get; set; } = 1.0f;
+        public float SdrSpectrumGainB   { get; set; } = 1.0f;
+        public float SdrSpectrumLowDbA  { get; set; } = -120f;
+        public float SdrSpectrumLowDbB  { get; set; } = -120f;
+        public float SdrSpectrumHighDbA { get; set; } = 0f;
+        public float SdrSpectrumHighDbB { get; set; } = 0f;
+
         // Optional user override for the SDRplay API install directory
         // (the folder that contains the x64\sdrplay_api.dll subfolder).
         // Leave blank for auto-detect: SdrplayDllResolver tries the app

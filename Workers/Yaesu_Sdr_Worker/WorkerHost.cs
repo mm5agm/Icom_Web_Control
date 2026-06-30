@@ -21,7 +21,8 @@ namespace Yaesu_Web_Control.Workers.Sdr;
 
 internal sealed class WorkerHost
 {
-    private readonly WorkerOptions _opts;
+    private readonly WorkerOptions     _opts;
+    private readonly SpectrumProcessor _processor = new();
 
     public WorkerHost(WorkerOptions opts) => _opts = opts;
 
@@ -64,6 +65,25 @@ internal sealed class WorkerHost
         ISdrDevice? device = null;
         int exit = 0;
 
+        // Background reader for main → worker DSP knob updates. Runs for the
+        // lifetime of the connection; exceptions are logged but don't kill
+        // the FFT pipeline.
+        var controlReader = new ControlReader(stream);
+        controlReader.DspSettingsReceived += s =>
+        {
+            _processor.GainLinear = s.GainLinear;
+            _processor.DbFloor    = s.DbFloor;
+            _processor.DbCeiling  = s.DbCeiling;
+            // EMA history is from the previous render scale — drop it so the
+            // new clamp/gain values land cleanly without a smear-in.
+            _processor.ResetSmoothing();
+        };
+        _ = Task.Run(async () =>
+        {
+            try { await controlReader.RunAsync(stoppingToken).ConfigureAwait(false); }
+            catch (Exception ex) { Log($"control reader exited: {ex.Message}"); }
+        }, stoppingToken);
+
         try
         {
             await writer.WriteStatusAsync("connecting", stoppingToken).ConfigureAwait(false);
@@ -88,7 +108,7 @@ internal sealed class WorkerHost
                     .ConfigureAwait(false);
                 if (!got) continue;
 
-                float[] bins = FftProcessor.ComputeSpectrum(iqBuffer, _opts.FftSize);
+                float[] bins = _processor.ComputeSpectrum(iqBuffer, _opts.FftSize);
 
                 // Round to 1 dp before transmission (same precision as the
                 // current SignalR path, keeps frames small).

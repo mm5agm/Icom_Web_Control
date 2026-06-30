@@ -31,7 +31,8 @@
     <Compile Include="..\..\Services\Sdr\SdrplayDllResolver.cs" Link="LinkedSdr\SdrplayDllResolver.cs" />
     <Compile Include="..\..\Services\Sdr\SoapySdrDevice.cs"    Link="LinkedSdr\SoapySdrDevice.cs"    />
     <Compile Include="..\..\Services\Sdr\SoapySdrInterop.cs"   Link="LinkedSdr\SoapySdrInterop.cs"   />
-    <Compile Include="..\..\Services\Sdr\FftProcessor.cs"      Link="LinkedSdr\FftProcessor.cs"      />
+    <Compile Include="..\..\Services\Sdr\SpectrumProcessor.cs" Link="LinkedSdr\SpectrumProcessor.cs" />
+    <Compile Include="..\..\Services\Sdr\WireProtocol.cs"      Link="LinkedSdr\WireProtocol.cs"      />
   </ItemGroup>
 
 </Project>

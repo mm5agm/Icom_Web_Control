@@ -6,6 +6,7 @@
 // 'notes' contains plain-English installation guidance when drivers are missing.
 
 using Yaesu_Web_Control.Services.Sdr;
+using Yaesu_Web_Control.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Yaesu_Web_Control.Controllers
@@ -16,11 +17,13 @@ namespace Yaesu_Web_Control.Controllers
     {
         private readonly ILogger<SdrController> _logger;
         private readonly SdrManager             _sdrManager;
+        private readonly ISettingsService       _settings;
 
-        public SdrController(ILogger<SdrController> logger, SdrManager sdrManager)
+        public SdrController(ILogger<SdrController> logger, SdrManager sdrManager, ISettingsService settings)
         {
             _logger     = logger;
             _sdrManager = sdrManager;
+            _settings   = settings;
         }
 
         /// <summary>
@@ -247,6 +250,57 @@ namespace Yaesu_Web_Control.Controllers
             thread.IsBackground = true;
             thread.Start();
             return tcs.Task;
+        }
+
+        // ── Spectrum DSP knobs (Low / High / Zoom-gain) ─────────────────────
+        //
+        // POST /api/sdr/dsp/{vfo}  body { gainLinear, dbFloor, dbCeiling }
+        //
+        // Persists the three values to appsettings.user.json AND pushes them
+        // live to the worker holding {vfo}. The slider UI calls this on each
+        // committed change. Returns { applied = true|false } — applied=false
+        // means the persist succeeded but no worker was connected to push to
+        // (settings will be re-sent when a worker spawns).
+
+        public class DspSettingsRequest
+        {
+            public float GainLinear { get; set; } = 1.0f;
+            public float DbFloor    { get; set; } = -120f;
+            public float DbCeiling  { get; set; } = 0f;
+        }
+
+        [HttpPost("dsp/{vfo}")]
+        public async Task<IActionResult> SetDspSettings(string vfo, [FromBody] DspSettingsRequest req)
+        {
+            string v = (vfo ?? "").Trim().ToUpperInvariant();
+            if (v != "A" && v != "B") return BadRequest(new { error = "vfo must be 'a' or 'b'" });
+            if (req == null)          return BadRequest(new { error = "missing body" });
+            if (!float.IsFinite(req.GainLinear) || req.GainLinear <= 0)
+                return BadRequest(new { error = "gainLinear must be > 0" });
+            if (!float.IsFinite(req.DbFloor) || !float.IsFinite(req.DbCeiling) || req.DbFloor >= req.DbCeiling)
+                return BadRequest(new { error = "dbFloor must be < dbCeiling and both finite" });
+
+            // Persist to settings (round-trip read-modify-write).
+            var settings = await _settings.GetSettingsAsync();
+            if (v == "B")
+            {
+                settings.SdrSpectrumGainB   = req.GainLinear;
+                settings.SdrSpectrumLowDbB  = req.DbFloor;
+                settings.SdrSpectrumHighDbB = req.DbCeiling;
+            }
+            else
+            {
+                settings.SdrSpectrumGainA   = req.GainLinear;
+                settings.SdrSpectrumLowDbA  = req.DbFloor;
+                settings.SdrSpectrumHighDbA = req.DbCeiling;
+            }
+            await _settings.SaveSettingsAsync(settings);
+
+            // Push live to the worker if one is connected for this VFO.
+            bool applied = await _sdrManager.TrySendDspSettingsAsync(
+                v, new DspSettingsPayload(req.GainLinear, req.DbFloor, req.DbCeiling));
+
+            return Ok(new { applied });
         }
     }
 }

@@ -76,10 +76,17 @@ export class SpectrumPanel {
         this._splitterDragging = false;
 
         // dB range — vertical scale of the spectrum trace, in dBFS.
-        // Persisted per-VFO. Default matches pre-existing hardcoded behaviour.
-        const range = this._loadDbRange();
-        this._dbMin = range.dbMin;
-        this._dbMax = range.dbMax;
+        // Default fallback only; the real values come from the server-rendered
+        // Low/High sliders which call setDbRange() once their wire-up runs.
+        this._dbMin = -120;
+        this._dbMax = 0;
+
+        // Garbage-collect the pre-v2.4.0 client-side dB-range persistence.
+        // The server now owns this via /api/sdr/dsp/{vfo}; the old key would
+        // just sit forever in users' browsers otherwise. Safe to remove
+        // unconditionally — removeItem on a missing key is a no-op.
+        try { localStorage.removeItem('ywc.spectrumDbRange.' + this._vfo); }
+        catch (e) { /* localStorage may be unavailable */ }
 
         this._init();
     }
@@ -101,47 +108,19 @@ export class SpectrumPanel {
         } catch (e) { /* localStorage may be unavailable */ }
     }
 
-    // Load persisted dB range. Stored as "dbMax/dbMin" e.g. "0/-120".
-    _loadDbRange() {
-        const fallback = { dbMin: -120, dbMax: 0 };
-        try {
-            const raw = localStorage.getItem('ywc.spectrumDbRange.' + this._vfo);
-            if (!raw) return fallback;
-            const [maxStr, minStr] = raw.split('/');
-            const dbMax = parseFloat(maxStr);
-            const dbMin = parseFloat(minStr);
-            if (isFinite(dbMax) && isFinite(dbMin) && dbMax > dbMin) {
-                return { dbMin, dbMax };
-            }
-        } catch (e) { /* localStorage may be unavailable */ }
-        return fallback;
-    }
-
-    _saveDbRange() {
-        try {
-            localStorage.setItem(
-                'ywc.spectrumDbRange.' + this._vfo,
-                this._dbMax + '/' + this._dbMin
-            );
-        } catch (e) { /* localStorage may be unavailable */ }
-    }
-
     /**
-     * Set the spectrum dB range. Called from the UI dropdown.
-     * @param {number} dbMax  Top of the scale (e.g. 0, -40, -60, -80).
-     * @param {number} dbMin  Bottom of the scale (e.g. -120).
+     * Set the spectrum dB range. Called by the Low/High slider handler in
+     * Index.cshtml whenever the user moves a slider. Persistence is handled
+     * server-side via /api/sdr/dsp/{vfo}; this method just rescales the
+     * canvas y-axis so the visual change is immediate.
+     * @param {number} dbMax  Top of the scale (High slider value).
+     * @param {number} dbMin  Bottom of the scale (Low slider value).
      */
     setDbRange(dbMax, dbMin) {
         if (!isFinite(dbMax) || !isFinite(dbMin) || dbMax <= dbMin) return;
         this._dbMax = dbMax;
         this._dbMin = dbMin;
-        this._saveDbRange();
         if (this._lastBins) this._render();
-    }
-
-    /** Current dB range, used by the UI to set the dropdown's initial value. */
-    getDbRange() {
-        return { dbMax: this._dbMax, dbMin: this._dbMin };
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
