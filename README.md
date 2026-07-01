@@ -237,6 +237,12 @@ After Alessandro's feedback that S&P-mode operating doesn't fit well with popout
 
 When you click the spectrum to QSY, the spectrum recentres on the new VFO frequency. The live crosshair (the vertical line that tracks your mouse position) used to stay at its pixel position — which meant the *frequency* under the cursor briefly shifted by hundreds of Hz after the click, until you next moved the mouse. The crosshair now jumps to the canvas centre at click time, where the clicked frequency now sits, so the readout label stays on the frequency you just picked. The next real mouse movement resumes normal tracking.
 
+### VC Tune preselector hidden for hardware revisions that don't support VT CAT ([#59](https://github.com/mm5agm/Yaesu_Web_Control/issues/59))
+
+The FTdx101MP's VC Tune preselector is physically present on many units and works from the front panel. However, some hardware revisions — confirmed on units returning `ID0682` — do not expose VC Tune over CAT. Sending `VT VCT` commands to these units returns `?;?;` (CAT error) even on fully up-to-date firmware (MAIN V01-28 / DISPLAY V01-51 / DSP V01-20).
+
+YWC now reads the radio's `ID;` response on startup and compares it against a list of known-unsupported hardware IDs. When the radio is on the list the VC Tune controls are hidden entirely. The physical preselector is unaffected and continues to work normally from the front panel.
+
 ### DX Spots list — click now sets mode as well as frequency ([#57](https://github.com/mm5agm/Yaesu_Web_Control/issues/57))
 
 Requested by IK2XRW Alessandro. Clicking a row in the DX Spots popup now follows the QSY with a band-plan-aware mode change, matching what spectrum-panel clicks have always done. Click an FT8 spot from USB and the radio flips to DATA-U; click a CW spot from FT8 and it flips to CW-U; and so on. The mode is derived from the band-plan (not from the spot's free-text comment) so it's consistent and reliable.

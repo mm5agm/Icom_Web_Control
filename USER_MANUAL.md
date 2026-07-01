@@ -27,6 +27,7 @@
    - 5.16 [Voice Announcements](#516-voice-announcements)
    - 5.17 [DX Spots List](#517-dx-spots-list)
    - 5.18 [Audio Filter popout](#518-audio-filter-popout)
+   - 5.19 [VC Tune Preselector (FTdx101MP)](#519-vc-tune-preselector-ftdx101mp)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -825,6 +826,34 @@ Four controls in each dialog:
 When a control is greyed out for the current mode + radio combination, the explanation is that the radio's CAT command set simply doesn't include that setting for that mode — you'd need to set it on the radio's front-panel menu instead (if it's adjustable there at all).
 
 **How the writes are confirmed.** Each slider change reads the value back from the radio after writing, so the on-screen value reflects what the radio actually stored — not just what YWC sent. This catches the rare cases where the radio clamps or refuses a value.
+
+---
+
+### 5.19 VC Tune Preselector (FTdx101MP)
+
+Some FTdx101MP units have an optional **VC Tune** preselector fitted to the MAIN and/or SUB receiver. The preselector improves strong-signal performance and selectivity on crowded bands. When supported, a **VC Tune** button and a row of controls appear in each VFO panel header.
+
+**When VC Tune appears in YWC.** The controls are shown only when both of the following are true:
+
+- The radio model is **FTdx101MP** (VC Tune is not fitted to any other supported model).
+- The hardware revision reports a hardware ID that supports VT CAT commands. YWC checks this automatically on startup by reading the radio's `ID;` response.
+
+**Hardware limitation — some FTdx101MP units do not support VT CAT.** Yaesu produced the FTdx101MP in more than one hardware revision. Not all revisions expose VC Tune over CAT. On units with hardware ID **0682**, all `VT VCT` CAT commands are rejected with a `?;?;` error, even on fully up-to-date firmware (MAIN V01-28 / DISPLAY V01-51 / DSP V01-20). On these units the VC Tune controls are **hidden entirely** — the physical preselector is unaffected and continues to work normally from the radio's front panel.
+
+**VC Tune controls (when present):**
+
+| Control | Description |
+|---------|-------------|
+| **VC Tune** button | Toggles the preselector on or off. Turns amber when the preselector is active. |
+| **Default** | Sends the auto-tune command — the radio tunes the preselector capacitor to the current frequency automatically. |
+| **−** / **+** | Steps the preselector capacitor down or up by the selected step size. |
+| Step size | Dropdown 1–9. Controls how many capacitor steps each − / + click moves. |
+| **Center** | Centers the preselector capacitor at its midpoint. |
+| P5 reading | The raw preselector meter value reported by the radio after the last command. |
+
+All changes are confirmed by reading the radio's state back after each command, so the displayed state always reflects what the radio actually has.
+
+**If the VC Tune controls do not appear on your FTdx101MP,** your unit's hardware revision is likely not in the supported list. Check the radio firmware and hardware revision via the front-panel menu and raise a report on the [GitHub Issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues) if you believe your hardware should be able to support VT CAT.
 
 ---
 

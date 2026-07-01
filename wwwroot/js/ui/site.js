@@ -3474,3 +3474,122 @@ pollInitStatus();
         setTimeout(_checkForUpdate, 3000);
     }
 })()
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VC Tune preselector controls
+// Sends commands to /api/vctune/{band}/{command} and updates button states
+// from the JSON response.  Band is 'a' (MAIN) or 'b' (SUB).
+// ─────────────────────────────────────────────────────────────────────────────
+(function () {
+    var _state         = { a: 'Unknown', b: 'Unknown' };
+    var _catBlocked    = { a: false, b: false };  // true when hardware rejects VT CAT
+
+    function _updateUi(band, data) {
+        var vfo       = band.toUpperCase();
+        var toggleBtn = document.getElementById('vcTuneToggleBtn' + vfo);
+        var defBtn    = document.getElementById('vcTuneDefaultBtn' + vfo);
+        var ctrBtn    = document.getElementById('vcTuneCenterBtn' + vfo);
+        var meter     = document.getElementById('vcTuneMeter' + vfo);
+        var warn      = document.getElementById('vcTuneWarn' + vfo);
+        var row       = document.getElementById('vcTuneRow' + vfo);
+
+        var catNotSupported = (data.errorCategory === 'CatNotSupported');
+        if (catNotSupported) _catBlocked[band] = true;
+
+        // Hardware does not support VC Tune over CAT — hide everything immediately.
+        if (catNotSupported) {
+            if (toggleBtn) toggleBtn.style.display = 'none';
+            if (row)       row.style.display       = 'none';
+            return;
+        }
+
+        var state = data.state || 'Unknown';
+        var avail = (data.availability != null) ? data.availability : 0;
+        _state[band] = state;
+
+        var notInstalled = (avail === 0);
+
+        if (toggleBtn) {
+            var isActive = (state === 'On' || state === 'Stepping' || state === 'Centering');
+            toggleBtn.classList.remove('btn-outline-light', 'btn-warning');
+            toggleBtn.classList.add(isActive ? 'btn-warning' : 'btn-outline-light');
+            toggleBtn.disabled = notInstalled;
+            if (band === 'b') toggleBtn.style.display = avail > 0 ? '' : 'none';
+        }
+
+        if (defBtn) defBtn.disabled = notInstalled;
+        if (ctrBtn) ctrBtn.disabled = notInstalled;
+
+        if (meter) {
+            var m = (data.meter != null) ? data.meter : -1;
+            meter.textContent = m >= 0 ? 'P5: ' + m : 'P5: -';
+        }
+
+        if (warn) {
+            var txt = '';
+            if (avail === 0)                        txt = 'Not installed';
+            else if (avail === 2)                   txt = 'Temporarily unavailable';
+            else if (!data.success && data.message) txt = data.message;
+            warn.textContent   = txt;
+            warn.style.display = txt ? '' : 'none';
+        }
+
+        if (band === 'b' && row) row.style.display = avail > 0 ? '' : 'none';
+    }
+
+    async function vcTuneCommand(band, cmd) {
+        try {
+            var resp = await fetch('/api/vctune/' + band + '/' + cmd, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            if (!resp.ok) return;
+            _updateUi(band, await resp.json());
+        } catch(e) { console.error('VC Tune ' + cmd + ' failed:', e); }
+    }
+
+    async function vcTuneToggle(band) {
+        if (_catBlocked[band]) return;
+        var isOn = (_state[band] === 'On' || _state[band] === 'Stepping' || _state[band] === 'Centering');
+        await vcTuneCommand(band, isOn ? 'off' : 'on');
+    }
+
+    async function vcTuneStep(band, direction) {
+        if (_catBlocked[band]) return;
+        var sel    = document.getElementById('vcTuneStep' + band.toUpperCase());
+        var amount = sel ? parseInt(sel.value, 10) : 5;
+        try {
+            var resp = await fetch('/api/vctune/' + band + '/step', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ direction: direction, amount: amount })
+            });
+            if (!resp.ok) return;
+            _updateUi(band, await resp.json());
+        } catch(e) { console.error('VC Tune step failed:', e); }
+    }
+
+    async function _refreshStatus(band) {
+        try {
+            var resp = await fetch('/api/vctune/' + band + '/status');
+            if (!resp.ok) return;
+            _updateUi(band, await resp.json());
+        } catch(e) { /* non-fatal */ }
+    }
+
+    function _vcTuneInit() {
+        if (document.getElementById('vcTuneToggleBtnA')) _refreshStatus('a');
+        if (document.getElementById('vcTuneToggleBtnB')) _refreshStatus('b');
+    }
+
+    window.vcTuneCommand = vcTuneCommand;
+    window.vcTuneToggle  = vcTuneToggle;
+    window.vcTuneStep    = vcTuneStep;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _vcTuneInit);
+    } else {
+        _vcTuneInit();
+    }
+})()

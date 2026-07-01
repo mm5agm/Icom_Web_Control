@@ -267,6 +267,19 @@ builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<Ra
 
 // Register the radio initialization service
 builder.Services.AddSingleton<RadioInitializationService>();
+
+// VC Tune preselector control
+builder.Services.AddSingleton<CatRequestSemaphore>();
+builder.Services.AddSingleton<IVCTuneCommandBuilder, VCTuneCommandBuilder>();
+builder.Services.AddSingleton<IVCTuneResponseParser, VCTuneResponseParser>();
+builder.Services.AddSingleton<IVCTuneStateMachine, VCTuneStateMachine>();
+builder.Services.AddSingleton<IVCTuneConfigurationStore, VCTuneConfigurationStore>();
+builder.Services.AddSingleton<VCTuneDiagnostics>();
+builder.Services.AddSingleton<VCTuneHelpProvider>();
+builder.Services.AddSingleton<VCTuneModule>();
+builder.Services.AddSingleton<VCTuneIntegrationHarness>();
+builder.Services.AddSingleton<IVcTuneService, VcTuneService>();
+builder.Services.AddSingleton<VCTuneViewModel>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioInitializationService>());
 
 // ADD THIS LINE for Razor Pages support:
@@ -342,6 +355,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.
 // VoiceController exposes /api/voice/*. See docs/VoiceControl/v1-plan.md.
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.IntentDispatcher>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceTtsService>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VCTuneRecognizer>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceControlService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Voice.VoiceControlService>());
 

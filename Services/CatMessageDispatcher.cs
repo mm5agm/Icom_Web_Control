@@ -614,6 +614,16 @@
                         if (message.Length >= 7 && int.TryParse(message.Substring(2, 4), out int sdVal))
                             _stateService.CwBreakInDelay = Math.Clamp(sdVal, 0, 2500);
                         break;
+                    case "ID":
+                        // ID{nnnn}; — hardware revision identifier e.g. ID0682;
+                        // Stored for runtime capability checks (VC Tune CAT support etc.).
+                        if (message.Length > 4)
+                        {
+                            var hwId = message.Substring(2).TrimEnd(';');
+                            if (!string.IsNullOrEmpty(hwId))
+                                _stateService.Id = hwId;
+                        }
+                        break;
                     // No debug logging for unhandled commands
                 }
             }

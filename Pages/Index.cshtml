@@ -24,6 +24,12 @@
     // each VFO is its own physical receiver chain.
     bool isSingleReceiver  = Yaesu_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
     bool hasAntennaSelector = Yaesu_Web_Control.Services.RadioCapabilities.HasAntennaSelector(Model.RadioModel);
+    // Render VC Tune controls only when both the model supports VC Tune (FTdx101MP)
+    // AND the hardware ID is positively confirmed to support VT CAT commands.
+    // Empty/unknown ID → hidden (user can reload once radio connects and ID; is received).
+    bool hasVcTune    = Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneMain(Model.RadioModel)
+                     && Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneCat(Model.RadioState.Id);
+    bool hasVcTuneSub = Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneSubStatic(Model.RadioModel);
 
     string clarModeInit = (Model.RadioState.RxClarOn, Model.RadioState.TxClarOn) switch
     {
@@ -607,20 +613,51 @@
         <!-- VFO A Panel -->
         <div class="col-lg-6 col-12" id="vfoACol">
             <div class="card border-primary h-100 receiver-card">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-1">
-                    <h5 class="mb-0">
-                        <span id="receiverAHeading">VFO A</span>
-                    </h5>
-                    <div class="d-flex align-items-center gap-2">
-                        <span id="splitTxBadgeA" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
-                        <button type="button" id="zinBtnA" class="btn btn-outline-light btn-sm"
-                                onclick="cwZeroIn('A')"
-                                aria-label="VFO A CW Auto Zero In"
-                                title="CW Auto Zero In on VFO A — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
-                        <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
-                                onclick="toggleTx()" title="Toggle Transmit">
-                            <i class="bi bi-broadcast" aria-hidden="true"></i> TX
-                        </button>
+                <div class="card-header bg-primary text-white py-1">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+                        <h5 class="mb-0">
+                            <span id="receiverAHeading">VFO A</span>
+                        </h5>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <span id="splitTxBadgeA" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                            <button type="button" id="zinBtnA" class="btn btn-outline-light btn-sm"
+                                    onclick="cwZeroIn('A')"
+                                    aria-label="VFO A CW Auto Zero In"
+                                    title="CW Auto Zero In on VFO A — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
+                            @if (hasVcTune) {
+                            <button type="button" id="vcTuneToggleBtnA" class="btn btn-outline-light btn-sm"
+                                    onclick="vcTuneToggle('a')"
+                                    aria-label="MAIN VC Tune on/off"
+                                    title="Toggle MAIN VC Tune preselector on/off">VC Tune</button>
+                            <span id="vcTuneRowA" class="d-inline-flex align-items-center gap-1">
+                                <button id="vcTuneDefaultBtnA" class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneCommand('a','default')"
+                                        aria-label="MAIN VC Tune default" title="MAIN VC Tune auto-tune">Default</button>
+                                <button class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneStep('a','minus')"
+                                        aria-label="MAIN VC Tune step down" title="Step MAIN preselector capacitor down">−</button>
+                                <select id="vcTuneStepA" class="form-select form-select-sm"
+                                        style="width: 3.5rem; background-color: transparent; color: white; border-color: rgba(255,255,255,0.5);"
+                                        aria-label="MAIN VC Tune step size" title="Step size (1–9)">
+                                    <option value="1" style="color:black;">1</option><option value="2" style="color:black;">2</option><option value="3" style="color:black;">3</option>
+                                    <option value="4" style="color:black;">4</option><option value="5" selected style="color:black;">5</option><option value="6" style="color:black;">6</option>
+                                    <option value="7" style="color:black;">7</option><option value="8" style="color:black;">8</option><option value="9" style="color:black;">9</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneStep('a','plus')"
+                                        aria-label="MAIN VC Tune step up" title="Step MAIN preselector capacitor up">+</button>
+                                <button id="vcTuneCenterBtnA" class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneCommand('a','center')"
+                                        aria-label="MAIN VC Tune center" title="Center MAIN preselector capacitor">Center</button>
+                                <span id="vcTuneMeterA" class="small text-white-50" style="font-size: 0.75rem; min-width: 44px;">P5: —</span>
+                                <span id="vcTuneWarnA" class="text-warning small" style="display:none; font-size: 0.75rem;"></span>
+                            </span>
+                            }
+                            <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
+                                    onclick="toggleTx()" title="Toggle Transmit">
+                                <i class="bi bi-broadcast" aria-hidden="true"></i> TX
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body p-2">
@@ -953,20 +990,52 @@
                     <!-- VFO B Panel -->
         <div class="col-lg-6 col-12" id="vfoBCol">
             <div class="card border-success h-100 receiver-card">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-1">
-                    <h5 class="mb-0">
-                        <span id="receiverBHeading">VFO B</span>
-                    </h5>
-                    <div class="d-flex align-items-center gap-2">
-                        <span id="splitTxBadgeB" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
-                        <button type="button" id="zinBtnB" class="btn btn-outline-light btn-sm"
-                                onclick="cwZeroIn('B')"
-                                aria-label="VFO B CW Auto Zero In"
-                                title="CW Auto Zero In on VFO B — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
-                        <button id="txButtonB" class="btn btn-warning btn-sm" style="display:none;"
-                                onclick="toggleTx()" title="Toggle Transmit">
-                            <i class="bi bi-broadcast" aria-hidden="true"></i> TX
-                        </button>
+                <div class="card-header bg-success text-white py-1">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+                        <h5 class="mb-0">
+                            <span id="receiverBHeading">VFO B</span>
+                        </h5>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <span id="splitTxBadgeB" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                            <button type="button" id="zinBtnB" class="btn btn-outline-light btn-sm"
+                                    onclick="cwZeroIn('B')"
+                                    aria-label="VFO B CW Auto Zero In"
+                                    title="CW Auto Zero In on VFO B — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
+                            @if (hasVcTuneSub) {
+                            <button type="button" id="vcTuneToggleBtnB" class="btn btn-outline-light btn-sm"
+                                    style="display:none"
+                                    onclick="vcTuneToggle('b')"
+                                    aria-label="SUB VC Tune on/off"
+                                    title="Toggle SUB VC Tune preselector on/off">VC Tune</button>
+                            <span id="vcTuneRowB" class="d-inline-flex align-items-center gap-1" style="display:none !important;">
+                                <button id="vcTuneDefaultBtnB" class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneCommand('b','default')"
+                                        aria-label="SUB VC Tune default" title="SUB VC Tune auto-tune">Default</button>
+                                <button class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneStep('b','minus')"
+                                        aria-label="SUB VC Tune step down" title="Step SUB preselector capacitor down">−</button>
+                                <select id="vcTuneStepB" class="form-select form-select-sm"
+                                        style="width: 3.5rem; background-color: transparent; color: white; border-color: rgba(255,255,255,0.5);"
+                                        aria-label="SUB VC Tune step size" title="Step size (1–9)">
+                                    <option value="1" style="color:black;">1</option><option value="2" style="color:black;">2</option><option value="3" style="color:black;">3</option>
+                                    <option value="4" style="color:black;">4</option><option value="5" selected style="color:black;">5</option><option value="6" style="color:black;">6</option>
+                                    <option value="7" style="color:black;">7</option><option value="8" style="color:black;">8</option><option value="9" style="color:black;">9</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneStep('b','plus')"
+                                        aria-label="SUB VC Tune step up" title="Step SUB preselector capacitor up">+</button>
+                                <button id="vcTuneCenterBtnB" class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneCommand('b','center')"
+                                        aria-label="SUB VC Tune center" title="Center SUB preselector capacitor">Center</button>
+                                <span id="vcTuneMeterB" class="small text-white-50" style="font-size: 0.75rem; min-width: 44px;">P5: —</span>
+                                <span id="vcTuneWarnB" class="text-warning small" style="display:none; font-size: 0.75rem;"></span>
+                            </span>
+                            }
+                            <button id="txButtonB" class="btn btn-warning btn-sm" style="display:none;"
+                                    onclick="toggleTx()" title="Toggle Transmit">
+                                <i class="bi bi-broadcast" aria-hidden="true"></i> TX
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body p-2">
