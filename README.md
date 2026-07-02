@@ -139,7 +139,7 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 
 Active development is currently focused on bug fixes and polish for the supported radios, plus rolling out **voice control** as an accessibility feature for partially sighted and blind operators — hands-free band changes, frequency entry, mode switching, and rig status without needing to see the screen.
 
-**Voice control v1 shipped in v2.4.0-pre1 (2026-06-24)** and is in the current pre-release v2.4.0-pre2. It uses **Windows' built-in speech recognition (SAPI 5 / `System.Speech`)** running locally on the user's PC, driven by a grammar tuned to ham-radio vocabulary, with a press-and-hold microphone button in the YWC navbar. Recognised audio never leaves the PC; no cloud account, no public endpoint, no DNS or tunnel setup. A microphone connected to the PC is the only hardware requirement. See [USER_MANUAL.md §17 Voice Control](USER_MANUAL.md#17-voice-control) for what voice does, the full command list, and how to enable it. Feedback from real users is what's wanted right now — please try it and report back.
+**Voice control v1 shipped in v2.4.0-pre1 (2026-06-24)** and is in the current pre-release v2.4.0-pre3. It uses **Windows' built-in speech recognition (SAPI 5 / `System.Speech`)** running locally on the user's PC, driven by a grammar tuned to ham-radio vocabulary, with a press-and-hold microphone button in the YWC navbar. Recognised audio never leaves the PC; no cloud account, no public endpoint, no DNS or tunnel setup. A microphone connected to the PC is the only hardware requirement. See [USER_MANUAL.md §17 Voice Control](USER_MANUAL.md#17-voice-control) for what voice does, the full command list, and how to enable it. Feedback from real users is what's wanted right now — please try it and report back.
 
 **On the abandoned Amazon Alexa route:** an earlier proof of concept routed voice through an Echo device over a Cloudflare tunnel into YWC. It worked end-to-end including signature verification, but setting it up required the user to own a domain, run a Cloudflare account, configure a custom Alexa Skill in the Amazon Developer Console, and install `cloudflared` — well over an hour of fiddly setup for the average ham. The local-SAPI approach above is dramatically simpler (one Windows speech-pack install, one Settings toggle) and runs entirely offline. The Alexa branch is therefore retired; the local mic approach is the supported path going forward.
 
@@ -174,14 +174,9 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 Changes queued for the next public release (v2.4.0 will also include the voice-control work currently in v2.4.0-pre1).
 
-### Spectrum display — draggable splitter and dB range presets
+### Spectrum display — draggable splitter
 
-Two improvements to each SDR spectrum panel:
-
-- **Draggable splitter between spectrum trace and waterfall.** Hover the boundary; the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room (useful for low-signal work), drag down to give the waterfall more history. The ratio is persisted per-VFO in browser localStorage. Default is unchanged (45 % spectrum / 55 % waterfall), so users who don't touch it see no difference.
-- **Spectrum dB-range dropdown** beside the Hold button. Four presets: **0/-120** (default, matches prior behaviour), **-40/-120**, **-60/-120**, **-80/-120**. Tighter ranges zoom into the lower part of the scale where weak signals live and stop them being squashed into the bottom row of pixels. Choice is persisted per-VFO.
-
-Both controls operate independently per VFO panel, so on a dual-SDR setup the two panels can be sized and ranged differently to suit each receiver.
+Each SDR spectrum panel has a **draggable splitter between spectrum trace and waterfall.** Hover the boundary; the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room (useful for low-signal work), drag down to give the waterfall more history. The ratio is persisted per-VFO in browser localStorage and operates independently on each panel in a dual-SDR setup. Default is unchanged (45 % spectrum / 55 % waterfall), so users who don't touch it see no difference.
 
 ### Fullscreen shortcut no longer hijacks browser find (Ctrl+F)
 
@@ -236,6 +231,16 @@ After Alessandro's feedback that S&P-mode operating doesn't fit well with popout
 ### Spectrum click — crosshair follows the clicked frequency
 
 When you click the spectrum to QSY, the spectrum recentres on the new VFO frequency. The live crosshair (the vertical line that tracks your mouse position) used to stay at its pixel position — which meant the *frequency* under the cursor briefly shifted by hundreds of Hz after the click, until you next moved the mouse. The crosshair now jumps to the canvas centre at click time, where the clicked frequency now sits, so the readout label stays on the frequency you just picked. The next real mouse movement resumes normal tracking.
+
+### Spectrum display — Low/High/Gain sliders for noise-floor tuning ([#53](https://github.com/mm5agm/Yaesu_Web_Control/issues/53))
+
+Three continuous sliders on each spectrum panel replace the static four-option dB-range preset dropdown:
+
+- **Low** (−160 to −60 dBFS) — noise floor (bottom of the scale). Drag up to push the static noise shelf out of view; drag down to reveal signals buried near the floor.
+- **High** (−100 to 0 dBFS) — ceiling (top of the scale). Leave at 0 for a full-range view or tighten to compress empty headroom.
+- **Gain** (0 to +30 dB, shown as **+N dB**) — pre-display digital gain applied to the FFT data before the floor/ceiling window. Lifts the whole trace proportionally. Labelled **Gain** rather than "Zoom" to avoid confusion with the existing frequency-span buttons.
+
+The Low and High sliders enforce **low < high**: dragging one past the other nudges the other slider rather than rejecting the input. Changes take effect on the next SDR frame — no restart, no page reload. Settings persist server-side in `appsettings.user.json` per VFO, so a browser reload or a second browser inherits the same calibrated view.
 
 ### VC Tune preselector hidden for hardware revisions that don't support VT CAT ([#59](https://github.com/mm5agm/Yaesu_Web_Control/issues/59))
 
