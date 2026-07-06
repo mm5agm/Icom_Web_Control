@@ -252,6 +252,10 @@ YWC now reads the radio's `ID;` response on startup and compares it against a li
 
 Requested by IK2XRW Alessandro. Clicking a row in the DX Spots popup now follows the QSY with a band-plan-aware mode change, matching what spectrum-panel clicks have always done. Click an FT8 spot from USB and the radio flips to DATA-U; click a CW spot from FT8 and it flips to CW-U; and so on. The mode is derived from the band-plan (not from the spot's free-text comment) so it's consistent and reliable.
 
+### Esc key now closes the Memory panel ([#61](https://github.com/mm5agm/Yaesu_Web_Control/issues/61))
+
+Reported by Thomas OZ1JTE. The Frequency Entry keyboard has always closed on **Esc**; the Memory panel did not, because it opens as a non-modal dialog (so the rest of the app stays usable while it's open) and non-modal `<dialog>` elements don't get the browser's built-in Esc-to-close behaviour the way modal ones do. Esc now closes the Memory panel too, including when it's open at the same time as the Frequency Entry keyboard.
+
 ---
 
 ## 2026-06-22 - v2.3.9

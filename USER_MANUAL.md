@@ -695,7 +695,7 @@ The **Mem** button in the toolbar (bold black text) opens a floating memory pane
 
 ![Floating memory panel with the Banks dropdown open — tile grid on the left, banks list on the right, plus the four Load-from-Rig / Save-to-Rig action buttons across the top](pictures/Memories_Floating_Panel.png)
 
-The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions.
+The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions. Press **Esc** to close it.
 
 **The toolbar at the top of the floating panel** carries the four rig-transfer actions and the Banks dropdown:
 
@@ -1801,6 +1801,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 | **Delete** (frequency keyboard open) | Clear all digits |
 | **↵ Enter** (frequency keyboard open) | Send the entered frequency to the radio |
 | **Esc** (frequency keyboard open) | Close the keyboard without changing frequency |
+| **Esc** (Memory panel open) | Close the Memory panel |
 
 **Frequency display — changing the value digit by digit.** Every VFO frequency display is a "digit-pickable" control. You select a digit (it highlights yellow), then step it up or down. Three input methods reach the same set of actions, so pick whichever suits you:
 
