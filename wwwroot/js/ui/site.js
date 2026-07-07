@@ -3473,7 +3473,7 @@ pollInitStatus();
     } else {
         setTimeout(_checkForUpdate, 3000);
     }
-})()
+})();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VC Tune preselector controls

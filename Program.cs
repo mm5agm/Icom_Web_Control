@@ -356,6 +356,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.IntentDispatcher>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceTtsService>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VCTuneRecognizer>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoicePhraseStore>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceControlService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Voice.VoiceControlService>());
 

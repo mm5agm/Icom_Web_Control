@@ -269,14 +269,40 @@
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label">Language</label>
-                <select class="form-select form-select-sm" disabled>
-                    <option selected>English (UK)</option>
+                <label class="form-label fw-semibold" for="voiceNudgeStepHz">Nudge step size</label>
+                <select class="form-select w-auto" id="voiceNudgeStepHz" asp-for="Settings.VoiceNudgeStepHz">
+                    <option value="10">10 Hz</option>
+                    <option value="100">100 Hz</option>
+                    <option value="1000">1 kHz</option>
+                    <option value="10000">10 kHz</option>
+                    <option value="100000">100 kHz</option>
                 </select>
                 <div class="form-text">
-                    Only English (UK) ships in v1. Multi-language support (drop in your own
-                    <code>Commands.&lt;culture&gt;.srgs</code> file) is on the roadmap for v2.
+                    How far "tune up" / "nudge up" (and their down equivalents) move VFO A per command.
+                    10 kHz is a good starting point for quickly hopping across a band; 1 kHz suits SSB fine-tuning.
                 </div>
+            </div>
+            <!-- Voice Phrases editor -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Voice Phrases</label>
+                <p class="form-text mt-0 mb-2">
+                    Edit the phrases used to trigger each voice command. Enter one or more phrases
+                    per row, separated by commas. Phrases must be in the language your
+                    <strong>Windows Speech Recognition</strong> is set to.
+                    Changes take effect immediately — no restart needed.
+                </p>
+                <div id="voicePhrasesEditor">
+                    <em class="text-muted small">Loading…</em>
+                </div>
+                <div class="mt-2 d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-primary" id="savePhrasesBtn" onclick="ywcSavePhrases()">
+                        <i class="bi bi-floppy" aria-hidden="true"></i>&nbsp;Save phrases
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="ywcResetPhrases()">
+                        Reset to defaults
+                    </button>
+                </div>
+                <div id="phrasesSaveStatus" class="form-text mt-1" aria-live="polite"></div>
             </div>
             <div class="mb-3">
                 <label class="form-label">Diagnostics</label>
@@ -295,8 +321,8 @@
                 </button>
                 <div class="form-text">
                     Opens <code>%APPDATA%\MM5AGM\Yaesu Web Control\Grammars\</code> in Explorer.
-                    Drop a <code>Commands.&lt;culture&gt;.srgs</code> file here (v2+) to add a new
-                    language without touching the install directory.
+                    Advanced users can also place a hand-crafted <code>Commands.&lt;culture&gt;.srgs</code>
+                    file here for full SRGS grammar control.
                 </div>
             </div>
         </div>
@@ -333,6 +359,273 @@
                     alert('Could not open grammars folder: ' + e);
                 }
             }
+
+            // ── Voice Phrases editor ──────────────────────────────────────
+
+            let _phrasesConfig = null;
+
+            function phrasesToStr(arr) { return (arr || []).join(', '); }
+            function strToPhrases(s) { return s.split(',').map(p => p.trim()).filter(Boolean); }
+
+            function buildPhrasesEditor(cfg) {
+                const rows = [];
+
+                // Row helper: one labelled text input with a data-path attribute.
+                const row = (label, path, val) =>
+                    `<tr><td class="align-middle text-nowrap" style="width:35%">${label}</td>` +
+                    `<td><input type="text" class="form-control form-control-sm" data-path="${path}" value="${escapeAttr(val)}"></td></tr>`;
+
+                const thead1 = '<thead><tr><th style="width:35%">Command</th><th>Phrases (comma-separated)</th></tr></thead>';
+                const thead2 = '<thead><tr><th style="width:35%">Value</th><th>Say (comma-separated)</th></tr></thead>';
+
+                // ── General commands ──────────────────────────────────────
+                rows.push(`<h6 class="mt-2 mb-1 text-muted small text-uppercase">General</h6>`);
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead1}<tbody>`);
+                const simpleLabels = {
+                    SwapVFO:'Swap VFO', NudgeUp:'Step up', NudgeDown:'Step down',
+                    BandUp:'Band up', BandDown:'Band down',
+                    StatusFrequency:'What frequency?', StatusMode:'What mode?', StatusBand:'What band?',
+                    TxOn:'Key transmitter', TxOff:'Stop transmitting',
+                    SplitOn:'Split on', SplitOff:'Split off',
+                    NudgeIfWidthUp:'Filter wider', NudgeIfWidthDown:'Filter narrower',
+                    Help:'Help',
+                };
+                for (const [key, label] of Object.entries(simpleLabels))
+                    rows.push(row(label, `simple.${key}`, phrasesToStr(cfg.simpleCommands?.[key])));
+                rows.push('</tbody></table>');
+
+                // ── Set Mode ──────────────────────────────────────────────
+                // Trigger phrase(s) + vocabulary: say "[trigger] [mode word]"
+                // e.g. "mode u s b" or "set mode upper sideband"
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Set Mode</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger, then the mode name — e.g. <em>"mode u s b"</em> or <em>"set mode upper sideband"</em>.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`);
+                rows.push(row('Trigger phrases', 'setMode.triggers', phrasesToStr(cfg.setMode?.triggers)));
+                rows.push('</tbody></table>');
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`);
+                const modeLabels = { USB:'USB', LSB:'LSB', 'CW-U':'CW', AM:'AM', FM:'FM', 'DATA-U':'DATA-U', 'DATA-L':'DATA-L', 'RTTY-L':'RTTY' };
+                for (const [key, label] of Object.entries(modeLabels))
+                    rows.push(row(label, `setMode.vocab.${key}`, phrasesToStr(cfg.setMode?.vocabulary?.[key])));
+                rows.push('</tbody></table>');
+
+                // ── Set Band ──────────────────────────────────────────────
+                // Trigger phrase(s) + vocabulary: say "[trigger] [band word]"
+                // e.g. "go to eighty metres" or "switch to twenty metres"
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Set Band</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger, then the band — e.g. <em>"go to eighty metres"</em> or <em>"switch to twenty metres"</em>.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`);
+                rows.push(row('Trigger phrases', 'setBand.triggers', phrasesToStr(cfg.setBand?.triggers)));
+                rows.push('</tbody></table>');
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`);
+                const vocab = cfg.setBand?.vocabulary || {};
+                for (const m of Object.keys(vocab).sort((a, b) => parseInt(b) - parseInt(a)))
+                    rows.push(row(`${m}m`, `setBand.vocab.${m}`, phrasesToStr(vocab[m])));
+                rows.push('</tbody></table>');
+
+                // ── Set Frequency ─────────────────────────────────────────
+                // Trigger includes the connector word ("tune to", "set frequency to").
+                // The MHz vocabulary and fractional digits are system-managed.
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Set Frequency</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger followed by a number — e.g. <em>"tune to fourteen megahertz"</em> or <em>"tune to fourteen point zero seven four"</em>.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead1}<tbody>`);
+                rows.push(row('Trigger phrases', 'setFreq.triggers', phrasesToStr(cfg.setFrequency?.triggers)));
+                rows.push('</tbody></table>');
+
+                // ── Set Nudge Step ────────────────────────────────────────
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Set Nudge Step</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger, then the step size — e.g. <em>"set step ten kilohertz"</em> or <em>"step size one k"</em>.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`);
+                rows.push(row('Trigger phrases', 'setNudgeStep.triggers', phrasesToStr(cfg.setNudgeStep?.triggers)));
+                rows.push('</tbody></table>');
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`);
+                const stepLabels = { '10':'10 Hz', '100':'100 Hz', '1000':'1 kHz', '10000':'10 kHz', '100000':'100 kHz' };
+                for (const [key, label] of Object.entries(stepLabels))
+                    rows.push(row(label, `setNudgeStep.vocab.${key}`, phrasesToStr(cfg.setNudgeStep?.vocabulary?.[key])));
+                rows.push('</tbody></table>');
+
+                // ── Set AF Gain ───────────────────────────────────────────
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Set AF Gain</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger then a level (0–100) — e.g. <em>"a f gain fifty"</em> or <em>"audio gain thirty"</em>.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`);
+                rows.push(row('Trigger phrases', 'setAfGain.triggers', phrasesToStr(cfg.setAfGain?.triggers)));
+                rows.push('</tbody></table>');
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`);
+                const afGainLabels = { '0':'0 (mute)', '10':'10', '20':'20', '25':'25', '30':'30', '40':'40', '50':'50', '60':'60', '70':'70', '75':'75', '80':'80', '90':'90', '100':'100 (max)' };
+                for (const [key, label] of Object.entries(afGainLabels))
+                    rows.push(row(label, `setAfGain.vocab.${key}`, phrasesToStr(cfg.setAfGain?.vocabulary?.[key])));
+                rows.push('</tbody></table>');
+
+                // ── Set Attenuator ────────────────────────────────────────
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Set Attenuator</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger then a level — e.g. <em>"attenuator six d b"</em> or <em>"a t t off"</em>.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`);
+                rows.push(row('Trigger phrases', 'setAttenuator.triggers', phrasesToStr(cfg.setAttenuator?.triggers)));
+                rows.push('</tbody></table>');
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`);
+                for (const [key, label] of Object.entries({ 'off':'Off', '6':'6 dB', '12':'12 dB', '18':'18 dB' }))
+                    rows.push(row(label, `setAttenuator.vocab.${key}`, phrasesToStr(cfg.setAttenuator?.vocabulary?.[key])));
+                rows.push('</tbody></table>');
+
+                // ── Set Preamp ────────────────────────────────────────────
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Set Preamp</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger then a level — e.g. <em>"preamp one"</em> or <em>"preamplifier off"</em>.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`);
+                rows.push(row('Trigger phrases', 'setPreamp.triggers', phrasesToStr(cfg.setPreamp?.triggers)));
+                rows.push('</tbody></table>');
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`);
+                for (const [key, label] of Object.entries({ 'off':'Off (IPO)', '1':'Amp 1', '2':'Amp 2' }))
+                    rows.push(row(label, `setPreamp.vocab.${key}`, phrasesToStr(cfg.setPreamp?.vocabulary?.[key])));
+                rows.push('</tbody></table>');
+
+                // ── Set AGC ───────────────────────────────────────────────
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Set AGC</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger then a speed — e.g. <em>"a g c slow"</em> or <em>"set a g c off"</em>.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`);
+                rows.push(row('Trigger phrases', 'setAgc.triggers', phrasesToStr(cfg.setAgc?.triggers)));
+                rows.push('</tbody></table>');
+                rows.push(`<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`);
+                for (const [key, label] of Object.entries({ 'off':'Off', 'fast':'Fast', 'mid':'Mid', 'slow':'Slow', 'auto':'Auto' }))
+                    rows.push(row(label, `setAgc.vocab.${key}`, phrasesToStr(cfg.setAgc?.vocabulary?.[key])));
+                rows.push('</tbody></table>');
+
+                // ── Macros ────────────────────────────────────────────────
+                rows.push(`<h6 class="mb-1 text-muted small text-uppercase">Macros</h6>`);
+                rows.push(`<p class="text-muted mb-1" style="font-size:0.82em">Custom commands that send CAT strings directly. Use <code>;</code> to chain commands, e.g. <code>NR01;NB01;</code>. Power users can add their own rows.</p>`);
+                rows.push(`<table class="table table-sm table-bordered mb-2" id="macrosTable"><thead><tr><th style="width:22%">Name</th><th style="width:35%">Phrases (comma-separated)</th><th style="width:28%">CAT string</th><th></th></tr></thead><tbody>`);
+                for (const m of (cfg.macros || []))
+                    rows.push(macroRow(m.name || '', m.phrases || [], m.cat || ''));
+                rows.push(`</tbody></table>`);
+                rows.push(`<button type="button" class="btn btn-sm btn-outline-secondary" onclick="ywcAddMacroRow()"><i class="bi bi-plus" aria-hidden="true"></i> Add macro</button>`);
+
+                return rows.join('');
+            }
+
+            function macroRow(name, phrases, cat) {
+                return `<tr>
+                    <td><input type="text" class="form-control form-control-sm macro-name" value="${escapeAttr(name)}" placeholder="e.g. NR on"></td>
+                    <td><input type="text" class="form-control form-control-sm macro-phrases" value="${escapeAttr(phrasesToStr(phrases))}" placeholder="noise reduction on, n r on"></td>
+                    <td><input type="text" class="form-control form-control-sm macro-cat" style="font-family:monospace" value="${escapeAttr(cat)}" placeholder="NR01;"></td>
+                    <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="ywcDeleteMacroRow(this)" title="Delete macro" aria-label="Delete macro">✕</button></td>
+                </tr>`;
+            }
+
+            function ywcAddMacroRow() {
+                const tbody = document.querySelector('#macrosTable tbody');
+                if (tbody) tbody.insertAdjacentHTML('beforeend', macroRow('', [], ''));
+            }
+
+            function ywcDeleteMacroRow(btn) { btn.closest('tr').remove(); }
+
+            function readPhrasesFromEditor(cfg) {
+                const out = JSON.parse(JSON.stringify(cfg));
+                document.querySelectorAll('#voicePhrasesEditor input[data-path]').forEach(input => {
+                    // Paths: "simple.SwapVFO" | "setMode.triggers" | "setMode.vocab.USB"
+                    //        "setBand.triggers" | "setBand.vocab.80" | "setFreq.triggers"
+                    const [section, sub, param] = input.dataset.path.split('.');
+                    const phrases = strToPhrases(input.value);
+                    if (section === 'simple') {
+                        out.simpleCommands[sub] = phrases;
+                    } else if (section === 'setMode') {
+                        if (sub === 'triggers')      out.setMode.triggers = phrases;
+                        else if (sub === 'vocab')    out.setMode.vocabulary[param] = phrases;
+                    } else if (section === 'setBand') {
+                        if (sub === 'triggers')      out.setBand.triggers = phrases;
+                        else if (sub === 'vocab')    out.setBand.vocabulary[param] = phrases;
+                    } else if (section === 'setFreq' && sub === 'triggers') {
+                        out.setFrequency.triggers = phrases;
+                    } else if (section === 'setNudgeStep') {
+                        if (sub === 'triggers')   out.setNudgeStep.triggers = phrases;
+                        else if (sub === 'vocab') out.setNudgeStep.vocabulary[param] = phrases;
+                    } else if (section === 'setAfGain') {
+                        if (sub === 'triggers')   out.setAfGain.triggers = phrases;
+                        else if (sub === 'vocab') out.setAfGain.vocabulary[param] = phrases;
+                    } else if (section === 'setAttenuator') {
+                        if (sub === 'triggers')   out.setAttenuator.triggers = phrases;
+                        else if (sub === 'vocab') out.setAttenuator.vocabulary[param] = phrases;
+                    } else if (section === 'setPreamp') {
+                        if (sub === 'triggers')   out.setPreamp.triggers = phrases;
+                        else if (sub === 'vocab') out.setPreamp.vocabulary[param] = phrases;
+                    } else if (section === 'setAgc') {
+                        if (sub === 'triggers')   out.setAgc.triggers = phrases;
+                        else if (sub === 'vocab') out.setAgc.vocabulary[param] = phrases;
+                    }
+                });
+                // Collect macros from the dynamic table
+                out.macros = [];
+                document.querySelectorAll('#macrosTable tbody tr').forEach(tr => {
+                    const name = tr.querySelector('.macro-name')?.value?.trim() ?? '';
+                    const cat  = tr.querySelector('.macro-cat')?.value?.trim() ?? '';
+                    if (!name && !cat) return;
+                    out.macros.push({
+                        name,
+                        phrases: strToPhrases(tr.querySelector('.macro-phrases')?.value ?? ''),
+                        cat,
+                    });
+                });
+                return out;
+            }
+
+            async function ywcLoadPhrases(url) {
+                const el = document.getElementById('voicePhrasesEditor');
+                try {
+                    const r = await fetch(url || '/api/voice/phrases');
+                    if (!r.ok) { el.innerHTML = '<span class="text-danger">Could not load phrases (status ' + r.status + ')</span>'; return; }
+                    _phrasesConfig = await r.json();
+                    el.innerHTML = buildPhrasesEditor(_phrasesConfig);
+                } catch (e) {
+                    el.innerHTML = '<span class="text-danger">Error loading phrases: ' + escapeHtml(String(e)) + '</span>';
+                }
+            }
+
+            async function ywcSavePhrases() {
+                if (!_phrasesConfig) return;
+                const status = document.getElementById('phrasesSaveStatus');
+                const btn = document.getElementById('savePhrasesBtn');
+                btn.disabled = true;
+                status.textContent = 'Saving…';
+                try {
+                    const updated = readPhrasesFromEditor(_phrasesConfig);
+                    const r = await fetch('/api/voice/phrases', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updated),
+                    });
+                    if (!r.ok) {
+                        const err = await r.json().catch(() => ({ error: r.statusText }));
+                        status.innerHTML = '<span class="text-danger">Save failed: ' + escapeHtml(err.error || r.statusText) + '</span>';
+                    } else {
+                        _phrasesConfig = updated;
+                        status.innerHTML = '<span class="text-success">✓ Phrases saved and grammar reloaded.</span>';
+                        setTimeout(() => { if (status) status.textContent = ''; }, 4000);
+                    }
+                } catch (e) {
+                    status.innerHTML = '<span class="text-danger">Save failed: ' + escapeHtml(String(e)) + '</span>';
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+            async function ywcResetPhrases() {
+                if (!confirm('Reset all phrases to the built-in English (UK) defaults?')) return;
+                await ywcLoadPhrases('/api/voice/phrases/defaults');
+                document.getElementById('phrasesSaveStatus').innerHTML = '<span class="text-warning">Defaults loaded — click Save phrases to apply.</span>';
+            }
+
+            function escapeAttr(s) {
+                return String(s).replace(/[&"<>]/g, c => ({ '&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;' }[c]));
+            }
+
+            // Load phrases when the Voice Control section is opened.
+            (function () {
+                const details = document.querySelector('details.settings-section:has(#voicePhrasesEditor)');
+                if (details) {
+                    details.addEventListener('toggle', function onToggle() {
+                        if (details.open && !_phrasesConfig) ywcLoadPhrases();
+                    });
+                    // Also load immediately if the section starts open.
+                    if (details.open) ywcLoadPhrases();
+                }
+            })();
         </script>
     </details>
 

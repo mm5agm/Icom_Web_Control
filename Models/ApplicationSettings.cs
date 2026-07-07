@@ -184,6 +184,10 @@
         // screen to know whether a CAT command landed. Users who find it
         // chatty can disable here without disabling voice control itself.
         public bool VoiceSpokenConfirmationEnabled { get; set; } = true;
+
+        // Step size used by the NudgeUp / NudgeDown voice commands (Hz).
+        // Options exposed in Settings: 10, 100, 1000, 10000, 100000.
+        public long VoiceNudgeStepHz { get; set; } = 10_000;
     }
 
     public class RadioState

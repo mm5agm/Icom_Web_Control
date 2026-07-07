@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using Yaesu_Web_Control.Models;
+using Yaesu_Web_Control.Services;
 using Yaesu_Web_Control.Services.Voice;
 
 namespace Yaesu_Web_Control.Controllers
@@ -16,11 +18,15 @@ namespace Yaesu_Web_Control.Controllers
     public sealed class VoiceController : ControllerBase
     {
         private readonly VoiceControlService _voice;
+        private readonly VoicePhraseStore _phraseStore;
+        private readonly ISettingsService _settings;
         private readonly ILogger<VoiceController> _logger;
 
-        public VoiceController(VoiceControlService voice, ILogger<VoiceController> logger)
+        public VoiceController(VoiceControlService voice, VoicePhraseStore phraseStore, ISettingsService settings, ILogger<VoiceController> logger)
         {
             _voice = voice;
+            _phraseStore = phraseStore;
+            _settings = settings;
             _logger = logger;
         }
 
@@ -85,6 +91,66 @@ namespace Yaesu_Web_Control.Controllers
         /// Patterns matched: lines containing "[Voice]" or "[IntentDispatcher]".
         /// Lines are returned newest-last to read like a normal log file.
         /// </summary>
+        private static readonly long[] _validNudgeSteps = [10, 100, 1_000, 10_000, 100_000];
+
+        /// <summary>
+        /// Updates the voice nudge step size without a full Settings round-trip.
+        /// Called by the navbar step-size selector on change.
+        /// </summary>
+        [HttpPost("nudge-step")]
+        public async Task<IActionResult> SetNudgeStep([FromBody] NudgeStepRequest request)
+        {
+            if (!_validNudgeSteps.Contains(request.StepHz))
+                return BadRequest(new { error = "Invalid step size." });
+
+            var settings = await _settings.GetSettingsAsync();
+            settings.VoiceNudgeStepHz = request.StepHz;
+            await _settings.SaveSettingsAsync(settings);
+            _logger.LogInformation("[Voice] Nudge step updated to {Step} Hz via API", request.StepHz);
+            return Ok(new { ok = true });
+        }
+
+        public record NudgeStepRequest(long StepHz);
+
+        /// <summary>Returns the current voice phrases configuration (user file or built-in defaults).</summary>
+        [HttpGet("phrases")]
+        public IActionResult GetPhrases()
+        {
+            var config = _phraseStore.Load();
+            return Ok(config);
+        }
+
+        /// <summary>
+        /// Saves a new voice phrases configuration and hot-reloads the SAPI
+        /// grammar so changes take effect immediately without an app restart.
+        /// </summary>
+        [HttpPost("phrases")]
+        public IActionResult SavePhrases([FromBody] VoicePhrasesConfig config)
+        {
+            if (config == null)
+                return BadRequest(new { error = "No configuration supplied." });
+
+            try
+            {
+                _phraseStore.Save(config);
+                _voice.ReloadGrammar();
+                _logger.LogInformation("[Voice] Phrases saved and grammar reloaded.");
+                return Ok(new { ok = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Voice] Failed to save phrases");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        /// <summary>Returns the built-in default phrases so the UI can offer a Reset button.</summary>
+        [HttpGet("phrases/defaults")]
+        public IActionResult GetDefaultPhrases()
+        {
+            return Ok(VoicePhraseStore.BuildDefaults());
+        }
+
         [HttpGet("log")]
         public IActionResult VoiceLog([FromQuery] int lines = 200)
         {

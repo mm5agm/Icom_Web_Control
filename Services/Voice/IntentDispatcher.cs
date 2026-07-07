@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using Yaesu_Web_Control.Hubs;
 using Yaesu_Web_Control.Services;
 
 namespace Yaesu_Web_Control.Services.Voice
@@ -16,17 +18,20 @@ namespace Yaesu_Web_Control.Services.Voice
         private readonly ICatClient _catClient;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
+        private readonly IHubContext<RadioHub> _hub;
 
         public IntentDispatcher(
             ILogger<IntentDispatcher> logger,
             ICatClient catClient,
             RadioStateService state,
-            ISettingsService settings)
+            ISettingsService settings,
+            IHubContext<RadioHub> hub)
         {
             _logger = logger;
             _catClient = catClient;
             _state = state;
             _settings = settings;
+            _hub = hub;
         }
 
         /// <summary>
@@ -47,11 +52,28 @@ namespace Yaesu_Web_Control.Services.Voice
             {
                 switch (intent)
                 {
-                    case "SetFrequency":  return await SetFrequencyAsync(parameters, cancellationToken);
-                    case "SetBand":       return await SetBandAsync(parameters, cancellationToken);
-                    case "SetMode":       return await SetModeAsync(parameters, cancellationToken);
-                    case "SwapVFO":       return await SwapVfoAsync(cancellationToken);
-                    case "NudgeFrequency": return await NudgeFrequencyAsync(parameters, cancellationToken);
+                    case "SetFrequency":   return await SetFrequencyAsync(parameters, cancellationToken);
+                    case "SetBand":        return await SetBandAsync(parameters, cancellationToken);
+                    case "SetMode":        return await SetModeAsync(parameters, cancellationToken);
+                    case "SetNudgeStep":      return await SetNudgeStepAsync(parameters, cancellationToken);
+                    case "SwapVFO":           return await SwapVfoAsync(cancellationToken);
+                    case "NudgeFrequency":    return await NudgeFrequencyAsync(parameters, cancellationToken);
+                    case "BandUp":            return await BandStepAsync(up: true, cancellationToken);
+                    case "BandDown":          return await BandStepAsync(up: false, cancellationToken);
+                    case "Macro":             return await MacroAsync(parameters, cancellationToken);
+                    case "StatusFrequency":   return StatusFrequency();
+                    case "StatusMode":        return StatusMode();
+                    case "StatusBand":        return StatusBand();
+                    case "TxOn":              return await TxOnAsync(cancellationToken);
+                    case "TxOff":             return await TxOffAsync(cancellationToken);
+                    case "SplitOn":           return await SplitAsync(true, cancellationToken);
+                    case "SplitOff":          return await SplitAsync(false, cancellationToken);
+                    case "Help":              return Help();
+                    case "NudgeIfWidth":      return await NudgeIfWidthAsync(parameters, cancellationToken);
+                    case "SetAfGain":          return await SetAfGainAsync(parameters, cancellationToken);
+                    case "SetAttenuator":     return await SetAttenuatorAsync(parameters, cancellationToken);
+                    case "SetPreamp":         return await SetPreampAsync(parameters, cancellationToken);
+                    case "SetAgc":            return await SetAgcAsync(parameters, cancellationToken);
                     default:
                         _logger.LogWarning("[IntentDispatcher] Unknown intent: {Intent}", intent);
                         return new DispatchResult(false, "Unknown command");
@@ -191,16 +213,36 @@ namespace Yaesu_Web_Control.Services.Voice
             }
         }
 
-        // -- NudgeFrequency ------------------------------------------------
+        // -- SetNudgeStep --------------------------------------------------
 
-        // Fixed step for v1. Future: read the frontend's currently-selected
-        // digit and use that step. 10 kHz was picked over 1 kHz so each
-        // "tune up" / "nudge up" press produces a visible movement on the
-        // display -- 1 kHz only changes the rightmost-but-three digit and
-        // is easy to miss when you're driving by voice rather than watching
-        // the screen. If 10 kHz turns out to be too coarse for SSB use, the
-        // v2 "step by selected digit" plan is the proper fix.
-        private const long NudgeStepHz = 10_000;
+        private static readonly long[] _validNudgeSteps = [10, 100, 1_000, 10_000, 100_000];
+
+        private async Task<DispatchResult> SetNudgeStepAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!TryGetLong(args, "step", out var step) || !_validNudgeSteps.Contains(step))
+                return new DispatchResult(false, "Set step size");
+
+            var settings = await _settings.GetSettingsAsync();
+            settings.VoiceNudgeStepHz = step;
+            await _settings.SaveSettingsAsync(settings);
+            await _hub.Clients.All.SendAsync("RadioStateUpdate",
+                new { property = "VoiceNudgeStepHz", value = step }, ct);
+
+            var label = step switch
+            {
+                10      => "ten hertz",
+                100     => "one hundred hertz",
+                1_000   => "one kilohertz",
+                10_000  => "ten kilohertz",
+                100_000 => "one hundred kilohertz",
+                _       => $"{step} hertz",
+            };
+            _logger.LogInformation("[Voice] SetNudgeStep -> {Step} Hz", step);
+            return new DispatchResult(true, $"Step size {label}");
+        }
+
+        // -- NudgeFrequency ------------------------------------------------
 
         private async Task<DispatchResult> NudgeFrequencyAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
@@ -211,8 +253,10 @@ namespace Yaesu_Web_Control.Services.Voice
                 return new DispatchResult(false, "Tune");
             }
             var phrase = direction > 0 ? "Tune up" : "Tune down";
+            var settings = await _settings.GetSettingsAsync();
+            var stepHz = settings.VoiceNudgeStepHz > 0 ? settings.VoiceNudgeStepHz : 10_000;
             var current = _state.FrequencyA;
-            var next = current + direction * NudgeStepHz;
+            var next = current + direction * stepHz;
             if (next < 30_000 || next > 75_000_000)
             {
                 _logger.LogWarning("[Voice] NudgeFrequency would go out of range ({Next})", next);
@@ -223,6 +267,220 @@ namespace Yaesu_Web_Control.Services.Voice
             _logger.LogInformation("[Voice] NudgeFrequency {Dir} -> {Hz} Hz",
                 direction > 0 ? "up" : "down", next);
             return new DispatchResult(true, phrase);
+        }
+
+        // -- BandUp / BandDown ---------------------------------------------
+
+        private async Task<DispatchResult> BandStepAsync(bool up, CancellationToken ct)
+        {
+            var phrase = up ? "Band up" : "Band down";
+            var command = up ? "BU;" : "BD;";
+            await _catClient.SendCommandAsync(command, "Voice", ct);
+            _logger.LogInformation("[Voice] {Phrase}", phrase);
+            return new DispatchResult(true, phrase);
+        }
+
+        // -- Macro ---------------------------------------------------------
+
+        private async Task<DispatchResult> MacroAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            var name = args.TryGetValue("macroName", out var n) ? n?.ToString() ?? "Macro" : "Macro";
+            if (!args.TryGetValue("macroCat", out var c) || c is not string cat || string.IsNullOrWhiteSpace(cat))
+            {
+                _logger.LogWarning("[Voice] Macro '{Name}' has no CAT string", name);
+                return new DispatchResult(false, name);
+            }
+            // Split on ';' to support multi-command macros like "NR01;NB01;"
+            foreach (var seg in cat.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                await _catClient.SendCommandAsync(seg + ";", "Voice", ct);
+            _logger.LogInformation("[Voice] Macro '{Name}' -> {Cat}", name, cat);
+            return new DispatchResult(true, name);
+        }
+
+        // -- Status read-back (IsReadBack=true → no ", successful" appended) -----
+
+        private DispatchResult StatusFrequency()
+        {
+            var phrase = FormatFrequencyForSpeech(_state.FrequencyA);
+            return new DispatchResult(true, phrase, IsReadBack: true);
+        }
+
+        private DispatchResult StatusMode()
+        {
+            var phrase = $"Mode {ModeForSpeech(_state.ModeA ?? string.Empty)}";
+            return new DispatchResult(true, phrase, IsReadBack: true);
+        }
+
+        private DispatchResult StatusBand()
+        {
+            var phrase = FrequencyToBandName(_state.FrequencyA) is string band
+                ? $"{band} metres"
+                : "frequency not on a standard amateur band";
+            return new DispatchResult(true, phrase, IsReadBack: true);
+        }
+
+        private static string? FrequencyToBandName(long hz) => hz switch
+        {
+            >= 1_800_000  and <= 2_000_000  => "one six zero",
+            >= 3_500_000  and <= 4_000_000  => "eighty",
+            >= 5_250_000  and <= 5_450_000  => "sixty",
+            >= 7_000_000  and <= 7_300_000  => "forty",
+            >= 10_100_000 and <= 10_150_000 => "thirty",
+            >= 14_000_000 and <= 14_350_000 => "twenty",
+            >= 18_068_000 and <= 18_168_000 => "seventeen",
+            >= 21_000_000 and <= 21_450_000 => "fifteen",
+            >= 24_890_000 and <= 24_990_000 => "twelve",
+            >= 28_000_000 and <= 29_700_000 => "ten",
+            >= 50_000_000 and <= 54_000_000 => "six",
+            >= 70_000_000 and <= 71_000_000 => "four",
+            _ => null,
+        };
+
+        private static DispatchResult Help() =>
+            new(true,
+                "Available commands: set frequency, set mode, set band, " +
+                "tune up or down, band up or down, set step, swap V F O, " +
+                "split on or off, key transmitter, stop transmitting, " +
+                "attenuator, preamp, A G C, filter wider or narrower, " +
+                "roofing filter, A F gain up or down, " +
+                "and status queries — what frequency, what mode, what band.",
+                IsReadBack: true);
+
+        // -- TX / Split ----------------------------------------------------
+
+        private async Task<DispatchResult> TxOnAsync(CancellationToken ct)
+        {
+            await _catClient.SendCommandAsync("TX0;", "Voice", ct);
+            _state.IsTransmitting = true;
+            _logger.LogInformation("[Voice] TxOn");
+            return new DispatchResult(true, "Transmitting");
+        }
+
+        private async Task<DispatchResult> TxOffAsync(CancellationToken ct)
+        {
+            await _catClient.SendCommandAsync("RX;", "Voice", ct);
+            _state.IsTransmitting = false;
+            _logger.LogInformation("[Voice] TxOff");
+            return new DispatchResult(true, "Receive");
+        }
+
+        private async Task<DispatchResult> SplitAsync(bool on, CancellationToken ct)
+        {
+            await _catClient.SendCommandAsync(on ? "FT1;" : "FT0;", "Voice", ct);
+            _state.SplitMode = on ? 1 : 0;
+            _logger.LogInformation("[Voice] Split {State}", on ? "on" : "off");
+            return new DispatchResult(true, on ? "Split on" : "Split off");
+        }
+
+        // -- IF width / AF gain nudges (query → adjust → set) --------------
+
+        private async Task<DispatchResult> NudgeIfWidthAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!TryGetLong(args, "direction", out var direction) || (direction != 1 && direction != -1))
+                return new DispatchResult(false, "Filter width");
+
+            var raw = await _catClient.SendCommandAsync("SH;", "Voice", ct);
+            if (!TryParseIntResponse(raw, "SH", out var current))
+                return new DispatchResult(false, "Filter width");
+
+            var next = Math.Clamp(current + (int)direction, 0, 40);
+            await _catClient.SendCommandAsync($"SH{next:D2};", "Voice", ct);
+            _state.IfWidthA = next.ToString();
+            _logger.LogInformation("[Voice] NudgeIfWidth {Dir} -> {Next}", direction > 0 ? "wider" : "narrower", next);
+            return new DispatchResult(true, direction > 0 ? "Filter wider" : "Filter narrower");
+        }
+
+        private async Task<DispatchResult> SetAfGainAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            // Vocabulary keys are 0-100 (percentage). Map to 0-255 for the CAT command.
+            if (!TryGetLong(args, "level", out var pct))
+                return new DispatchResult(false, "A F gain");
+
+            pct = Math.Clamp(pct, 0, 100);
+            var catValue = (int)Math.Round(pct * 255.0 / 100.0);
+            await _catClient.SendCommandAsync($"AG0{catValue:D3};", "Voice", ct);
+            _state.AfGainA = catValue;
+            _logger.LogInformation("[Voice] SetAfGain {Pct}% -> CAT {CatValue}", pct, catValue);
+            return new DispatchResult(true, $"Audio gain {pct}");
+        }
+
+        // -- Attenuator / Preamp / AGC -------------------------------------
+
+        private async Task<DispatchResult> SetAttenuatorAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!args.TryGetValue("level", out var lvlObj) || lvlObj is not string level)
+                return new DispatchResult(false, "Attenuator");
+
+            var command = level switch
+            {
+                "off" => "RA00;",
+                "6"   => "RA01;",
+                "12"  => "RA02;",
+                "18"  => "RA03;",
+                _     => null,
+            };
+            if (command == null) return new DispatchResult(false, "Attenuator");
+
+            await _catClient.SendCommandAsync(command, "Voice", ct);
+            _state.AttA = level switch { "off" => "00", "6" => "06", "12" => "12", "18" => "18", _ => _state.AttA };
+            var phrase = level == "off" ? "Attenuator off" : $"Attenuator {level} decibels";
+            _logger.LogInformation("[Voice] SetAttenuator -> {Level}", level);
+            return new DispatchResult(true, phrase);
+        }
+
+        private async Task<DispatchResult> SetPreampAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!args.TryGetValue("level", out var lvlObj) || lvlObj is not string level)
+                return new DispatchResult(false, "Preamp");
+
+            var command = level switch
+            {
+                "off" => "PA00;",
+                "1"   => "PA01;",
+                "2"   => "PA02;",
+                _     => null,
+            };
+            if (command == null) return new DispatchResult(false, "Preamp");
+
+            await _catClient.SendCommandAsync(command, "Voice", ct);
+            _state.IpoA = level switch { "off" => "0", "1" => "1", "2" => "2", _ => _state.IpoA };
+            var phrase = level switch
+            {
+                "off" => "Preamp off",
+                "1"   => "Preamp amp one",
+                "2"   => "Preamp amp two",
+                _     => "Preamp",
+            };
+            _logger.LogInformation("[Voice] SetPreamp -> {Level}", level);
+            return new DispatchResult(true, phrase);
+        }
+
+        private async Task<DispatchResult> SetAgcAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!args.TryGetValue("speed", out var spObj) || spObj is not string speed)
+                return new DispatchResult(false, "A G C");
+
+            var command = speed switch
+            {
+                "off"  => "GT00;",
+                "fast" => "GT01;",
+                "mid"  => "GT02;",
+                "slow" => "GT03;",
+                "auto" => "GT04;",
+                _      => null,
+            };
+            if (command == null) return new DispatchResult(false, "A G C");
+
+            await _catClient.SendCommandAsync(command, "Voice", ct);
+            _state.AgcA = speed switch { "off" => "0", "fast" => "1", "mid" => "2", "slow" => "3", "auto" => "4", _ => _state.AgcA };
+            _logger.LogInformation("[Voice] SetAgc -> {Speed}", speed);
+            return new DispatchResult(true, $"A G C {speed}");
         }
 
         // -- helpers -------------------------------------------------------
@@ -248,6 +506,15 @@ namespace Yaesu_Web_Control.Services.Voice
             }
         }
 
+        private static bool TryParseIntResponse(string? raw, string prefix, out int value)
+        {
+            value = 0;
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+            var trimmed = raw.Trim().TrimEnd(';');
+            if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+            return int.TryParse(trimmed.AsSpan(prefix.Length), out value);
+        }
+
         /// <summary>Parses "FA01407400000;" or "FA01407400000" into a long Hz value.</summary>
         private static bool TryParseFreqResponse(string? raw, string prefix, out long hz)
         {
@@ -268,16 +535,22 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private static string FormatFrequencyForSpeech(long hz)
         {
-            var mhz = hz / 1_000_000;
-            var fracKhz = (hz % 1_000_000) / 1000;  // 0-999
-            if (fracKhz == 0)
+            var mhz     = hz / 1_000_000;
+            var rem     = hz % 1_000_000;
+            var fracKhz = rem / 1000;   // 0-999: kHz digits
+            var fracHz  = rem % 1000;   // 0-999: Hz digits (often 0)
+
+            if (fracKhz == 0 && fracHz == 0)
                 return $"{NumberWord(mhz)} megahertz";
-            // Pad to 3 digits and speak each digit separately so "074" reads
-            // as "zero seven four", matching the grammar's digit-by-digit
-            // form ("point zero seven four").
-            var fracDigits = fracKhz.ToString("D3");
-            var spelled = string.Join(" ", fracDigits.Select(c => DigitWord(c - '0')));
-            return $"{NumberWord(mhz)} point {spelled} megahertz";
+
+            var khzSpelled = string.Join(" ", fracKhz.ToString("D3").Select(c => DigitWord(c - '0')));
+            if (fracHz == 0)
+                return $"{NumberWord(mhz)} point {khzSpelled} megahertz";
+
+            // Include the sub-kHz digits so "18.128010" reads as
+            // "eighteen point one two eight zero one zero megahertz".
+            var hzSpelled = string.Join(" ", fracHz.ToString("D3").Select(c => DigitWord(c - '0')));
+            return $"{NumberWord(mhz)} point {khzSpelled} {hzSpelled} megahertz";
         }
 
         private static string DigitWord(int d) => d switch
@@ -335,5 +608,10 @@ namespace Yaesu_Web_Control.Services.Voice
     /// the command tried to do, with parameter values folded in
     /// (e.g. "Move to fourteen point zero seven four megahertz", "Mode U S B").
     /// </summary>
-    public record DispatchResult(bool Success, string ConfirmationPhrase);
+    /// <summary>
+    /// <c>IsReadBack</c> = true for status queries and help — the phrase is spoken directly
+    /// without appending ", successful". Also bypasses the VoiceSpokenConfirmationEnabled
+    /// gate so status queries always get a spoken answer.
+    /// </summary>
+    public record DispatchResult(bool Success, string ConfirmationPhrase, bool IsReadBack = false);
 }

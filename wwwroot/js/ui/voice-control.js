@@ -12,25 +12,40 @@
 (function () {
     'use strict';
 
-    const btn = document.getElementById('voiceMicBtn');
+    const btn        = document.getElementById('voiceMicBtn');
+    const stepSelect = document.getElementById('voiceNudgeStepSelect');
     const lastHeardEl = document.getElementById('voiceLastHeard');
     if (!btn) return;
 
     // Show button only if voice control is enabled in Settings.
-    // Step 5 sets window.ywcVoiceEnabled from server-side @Model. For
-    // Step 4 the flag is undefined and the button stays hidden so users
-    // don't see a non-functional control until Settings exposes the
-    // toggle.
     if (!window.ywcVoiceEnabled) return;
     btn.style.display = '';
+
+    // Show and initialise the step-size selector.
+    if (stepSelect) {
+        stepSelect.style.display = '';
+        stepSelect.value = String(window.ywcVoiceNudgeStepHz || 10000);
+        stepSelect.addEventListener('change', async function () {
+            const stepHz = parseInt(this.value, 10);
+            try {
+                await fetch('/api/voice/nudge-step', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stepHz }),
+                });
+            } catch (e) {
+                console.error('[voice] nudge-step update failed', e);
+            }
+        });
+    }
 
     // ---- Visual state ----------------------------------------------------
 
     function setButtonClass(suffix) {
-        btn.className = 'btn btn-sm btn-' + suffix + ' mx-2';
+        btn.className = 'btn btn-' + suffix + ' mx-2';
     }
-    function setIdleVisual()        { setButtonClass('outline-secondary'); }
-    function setListeningVisual()   { setButtonClass('primary'); }
+    function setIdleVisual()        { setButtonClass('outline-danger'); }
+    function setListeningVisual()   { setButtonClass('danger'); }
     function setHeardVisual()       { setButtonClass('success'); }
     function setExecutingVisual()   { setButtonClass('success'); }
     function setErrorVisual()       { setButtonClass('danger'); }
@@ -102,6 +117,10 @@
             return;
         }
         conn.on('VoiceStatusUpdate', handleStatusUpdate);
+        conn.on('RadioStateUpdate', function (update) {
+            if (update.property === 'VoiceNudgeStepHz' && stepSelect)
+                stepSelect.value = String(update.value);
+        });
     }
     tryAttachSignalR();
 

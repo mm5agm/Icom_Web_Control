@@ -38,6 +38,7 @@ namespace Yaesu_Web_Control.Services.Voice
         private readonly IWebHostEnvironment _env;
         private readonly ISettingsService _settings;
         private readonly VoiceTtsService _tts;
+        private readonly VoicePhraseStore _phraseStore;
 
         private readonly object _engineLock = new();
         private SpeechRecognitionEngine? _engine;
@@ -55,7 +56,8 @@ namespace Yaesu_Web_Control.Services.Voice
             IntentDispatcher intentDispatcher,
             IWebHostEnvironment env,
             ISettingsService settings,
-            VoiceTtsService tts)
+            VoiceTtsService tts,
+            VoicePhraseStore phraseStore)
         {
             _logger = logger;
             _hubContext = hubContext;
@@ -63,6 +65,7 @@ namespace Yaesu_Web_Control.Services.Voice
             _env = env;
             _settings = settings;
             _tts = tts;
+            _phraseStore = phraseStore;
         }
 
         public override async Task StartAsync(CancellationToken cancellationToken)
@@ -161,6 +164,38 @@ namespace Yaesu_Web_Control.Services.Voice
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Reloads the grammar from the current voice_phrases.json without
+        /// restarting the recogniser. Called by the API after the user saves
+        /// the phrases editor. Safe to call while listening — stops, swaps
+        /// grammar, restarts.
+        /// </summary>
+        public void ReloadGrammar()
+        {
+            lock (_engineLock)
+            {
+                if (_engine == null) return;
+                try
+                {
+                    var wasListening = _status.State == VoiceState.Listening;
+                    if (wasListening) _engine.RecognizeAsyncCancel();
+
+                    var phraseCfg = _phraseStore.Load();
+                    var grammar = VoiceGrammar.Build(phraseCfg);
+                    _engine.UnloadAllGrammars();
+                    _engine.LoadGrammar(grammar);
+                    _logger.LogInformation("[Voice] Grammar reloaded from voice_phrases.json");
+
+                    if (wasListening) _engine.RecognizeAsync(RecognizeMode.Multiple);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[Voice] Failed to reload grammar");
+                    UpdateStatus(VoiceState.Error, error: ex.Message);
+                }
+            }
+        }
+
         // -----------------------------------------------------------------
 
         private void TryInitialiseEngine()
@@ -191,7 +226,8 @@ namespace Yaesu_Web_Control.Services.Voice
                 // isn't shipped with the modern NuGet. The SRGS XML file lives
                 // in Grammars/ as the human-readable spec; VoiceGrammar.cs
                 // mirrors it using GrammarBuilder + Choices.
-                var grammar = VoiceGrammar.BuildEnGb();
+                var phraseCfg = _phraseStore.Load();
+                var grammar = VoiceGrammar.Build(phraseCfg);
                 engine.LoadGrammar(grammar);
                 _engine = engine;
                 _logger.LogInformation(
@@ -295,10 +331,15 @@ namespace Yaesu_Web_Control.Services.Voice
                 // Thomas OZ1JTE) where the operator may not be watching the
                 // screen for visual confirmation.
                 var settings = await _settings.GetSettingsAsync();
-                if (settings.VoiceSpokenConfirmationEnabled && !string.IsNullOrWhiteSpace(result.ConfirmationPhrase))
+                if (!string.IsNullOrWhiteSpace(result.ConfirmationPhrase) &&
+                    (settings.VoiceSpokenConfirmationEnabled || result.IsReadBack))
                 {
-                    var status = result.Success ? "successful" : "unsuccessful";
-                    _tts.Speak($"{result.ConfirmationPhrase}, {status}");
+                    // Read-back responses (status queries, help) speak the phrase directly.
+                    // Command confirmations append ", successful" / ", unsuccessful".
+                    var speech = result.IsReadBack
+                        ? result.ConfirmationPhrase
+                        : $"{result.ConfirmationPhrase}, {(result.Success ? "successful" : "unsuccessful")}";
+                    _tts.Speak(speech);
                 }
             }
             catch (Exception ex)
@@ -328,6 +369,70 @@ namespace Yaesu_Web_Control.Services.Voice
             {
                 args["direction"] = -1L;
                 return ("NudgeFrequency", args);
+            }
+            if (string.Equals(intent, "NudgeIfWidthUp", StringComparison.Ordinal))
+            {
+                args["direction"] = 1L;
+                return ("NudgeIfWidth", args);
+            }
+            if (string.Equals(intent, "NudgeIfWidthDown", StringComparison.Ordinal))
+            {
+                args["direction"] = -1L;
+                return ("NudgeIfWidth", args);
+            }
+            if (intent.StartsWith("SetAfGain:", StringComparison.Ordinal))
+            {
+                if (int.TryParse(intent["SetAfGain:".Length..], out var pct))
+                    args["level"] = pct;
+                return ("SetAfGain", args);
+            }
+            // Flat phrase-map intents: "SetMode:USB", "SetBand:80"
+            if (intent.StartsWith("SetMode:", StringComparison.Ordinal))
+            {
+                args["mode"] = intent["SetMode:".Length..];
+                return ("SetMode", args);
+            }
+            if (intent.StartsWith("SetBand:", StringComparison.Ordinal))
+            {
+                if (long.TryParse(intent.AsSpan("SetBand:".Length), out var metres))
+                    args["metres"] = metres;
+                return ("SetBand", args);
+            }
+            if (intent.StartsWith("SetNudgeStep:", StringComparison.Ordinal))
+            {
+                if (long.TryParse(intent.AsSpan("SetNudgeStep:".Length), out var step))
+                    args["step"] = step;
+                return ("SetNudgeStep", args);
+            }
+            if (intent.StartsWith("SetAttenuator:", StringComparison.Ordinal))
+            {
+                args["level"] = intent["SetAttenuator:".Length..];
+                return ("SetAttenuator", args);
+            }
+            if (intent.StartsWith("SetPreamp:", StringComparison.Ordinal))
+            {
+                args["level"] = intent["SetPreamp:".Length..];
+                return ("SetPreamp", args);
+            }
+            if (intent.StartsWith("SetAgc:", StringComparison.Ordinal))
+            {
+                args["speed"] = intent["SetAgc:".Length..];
+                return ("SetAgc", args);
+            }
+            if (intent.StartsWith("Macro:", StringComparison.Ordinal))
+            {
+                var payload = intent["Macro:".Length..];
+                var pipe = payload.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    args["macroName"] = payload[..pipe];
+                    args["macroCat"]  = payload[(pipe + 1)..];
+                }
+                else
+                {
+                    args["macroName"] = payload;
+                }
+                return ("Macro", args);
             }
             return (intent, args);
         }
