@@ -34,19 +34,35 @@ namespace Yaesu_Web_Control.Services.Voice
             _hub = hub;
         }
 
+        // §6.5 dry-run testing: when set, SendCommand() logs the CAT string
+        // instead of sending it. AsyncLocal rather than a field/parameter
+        // threaded through every intent handler -- it scopes cleanly to the
+        // single DispatchAsync call tree without touching ~20 method
+        // signatures, and doesn't leak into unrelated concurrent dispatches.
+        private static readonly AsyncLocal<bool> _dryRun = new();
+
         /// <summary>
         /// Dispatch a recognised intent. Returns true if the intent was
         /// known AND successfully sent to the radio; false if the intent
-        /// name is unknown or arguments are invalid.
+        /// name is unknown or arguments are invalid. When <paramref name="dryRun"/>
+        /// is true, intent matching and confirmation-phrase generation run
+        /// exactly as normal but no CAT command is actually sent to the
+        /// radio (§6.5 "Test this pack" dry run). Read-modify-write intents
+        /// (SwapVFO on single-receiver radios, NudgeIfWidth) need a real CAT
+        /// readback to compute their result and will report unsuccessful in
+        /// dry-run mode -- a known, acceptable limitation of testing without
+        /// a connected radio.
         /// </summary>
         public async Task<DispatchResult> DispatchAsync(
             string intent,
             IReadOnlyDictionary<string, object> parameters,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            bool dryRun = false)
         {
+            _dryRun.Value = dryRun;
             _logger.LogInformation(
-                "[IntentDispatcher] intent={Intent} params={@Params}",
-                intent, parameters);
+                "[IntentDispatcher] intent={Intent} params={@Params} dryRun={DryRun}",
+                intent, parameters, dryRun);
 
             try
             {
@@ -104,7 +120,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 return new DispatchResult(false, phrase);
             }
             var command = $"FA{hz:D9};";
-            await _catClient.SendCommandAsync(command, "Voice", ct);
+            await SendCommand(command, ct);
             _state.FrequencyA = hz;
             _logger.LogInformation("[Voice] SetFrequency -> {Hz} Hz", hz);
             return new DispatchResult(true, phrase);
@@ -148,7 +164,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 return new DispatchResult(false, phrase);
             }
             var command = $"FA{hz:D9};";
-            await _catClient.SendCommandAsync(command, "Voice", ct);
+            await SendCommand(command, ct);
             _state.FrequencyA = hz;
             _logger.LogInformation("[Voice] SetBand -> {Metres}m -> {Hz} Hz", metres, hz);
             return new DispatchResult(true, phrase);
@@ -167,7 +183,7 @@ namespace Yaesu_Web_Control.Services.Voice
             // CatCommands.FormatMode handles the Yaesu-mode-string -> MD code
             // translation. Voice always targets VFO A in v1.
             var command = CatCommands.FormatMode(mode, isSubVfo: false);
-            await _catClient.SendCommandAsync(command, "Voice", ct);
+            await SendCommand(command, ct);
             _state.ModeA = mode;
             _logger.LogInformation("[Voice] SetMode -> {Mode}", mode);
             return new DispatchResult(true, $"Mode {ModeForSpeech(mode)}");
@@ -188,16 +204,16 @@ namespace Yaesu_Web_Control.Services.Voice
                 // and writing them back swapped. Simpler than toggling VS,
                 // and matches what the radio actually does when the user
                 // presses A/B on the front panel.
-                var faRaw = await _catClient.SendCommandAsync("FA;", "Voice", ct);
-                var fbRaw = await _catClient.SendCommandAsync("FB;", "Voice", ct);
+                var faRaw = await SendCommand("FA;", ct);
+                var fbRaw = await SendCommand("FB;", ct);
                 if (!TryParseFreqResponse(faRaw, "FA", out var fa) ||
                     !TryParseFreqResponse(fbRaw, "FB", out var fb))
                 {
                     _logger.LogWarning("[Voice] SwapVFO: couldn't parse FA/FB readback");
                     return new DispatchResult(false, phrase);
                 }
-                await _catClient.SendCommandAsync($"FA{fb:D9};", "Voice", ct);
-                await _catClient.SendCommandAsync($"FB{fa:D9};", "Voice", ct);
+                await SendCommand($"FA{fb:D9};", ct);
+                await SendCommand($"FB{fa:D9};", ct);
                 _state.FrequencyA = fb;
                 _state.FrequencyB = fa;
                 _logger.LogInformation("[Voice] SwapVFO (fake) -> A={A}, B={B}", fb, fa);
@@ -207,7 +223,7 @@ namespace Yaesu_Web_Control.Services.Voice
             {
                 // Dual-receiver (FTdx101): atomic SV; — the radio handles the
                 // swap and broadcasts new FA/FB via auto-info.
-                await _catClient.SendCommandAsync("SV;", "Voice", ct);
+                await SendCommand("SV;", ct);
                 _logger.LogInformation("[Voice] SwapVFO (SV;)");
                 return new DispatchResult(true, phrase);
             }
@@ -262,7 +278,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] NudgeFrequency would go out of range ({Next})", next);
                 return new DispatchResult(false, phrase);
             }
-            await _catClient.SendCommandAsync($"FA{next:D9};", "Voice", ct);
+            await SendCommand($"FA{next:D9};", ct);
             _state.FrequencyA = next;
             _logger.LogInformation("[Voice] NudgeFrequency {Dir} -> {Hz} Hz",
                 direction > 0 ? "up" : "down", next);
@@ -274,8 +290,11 @@ namespace Yaesu_Web_Control.Services.Voice
         private async Task<DispatchResult> BandStepAsync(bool up, CancellationToken ct)
         {
             var phrase = up ? "Band up" : "Band down";
-            var command = up ? "BU;" : "BD;";
-            await _catClient.SendCommandAsync(command, "Voice", ct);
+            // BU/BD require a P1 band selector (0=MAIN, 1=SUB) per the
+            // FTdx101MP CAT manual -- a bare "BU;"/"BD;" is malformed and
+            // the radio silently ignores it. Voice always targets VFO A/MAIN.
+            var command = up ? "BU0;" : "BD0;";
+            await SendCommand(command, ct);
             _logger.LogInformation("[Voice] {Phrase}", phrase);
             return new DispatchResult(true, phrase);
         }
@@ -293,7 +312,7 @@ namespace Yaesu_Web_Control.Services.Voice
             }
             // Split on ';' to support multi-command macros like "NR01;NB01;"
             foreach (var seg in cat.Split(';', StringSplitOptions.RemoveEmptyEntries))
-                await _catClient.SendCommandAsync(seg + ";", "Voice", ct);
+                await SendCommand(seg + ";", ct);
             _logger.LogInformation("[Voice] Macro '{Name}' -> {Cat}", name, cat);
             return new DispatchResult(true, name);
         }
@@ -351,7 +370,7 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private async Task<DispatchResult> TxOnAsync(CancellationToken ct)
         {
-            await _catClient.SendCommandAsync("TX0;", "Voice", ct);
+            await SendCommand("TX0;", ct);
             _state.IsTransmitting = true;
             _logger.LogInformation("[Voice] TxOn");
             return new DispatchResult(true, "Transmitting");
@@ -359,7 +378,7 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private async Task<DispatchResult> TxOffAsync(CancellationToken ct)
         {
-            await _catClient.SendCommandAsync("RX;", "Voice", ct);
+            await SendCommand("RX;", ct);
             _state.IsTransmitting = false;
             _logger.LogInformation("[Voice] TxOff");
             return new DispatchResult(true, "Receive");
@@ -367,7 +386,7 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private async Task<DispatchResult> SplitAsync(bool on, CancellationToken ct)
         {
-            await _catClient.SendCommandAsync(on ? "FT1;" : "FT0;", "Voice", ct);
+            await SendCommand(on ? "FT1;" : "FT0;", ct);
             _state.SplitMode = on ? 1 : 0;
             _logger.LogInformation("[Voice] Split {State}", on ? "on" : "off");
             return new DispatchResult(true, on ? "Split on" : "Split off");
@@ -381,12 +400,12 @@ namespace Yaesu_Web_Control.Services.Voice
             if (!TryGetLong(args, "direction", out var direction) || (direction != 1 && direction != -1))
                 return new DispatchResult(false, "Filter width");
 
-            var raw = await _catClient.SendCommandAsync("SH;", "Voice", ct);
+            var raw = await SendCommand("SH;", ct);
             if (!TryParseIntResponse(raw, "SH", out var current))
                 return new DispatchResult(false, "Filter width");
 
             var next = Math.Clamp(current + (int)direction, 0, 40);
-            await _catClient.SendCommandAsync($"SH{next:D2};", "Voice", ct);
+            await SendCommand($"SH{next:D2};", ct);
             _state.IfWidthA = next.ToString();
             _logger.LogInformation("[Voice] NudgeIfWidth {Dir} -> {Next}", direction > 0 ? "wider" : "narrower", next);
             return new DispatchResult(true, direction > 0 ? "Filter wider" : "Filter narrower");
@@ -401,7 +420,7 @@ namespace Yaesu_Web_Control.Services.Voice
 
             pct = Math.Clamp(pct, 0, 100);
             var catValue = (int)Math.Round(pct * 255.0 / 100.0);
-            await _catClient.SendCommandAsync($"AG0{catValue:D3};", "Voice", ct);
+            await SendCommand($"AG0{catValue:D3};", ct);
             _state.AfGainA = catValue;
             _logger.LogInformation("[Voice] SetAfGain {Pct}% -> CAT {CatValue}", pct, catValue);
             return new DispatchResult(true, $"Audio gain {pct}");
@@ -425,7 +444,7 @@ namespace Yaesu_Web_Control.Services.Voice
             };
             if (command == null) return new DispatchResult(false, "Attenuator");
 
-            await _catClient.SendCommandAsync(command, "Voice", ct);
+            await SendCommand(command, ct);
             _state.AttA = level switch { "off" => "00", "6" => "06", "12" => "12", "18" => "18", _ => _state.AttA };
             var phrase = level == "off" ? "Attenuator off" : $"Attenuator {level} decibels";
             _logger.LogInformation("[Voice] SetAttenuator -> {Level}", level);
@@ -447,7 +466,7 @@ namespace Yaesu_Web_Control.Services.Voice
             };
             if (command == null) return new DispatchResult(false, "Preamp");
 
-            await _catClient.SendCommandAsync(command, "Voice", ct);
+            await SendCommand(command, ct);
             _state.IpoA = level switch { "off" => "0", "1" => "1", "2" => "2", _ => _state.IpoA };
             var phrase = level switch
             {
@@ -477,10 +496,31 @@ namespace Yaesu_Web_Control.Services.Voice
             };
             if (command == null) return new DispatchResult(false, "A G C");
 
-            await _catClient.SendCommandAsync(command, "Voice", ct);
+            await SendCommand(command, ct);
             _state.AgcA = speed switch { "off" => "0", "fast" => "1", "mid" => "2", "slow" => "3", "auto" => "4", _ => _state.AgcA };
             _logger.LogInformation("[Voice] SetAgc -> {Speed}", speed);
             return new DispatchResult(true, $"A G C {speed}");
+        }
+
+        // -- CAT send, dry-run-aware ----------------------------------------
+
+        /// <summary>
+        /// Every intent handler routes its CAT traffic through here instead
+        /// of calling _catClient directly, so the §6.5 dry-run flag has a
+        /// single choke point. In dry-run mode a query (bare "XX;") still
+        /// isn't sent -- there's no live radio guaranteed to be present
+        /// during a pack test -- so read-modify-write intents return an
+        /// empty response and report unsuccessful; see DispatchAsync's doc
+        /// comment.
+        /// </summary>
+        private Task<string> SendCommand(string command, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would send {Command}", command);
+                return Task.FromResult(string.Empty);
+            }
+            return _catClient.SendCommandAsync(command, "Voice", ct);
         }
 
         // -- helpers -------------------------------------------------------

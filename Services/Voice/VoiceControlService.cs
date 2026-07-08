@@ -17,8 +17,12 @@ namespace Yaesu_Web_Control.Services.Voice
     /// Lifecycle:
     /// <list type="bullet">
     /// <item><c>StartAsync</c> (hosted service): attempts to construct the
-    /// SAPI recogniser for <c>en-GB</c> and load <c>Grammars/Commands.en-GB.srgs</c>.
-    /// Failures are logged but non-fatal — the rest of YWC still runs.</item>
+    /// SAPI recogniser for <c>Settings.VoiceActiveLocale</c> (default
+    /// en-GB) and load its installed pack. Failures are logged but
+    /// non-fatal — the rest of YWC still runs.</item>
+    /// <item><c>SwitchLocaleAsync</c> (called by VoiceController when the
+    /// user changes the language switcher in Settings): disposes the
+    /// current engine and reconstructs it for the new culture — see §4.2.</item>
     /// <item><c>StartListeningAsync</c> (called by VoiceController when the
     /// on-screen PTT button is pressed): wires audio input + begins
     /// recognition. State -> Listening.</item>
@@ -42,7 +46,27 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private readonly object _engineLock = new();
         private SpeechRecognitionEngine? _engine;
+
+        // Serializes §2.5 "Try it" tests end-to-end (grammar swap through
+        // Recognize through restore). _engineLock alone isn't enough here --
+        // it's only held for the brief swap, not for the several seconds
+        // Recognize() blocks. Two Try It clicks close together used to
+        // interleave: the second call's UnloadAllGrammars()/LoadGrammar()
+        // would silently replace the first call's still-in-flight test
+        // grammar, so both recognitions ended up matching against whichever
+        // row was tested second (observed as unrelated phrases both
+        // reporting the other row's phrase as "heard").
+        private readonly SemaphoreSlim _tryPhraseGate = new(1, 1);
         private bool _audioWired;
+        private string _activeCulture = VoicePhraseStore.DefaultCulture;
+
+        // §6.5 "Test this pack" dry run -- set for the duration of a
+        // StartListeningAsync(dryRun: true) session; OnSpeechRecognized reads
+        // it to skip actually sending the matched CAT command.
+        private bool _dryRun;
+
+        /// <summary>The locale currently loaded into the live SAPI engine (or the last one attempted, if construction failed).</summary>
+        public string ActiveCulture => _activeCulture;
 
         // Status is read by /api/voice/status; updated whenever state changes.
         // Volatile reference assignment is atomic in .NET so no lock needed
@@ -77,7 +101,9 @@ namespace Yaesu_Web_Control.Services.Voice
             var settings = await _settings.GetSettingsAsync();
             if (settings.VoiceControlEnabled)
             {
-                TryInitialiseEngine();
+                TryInitialiseEngine(string.IsNullOrWhiteSpace(settings.VoiceActiveLocale)
+                    ? VoicePhraseStore.DefaultCulture
+                    : settings.VoiceActiveLocale);
             }
             else
             {
@@ -104,17 +130,22 @@ namespace Yaesu_Web_Control.Services.Voice
         /// <summary>
         /// Begin recognising. Called by the API endpoint when the PTT button
         /// is pressed. Idempotent — calling while already listening is a no-op.
+        /// <paramref name="dryRun"/> (§6.5) leaves recognition and intent
+        /// matching untouched but suppresses the actual CAT send — used by
+        /// the Settings "Test this pack" modal so a pack can be exercised
+        /// without a radio connected or without changing its live state.
         /// </summary>
-        public async Task<bool> StartListeningAsync()
+        public async Task<bool> StartListeningAsync(bool dryRun = false)
         {
             lock (_engineLock)
             {
                 if (_engine == null)
                 {
-                    UpdateStatus(VoiceState.Error, error: "Speech recogniser not available (check Windows en-GB speech pack)");
+                    UpdateStatus(VoiceState.Error, error: $"Speech recogniser not available (check Windows {_activeCulture} speech pack)");
                     return false;
                 }
 
+                _dryRun = dryRun;
                 try
                 {
                     if (!_audioWired)
@@ -159,16 +190,16 @@ namespace Yaesu_Web_Control.Services.Voice
                 {
                     _logger.LogWarning(ex, "[Voice] RecognizeAsyncStop threw (non-fatal)");
                 }
+                _dryRun = false;
                 UpdateStatus(VoiceState.Idle);
             }
             return Task.CompletedTask;
         }
 
         /// <summary>
-        /// Reloads the grammar from the current voice_phrases.json without
-        /// restarting the recogniser. Called by the API after the user saves
-        /// the phrases editor. Safe to call while listening — stops, swaps
-        /// grammar, restarts.
+        /// Reloads the grammar for the active culture without restarting the
+        /// recogniser. Called by the API after the user saves the phrases
+        /// editor. Safe to call while listening — stops, swaps grammar, restarts.
         /// </summary>
         public void ReloadGrammar()
         {
@@ -180,11 +211,11 @@ namespace Yaesu_Web_Control.Services.Voice
                     var wasListening = _status.State == VoiceState.Listening;
                     if (wasListening) _engine.RecognizeAsyncCancel();
 
-                    var phraseCfg = _phraseStore.Load();
-                    var grammar = VoiceGrammar.Build(phraseCfg);
+                    var phraseCfg = _phraseStore.Load(_activeCulture);
+                    var grammar = VoiceGrammar.Build(phraseCfg, _activeCulture);
                     _engine.UnloadAllGrammars();
                     _engine.LoadGrammar(grammar);
-                    _logger.LogInformation("[Voice] Grammar reloaded from voice_phrases.json");
+                    _logger.LogInformation("[Voice] Grammar reloaded for {Culture}", _activeCulture);
 
                     if (wasListening) _engine.RecognizeAsync(RecognizeMode.Multiple);
                 }
@@ -196,43 +227,213 @@ namespace Yaesu_Web_Control.Services.Voice
             }
         }
 
-        // -----------------------------------------------------------------
+        /// <summary>
+        /// Per-row "Try it" test (§2.5): briefly swaps the live engine's
+        /// grammar for a one-off Choices grammar built from just the phrases
+        /// being edited, listens for a single utterance up to
+        /// <paramref name="timeout"/>, then restores whatever grammar/listen
+        /// state was active before. Reuses the single live engine (rather
+        /// than spinning up a second SpeechRecognitionEngine) so it can't
+        /// fight the main recogniser over exclusive audio-device access.
+        /// Returns (matched, heardText, error).
+        /// </summary>
+        public async Task<(bool Matched, string? Heard, float? Confidence, string? Error)> TryPhraseAsync(
+            IReadOnlyList<string> phrases, TimeSpan timeout)
+        {
+            if (phrases == null || phrases.Count == 0)
+                return (false, null, null, "No phrases to test.");
 
-        private void TryInitialiseEngine()
+            // Serialize the whole test end-to-end -- see _tryPhraseGate's
+            // doc comment for why _engineLock alone isn't sufficient here.
+            await _tryPhraseGate.WaitAsync();
+            try
+            {
+                SpeechRecognitionEngine? engine;
+                bool wasListening;
+                lock (_engineLock)
+                {
+                    engine = _engine;
+                    if (engine == null)
+                        return (false, null, null, $"Speech recogniser not available (check Windows {_activeCulture} speech pack)");
+
+                    wasListening = _status.State == VoiceState.Listening;
+                    if (wasListening) engine.RecognizeAsyncCancel();
+
+                    try
+                    {
+                        // Re-wire the audio input immediately before every test,
+                        // not just the first one. SAPI keeps capturing
+                        // continuously once an input device is wired, even
+                        // between explicit Recognize() calls -- so ambient
+                        // noise, or the tail of what was said for a *previous*
+                        // Try It test, sits queued in the engine's audio buffer
+                        // and gets consumed as the start of the next
+                        // Recognize() call, matching against a phrase the user
+                        // never said this time. SetInputToNull() followed by
+                        // SetInputToDefaultAudioDevice() discards that queue so
+                        // each test only hears audio spoken after it starts.
+                        engine.SetInputToNull();
+                        engine.SetInputToDefaultAudioDevice();
+                        _audioWired = true;
+
+                        engine.UnloadAllGrammars();
+                        var builder = new System.Speech.Recognition.GrammarBuilder(
+                            new System.Speech.Recognition.Choices(phrases.ToArray()))
+                        {
+                            Culture = new CultureInfo(_activeCulture),
+                        };
+                        engine.LoadGrammar(new System.Speech.Recognition.Grammar(builder));
+                        _logger.LogInformation("[Voice] Try-it: testing phrases [{Phrases}], engine now has {GrammarCount} grammar(s) loaded",
+                            string.Join(" | ", phrases), engine.Grammars.Count);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "[Voice] Try-it: failed to build test grammar");
+                        RestoreLiveGrammar(engine, wasListening);
+                        return (false, null, null, ex.Message);
+                    }
+                }
+
+                try
+                {
+                    // Recognize() blocks synchronously -- run it off the request
+                    // thread. Not holding _engineLock here: it only blocks other
+                    // engine operations, and this can legitimately take seconds.
+                    // _tryPhraseGate (held for this whole method) is what
+                    // actually keeps a second Try It from swapping the grammar
+                    // out from under this call while it's blocked here.
+                    var result = await Task.Run(() => engine.Recognize(timeout));
+                    if (result == null)
+                    {
+                        _logger.LogInformation("[Voice] Try-it: Recognize() returned null (timed out / no speech)");
+                        return (false, null, null, (string?)null);
+                    }
+                    _logger.LogInformation("[Voice] Try-it: Recognize() returned Text=\"{Text}\" Confidence={Confidence} Grammar={Grammar}",
+                        result.Text, result.Confidence, result.Grammar?.Name);
+
+                    // A small forced-choice grammar (just this row's phrases) has
+                    // nowhere else to put ambient noise or an unrelated utterance
+                    // -- SAPI still has to pick its closest-matching choice, so it
+                    // very often returns a non-null result even for silence or a
+                    // completely different phrase. Gate on the same MinConfidence
+                    // threshold the live recogniser uses, or every Try It would
+                    // report "heard" regardless of what was actually said.
+                    bool matched = result.Confidence >= MinConfidence;
+                    return (matched, result.Text, result.Confidence, (string?)null);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[Voice] Try-it: recognition failed");
+                    return (false, null, null, ex.Message);
+                }
+                finally
+                {
+                    lock (_engineLock)
+                    {
+                        RestoreLiveGrammar(engine, wasListening);
+                    }
+                }
+            }
+            finally
+            {
+                _tryPhraseGate.Release();
+            }
+        }
+
+        /// <summary>Must be called with _engineLock held.</summary>
+        private void RestoreLiveGrammar(SpeechRecognitionEngine engine, bool resumeListening)
         {
             try
             {
-                var culture = new CultureInfo("en-GB");
+                engine.UnloadAllGrammars();
+                var phraseCfg = _phraseStore.Load(_activeCulture);
+                engine.LoadGrammar(VoiceGrammar.Build(phraseCfg, _activeCulture));
+                if (resumeListening)
+                {
+                    // Flush before resuming live listening too, so nothing
+                    // spoken during the Try It test (or the silence after it)
+                    // gets replayed into the live grammar as its first match.
+                    engine.SetInputToNull();
+                    engine.SetInputToDefaultAudioDevice();
+                    engine.RecognizeAsync(RecognizeMode.Multiple);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Voice] Try-it: failed to restore live grammar");
+                UpdateStatus(VoiceState.Error, error: ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Switches the live engine to a different installed locale (§4.2) —
+        /// disposes the current SAPI engine (if any) and constructs a new one
+        /// for <paramref name="culture"/>, persisting the choice to Settings
+        /// so it's restored on next launch. Returns false if the Windows SAPI
+        /// recogniser for that locale isn't installed; the pack can still be
+        /// selected as "active" (so it's ready the moment the user installs
+        /// the Windows speech pack), but the engine won't actually be
+        /// listening until then — same non-fatal-failure pattern as startup.
+        /// </summary>
+        public async Task<bool> SwitchLocaleAsync(string culture)
+        {
+            DisposeEngine();
+
+            var settings = await _settings.GetSettingsAsync();
+            settings.VoiceActiveLocale = culture;
+            await _settings.SaveSettingsAsync(settings);
+
+            if (!settings.VoiceControlEnabled)
+            {
+                // Voice control itself is off -- record the choice but don't
+                // spin up an engine (mirrors StartAsync's own gate).
+                _activeCulture = culture;
+                UpdateStatus(VoiceState.Idle);
+                return true;
+            }
+
+            TryInitialiseEngine(culture);
+            return _engine != null;
+        }
+
+        // -----------------------------------------------------------------
+
+        private void TryInitialiseEngine(string culture)
+        {
+            _activeCulture = culture;
+            try
+            {
+                var cultureInfo = new CultureInfo(culture);
                 var available = SpeechRecognitionEngine.InstalledRecognizers()
-                    .Any(r => r.Culture.Name.Equals(culture.Name, StringComparison.OrdinalIgnoreCase));
+                    .Any(r => r.Culture.Name.Equals(cultureInfo.Name, StringComparison.OrdinalIgnoreCase));
                 if (!available)
                 {
                     _logger.LogWarning(
-                        "[Voice] en-GB SAPI recogniser not installed on this machine. " +
-                        "Install via Settings → Time & Language → Speech.");
-                    UpdateStatus(VoiceState.Error, error: "en-GB Windows speech pack not installed");
+                        "[Voice] {Culture} SAPI recogniser not installed on this machine. " +
+                        "Install via Settings → Time & Language → Speech.", culture);
+                    UpdateStatus(VoiceState.Error, error: $"{culture} Windows speech pack not installed");
                     return;
                 }
 
-                var engine = new SpeechRecognitionEngine(culture);
+                var engine = new SpeechRecognitionEngine(cultureInfo);
                 engine.SpeechRecognized += OnSpeechRecognized;
                 engine.SpeechRecognitionRejected += OnSpeechRejected;
                 engine.RecognizeCompleted += OnRecognizeCompleted;
 
-                // Grammar is built programmatically via VoiceGrammar.BuildEnGb().
-                // We can't load Grammars/Commands.en-GB.srgs at runtime because
+                // Grammar is built programmatically via VoiceGrammar.Build().
+                // We can't load Commands.<culture>.srgs at runtime because
                 // System.Speech on .NET 6+ throws PlatformNotSupportedException
                 // from Grammar.LoadCfg -- the in-process SAPI 5 SRGS compiler
-                // isn't shipped with the modern NuGet. The SRGS XML file lives
-                // in Grammars/ as the human-readable spec; VoiceGrammar.cs
-                // mirrors it using GrammarBuilder + Choices.
-                var phraseCfg = _phraseStore.Load();
-                var grammar = VoiceGrammar.Build(phraseCfg);
+                // isn't shipped with the modern NuGet. The SRGS XML file is a
+                // human-readable/exportable spec only; VoiceGrammar.cs mirrors
+                // it using GrammarBuilder + Choices.
+                var phraseCfg = _phraseStore.Load(culture);
+                var grammar = VoiceGrammar.Build(phraseCfg, culture);
                 engine.LoadGrammar(grammar);
                 _engine = engine;
                 _logger.LogInformation(
                     "[Voice] SAPI recogniser ready (culture={Culture}, grammar={Grammar})",
-                    culture.Name, grammar.Name);
+                    cultureInfo.Name, grammar.Name);
                 UpdateStatus(VoiceState.Idle);
             }
             catch (Exception ex)
@@ -282,7 +483,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogInformation(
                     "[Voice] Low-confidence match ({Conf:F2}) for '{Heard}' -- ignoring",
                     confidence, heard);
-                UpdateStatus(VoiceState.Unrecognised, heard: heard);
+                UpdateStatus(VoiceState.Unrecognised, heard: heard, confidence: confidence);
                 return;
             }
 
@@ -291,7 +492,7 @@ namespace Yaesu_Web_Control.Services.Voice
             if (intent == null)
             {
                 _logger.LogInformation("[Voice] Heard '{Heard}' (no intent tag)", heard);
-                UpdateStatus(VoiceState.Heard, heard: heard);
+                UpdateStatus(VoiceState.Heard, heard: heard, confidence: confidence);
                 return;
             }
 
@@ -315,13 +516,13 @@ namespace Yaesu_Web_Control.Services.Voice
             //     with args["direction"] = ±1
             (intent, args) = NormaliseIntent(intent, args, heard);
 
-            UpdateStatus(VoiceState.Heard, heard: heard, intent: intent);
-            UpdateStatus(VoiceState.Executing, heard: heard, intent: intent);
+            UpdateStatus(VoiceState.Heard, heard: heard, intent: intent, confidence: confidence);
+            UpdateStatus(VoiceState.Executing, heard: heard, intent: intent, confidence: confidence);
             try
             {
-                var result = await _intentDispatcher.DispatchAsync(intent, args);
+                var result = await _intentDispatcher.DispatchAsync(intent, args, dryRun: _dryRun);
                 UpdateStatus(result.Success ? VoiceState.Idle : VoiceState.Error,
-                             heard: heard, intent: intent,
+                             heard: heard, intent: intent, confidence: confidence,
                              error: result.Success ? null : "Command did not complete");
 
                 // Spoken confirmation via TTS, if enabled in Settings. Phrase
@@ -329,7 +530,9 @@ namespace Yaesu_Web_Control.Services.Voice
                 // so a listener hears the whole command echoed back along
                 // with the outcome -- key for accessibility (Yuri W4YSW,
                 // Thomas OZ1JTE) where the operator may not be watching the
-                // screen for visual confirmation.
+                // screen for visual confirmation. In a dry run (§6.5) nothing
+                // was actually sent, so the confirmation says so instead of
+                // claiming success/failure it didn't earn.
                 var settings = await _settings.GetSettingsAsync();
                 if (!string.IsNullOrWhiteSpace(result.ConfirmationPhrase) &&
                     (settings.VoiceSpokenConfirmationEnabled || result.IsReadBack))
@@ -338,14 +541,16 @@ namespace Yaesu_Web_Control.Services.Voice
                     // Command confirmations append ", successful" / ", unsuccessful".
                     var speech = result.IsReadBack
                         ? result.ConfirmationPhrase
-                        : $"{result.ConfirmationPhrase}, {(result.Success ? "successful" : "unsuccessful")}";
+                        : _dryRun
+                            ? $"{result.ConfirmationPhrase}, dry run, not sent"
+                            : $"{result.ConfirmationPhrase}, {(result.Success ? "successful" : "unsuccessful")}";
                     _tts.Speak(speech);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[Voice] Intent dispatch failed for '{Intent}'", intent);
-                UpdateStatus(VoiceState.Error, heard: heard, intent: intent, error: ex.Message);
+                UpdateStatus(VoiceState.Error, heard: heard, intent: intent, confidence: confidence, error: ex.Message);
             }
         }
 
@@ -506,17 +711,20 @@ namespace Yaesu_Web_Control.Services.Voice
             VoiceState state,
             string? heard = null,
             string? intent = null,
-            string? error = null)
+            string? error = null,
+            float? confidence = null)
         {
-            // Preserve previous LastHeard/LastIntent unless the caller passes
-            // something new, so transient states (Heard -> Executing -> Idle)
-            // keep showing the most recent phrase.
+            // Preserve previous LastHeard/LastIntent/Confidence unless the
+            // caller passes something new, so transient states
+            // (Heard -> Executing -> Idle) keep showing the most recent phrase.
             var prev = _status;
             var update = new VoiceStatusUpdate(
                 state,
                 heard ?? prev.LastHeard,
                 intent ?? prev.LastIntent,
-                error
+                error,
+                confidence ?? prev.Confidence,
+                _dryRun
             );
             _status = update;
 

@@ -103,6 +103,15 @@ namespace Yaesu_Web_Control.Models
         /// <summary>One or more CAT commands, e.g. "NR01;" or "NR01;NB01;".</summary>
         [JsonPropertyName("cat")]
         public string Cat { get; set; } = "";
+
+        /// <summary>
+        /// Free-text grouping shown in the Settings "Custom Commands" editor
+        /// (e.g. "Noise Reduction", "Custom CAT commands"). Defaults to
+        /// "Macros" for anything created before this field existed. Purely
+        /// presentational — has no effect on recognition or dispatch.
+        /// </summary>
+        [JsonPropertyName("category")]
+        public string Category { get; set; } = "Macros";
     }
 
     public sealed class SetFrequencyPhrases

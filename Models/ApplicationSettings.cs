@@ -188,6 +188,25 @@
         // Step size used by the NudgeUp / NudgeDown voice commands (Hz).
         // Options exposed in Settings: 10, 100, 1000, 10000, 100000.
         public long VoiceNudgeStepHz { get; set; } = 10_000;
+
+        // When true, Custom Command (macro) CAT strings are accepted
+        // regardless of prefix during validation. Default OFF: a Custom
+        // Command's CAT string must start with a prefix one of the built-in
+        // Core Commands already trusts (see VoicePhraseValidator's CAT
+        // allowlist) -- "recombine the primitives the app already trusts,
+        // don't grant new ones." This is the gate an imported/shared voice
+        // pack's CAT strings pass through; see
+        // docs/VoiceControl/language-pack-manager-design.md §5.5.
+        public bool VoiceAdvancedModeEnabled { get; set; } = false;
+
+        // Active recognition locale (BCP-47, e.g. "en-GB"). Distinct from
+        // "installed languages": a user can have several packs installed
+        // under Grammars\<culture>\ and only one active at a time -- SAPI's
+        // SpeechRecognitionEngine is constructed for a single culture (see
+        // VoiceControlService.SwitchLocaleAsync). Switching doesn't require
+        // an app restart. Defaults to en-GB since that's the only pack that
+        // ships today. docs/VoiceControl/language-pack-manager-design.md §4.4.
+        public string VoiceActiveLocale { get; set; } = "en-GB";
     }
 
     public class RadioState
