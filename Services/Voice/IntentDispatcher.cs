@@ -386,12 +386,9 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private static DispatchResult Help() =>
             new(true,
-                "Available commands: set frequency, set mode, set band, " +
-                "tune up or down, band up or down, set step, swap V F O, " +
-                "split on or off, key transmitter, stop transmitting, " +
-                "attenuator, preamp, A G C, filter wider or narrower, " +
-                "roofing filter, A F gain up or down, " +
-                "and status queries — what frequency, what mode, what band.",
+                "You can say: set frequency, set mode, set band, band up or down, " +
+                "tune up or down, swap V F O, or ask what frequency, what mode, " +
+                "what band. Full list in the user manual.",
                 IsReadBack: true);
 
         // -- TX / Split ----------------------------------------------------
