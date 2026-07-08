@@ -39,6 +39,10 @@ namespace Yaesu_Web_Control.Services.Voice
     /// diagnostics panel -- previously enforced (MinConfidence = 0.6f) but
     /// never shown to the user. <c>DryRun</c> is true while a §6.5 "Test this
     /// pack" session is active (recognition runs, no CAT command is sent).
+    /// <c>Vfo</c> ("A" or "B") is which VFO's mic button the current/last
+    /// listening session targeted -- only one SAPI engine session can be
+    /// active at a time, so each VFO's mic button on the Index page filters
+    /// this broadcast to know whether it's the one that's live.
     /// </summary>
     public sealed record VoiceStatusUpdate(
         VoiceState State,
@@ -46,6 +50,7 @@ namespace Yaesu_Web_Control.Services.Voice
         string? LastIntent,
         string? ErrorMessage,
         float? Confidence = null,
-        bool DryRun = false
+        bool DryRun = false,
+        string Vfo = "A"
     );
 }

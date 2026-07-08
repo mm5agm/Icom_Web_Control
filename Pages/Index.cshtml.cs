@@ -98,6 +98,12 @@ namespace Yaesu_Web_Control.Pages
         // Default false; user enables via Settings > Accessibility.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
 
+        // Voice control nudge step defaults for each VFO's mic button
+        // dropdown, server-rendered so voice-control.js has a starting
+        // value before it can fetch/receive anything.
+        public long VoiceNudgeStepHzA { get; set; } = 10_000;
+        public long VoiceNudgeStepHzB { get; set; } = 10_000;
+
         public RadioStateService RadioState => _radioStateService;
 
         public RadioStateViewModel State { get; set; } = new RadioStateViewModel();
@@ -131,6 +137,8 @@ namespace Yaesu_Web_Control.Pages
             SdrSpectrumLowDbB  = settings.SdrSpectrumLowDbB;
             SdrSpectrumHighDbA = settings.SdrSpectrumHighDbA;
             SdrSpectrumHighDbB = settings.SdrSpectrumHighDbB;
+            VoiceNudgeStepHzA = settings.VoiceNudgeStepHzA;
+            VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;

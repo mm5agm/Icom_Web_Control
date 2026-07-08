@@ -37,26 +37,20 @@ namespace Yaesu_Web_Control.Controllers
 
         /// <summary>
         /// Returns the P1 character for a per-VFO CAT command, given the
-        /// user's clicked receiver ("A" or "B"). On single-receiver radios
-        /// always "0"; on dual-receiver "0" for A, "1" for B.
+        /// user's clicked receiver ("A" or "B"). Delegates to
+        /// <see cref="RadioCapabilities.VfoP1"/> -- see that method for the
+        /// single- vs dual-receiver rule.
         /// </summary>
         private string VfoP1Outgoing(string receiver) =>
-            _radioStateService.IsSingleReceiver
-                ? "0"
-                : (receiver.Equals("B", StringComparison.OrdinalIgnoreCase) ? "1" : "0");
+            RadioCapabilities.VfoP1(_radioStateService.IsSingleReceiver, receiver);
 
         /// <summary>
         /// Returns true if the per-VFO state write should target *B (vs *A)
-        /// for a user-clicked receiver. On single-receiver the radio applies
-        /// the change to whichever VFO is currently active (ActiveVfo), so we
-        /// mirror that into state to stay consistent with the hardware --
-        /// the user's clicked panel is a hint, not an addressable target.
-        /// On dual-receiver the user's choice wins.
+        /// for a user-clicked receiver. Delegates to
+        /// <see cref="RadioCapabilities.VfoIsB"/>.
         /// </summary>
         private bool VfoIsB(string receiver) =>
-            _radioStateService.IsSingleReceiver
-                ? _radioStateService.ActiveVfo == 1
-                : receiver.Equals("B", StringComparison.OrdinalIgnoreCase);
+            RadioCapabilities.VfoIsB(_radioStateService.IsSingleReceiver, _radioStateService.ActiveVfo, receiver);
 
         [HttpPost("afgain/a")]
         public async Task<IActionResult> SetAfGainA([FromBody] int value)

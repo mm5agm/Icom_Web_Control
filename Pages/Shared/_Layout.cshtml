@@ -53,25 +53,6 @@
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow" style="padding-top: 0; padding-bottom: 0; margin-bottom: 2px; min-height: 0;">
             <div class="container-fluid px-3">
                 <a class="navbar-brand" asp-area="" asp-page="/Index" data-a11y-key="nav.brand" aria-label="Yaesu Web Control home">Yaesu Web Control <small class="text-muted fw-normal" style="font-size: 0.6em;">v@(AppVersion.Current) &copy; 2025</small></a>
-                <!-- Voice control PTT button — large, always visible, left of nav links. -->
-                <button id="voiceMicBtn" type="button"
-                        class="btn btn-outline-danger mx-1"
-                        style="display:none; padding:0.45rem 0.65rem;"
-                        title="Hold to give a voice command"
-                        aria-label="Voice command — hold to speak">
-                    <i class="bi bi-mic-fill" style="font-size:1.6rem; line-height:1;" aria-hidden="true"></i>
-                </button>
-                <select id="voiceNudgeStepSelect"
-                        class="form-select form-select-sm me-2"
-                        style="display:none; width:auto;"
-                        title="Voice nudge step size — how far 'tune up'/'tune down' moves VFO A"
-                        aria-label="Voice nudge step size">
-                    <option value="10">10 Hz</option>
-                    <option value="100">100 Hz</option>
-                    <option value="1000">1 kHz</option>
-                    <option value="10000">10 kHz</option>
-                    <option value="100000">100 kHz</option>
-                </select>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -103,12 +84,6 @@
                             <a class="nav-link text-dark" asp-area="" asp-page="/Labels">Accessibility Labels</a>
                         </li>
                     </ul>
-                    <!-- voiceLastHeard lives here so it never pushes the nav links off-screen.
-                         It's inside the collapse so it's part of the same flex row as the links. -->
-                    <span id="voiceLastHeard"
-                          class="text-muted small ms-2 d-none d-sm-inline"
-                          style="max-width:14em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:1;"
-                          aria-live="polite"></span>
                 </div>
             </div>
         </nav>
@@ -130,24 +105,23 @@
     <script src="~/js/ui/site.js" asp-append-version="true"></script>
     @{
         // Voice Control: server-render the enable flag so voice-control.js
-        // can decide whether to show the navbar mic button before any user
+        // can decide whether to show the per-VFO mic buttons before any user
         // interaction. The toggle lives in ApplicationSettings.VoiceControlEnabled
-        // (Settings page > Voice Control section). Default off.
+        // (Settings page > Voice Control section). Default off. Per-VFO nudge
+        // step defaults (VoiceNudgeStepHzA/B) are rendered directly on
+        // Index.cshtml next to each VFO's mic button, not here.
         var _ywcSettingsService = (Yaesu_Web_Control.Services.ISettingsService)Context.RequestServices
             .GetService(typeof(Yaesu_Web_Control.Services.ISettingsService))!;
         var _ywcVoiceEnabled = false;
-        var _ywcNudgeStepHz  = 10_000L;
         try
         {
             var _ywcSettings = await _ywcSettingsService.GetSettingsAsync();
             _ywcVoiceEnabled = _ywcSettings.VoiceControlEnabled;
-            _ywcNudgeStepHz  = _ywcSettings.VoiceNudgeStepHz;
         }
         catch { /* settings unavailable -> defaults */ }
     }
     <script>
-        window.ywcVoiceEnabled    = @(_ywcVoiceEnabled ? "true" : "false");
-        window.ywcVoiceNudgeStepHz = @_ywcNudgeStepHz;
+        window.ywcVoiceEnabled = @(_ywcVoiceEnabled ? "true" : "false");
     </script>
     <script src="~/js/ui/voice-control.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />

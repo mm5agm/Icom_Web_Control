@@ -85,4 +85,30 @@ public static class RadioCapabilities
     /// </summary>
     public static bool SupportsVCTuneCat(string? hardwareId) =>
         !string.IsNullOrEmpty(hardwareId) && !_vcTuneCatBlockedIds.Contains(hardwareId);
+
+    /// <summary>
+    /// Returns the P1 character for a per-VFO CAT command, given the
+    /// user's (or voice command's) targeted receiver ("A" or "B"). On
+    /// single-receiver radios always "0" -- the firmware hard-codes that
+    /// position and rejects P1=1; on dual-receiver "0" for A, "1" for B.
+    /// Shared by CatController (mouse/keyboard input) and IntentDispatcher
+    /// (voice input) so the routing rule lives in exactly one place.
+    /// </summary>
+    public static string VfoP1(bool isSingleReceiver, string receiver) =>
+        isSingleReceiver
+            ? "0"
+            : (receiver.Equals("B", StringComparison.OrdinalIgnoreCase) ? "1" : "0");
+
+    /// <summary>
+    /// Returns true if the per-VFO state write should target *B (vs *A) for
+    /// a targeted receiver. On single-receiver radios the change always
+    /// applies to whichever VFO is currently active -- the targeted panel
+    /// is a hint, not an addressable target -- so this mirrors
+    /// <paramref name="activeVfo"/> (0 = A, 1 = B). On dual-receiver radios
+    /// the target wins outright.
+    /// </summary>
+    public static bool VfoIsB(bool isSingleReceiver, int activeVfo, string receiver) =>
+        isSingleReceiver
+            ? activeVfo == 1
+            : receiver.Equals("B", StringComparison.OrdinalIgnoreCase);
 }

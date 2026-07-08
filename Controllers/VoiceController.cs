@@ -36,12 +36,15 @@ namespace Yaesu_Web_Control.Controllers
         /// <paramref name="dryRun"/> (§6.5) is set by the Settings "Test this
         /// pack" modal's dry-run toggle — recognition and intent matching run
         /// normally but no CAT command is sent. The navbar mic button always
-        /// calls this with dryRun=false (the default).
+        /// calls this with dryRun=false (the default). <paramref name="vfo"/>
+        /// ("A" or "B") is which VFO's mic button on the Index page was
+        /// pressed; forwarded through to IntentDispatcher so the recognised
+        /// command lands on the right receiver.
         /// </summary>
         [HttpPost("start")]
-        public async Task<IActionResult> Start([FromQuery] bool dryRun = false)
+        public async Task<IActionResult> Start([FromQuery] bool dryRun = false, [FromQuery] string vfo = "A")
         {
-            var ok = await _voice.StartListeningAsync(dryRun);
+            var ok = await _voice.StartListeningAsync(dryRun, vfo);
             return ok
                 ? Ok(_voice.CurrentStatus)
                 : StatusCode(503, _voice.CurrentStatus);
@@ -160,7 +163,7 @@ namespace Yaesu_Web_Control.Controllers
 
         /// <summary>
         /// Updates the voice nudge step size without a full Settings round-trip.
-        /// Called by the navbar step-size selector on change.
+        /// Called by each VFO's step-size selector on the Index page on change.
         /// </summary>
         [HttpPost("nudge-step")]
         public async Task<IActionResult> SetNudgeStep([FromBody] NudgeStepRequest request)
@@ -169,13 +172,15 @@ namespace Yaesu_Web_Control.Controllers
                 return BadRequest(new { error = "Invalid step size." });
 
             var settings = await _settings.GetSettingsAsync();
-            settings.VoiceNudgeStepHz = request.StepHz;
+            var isB = string.Equals(request.Vfo, "B", StringComparison.OrdinalIgnoreCase);
+            if (isB) settings.VoiceNudgeStepHzB = request.StepHz;
+            else     settings.VoiceNudgeStepHzA = request.StepHz;
             await _settings.SaveSettingsAsync(settings);
-            _logger.LogInformation("[Voice] Nudge step updated to {Step} Hz via API", request.StepHz);
+            _logger.LogInformation("[Voice] Nudge step updated to {Step} Hz via API (VFO {Vfo})", request.StepHz, isB ? "B" : "A");
             return Ok(new { ok = true });
         }
 
-        public record NudgeStepRequest(long StepHz);
+        public record NudgeStepRequest(long StepHz, string Vfo = "A");
 
         /// <summary>
         /// Language discovery for the Settings switcher (§4.1): every

@@ -185,9 +185,14 @@
         // chatty can disable here without disabling voice control itself.
         public bool VoiceSpokenConfirmationEnabled { get; set; } = true;
 
-        // Step size used by the NudgeUp / NudgeDown voice commands (Hz).
-        // Options exposed in Settings: 10, 100, 1000, 10000, 100000.
-        public long VoiceNudgeStepHz { get; set; } = 10_000;
+        // Step size used by the NudgeUp / NudgeDown voice commands (Hz),
+        // independently per VFO -- each VFO's mic button on the Index page
+        // has its own step-size dropdown next to it. Options exposed: 10,
+        // 100, 1000, 10000, 100000. VFO B is only reachable on dual-receiver
+        // radios (RadioCapabilities.IsDualReceiver); the field still exists
+        // for single-receiver radios but nothing writes/reads it there.
+        public long VoiceNudgeStepHzA { get; set; } = 10_000;
+        public long VoiceNudgeStepHzB { get; set; } = 10_000;
 
         // When true, Custom Command (macro) CAT strings are accepted
         // regardless of prefix during validation. Default OFF: a Custom

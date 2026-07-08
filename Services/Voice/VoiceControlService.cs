@@ -65,6 +65,14 @@ namespace Yaesu_Web_Control.Services.Voice
         // it to skip actually sending the matched CAT command.
         private bool _dryRun;
 
+        // Which VFO's mic button started the current/last listening session
+        // ("A" or "B") -- set by StartListeningAsync, read by
+        // OnSpeechRecognized when handing off to IntentDispatcher, and
+        // included in every status broadcast so each VFO's mic button knows
+        // whether it's the one currently live (only one SAPI session at a
+        // time, per _engineLock).
+        private string _targetVfo = "A";
+
         /// <summary>The locale currently loaded into the live SAPI engine (or the last one attempted, if construction failed).</summary>
         public string ActiveCulture => _activeCulture;
 
@@ -134,8 +142,11 @@ namespace Yaesu_Web_Control.Services.Voice
         /// matching untouched but suppresses the actual CAT send — used by
         /// the Settings "Test this pack" modal so a pack can be exercised
         /// without a radio connected or without changing its live state.
+        /// <paramref name="vfo"/> ("A" or "B") is which mic button was
+        /// pressed; forwarded to IntentDispatcher so per-VFO intents (set
+        /// frequency, nudge, band up/down, etc.) land on the right receiver.
         /// </summary>
-        public async Task<bool> StartListeningAsync(bool dryRun = false)
+        public async Task<bool> StartListeningAsync(bool dryRun = false, string vfo = "A")
         {
             lock (_engineLock)
             {
@@ -146,6 +157,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 }
 
                 _dryRun = dryRun;
+                _targetVfo = vfo;
                 try
                 {
                     if (!_audioWired)
@@ -520,7 +532,7 @@ namespace Yaesu_Web_Control.Services.Voice
             UpdateStatus(VoiceState.Executing, heard: heard, intent: intent, confidence: confidence);
             try
             {
-                var result = await _intentDispatcher.DispatchAsync(intent, args, dryRun: _dryRun);
+                var result = await _intentDispatcher.DispatchAsync(intent, args, dryRun: _dryRun, vfo: _targetVfo);
                 UpdateStatus(result.Success ? VoiceState.Idle : VoiceState.Error,
                              heard: heard, intent: intent, confidence: confidence,
                              error: result.Success ? null : "Command did not complete");
@@ -724,7 +736,8 @@ namespace Yaesu_Web_Control.Services.Voice
                 intent ?? prev.LastIntent,
                 error,
                 confidence ?? prev.Confidence,
-                _dryRun
+                _dryRun,
+                _targetVfo
             );
             _status = update;
 

@@ -720,6 +720,32 @@
                                 }
                             </div>
                         </div>
+                        <!-- Voice control mic button + step selector VFO A — large PTT target for accessibility, step select left of the button, both enlarged per Colin's testing feedback; shown only when voice control is enabled (voice-control.js) -->
+                        <div class="flex-shrink-0" id="voiceMicContainerA" style="display:none;">
+                            <div class="d-flex align-items-center gap-2">
+                                <select id="voiceNudgeStepSelectA"
+                                        class="form-select"
+                                        style="width:auto; font-size:1.4rem; font-weight:600; padding:0.4rem 2.4rem 0.4rem 0.6rem;"
+                                        title="Voice nudge step size — how far 'tune up'/'tune down' moves VFO A"
+                                        aria-label="VFO A voice nudge step size">
+                                    <option value="10">10 Hz</option>
+                                    <option value="100">100 Hz</option>
+                                    <option value="1000">1 kHz</option>
+                                    <option value="10000">10 kHz</option>
+                                    <option value="100000">100 kHz</option>
+                                </select>
+                                <button id="voiceMicBtnA" type="button"
+                                        class="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                                        style="width:140px; height:120px; padding:0;"
+                                        title="Hold to give a VFO A voice command"
+                                        aria-label="Voice command VFO A — hold to speak">
+                                    <i class="bi bi-mic-fill" style="font-size:4.5rem; line-height:1;" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div id="voiceLastHeardA"
+                                 style="font-size:1.1rem; font-weight:700; color:#000; margin-top:0.3rem; max-width:320px; overflow-wrap:break-word;"
+                                 aria-live="polite"></div>
+                        </div>
                         <!-- Filter scope display VFO A — sits between band buttons and AGC column -->
                         <div class="flex-shrink-0" id="filterScopeContainerA" style="width:160px;">
                             <canvas id="filterScopeCanvasA" role="img" aria-hidden="true"
@@ -1095,6 +1121,35 @@
                                 }
                             </div>
                         </div>
+                        @if (!isSingleReceiver)
+                        {
+                            <!-- Voice control mic button + step selector VFO B — step select left of the button, both enlarged per Colin's testing feedback. Single-receiver radios (FTdx10, FT-710, FTDX3000) have no independent VFO B receiver, so no mic button here at all. -->
+                            <div class="flex-shrink-0" id="voiceMicContainerB" style="display:none;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <select id="voiceNudgeStepSelectB"
+                                            class="form-select"
+                                            style="width:auto; font-size:1.4rem; font-weight:600; padding:0.4rem 2.4rem 0.4rem 0.6rem;"
+                                            title="Voice nudge step size — how far 'tune up'/'tune down' moves VFO B"
+                                            aria-label="VFO B voice nudge step size">
+                                        <option value="10">10 Hz</option>
+                                        <option value="100">100 Hz</option>
+                                        <option value="1000">1 kHz</option>
+                                        <option value="10000">10 kHz</option>
+                                        <option value="100000">100 kHz</option>
+                                    </select>
+                                    <button id="voiceMicBtnB" type="button"
+                                            class="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                                            style="width:140px; height:120px; padding:0;"
+                                            title="Hold to give a VFO B voice command"
+                                            aria-label="Voice command VFO B — hold to speak">
+                                        <i class="bi bi-mic-fill" style="font-size:4.5rem; line-height:1;" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <div id="voiceLastHeardB"
+                                     style="font-size:1.1rem; font-weight:700; color:#000; margin-top:0.3rem; max-width:320px; overflow-wrap:break-word;"
+                                     aria-live="polite"></div>
+                            </div>
+                        }
                         <!-- Filter scope display VFO B — sits between band buttons and AGC column -->
                         <div class="flex-shrink-0" id="filterScopeContainerB" style="width:160px;">
                             <canvas id="filterScopeCanvasB" role="img" aria-hidden="true"
@@ -1915,6 +1970,10 @@
 @section Scripts {
     <!-- Cache-busted JS reference, placed BEFORE your inline script if you use window.radioControl, etc. -->
     <script>window.bandPlan = '@Model.BandPlan';</script>
+    <script>
+        window.ywcVoiceNudgeStepHzA = @Model.VoiceNudgeStepHzA;
+        window.ywcVoiceNudgeStepHzB = @Model.VoiceNudgeStepHzB;
+    </script>
     <script type="module">
         import { MeterPanel }           from "/js/guages/meter-panel.js?v=1";
         import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";

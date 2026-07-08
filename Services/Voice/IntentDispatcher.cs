@@ -8,9 +8,11 @@ namespace Yaesu_Web_Control.Services.Voice
     /// <summary>
     /// Maps a recognised semantic intent + parameter dictionary (from the
     /// SRGS grammar's <c>out.intent</c> tags) to CAT commands sent via
-    /// <see cref="ICatClient"/>. Voice commands always target VFO A per
-    /// the v1 plan — FTdx10 / FT-710 are single-receiver anyway, and the
-    /// dual-receiver case (FTdx101) can be extended in v2 if needed.
+    /// <see cref="ICatClient"/>. Voice commands target whichever VFO's mic
+    /// button was pressed (v2, per-VFO voice) — see <see cref="_vfo"/>.
+    /// FTdx10 / FT-710 are single-receiver, so the target always collapses
+    /// to A there (<see cref="RadioCapabilities.VfoP1"/> /
+    /// <see cref="RadioCapabilities.VfoIsB"/> already enforce this).
     /// </summary>
     public sealed class IntentDispatcher
     {
@@ -41,6 +43,22 @@ namespace Yaesu_Web_Control.Services.Voice
         // signatures, and doesn't leak into unrelated concurrent dispatches.
         private static readonly AsyncLocal<bool> _dryRun = new();
 
+        // Which VFO this DispatchAsync call tree targets ("A" or "B") -- set
+        // by whichever mic button the operator pressed (VoiceControlService
+        // passes it through from StartListeningAsync). Same AsyncLocal
+        // pattern as _dryRun, for the same reason: scopes to one dispatch
+        // without threading a parameter through ~15 handler methods.
+        private static readonly AsyncLocal<string?> _vfo = new();
+
+        /// <summary>The targeted VFO for the in-flight dispatch ("A" or "B"); defaults to "A".</summary>
+        private static string CurrentVfo => _vfo.Value ?? "A";
+
+        /// <summary>P1 digit for per-VFO receive-control commands (AG/GT/PA/RA/BU/BD/SH/etc). See <see cref="RadioCapabilities.VfoP1"/>.</summary>
+        private string VfoP1 => RadioCapabilities.VfoP1(_state.IsSingleReceiver, CurrentVfo);
+
+        /// <summary>True when the targeted VFO's state should be written to the *B fields. See <see cref="RadioCapabilities.VfoIsB"/>.</summary>
+        private bool VfoIsB => RadioCapabilities.VfoIsB(_state.IsSingleReceiver, _state.ActiveVfo, CurrentVfo);
+
         /// <summary>
         /// Dispatch a recognised intent. Returns true if the intent was
         /// known AND successfully sent to the radio; false if the intent
@@ -51,18 +69,22 @@ namespace Yaesu_Web_Control.Services.Voice
         /// (SwapVFO on single-receiver radios, NudgeIfWidth) need a real CAT
         /// readback to compute their result and will report unsuccessful in
         /// dry-run mode -- a known, acceptable limitation of testing without
-        /// a connected radio.
+        /// a connected radio. <paramref name="vfo"/> is "A" or "B" -- which
+        /// mic button was pressed; ignored (collapses to "A") on
+        /// single-receiver radios.
         /// </summary>
         public async Task<DispatchResult> DispatchAsync(
             string intent,
             IReadOnlyDictionary<string, object> parameters,
             CancellationToken cancellationToken = default,
-            bool dryRun = false)
+            bool dryRun = false,
+            string vfo = "A")
         {
             _dryRun.Value = dryRun;
+            _vfo.Value = vfo;
             _logger.LogInformation(
-                "[IntentDispatcher] intent={Intent} params={@Params} dryRun={DryRun}",
-                intent, parameters, dryRun);
+                "[IntentDispatcher] intent={Intent} params={@Params} dryRun={DryRun} vfo={Vfo}",
+                intent, parameters, dryRun, vfo);
 
             try
             {
@@ -119,10 +141,10 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] SetFrequency {Hz} out of range", hz);
                 return new DispatchResult(false, phrase);
             }
-            var command = $"FA{hz:D9};";
+            var command = $"{(VfoIsB ? "FB" : "FA")}{hz:D9};";
             await SendCommand(command, ct);
-            _state.FrequencyA = hz;
-            _logger.LogInformation("[Voice] SetFrequency -> {Hz} Hz", hz);
+            if (VfoIsB) _state.FrequencyB = hz; else _state.FrequencyA = hz;
+            _logger.LogInformation("[Voice] SetFrequency -> {Hz} Hz (VFO {Vfo})", hz, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
 
@@ -163,10 +185,10 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] SetBand: no default frequency for {Metres}m", metres);
                 return new DispatchResult(false, phrase);
             }
-            var command = $"FA{hz:D9};";
+            var command = $"{(VfoIsB ? "FB" : "FA")}{hz:D9};";
             await SendCommand(command, ct);
-            _state.FrequencyA = hz;
-            _logger.LogInformation("[Voice] SetBand -> {Metres}m -> {Hz} Hz", metres, hz);
+            if (VfoIsB) _state.FrequencyB = hz; else _state.FrequencyA = hz;
+            _logger.LogInformation("[Voice] SetBand -> {Metres}m -> {Hz} Hz (VFO {Vfo})", metres, hz, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
 
@@ -181,11 +203,11 @@ namespace Yaesu_Web_Control.Services.Voice
                 return new DispatchResult(false, "Set mode");
             }
             // CatCommands.FormatMode handles the Yaesu-mode-string -> MD code
-            // translation. Voice always targets VFO A in v1.
-            var command = CatCommands.FormatMode(mode, isSubVfo: false);
+            // translation.
+            var command = CatCommands.FormatMode(mode, isSubVfo: VfoIsB);
             await SendCommand(command, ct);
-            _state.ModeA = mode;
-            _logger.LogInformation("[Voice] SetMode -> {Mode}", mode);
+            if (VfoIsB) _state.ModeB = mode; else _state.ModeA = mode;
+            _logger.LogInformation("[Voice] SetMode -> {Mode} (VFO {Vfo})", mode, CurrentVfo);
             return new DispatchResult(true, $"Mode {ModeForSpeech(mode)}");
         }
 
@@ -240,10 +262,11 @@ namespace Yaesu_Web_Control.Services.Voice
                 return new DispatchResult(false, "Set step size");
 
             var settings = await _settings.GetSettingsAsync();
-            settings.VoiceNudgeStepHz = step;
+            var isB = VfoIsB;
+            if (isB) settings.VoiceNudgeStepHzB = step; else settings.VoiceNudgeStepHzA = step;
             await _settings.SaveSettingsAsync(settings);
             await _hub.Clients.All.SendAsync("RadioStateUpdate",
-                new { property = "VoiceNudgeStepHz", value = step }, ct);
+                new { property = isB ? "VoiceNudgeStepHzB" : "VoiceNudgeStepHzA", value = step }, ct);
 
             var label = step switch
             {
@@ -270,18 +293,20 @@ namespace Yaesu_Web_Control.Services.Voice
             }
             var phrase = direction > 0 ? "Tune up" : "Tune down";
             var settings = await _settings.GetSettingsAsync();
-            var stepHz = settings.VoiceNudgeStepHz > 0 ? settings.VoiceNudgeStepHz : 10_000;
-            var current = _state.FrequencyA;
+            var isB = VfoIsB;
+            var stepHzSetting = isB ? settings.VoiceNudgeStepHzB : settings.VoiceNudgeStepHzA;
+            var stepHz = stepHzSetting > 0 ? stepHzSetting : 10_000;
+            var current = isB ? _state.FrequencyB : _state.FrequencyA;
             var next = current + direction * stepHz;
             if (next < 30_000 || next > 75_000_000)
             {
                 _logger.LogWarning("[Voice] NudgeFrequency would go out of range ({Next})", next);
                 return new DispatchResult(false, phrase);
             }
-            await SendCommand($"FA{next:D9};", ct);
-            _state.FrequencyA = next;
-            _logger.LogInformation("[Voice] NudgeFrequency {Dir} -> {Hz} Hz",
-                direction > 0 ? "up" : "down", next);
+            await SendCommand($"{(isB ? "FB" : "FA")}{next:D9};", ct);
+            if (isB) _state.FrequencyB = next; else _state.FrequencyA = next;
+            _logger.LogInformation("[Voice] NudgeFrequency {Dir} -> {Hz} Hz (VFO {Vfo})",
+                direction > 0 ? "up" : "down", next, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
 
@@ -292,10 +317,10 @@ namespace Yaesu_Web_Control.Services.Voice
             var phrase = up ? "Band up" : "Band down";
             // BU/BD require a P1 band selector (0=MAIN, 1=SUB) per the
             // FTdx101MP CAT manual -- a bare "BU;"/"BD;" is malformed and
-            // the radio silently ignores it. Voice always targets VFO A/MAIN.
-            var command = up ? "BU0;" : "BD0;";
+            // the radio silently ignores it.
+            var command = (up ? "BU" : "BD") + VfoP1 + ";";
             await SendCommand(command, ct);
-            _logger.LogInformation("[Voice] {Phrase}", phrase);
+            _logger.LogInformation("[Voice] {Phrase} (VFO {Vfo})", phrase, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
 
@@ -321,19 +346,22 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private DispatchResult StatusFrequency()
         {
-            var phrase = FormatFrequencyForSpeech(_state.FrequencyA);
+            var hz = VfoIsB ? _state.FrequencyB : _state.FrequencyA;
+            var phrase = FormatFrequencyForSpeech(hz);
             return new DispatchResult(true, phrase, IsReadBack: true);
         }
 
         private DispatchResult StatusMode()
         {
-            var phrase = $"Mode {ModeForSpeech(_state.ModeA ?? string.Empty)}";
+            var mode = VfoIsB ? _state.ModeB : _state.ModeA;
+            var phrase = $"Mode {ModeForSpeech(mode ?? string.Empty)}";
             return new DispatchResult(true, phrase, IsReadBack: true);
         }
 
         private DispatchResult StatusBand()
         {
-            var phrase = FrequencyToBandName(_state.FrequencyA) is string band
+            var hz = VfoIsB ? _state.FrequencyB : _state.FrequencyA;
+            var phrase = FrequencyToBandName(hz) is string band
                 ? $"{band} metres"
                 : "frequency not on a standard amateur band";
             return new DispatchResult(true, phrase, IsReadBack: true);
@@ -400,14 +428,15 @@ namespace Yaesu_Web_Control.Services.Voice
             if (!TryGetLong(args, "direction", out var direction) || (direction != 1 && direction != -1))
                 return new DispatchResult(false, "Filter width");
 
-            var raw = await SendCommand("SH;", ct);
+            var p1 = VfoP1;
+            var raw = await SendCommand($"SH{p1};", ct);
             if (!TryParseIntResponse(raw, "SH", out var current))
                 return new DispatchResult(false, "Filter width");
 
             var next = Math.Clamp(current + (int)direction, 0, 40);
-            await SendCommand($"SH{next:D2};", ct);
-            _state.IfWidthA = next.ToString();
-            _logger.LogInformation("[Voice] NudgeIfWidth {Dir} -> {Next}", direction > 0 ? "wider" : "narrower", next);
+            await SendCommand($"SH{p1}0{next:D2};", ct);
+            if (VfoIsB) _state.IfWidthB = next.ToString(); else _state.IfWidthA = next.ToString();
+            _logger.LogInformation("[Voice] NudgeIfWidth {Dir} -> {Next} (VFO {Vfo})", direction > 0 ? "wider" : "narrower", next, CurrentVfo);
             return new DispatchResult(true, direction > 0 ? "Filter wider" : "Filter narrower");
         }
 
@@ -420,9 +449,9 @@ namespace Yaesu_Web_Control.Services.Voice
 
             pct = Math.Clamp(pct, 0, 100);
             var catValue = (int)Math.Round(pct * 255.0 / 100.0);
-            await SendCommand($"AG0{catValue:D3};", ct);
-            _state.AfGainA = catValue;
-            _logger.LogInformation("[Voice] SetAfGain {Pct}% -> CAT {CatValue}", pct, catValue);
+            await SendCommand($"AG{VfoP1}{catValue:D3};", ct);
+            if (VfoIsB) _state.AfGainB = catValue; else _state.AfGainA = catValue;
+            _logger.LogInformation("[Voice] SetAfGain {Pct}% -> CAT {CatValue} (VFO {Vfo})", pct, catValue, CurrentVfo);
             return new DispatchResult(true, $"Audio gain {pct}");
         }
 
@@ -434,20 +463,21 @@ namespace Yaesu_Web_Control.Services.Voice
             if (!args.TryGetValue("level", out var lvlObj) || lvlObj is not string level)
                 return new DispatchResult(false, "Attenuator");
 
-            var command = level switch
+            var code = level switch
             {
-                "off" => "RA00;",
-                "6"   => "RA01;",
-                "12"  => "RA02;",
-                "18"  => "RA03;",
+                "off" => "0",
+                "6"   => "1",
+                "12"  => "2",
+                "18"  => "3",
                 _     => null,
             };
-            if (command == null) return new DispatchResult(false, "Attenuator");
+            if (code == null) return new DispatchResult(false, "Attenuator");
 
-            await SendCommand(command, ct);
-            _state.AttA = level switch { "off" => "00", "6" => "06", "12" => "12", "18" => "18", _ => _state.AttA };
+            await SendCommand($"RA{VfoP1}{code};", ct);
+            var attValue = level switch { "off" => "00", "6" => "06", "12" => "12", "18" => "18", _ => (string?)null };
+            if (VfoIsB) _state.AttB = attValue ?? _state.AttB; else _state.AttA = attValue ?? _state.AttA;
             var phrase = level == "off" ? "Attenuator off" : $"Attenuator {level} decibels";
-            _logger.LogInformation("[Voice] SetAttenuator -> {Level}", level);
+            _logger.LogInformation("[Voice] SetAttenuator -> {Level} (VFO {Vfo})", level, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
 
@@ -457,17 +487,17 @@ namespace Yaesu_Web_Control.Services.Voice
             if (!args.TryGetValue("level", out var lvlObj) || lvlObj is not string level)
                 return new DispatchResult(false, "Preamp");
 
-            var command = level switch
+            var code = level switch
             {
-                "off" => "PA00;",
-                "1"   => "PA01;",
-                "2"   => "PA02;",
+                "off" => "0",
+                "1"   => "1",
+                "2"   => "2",
                 _     => null,
             };
-            if (command == null) return new DispatchResult(false, "Preamp");
+            if (code == null) return new DispatchResult(false, "Preamp");
 
-            await SendCommand(command, ct);
-            _state.IpoA = level switch { "off" => "0", "1" => "1", "2" => "2", _ => _state.IpoA };
+            await SendCommand($"PA{VfoP1}{code};", ct);
+            if (VfoIsB) _state.IpoB = code; else _state.IpoA = code;
             var phrase = level switch
             {
                 "off" => "Preamp off",
@@ -475,7 +505,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 "2"   => "Preamp amp two",
                 _     => "Preamp",
             };
-            _logger.LogInformation("[Voice] SetPreamp -> {Level}", level);
+            _logger.LogInformation("[Voice] SetPreamp -> {Level} (VFO {Vfo})", level, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
 
@@ -485,20 +515,20 @@ namespace Yaesu_Web_Control.Services.Voice
             if (!args.TryGetValue("speed", out var spObj) || spObj is not string speed)
                 return new DispatchResult(false, "A G C");
 
-            var command = speed switch
+            var code = speed switch
             {
-                "off"  => "GT00;",
-                "fast" => "GT01;",
-                "mid"  => "GT02;",
-                "slow" => "GT03;",
-                "auto" => "GT04;",
+                "off"  => "0",
+                "fast" => "1",
+                "mid"  => "2",
+                "slow" => "3",
+                "auto" => "4",
                 _      => null,
             };
-            if (command == null) return new DispatchResult(false, "A G C");
+            if (code == null) return new DispatchResult(false, "A G C");
 
-            await SendCommand(command, ct);
-            _state.AgcA = speed switch { "off" => "0", "fast" => "1", "mid" => "2", "slow" => "3", "auto" => "4", _ => _state.AgcA };
-            _logger.LogInformation("[Voice] SetAgc -> {Speed}", speed);
+            await SendCommand($"GT{VfoP1}{code};", ct);
+            if (VfoIsB) _state.AgcB = code; else _state.AgcA = code;
+            _logger.LogInformation("[Voice] SetAgc -> {Speed} (VFO {Vfo})", speed, CurrentVfo);
             return new DispatchResult(true, $"A G C {speed}");
         }
 

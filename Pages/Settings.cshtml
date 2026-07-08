@@ -281,20 +281,6 @@
                     command landed. Default on; turn off here if you find it chatty.
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold" for="voiceNudgeStepHz">Nudge step size</label>
-                <select class="form-select w-auto" id="voiceNudgeStepHz" asp-for="Settings.VoiceNudgeStepHz">
-                    <option value="10">10 Hz</option>
-                    <option value="100">100 Hz</option>
-                    <option value="1000">1 kHz</option>
-                    <option value="10000">10 kHz</option>
-                    <option value="100000">100 kHz</option>
-                </select>
-                <div class="form-text">
-                    How far "tune up" / "nudge up" (and their down equivalents) move VFO A per command.
-                    10 kHz is a good starting point for quickly hopping across a band; 1 kHz suits SSB fine-tuning.
-                </div>
-            </div>
             <div class="mb-3 form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch"
                        id="voiceAdvancedModeEnabled" asp-for="Settings.VoiceAdvancedModeEnabled" />

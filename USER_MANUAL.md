@@ -79,11 +79,11 @@
 17. [Voice Control](#17-voice-control)
     - 17.1 [What you can say](#171-what-you-can-say)
     - 17.2 [Enabling voice control](#172-enabling-voice-control)
-    - 17.3 [Using the mic button](#173-using-the-mic-button)
+    - 17.3 [Using the mic buttons](#173-using-the-mic-buttons)
     - 17.4 [Troubleshooting](#174-troubleshooting)
     - 17.5 [Privacy](#175-privacy)
     - 17.6 [Adding your own commands](#176-adding-your-own-commands)
-    - 17.7 [Roadmap: more languages](#177-roadmap-more-languages)
+    - 17.7 [More languages](#177-more-languages)
 
 ---
 
@@ -2037,7 +2037,7 @@ If you must use a virtual port sharer (e.g. you've already built a working setup
 
 Earlier development branches explored using Amazon Alexa to control YWC — you'd say "Alexa, set frequency to fourteen point zero seven four" to your Echo device and the command would route through Amazon's cloud, hit a custom skill, and arrive at YWC over a Cloudflare tunnel. That work reached a fully-working end-to-end prototype, but **the setup overhead made it impractical for anyone who isn't already comfortable with Cloudflare tunnels and the Amazon Developer Console**.
 
-The current voice control uses **Windows' built-in speech recognition (SAPI 5)** with a press-and-hold microphone button in the YWC navbar. No cloud round-trip, no external accounts, no public endpoint, and your audio never leaves your computer.
+The current voice control uses **Windows' built-in speech recognition (SAPI 5)** with a press-and-hold microphone button beside each VFO panel. No cloud round-trip, no external accounts, no public endpoint, and your audio never leaves your computer.
 
 | What's needed | Alexa method | Built-in microphone method |
 | --- | :---: | :---: |
@@ -2342,26 +2342,35 @@ Originally requested by Yuri W4YSW. Shipped in v2.3.9.
 
 ## 17. Voice Control
 
-> **Not the same as Voice Announcements (§5.16).** Voice *control* (this section) is **you speaking to the app** — a press-and-hold mic button in the navbar that lets you issue spoken commands. Voice *announcements* (§5.16) is **the app speaking to you** — automatic spoken cues for band, mode, TX state, DX alerts, etc., useful as an accessibility feature. They are independent features with separate on/off switches. If you're looking for the toggle to silence YWC's automatic speech, you want §5.16.
+> **Not the same as Voice Announcements (§5.16).** Voice *control* (this section) is **you speaking to the app** — a press-and-hold mic button that lets you issue spoken commands. Voice *announcements* (§5.16) is **the app speaking to you** — automatic spoken cues for band, mode, TX state, DX alerts, etc., useful as an accessibility feature. They are independent features with separate on/off switches. If you're looking for the toggle to silence YWC's automatic speech, you want §5.16.
 
-YWC includes hands-free voice control of common operating actions. A small microphone button appears in the navbar; press and hold it, speak a command, release, and the radio responds. Recognition happens entirely on your PC via Windows' built-in speech engine — your audio never leaves your computer. See [§15.7](#157-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method) for the reasoning behind this approach and the Alexa method that was considered and dropped.
+YWC includes hands-free voice control of common operating actions. **Each VFO has its own mic button**, on the main Index page next to that VFO's band/mode controls — press and hold VFO A's button to control VFO A, VFO B's button to control VFO B. On single-receiver radios (FTdx10, FT-710, FTDX3000) only VFO A's button appears, since there's no independent VFO B to target. Recognition happens entirely on your PC via Windows' built-in speech engine — your audio never leaves your computer. See [§15.8](#158-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method) for the reasoning behind this approach and the Alexa method that was considered and dropped.
 
-Voice control is **off by default** — it has to be turned on in Settings before the mic button appears (see [§17.2](#172-enabling-voice-control)).
+Voice control is **off by default** — it has to be turned on in Settings before the mic buttons appear (see [§17.2](#172-enabling-voice-control)).
 
 ### 17.1 What you can say
 
-The first release covers six command families, all operating on **VFO A**:
+Every command below targets whichever VFO's mic button you're holding down — a command spoken into VFO B's button only ever touches VFO B, and vice versa. The phrases are the built-in English (UK) defaults; they're editable (see [§17.6](#176-adding-your-own-commands)), so if your installation has custom phrases, "Settings → Voice Control → Voice Phrases" is the definitive list, not this table.
 
-| Action | Example phrases | What happens |
+| Command family | Say | What happens |
 | --- | --- | --- |
-| Set frequency (whole MHz) | "set frequency to fourteen megahertz" | VFO A → 14.000 MHz |
-| Set frequency (one decimal) | "set frequency to fourteen point zero megahertz" | VFO A → 14.000 MHz |
-| Set frequency (three decimals) | "set frequency to fourteen point zero seven four megahertz" | VFO A → 14.074 MHz |
-| Change band | "go to twenty metres", "switch to forty metres" | VFO A → that band's default frequency (e.g. 20 m → 14.074 MHz, 40 m → 7.074 MHz — the common FT8 hangouts) |
-| Set mode | "set mode U S B", "mode L S B", "set mode C W" | VFO A mode change |
-| Swap VFOs | "swap V F O", "swap A and B" | A ↔ B |
-| Step up | "tune up", "step up", "frequency up", "nudge up" | VFO A +10 kHz |
-| Step down | "tune down", "step down", "frequency down", "nudge down" | VFO A −10 kHz |
+| Set frequency | "tune to fourteen point zero seven four megahertz", "set frequency to fourteen megahertz" | Held VFO tunes to that frequency. Whole MHz, one decimal, or three decimals; "megahertz" is optional |
+| Change band | "go to twenty metres", "switch to forty metres" | Held VFO jumps to that band's default (usually FT8) frequency. Bands: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres |
+| Step up / down | "tune up" / "step up" / "nudge up"; "tune down" / "step down" / "nudge down" | Held VFO moves by that VFO's configured step size (see below; default 10 kHz) |
+| Set step size | "set step to ten kilohertz", "step size one kilohertz" | Changes the held VFO's step size: 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. Same value as the dropdown next to that VFO's mic button — either one updates the other |
+| Band up / down | "band up" / "band down" | Held VFO jumps to the next/previous ham band |
+| Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Held VFO switches to that mode |
+| Swap VFOs | "swap V F O", "swap A and B" | VFO A and B contents swap (radio-wide, not VFO-specific) |
+| Set attenuator | "set attenuator off", "attenuator six d b" (also twelve, eighteen dB) | Held VFO's attenuator changes |
+| Set preamp | "set preamp off" / "i p o", "preamp one" (also two) | Held VFO's preamp changes |
+| Set AGC | "set a g c fast" (also mid, slow, auto, off) | Held VFO's AGC speed changes |
+| Set AF gain | "set a f gain fifty" (0–100 in the steps listed in the phrase editor, or "mute"/"maximum") | Held VFO's volume changes |
+| IF filter width | "filter wider" / "filter narrower" | Held VFO's IF (roofing) filter bandwidth nudges one step |
+| Transmit | "key transmitter" / "start transmitting"; "stop transmitting" / "go to receive" | Radio keys up / drops back to receive |
+| Split | "split on" / "enable split"; "split off" / "simplex" | Split operation toggles |
+| Status read-back | "what frequency", "what mode", "what band" | YWC speaks the held VFO's current value out loud — no CAT command is sent to the radio |
+| Help | "help", "what can I say" | YWC speaks a short list of the available command categories |
+| Macros | "noise reduction on/off", "noise blanker on/off", "copy a to b" / "copy b to a", "fine step up/down", "roofing three/six/twelve kilohertz" | Runs the matching one-shot CAT command. See the Macros group in the phrase editor for the full list and their exact CAT strings |
 
 A few notes on phrasing:
 
@@ -2381,7 +2390,7 @@ A few notes on phrasing:
 - *"Tune up, successful"* / *"Tune down, successful"* — for nudge.
 - If the command was rejected (e.g. frequency out of range), the suffix is *"unsuccessful"* instead.
 
-This is a primary accessibility feature: a partially-sighted operator can drive the radio without watching the screen and hear exactly what happened to each command. The confirmation also doubles as the safety net for misrecognition — if you said "tune to fourteen" but heard *"Move to forty megahertz, successful"*, the spoken readback tells you the engine misheard and you can issue the command again. Disable in **Settings → Voice Control → Speak confirmation after each voice command** if you find it chatty.
+This is a primary accessibility feature: a partially-sighted operator can drive the radio without watching the screen and hear exactly what happened to each command. The confirmation also doubles as the safety net for misrecognition — if you said "tune to fourteen" but heard *"Move to forty megahertz, successful"*, the spoken readback tells you the engine misheard and you can issue the command again. Confirmations don't name the VFO — you already know which one from which mic button you were holding. Disable in **Settings → Voice Control → Speak confirmation after each voice command** if you find it chatty.
 
 ### 17.2 Enabling voice control
 
@@ -2389,19 +2398,19 @@ This is a primary accessibility feature: a partially-sighted operator can drive 
 2. Scroll to the **Voice Control** section.
 3. Tick **Enable voice control**, then click **Save**.
 4. **Restart YWC.** The speech engine is loaded once at startup; the toggle takes effect on the next launch.
-5. Confirm the **Windows English (UK) speech recognition pack** is installed. Open Windows → Settings → Time &amp; Language → Speech and check the installed-languages list. If English (United Kingdom) isn't listed, install it from there. (Most UK Windows installs already have it.)
+5. Confirm the **Windows speech recognition pack for your active language** is installed. Open Windows → Settings → Time &amp; Language → Speech and check the installed-languages list. The active language defaults to English (United Kingdom) — if it isn't listed, install it from there (most UK Windows installs already have it). The **Active language** dropdown in the Voice Control section lets you switch to any other installed language pack (see [§17.7](#177-more-languages)).
 
-After restart, you should see a **circular mic icon** in the YWC navbar, immediately to the right of the brand name. If you don't see it, jump to [§17.4 Troubleshooting](#174-troubleshooting).
+After restart, you should see a **mic button on the Index page beside each VFO panel** — VFO A's next to VFO A's band/mode controls, and (on dual-receiver radios) VFO B's next to VFO B's. If you don't see them, jump to [§17.4 Troubleshooting](#174-troubleshooting).
 
-### 17.3 Using the mic button
+### 17.3 Using the mic buttons
 
-The mic button is a **press-and-hold** control — it doesn't latch.
+Each mic button is a **press-and-hold** control — it doesn't latch. The two VFOs' buttons are independent, but only one can be listening at a time (there's a single speech engine underneath); holding one button while the other is already listening simply has no effect until you release the first.
 
-1. **Press and hold** the mic button. The button colour changes to indicate the speech engine is listening.
+1. **Press and hold** a VFO's mic button. The button colour changes to indicate the speech engine is listening.
 2. **Speak the command clearly** at a normal volume.
 3. **Release** the button. The engine processes what it heard.
-4. If the phrase matched the grammar, the radio responds within a fraction of a second. The button returns to its idle (grey) colour.
-5. Small grey text under the button shows the **last phrase recognised** — useful for spotting misrecognitions ("set frequency to forty metres" instead of "go to forty metres", say).
+4. If the phrase matched the grammar, that VFO responds within a fraction of a second. The button returns to its idle colour.
+5. Bold text under the button shows the **last phrase recognised** and which command it matched — useful for spotting misrecognitions ("set frequency to forty metres" instead of "go to forty metres", say).
 
 If you change your mind mid-phrase, just release the button without speaking. Nothing is sent to the radio unless a full grammar match is found.
 
@@ -2411,10 +2420,11 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 
 ### 17.4 Troubleshooting
 
-**No mic button in the navbar.**
+**No mic buttons on the Index page.**
 - Did you tick "Enable voice control" in Settings *and* restart YWC? The toggle only takes effect on next launch.
+- Only one mic button (VFO A's)? That's expected on single-receiver radios (FTdx10, FT-710, FTDX3000) — there's no independent VFO B to target.
 - Open the Settings page → Voice Control → Diagnostics. If the **State** is anything other than `Idle`, there's an engine error — read the **Last error** line.
-- If Diagnostics shows `Error: en-GB Windows speech pack not installed`, install it (Windows → Settings → Time &amp; Language → Speech → Add a language → English (United Kingdom)).
+- If Diagnostics shows the active language's Windows speech pack isn't installed, install it (Windows → Settings → Time &amp; Language → Speech → Add a language) — see [§17.2](#172-enabling-voice-control).
 
 **Mic button is there but commands don't do anything.**
 - Open the **Diagnostics page** (`http://localhost:8080/Diagnostics`), click the **Voice Control Log** button at the top, then click **Refresh**. This shows the recent voice events (start / stop / heard / rejected / dispatched) from today's log without you having to find or parse the raw log file. Click **Copy to clipboard** to grab them for a bug report.
@@ -2423,8 +2433,9 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 - The raw log file lives at `%APPDATA%\MM5AGM\Yaesu Web Control\logs\ywc-YYYYMMDD.log` if you ever need the unfiltered version (e.g. CAT command traffic, SDR worker status, etc.), but the Diagnostics page is the right tool for voice-specific issues.
 
 **"Tune up" doesn't seem to do much.**
-- It does — VFO A steps up by exactly **10 kHz** per command. Watch the **VFO A panel**, not VFO B (voice control always targets VFO A in this release). If you need bigger jumps use "set frequency to …" or "go to … metres".
-- A "step by your currently-selected digit" mode is on the roadmap for v2; for now the step is fixed at 10 kHz.
+- Check you're watching the VFO panel whose mic button you actually pressed — each VFO steps independently, so "tune up" spoken into VFO B's button moves VFO B, not VFO A.
+- Each VFO's step size is shown (and changeable) in the dropdown next to that VFO's mic button, default **10 kHz**. If it's set small (e.g. 10 Hz) the movement can be easy to miss. Change it with the dropdown or by voice: "set step to ten kilohertz".
+- If you need bigger jumps use "set frequency to …" or "go to … metres" instead.
 
 **Speech engine works for a while then stops responding.**
 - Restart YWC. The engine is held alive across recognitions, and on rare Windows audio-stack hiccups it can lose its mic handle. Restart is the cleanest fix; if you see this often, report it on GitHub with the log.
@@ -2437,34 +2448,26 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 
 ### 17.6 Adding your own commands
 
-The voice command grammar is currently built in code (`Services/Voice/VoiceGrammar.cs`) using the Windows GrammarBuilder API. The original human-readable design lives at `Grammars/Commands.en-GB.srgs` — that's an SRGS XML file describing every intent, vocabulary, and tag in a single document. It's not loaded at runtime on .NET 10 (the in-process SRGS compiler isn't shipped with the modern `System.Speech` NuGet) but it remains the reference spec for the grammar.
+The voice command grammar is **data, not code** — it lives at `%APPDATA%\MM5AGM\Yaesu Web Control\Grammars\<culture>\Commands.<culture>.json` and is edited live from **Settings → Voice Control → Voice Phrases**:
 
-For v1 we're not exposing a "drop in your own grammar" extension point; the **Settings → Voice Control → Open user grammars folder** button creates the folder at `%APPDATA%\MM5AGM\Yaesu Web Control\Grammars\` for the v2 plan, but anything you put there isn't picked up yet. If there's a particular command or phrasing you'd like added, please file it as a GitHub issue or discussion.
+- **Voice Phrases editor.** Every command family from the [§17.1](#171-what-you-can-say) table is listed with its trigger phrases in an editable grid — add, remove, or reword phrases, one or more per row, comma-separated. **Save phrases** writes immediately and takes effect with no restart; **Validate** checks for empty/duplicate entries before you save; **Reset to defaults** restores the built-in English (UK) set.
+- **Test this pack.** A dry-run tester — speak a command and see what's recognised without sending anything to the radio, useful for checking a reworded phrase actually matches before trusting it live.
+- **Version history.** Every save (and every pack import) snapshots the previous version — up to the last 5 — so a bad edit or import can be undone from **Show version history**.
+- **Export / import as a language pack.** **Export language pack** bundles the current phrases, a generated `.srgs` reference copy, and author/description metadata into `YWC-VoicePack-<culture>-vN.zip` — share it on the [GitHub Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions) group. **Preview import** lets you inspect another pack's contents before installing it.
+- **Open user grammars folder** jumps straight to the `Grammars\` folder in Explorer if you'd rather hand-edit the JSON or inspect the generated `.srgs` file (a human-readable reference copy, not what the engine actually loads).
+- **Advanced mode** (off by default) allows a Custom Command's CAT string to be anything, not just a recombination of prefixes the built-in Core Commands already send. Only enable it if you trust the source of any pack you import.
 
-### 17.7 Roadmap: more languages
+If there's a particular command or phrasing you'd like added to the *built-in* defaults (as opposed to your own local edit), please file it as a GitHub issue or discussion.
 
-Only **English (UK)** ships today. The language code is hard-wired in `VoiceControlService` and the grammar is hard-wired in `VoiceGrammar.cs`. Adding another language has three moving parts:
+### 17.7 More languages
 
-1. **The Windows speech pack for that language must be installed** on the operator's PC. Windows → Settings → Time &amp; Language → Speech → Add a language. Microsoft ships full recognition packs for US English, French, German, Spanish, Italian, Japanese, Mandarin Chinese, Brazilian Portuguese and Australian English (the list does shift between Windows releases). Some other languages only ship voice synthesis, not recognition — those can't be used for voice control regardless of what YWC does.
-2. **A translated grammar.** Phrases are language-specific; "go to twenty metres" doesn't help a French operator. Each new language needs its own builder methods translating the verbs, the band words ("vingt mètres"), the mode words, the digit words. The semantic keys (`intent`, `mhz_whole`, `metres`, `mode`, `direction`) stay identical so the dispatcher needs no changes.
-3. **A user-facing language picker.** The Settings → Voice Control section has a disabled "English (UK)" dropdown as a placeholder; v2 turns that into a real selector listing whichever languages YWC has grammars for, persists the choice, and `VoiceControlService` constructs the recogniser for the chosen culture at startup.
+Only **English (UK)** ships as the built-in default, but the language pack system itself is already multi-language:
 
-**Likely path for v1.x** (adding one extra language quickly):
+1. **The Windows speech pack for the target language must be installed** on the operator's PC (Windows → Settings → Time &amp; Language → Speech → Add a language). Microsoft ships full recognition packs for US English, French, German, Spanish, Italian, Japanese, Mandarin Chinese, Brazilian Portuguese and Australian English (the list shifts between Windows releases). Some languages only ship voice synthesis, not recognition — those can't be used for voice control regardless of what YWC does.
+2. **A phrase pack for that culture.** The **Active language** dropdown in Settings → Voice Control lists every culture with an installed pack (a ✓ or ⚠ shows whether Windows also has a matching recogniser). Installing a new one means either importing a `YWC-VoicePack-<culture>-vN.zip` someone else has authored and shared (**Preview import** → **Install**), or hand-authoring `Commands.<culture>.json` and dropping it into `Grammars\<culture>\` via **Open user grammars folder** — the semantic keys (intent names, parameter vocab) stay identical to the English defaults, only the phrases change.
+3. **Switching locale takes effect immediately** — no restart needed, unlike the initial enable toggle.
 
-- Add `VoiceGrammar.BuildEsEs()` (or `BuildFrFr()`, `BuildDeDe()` …) returning a translated grammar with the same intents.
-- Add a `BuildForCulture(string culture)` switch in `VoiceGrammar`.
-- Make the Settings dropdown live and persisted.
-- The language pack install remains the user's responsibility, documented in §17.2.
-
-Each additional language is roughly a day of work — most of it translation, not code. The semantic dispatcher stays untouched, so once a translator has provided the words there's no further engineering.
-
-**Larger v2 ambition** (community-supplied grammars without recompiling YWC):
-
-- Define a simple JSON grammar format we can ship and translate to `GrammarBuilder` calls at runtime. (We can't use SRGS for this — the in-process SRGS compiler isn't shipped with the modern `System.Speech` NuGet, which is why our own grammar is built in code.)
-- The user grammars folder created by the **Open user grammars folder** button becomes the load location: drop in `Commands.de-DE.json` and YWC picks it up next launch.
-- A contributor who wants German support can hand-author the JSON without touching C# code.
-
-This is bigger work and only worth doing once we have evidence of demand. If you'd like a particular language prioritised, please open a GitHub discussion or issue and mention it.
+The **Voice Phrases editor** itself currently only edits the **en-GB** pack in place; editing an *installed non-English pack* through the same in-app grid isn't wired up yet — for now, translate by hand-editing that culture's JSON file directly, or ask a fluent speaker to export their pack after editing it locally. If you'd like a particular language prioritised for a built-in default, or want the editor to support editing other locales directly, please open a GitHub discussion or issue and mention it.
 
 ---
 
