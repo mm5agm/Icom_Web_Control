@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.4.0-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.4.1-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -171,6 +171,20 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 ---
 
 ## Release Notes
+
+## 2026-07-10 - v2.4.1
+
+Bug-fix release, out of the normal cadence, because the bug it fixes turned out to block basic connectivity for real users on day one of v2.4.0.
+
+### Settings page silently failing to save ([#65](https://github.com/mm5agm/Yaesu_Web_Control/issues/65))
+
+Reported by yozhin (FTdx10) and independently by Steve K3FZT (FTdx101MP, via the Groups.io list) within hours of the v2.4.0 release. The **SDRplay install path** field in Settings → SDR Spectrum Display was a non-nullable string, which under this project's `<Nullable>enable</Nullable>` triggers an implicit "required" validation rule — invisible in the UI, but enough for the browser's client-side validation to silently block the *entire* Settings form from submitting whenever that field was blank (the default for almost everyone). No error appeared anywhere; clicking Save just did nothing.
+
+For Steve this wasn't just an annoyance — it meant he couldn't change the serial port away from the shipped default (`COM3`) to match his own PC, so YWC couldn't reach his FTdx101MP at all even though nothing else was using the port. Fixed: the field is now nullable, matching the pattern already used by the other optional Settings fields, and a second latent bug (the field's value was never actually copied into the saved settings object, even before this) is fixed alongside it.
+
+### English (US) voice control language pack
+
+Added a US-English variant of the built-in Voice Control phrase pack (same commands, "meters" instead of "metres", the one UK-only trigger phrase dropped) — install it via **Settings → Voice Control → Preview import** using the pack shipped at `/voice-packs/YWC-VoicePack-en-US-v1.zip`. See [USER_MANUAL.md §17.7](USER_MANUAL.md#177-more-languages) for how to author and share further language packs.
 
 ## 2026-07-10 - v2.4.0
 
