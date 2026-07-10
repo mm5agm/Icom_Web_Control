@@ -516,6 +516,29 @@ namespace Yaesu_Web_Control.Services
                 logger.LogInformation("[RadioInitializationService] InitializationStatus set to complete");
                 await _hubContext.Clients.All.SendAsync("InitializationStatus", "complete");
 
+                // Initialize VC Tune preselector module in the background so it
+                // never delays the "complete" status or the browser opener.
+                // VCTuneModule.InitializeAsync sends VT CAT commands; if the radio
+                // is slow to respond those round-trips must not block this path.
+                if (RadioCapabilities.SupportsVCTuneMain(settings.RadioModel))
+                {
+                    var vcTune = _serviceProvider.GetRequiredService<VCTuneModule>();
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(1500); // let AutoInfo streaming settle first
+                        try
+                        {
+                            await vcTune.InitializeAsync(CancellationToken.None);
+                        }
+                        catch (Exception ex)
+                        {
+                            // VCTuneModule logs internally; swallow here so the
+                            // fire-and-forget task never becomes an unobserved exception.
+                            _ = ex;
+                        }
+                    });
+                }
+
                 // On success, open main page only in Production and not under debugger
                 if (!Debugger.IsAttached && 
                     string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))

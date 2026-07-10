@@ -43,6 +43,22 @@ public sealed class SdrManager : BackgroundService
     // direct sdrplay_api_GetDevices enumeration). Updated under a lock so the
     // controller's read is consistent with concurrent session lifecycle.
     private readonly Dictionary<string, string> _activeDeviceKeys = new();
+
+    // Frame writers for the currently-connected workers, keyed by VFO id.
+    // Used by TrySendDspSettingsAsync to push live DSP-knob updates (gain,
+    // dB clamp) into the worker that owns each VFO's spectrum. Populated
+    // for the lifetime of one RunSessionAsync call; removed in its finally.
+    //
+    // Each entry pairs the writer with a SemaphoreSlim so that concurrent
+    // slider POSTs serialise their writes on the same NetworkStream —
+    // without the lock, two overlapping WriteDspSettingsAsync calls would
+    // interleave bytes mid-frame and the worker's ControlReader would
+    // read garbage (manifests as B going silent: corrupted length prefix
+    // makes the reader block forever waiting for bytes that never come).
+    private readonly Dictionary<string, WriterSlot> _writers = new();
+
+    private sealed record WriterSlot(FrameWriter Writer, SemaphoreSlim Lock);
+
     private readonly object _activeLock = new();
 
     /// <summary>
@@ -149,6 +165,28 @@ public sealed class SdrManager : BackgroundService
 
             using var stream = client.GetStream();
             var reader = new FrameReader(stream);
+            var writer = new FrameWriter(stream);
+
+            // Replay persisted DSP settings BEFORE publishing the writer so a
+            // concurrent slider POST can't grab the slot mid-startup and race
+            // its WriteDspSettingsAsync against ours on the same NetworkStream.
+            var dsp = vfo == "B"
+                ? new DspSettingsPayload(config.SdrSpectrumGainB,
+                                          config.SdrSpectrumLowDbB,
+                                          config.SdrSpectrumHighDbB)
+                : new DspSettingsPayload(config.SdrSpectrumGainA,
+                                          config.SdrSpectrumLowDbA,
+                                          config.SdrSpectrumHighDbA);
+            try { await writer.WriteDspSettingsAsync(dsp, stoppingToken).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "SDR {Vfo}: initial DSP push failed — worker will run with defaults", vfo);
+            }
+
+            // Now safe to expose the writer to the controller. The per-slot
+            // semaphore serialises any subsequent slider POSTs.
+            var writeLock = new SemaphoreSlim(1, 1);
+            lock (_activeLock) _writers[vfo] = new WriterSlot(writer, writeLock);
 
             int heartbeatCounter = 0;
 
@@ -214,13 +252,58 @@ public sealed class SdrManager : BackgroundService
         }
         finally
         {
-            lock (_activeLock) _activeDeviceKeys.Remove(vfo);
+            WriterSlot? removedSlot = null;
+            lock (_activeLock)
+            {
+                _activeDeviceKeys.Remove(vfo);
+                if (_writers.Remove(vfo, out var slot)) removedSlot = slot;
+            }
+            removedSlot?.Lock.Dispose();
             try { client?.Close(); } catch { }
             if (worker != null)
             {
                 await worker.StopAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
                 worker.Dispose();
             }
+        }
+    }
+
+    /// <summary>
+    /// Push a live DSP-knob update (gain + dB clamp) to the worker holding
+    /// the given VFO. Returns false if no worker is currently connected for
+    /// that VFO (settings should still be persisted by the caller so they
+    /// get re-sent on next session start).
+    /// </summary>
+    public async Task<bool> TrySendDspSettingsAsync(
+        string vfo,
+        DspSettingsPayload settings,
+        CancellationToken ct = default)
+    {
+        WriterSlot? slot;
+        lock (_activeLock) _writers.TryGetValue(vfo, out slot);
+        if (slot == null) return false;
+
+        // Serialise writes per VFO so back-to-back slider POSTs can't
+        // interleave bytes on the worker's NetworkStream. The semaphore
+        // is disposed in RunSessionAsync's finally block; if disposal
+        // races with us, the WaitAsync throws ObjectDisposedException
+        // and we return false — the caller treats this the same as "no
+        // worker connected", which is accurate at that point.
+        try { await slot.Lock.WaitAsync(ct).ConfigureAwait(false); }
+        catch (ObjectDisposedException) { return false; }
+        try
+        {
+            await slot.Writer.WriteDspSettingsAsync(settings, ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SDR {Vfo}: failed to push DSP settings — {Message}", vfo, ex.Message);
+            return false;
+        }
+        finally
+        {
+            try { slot.Lock.Release(); } catch (ObjectDisposedException) { /* session ended mid-write */ }
         }
     }
 

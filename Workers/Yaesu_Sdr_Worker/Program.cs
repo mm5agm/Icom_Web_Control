@@ -23,6 +23,11 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        // Resolve sdrplay_api.dll from the SDRplay install location even when
+        // PATH isn't set — same fix the main YWC process applies. See
+        // SdrplayDllResolver and issue #53.
+        Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.Register();
+
         WorkerOptions? opts;
         try { opts = ParseArgs(args); }
         catch (ArgumentException ex)

@@ -32,24 +32,36 @@
 //   ErrorReport (type 0x03)
 //     [UTF-8 string]  error message — human-readable diagnostic
 //
-//   Messages: main → worker (none currently)
-//   ────────────────────────────────────────
-//   Configuration changes are handled by killing and respawning the worker,
-//   so no main→worker control messages are needed in v1. The protocol leaves
-//   room for them to be added later without breaking compatibility.
+//   Messages: main → worker
+//   ───────────────────────
+//   DspSettings (type 0x04)
+//     [4 bytes]  gainLinear  (float32, BE) — pre-dB gain G (§4.1)
+//     [4 bytes]  dbFloor     (float32, BE) — display clamp lower bound
+//     [4 bytes]  dbCeiling   (float32, BE) — display clamp upper bound
+//
+//   Sample-rate / FFT-size changes still go via worker respawn; only the
+//   live spectrum-rendering knobs travel through this control channel so
+//   slider drag is smooth.
 
 using System.Buffers.Binary;
 using System.Net.Sockets;
 using System.Text;
 
-namespace Yaesu_Web_Control.Workers.Sdr;
+namespace Yaesu_Web_Control.Services.Sdr;
 
 public enum MessageType : byte
 {
     SpectrumFrame = 0x01,
     StatusUpdate  = 0x02,
     ErrorReport   = 0x03,
+    DspSettings   = 0x04,
 }
+
+/// <summary>
+/// Payload of a DspSettings message. Used by both ends of the protocol —
+/// FrameWriter on main writes it, ControlReader on the worker reads it.
+/// </summary>
+public readonly record struct DspSettingsPayload(float GainLinear, float DbFloor, float DbCeiling);
 
 /// <summary>
 /// Frame writer for the worker side. Encapsulates the length-prefix framing
@@ -92,6 +104,19 @@ public sealed class FrameWriter
     public Task WriteErrorAsync(string error, CancellationToken ct) =>
         WriteStringMessageAsync(MessageType.ErrorReport, error, ct);
 
+    /// <summary>Main → worker: live DSP knob update. Three floats, 12-byte payload.</summary>
+    public async Task WriteDspSettingsAsync(DspSettingsPayload settings, CancellationToken ct)
+    {
+        const int payloadLen = 12;
+        var buf = new byte[5 + payloadLen];
+        BinaryPrimitives.WriteUInt32BigEndian(buf.AsSpan(0, 4), payloadLen);
+        buf[4] = (byte)MessageType.DspSettings;
+        BinaryPrimitives.WriteSingleBigEndian(buf.AsSpan(5,  4), settings.GainLinear);
+        BinaryPrimitives.WriteSingleBigEndian(buf.AsSpan(9,  4), settings.DbFloor);
+        BinaryPrimitives.WriteSingleBigEndian(buf.AsSpan(13, 4), settings.DbCeiling);
+        await _stream.WriteAsync(buf.AsMemory(), ct).ConfigureAwait(false);
+    }
+
     private async Task WriteStringMessageAsync(MessageType type, string text, CancellationToken ct)
     {
         byte[] payload = Encoding.UTF8.GetBytes(text);
@@ -99,5 +124,58 @@ public sealed class FrameWriter
         _headerBuf[4] = (byte)type;
         await _stream.WriteAsync(_headerBuf.AsMemory(0, 5), ct).ConfigureAwait(false);
         await _stream.WriteAsync(payload.AsMemory(), ct).ConfigureAwait(false);
+    }
+}
+
+/// <summary>
+/// Worker-side reader for main → worker control messages. Keeps reading
+/// frames on a background task; raises <see cref="DspSettingsReceived"/>
+/// each time a DspSettings message arrives. Unknown message types are
+/// skipped (their length prefix lets us advance past them safely so we
+/// stay forwards-compatible with future control messages).
+/// </summary>
+public sealed class ControlReader
+{
+    private readonly NetworkStream _stream;
+    private readonly byte[]        _hdr = new byte[5];
+
+    public ControlReader(NetworkStream stream) => _stream = stream;
+
+    public event Action<DspSettingsPayload>? DspSettingsReceived;
+
+    public async Task RunAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            if (!await ReadExactAsync(_hdr, ct).ConfigureAwait(false)) return;
+            int payloadLen = (int)BinaryPrimitives.ReadUInt32BigEndian(_hdr.AsSpan(0, 4));
+            var type = (MessageType)_hdr[4];
+
+            var payload = new byte[payloadLen];
+            if (payloadLen > 0 && !await ReadExactAsync(payload, ct).ConfigureAwait(false)) return;
+
+            if (type == MessageType.DspSettings && payloadLen == 12)
+            {
+                var s = new DspSettingsPayload(
+                    GainLinear: BinaryPrimitives.ReadSingleBigEndian(payload.AsSpan(0, 4)),
+                    DbFloor:    BinaryPrimitives.ReadSingleBigEndian(payload.AsSpan(4, 4)),
+                    DbCeiling:  BinaryPrimitives.ReadSingleBigEndian(payload.AsSpan(8, 4)));
+                DspSettingsReceived?.Invoke(s);
+            }
+            // Unknown types are silently dropped — the length prefix means we
+            // already consumed the right number of payload bytes.
+        }
+    }
+
+    private async Task<bool> ReadExactAsync(byte[] buf, CancellationToken ct)
+    {
+        int got = 0;
+        while (got < buf.Length)
+        {
+            int n = await _stream.ReadAsync(buf.AsMemory(got), ct).ConfigureAwait(false);
+            if (n == 0) return false;   // peer closed
+            got += n;
+        }
+        return true;
     }
 }

@@ -126,6 +126,20 @@ export function initMemoriesPanel() {
         if (dialog.open) { _loadBanks(); _loadAndRender(); }
     });
 
+    // Escape always closes the panel (show() does not auto-close on Escape).
+    // Capture phase, matching freq-keyboard.js's pattern: its own capture-phase
+    // Escape handler calls stopPropagation(), which — since it fires at document,
+    // the first node in the capture path — would otherwise swallow the event
+    // before any bubble-phase document listener ever ran (e.g. both panels open
+    // at once). Capture-phase listeners on the same node still all run regardless
+    // of a sibling's stopPropagation(); only stopImmediatePropagation would block us.
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && dialog.open) {
+            e.preventDefault();
+            closeMemoriesPanel();
+        }
+    }, true);
+
     // Refresh when the user returns to this tab (e.g. after editing in /Memories)
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && dialog.open) _loadAndRender();

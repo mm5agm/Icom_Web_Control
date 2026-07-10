@@ -480,7 +480,9 @@ namespace Yaesu_Web_Control.Services
             await SendCommand("SS15;", true);
             await SendCommand("SS06;", true);
             await SendCommand("SS16;", true);
-            await SendCommand("VT0;", true);
+            // VT0; removed: VC Tune status is probed by VCTuneModule.InitializeAsync
+            // after init completes. Hardware revisions that reject VT CAT frames
+            // (e.g. ID0682) would return "?;?;" here, polluting the message buffer.
             await SendCommand("VX;", true);
             await SendCommand("VG;", true);
             await SendCommand("AV;", true);

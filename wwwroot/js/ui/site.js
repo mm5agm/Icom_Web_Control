@@ -50,6 +50,7 @@ function showServerStoppedOverlay() {
     try { window.filterScopePanelA?.stop?.(); } catch { /* ignore */ }
     try { window.filterScopePanelB?.stop?.(); } catch { /* ignore */ }
     try { window.sMeterHistory?.stop?.();    } catch { /* ignore */ }
+    try { window.sMeterHistoryB?.stop?.();   } catch { /* ignore */ }
 }
 
 // --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
@@ -57,8 +58,9 @@ document.addEventListener('keydown', function (e) {
     // Ignore if typing in an input, textarea, or contenteditable
     const active = document.activeElement;
     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
-    if (e.key === 'f' || e.key === 'F') {
-        // Enter fullscreen on the <body> element (entire app)
+    if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Bare F only — guarding against modifiers stops YWC from stealing
+        // Ctrl+F (browser find-in-page) and Cmd+F on Mac.
         const body = document.body;
         if (body && !document.fullscreenElement) {
             body.requestFullscreen && body.requestFullscreen();
@@ -990,6 +992,7 @@ connection.on("RadioStateUpdate", function (update) {
         }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeA', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('A', update.value);
+        if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('A', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
@@ -1002,6 +1005,7 @@ connection.on("RadioStateUpdate", function (update) {
         }
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeB', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('B', update.value);
+        if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('B', update.value);
     }
 
     // --- ANTENNA CHANGE ---
@@ -1518,13 +1522,6 @@ connection.on("RadioStateUpdate", function (update) {
         const el = document.getElementById('ctcssToneSelect'); if (el) el.value = update.value;
     }
 
-    // --- IF LOW CUT ---
-    if (update.property === "IfLowCutA") {
-        const el = document.getElementById('ifLowCutSelectA'); if (el) el.value = update.value;
-    }
-    if (update.property === "IfLowCutB") {
-        const el = document.getElementById('ifLowCutSelectB'); if (el) el.value = update.value;
-    }
 });
 
 // SignalR connection is started once below (after the IIFE) with a .catch() error handler.
@@ -1648,10 +1645,6 @@ window.radioControl = {
     setIfShift: async function (receiver, shiftHz) {
         await fetch(`/api/cat/ifshift/${receiver.toLowerCase()}`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftHz: parseInt(shiftHz) }) });
-    },
-    setIfLowCut: async function (receiver, code) {
-        await fetch(`/api/cat/iflowcut/${receiver.toLowerCase()}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
     }
 };
 
@@ -2435,23 +2428,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // ▲ / ▼ buttons — visible when Settings > Accessibility >
-        // Show frequency arrow buttons is on (Yuri W4YSW request). Each
-        // click steps the currently-selected digit by 1 — same action as
-        // ArrowUp / ArrowDown and the mouse wheel.
-        if (upBtn) {
-            upBtn.onclick = function (e) {
-                e.preventDefault();
+        // Show frequency arrow buttons is on (Yuri W4YSW request). A single
+        // click/tap steps the currently-selected digit by 1 — same action as
+        // ArrowUp / ArrowDown and the mouse wheel. Press-and-hold repeats
+        // that same step every 500 ms until released, so reaching a distant
+        // frequency doesn't need dozens of individual clicks.
+        function bindHoldToRepeat(btn, direction) {
+            if (!btn) return;
+            let repeatTimer = null;
+            let firedByHold = false;
+
+            function doStep() {
                 ensureSelection();
-                stepSelectedDigit(1);
-            };
-        }
-        if (downBtn) {
-            downBtn.onclick = function (e) {
+                stepSelectedDigit(direction);
+            }
+            function start(e) {
                 e.preventDefault();
-                ensureSelection();
-                stepSelectedDigit(-1);
-            };
+                firedByHold = true;
+                doStep();
+                clearInterval(repeatTimer);
+                repeatTimer = setInterval(doStep, 500);
+            }
+            function stop() {
+                clearInterval(repeatTimer);
+                repeatTimer = null;
+            }
+
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('touchstart', start, { passive: false });
+            btn.addEventListener('mouseup', stop);
+            btn.addEventListener('mouseleave', stop);
+            btn.addEventListener('touchend', stop);
+            btn.addEventListener('touchcancel', stop);
+            window.addEventListener('blur', stop);
+
+            // Keyboard activation (Enter/Space) fires 'click' directly with
+            // no preceding mousedown/touchstart, so it still gets a single
+            // step. A pointer click/tap already stepped via start() above —
+            // firedByHold suppresses the duplicate step from the click that
+            // follows mouseup/touchend.
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (firedByHold) { firedByHold = false; return; }
+                doStep();
+            });
         }
+        bindHoldToRepeat(upBtn, 1);
+        bindHoldToRepeat(downBtn, -1);
 
         document.addEventListener('click', function (e) {
             // Don't clear selection on clicks inside the display OR inside
@@ -2901,14 +2924,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateSMeter(receiver, value) {
-        // v2.3.9: the S-meter and its history strip moved out of the VFO
-        // panels into the top meter row -- single shared gauge and single
-        // history because Yaesu radios only have one calibrated S-meter
-        // (tied to MAIN on FTdx101 family; only physical receiver on
-        // single-receiver rigs). The `receiver` parameter is preserved
-        // for call-site compatibility but ignored: only the 'A' value
-        // (MAIN) actually drives the gauge.
-        if (receiver !== 'A') return;
+        // v2.4.0: restored as a real per-VFO pair (dual-receiver radios have
+        // an independently calibrated S-meter per receiver, SM0;/SM1;).
+        // On single-receiver radios receiver 'B' is a no-op below since
+        // window.meterPanel has no 'smeterB' gauge (canvas doesn't exist —
+        // MeterPanel._createGauges skipped it) and sMeterHistoryB.push() is
+        // a no-op (canvas doesn't exist).
+        const gaugeKey   = receiver === 'B' ? 'smeterB' : 'smeter';
+        const history     = receiver === 'B' ? window.sMeterHistoryB : window.sMeterHistory;
+        const canvasId    = receiver === 'B' ? 'sMeterCanvasB' : 'sMeterCanvas';
+        const labelId     = receiver === 'B' ? 'sMeterValueB' : 'sMeterValue';
 
         // The S-meter gauge has hardcoded tick positions on a 0-255 scale and
         // ignores calibration tables for needle placement. To make the user's
@@ -2919,19 +2944,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // raw display, and snap-label keep using the un-translated raw value.
         // Reported by Jacek SP3L on #29; confirmed broken by Colin on bench
         // 2026-06-12 and traced to gauge.js:137 hardcoded majorTicks.
+        // Both VFOs share the single calibration table -- there's no
+        // per-receiver calibration in this codebase, and SM0;/SM1; both
+        // report on the same raw 0-255 scale.
         const gaugePos = window.calibrationEngine?.calibrateSMeterForGauge
             ? window.calibrationEngine.calibrateSMeterForGauge(value)
             : value;
-        if (window.meterPanel) window.meterPanel.update('smeter', gaugePos);
-        if (window.sMeterHistory) window.sMeterHistory.push(value);
-        if (typeof updateRawSMeterValueA === 'function') updateRawSMeterValueA(value);
-        const canvas = document.getElementById('sMeterCanvas');
+        if (window.meterPanel) window.meterPanel.update(gaugeKey, gaugePos);
+        if (history) history.push(value);
+        if (receiver === 'A' && typeof updateRawSMeterValueA === 'function') updateRawSMeterValueA(value);
+        const canvas = document.getElementById(canvasId);
         const sUnit = sMeterLabel(value);
         if (canvas) canvas.dataset.reading = sUnit;
         // Update the "S-Meter S5" title label under the gauge (matches SWR /
         // Power / Temp / etc. format). Element is rendered by SMeterGauge
         // when gaugeTitleShow is true (set in gauge.js).
-        const sLabel = document.getElementById('sMeterValue');
+        const sLabel = document.getElementById(labelId);
         if (sLabel) sLabel.textContent = sUnit;
     }
 
@@ -3480,5 +3508,124 @@ pollInitStatus();
         document.addEventListener('DOMContentLoaded', () => setTimeout(_checkForUpdate, 3000));
     } else {
         setTimeout(_checkForUpdate, 3000);
+    }
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VC Tune preselector controls
+// Sends commands to /api/vctune/{band}/{command} and updates button states
+// from the JSON response.  Band is 'a' (MAIN) or 'b' (SUB).
+// ─────────────────────────────────────────────────────────────────────────────
+(function () {
+    var _state         = { a: 'Unknown', b: 'Unknown' };
+    var _catBlocked    = { a: false, b: false };  // true when hardware rejects VT CAT
+
+    function _updateUi(band, data) {
+        var vfo       = band.toUpperCase();
+        var toggleBtn = document.getElementById('vcTuneToggleBtn' + vfo);
+        var defBtn    = document.getElementById('vcTuneDefaultBtn' + vfo);
+        var ctrBtn    = document.getElementById('vcTuneCenterBtn' + vfo);
+        var meter     = document.getElementById('vcTuneMeter' + vfo);
+        var warn      = document.getElementById('vcTuneWarn' + vfo);
+        var row       = document.getElementById('vcTuneRow' + vfo);
+
+        var catNotSupported = (data.errorCategory === 'CatNotSupported');
+        if (catNotSupported) _catBlocked[band] = true;
+
+        // Hardware does not support VC Tune over CAT — hide everything immediately.
+        if (catNotSupported) {
+            if (toggleBtn) toggleBtn.style.display = 'none';
+            if (row)       row.style.display       = 'none';
+            return;
+        }
+
+        var state = data.state || 'Unknown';
+        var avail = (data.availability != null) ? data.availability : 0;
+        _state[band] = state;
+
+        var notInstalled = (avail === 0);
+
+        if (toggleBtn) {
+            var isActive = (state === 'On' || state === 'Stepping' || state === 'Centering');
+            toggleBtn.classList.remove('btn-outline-light', 'btn-warning');
+            toggleBtn.classList.add(isActive ? 'btn-warning' : 'btn-outline-light');
+            toggleBtn.disabled = notInstalled;
+            if (band === 'b') toggleBtn.style.display = avail > 0 ? '' : 'none';
+        }
+
+        if (defBtn) defBtn.disabled = notInstalled;
+        if (ctrBtn) ctrBtn.disabled = notInstalled;
+
+        if (meter) {
+            var m = (data.meter != null) ? data.meter : -1;
+            meter.textContent = m >= 0 ? 'P5: ' + m : 'P5: -';
+        }
+
+        if (warn) {
+            var txt = '';
+            if (avail === 0)                        txt = 'Not installed';
+            else if (avail === 2)                   txt = 'Temporarily unavailable';
+            else if (!data.success && data.message) txt = data.message;
+            warn.textContent   = txt;
+            warn.style.display = txt ? '' : 'none';
+        }
+
+        if (band === 'b' && row) row.style.display = avail > 0 ? '' : 'none';
+    }
+
+    async function vcTuneCommand(band, cmd) {
+        try {
+            var resp = await fetch('/api/vctune/' + band + '/' + cmd, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            if (!resp.ok) return;
+            _updateUi(band, await resp.json());
+        } catch(e) { console.error('VC Tune ' + cmd + ' failed:', e); }
+    }
+
+    async function vcTuneToggle(band) {
+        if (_catBlocked[band]) return;
+        var isOn = (_state[band] === 'On' || _state[band] === 'Stepping' || _state[band] === 'Centering');
+        await vcTuneCommand(band, isOn ? 'off' : 'on');
+    }
+
+    async function vcTuneStep(band, direction) {
+        if (_catBlocked[band]) return;
+        var sel    = document.getElementById('vcTuneStep' + band.toUpperCase());
+        var amount = sel ? parseInt(sel.value, 10) : 5;
+        try {
+            var resp = await fetch('/api/vctune/' + band + '/step', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ direction: direction, amount: amount })
+            });
+            if (!resp.ok) return;
+            _updateUi(band, await resp.json());
+        } catch(e) { console.error('VC Tune step failed:', e); }
+    }
+
+    async function _refreshStatus(band) {
+        try {
+            var resp = await fetch('/api/vctune/' + band + '/status');
+            if (!resp.ok) return;
+            _updateUi(band, await resp.json());
+        } catch(e) { /* non-fatal */ }
+    }
+
+    function _vcTuneInit() {
+        if (document.getElementById('vcTuneToggleBtnA')) _refreshStatus('a');
+        if (document.getElementById('vcTuneToggleBtnB')) _refreshStatus('b');
+    }
+
+    window.vcTuneCommand = vcTuneCommand;
+    window.vcTuneToggle  = vcTuneToggle;
+    window.vcTuneStep    = vcTuneStep;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _vcTuneInit);
+    } else {
+        _vcTuneInit();
     }
 })()

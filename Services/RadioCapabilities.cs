@@ -15,6 +15,15 @@ namespace Yaesu_Web_Control.Services;
 // possibly only one set actually exists in the hardware.
 public static class RadioCapabilities
 {
+    // Hardware revision IDs confirmed to reject VT CAT commands despite the
+    // model supporting VC Tune in principle. The physical preselector works
+    // from the front panel but is not exposed via CAT on these revisions.
+    //
+    // Confirmed 2026-07-01 by Colin MM5AGM on FTdx101MP ID0682:
+    //   VT VCT 0,1,+,0; → ?;?;  (CAT error)
+    //   FA; → correct frequency  (serial link otherwise functional)
+    //   Firmware: MAIN V01-28 / DISPLAY V01-51 / DSP V01-20 (current / up to date)
+    private static readonly HashSet<string> _vcTuneCatBlockedIds = ["0682"];
     /// <summary>
     /// True when the radio has two independent physical receiver chains
     /// (MAIN + SUB), each with its own set of RX controls addressable
@@ -47,4 +56,59 @@ public static class RadioCapabilities
         "FTdx10" or "FT-991A" => false,
         _                     => true
     };
+
+    /// <summary>
+    /// True when the radio has a MAIN VC Tune preselector that can be
+    /// controlled via the VT CAT command. Currently limited to the FTdx101
+    /// family; all other supported models lack this hardware.
+    /// </summary>
+    public static bool SupportsVCTuneMain(string radioModel) =>
+        radioModel is "FTdx101MP" or "FTdx101D";
+
+    /// <summary>
+    /// True when the radio model can optionally have a SUB VC Tune board
+    /// fitted (static capability — hardware presence must still be confirmed
+    /// at runtime via the P6 field in the VT CAT response).
+    /// Only the FTdx101MP supports the SUB VC Tune option; the FTdx101D SUB
+    /// receiver does not have a VC Tune capacitor.
+    /// </summary>
+    public static bool SupportsVCTuneSubStatic(string radioModel) =>
+        radioModel == "FTdx101MP";
+
+    /// <summary>
+    /// True when the hardware revision reported by the ID; CAT command supports
+    /// VC Tune control over CAT. Returns false for hardware revisions confirmed
+    /// to reject VT frames (see <see cref="_vcTuneCatBlockedIds"/>).
+    /// Also returns false for a null or empty ID (conservative default — ID is
+    /// populated from the ID; response during init; until that arrives treat as
+    /// not supported so no VT commands are sent prematurely).
+    /// </summary>
+    public static bool SupportsVCTuneCat(string? hardwareId) =>
+        !string.IsNullOrEmpty(hardwareId) && !_vcTuneCatBlockedIds.Contains(hardwareId);
+
+    /// <summary>
+    /// Returns the P1 character for a per-VFO CAT command, given the
+    /// user's (or voice command's) targeted receiver ("A" or "B"). On
+    /// single-receiver radios always "0" -- the firmware hard-codes that
+    /// position and rejects P1=1; on dual-receiver "0" for A, "1" for B.
+    /// Shared by CatController (mouse/keyboard input) and IntentDispatcher
+    /// (voice input) so the routing rule lives in exactly one place.
+    /// </summary>
+    public static string VfoP1(bool isSingleReceiver, string receiver) =>
+        isSingleReceiver
+            ? "0"
+            : (receiver.Equals("B", StringComparison.OrdinalIgnoreCase) ? "1" : "0");
+
+    /// <summary>
+    /// Returns true if the per-VFO state write should target *B (vs *A) for
+    /// a targeted receiver. On single-receiver radios the change always
+    /// applies to whichever VFO is currently active -- the targeted panel
+    /// is a hint, not an addressable target -- so this mirrors
+    /// <paramref name="activeVfo"/> (0 = A, 1 = B). On dual-receiver radios
+    /// the target wins outright.
+    /// </summary>
+    public static bool VfoIsB(bool isSingleReceiver, int activeVfo, string receiver) =>
+        isSingleReceiver
+            ? activeVfo == 1
+            : receiver.Equals("B", StringComparison.OrdinalIgnoreCase);
 }

@@ -162,6 +162,7 @@ namespace Yaesu_Web_Control.Services
             s.JtalertCommandLine     = AutoQuote(s.JtalertCommandLine);
             s.Log4omCommandLine      = AutoQuote(s.Log4omCommandLine);
             s.GridtrackerCommandLine = AutoQuote(s.GridtrackerCommandLine);
+            s.FldigiCommandLine      = AutoQuote(s.FldigiCommandLine);
         }
 
         private static string AutoQuote(string value)

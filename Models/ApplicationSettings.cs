@@ -25,12 +25,14 @@
         public string JtalertCommandLine { get; set; } = @"C:\HamApps\JTAlert\JTAlert.exe";
         public string Log4omCommandLine { get; set; } = @"""C:\Program Files (x86)\Log4OM 2\Log4OM.exe""";
         public string GridtrackerCommandLine { get; set; } = @"""C:\Program Files\GridTracker2\GridTracker2.exe""";
+        public string FldigiCommandLine { get; set; } = @"""C:\Program Files\Fldigi-4.2.11\fldigi.exe""";
 
         // External Applications - Custom Names (user can rename buttons)
         public string App1Name { get; set; } = "WSJT-X";
         public string App2Name { get; set; } = "JTAlert";
         public string App3Name { get; set; } = "Log4OM";
         public string App4Name { get; set; } = "GridTracker";
+        public string App5Name { get; set; } = "Fldigi";
 
         // External Applications - Show/Hide buttons (optional apps)
         public bool ShowWsjtxButton { get; set; } = true;
@@ -38,6 +40,8 @@
         public bool ShowLog4omButton { get; set; } = true;
         // Default off — most users won't have GridTracker installed
         public bool ShowGridtrackerButton { get; set; } = false;
+        // Default off — most users won't have Fldigi installed
+        public bool ShowFldigiButton { get; set; } = false;
 
         // WSJT-X UDP Settings
         // Default: Use the same multicast address as configured in WSJT-X
@@ -95,6 +99,30 @@
         public long SdrIfFrequencyHz { get; set; } = 9_000_000;
         public int SdrFftSize { get; set; } = 1024;
 
+        // Per-VFO spectrum DSP knobs (see SpectrumProcessor). Live-controlled
+        // from the three sliders on each spectrum panel; persisted here so
+        // settings survive YWC restarts and re-apply to a new worker session.
+        //
+        //   Gain    — pre-dB linear gain G (design doc §4.1). 1.0 = no boost.
+        //   LowDb   — display clamp lower bound (SDR Console "Low"). Bins below
+        //             this are pinned. Default -120 = full SDR range.
+        //   HighDb  — display clamp upper bound (SDR Console "High"). Default
+        //             0 = full SDR range.
+        public float SdrSpectrumGainA   { get; set; } = 1.0f;
+        public float SdrSpectrumGainB   { get; set; } = 1.0f;
+        public float SdrSpectrumLowDbA  { get; set; } = -120f;
+        public float SdrSpectrumLowDbB  { get; set; } = -120f;
+        public float SdrSpectrumHighDbA { get; set; } = 0f;
+        public float SdrSpectrumHighDbB { get; set; } = 0f;
+
+        // Optional user override for the SDRplay API install directory
+        // (the folder that contains the x64\sdrplay_api.dll subfolder).
+        // Leave blank for auto-detect: SdrplayDllResolver tries the app
+        // directory, then standard Program Files locations. Only needed
+        // when the SDRplay API was installed to a non-default location
+        // AND its bin folder wasn't added to PATH.
+        public string SdrplayInstallPath { get; set; } = string.Empty;
+
         // CW keyer message memories M1-M5 (sent via KY command)
         public List<string> CwMessages { get; set; } = new() { "CQ CQ DE {CALL}", "TU 73", "QRZ?", "UR 5NN", "DE {CALL}" };
 
@@ -138,6 +166,52 @@
         // so users with mouse wheels see the uncluttered default layout.
         // Yuri W4YSW request 2026-06-17.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
+
+        // ── Voice Control (in-process SAPI) ───────────────────────────────
+        // When true, the navbar mic button is shown and the SAPI recogniser
+        // engages on PTT. Default OFF -- voice control is opt-in so users
+        // who didn't ask for it don't get surprise mic-permission prompts
+        // and don't pay the small CPU cost of holding a SAPI engine alive.
+        // v2.4.0 feature (replaces the parked Alexa work). See
+        // docs/VoiceControl/v1-plan.md.
+        public bool VoiceControlEnabled { get; set; } = false;
+
+        // After every recognised voice command, speak a confirmation phrase
+        // ("Move to fourteen point zero seven four megahertz, successful")
+        // back through the PC's default audio output. Default ON when voice
+        // control is enabled -- key accessibility feature for partially-
+        // sighted operators (Yuri W4YSW, Thomas OZ1JTE) who can't see the
+        // screen to know whether a CAT command landed. Users who find it
+        // chatty can disable here without disabling voice control itself.
+        public bool VoiceSpokenConfirmationEnabled { get; set; } = true;
+
+        // Step size used by the NudgeUp / NudgeDown voice commands (Hz),
+        // independently per VFO -- each VFO's mic button on the Index page
+        // has its own step-size dropdown next to it. Options exposed: 10,
+        // 100, 1000, 10000, 100000. VFO B is only reachable on dual-receiver
+        // radios (RadioCapabilities.IsDualReceiver); the field still exists
+        // for single-receiver radios but nothing writes/reads it there.
+        public long VoiceNudgeStepHzA { get; set; } = 10_000;
+        public long VoiceNudgeStepHzB { get; set; } = 10_000;
+
+        // When true, Custom Command (macro) CAT strings are accepted
+        // regardless of prefix during validation. Default OFF: a Custom
+        // Command's CAT string must start with a prefix one of the built-in
+        // Core Commands already trusts (see VoicePhraseValidator's CAT
+        // allowlist) -- "recombine the primitives the app already trusts,
+        // don't grant new ones." This is the gate an imported/shared voice
+        // pack's CAT strings pass through; see
+        // docs/VoiceControl/language-pack-manager-design.md §5.5.
+        public bool VoiceAdvancedModeEnabled { get; set; } = false;
+
+        // Active recognition locale (BCP-47, e.g. "en-GB"). Distinct from
+        // "installed languages": a user can have several packs installed
+        // under Grammars\<culture>\ and only one active at a time -- SAPI's
+        // SpeechRecognitionEngine is constructed for a single culture (see
+        // VoiceControlService.SwitchLocaleAsync). Switching doesn't require
+        // an app restart. Defaults to en-GB since that's the only pack that
+        // ships today. docs/VoiceControl/language-pack-manager-design.md §4.4.
+        public string VoiceActiveLocale { get; set; } = "en-GB";
     }
 
     public class RadioState

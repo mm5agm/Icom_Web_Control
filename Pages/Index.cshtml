@@ -24,6 +24,12 @@
     // each VFO is its own physical receiver chain.
     bool isSingleReceiver  = Yaesu_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
     bool hasAntennaSelector = Yaesu_Web_Control.Services.RadioCapabilities.HasAntennaSelector(Model.RadioModel);
+    // Render VC Tune controls only when both the model supports VC Tune (FTdx101MP)
+    // AND the hardware ID is positively confirmed to support VT CAT commands.
+    // Empty/unknown ID → hidden (user can reload once radio connects and ID; is received).
+    bool hasVcTune    = Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneMain(Model.RadioModel)
+                     && Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneCat(Model.RadioState.Id);
+    bool hasVcTuneSub = Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneSubStatic(Model.RadioModel);
 
     string clarModeInit = (Model.RadioState.RxClarOn, Model.RadioState.TxClarOn) switch
     {
@@ -67,17 +73,19 @@
         }
         : new (string Value, string Label)[]
         {
-            // FTdx101MP/D SH codes per Table 3 of the CAT manual.
-            // Code 0 is the radio's mode-dependent default (3 kHz with a 3 kHz roofing filter
-            // in SSB); codes 1-21 run narrow→wide. Same command structure as the FTdx10
-            // but with slightly different bandwidths at the wide end.
+            // FTdx101MP/D SH codes. The 2308-L CAT manual documents 0-21; current
+            // firmware (verified empirically by Colin on the FTdx101MP, #50)
+            // extends to code 23 = 4.0 kHz, with code 22 = 3.5 kHz between them.
+            // Code 0 is the radio's mode-dependent default (3 kHz with a 3 kHz
+            // roofing filter in SSB); codes 1-21 run narrow→wide as per the
+            // manual, then 22/23 add the wider SSB filters.
             ("0","3.0 kHz"),
             ("1","300 Hz"), ("2","400 Hz"), ("3","600 Hz"), ("4","850 Hz"),
             ("5","1.1 kHz"), ("6","1.2 kHz"), ("7","1.5 kHz"), ("8","1.65 kHz"),
             ("9","1.8 kHz"), ("10","1.95 kHz"), ("11","2.1 kHz"), ("12","2.2 kHz"),
             ("13","2.3 kHz"), ("14","2.4 kHz"), ("15","2.5 kHz"), ("16","2.6 kHz"),
             ("17","2.7 kHz"), ("18","2.8 kHz"), ("19","2.9 kHz"), ("20","3.0 kHz"),
-            ("21","3.2 kHz")
+            ("21","3.2 kHz"), ("22","3.5 kHz"), ("23","4.0 kHz")
         };
     string ifWidthDefaultA = isFtdx10 ? "0" : isFt710 ? "12" : isFtdx3000 ? "14" : "0";
     string ifWidthDefaultB = isFtdx10 ? "0" : isFt710 ? "12" : isFtdx3000 ? "14" : "0";
@@ -95,14 +103,6 @@
             .Where(o => o.Value == "0" || o.Value == "1" || o.Value == "2" || o.Value == "3"
                      || Model.InstalledRoofingFilters.Contains(o.Value))
             .ToArray();
-
-    // IF Low Cut options (SL command) — shared across models
-    var ifLowCutOptions = new (string Value, string Label)[]
-    {
-        ("0","OFF"), ("1","100 Hz"), ("2","200 Hz"), ("3","300 Hz"), ("4","400 Hz"),
-        ("5","500 Hz"), ("6","600 Hz"), ("7","700 Hz"), ("8","800 Hz"),
-        ("9","900 Hz"), ("10","1.0 kHz"), ("11","1.1 kHz")
-    };
 
     // Standard CTCSS tones
     var ctcssTones = new (string Code, string Label)[]
@@ -252,6 +252,15 @@
                 </button>
             </div>
         }
+        @if (Model.ShowApp5Button)
+        {
+            <div class="col-auto">
+                <button id="fldigiBtn" class="btn btn-secondary btn-sm" style="padding-top: 1px; padding-bottom: 1px;"
+                        onclick="launchFldigi()" title="Launch @Model.App5Name" aria-label="Launch @Model.App5Name">
+                    @Model.App5Name
+                </button>
+            </div>
+        }
         <div class="col-auto ms-auto d-flex gap-2 align-items-center">
             <span id="utcClock"
                   class="font-monospace fw-bold px-2"
@@ -335,28 +344,46 @@
                              reads left-to-right toward the S-meter needle. Hidden
                              until the toolbar's S-hist toggle is on. Sized to match
                              the meter cells alongside it. Moved from inside the VFO
-                             panels in v2.3.9 (Jacek SP3L #34 / Colin's design call):
-                             the radio only has ONE calibrated S-meter (tied to MAIN
-                             on FTdx101; only physical receiver on single-receiver
-                             rigs), so showing it once at the top is the honest
-                             presentation. -->
+                             panels in v2.3.9 (Jacek SP3L #34 / Colin's design call).
+                             v2.4.0: restored as a VFO A / VFO B pair — dual-receiver
+                             radios (FTdx101MP/D) have an independently calibrated
+                             S-meter per receiver (SM0;/SM1;); single-receiver radios
+                             only get the VFO A pair since there's no SUB receiver. -->
                         <div id="sMeterHistoryContainer"
                              class="text-center smeter-history-container"
-                             style="display:none; position: relative; height: 135px; min-width: 260px; margin: 0; padding: 0;">
+                             style="display:none; position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
                             <canvas id="sMeterHistoryCanvas"
                                     role="img" aria-hidden="true"
-                                    aria-label="S-meter 30-second history"
-                                    data-a11y-key="meters.smeterHistory"
+                                    aria-label="S-meter 30-second history — VFO A"
+                                    data-a11y-key="meters.smeterHistoryA"
                                     style="display:block; width:100%; height:100%; border-radius:3px;"></canvas>
                         </div>
-                        <!-- S-Meter — moved from per-VFO panels to the top row
-                             in v2.3.9. Always live (unlike SWR/Power/etc which
+                        <!-- S-Meter A (MAIN) — moved from per-VFO panels to the top
+                             row in v2.3.9. Always live (unlike SWR/Power/etc which
                              are TX-only). -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
-                                <canvas id="sMeterCanvas" role="img" aria-hidden="true" aria-label="S meter" data-a11y-key="meters.smeter"></canvas>
+                                <canvas id="sMeterCanvas" role="img" aria-hidden="true" aria-label="S meter A" data-a11y-key="meters.smeterA"></canvas>
                             </div>
                         </div>
+                        @if (!isSingleReceiver)
+                        {
+                            <!-- S-Meter B (SUB) — dual-receiver radios only. -->
+                            <div id="sMeterHistoryContainerB"
+                                 class="text-center smeter-history-container"
+                                 style="display:none; position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
+                                <canvas id="sMeterHistoryCanvasB"
+                                        role="img" aria-hidden="true"
+                                        aria-label="S-meter 30-second history — VFO B"
+                                        data-a11y-key="meters.smeterHistoryB"
+                                        style="display:block; width:100%; height:100%; border-radius:3px;"></canvas>
+                            </div>
+                            <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                                <div class="analog-meter-container">
+                                    <canvas id="sMeterCanvasB" role="img" aria-hidden="true" aria-label="S meter B" data-a11y-key="meters.smeterB"></canvas>
+                                </div>
+                            </div>
+                        }
                         <!-- SWR Meter -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
@@ -546,6 +573,17 @@
                             <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
+                    <div class="spectrum-dsp-bar d-flex align-items-center gap-2 px-2 py-1 small" data-vfo="A">
+                        <label class="text-nowrap mb-0" title="Display floor — bins below this dB level are clamped (SDR Console &quot;Low&quot;)">Low</label>
+                        <input type="range" class="form-range spectrum-low-slider" data-vfo="A" min="-160" max="-60" step="1" value="@((int)Math.Round(Model.SdrSpectrumLowDbA))" aria-label="VFO A spectrum Low (dB floor)" style="flex:1; min-width:60px;">
+                        <span class="text-monospace spectrum-low-label" data-vfo="A" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumLowDbA))</span>
+                        <label class="text-nowrap mb-0 ms-2" title="Display ceiling — bins above this dB level are clamped (SDR Console &quot;High&quot;)">High</label>
+                        <input type="range" class="form-range spectrum-high-slider" data-vfo="A" min="-100" max="0" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbA))" aria-label="VFO A spectrum High (dB ceiling)" style="flex:1; min-width:60px;">
+                        <span class="text-monospace spectrum-high-label" data-vfo="A" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbA))</span>
+                        <label class="text-nowrap mb-0 ms-2" title="Pre-dB digital gain — brightens the whole trace so weak signals climb into the Low/High window. Does not change the frequency span (use the kHz/MHz buttons for that).">Gain</label>
+                        <input type="range" class="form-range spectrum-gain-slider" data-vfo="A" min="0" max="30" step="1" value="@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainA))))" aria-label="VFO A spectrum digital gain (dB)" style="flex:1; min-width:60px;">
+                        <span class="text-monospace spectrum-gain-label" data-vfo="A" style="min-width:3.5em; text-align:right;">+@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainA)))) dB</span>
+                    </div>
                     <div class="card-body p-0">
                         <canvas id="spectrumCanvasA" role="img" aria-hidden="true" aria-label="RF spectrum display VFO A" style="display:block; width:100%;"></canvas>
                     </div>
@@ -570,6 +608,17 @@
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
+                    <div class="spectrum-dsp-bar d-flex align-items-center gap-2 px-2 py-1 small" data-vfo="B">
+                        <label class="text-nowrap mb-0" title="Display floor — bins below this dB level are clamped (SDR Console &quot;Low&quot;)">Low</label>
+                        <input type="range" class="form-range spectrum-low-slider" data-vfo="B" min="-160" max="-60" step="1" value="@((int)Math.Round(Model.SdrSpectrumLowDbB))" aria-label="VFO B spectrum Low (dB floor)" style="flex:1; min-width:60px;">
+                        <span class="text-monospace spectrum-low-label" data-vfo="B" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumLowDbB))</span>
+                        <label class="text-nowrap mb-0 ms-2" title="Display ceiling — bins above this dB level are clamped (SDR Console &quot;High&quot;)">High</label>
+                        <input type="range" class="form-range spectrum-high-slider" data-vfo="B" min="-100" max="0" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbB))" aria-label="VFO B spectrum High (dB ceiling)" style="flex:1; min-width:60px;">
+                        <span class="text-monospace spectrum-high-label" data-vfo="B" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbB))</span>
+                        <label class="text-nowrap mb-0 ms-2" title="Pre-dB digital gain — brightens the whole trace so weak signals climb into the Low/High window. Does not change the frequency span (use the kHz/MHz buttons for that).">Gain</label>
+                        <input type="range" class="form-range spectrum-gain-slider" data-vfo="B" min="0" max="30" step="1" value="@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainB))))" aria-label="VFO B spectrum digital gain (dB)" style="flex:1; min-width:60px;">
+                        <span class="text-monospace spectrum-gain-label" data-vfo="B" style="min-width:3.5em; text-align:right;">+@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainB)))) dB</span>
+                    </div>
                     <div class="card-body p-0">
                         <canvas id="spectrumCanvasB" role="img" aria-hidden="true" aria-label="RF spectrum display VFO B" style="display:block; width:100%;"></canvas>
                     </div>
@@ -582,16 +631,51 @@
         <!-- VFO A Panel -->
         <div class="col-lg-6 col-12" id="vfoACol">
             <div class="card border-primary h-100 receiver-card">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-1">
-                    <h5 class="mb-0">
-                        <span id="receiverAHeading">VFO A</span>
-                    </h5>
-                    <div class="d-flex align-items-center gap-2">
-                        <span id="splitTxBadgeA" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
-                        <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
-                                onclick="toggleTx()" title="Toggle Transmit">
-                            <i class="bi bi-broadcast" aria-hidden="true"></i> TX
-                        </button>
+                <div class="card-header bg-primary text-white py-1">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+                        <h5 class="mb-0">
+                            <span id="receiverAHeading">VFO A</span>
+                        </h5>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <span id="splitTxBadgeA" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                            <button type="button" id="zinBtnA" class="btn btn-outline-light btn-sm"
+                                    onclick="cwZeroIn('A')"
+                                    aria-label="VFO A CW Auto Zero In"
+                                    title="CW Auto Zero In on VFO A — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
+                            @if (hasVcTune) {
+                            <button type="button" id="vcTuneToggleBtnA" class="btn btn-outline-light btn-sm"
+                                    onclick="vcTuneToggle('a')"
+                                    aria-label="MAIN VC Tune on/off"
+                                    title="Toggle MAIN VC Tune preselector on/off">VC Tune</button>
+                            <span id="vcTuneRowA" class="d-inline-flex align-items-center gap-1">
+                                <button id="vcTuneDefaultBtnA" class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneCommand('a','default')"
+                                        aria-label="MAIN VC Tune default" title="MAIN VC Tune auto-tune">Default</button>
+                                <button class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneStep('a','minus')"
+                                        aria-label="MAIN VC Tune step down" title="Step MAIN preselector capacitor down">−</button>
+                                <select id="vcTuneStepA" class="form-select form-select-sm"
+                                        style="width: 3.5rem; background-color: transparent; color: white; border-color: rgba(255,255,255,0.5);"
+                                        aria-label="MAIN VC Tune step size" title="Step size (1–9)">
+                                    <option value="1" style="color:black;">1</option><option value="2" style="color:black;">2</option><option value="3" style="color:black;">3</option>
+                                    <option value="4" style="color:black;">4</option><option value="5" selected style="color:black;">5</option><option value="6" style="color:black;">6</option>
+                                    <option value="7" style="color:black;">7</option><option value="8" style="color:black;">8</option><option value="9" style="color:black;">9</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneStep('a','plus')"
+                                        aria-label="MAIN VC Tune step up" title="Step MAIN preselector capacitor up">+</button>
+                                <button id="vcTuneCenterBtnA" class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneCommand('a','center')"
+                                        aria-label="MAIN VC Tune center" title="Center MAIN preselector capacitor">Center</button>
+                                <span id="vcTuneMeterA" class="small text-white-50" style="font-size: 0.75rem; min-width: 44px;">P5: —</span>
+                                <span id="vcTuneWarnA" class="text-warning small" style="display:none; font-size: 0.75rem;"></span>
+                            </span>
+                            }
+                            <button id="txButtonA" class="btn btn-warning btn-sm" style="display:none;"
+                                    onclick="toggleTx()" title="Toggle Transmit">
+                                <i class="bi bi-broadcast" aria-hidden="true"></i> TX
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body p-2">
@@ -653,6 +737,32 @@
                                     </select>
                                 }
                             </div>
+                        </div>
+                        <!-- Voice control mic button + step selector VFO A — large PTT target for accessibility, step select left of the button, both enlarged per Colin's testing feedback; shown only when voice control is enabled (voice-control.js) -->
+                        <div class="flex-shrink-0" id="voiceMicContainerA" style="display:none;">
+                            <div class="d-flex align-items-center gap-2">
+                                <select id="voiceNudgeStepSelectA"
+                                        class="form-select"
+                                        style="width:auto; font-size:1.4rem; font-weight:600; padding:0.4rem 2.4rem 0.4rem 0.6rem;"
+                                        title="Voice nudge step size — how far 'tune up'/'tune down' moves VFO A"
+                                        aria-label="VFO A voice nudge step size">
+                                    <option value="10">10 Hz</option>
+                                    <option value="100">100 Hz</option>
+                                    <option value="1000">1 kHz</option>
+                                    <option value="10000">10 kHz</option>
+                                    <option value="100000">100 kHz</option>
+                                </select>
+                                <button id="voiceMicBtnA" type="button"
+                                        class="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                                        style="width:140px; height:120px; padding:0;"
+                                        title="Hold to give a VFO A voice command"
+                                        aria-label="Voice command VFO A — hold to speak">
+                                    <i class="bi bi-mic-fill" style="font-size:4.5rem; line-height:1;" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div id="voiceLastHeardA"
+                                 style="font-size:1.1rem; font-weight:700; color:#000; margin-top:0.3rem; max-width:320px; overflow-wrap:break-word;"
+                                 aria-live="polite"></div>
                         </div>
                         <!-- Filter scope display VFO A — sits between band buttons and AGC column -->
                         <div class="flex-shrink-0" id="filterScopeContainerA" style="width:160px;">
@@ -894,17 +1004,13 @@
                                 <option value="@opt.Value" selected="@(Model.RadioState.IfWidthA==opt.Value||isDefault ? "selected" : null)">@opt.Label</option>
                             }
                         </select>
-                        <label class="mb-0 text-nowrap ms-2 fw-bold">Low Cut:</label>
-                        <select class="form-select form-select-sm fw-bold flex-shrink-0" id="ifLowCutSelectA"
-                                aria-label="VFO A IF low cut"
-                                title="VFO A IF low cut (lower edge of passband)"
-                                style="width: auto;"
-                                onchange="window.radioControl.setIfLowCut('A', this.value)">
-                            @foreach (var opt in ifLowCutOptions)
-                            {
-                                <option value="@opt.Value" selected="@(Model.RadioState.IfLowCutA==opt.Value ? "selected" : null)">@opt.Label</option>
-                            }
-                        </select>
+                        <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0 ms-2"
+                                id="audioFilterBtnA"
+                                aria-label="VFO A Audio Filter"
+                                title="Open the Audio Filter dialog for VFO A's current mode (LCUT FREQ, LCUT SLOPE, HCUT FREQ, HCUT SLOPE)"
+                                onclick="window.audioFilter && window.audioFilter.open('A')">
+                            Audio Filter
+                        </button>
                         <label class="mb-0 text-nowrap ms-1 fw-bold">IF Shift: <span id="ifShiftValueA" class="fw-bold">@Model.RadioState.IfShiftA</span></label>
                         <input type="range" class="form-range ifshift-slider flex-shrink-0"
                                id="ifShiftSliderA"
@@ -928,16 +1034,52 @@
                     <!-- VFO B Panel -->
         <div class="col-lg-6 col-12" id="vfoBCol">
             <div class="card border-success h-100 receiver-card">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-1">
-                    <h5 class="mb-0">
-                        <span id="receiverBHeading">VFO B</span>
-                    </h5>
-                    <div class="d-flex align-items-center gap-2">
-                        <span id="splitTxBadgeB" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
-                        <button id="txButtonB" class="btn btn-warning btn-sm" style="display:none;"
-                                onclick="toggleTx()" title="Toggle Transmit">
-                            <i class="bi bi-broadcast" aria-hidden="true"></i> TX
-                        </button>
+                <div class="card-header bg-success text-white py-1">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+                        <h5 class="mb-0">
+                            <span id="receiverBHeading">VFO B</span>
+                        </h5>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <span id="splitTxBadgeB" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
+                            <button type="button" id="zinBtnB" class="btn btn-outline-light btn-sm"
+                                    onclick="cwZeroIn('B')"
+                                    aria-label="VFO B CW Auto Zero In"
+                                    title="CW Auto Zero In on VFO B — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
+                            @if (hasVcTuneSub) {
+                            <button type="button" id="vcTuneToggleBtnB" class="btn btn-outline-light btn-sm"
+                                    style="display:none"
+                                    onclick="vcTuneToggle('b')"
+                                    aria-label="SUB VC Tune on/off"
+                                    title="Toggle SUB VC Tune preselector on/off">VC Tune</button>
+                            <span id="vcTuneRowB" class="d-inline-flex align-items-center gap-1" style="display:none !important;">
+                                <button id="vcTuneDefaultBtnB" class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneCommand('b','default')"
+                                        aria-label="SUB VC Tune default" title="SUB VC Tune auto-tune">Default</button>
+                                <button class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneStep('b','minus')"
+                                        aria-label="SUB VC Tune step down" title="Step SUB preselector capacitor down">−</button>
+                                <select id="vcTuneStepB" class="form-select form-select-sm"
+                                        style="width: 3.5rem; background-color: transparent; color: white; border-color: rgba(255,255,255,0.5);"
+                                        aria-label="SUB VC Tune step size" title="Step size (1–9)">
+                                    <option value="1" style="color:black;">1</option><option value="2" style="color:black;">2</option><option value="3" style="color:black;">3</option>
+                                    <option value="4" style="color:black;">4</option><option value="5" selected style="color:black;">5</option><option value="6" style="color:black;">6</option>
+                                    <option value="7" style="color:black;">7</option><option value="8" style="color:black;">8</option><option value="9" style="color:black;">9</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneStep('b','plus')"
+                                        aria-label="SUB VC Tune step up" title="Step SUB preselector capacitor up">+</button>
+                                <button id="vcTuneCenterBtnB" class="btn btn-sm btn-outline-light"
+                                        onclick="vcTuneCommand('b','center')"
+                                        aria-label="SUB VC Tune center" title="Center SUB preselector capacitor">Center</button>
+                                <span id="vcTuneMeterB" class="small text-white-50" style="font-size: 0.75rem; min-width: 44px;">P5: —</span>
+                                <span id="vcTuneWarnB" class="text-warning small" style="display:none; font-size: 0.75rem;"></span>
+                            </span>
+                            }
+                            <button id="txButtonB" class="btn btn-warning btn-sm" style="display:none;"
+                                    onclick="toggleTx()" title="Toggle Transmit">
+                                <i class="bi bi-broadcast" aria-hidden="true"></i> TX
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body p-2">
@@ -997,6 +1139,35 @@
                                 }
                             </div>
                         </div>
+                        @if (!isSingleReceiver)
+                        {
+                            <!-- Voice control mic button + step selector VFO B — step select left of the button, both enlarged per Colin's testing feedback. Single-receiver radios (FTdx10, FT-710, FTDX3000) have no independent VFO B receiver, so no mic button here at all. -->
+                            <div class="flex-shrink-0" id="voiceMicContainerB" style="display:none;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <select id="voiceNudgeStepSelectB"
+                                            class="form-select"
+                                            style="width:auto; font-size:1.4rem; font-weight:600; padding:0.4rem 2.4rem 0.4rem 0.6rem;"
+                                            title="Voice nudge step size — how far 'tune up'/'tune down' moves VFO B"
+                                            aria-label="VFO B voice nudge step size">
+                                        <option value="10">10 Hz</option>
+                                        <option value="100">100 Hz</option>
+                                        <option value="1000">1 kHz</option>
+                                        <option value="10000">10 kHz</option>
+                                        <option value="100000">100 kHz</option>
+                                    </select>
+                                    <button id="voiceMicBtnB" type="button"
+                                            class="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                                            style="width:140px; height:120px; padding:0;"
+                                            title="Hold to give a VFO B voice command"
+                                            aria-label="Voice command VFO B — hold to speak">
+                                        <i class="bi bi-mic-fill" style="font-size:4.5rem; line-height:1;" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <div id="voiceLastHeardB"
+                                     style="font-size:1.1rem; font-weight:700; color:#000; margin-top:0.3rem; max-width:320px; overflow-wrap:break-word;"
+                                     aria-live="polite"></div>
+                            </div>
+                        }
                         <!-- Filter scope display VFO B — sits between band buttons and AGC column -->
                         <div class="flex-shrink-0" id="filterScopeContainerB" style="width:160px;">
                             <canvas id="filterScopeCanvasB" role="img" aria-hidden="true"
@@ -1237,17 +1408,13 @@
                                 <option value="@opt.Value" selected="@(Model.RadioState.IfWidthB==opt.Value||isDefault ? "selected" : null)">@opt.Label</option>
                             }
                         </select>
-                        <label class="mb-0 text-nowrap ms-2 fw-bold">Low Cut:</label>
-                        <select class="form-select form-select-sm fw-bold flex-shrink-0" id="ifLowCutSelectB"
-                                aria-label="VFO B IF low cut"
-                                title="VFO B IF low cut (lower edge of passband)"
-                                style="width: auto;"
-                                onchange="window.radioControl.setIfLowCut('B', this.value)">
-                            @foreach (var opt in ifLowCutOptions)
-                            {
-                                <option value="@opt.Value" selected="@(Model.RadioState.IfLowCutB==opt.Value ? "selected" : null)">@opt.Label</option>
-                            }
-                        </select>
+                        <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0 ms-2"
+                                id="audioFilterBtnB"
+                                aria-label="VFO B Audio Filter"
+                                title="Open the Audio Filter dialog for VFO B's current mode (LCUT FREQ, LCUT SLOPE, HCUT FREQ, HCUT SLOPE)"
+                                onclick="window.audioFilter && window.audioFilter.open('B')">
+                            Audio Filter
+                        </button>
                         <label class="mb-0 text-nowrap ms-1 fw-bold">IF Shift: <span id="ifShiftValueB" class="fw-bold">@Model.RadioState.IfShiftB</span></label>
                         <input type="range" class="form-range ifshift-slider flex-shrink-0"
                                id="ifShiftSliderB"
@@ -1470,6 +1637,10 @@
                    oninput="document.getElementById('cwSpeedValue').textContent = this.value"
                    onchange="setCwSpeed(this.value)"
                    aria-label="CW keyer speed" title="CW keyer speed in WPM">
+            <button type="button" class="btn btn-sm btn-outline-light flex-shrink-0"
+                    onclick="cwZeroIn()"
+                    title="CW Auto Zero In — nudges the active VFO so the received CW signal sits at your preferred pitch"
+                    aria-label="CW Auto Zero In">ZIN</button>
         </div>
         <div class="d-flex align-items-center gap-2">
             <label class="mb-0 text-nowrap" style="min-width:100px;">Break-in:</label>
@@ -1588,6 +1759,65 @@
         </div>
     </div>
 </dialog>
+
+<!-- Audio Filter Dialogs — LCUT FREQ / LCUT SLOPE / HCUT FREQ / HCUT SLOPE
+     for the current mode of each VFO. One dialog per VFO so the user can
+     view/adjust both at once on FTdx101-family dual-receiver radios.
+     Uses EX menu commands per AudioFilterMapService; replaces the broken
+     SL-based "IF Low Cut" dropdown. -->
+@foreach (var vfo in new[] { "A", "B" })
+{
+    <dialog id="audioFilterDialog@(vfo)" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:380px; max-width:520px; position:fixed; margin:0;" aria-labelledby="audioFilterDialogTitle@(vfo)">
+        <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+            <strong id="audioFilterDialogTitle@(vfo)">Audio Filter — VFO @vfo <span id="audioFilterModeLabel@(vfo)" class="text-info ms-1"></span></strong>
+            <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('audioFilterDialog@(vfo)').close()" aria-label="Close VFO @vfo Audio Filter dialog">✕</button>
+        </div>
+        <div class="p-3 d-flex flex-column gap-3">
+            <div id="audioFilterStatus@(vfo)" class="small text-warning" style="min-height:1.2em;"></div>
+            <div id="audioFilterUnsupported@(vfo)" class="alert alert-secondary mb-0" style="display:none;">
+                Audio Filter is not available for this mode on this radio model.
+            </div>
+            <div id="audioFilterControls@(vfo)">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="mb-0 fw-bold" style="min-width:90px;">LCUT FREQ:</label>
+                    <input type="checkbox" id="audioFilterLcutFreqOff@(vfo)" class="form-check-input"
+                           title="Disable low-cut filter (OFF)" aria-label="LCUT FREQ off">
+                    <label class="mb-0 small" for="audioFilterLcutFreqOff@(vfo)">Off</label>
+                    <input type="range" id="audioFilterLcutFreqSlider@(vfo)"
+                           min="100" max="1000" step="50" value="100"
+                           style="flex:1; height:18px;"
+                           aria-label="LCUT FREQ Hz">
+                    <span id="audioFilterLcutFreqLabel@(vfo)" class="text-end" style="min-width:64px;">—</span>
+                </div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="mb-0 fw-bold" style="min-width:90px;">LCUT SLOPE:</label>
+                    <button type="button" class="btn btn-sm btn-outline-light audio-filter-slope-btn"
+                            id="audioFilterLcutSlopeBtn@(vfo)" data-slope-code="0"
+                            title="Toggle LCUT slope between 6 dB/oct and 18 dB/oct"
+                            aria-label="LCUT slope">— dB/oct</button>
+                </div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="mb-0 fw-bold" style="min-width:90px;">HCUT FREQ:</label>
+                    <input type="checkbox" id="audioFilterHcutFreqOff@(vfo)" class="form-check-input"
+                           title="Disable high-cut filter (OFF)" aria-label="HCUT FREQ off">
+                    <label class="mb-0 small" for="audioFilterHcutFreqOff@(vfo)">Off</label>
+                    <input type="range" id="audioFilterHcutFreqSlider@(vfo)"
+                           min="700" max="4000" step="50" value="3000"
+                           style="flex:1; height:18px;"
+                           aria-label="HCUT FREQ Hz">
+                    <span id="audioFilterHcutFreqLabel@(vfo)" class="text-end" style="min-width:64px;">—</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="mb-0 fw-bold" style="min-width:90px;">HCUT SLOPE:</label>
+                    <button type="button" class="btn btn-sm btn-outline-light audio-filter-slope-btn"
+                            id="audioFilterHcutSlopeBtn@(vfo)" data-slope-code="0"
+                            title="Toggle HCUT slope between 6 dB/oct and 18 dB/oct"
+                            aria-label="HCUT slope">— dB/oct</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+}
 
 <!-- Voice Announcements Dialog -->
 <dialog id="voiceDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:340px; max-width:480px;" aria-labelledby="voiceDialogTitle">
@@ -1758,6 +1988,10 @@
 @section Scripts {
     <!-- Cache-busted JS reference, placed BEFORE your inline script if you use window.radioControl, etc. -->
     <script>window.bandPlan = '@Model.BandPlan';</script>
+    <script>
+        window.ywcVoiceNudgeStepHzA = @Model.VoiceNudgeStepHzA;
+        window.ywcVoiceNudgeStepHzB = @Model.VoiceNudgeStepHzB;
+    </script>
     <script type="module">
         import { MeterPanel }           from "/js/guages/meter-panel.js?v=1";
         import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";
@@ -1765,7 +1999,7 @@
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
         import { FilterScopePanel }    from "/js/ui/filter-scope-panel.js?v=2";
-        import "/js/ui/if-width-tables.js?v=1";
+        import "/js/ui/if-width-tables.js?v=3";
         import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=5";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
@@ -1793,12 +2027,15 @@
                 setInterval(tick, 1000);
             }
             window.meterPanel = new MeterPanel({
-                // v2.3.9: S-meter moved from per-VFO panels into the top meter
-                // row. Yaesu radios only have one calibrated S-meter (tied to
-                // MAIN on the FTdx101 family; only physical receiver on
-                // single-receiver rigs), so a single gauge is the truthful
-                // presentation. Old smeterA/smeterB keys are gone.
+                // v2.3.9 dropped SMeterB to a single shared gauge; v2.4.0
+                // restored it as a real VFO A / VFO B pair on dual-receiver
+                // radios (FTdx101MP/D each have an independently calibrated
+                // S-meter, SM0;/SM1;). smeterB's canvas doesn't exist on
+                // single-receiver radios, so MeterPanel._createGauges skips
+                // it automatically (config entries for missing canvases are
+                // no-ops) — no isSingleReceiver check needed here.
                 smeter:      { type: 'smeter', canvasId: 'sMeterCanvas' },
+                smeterB:     { type: 'smeter', canvasId: 'sMeterCanvasB', gaugeTitleId: 'sMeterValueB' },
                 power:       { canvasId: 'powerMeterCanvas' },
                 swr:         { canvasId: 'swrMeterCanvas' },
                 compression: { canvasId: 'compressionMeterCanvas' },
@@ -1809,20 +2046,24 @@
             });
             window.ftdx101Meters = new FTdx101Meters(window.meterPanel, window.calibrationEngine);
 
-            // ── S-meter history strip ────────────────────────────────────────
+            // ── S-meter history strips ───────────────────────────────────────
             // Hidden by default. Toggle via the "S-hist" button in the top
             // toolbar; visibility persists in localStorage so the choice
-            // survives page reloads. Single strip in the top meter row,
-            // leftmost so the trace reads left-to-right toward the S-meter.
-            window.sMeterHistory = new SMeterHistoryPanel('sMeterHistoryCanvas');
+            // survives page reloads. Both A and B strips (when B exists)
+            // share the one toggle — independent per-VFO toggles can be
+            // added later if wanted, but one button is the smaller change.
+            window.sMeterHistory  = new SMeterHistoryPanel('sMeterHistoryCanvas');
+            window.sMeterHistoryB = new SMeterHistoryPanel('sMeterHistoryCanvasB');
             (function () {
-                const btn = document.getElementById('sMeterHistoryToggleBtn');
-                const con = document.getElementById('sMeterHistoryContainer');
+                const btn  = document.getElementById('sMeterHistoryToggleBtn');
+                const con  = document.getElementById('sMeterHistoryContainer');
+                const conB = document.getElementById('sMeterHistoryContainerB');
                 if (!btn || !con) return;
 
                 const KEY = 'ywc.sMeterHistoryVisible';
                 const apply = (visible) => {
                     con.style.display = visible ? '' : 'none';
+                    if (conB) conB.style.display = visible ? '' : 'none';
                     btn.classList.toggle('active', visible);
                     btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
                 };
@@ -2165,6 +2406,90 @@
                 });
             });
 
+            // Spectrum DSP sliders — Low (dB floor) / High (dB ceiling) / Gain
+            // (pre-dB digital gain in dB). On change:
+            //   • update the visible label
+            //   • update the canvas y-axis via panel.setDbRange(high, low)
+            //   • debounced POST to /api/sdr/dsp/{vfo} which persists the
+            //     value and forwards a DspSettingsPayload to the worker
+            //     over the TCP control channel — so dB clamping and EMA
+            //     reset happen on the spectrum bins before they reach us.
+            // Initial slider values come from server-side settings via Razor.
+            (function wireDspSliders() {
+                const debTimers = { A: null, B: null };
+                const DEBOUNCE_MS = 150;
+
+                function readVfoState(vfo) {
+                    const low  = parseFloat(document.querySelector(`.spectrum-low-slider[data-vfo="${vfo}"]`).value);
+                    const high = parseFloat(document.querySelector(`.spectrum-high-slider[data-vfo="${vfo}"]`).value);
+                    const gainDb = parseFloat(document.querySelector(`.spectrum-gain-slider[data-vfo="${vfo}"]`).value);
+                    const gainLinear = Math.pow(10, gainDb / 20);
+                    return { low, high, gainDb, gainLinear };
+                }
+
+                function applyToPanel(vfo, low, high) {
+                    const panel = vfo === 'B' ? spectrumPanelB : spectrumPanelA;
+                    if (panel && high > low) panel.setDbRange(high, low);
+                }
+
+                function scheduleSend(vfo) {
+                    if (debTimers[vfo]) clearTimeout(debTimers[vfo]);
+                    debTimers[vfo] = setTimeout(async () => {
+                        debTimers[vfo] = null;
+                        const s = readVfoState(vfo);
+                        if (!(s.high > s.low)) return;   // server would reject anyway
+                        try {
+                            await fetch(`/api/sdr/dsp/${vfo}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    gainLinear: s.gainLinear,
+                                    dbFloor:    s.low,
+                                    dbCeiling:  s.high
+                                })
+                            });
+                        } catch { /* network error — slider stays at user's value */ }
+                    }, DEBOUNCE_MS);
+                }
+
+                ['A', 'B'].forEach(vfo => {
+                    const lowSlider  = document.querySelector(`.spectrum-low-slider[data-vfo="${vfo}"]`);
+                    const highSlider = document.querySelector(`.spectrum-high-slider[data-vfo="${vfo}"]`);
+                    const gainSlider = document.querySelector(`.spectrum-gain-slider[data-vfo="${vfo}"]`);
+                    const lowLabel   = document.querySelector(`.spectrum-low-label[data-vfo="${vfo}"]`);
+                    const highLabel  = document.querySelector(`.spectrum-high-label[data-vfo="${vfo}"]`);
+                    const gainLabel  = document.querySelector(`.spectrum-gain-label[data-vfo="${vfo}"]`);
+                    if (!lowSlider || !highSlider || !gainSlider) return;   // VFO B hidden when no SDR
+
+                    // Sync canvas range to server-rendered initial slider values.
+                    applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
+
+                    lowSlider.addEventListener('input', () => {
+                        // Prevent low rising above high: nudge high up to maintain the invariant.
+                        if (parseFloat(lowSlider.value) >= parseFloat(highSlider.value)) {
+                            highSlider.value = parseFloat(lowSlider.value) + 1;
+                            highLabel.textContent = highSlider.value;
+                        }
+                        lowLabel.textContent = lowSlider.value;
+                        applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
+                        scheduleSend(vfo);
+                    });
+                    highSlider.addEventListener('input', () => {
+                        if (parseFloat(highSlider.value) <= parseFloat(lowSlider.value)) {
+                            lowSlider.value = parseFloat(highSlider.value) - 1;
+                            lowLabel.textContent = lowSlider.value;
+                        }
+                        highLabel.textContent = highSlider.value;
+                        applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
+                        scheduleSend(vfo);
+                    });
+                    gainSlider.addEventListener('input', () => {
+                        gainLabel.textContent = '+' + gainSlider.value + ' dB';
+                        scheduleSend(vfo);
+                    });
+                });
+            })();
+
             // Span selector — POST new sample rate for this VFO and restart
             // the corresponding worker. data-vfo on each button tells the
             // server which VFO to apply the change to so the other panel
@@ -2384,6 +2709,52 @@
 
         updateGridtrackerStatus();
         setInterval(updateGridtrackerStatus, 5000);
+
+        // Fldigi launch and status functions
+        async function launchFldigi() {
+            try {
+                const response = await fetch('/api/fldigi/launch', { method: 'POST' });
+                const btn = document.getElementById('fldigiBtn');
+                if (response.ok) {
+                    const data = await response.json();
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-success');
+                    btn.title = 'Fldigi is running';
+                    if (data.alreadyRunning) {
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = 'Fldigi Already Running';
+                        setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+                    }
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to launch Fldigi');
+                }
+            } catch (e) {
+                alert('Error launching Fldigi: ' + e.message);
+            }
+        }
+
+        async function updateFldigiStatus() {
+            try {
+                const response = await fetch('/api/fldigi/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    const btn = document.getElementById('fldigiBtn');
+                    if (!btn) return;
+                    btn.classList.remove('btn-secondary', 'btn-success', 'btn-warning', 'btn-danger');
+                    if (data.running) {
+                        btn.classList.add('btn-success');
+                        btn.title = 'Fldigi is running';
+                    } else {
+                        btn.classList.add('btn-danger');
+                        btn.title = 'Fldigi is not running';
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        updateFldigiStatus();
+        setInterval(updateFldigiStatus, 5000);
 
         async function setMicGain(value) {
             console.log('[setMicGain] Called with value:', value);
@@ -2747,7 +3118,7 @@
             }, { passive: true });
         }
 
-        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'utcClockInfoDialog'].forEach(id => {
+        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'audioFilterDialogA', 'audioFilterDialogB', 'utcClockInfoDialog'].forEach(id => {
             const dlg = document.getElementById(id);
             if (!dlg) return;
             makeDraggable(dlg, dlg.querySelector('div'));
@@ -3514,6 +3885,15 @@
             try { await fetch('/api/cat/cw/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed: parseInt(v) }) }); }
             catch (e) { console.error('setCwSpeed error:', e); }
         }
+        // vfo argument: 'a', 'b', or 'active'. Fire-and-forget. The CW Keyer
+        // popup button passes 'active' so it follows whichever VFO is in
+        // focus; the per-VFO buttons on each VFO panel pass their own letter
+        // so they always target that specific receiver.
+        async function cwZeroIn(vfo) {
+            const target = (vfo === 'A' || vfo === 'B') ? vfo.toLowerCase() : 'active';
+            try { await fetch(`/api/cat/cw/zin/${target}`, { method: 'POST' }); }
+            catch (e) { console.error('cwZeroIn error:', e); }
+        }
         async function setCwBreakIn(v) {
             try { await fetch('/api/cat/cw/breakin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: v }) }); }
             catch (e) { console.error('setCwBreakIn error:', e); }
@@ -3539,11 +3919,197 @@
             } catch (e) { console.error('saveCwMessages error:', e); }
         }
 
+        // --- AUDIO FILTER POPOUT ---
+        // One independent dialog per VFO so the user can view/adjust both at
+        // once on FTdx101-family dual-receiver radios. Each instance reads/
+        // writes the four EX-menu values for *its* VFO's current mode class,
+        // backed by /api/cat/audiofilter/{vfo}. The dialog is a thin read/
+        // write proxy — the radio holds all state.
+        window.audioFilter = (function () {
+            const $ = (id) => document.getElementById(id);
+
+            function makeInstance(vfo) {
+                const dialogId = 'audioFilterDialog' + vfo;
+                const dlg = () => $(dialogId);
+                const id = (suffix) => `audioFilter${suffix}${vfo}`;
+                const el = (suffix) => $(id(suffix));
+                // Remember the slider's last non-OFF Hz so toggling OFF→ON
+                // returns to the same value rather than the slider's min.
+                let _lastLcutHz = 300;
+                let _lastHcutHz = 3000;
+                let _busy = false;
+
+                async function open() {
+                    const d = dlg();
+                    if (d && typeof d.show === 'function' && !d.open) {
+                        // On first open (no saved drag position), anchor the
+                        // dialog just below the Audio Filter button that
+                        // opened it.
+                        const hasSaved = !!localStorage.getItem('dlgPos_' + dialogId);
+                        if (!hasSaved) {
+                            const btn = $('audioFilterBtn' + vfo);
+                            if (btn) {
+                                const r = btn.getBoundingClientRect();
+                                d.style.left = Math.round(r.left) + 'px';
+                                d.style.top  = Math.round(r.bottom + 6) + 'px';
+                                d.style.transform = 'none';
+                            }
+                        }
+                        d.show();
+                    }
+                    await refresh();
+                }
+
+                async function refresh() {
+                    if (_busy) return;
+                    _busy = true;
+                    try {
+                        const resp = await fetch(`/api/cat/audiofilter/${vfo.toLowerCase()}`);
+                        if (!resp.ok) {
+                            el('Status').textContent = 'Failed to read audio filter.';
+                            return;
+                        }
+                        const data = await resp.json();
+                        el('ModeLabel').textContent = data.modeClass ? `(${data.modeClass})` : '';
+
+                        const otherVfo = vfo === 'A' ? 'B' : 'A';
+                        el('Status').textContent = data.otherVfoShares
+                            ? `VFO ${otherVfo} is also in ${data.modeClass} — these settings affect both VFOs.`
+                            : '';
+
+                        const anySupported = (data.lcutFreq && data.lcutFreq.supported)
+                                          || (data.lcutSlope && data.lcutSlope.supported)
+                                          || (data.hcutFreq && data.hcutFreq.supported)
+                                          || (data.hcutSlope && data.hcutSlope.supported);
+                        el('Unsupported').style.display = anySupported ? 'none' : '';
+                        el('Controls').style.display    = anySupported ? '' : 'none';
+                        if (!anySupported) return;
+
+                        renderFreqRow('Lcut', data.lcutFreq);
+                        renderSlopeBtn('Lcut', data.lcutSlope);
+                        renderFreqRow('Hcut', data.hcutFreq);
+                        renderSlopeBtn('Hcut', data.hcutSlope);
+                    } catch (e) {
+                        console.error(`audioFilter[${vfo}].refresh error:`, e);
+                    } finally {
+                        _busy = false;
+                    }
+                }
+
+                function renderFreqRow(prefix, v) {
+                    const slider = el(prefix + 'FreqSlider');
+                    const off    = el(prefix + 'FreqOff');
+                    const label  = el(prefix + 'FreqLabel');
+                    if (!v || !v.supported) {
+                        slider.disabled = true; off.disabled = true; label.textContent = '—';
+                        return;
+                    }
+                    off.disabled = false;
+                    if (v.label === 'OFF') {
+                        off.checked = true; slider.disabled = true;
+                        label.textContent = 'OFF';
+                    } else {
+                        off.checked = false; slider.disabled = false;
+                        if (typeof v.hz === 'number') {
+                            slider.value = v.hz;
+                            if (prefix === 'Lcut') _lastLcutHz = v.hz; else _lastHcutHz = v.hz;
+                        }
+                        label.textContent = v.label || (slider.value + ' Hz');
+                    }
+                }
+
+                function renderSlopeBtn(prefix, v) {
+                    const btn = el(prefix + 'SlopeBtn');
+                    if (!v || !v.supported) {
+                        btn.disabled = true; btn.textContent = '—';
+                        btn.classList.remove('btn-warning'); btn.classList.add('btn-outline-light');
+                        return;
+                    }
+                    btn.disabled = false;
+                    btn.dataset.slopeCode = v.code || '0';
+                    btn.textContent = v.label || (v.code === '1' ? '18 dB/oct' : '6 dB/oct');
+                    btn.classList.toggle('btn-warning',      v.code === '1');
+                    btn.classList.toggle('btn-outline-light', v.code !== '1');
+                }
+
+                function hzToFreqCode(hz, isLcut) {
+                    const base = isLcut ? 100 : 700;
+                    const n = Math.round((hz - base) / 50) + 1;
+                    return String(n).padStart(2, '0');
+                }
+
+                async function writeOne(setting, code) {
+                    try {
+                        const resp = await fetch(`/api/cat/audiofilter/${vfo.toLowerCase()}/${setting}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code })
+                        });
+                        if (!resp.ok) return;
+                        const data = await resp.json();
+                        const v = data.result;
+                        if (setting === 'lcutFreq') renderFreqRow('Lcut', v);
+                        else if (setting === 'hcutFreq') renderFreqRow('Hcut', v);
+                        else if (setting === 'lcutSlope') renderSlopeBtn('Lcut', v);
+                        else if (setting === 'hcutSlope') renderSlopeBtn('Hcut', v);
+                    } catch (e) { console.error(`audioFilter[${vfo}].writeOne error:`, e); }
+                }
+
+                function wireDom() {
+                    el('LcutFreqSlider').addEventListener('input',  (e) => el('LcutFreqLabel').textContent = e.target.value + ' Hz');
+                    el('LcutFreqSlider').addEventListener('change', (e) => writeOne('lcutFreq', hzToFreqCode(parseInt(e.target.value), true)));
+                    el('LcutFreqOff').addEventListener('change', (e) => {
+                        if (e.target.checked) writeOne('lcutFreq', '00');
+                        else                  writeOne('lcutFreq', hzToFreqCode(_lastLcutHz, true));
+                    });
+                    el('LcutSlopeBtn').addEventListener('click', () => {
+                        const cur = el('LcutSlopeBtn').dataset.slopeCode || '0';
+                        writeOne('lcutSlope', cur === '0' ? '1' : '0');
+                    });
+                    el('HcutFreqSlider').addEventListener('input',  (e) => el('HcutFreqLabel').textContent = e.target.value + ' Hz');
+                    el('HcutFreqSlider').addEventListener('change', (e) => writeOne('hcutFreq', hzToFreqCode(parseInt(e.target.value), false)));
+                    el('HcutFreqOff').addEventListener('change', (e) => {
+                        if (e.target.checked) writeOne('hcutFreq', '00');
+                        else                  writeOne('hcutFreq', hzToFreqCode(_lastHcutHz, false));
+                    });
+                    el('HcutSlopeBtn').addEventListener('click', () => {
+                        const cur = el('HcutSlopeBtn').dataset.slopeCode || '0';
+                        writeOne('hcutSlope', cur === '0' ? '1' : '0');
+                    });
+                }
+
+                function onModeChanged(changedVfo) {
+                    if (changedVfo !== vfo) return;
+                    const d = dlg();
+                    if (!d || !d.open) return;
+                    refresh();
+                }
+
+                return { open, refresh, onModeChanged, wireDom };
+            }
+
+            const instances = { A: makeInstance('A'), B: makeInstance('B') };
+
+            document.addEventListener('DOMContentLoaded', () => {
+                instances.A.wireDom();
+                instances.B.wireDom();
+            });
+
+            return {
+                open: (vfo) => instances[(vfo === 'B') ? 'B' : 'A'].open(),
+                onModeChanged: (vfo, mode) => {
+                    instances.A.onModeChanged(vfo, mode);
+                    instances.B.onModeChanged(vfo, mode);
+                }
+            };
+        })();
+
         // Expose functions called from HTML onclick/onchange attributes
         window.launchWsjtx  = launchWsjtx;
         window.launchJtalert = launchJtalert;
         window.launchLog4om  = launchLog4om;
         window.launchGridtracker = launchGridtracker;
+        window.launchFldigi      = launchFldigi;
         window.setMicGain    = setMicGain;
         window.toggleProc    = toggleProc;
         window.setProcLevel  = setProcLevel;
@@ -3575,6 +4141,7 @@
         window.saveFmRepeater  = saveFmRepeater;
         window.setCwPitch      = setCwPitch;
         window.setCwSpeed      = setCwSpeed;
+        window.cwZeroIn        = cwZeroIn;
         window.setCwBreakIn    = setCwBreakIn;
         window.setCwBreakInDelay = setCwBreakInDelay;
         window.sendCwMessage   = sendCwMessage;

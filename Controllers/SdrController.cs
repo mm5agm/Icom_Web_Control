@@ -6,6 +6,7 @@
 // 'notes' contains plain-English installation guidance when drivers are missing.
 
 using Yaesu_Web_Control.Services.Sdr;
+using Yaesu_Web_Control.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Yaesu_Web_Control.Controllers
@@ -16,11 +17,13 @@ namespace Yaesu_Web_Control.Controllers
     {
         private readonly ILogger<SdrController> _logger;
         private readonly SdrManager             _sdrManager;
+        private readonly ISettingsService       _settings;
 
-        public SdrController(ILogger<SdrController> logger, SdrManager sdrManager)
+        public SdrController(ILogger<SdrController> logger, SdrManager sdrManager, ISettingsService settings)
         {
             _logger     = logger;
             _sdrManager = sdrManager;
+            _settings   = settings;
         }
 
         /// <summary>
@@ -161,6 +164,143 @@ namespace Yaesu_Web_Control.Controllers
                 }),
                 notes
             });
+        }
+
+        // ── SDRplay install path helpers (for the Settings page) ────────────
+        //
+        // GET  /api/sdr/sdrplay/detected-installdir
+        //   Returns { detected: "..." | null } — the path SdrplayDllResolver
+        //   would resolve to right now, useful for the Settings page to show
+        //   "Auto-detected: <path>" alongside the user-override input.
+        //
+        // POST /api/sdr/sdrplay/pick-installdir  body { startPath: "..." }
+        //   Opens a native Windows FolderBrowserDialog on the YWC host so
+        //   the user can navigate to the SDRplay install folder. Returns
+        //   { picked: "..." | null } where null means the user cancelled.
+        //   The dialog runs on a temporary STA thread; the request thread
+        //   awaits the user's selection.
+
+        [HttpGet("sdrplay/detected-installdir")]
+        public IActionResult DetectedSdrplayInstallDir()
+        {
+            return Ok(new { detected = SdrplayDllResolver.DetectInstallDir() });
+        }
+
+        public class PickInstallDirRequest
+        {
+            public string? StartPath { get; set; }
+        }
+
+        [HttpPost("sdrplay/pick-installdir")]
+        public async Task<IActionResult> PickSdrplayInstallDir([FromBody] PickInstallDirRequest? request)
+        {
+            // The folder picker is a native dialog on the YWC host's desktop.
+            // If the request came from a remote IP, the user can't see the
+            // dialog so the picker would appear to hang. Refuse with a clear
+            // error so the remote user knows to come to the host machine.
+            var remote = HttpContext.Connection.RemoteIpAddress;
+            if (remote != null && !System.Net.IPAddress.IsLoopback(remote))
+            {
+                return BadRequest(new {
+                    error = "The folder browser opens on the YWC host machine's desktop, so it only works when the browser is running on the same PC as YWC. Either open YWC's Settings page in a browser on the host machine to use Browse…, or type the path manually into the field on this remote browser."
+                });
+            }
+
+            string start = request?.StartPath ?? SdrplayDllResolver.DetectInstallDir() ?? @"C:\Program Files\SDRplay\API";
+            try
+            {
+                var picked = await PickFolderAsync(
+                    description: "Select the SDRplay API install folder (the one containing the x64 subfolder)",
+                    startPath:   start);
+                return Ok(new { picked });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Native folder picker failed");
+                return StatusCode(500, new { error = "Folder picker failed: " + ex.Message });
+            }
+        }
+
+        // Shows System.Windows.Forms.FolderBrowserDialog on a fresh STA
+        // thread (HTTP request threads aren't STA). The dialog opens on
+        // the YWC host machine's desktop — appropriate when the user is
+        // running YWC at http://localhost:8080 (the common case).
+        private static Task<string?> PickFolderAsync(string description, string startPath)
+        {
+            var tcs = new TaskCompletionSource<string?>();
+            var thread = new Thread(() =>
+            {
+                try
+                {
+#pragma warning disable CA1416 // Validate platform compatibility (project is win-only)
+                    using var dlg = new System.Windows.Forms.FolderBrowserDialog
+                    {
+                        Description           = description,
+                        UseDescriptionForTitle = true,
+                        ShowNewFolderButton   = false,
+                        SelectedPath          = Directory.Exists(startPath) ? startPath : "",
+                    };
+                    var result = dlg.ShowDialog();
+                    tcs.SetResult(result == System.Windows.Forms.DialogResult.OK ? dlg.SelectedPath : null);
+#pragma warning restore CA1416
+                }
+                catch (Exception ex) { tcs.SetException(ex); }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+            return tcs.Task;
+        }
+
+        // ── Spectrum DSP knobs (Low / High / Zoom-gain) ─────────────────────
+        //
+        // POST /api/sdr/dsp/{vfo}  body { gainLinear, dbFloor, dbCeiling }
+        //
+        // Persists the three values to appsettings.user.json AND pushes them
+        // live to the worker holding {vfo}. The slider UI calls this on each
+        // committed change. Returns { applied = true|false } — applied=false
+        // means the persist succeeded but no worker was connected to push to
+        // (settings will be re-sent when a worker spawns).
+
+        public class DspSettingsRequest
+        {
+            public float GainLinear { get; set; } = 1.0f;
+            public float DbFloor    { get; set; } = -120f;
+            public float DbCeiling  { get; set; } = 0f;
+        }
+
+        [HttpPost("dsp/{vfo}")]
+        public async Task<IActionResult> SetDspSettings(string vfo, [FromBody] DspSettingsRequest req)
+        {
+            string v = (vfo ?? "").Trim().ToUpperInvariant();
+            if (v != "A" && v != "B") return BadRequest(new { error = "vfo must be 'a' or 'b'" });
+            if (req == null)          return BadRequest(new { error = "missing body" });
+            if (!float.IsFinite(req.GainLinear) || req.GainLinear <= 0)
+                return BadRequest(new { error = "gainLinear must be > 0" });
+            if (!float.IsFinite(req.DbFloor) || !float.IsFinite(req.DbCeiling) || req.DbFloor >= req.DbCeiling)
+                return BadRequest(new { error = "dbFloor must be < dbCeiling and both finite" });
+
+            // Persist to settings (round-trip read-modify-write).
+            var settings = await _settings.GetSettingsAsync();
+            if (v == "B")
+            {
+                settings.SdrSpectrumGainB   = req.GainLinear;
+                settings.SdrSpectrumLowDbB  = req.DbFloor;
+                settings.SdrSpectrumHighDbB = req.DbCeiling;
+            }
+            else
+            {
+                settings.SdrSpectrumGainA   = req.GainLinear;
+                settings.SdrSpectrumLowDbA  = req.DbFloor;
+                settings.SdrSpectrumHighDbA = req.DbCeiling;
+            }
+            await _settings.SaveSettingsAsync(settings);
+
+            // Push live to the worker if one is connected for this VFO.
+            bool applied = await _sdrManager.TrySendDspSettingsAsync(
+                v, new DspSettingsPayload(req.GainLinear, req.DbFloor, req.DbCeiling));
+
+            return Ok(new { applied });
         }
     }
 }

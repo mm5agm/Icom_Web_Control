@@ -53,6 +53,16 @@ namespace Yaesu_Web_Control.Pages
         [BindProperty]
         public string App4CommandLine { get; set; } = string.Empty;
 
+        // App 5 (default: Fldigi)
+        [BindProperty]
+        public bool ShowApp5Button { get; set; }
+
+        [BindProperty]
+        public string App5Name { get; set; } = "Fldigi";
+
+        [BindProperty]
+        public string App5CommandLine { get; set; } = string.Empty;
+
         // WSJT-X UDP Settings
         [BindProperty]
         public string WsjtxUdpAddress { get; set; } = "127.0.0.1";
@@ -84,6 +94,11 @@ namespace Yaesu_Web_Control.Pages
             App4Name = settings.App4Name;
             App4CommandLine = settings.GridtrackerCommandLine;
 
+            // App 5
+            ShowApp5Button = settings.ShowFldigiButton;
+            App5Name = settings.App5Name;
+            App5CommandLine = settings.FldigiCommandLine;
+
             // UDP Settings
             WsjtxUdpAddress = settings.WsjtxUdpAddress;
             WsjtxUdpPort = settings.WsjtxUdpPort;
@@ -112,6 +127,11 @@ namespace Yaesu_Web_Control.Pages
             settings.ShowGridtrackerButton = ShowApp4Button;
             settings.App4Name = App4Name;
             settings.GridtrackerCommandLine = App4CommandLine;
+
+            // App 5
+            settings.ShowFldigiButton = ShowApp5Button;
+            settings.App5Name = App5Name;
+            settings.FldigiCommandLine = App5CommandLine;
 
             // UDP Settings
             settings.WsjtxUdpAddress = WsjtxUdpAddress;

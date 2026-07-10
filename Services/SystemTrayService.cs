@@ -203,7 +203,7 @@ namespace Yaesu_Web_Control.Services
         private void OnExit(object? sender, EventArgs e)
         {
             var ok = MessageBox.Show(
-                "Stop Yaesu Web Control?\n\nWSJT-X / Log4OM / JTAlert / GridTracker " +
+                "Stop Yaesu Web Control?\n\nWSJT-X / Log4OM / JTAlert / GridTracker / Fldigi " +
                 "will lose their CAT connection until YWC is restarted.",
                 "Exit Yaesu Web Control",
                 MessageBoxButtons.OKCancel,

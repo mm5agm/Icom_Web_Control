@@ -44,7 +44,6 @@
 
         // FILTER COMMANDS
         public const string FilterHigh = "SH0";
-        public const string FilterLow = "SL0";
 
         // CLARIFIER COMMANDS
         public const string ClarifierClear = "RC";

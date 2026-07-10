@@ -12,6 +12,8 @@
             aria-expanded="false" aria-controls="diag-ports-panel">COM Ports</button>
     <button type="button" id="diag-toggle-cat" class="btn btn-sm btn-outline-secondary"
             aria-expanded="false" aria-controls="diag-cat-panel">CAT Status JSON</button>
+    <button type="button" id="diag-toggle-voice" class="btn btn-sm btn-outline-secondary"
+            aria-expanded="false" aria-controls="diag-voice-panel">Voice Control Log</button>
 </div>
 
 <div id="diag-ports-panel" class="card mb-2" hidden>
@@ -32,6 +34,27 @@
         </div>
         <pre id="diag-cat-body"
              style="max-height:240px;overflow:auto;font-size:12px;background:#1e1e1e;color:#d4d4d4;padding:8px;margin:0"><em style="color:#888">Loading&hellip;</em></pre>
+    </div>
+</div>
+
+<div id="diag-voice-panel" class="card mb-2" hidden>
+    <div class="card-body py-2">
+        <div class="d-flex align-items-center justify-content-between mb-1 flex-wrap gap-2">
+            <span class="fw-semibold">
+                Voice control log <small class="text-muted fw-normal" id="diag-voice-meta">&mdash;</small>
+            </span>
+            <div class="d-flex gap-2">
+                <button type="button" id="diag-voice-refresh" class="btn btn-sm btn-outline-secondary">Refresh</button>
+                <button type="button" id="diag-voice-copy" class="btn btn-sm btn-outline-primary">Copy to clipboard</button>
+            </div>
+        </div>
+        <div class="small text-muted mb-1">
+            Recent <code>[Voice]</code> and <code>[IntentDispatcher]</code> entries from today's YWC log,
+            filtered server-side. Use the <strong>Copy to clipboard</strong> button if you want to paste
+            these into a GitHub issue.
+        </div>
+        <pre id="diag-voice-body"
+             style="max-height:320px;overflow:auto;font-size:12px;background:#1e1e1e;color:#d4d4d4;padding:8px;margin:0"><em style="color:#888">Click <strong>Voice Control Log</strong> above to load&hellip;</em></pre>
     </div>
 </div>
 
@@ -449,6 +472,87 @@
         if (!open && !catLoaded) loadCatStatus();
     });
     document.getElementById('diag-cat-refresh').addEventListener('click', loadCatStatus);
+
+    // ── Voice Control Log panel ───────────────────────────────────────────────
+    // Reads /api/voice/log which returns recent [Voice] and [IntentDispatcher]
+    // entries from today's YWC log, filtered server-side. Designed for bug
+    // reporters: open the panel, click Copy to clipboard, paste into an
+    // issue. No log-file location knowledge required.
+    const voicePanel  = document.getElementById('diag-voice-panel');
+    const voiceBody   = document.getElementById('diag-voice-body');
+    const voiceMeta   = document.getElementById('diag-voice-meta');
+    const voiceToggle = document.getElementById('diag-toggle-voice');
+    let voiceLoaded = false;
+
+    async function loadVoiceLog() {
+        voiceBody.innerHTML = '<em style="color:#888">Loading&hellip;</em>';
+        voiceMeta.textContent = '—';
+        try {
+            const r = await fetch('/api/voice/log?lines=200');
+            const j = await r.json();
+            if (!j.lines || j.lines.length === 0) {
+                voiceBody.innerHTML = '<em style="color:#888">No voice activity found in '
+                    + (j.source ? '<code style="color:#888">' + j.source + '</code>'
+                                : 'today\'s log')
+                    + '. Try the mic button on the main page, then refresh.</em>';
+                voiceMeta.textContent = j.source
+                    ? 'from ' + j.source + ' (0 lines)'
+                    : 'no log file yet';
+                voiceLoaded = true;
+                return;
+            }
+            voiceBody.textContent = j.lines.join('\n');
+            voiceMeta.textContent = 'from ' + j.source + ' — '
+                + j.returned + ' of ' + j.totalMatched + ' matched';
+            voiceLoaded = true;
+            // Auto-scroll to bottom so the most recent event is visible.
+            voiceBody.scrollTop = voiceBody.scrollHeight;
+        } catch (e) {
+            voiceBody.innerHTML = '<span style="color:#f87171">Failed to load: ' + e.message + '</span>';
+        }
+    }
+
+    voiceToggle.addEventListener('click', () => {
+        const open = !voicePanel.hidden;
+        voicePanel.hidden = open;
+        voiceToggle.setAttribute('aria-expanded', String(!open));
+        if (!open && !voiceLoaded) loadVoiceLog();
+    });
+    document.getElementById('diag-voice-refresh').addEventListener('click', loadVoiceLog);
+
+    // Auto-refresh on every voice event so the user doesn't need to remember
+    // to press Refresh after each test press. Each PTT generates a small
+    // burst (Listening -> Heard -> Executing -> Idle), so we debounce ~500 ms
+    // and refresh once when the burst settles. Only refreshes while the
+    // panel is visible, to avoid churning the API for users who don't have
+    // the log panel open.
+    let voiceRefreshDebounce = null;
+    function scheduleVoiceRefresh() {
+        if (voicePanel.hidden) return;       // panel not visible -- skip
+        clearTimeout(voiceRefreshDebounce);
+        voiceRefreshDebounce = setTimeout(loadVoiceLog, 500);
+    }
+    conn.on('VoiceStatusUpdate', scheduleVoiceRefresh);
+    document.getElementById('diag-voice-copy').addEventListener('click', async () => {
+        const text = voiceBody.textContent || '';
+        if (!text.trim()) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            const btn = document.getElementById('diag-voice-copy');
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.classList.add('btn-success');
+            btn.classList.remove('btn-outline-primary');
+            setTimeout(() => {
+                btn.textContent = orig;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+            }, 1200);
+        } catch (e) {
+            alert('Could not copy: ' + e.message);
+        }
+    });
+
 
     refreshIndicator();
 

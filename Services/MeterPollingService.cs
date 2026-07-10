@@ -48,6 +48,11 @@ namespace Yaesu_Web_Control.Services
         private int _sMeterZeroCount = 0;
         private const int SMeterZeroThreshold = 3;
 
+        // Same zero-flash debounce as SMeterA, applied independently to
+        // SMeterB (SUB receiver) so a transient zero on one VFO's meter
+        // doesn't hold the other's needle back.
+        private int _sMeterBZeroCount = 0;
+
         public MeterPollingService(
             CatMultiplexerService multiplexer,
             RadioStateService stateService,
@@ -132,15 +137,33 @@ namespace Yaesu_Web_Control.Services
                         _stateService.SMeterA = sMeterA;
                     }
 
-                    // SMeterB is no longer displayed -- v2.3.9 moved the S-meter
-                    // (and its history strip) into the top meter row as a
-                    // single shared gauge. Yaesu radios only have one calibrated
-                    // S-meter: on dual-receiver FTdx101MP/D it's tied to MAIN,
-                    // on single-receiver radios there's only one receiver. So
-                    // we skip the SM1; query entirely (it returns junk on
-                    // FTdx101 and nothing on single-receiver radios anyway).
-                    // SMeterB stays at its default for any leftover consumers
-                    // (rigctld doesn't read it); the front-end ignores it.
+                    if (_stateService.IsSingleReceiver)
+                    {
+                        // No SUB receiver to poll. Mirror SMeterA so any
+                        // leftover consumer of SMeterB still reads something
+                        // sane rather than a stale default.
+                        _stateService.SMeterB = sMeterA;
+                    }
+                    else
+                    {
+                        _logger.LogInformation("[MeterPolling][DEBUG] Polling S-Meter B...");
+                        var smBResponse = await _multiplexer.SendCommandAsync(CatCommands.SMeterSub + ";", "MeterPoll", stoppingToken);
+                        _logger.LogInformation("[MeterPolling][DEBUG] S-Meter B response: {0}", smBResponse);
+                        int sMeterB = CatCommands.ParseSMeter(smBResponse ?? "");
+
+                        if (sMeterB == 0)
+                        {
+                            _sMeterBZeroCount++;
+                            if (_sMeterBZeroCount >= SMeterZeroThreshold)
+                                _stateService.SMeterB = 0;
+                            // else: hold the previous SMeterB value, don't overwrite.
+                        }
+                        else
+                        {
+                            _sMeterBZeroCount = 0;
+                            _stateService.SMeterB = sMeterB;
+                        }
+                    }
 
                     _logger.LogInformation("[MeterPolling][DEBUG] Polling Power Meter...");
                     var powerResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterPower + ";", "MeterPoll", stoppingToken);

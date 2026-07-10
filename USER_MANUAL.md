@@ -1,5 +1,7 @@
 # Yaesu Web Control — User Manual
 
+> 🔍 **Searching this manual:** press **Ctrl + F** (Windows / Linux) or **⌘ + F** (Mac) to open your browser's find-in-page box. Type any term — a band name like "60m", a control like "Speech Processor", an error message you've hit — to jump straight to the relevant section.
+
 ## Table of Contents
 
 1. [Introduction](#1-introduction)
@@ -14,7 +16,7 @@
    - 5.5 [VFO Panels](#55-vfo-panels)
    - 5.6 [Frequency Display and Tuning](#56-frequency-display-and-tuning)
    - 5.7 [Receiver Controls](#57-receiver-controls)
-   - 5.8 [IF Width, IF Low Cut, IF Shift, and AF Gain](#58-if-width-if-low-cut-if-shift-and-af-gain)
+   - 5.8 [IF Width, Audio Filter, IF Shift, and AF Gain](#58-if-width-audio-filter-if-shift-and-af-gain)
    - 5.9 [Band and Segment Selection](#59-band-and-segment-selection)
    - 5.10 [Transmit Controls](#510-transmit-controls)
    - 5.11 [VOX Panel](#511-vox-panel)
@@ -24,6 +26,8 @@
    - 5.15 [Memory Panel](#515-memory-panel)
    - 5.16 [Voice Announcements](#516-voice-announcements)
    - 5.17 [DX Spots List](#517-dx-spots-list)
+   - 5.18 [Audio Filter popout](#518-audio-filter-popout)
+   - 5.19 [VC Tune Preselector (FTdx101MP)](#519-vc-tune-preselector-ftdx101mp)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -62,6 +66,8 @@
     - 15.4 [Why not use an RTL-SDR dongle?](#154-why-not-use-a-25-rtl-sdr-dongle-instead-of-an-rspplay)
     - 15.5 [Why the 3-second delay when changing spectrum bandwidth?](#155-why-is-there-a-3-second-delay-when-i-change-the-spectrum-bandwidth)
     - 15.6 [Can I use VSPE / OmniRig / com0com?](#156-can-i-use-vspe-omnirig-com0com-or-a-similar-virtual-com-port-sharer)
+    - 15.7 [What is the TX button for?](#157-what-is-the-tx-button-for-when-i-press-it-the-radio-goes-into-tx-mode-but-theres-no-audio-from-my-microphone)
+    - 15.8 [Why was Alexa voice control dropped in favour of the built-in microphone?](#158-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -70,6 +76,14 @@
     - 16.5 [Windows Narrator](#165-windows-narrator)
     - 16.6 [Customising Accessible Labels](#166-customising-screen-reader-labels)
     - 16.7 [Frequency tuning by keyboard or buttons](#167-frequency-tuning-by-keyboard-or-buttons)
+17. [Voice Control](#17-voice-control)
+    - 17.1 [What you can say](#171-what-you-can-say)
+    - 17.2 [Enabling voice control](#172-enabling-voice-control)
+    - 17.3 [Using the mic buttons](#173-using-the-mic-buttons)
+    - 17.4 [Troubleshooting](#174-troubleshooting)
+    - 17.5 [Privacy](#175-privacy)
+    - 17.6 [Adding your own commands](#176-adding-your-own-commands)
+    - 17.7 [More languages](#177-more-languages)
 
 ---
 
@@ -176,7 +190,7 @@ A small **YWC tray icon** appears in the Windows system tray (down by the clock,
 | Open Yaesu Web Control | Opens YWC in your default browser. |
 | About — version vX.Y.Z | Shows version, release date, and licence. The browser About page (top nav bar) has full details and a Copy diagnostics button. |
 | Open user data folder | Opens `%APPDATA%\MM5AGM\Yaesu Web Control\` in File Explorer — handy for grabbing the backup zip after export, or inspecting/editing JSON files. |
-| Exit Yaesu Web Control | Confirms then shuts the app down cleanly. WSJT-X / Log4OM / JTAlert / GridTracker lose their CAT connection until you restart YWC. |
+| Exit Yaesu Web Control | Confirms then shuts the app down cleanly. WSJT-X / Log4OM / JTAlert / GridTracker / Fldigi lose their CAT connection until you restart YWC. |
 
 ![YWC tray icon with right-click menu open, showing Open / About / Open user data folder / Exit](pictures/SystemTrayIcon.png)
 
@@ -199,7 +213,7 @@ The top bar contains navigation links, external application buttons, and the rad
 
 **Update notification** — on startup the app silently checks the GitHub releases page for a newer version. If one is available, a small banner appears in the bottom-right corner with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 
-**External app buttons** (WSJT-X, JTAlert, Log4OM) appear if they are enabled in Application Setup. The colour of each button indicates status:
+**External app buttons** (WSJT-X, JTAlert, Log4OM, GridTracker, Fldigi) appear if they are enabled in Application Setup. The colour of each button indicates status:
 
 | Colour | Meaning |
 |--------|---------|
@@ -243,13 +257,14 @@ The line shows the current band, mode and frequency, with transmit power appende
 
 ### 5.2 Meters
 
-A scrollable row of meters is displayed above the VFO panels. The leftmost slot is the S-meter (and its optional history strip — see below). To the right of the S-meter come the transmit-related meters, which depend on your radio model:
+A scrollable row of meters is displayed above the VFO panels. The leftmost slots are the S-meter(s) (and their optional history strips — see below). To the right of the S-meter(s) come the transmit-related meters, which depend on your radio model:
 
-**FTdx101MP, FTdx101D, FTDX3000** — S-meter plus seven TX meters:
+**FTdx101MP, FTdx101D** — two S-meters (VFO A / MAIN and VFO B / SUB, each an independent physical receiver chain) plus seven TX meters:
 
 | Meter | What it shows |
 |-------|--------------|
-| S-meter | Receive signal strength on VFO A (the radio's only calibrated S-meter) — always live |
+| S-meter A | Receive signal strength on VFO A / MAIN — always live |
+| S-meter B | Receive signal strength on VFO B / SUB — always live |
 | SWR | Standing wave ratio on the antenna — only active during transmit |
 | Power | Output power in watts — only active during transmit |
 | Compression | Speech compression in dB — only active during transmit |
@@ -258,13 +273,15 @@ A scrollable row of meters is displayed above the VFO panels. The leftmost slot 
 | IDD | PA drain current in amps |
 | VDD | PA supply voltage in volts |
 
-**FTdx10, FT-710** — S-meter plus four TX meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.
+**FTDX3000** — single S-meter (VFO A) plus the same seven TX meters — FTDX3000 is a single-receiver radio, so there is no VFO B S-meter.
 
-All meters update in real time at approximately 10 times per second. Meters that only apply to transmit automatically read zero when the radio is receiving. The S-meter is always live.
+**FTdx10, FT-710** — single S-meter (VFO A) plus four TX meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.
 
-The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your specific radio.
+All meters update in real time at approximately 10 times per second. Meters that only apply to transmit automatically read zero when the radio is receiving. The S-meter(s) are always live.
 
-**S-meter history strip.** A small 30-second strip-chart can be shown to the left of the S-meter gauge in the top meter row. Click the **S-hist** button in the top toolbar to toggle it on (off by default; the choice is remembered between sessions). The strip shows three things at once:
+The meter scales are calibrated to show meaningful units rather than raw ADC values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your specific radio. Both S-meter gauges share the same calibration table — there's no separate MAIN/SUB calibration.
+
+**S-meter history strip.** A small 30-second strip-chart can be shown to the left of each S-meter gauge in the top meter row (one per VFO on dual-receiver radios). Click the **S-hist** button in the top toolbar to toggle both on or off together (off by default; the choice is remembered between sessions). Each strip shows three things at once:
 
 - **Green line** — the actual S-meter trace over the last 30 seconds. Lets you see QSB fading patterns and brief interference spikes that the analog needle barely registered.
 - **Yellow dashed line** — the peak hold for the window, useful for noting a station's actual peak signal during an over without staring at the needle.
@@ -302,6 +319,15 @@ The spectrum display is only visible if an SDR device has been configured in Set
 
 **Frequency crosshair** — Move the mouse over the spectrum to see the exact RF frequency at the cursor position displayed above the waterfall.
 
+**Resize spectrum vs waterfall** — Hover the horizontal boundary between the spectrum trace (top) and the waterfall (bottom); the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room — useful when you're hunting weak signals close to the noise floor. Drag down to give the waterfall more history. The ratio is remembered per VFO across browser reloads, so the next time you open YWC the panel is back the way you left it. Two short grey grip-bars at the centre of the boundary mark the handle; they turn cyan while you're dragging.
+
+**dB range** — The dropdown beside the **Hold** button picks the vertical scale of the spectrum trace, in dBFS:
+
+- **0/-120** (default) — the full SDR range; signals span the whole vertical height of the spectrum panel.
+- **-40/-120**, **-60/-120**, **-80/-120** — progressively zoom into the lower part of the scale, where weak signals normally sit. The strongest signals get clipped at the top of the panel, but the noise floor and anything just above it spreads out vertically and is much easier to see.
+
+Pick whichever lets you see your noise floor without weak signals being squashed into the bottom row of pixels. The choice is remembered per VFO.
+
 **DX cluster spots** — If you have configured a DX cluster server in Settings (see §6.6), incoming spots are overlaid as small yellow callsign labels along the top of the spectrum at each spot's frequency. Clicking on a spot (within a few pixels of its marker) tunes VFO A exactly to that frequency. Spots outside the current span are not drawn; spots older than the configured age (default 15 minutes) are removed automatically.
 
 **How spots are filtered for display** — the spectrum panel shows any spot whose frequency falls inside the currently visible window (VFO A ± half the span). When you change band, VFO A moves and the spectrum recentres, so the visible spots change automatically to match the new band. There is no explicit band filter — just a "is this spot inside the visible window?" check. In practice this means you see only the current band, because amateur bands have large gaps between them. If you zoom out to a 2 MHz span you'd technically see a wider chunk, but adjacent bands rarely overlap that window.
@@ -336,11 +362,9 @@ There are two VFO panels side by side:
 
 On **dual-receiver radios** (FTdx101MP / FTdx101D) neither panel is greyed at any time — both VFOs are real physical receiver chains and are always independently usable.
 
-**S-meter location — not in the VFO panels.** From v2.3.9 the S-meter and its 30-second history strip live in the **top meter row** (just below the toolbar), not inside the VFO A / VFO B panels. There is **one** S-meter gauge and **one** history strip, shown at the leftmost end of the meter row.
+**S-meter location — not in the VFO panels.** From v2.3.9 the S-meter(s) and their 30-second history strips live in the **top meter row** (just below the toolbar), not inside the VFO A / VFO B panels.
 
-Why: Yaesu radios only have one calibrated S-meter — on dual-receiver models (FTdx101MP / FTdx101D) it is hardwired to the MAIN (VFO-A) chain, and the SUB chain has only an uncalibrated activity bar on the spectrum display with no S-meter readout exposed over CAT. On single-receiver models (FTdx10 / FT-710 / FTDX3000 / FT-991A) there is only one physical receiver chain. Showing a separate S-meter gauge per VFO would be duplicate information at best and a misleading stuck reading at worst, so YWC presents the truthful single gauge once at the top.
-
-If you operate dual-receive on an FTdx101, watch the spectrum panel for SUB activity rather than the (no-longer-existent) VFO B S-meter gauge.
+On **dual-receiver radios** (FTdx101MP / FTdx101D) there are **two** S-meter gauges side by side — VFO A / MAIN first, then VFO B / SUB — each with its own history strip, since MAIN and SUB are independent physical receiver chains with their own calibrated S-meter (`SM0;` and `SM1;` respectively). On **single-receiver radios** (FTdx10 / FT-710 / FTDX3000 / FT-991A) there is only **one** S-meter gauge, since there's only one physical receiver.
 
 **Antenna selector visibility:** the per-VFO antenna dropdown is hidden on radios with a single antenna jack (**FTdx10, FT-991A**) since there is nothing to select between. Radios with multiple antenna jacks (FTdx101MP, FTdx101D, FT-710, FTDX3000) keep the selector.
 
@@ -455,7 +479,7 @@ All of these settings are read from the radio when the app connects.
 
 ---
 
-### 5.8 IF Width, IF Low Cut, IF Shift, and AF Gain
+### 5.8 IF Width, Audio Filter, IF Shift, and AF Gain
 
 **IF Width** — Sets the DSP filter bandwidth.
 
@@ -467,11 +491,11 @@ The IF Width dropdown is **mode-aware**: the SH command code sent to the radio i
 
 The first entry in the dropdown ("Default") is the radio's mode-dependent default, which varies by the selected roofing filter. The current width is read from the radio on connect; selecting a new value sends it immediately.
 
+**Audio Filter button** — Opens the **Audio Filter** popout dialog for this VFO, where you can adjust the per-mode LCUT FREQ, LCUT SLOPE, HCUT FREQ and HCUT SLOPE. See [§5.18](#518-audio-filter-popout) for the full description. Replaces the IF Low Cut dropdown that was in this row in v2.3.9 and earlier — that control was sending a CAT command no current Yaesu HF radio actually supports, so it was a no-op. The new Audio Filter popout uses EX menu commands that the radio honours.
+
 > **About the FTdx101 "4 kHz" firmware update** — Yaesu's 2023 firmware release notes mention *"Increased RX IF Band WIDTH up to 4000 Hz"* for SSB, CW, RTTY, PSK and DATA. This is **not** an extension of the IF Width dropdown's range. The FTdx101's IF DSP filter (SH command) still tops out at 3.2 kHz in SSB and 3.0 kHz in CW — the dropdown values in this app are correct and match the Yaesu CAT manual.
 >
-> What the firmware *did* extend is **HCUT** — the audio high-cut filter that shapes audio inside the IF passband. HCUT now goes up to 4000 Hz (was 3000 Hz). HCUT is an EX menu setting on the radio's own touch screen — set it once on the radio and it stays. The app does not control HCUT directly. If you want fuller audio (e.g. 4 kHz HCUT for SSB ESSB-style audio), set it via your radio's **Function → Radio Setting → Mode SSB → HCUT FREQ** menu.
-
-**IF Low Cut** — Sets the lower edge of the DSP passband (SL command). Options: OFF, 100 Hz, 200 Hz, 300 Hz, 400 Hz, 500 Hz, 600 Hz, 700 Hz, 800 Hz, 900 Hz, 1.0 kHz, 1.1 kHz. Use this to cut low-frequency audio or interference — for example, 300 Hz in SSB to reduce hum and LF splatter. This setting is independent per VFO.
+> What the firmware *did* extend is **HCUT** — the audio high-cut filter that shapes audio inside the IF passband. HCUT now goes up to 4000 Hz (was 3000 Hz). You can now adjust HCUT directly from YWC's **Audio Filter** popout (§5.18) — no need to dig through the radio's own touch-screen menu.
 
 **IF Shift** — Shifts the passband centre ±1000 Hz in 20 Hz steps. Drag the slider or use the keyboard arrow keys. The current offset is shown next to the slider.
 
@@ -595,6 +619,7 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 | Control | Description |
 |---------|-------------|
 | Speed | Keyer speed in WPM (4–60) |
+| ZIN | CW Auto Zero In. One click sends the Yaesu `ZI` command; the radio nudges the VFO so the received CW signal sits exactly at your configured CW pitch (set via the Pitch control). Much faster than chasing the signal with the VFO knob. Targets whichever VFO is currently active on dual-receiver radios. **Also available as a per-VFO ZIN button in each VFO panel's header** — handy for Search-and-Pounce operating when you don't want to open the popout for every signal. The per-VFO buttons target their specific VFO regardless of which is currently focused. |
 | Break-in | **Off** (keyer only), **Semi** (semi break-in), or **Full** (QSK full break-in) |
 | Delay | Semi break-in delay (0–2500 ms) — only relevant in Semi mode |
 | Pitch | CW sidetone pitch frequency (300–1050 Hz in 10 Hz steps). Also sets the CW receive offset so the radio zero-beats at this tone. Read from the radio on connect. |
@@ -671,7 +696,7 @@ The **Mem** button in the toolbar (bold black text) opens a floating memory pane
 
 ![Floating memory panel with the Banks dropdown open — tile grid on the left, banks list on the right, plus the four Load-from-Rig / Save-to-Rig action buttons across the top](pictures/Memories_Floating_Panel.png)
 
-The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions.
+The panel is non-modal — it stays open while you use the rest of the app. Drag the title bar to reposition it anywhere on screen. Its position is remembered between sessions. Press **Esc** to close it.
 
 **The toolbar at the top of the floating panel** carries the four rig-transfer actions and the Banks dropdown:
 
@@ -693,7 +718,11 @@ For full memory management — editing labels and frequencies, reordering, impor
 
 ### 5.16 Voice Announcements
 
-Click the **Voice** button in the toolbar to open the voice-announcements panel. This makes the app speak when key things change — useful for partially sighted operators, or for anyone who wants to be told what the radio is doing without having to look at the screen.
+> **Where's the on/off toggle?** It is **not** on the Settings page. The master switch for voice announcements lives in the **Voice** dialog — click the **Voice** button in the main-page toolbar (in the same row as **DX Watch** and **DX Spots**) and untick **Enable voice announcements** to turn them off (or tick to turn them on). The dialog also has the voice picker, rate, volume, per-category toggles and a Test button.
+>
+> Not the same as **Voice Control** (§17): voice *announcements* are the app **speaking to you** (band changes, mode changes, DX alerts), while voice *control* is **you speaking to the app** (press-and-hold mic button to issue commands). They are independent features with separate on/off switches.
+
+Voice announcements make the app speak when key things change — useful for partially sighted operators, or for anyone who wants to be told what the radio is doing without having to look at the screen.
 
 The feature uses your browser's built-in text-to-speech engine (Web Speech API), so any SAPI 5 voices already installed on Windows are available in the Voice picker.
 
@@ -743,7 +772,7 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 | Spotter | The station that reported the spot |
 | Comment | Free-text comment from the spotter |
 
-**Click any row** to QSY VFO A to that spot's frequency.
+**Click any row** to QSY VFO A to that spot's frequency **and switch mode** to match the band-plan segment the frequency falls into (FT8 → DATA-U, CW → CW-U, phone segments → USB or LSB as appropriate, etc.). This matches the click-to-tune behaviour on the spectrum panel — so clicking an FT8 spot from a phone segment flips the radio to DATA-U in one step rather than leaving you on the wrong mode.
 
 **Click any column header** to sort by that column; click again to reverse the sort direction. The current sort is shown by a ▲ or ▼ next to the column name.
 
@@ -767,6 +796,65 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 **Position and persistence** — drag the title bar to move the panel anywhere on screen. Panel position, size, sort column, sort direction, and the All bands setting are all saved per browser so the panel returns to where you left it next session.
 
 **Empty state** — if you see "No spots on this band", either no spots are in the buffer yet (cluster just connected, give it a few seconds), or the DX cluster feature isn't configured at all (see §6.6).
+
+---
+
+### 5.18 Audio Filter popout
+
+The **Audio Filter** button on each VFO panel (where the old "IF Low Cut" dropdown used to be) opens a popout dialog for adjusting the receive audio passband shape for the VFO's current mode.
+
+Four controls in each dialog:
+
+| Control | What it does |
+|---|---|
+| **LCUT FREQ** | Low-cut filter frequency. OFF, or 100 Hz – 1 kHz in 50 Hz steps. Sliders show Hz; tick **Off** to disable the filter entirely. |
+| **LCUT SLOPE** | Toggle button: **6 dB/oct** (gentle) or **18 dB/oct** (steep). |
+| **HCUT FREQ** | High-cut filter frequency. OFF, or 700 Hz – 4 kHz in 50 Hz steps. |
+| **HCUT SLOPE** | Toggle button: **6 dB/oct** or **18 dB/oct**. |
+
+**Per-mode storage.** The radio internally remembers a separate set of four values for each mode class — SSB, AM, FM, PSK/DATA, RTTY, CW. Switching mode automatically restores that mode's stored values; the dialog re-queries when the mode changes and the sliders jump to the new mode's settings. So you can have (for example) LCUT 200 Hz / HCUT 2.7 kHz for SSB and LCUT 500 Hz / HCUT 1 kHz for CW, and the radio swaps them in and out automatically as you change mode.
+
+**FTdx101 dual-receiver — both VFOs at once.** On the FTdx101 family you can open both VFO A's and VFO B's Audio Filter dialogs simultaneously; each opens with one click of its own button and can be dragged anywhere on screen, with positions remembered independently. When both VFOs happen to be in the same mode class, the dialogs show a small note ("VFO B is also in SSB — these settings affect both VFOs") because the radio shares the values between the two receivers for the same mode.
+
+**Replaces the old IF Low Cut dropdown.** The dropdown that was there in v2.3.9 sent a CAT command (`SL`) that turned out not to exist on any of YWC's supported radios — so it was a phantom control that *looked* like it was doing something but never actually reached the radio. The Audio Filter popout uses the radio's `EX` (menu) command path, which all five supported radios honour, so the values you set actually take effect on the audio.
+
+**Per-radio support.** Per-mode CAT availability varies:
+
+- **FTdx101MP / D**, **FTdx10**, **FT-710** — full support for all four controls in every mode.
+- **FTDX3000** — full support except RTTY LCUT SLOPE (the radio's CAT menu doesn't expose it; the corresponding control is greyed out).
+- **FT-991A** — full support in SSB / AM / DATA / RTTY / CW. In FM mode the radio doesn't expose any of the four via CAT, so all controls are greyed out.
+
+When a control is greyed out for the current mode + radio combination, the explanation is that the radio's CAT command set simply doesn't include that setting for that mode — you'd need to set it on the radio's front-panel menu instead (if it's adjustable there at all).
+
+**How the writes are confirmed.** Each slider change reads the value back from the radio after writing, so the on-screen value reflects what the radio actually stored — not just what YWC sent. This catches the rare cases where the radio clamps or refuses a value.
+
+---
+
+### 5.19 VC Tune Preselector (FTdx101MP)
+
+Some FTdx101MP units have an optional **VC Tune** preselector fitted to the MAIN and/or SUB receiver. The preselector improves strong-signal performance and selectivity on crowded bands. When supported, a **VC Tune** button and a row of controls appear in each VFO panel header.
+
+**When VC Tune appears in YWC.** The controls are shown only when both of the following are true:
+
+- The radio model is **FTdx101MP** (VC Tune is not fitted to any other supported model).
+- The hardware revision reports a hardware ID that supports VT CAT commands. YWC checks this automatically on startup by reading the radio's `ID;` response.
+
+**Hardware limitation — some FTdx101MP units do not support VT CAT.** Yaesu produced the FTdx101MP in more than one hardware revision. Not all revisions expose VC Tune over CAT. On units with hardware ID **0682**, all `VT VCT` CAT commands are rejected with a `?;?;` error, even on fully up-to-date firmware (MAIN V01-28 / DISPLAY V01-51 / DSP V01-20). On these units the VC Tune controls are **hidden entirely** — the physical preselector is unaffected and continues to work normally from the radio's front panel.
+
+**VC Tune controls (when present):**
+
+| Control | Description |
+|---------|-------------|
+| **VC Tune** button | Toggles the preselector on or off. Turns amber when the preselector is active. |
+| **Default** | Sends the auto-tune command — the radio tunes the preselector capacitor to the current frequency automatically. |
+| **−** / **+** | Steps the preselector capacitor down or up by the selected step size. |
+| Step size | Dropdown 1–9. Controls how many capacitor steps each − / + click moves. |
+| **Center** | Centers the preselector capacitor at its midpoint. |
+| P5 reading | The raw preselector meter value reported by the radio after the last command. |
+
+All changes are confirmed by reading the radio's state back after each command, so the displayed state always reflects what the radio actually has.
+
+**If the VC Tune controls do not appear on your FTdx101MP,** your unit's hardware revision is likely not in the supported list. Check the radio firmware and hardware revision via the front-panel menu and raise a report on the [GitHub Issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues) if you believe your hardware should be able to support VT CAT.
 
 ---
 
@@ -870,6 +958,12 @@ If you only have one SDR, set it in the **VFO A SDR** slot and leave **VFO B SDR
 
 > **Note on SDRplay devices specifically:** the SDRplay API service only allows one device per host process. YWC works around this by launching a separate background process (`Yaesu_Sdr_Worker.exe`) for each SDR you configure — you'll see them in Task Manager when YWC is streaming. They start and stop automatically; no user action needed. See [docs/decisions/0001-dual-sdr-architecture.md](docs/decisions/0001-dual-sdr-architecture.md) on GitHub if you're curious about the why.
 
+> **If YWC can't find your SDRplay device:** YWC needs to be able to load `sdrplay_api.dll` from the SDRplay install folder. For a standard install at `C:\Program Files\SDRplay\API\x64\sdrplay_api.dll` this just works — YWC auto-detects the path on startup. If you installed SDRplay to a non-standard location and your Windows `PATH` doesn't include its `x64` folder, YWC may fail to find the DLL.
+>
+> A new **SDRplay install path** field on the Settings page (in the same SDR Spectrum Display section as the IF Frequency) lets you point YWC explicitly at your SDRplay API folder. Leave it blank for auto-detect — the field shows the auto-detected path in green below it (or an amber warning if nothing was found), with a one-click **Use this path** link to fill the field, and a **Browse…** button that opens a native Windows folder picker.
+>
+> The Browse… picker opens on the same PC running YWC; if you're operating from a tablet over the LAN, the picker can't appear on your screen and you'll be told to come to the YWC host PC (or type the path into the field manually).
+
 When both VFOs have an SDR, the main control panel gains two small toggle groups above the spectrum panels:
 
 - **VFO A / VFO B / Both** — quickly hide one panel without changing settings.
@@ -919,7 +1013,7 @@ The Settings page Sample Rate dropdown still exists but now acts as a "reset bot
 
 YWC's dual-SDR support is designed for two completely separate receivers — typically two SDRplay RSPs. If you have an FTdx101MP or FTdx101D, both the **MAIN** and **SUB** receivers have their own rear-panel IF OUT sockets — connect one SDR to each and YWC can show both VFOs at once.
 
-You might assume an SDRplay **RSPduo** (two tuners in one box) would be the natural pick. In practice the author runs two separate **RSP1Bs**, and recommends that for new YWC dual-SDR setups, for three reasons:
+You might assume an SDRplay **RSPduo** (two tuners in one box) would be the natural pick. In practice I run two separate **RSP1Bs**, and recommend that for new YWC dual-SDR setups, for three reasons:
 
 1. **Bandwidth.** The RSPduo in dual-tuner mode is limited to roughly **2 MHz total** shared between its two tuners. Two separate RSP1Bs each give you the full chip bandwidth — currently we use 2 MHz spans per side, but the headroom is there if YWC adds wider spans later.
 2. **Cost.** Two RSP1Bs at typical retail prices are only marginally more expensive than one RSPduo.
@@ -936,7 +1030,7 @@ RTL-SDR dongles are supported via the SoapySDR driver path and will function —
 - **Front-end filtering.** RSPs have selectable bandpass filters; dongles have essentially none. With a kilowatt-class transmitter on the next band, a dongle overloads long before an RSP does.
 - **Clock stability.** RSPs use a TCXO; cheap dongles drift visibly during warm-up — the spectrum centred on a 9 MHz IF will appear to slide sideways for the first ten minutes after power-on.
 
-The author's full bench testing has been against the SDRplay path. RTL-SDR users are welcome to experiment and report back.
+My full bench testing has been against the SDRplay path. RTL-SDR users are welcome to experiment and report back.
 
 #### Why is there a brief pause when I change the span?
 
@@ -1089,7 +1183,7 @@ Access Application Setup from the navigation bar. This page configures the exter
 
 ### 7.1 External App Buttons
 
-Up to four buttons can appear in the top bar to launch external applications. For each button you can set:
+Up to five buttons can appear in the top bar to launch external applications. For each button you can set:
 
 - **Show / Hide** — whether the button appears on the main page
 - **Button Name** — the label shown on the button (e.g., "WSJT-X")
@@ -1103,8 +1197,9 @@ Default command lines:
 | JTAlert | `C:\HamApps\JTAlert\JTAlert.exe` |
 | Log4OM | `"C:\Program Files (x86)\Log4OM 2\Log4OM.exe"` |
 | GridTracker | `"C:\Program Files\GridTracker2\GridTracker2.exe"` |
+| Fldigi | `"C:\Program Files\Fldigi-4.2.11\fldigi.exe"` (version may differ) |
 
-Adjust these to match where you have installed each program. GridTracker is **off by default** — tick its **Show** box once you've installed it and confirmed the command line is correct.
+Adjust these to match where you have installed each program. GridTracker and Fldigi are **off by default** — tick the **Show** box for each once you've installed it and confirmed the command line is correct. The Fldigi button was added in v2.4.0 at the request of Bill W1WRH ([#52](https://github.com/mm5agm/Yaesu_Web_Control/issues/52)); the process detection uses the `fldigi.exe` task-manager name.
 
 #### Path quoting — important
 
@@ -1707,6 +1802,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 | **Delete** (frequency keyboard open) | Clear all digits |
 | **↵ Enter** (frequency keyboard open) | Send the entered frequency to the radio |
 | **Esc** (frequency keyboard open) | Close the keyboard without changing frequency |
+| **Esc** (Memory panel open) | Close the Memory panel |
 
 **Frequency display — changing the value digit by digit.** Every VFO frequency display is a "digit-pickable" control. You select a digit (it highlights yellow), then step it up or down. Three input methods reach the same set of actions, so pick whichever suits you:
 
@@ -1720,7 +1816,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 | **ArrowLeft** / **ArrowRight** | Move the selection cursor | Highlights the digit to the left / right. Does not change the frequency. |
 | **Home** | Jump to the most-significant digit | Selection moves to the **leftmost** digit (tens of MHz). |
 | **End** | Jump to the least-significant digit | Selection moves to the **rightmost** digit (Hz). |
-| **▲ / ▼** buttons | Step the selected digit by ±1 | Only visible if Settings → Accessibility → **Show frequency up/down arrow buttons** is on. Each click does the same as one ArrowUp / ArrowDown. If no digit is selected, the first click auto-selects the kHz digit and steps it in one go (buttons are a deliberate action — unlike the keyboard, they don't need a "show me the cursor" first press). |
+| **▲ / ▼** buttons | Step the selected digit by ±1 | Only visible if Settings → Accessibility → **Show frequency up/down arrow buttons** is on. A click does the same as one ArrowUp / ArrowDown. If no digit is selected, the first click auto-selects the kHz digit and steps it in one go (buttons are a deliberate action — unlike the keyboard, they don't need a "show me the cursor" first press). **Press and hold to repeat** the same step every 500 ms until released — mouse, touch, and keyboard (Enter/Space) all work. |
 | Click anywhere outside the display + arrow buttons | Deselect | The selection is cleared; the next ArrowUp will start over with the "first press picks the kHz digit" behaviour. |
 
 A few extra notes:
@@ -1758,8 +1854,11 @@ The fastest way to get a bug fixed is a good report. YWC has three features that
 - DX cluster host and your cluster login callsign (if configured)
 - Browser and version
 - .NET runtime version and Windows version
+- The firmware versions of my bench radio (so you can compare against yours — see below)
 
-That gives the developer everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
+That gives me everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
+
+**Radio firmware versions worth knowing.** Above the Diagnostics block on the About page there's a section titled **Developer's tested radio firmware** that lists my bench radio firmware values. Some YWC behaviours depend on the radio's firmware version — for example, the FTdx101's IF Width dropdown gained 3.5 kHz and 4.0 kHz options only in firmware released after the 2023 CAT manual was published. If you're hitting a CAT-related bug, comparing your firmware against the listed values quickly tells you whether a Yaesu firmware difference might be involved. To read your own firmware on an FTdx101MP / FTdx101D: **Func → Extension Settings → Soft Version** on the radio's front panel. Include any firmware mismatch in your bug report.
 
 ![The About page — version + release date at top, Resources section, Diagnostics block with the user's environment summary, and the Copy diagnostics + Report a bug buttons that send everything straight into a GitHub bug-report form](pictures/AboutPage.png)
 
@@ -1769,7 +1868,7 @@ That gives the developer everything needed to reproduce your setup — including
 
 If you're not already signed in to GitHub, you'll be asked to sign in first — GitHub then brings you back to the form with the diagnostics still intact. You'll need a (free) GitHub account; new operators can sign up at https://github.com/signup in about a minute.
 
-**3. Copy diagnostics button**. The alternative path for anyone who'd rather paste the diagnostics somewhere else — an email to the developer (mm5agm@outlook.com), a GitHub Discussion, a Groups.io reply, etc. Clicking it puts the same diagnostics block onto your clipboard; you can then paste with Ctrl+V into wherever you're writing.
+**3. Copy diagnostics button**. The alternative path for anyone who'd rather paste the diagnostics somewhere else — an email to me (mm5agm@outlook.com), a GitHub Discussion, a Groups.io reply, etc. Clicking it puts the same diagnostics block onto your clipboard; you can then paste with Ctrl+V into wherever you're writing.
 
 **Going to GitHub manually?** When you click **New issue** on the GitHub Issues page, you'll be offered a template picker — pick **Bug report** and the new-issue editor pre-fills with a structured skeleton: *Describe the bug · Steps to reproduce · Expected behaviour · Actual behaviour · Diagnostics · Screenshots / logs · Anything else*. Fill in each section as best you can. Paste the diagnostics block into the **Diagnostics** section. (The **Report a bug on GitHub** button does all of this automatically — recommended.)
 
@@ -1867,7 +1966,7 @@ For ordinary single-SDR use, this doesn't matter — YWC opens the only SDR plug
 
 **It does matter for dual-SDR setups** (one RSP per VFO) because YWC needs a stable identifier to remember "this physical device serves VFO A" across reconnects. YWC handles this from v2.3.0 onwards by composing the device key as `sdrplay:hw<hwVer>-<serial>` — including the hardware version means an RSP1 with the placeholder serial doesn't collide with an RSP1B that happens to use the same number. So:
 
-- **One RSP1 + one RSP1B (Colin's setup)** — works fine, no action needed.
+- **One RSP1 + one RSP1B (my setup)** — works fine, no action needed.
 - **Two of the same model**, both with the placeholder serial — this would still collide. The fix is to program a real serial into at least one device. If SDRplay's Serial Number Update Utility isn't on their downloads page, ask their support: it's a small Windows tool that writes a serial of your choice into the device's flash.
 
 YWC migrates settings from the v2.2.x key format (`sdrplay:<serial>` only) to the new format (`sdrplay:hw<N>-<serial>`) automatically the first time you save Settings on v2.3.0 or later. No user action required.
@@ -1880,7 +1979,7 @@ The dual-SDR support in YWC (v2.3.0+) is designed for two completely separate re
 
 1. **Bandwidth.** A single **RSP1B** can sample up to **10 MHz** of spectrum at once — wide enough to display the full 9 MHz IF in one shot if you wanted to. An RSPduo in dual-tuner mode is limited to roughly **2 MHz total shared** between its two tuners, so each side gets ~1 MHz at best.
 2. **Cost.** At UK retail prices (mid-2026): RSPduo around **£240**, RSP1B around **£125**. Two RSP1Bs come in at roughly the same total cost as one RSPduo, with double the bandwidth and full independence.
-3. **The author's own setup is "I had an old RSP1 sitting unused".** Adding a second SDR meant buying just one new RSP1B (£125) rather than a £240 RSPduo. That happens to be a common situation for hams who've upgraded their SDRplay receivers over the years — chances are there's an RSP1 or RSP2 in a drawer that can serve VFO B perfectly well.
+3. **My own setup was "I had an old RSP1 sitting unused".** Adding a second SDR meant buying just one new RSP1B (£125) rather than a £240 RSPduo. That happens to be a common situation for hams who've upgraded their SDRplay receivers over the years — chances are there's an RSP1 or RSP2 in a drawer that can serve VFO B perfectly well.
 
 If you already own an RSPduo it will still work — set it as the VFO A SDR and leave VFO B as *(none)*. The dual-tuner mode that lets one RSPduo serve both VFOs is not yet implemented.
 
@@ -1934,6 +2033,28 @@ Why this happens in practice:
 **Recommended setup:** plug your radio's USB-CAT cable in, see what COM port Windows assigns (Device Manager → Ports), set that COM port directly in YWC Settings. If you also want WSJT-X, JTAlert, Log4OM, etc. to control the same radio, point them at YWC's rigctld interface on **localhost:4532** rather than letting them open the COM port themselves. YWC then acts as the single owner of the radio's COM port and serves CAT to every other app over the network.
 
 If you must use a virtual port sharer (e.g. you've already built a working setup around one), the easiest test is to point YWC at the real physical COM port directly while everything else stays on the sharer's virtual ports — and only re-add the sharer to YWC's path if a specific need forces it.
+
+### 15.8 Why was Alexa voice control dropped in favour of the built-in microphone method?
+
+Earlier development branches explored using Amazon Alexa to control YWC — you'd say "Alexa, set frequency to fourteen point zero seven four" to your Echo device and the command would route through Amazon's cloud, hit a custom skill, and arrive at YWC over a Cloudflare tunnel. That work reached a fully-working end-to-end prototype, but **the setup overhead made it impractical for anyone who isn't already comfortable with Cloudflare tunnels and the Amazon Developer Console**.
+
+The current voice control uses **Windows' built-in speech recognition (SAPI 5)** with a press-and-hold microphone button beside each VFO panel. No cloud round-trip, no external accounts, no public endpoint, and your audio never leaves your computer.
+
+| What's needed | Alexa method | Built-in microphone method |
+| --- | :---: | :---: |
+| A public domain name | ✅ Required | ❌ Not required |
+| Cloudflare account &amp; tunnel | ✅ Required | ❌ Not required |
+| Amazon Developer account | ✅ Required | ❌ Not required |
+| SMAPI command-line install | ✅ Required | ❌ Not required |
+| Skill build in Alexa Developer Console | ✅ Required | ❌ Not required |
+| An Echo device (or Alexa app on a phone) | ✅ Required | ❌ Not required |
+| Internet connection (for every command) | ✅ Required | ❌ Not required |
+| Audio sent to a cloud service | ✅ Yes (Amazon) | ❌ Stays on your PC |
+| Hands-free wake-word ("Alexa, …") | ✅ Yes | ❌ No — press-and-hold mic button |
+| Works from anywhere in the house | ✅ Yes | ❌ Only at the PC |
+| Typical setup time | ~30–60 minutes | ~2 minutes |
+
+The Alexa code **isn't deleted** — it lives on a parked branch and can be revived if Amazon ever simplifies the developer experience, or if a contributor wants to package the cloud side as a one-click installer. For now, the built-in microphone method gives most of the same usefulness at a small fraction of the setup complexity, and it works equally well for users on a restricted home network where opening a Cloudflare tunnel isn't viable.
 
 ---
 
@@ -2213,10 +2334,141 @@ If you can't use a mouse wheel — head-tracking input, on-screen keyboard users
 - **ArrowLeft / ArrowRight** move the selection cursor sideways.
 - **Home / End** jump the selection to the **leftmost** (most significant — tens of MHz) or **rightmost** (least significant — Hz) digit.
 - The first arrow press when nothing is selected just highlights the kHz digit — a second press then steps it. This protects against an accidental ArrowUp changing the radio without you realising a digit was selected.
-- Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown).
+- Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown). Press and hold to repeat that step every 500 ms until released.
 - Clicking outside the display deselects.
 
 Originally requested by Yuri W4YSW. Shipped in v2.3.9.
+
+---
+
+## 17. Voice Control
+
+> **Not the same as Voice Announcements (§5.16).** Voice *control* (this section) is **you speaking to the app** — a press-and-hold mic button that lets you issue spoken commands. Voice *announcements* (§5.16) is **the app speaking to you** — automatic spoken cues for band, mode, TX state, DX alerts, etc., useful as an accessibility feature. They are independent features with separate on/off switches. If you're looking for the toggle to silence YWC's automatic speech, you want §5.16.
+
+YWC includes hands-free voice control of common operating actions. **Each VFO has its own mic button**, on the main Index page next to that VFO's band/mode controls — press and hold VFO A's button to control VFO A, VFO B's button to control VFO B. On single-receiver radios (FTdx10, FT-710, FTDX3000) only VFO A's button appears, since there's no independent VFO B to target. Recognition happens entirely on your PC via Windows' built-in speech engine — your audio never leaves your computer. See [§15.8](#158-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method) for the reasoning behind this approach and the Alexa method that was considered and dropped.
+
+Voice control is **off by default** — it has to be turned on in Settings before the mic buttons appear (see [§17.2](#172-enabling-voice-control)).
+
+### 17.1 What you can say
+
+Every command below targets whichever VFO's mic button you're holding down — a command spoken into VFO B's button only ever touches VFO B, and vice versa. The phrases are the built-in English (UK) defaults; they're editable (see [§17.6](#176-adding-your-own-commands)), so if your installation has custom phrases, "Settings → Voice Control → Voice Phrases" is the definitive list, not this table.
+
+| Command family | Say | What happens |
+| --- | --- | --- |
+| Set frequency | "tune to fourteen point zero seven four megahertz", "set frequency to fourteen megahertz" | Held VFO tunes to that frequency. Whole MHz, one decimal, or three decimals; "megahertz" is optional |
+| Change band | "go to twenty metres", "switch to forty metres" | Held VFO jumps to that band's default (usually FT8) frequency. Bands: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres |
+| Step up / down | "tune up" / "step up" / "nudge up"; "tune down" / "step down" / "nudge down" | Held VFO moves by that VFO's configured step size (see below; default 10 kHz) |
+| Set step size | "set step to ten kilohertz", "step size one kilohertz" | Changes the held VFO's step size: 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. Same value as the dropdown next to that VFO's mic button — either one updates the other |
+| Band up / down | "band up" / "band down" | Held VFO jumps to the next/previous ham band |
+| Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Held VFO switches to that mode |
+| Swap VFOs | "swap V F O", "swap A and B" | VFO A and B contents swap (radio-wide, not VFO-specific) |
+| Set attenuator | "set attenuator off", "attenuator six d b" (also twelve, eighteen dB) | Held VFO's attenuator changes |
+| Set preamp | "set preamp off" / "i p o", "preamp one" (also two) | Held VFO's preamp changes |
+| Set AGC | "set a g c fast" (also mid, slow, auto, off) | Held VFO's AGC speed changes |
+| Set AF gain | "set a f gain fifty" (0–100 in the steps listed in the phrase editor, or "mute"/"maximum") | Held VFO's volume changes |
+| IF filter width | "filter wider" / "filter narrower" | Held VFO's IF (roofing) filter bandwidth nudges one step |
+| Transmit | "key transmitter" / "start transmitting"; "stop transmitting" / "go to receive" | Radio keys up / drops back to receive |
+| Split | "split on" / "enable split"; "split off" / "simplex" | Split operation toggles |
+| Status read-back | "what frequency", "what mode", "what band" | YWC speaks the held VFO's current value out loud — no CAT command is sent to the radio |
+| Help | "help", "what can I say" | YWC speaks a short list of the available command categories |
+| Macros | "noise reduction on/off", "noise blanker on/off", "copy a to b" / "copy b to a", "fine step up/down", "roofing three/six/twelve kilohertz" | Runs the matching one-shot CAT command. See the Macros group in the phrase editor for the full list and their exact CAT strings |
+
+A few notes on phrasing:
+
+- **Spell out mode letters.** Say "U S B" (three letters), not "USB" as a word — the speech engine handles letter-by-letter spelling much more reliably for short acronyms.
+- **Fractional frequencies are spoken digit-by-digit** after "point". "Fourteen point zero seven four" parses as 14.074, not "fourteen point seventy-four". "Oh" is accepted as an alternative to "zero".
+- **"megahertz" is optional.** Both "set frequency to fourteen point zero seven four megahertz" and "tune to fourteen point zero seven four" work — say it or skip it.
+- **MHz only — no kHz.** The grammar recognises frequencies in whole-or-decimal **megahertz**, from 1 MHz up to 71 MHz (covering HF + 6 m + 4 m). It does **not** recognise kilohertz input. If you say something the grammar can't parse — e.g. "tune to thirty kilohertz" — the engine will fuzzy-match to the nearest valid in-range phrase ("tune to thirty point eight") and act on that instead. **Listen to the spoken confirmation** that follows every command: it tells you exactly what got recognised, which is the safety net against misrecognition. For sub-MHz tuning (LF, MF, the 30 kHz lower limit on the FTdx101), use the mouse or the keyboard-driven frequency display instead — see §16.7.
+- **Bands supported:** 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The default frequency picked for each band is roughly the FT8 / digital hangout — adjust with a follow-up "set frequency to …" or "tune up" / "tune down".
+- **Scots variants** are accepted: "go tae forty metres" works the same as "go to forty metres".
+
+**After every command, YWC speaks a short confirmation** through the PC's default audio output:
+
+- *"Move to fourteen point zero seven four megahertz, successful"* — for SetFrequency.
+- *"Move to 20 metres, successful"* — for SetBand.
+- *"Mode U S B, successful"* — for SetMode.
+- *"Swap V F O, successful"* — for SwapVFO.
+- *"Tune up, successful"* / *"Tune down, successful"* — for nudge.
+- If the command was rejected (e.g. frequency out of range), the suffix is *"unsuccessful"* instead.
+
+This is a primary accessibility feature: a partially-sighted operator can drive the radio without watching the screen and hear exactly what happened to each command. The confirmation also doubles as the safety net for misrecognition — if you said "tune to fourteen" but heard *"Move to forty megahertz, successful"*, the spoken readback tells you the engine misheard and you can issue the command again. Confirmations don't name the VFO — you already know which one from which mic button you were holding. Disable in **Settings → Voice Control → Speak confirmation after each voice command** if you find it chatty.
+
+### 17.2 Enabling voice control
+
+1. Open **Settings** in the YWC top navbar.
+2. Scroll to the **Voice Control** section.
+3. Tick **Enable voice control**, then click **Save**.
+4. **Restart YWC.** The speech engine is loaded once at startup; the toggle takes effect on the next launch.
+5. Confirm the **Windows speech recognition pack for your active language** is installed. Open Windows → Settings → Time &amp; Language → Speech and check the installed-languages list. The active language defaults to English (United Kingdom) — if it isn't listed, install it from there (most UK Windows installs already have it). The **Active language** dropdown in the Voice Control section lets you switch to any other installed language pack (see [§17.7](#177-more-languages)).
+
+After restart, you should see a **mic button on the Index page beside each VFO panel** — VFO A's next to VFO A's band/mode controls, and (on dual-receiver radios) VFO B's next to VFO B's. If you don't see them, jump to [§17.4 Troubleshooting](#174-troubleshooting).
+
+### 17.3 Using the mic buttons
+
+Each mic button is a **press-and-hold** control — it doesn't latch. The two VFOs' buttons are independent, but only one can be listening at a time (there's a single speech engine underneath); holding one button while the other is already listening simply has no effect until you release the first.
+
+1. **Press and hold** a VFO's mic button. The button colour changes to indicate the speech engine is listening.
+2. **Speak the command clearly** at a normal volume.
+3. **Release** the button. The engine processes what it heard.
+4. If the phrase matched the grammar, that VFO responds within a fraction of a second. The button returns to its idle colour.
+5. Bold text under the button shows the **last phrase recognised** and which command it matched — useful for spotting misrecognitions ("set frequency to forty metres" instead of "go to forty metres", say).
+
+If you change your mind mid-phrase, just release the button without speaking. Nothing is sent to the radio unless a full grammar match is found.
+
+**Low-confidence matches are rejected.** If you say something the engine isn't sure about — a phrase outside the grammar, background noise during PTT, an ambient TV in the room — the recognition is dropped rather than fitted to the closest rule. This stops random audio from accidentally firing a "set mode" or "go to band" command that would change the radio's state without you intending it. The "Last heard" hint under the mic button shows what the engine almost picked up; the Diagnostics block on the Settings page logs it as "Low-confidence match".
+
+The Settings page → Voice Control section has a **Diagnostics** block that shows the current state of the engine, the last phrase heard, the last intent matched, and any error message. Open it in another browser tab if you want a live view of what voice control is doing.
+
+### 17.4 Troubleshooting
+
+**No mic buttons on the Index page.**
+- Did you tick "Enable voice control" in Settings *and* restart YWC? The toggle only takes effect on next launch.
+- Only one mic button (VFO A's)? That's expected on single-receiver radios (FTdx10, FT-710, FTDX3000) — there's no independent VFO B to target.
+- Open the Settings page → Voice Control → Diagnostics. If the **State** is anything other than `Idle`, there's an engine error — read the **Last error** line.
+- If Diagnostics shows the active language's Windows speech pack isn't installed, install it (Windows → Settings → Time &amp; Language → Speech → Add a language) — see [§17.2](#172-enabling-voice-control).
+
+**Mic button is there but commands don't do anything.**
+- Open the **Diagnostics page** (`http://localhost:8080/Diagnostics`), click the **Voice Control Log** button at the top, then click **Refresh**. This shows the recent voice events (start / stop / heard / rejected / dispatched) from today's log without you having to find or parse the raw log file. Click **Copy to clipboard** to grab them for a bug report.
+- You should see `SAPI recogniser ready` shortly after YWC startup and a `Rejected (best alt: '…')` line for each unmatched press. The "best alt" is the engine's best guess at what you said — if it's wildly wrong, the mic itself may have a problem (try Windows Sound settings → Input → speak and see if the level meter responds).
+- If the log shows `Rejected (best alt: '<your phrase>')` and your phrase looks correct, the grammar wording isn't matching what you said. Try one of the alternative phrasings listed in [§17.1](#171-what-you-can-say), or open a [GitHub discussion](https://github.com/mm5agm/Yaesu_Web_Control/discussions) and propose a new phrasing.
+- The raw log file lives at `%APPDATA%\MM5AGM\Yaesu Web Control\logs\ywc-YYYYMMDD.log` if you ever need the unfiltered version (e.g. CAT command traffic, SDR worker status, etc.), but the Diagnostics page is the right tool for voice-specific issues.
+
+**"Tune up" doesn't seem to do much.**
+- Check you're watching the VFO panel whose mic button you actually pressed — each VFO steps independently, so "tune up" spoken into VFO B's button moves VFO B, not VFO A.
+- Each VFO's step size is shown (and changeable) in the dropdown next to that VFO's mic button, default **10 kHz**. If it's set small (e.g. 10 Hz) the movement can be easy to miss. Change it with the dropdown or by voice: "set step to ten kilohertz".
+- If you need bigger jumps use "set frequency to …" or "go to … metres" instead.
+
+**Speech engine works for a while then stops responding.**
+- Restart YWC. The engine is held alive across recognitions, and on rare Windows audio-stack hiccups it can lose its mic handle. Restart is the cleanest fix; if you see this often, report it on GitHub with the log.
+
+### 17.5 Privacy
+
+- All speech recognition happens **locally on your PC** through the Windows SAPI 5 engine. No audio is uploaded to Anthropic, Microsoft, Amazon, or anyone else.
+- Recognised phrases are written to YWC's log file (`ywc-YYYYMMDD.log`) so that misrecognitions can be diagnosed. If that's a concern, set the log retention / rotation in Settings, or simply disable voice control when not in use.
+- Nothing leaves the PC except the standard CAT commands going to the radio over the serial port.
+
+### 17.6 Adding your own commands
+
+The voice command grammar is **data, not code** — it lives at `%APPDATA%\MM5AGM\Yaesu Web Control\Grammars\<culture>\Commands.<culture>.json` and is edited live from **Settings → Voice Control → Voice Phrases**:
+
+- **Voice Phrases editor.** Every command family from the [§17.1](#171-what-you-can-say) table is listed with its trigger phrases in an editable grid — add, remove, or reword phrases, one or more per row, comma-separated. **Save phrases** writes immediately and takes effect with no restart; **Validate** checks for empty/duplicate entries before you save; **Reset to defaults** restores the built-in English (UK) set.
+- **Test this pack.** A dry-run tester — speak a command and see what's recognised without sending anything to the radio, useful for checking a reworded phrase actually matches before trusting it live.
+- **Version history.** Every save (and every pack import) snapshots the previous version — up to the last 5 — so a bad edit or import can be undone from **Show version history**.
+- **Export / import as a language pack.** **Export language pack** bundles the current phrases, a generated `.srgs` reference copy, and author/description metadata into `YWC-VoicePack-<culture>-vN.zip` — share it on the [GitHub Discussions](https://github.com/mm5agm/Yaesu_Web_Control/discussions) group. **Preview import** lets you inspect another pack's contents before installing it.
+- **Open user grammars folder** jumps straight to the `Grammars\` folder in Explorer if you'd rather hand-edit the JSON or inspect the generated `.srgs` file (a human-readable reference copy, not what the engine actually loads).
+- **Advanced mode** (off by default) allows a Custom Command's CAT string to be anything, not just a recombination of prefixes the built-in Core Commands already send. Only enable it if you trust the source of any pack you import.
+
+If there's a particular command or phrasing you'd like added to the *built-in* defaults (as opposed to your own local edit), please file it as a GitHub issue or discussion.
+
+### 17.7 More languages
+
+Only **English (UK)** ships as the built-in default, but the language pack system itself is already multi-language:
+
+1. **The Windows speech pack for the target language must be installed** on the operator's PC (Windows → Settings → Time &amp; Language → Speech → Add a language). Microsoft ships full recognition packs for US English, French, German, Spanish, Italian, Japanese, Mandarin Chinese, Brazilian Portuguese and Australian English (the list shifts between Windows releases). Some languages only ship voice synthesis, not recognition — those can't be used for voice control regardless of what YWC does.
+2. **A phrase pack for that culture.** The **Active language** dropdown in Settings → Voice Control lists every culture with an installed pack (a ✓ or ⚠ shows whether Windows also has a matching recogniser). Installing a new one means either importing a `YWC-VoicePack-<culture>-vN.zip` someone else has authored and shared (**Preview import** → **Install**), or hand-authoring `Commands.<culture>.json` and dropping it into `Grammars\<culture>\` via **Open user grammars folder** — the semantic keys (intent names, parameter vocab) stay identical to the English defaults, only the phrases change.
+3. **Switching locale takes effect immediately** — no restart needed, unlike the initial enable toggle.
+
+The **Voice Phrases editor** itself currently only edits the **en-GB** pack in place; editing an *installed non-English pack* through the same in-app grid isn't wired up yet — for now, translate by hand-editing that culture's JSON file directly, or ask a fluent speaker to export their pack after editing it locally. If you'd like a particular language prioritised for a built-in default, or want the editor to support editing other locales directly, please open a GitHub discussion or issue and mention it.
 
 ---
 

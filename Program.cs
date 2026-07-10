@@ -145,10 +145,18 @@ static int LoadConfiguredHttpPort()
 // bundled libusb.
 NativeWin32.SetErrorMode(NativeWin32.SEM_FAILCRITICALERRORS | NativeWin32.SEM_NOOPENFILEERRORBOX);
 
-// ── SoapySDR native library resolver ────────────────────────────────────────
-// .NET P/Invoke on Windows does not search PATH directories by default.
-// Resolve SoapySDR.dll explicitly from its install location so the P/Invoke
-// declarations in SoapySdrInterop are satisfied without relying on PATH.
+// ── Native library resolver (SoapySDR + sdrplay_api) ────────────────────────
+// .NET P/Invoke on Windows does not search PATH directories by default, so
+// DLLs that aren't next to the app or in System32 silently fail to load.
+// One resolver lambda handles both DLLs — SetDllImportResolver can only be
+// called *once* per assembly, so anything we want to resolve has to share
+// this single registration.
+//
+// SDRplay history: observed on IK2XRW Alessandro's system (#53, 2026-06-26)
+// where the SDRplay install didn't add its bin folder to PATH, so the SDR
+// scan returned nothing. SdrplayDllResolver.TryResolve tries the user-
+// configured path, the app directory, then the standard Program Files
+// locations before falling back to default search.
 NativeLibrary.SetDllImportResolver(
     System.Reflection.Assembly.GetExecutingAssembly(),
     static (name, _, _) =>
@@ -161,6 +169,11 @@ NativeLibrary.SetDllImportResolver(
             if (!File.Exists(path))
                 path = @"C:\SoapySDR\bin\SoapySDR.dll";
             if (File.Exists(path) && NativeLibrary.TryLoad(path, out IntPtr h))
+                return h;
+        }
+        else if (name == Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.DllName)
+        {
+            if (Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.TryResolve(out IntPtr h))
                 return h;
         }
         return IntPtr.Zero;   // fall back to default resolution for all other DLLs
@@ -235,6 +248,11 @@ builder.Services.AddHostedService<RigctldServer>();
 // Register your settings service
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 
+// Audio filter EX address map — loaded once at startup from
+// wwwroot/data/audio-filter-ex-map.json; used by the Audio Filter popout
+// controller endpoints to translate per-radio menu addresses.
+builder.Services.AddSingleton<AudioFilterMapService>();
+
 
 // Add after existing service registrations
 builder.Services.AddHostedService<MeterPollingService>();
@@ -249,6 +267,19 @@ builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<Ra
 
 // Register the radio initialization service
 builder.Services.AddSingleton<RadioInitializationService>();
+
+// VC Tune preselector control
+builder.Services.AddSingleton<CatRequestSemaphore>();
+builder.Services.AddSingleton<IVCTuneCommandBuilder, VCTuneCommandBuilder>();
+builder.Services.AddSingleton<IVCTuneResponseParser, VCTuneResponseParser>();
+builder.Services.AddSingleton<IVCTuneStateMachine, VCTuneStateMachine>();
+builder.Services.AddSingleton<IVCTuneConfigurationStore, VCTuneConfigurationStore>();
+builder.Services.AddSingleton<VCTuneDiagnostics>();
+builder.Services.AddSingleton<VCTuneHelpProvider>();
+builder.Services.AddSingleton<VCTuneModule>();
+builder.Services.AddSingleton<VCTuneIntegrationHarness>();
+builder.Services.AddSingleton<IVcTuneService, VcTuneService>();
+builder.Services.AddSingleton<VCTuneViewModel>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioInitializationService>());
 
 // ADD THIS LINE for Razor Pages support:
@@ -317,6 +348,17 @@ builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryBankService>();
 // the background hosted service so the API can read the spot buffer.
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.DxClusterService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.DxClusterService>());
+
+// Voice control (in-process SAPI). VoiceControlService is the IHostedService
+// that owns the SpeechRecognitionEngine; IntentDispatcher maps recognised
+// intents to CAT actions; VoiceTtsService speaks confirmation phrases;
+// VoiceController exposes /api/voice/*. See docs/VoiceControl/v1-plan.md.
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.IntentDispatcher>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceTtsService>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VCTuneRecognizer>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoicePhraseStore>();
+builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceControlService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Voice.VoiceControlService>());
 
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and

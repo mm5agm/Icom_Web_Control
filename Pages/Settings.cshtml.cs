@@ -34,6 +34,15 @@ namespace Yaesu_Web_Control.Pages
         [BindProperty]
         public ApplicationSettings Settings { get; set; } = new();
 
+        /// <summary>
+        /// Path the SdrplayDllResolver would currently auto-detect, or null
+        /// if no SDRplay install was found in any of the standard locations.
+        /// Shown on the Settings page next to the manual override input so
+        /// users can see whether auto-detect is working and grab the path
+        /// with one click if they want to fill the override.
+        /// </summary>
+        public string? DetectedSdrplayInstallPath { get; set; }
+
         [TempData]
         public string? StatusMessage { get; set; } = string.Empty;
 
@@ -77,6 +86,9 @@ namespace Yaesu_Web_Control.Pages
             // A-side rate as the pre-selected option so the dropdown reflects
             // a sensible value rather than the legacy zero placeholder.
             Settings.SdrSampleRateHz = Settings.SdrSampleRateHzA;
+            // Auto-detect the SDRplay install dir so the page can show the
+            // user where the resolver is finding it (or that it's not).
+            DetectedSdrplayInstallPath = SdrplayDllResolver.DetectInstallDir();
             NetworkAddresses = GetLocalIPAddresses();
             return Page();
         }
@@ -93,6 +105,8 @@ namespace Yaesu_Web_Control.Pages
             ModelState.Remove("Settings.SdrDeviceKey");
             ModelState.Remove("Settings.SdrDeviceKeyA");
             ModelState.Remove("Settings.SdrDeviceKeyB");
+            // SdrplayInstallPath is intentionally optional — blank = auto-detect.
+            ModelState.Remove("Settings.SdrplayInstallPath");
             // DX cluster host/callsign also allowed empty (empty = feature disabled).
             ModelState.Remove("Settings.DxClusterHost");
             ModelState.Remove("Settings.DxClusterLoginCallsign");
@@ -221,6 +235,10 @@ namespace Yaesu_Web_Control.Pages
 
                 // Accessibility
                 current.ShowFrequencyArrowButtons = Settings.ShowFrequencyArrowButtons;
+
+                // Voice Control (v1)
+                current.VoiceControlEnabled = Settings.VoiceControlEnabled;
+                current.VoiceSpokenConfirmationEnabled = Settings.VoiceSpokenConfirmationEnabled;
 
                 await _settingsService.SaveSettingsAsync(current);
 

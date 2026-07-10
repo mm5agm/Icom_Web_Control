@@ -540,12 +540,6 @@ namespace Yaesu_Web_Control.Services
         private int _cwBreakInDelay = 200;
         public int CwBreakInDelay { get => _cwBreakInDelay; set => SetField(ref _cwBreakInDelay, value); }
 
-        // IF Low Cut per VFO (SL command) — complements IF Width (SH command)
-        private string _ifLowCutA = "0";
-        public string IfLowCutA { get => _ifLowCutA; set => SetField(ref _ifLowCutA, value); }
-        private string _ifLowCutB = "0";
-        public string IfLowCutB { get => _ifLowCutB; set => SetField(ref _ifLowCutB, value); }
-
         private bool _radioPowerOn = true; // Assume on when app starts
         public bool RadioPowerOn { get => _radioPowerOn; set => SetField(ref _radioPowerOn, value); }
 

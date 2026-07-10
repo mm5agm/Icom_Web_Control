@@ -43,10 +43,12 @@ namespace Yaesu_Web_Control.Pages
         public bool ShowApp2Button { get; set; } = true;
         public bool ShowApp3Button { get; set; } = true;
         public bool ShowApp4Button { get; set; } = false;
+        public bool ShowApp5Button { get; set; } = false;
         public string App1Name { get; set; } = "WSJT-X";
         public string App2Name { get; set; } = "JTAlert";
         public string App3Name { get; set; } = "Log4OM";
         public string App4Name { get; set; } = "GridTracker";
+        public string App5Name { get; set; } = "Fldigi";
 
         // MIC Gain persisted value
         public int MicGain { get; set; } = 50;
@@ -76,6 +78,17 @@ namespace Yaesu_Web_Control.Pages
         public double SdrSampleRateHz  { get; set; } = 2_048_000;
         public double SdrSampleRateHzA { get; set; } = 2_048_000;
         public double SdrSampleRateHzB { get; set; } = 2_048_000;
+
+        // Per-VFO spectrum DSP knobs — initial values for the Low/High/Zoom
+        // sliders on each spectrum panel. Persisted server-side; see
+        // ApplicationSettings.SdrSpectrum* and Controllers/SdrController dsp endpoint.
+        public float SdrSpectrumGainA   { get; set; } = 1.0f;
+        public float SdrSpectrumGainB   { get; set; } = 1.0f;
+        public float SdrSpectrumLowDbA  { get; set; } = -120f;
+        public float SdrSpectrumLowDbB  { get; set; } = -120f;
+        public float SdrSpectrumHighDbA { get; set; } = 0f;
+        public float SdrSpectrumHighDbB { get; set; } = 0f;
+
         public string BandPlan { get; set; } = "Region1";
         public string RadioModel { get; set; } = "FTdx101MP";
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
@@ -84,6 +97,12 @@ namespace Yaesu_Web_Control.Pages
         // display for users who can't use a scroll wheel (Yuri W4YSW, etc.).
         // Default false; user enables via Settings > Accessibility.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
+
+        // Voice control nudge step defaults for each VFO's mic button
+        // dropdown, server-rendered so voice-control.js has a starting
+        // value before it can fetch/receive anything.
+        public long VoiceNudgeStepHzA { get; set; } = 10_000;
+        public long VoiceNudgeStepHzB { get; set; } = 10_000;
 
         public RadioStateService RadioState => _radioStateService;
 
@@ -102,14 +121,24 @@ namespace Yaesu_Web_Control.Pages
             ShowApp2Button = settings.ShowJtalertButton;
             ShowApp3Button = settings.ShowLog4omButton;
             ShowApp4Button = settings.ShowGridtrackerButton;
+            ShowApp5Button = settings.ShowFldigiButton;
             ShowFrequencyArrowButtons = settings.ShowFrequencyArrowButtons;
             App1Name = settings.App1Name;
             App2Name = settings.App2Name;
             App3Name = settings.App3Name;
             App4Name = settings.App4Name;
+            App5Name = settings.App5Name;
             SdrSampleRateHz  = settings.SdrSampleRateHzA;     // legacy single value, used by old code paths
             SdrSampleRateHzA = settings.SdrSampleRateHzA;
             SdrSampleRateHzB = settings.SdrSampleRateHzB;
+            SdrSpectrumGainA   = settings.SdrSpectrumGainA;
+            SdrSpectrumGainB   = settings.SdrSpectrumGainB;
+            SdrSpectrumLowDbA  = settings.SdrSpectrumLowDbA;
+            SdrSpectrumLowDbB  = settings.SdrSpectrumLowDbB;
+            SdrSpectrumHighDbA = settings.SdrSpectrumHighDbA;
+            SdrSpectrumHighDbB = settings.SdrSpectrumHighDbB;
+            VoiceNudgeStepHzA = settings.VoiceNudgeStepHzA;
+            VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;
