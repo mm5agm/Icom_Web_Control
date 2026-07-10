@@ -5,7 +5,7 @@
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
-> I would appreciate feedback and bug/layout reports. I have only tested on the FTdx101MP and the spectrum display with the SDRplay RSP1B.
+> **Feedback wanted — especially if your setup isn't mine.** I operate FT8 on an FTdx101MP with an SDRplay RSP1B/RSP1 for the spectrum display, so that's the combination that actually gets tested. YWC now does everything I personally need, which means I've run out of my own ideas for what to add next — new features from here on depend on what other operators ask for. If you use another mode (SSB, CW, RTTY, other digital modes), another supported radio (FTdx101D, FTdx10, FT-710, FTDX3000), or a different SDR, even a one-line "works fine" or "this is annoying because…" on the [Discussions tab](https://github.com/mm5agm/Yaesu_Web_Control/discussions) tells me something I can't find out on my own. Bug reports, layout issues, and feature requests are all equally welcome.
 
 Yaesu Web Control (**YWC**) is a continuation of my FTdx101_WebApp with more Yaesu transceivers added and more controls.
 
@@ -18,6 +18,8 @@ Yaesu Web Control (**YWC**) is a continuation of my FTdx101_WebApp with more Yae
 | FTdx10 | 100 W | Single | Two VFOs; no rear-panel IF output for spectrum |
 | FT-710 | 100 W | Single | Two VFOs; no rear-panel IF output for spectrum |
 | FTDX3000 | 100 W | Single | Two VFOs; no memory tag (MT) command |
+
+**Other Yaesu transceivers** (FT-991A, FTDX5000, etc.) can be added too — the CAT protocol is well documented and most of the groundwork already exists. What's missing is someone who owns the radio and can test against it as support is built. If that's you, open a [Discussion](https://github.com/mm5agm/Yaesu_Web_Control/discussions) and let's talk.
 
 ## Main Page
 ![Yaesu Web Control Main Page](pictures/DevelopScreen.png)
@@ -92,8 +94,8 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 **Supported SDR devices:**
 
-- **SDRplay RSP1 / RSP1A / RSP1B / RSP2 / RSPdx / RSPduo** — supported via the SDRplay API v3. The SDRplay API must be installed separately from [sdrplay.com](https://www.sdrplay.com/downloads/). The author runs YWC with an RSP1B (main IF) and an RSP1 (sub IF) on an FTdx101MP and that is the configuration most thoroughly tested.
-- **RTL-SDR, Airspy, and HackRF** — supported via the bundled SoapySDR driver interface. No separate SoapySDR installation is required — the necessary drivers are included in the installer. *These devices have not been tested by the author — feedback from users is very welcome.*
+- **SDRplay RSP1 / RSP1A / RSP1B / RSP2 / RSPdx / RSPduo** — supported via the SDRplay API v3. The SDRplay API must be installed separately from [sdrplay.com](https://www.sdrplay.com/downloads/). I run YWC with an RSP1B (main IF) and an RSP1 (sub IF) on an FTdx101MP and that is the configuration most thoroughly tested.
+- **RTL-SDR, Airspy, and HackRF** — supported via the bundled SoapySDR driver interface. No separate SoapySDR installation is required — the necessary drivers are included in the installer. *These devices have not been tested by me — feedback from users is very welcome.*
 
 **Features:**
 - Variable span: 62.5 kHz, 125 kHz, 250 kHz, 500 kHz, 1 MHz, or 2 MHz
@@ -106,7 +108,7 @@ The application includes a real-time spectrum display and waterfall, intended fo
 
 The FTdx101MP and FTdx101D have **two independent receivers**, with separate rear-panel IF output sockets (`IF OUT MAIN` for VFO A, `IF OUT SUB` for VFO B). Watching both bands at once requires **two SDRs** — one wired to each socket.
 
-At first glance an **SDRplay RSPduo** looks like the obvious choice — it has two independent tuners in one box. Why does the author run two separate **RSP1Bs** instead?
+At first glance an **SDRplay RSPduo** looks like the obvious choice — it has two independent tuners in one box. Why do I run two separate **RSP1Bs** instead?
 
 - **Bandwidth.** An RSPduo in dual-tuner mode is capped to **roughly 2 MHz total** shared between the two tuners — so each receiver gets ~1 MHz at best. Two separate RSP1Bs each give you the full **10 MHz** the chip can deliver (YWC currently uses 2 MHz spans per side but the headroom is there).
 - **Price.** Two RSP1Bs at retail are only marginally more expensive than one RSPduo — and you also get two completely independent radios you can move around your shack rather than one device locked to dual-tuner mode.
@@ -123,7 +125,7 @@ RTL-SDR dongles are supported and work — but for a serious HF-watching setup t
 - **Front-end filtering.** RSPs include selectable bandpass filters; RTL-SDR dongles have essentially none. With a kilowatt-class transmitter on the next band a dongle will overload long before an RSP does.
 - **Reference clock stability.** RSPs use a TCXO; the cheap dongles drift visibly during a warm-up. For spectrum display centred on the radio's IF, that drift shows up as the whole spectrum sliding sideways over the first ten minutes.
 
-For the author's FTdx101MP-with-9MHz-IF setup, the SDRplay-API path is what was developed against; RTL-SDR users are welcome to try the SoapySDR path but it has not been bench-tested.
+For my FTdx101MP-with-9MHz-IF setup, the SDRplay-API path is what was developed against; RTL-SDR users are welcome to try the SoapySDR path but it has not been bench-tested.
 
 ### What's that brief pause when I change the span?
 
@@ -139,13 +141,13 @@ This is normal and expected. The first time you see it you'll probably blink; fr
 
 Active development is currently focused on bug fixes and polish for the supported radios, plus rolling out **voice control** as an accessibility feature for partially sighted and blind operators — hands-free band changes, frequency entry, mode switching, and rig status without needing to see the screen.
 
-**Voice control v1 shipped in v2.4.0-pre1 (2026-06-24)** and is in the current pre-release v2.4.0-pre3. It uses **Windows' built-in speech recognition (SAPI 5 / `System.Speech`)** running locally on the user's PC, driven by an editable phrase pack tuned to ham-radio vocabulary, with a press-and-hold microphone button beside each VFO panel — VFO A and VFO B are controlled independently, and the command targets whichever VFO's button you're holding (single-receiver radios show only one button). Recognised audio never leaves the PC; no cloud account, no public endpoint, no DNS or tunnel setup. A microphone connected to the PC is the only hardware requirement. See [USER_MANUAL.md §17 Voice Control](USER_MANUAL.md#17-voice-control) for what voice does, the full command list, and how to enable it. Feedback from real users is what's wanted right now — please try it and report back.
+**Voice control v1 shipped in v2.4.0-pre1 (2026-06-24)** and has been extended through the v2.4.0 pre-release series, most recently with independent per-VFO control (separate mic buttons for VFO A and VFO B) and a full Voice Language Pack Manager for editing phrases and macros. It uses **Windows' built-in speech recognition (SAPI 5 / `System.Speech`)** running locally on the user's PC, driven by an editable phrase pack tuned to ham-radio vocabulary, with a press-and-hold microphone button beside each VFO panel — the command targets whichever VFO's button you're holding (single-receiver radios show only one button). Recognised audio never leaves the PC; no cloud account, no public endpoint, no DNS or tunnel setup. A microphone connected to the PC is the only hardware requirement. See [USER_MANUAL.md §17 Voice Control](USER_MANUAL.md#17-voice-control) for what voice does, the full command list, and how to enable it. Feedback from real users is what's wanted right now — please try it and report back.
 
 **On the abandoned Amazon Alexa route:** an earlier proof of concept routed voice through an Echo device over a Cloudflare tunnel into YWC. It worked end-to-end including signature verification, but setting it up required the user to own a domain, run a Cloudflare account, configure a custom Alexa Skill in the Amazon Developer Console, and install `cloudflared` — well over an hour of fiddly setup for the average ham. The local-SAPI approach above is dramatically simpler (one Windows speech-pack install, one Settings toggle) and runs entirely offline. The Alexa branch is therefore retired; the local mic approach is the supported path going forward.
 
 ### Which radios get tested?
 
-YWC supports the FTdx101MP, FTdx101D, FTdx10, FT-710, and FTDX3000. The developer owns and tests on the FTdx101MP; support for the other four models is implemented against the published CAT documentation and refined when users on those models report. **If you use one of the other four models, please consider dropping a one-liner on the [Discussions tab](https://github.com/mm5agm/Yaesu_Web_Control/discussions)** — even just "works fine on my FT-710" is useful. It tells the developer which models have actual users behind them and where to focus calibration improvements.
+YWC supports the FTdx101MP, FTdx101D, FTdx10, FT-710, and FTDX3000. I own and test on the FTdx101MP; support for the other four models is implemented against the published CAT documentation and refined when users on those models report. **If you use one of the other four models, please consider dropping a one-liner on the [Discussions tab](https://github.com/mm5agm/Yaesu_Web_Control/discussions)** — even just "works fine on my FT-710" is useful. It tells me which models have actual users behind them and where to focus calibration improvements.
 
 ---
 
@@ -214,7 +216,7 @@ Reported by solson888 on the FTdx10, confirmed on the FTdx101MP too — the univ
 
 ### Audio Filter popout (replaces broken IF Low Cut)
 
-The "IF Low Cut" dropdown on each VFO panel was sending the `SL` CAT command — which is not documented for any current Yaesu HF transceiver (FTdx101MP/D, FTdx10, FT-710, FTDX3000, FT-991A). The radio silently ignored it, so the control was a phantom: changing the dropdown looked like it was doing something but nothing actually reached the radio. Confirmed by Jacek SP3L on FTdx10 (#48) and the developer's own FTdx101MP.
+The "IF Low Cut" dropdown on each VFO panel was sending the `SL` CAT command — which is not documented for any current Yaesu HF transceiver (FTdx101MP/D, FTdx10, FT-710, FTDX3000, FT-991A). The radio silently ignored it, so the control was a phantom: changing the dropdown looked like it was doing something but nothing actually reached the radio. Confirmed by Jacek SP3L on FTdx10 (#48) and my own FTdx101MP.
 
 The fix replaces the dropdown with a new **Audio Filter** button on each VFO panel that opens a dedicated popout dialog exposing the full per-mode passband shaping the radio actually has:
 
@@ -367,7 +369,7 @@ A few quality-of-life changes during the FTdx10 testing this round:
 
 ## 2026-06-15 - v2.3.7
 
-Reporter-driven release across five contributors — Jacek SP3L, Thomas OZ1JTE, Ken KN2D, plus Colin's own bench testing. The biggest single change is a UI overhaul for single-receiver radios (FTdx10, FT-710, FTDX3000) driven by Jacek's hands-on testing. Eight new features and improvements; six bug fixes; one calibration update; one accessibility improvement specifically for screen-reader users; the v1 of the Voice Control documentation lands as a preview.
+Reporter-driven release across five contributors — Jacek SP3L, Thomas OZ1JTE, Ken KN2D, plus my own bench testing. The biggest single change is a UI overhaul for single-receiver radios (FTdx10, FT-710, FTDX3000) driven by Jacek's hands-on testing. Eight new features and improvements; six bug fixes; one calibration update; one accessibility improvement specifically for screen-reader users; the v1 of the Voice Control documentation lands as a preview.
 
 ### New features
 
@@ -436,7 +438,7 @@ Recommended update for everyone running v2.3.5.
 ### Bug fixes
 
 - **YWC no longer changes the radio's frequency on startup or tab
-  navigation.** Reported by Jacek SP3L (#33), reproduced on Colin's
+  navigation.** Reported by Jacek SP3L (#33), reproduced on my
   FTdx101MP. On every Index-page load, YWC was auto-tuning the radio
   to the last-clicked band segment for each VFO (e.g. snapping to the
   saved FT8 frequency on 20m even if you'd just manually tuned the rig
@@ -446,7 +448,7 @@ Recommended update for everyone running v2.3.5.
   source of truth.
 
 - **S-meter calibration now correctly drives the gauge needle.**
-  Reported by Jacek SP3L (#29), reproduced and traced on Colin's
+  Reported by Jacek SP3L (#29), reproduced and traced on my
   FTdx101MP. The v2.3.3 fix wired the SignalR refresh and the
   numeric-table loader, but two further bugs prevented the needle from
   moving correctly:
@@ -469,7 +471,7 @@ Recommended update for everyone running v2.3.5.
 ### Other fixes
 
 - **`0+60` typo** in the last S-Meter entry of all 6 shipped
-  calibration default files corrected to `+60`. Colin noticed this
+  calibration default files corrected to `+60`. I noticed this
   while bench-testing #29.
 
 - **Dev-mode no longer corrupts the shipped calibration files.**
@@ -492,7 +494,7 @@ Recommended update for everyone running v2.3.5.
   - §10.2 Power meter calibration via known TX power levels.
   - §10.3 Brief notes for ALC / SWR / Compression / IDD / VPA / TPA.
 
-  The S-Meter writeup was prompted by Colin discovering the on-rig
+  The S-Meter writeup was prompted by discovering the on-rig
   meter behaviour during calibration: the S-meter is displayed
   automatically during receive on the FTdx101MP/D, and is NOT
   selectable from the touchscreen meter chooser (which is for
@@ -540,7 +542,7 @@ Critical hotfix on v2.3.3. **If you have v2.3.3 installed, please update.**
   + ~30 CAT read queries + state restoration). That's safe at startup
   when nothing else is running yet — but on a running system it races
   with the 10 Hz meter poller, the SDR workers, and any in-flight
-  WebUI commands, and on Colin's bench it consistently crashed the
+  WebUI commands, and on my bench it consistently crashed the
   YWC process on the first or second click.
 
   Replacement: Test Connection now sends just the `ID;` probe through
@@ -782,7 +784,7 @@ bug and one regression that v2.2.1 itself introduced.
   next Save Settings. No user action required. New FAQ §15.2 explains
   the background.
 
-- Default `set/qra` example locator updated to `IO85CX` (Colin's actual
+- Default `set/qra` example locator updated to `IO85CX` (my actual
   square). Cosmetic only.
 
 ## 2026-06-09 - v2.2.1
