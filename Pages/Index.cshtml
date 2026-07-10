@@ -344,28 +344,46 @@
                              reads left-to-right toward the S-meter needle. Hidden
                              until the toolbar's S-hist toggle is on. Sized to match
                              the meter cells alongside it. Moved from inside the VFO
-                             panels in v2.3.9 (Jacek SP3L #34 / Colin's design call):
-                             the radio only has ONE calibrated S-meter (tied to MAIN
-                             on FTdx101; only physical receiver on single-receiver
-                             rigs), so showing it once at the top is the honest
-                             presentation. -->
+                             panels in v2.3.9 (Jacek SP3L #34 / Colin's design call).
+                             v2.4.0: restored as a VFO A / VFO B pair — dual-receiver
+                             radios (FTdx101MP/D) have an independently calibrated
+                             S-meter per receiver (SM0;/SM1;); single-receiver radios
+                             only get the VFO A pair since there's no SUB receiver. -->
                         <div id="sMeterHistoryContainer"
                              class="text-center smeter-history-container"
                              style="display:none; position: relative; height: 135px; min-width: 260px; margin: 0; padding: 0;">
                             <canvas id="sMeterHistoryCanvas"
                                     role="img" aria-hidden="true"
-                                    aria-label="S-meter 30-second history"
-                                    data-a11y-key="meters.smeterHistory"
+                                    aria-label="S-meter 30-second history — VFO A"
+                                    data-a11y-key="meters.smeterHistoryA"
                                     style="display:block; width:100%; height:100%; border-radius:3px;"></canvas>
                         </div>
-                        <!-- S-Meter — moved from per-VFO panels to the top row
-                             in v2.3.9. Always live (unlike SWR/Power/etc which
+                        <!-- S-Meter A (MAIN) — moved from per-VFO panels to the top
+                             row in v2.3.9. Always live (unlike SWR/Power/etc which
                              are TX-only). -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
-                                <canvas id="sMeterCanvas" role="img" aria-hidden="true" aria-label="S meter" data-a11y-key="meters.smeter"></canvas>
+                                <canvas id="sMeterCanvas" role="img" aria-hidden="true" aria-label="S meter A" data-a11y-key="meters.smeterA"></canvas>
                             </div>
                         </div>
+                        @if (!isSingleReceiver)
+                        {
+                            <!-- S-Meter B (SUB) — dual-receiver radios only. -->
+                            <div id="sMeterHistoryContainerB"
+                                 class="text-center smeter-history-container"
+                                 style="display:none; position: relative; height: 135px; min-width: 260px; margin: 0; padding: 0;">
+                                <canvas id="sMeterHistoryCanvasB"
+                                        role="img" aria-hidden="true"
+                                        aria-label="S-meter 30-second history — VFO B"
+                                        data-a11y-key="meters.smeterHistoryB"
+                                        style="display:block; width:100%; height:100%; border-radius:3px;"></canvas>
+                            </div>
+                            <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                                <div class="analog-meter-container">
+                                    <canvas id="sMeterCanvasB" role="img" aria-hidden="true" aria-label="S meter B" data-a11y-key="meters.smeterB"></canvas>
+                                </div>
+                            </div>
+                        }
                         <!-- SWR Meter -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
@@ -2009,12 +2027,15 @@
                 setInterval(tick, 1000);
             }
             window.meterPanel = new MeterPanel({
-                // v2.3.9: S-meter moved from per-VFO panels into the top meter
-                // row. Yaesu radios only have one calibrated S-meter (tied to
-                // MAIN on the FTdx101 family; only physical receiver on
-                // single-receiver rigs), so a single gauge is the truthful
-                // presentation. Old smeterA/smeterB keys are gone.
+                // v2.3.9 dropped SMeterB to a single shared gauge; v2.4.0
+                // restored it as a real VFO A / VFO B pair on dual-receiver
+                // radios (FTdx101MP/D each have an independently calibrated
+                // S-meter, SM0;/SM1;). smeterB's canvas doesn't exist on
+                // single-receiver radios, so MeterPanel._createGauges skips
+                // it automatically (config entries for missing canvases are
+                // no-ops) — no isSingleReceiver check needed here.
                 smeter:      { type: 'smeter', canvasId: 'sMeterCanvas' },
+                smeterB:     { type: 'smeter', canvasId: 'sMeterCanvasB', gaugeTitleId: 'sMeterValueB' },
                 power:       { canvasId: 'powerMeterCanvas' },
                 swr:         { canvasId: 'swrMeterCanvas' },
                 compression: { canvasId: 'compressionMeterCanvas' },
@@ -2025,20 +2046,24 @@
             });
             window.ftdx101Meters = new FTdx101Meters(window.meterPanel, window.calibrationEngine);
 
-            // ── S-meter history strip ────────────────────────────────────────
+            // ── S-meter history strips ───────────────────────────────────────
             // Hidden by default. Toggle via the "S-hist" button in the top
             // toolbar; visibility persists in localStorage so the choice
-            // survives page reloads. Single strip in the top meter row,
-            // leftmost so the trace reads left-to-right toward the S-meter.
-            window.sMeterHistory = new SMeterHistoryPanel('sMeterHistoryCanvas');
+            // survives page reloads. Both A and B strips (when B exists)
+            // share the one toggle — independent per-VFO toggles can be
+            // added later if wanted, but one button is the smaller change.
+            window.sMeterHistory  = new SMeterHistoryPanel('sMeterHistoryCanvas');
+            window.sMeterHistoryB = new SMeterHistoryPanel('sMeterHistoryCanvasB');
             (function () {
-                const btn = document.getElementById('sMeterHistoryToggleBtn');
-                const con = document.getElementById('sMeterHistoryContainer');
+                const btn  = document.getElementById('sMeterHistoryToggleBtn');
+                const con  = document.getElementById('sMeterHistoryContainer');
+                const conB = document.getElementById('sMeterHistoryContainerB');
                 if (!btn || !con) return;
 
                 const KEY = 'ywc.sMeterHistoryVisible';
                 const apply = (visible) => {
                     con.style.display = visible ? '' : 'none';
+                    if (conB) conB.style.display = visible ? '' : 'none';
                     btn.classList.toggle('active', visible);
                     btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
                 };

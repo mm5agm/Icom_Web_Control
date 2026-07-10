@@ -50,6 +50,7 @@ function showServerStoppedOverlay() {
     try { window.filterScopePanelA?.stop?.(); } catch { /* ignore */ }
     try { window.filterScopePanelB?.stop?.(); } catch { /* ignore */ }
     try { window.sMeterHistory?.stop?.();    } catch { /* ignore */ }
+    try { window.sMeterHistoryB?.stop?.();   } catch { /* ignore */ }
 }
 
 // --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
@@ -2893,14 +2894,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateSMeter(receiver, value) {
-        // v2.3.9: the S-meter and its history strip moved out of the VFO
-        // panels into the top meter row -- single shared gauge and single
-        // history because Yaesu radios only have one calibrated S-meter
-        // (tied to MAIN on FTdx101 family; only physical receiver on
-        // single-receiver rigs). The `receiver` parameter is preserved
-        // for call-site compatibility but ignored: only the 'A' value
-        // (MAIN) actually drives the gauge.
-        if (receiver !== 'A') return;
+        // v2.4.0: restored as a real per-VFO pair (dual-receiver radios have
+        // an independently calibrated S-meter per receiver, SM0;/SM1;).
+        // On single-receiver radios receiver 'B' is a no-op below since
+        // window.meterPanel has no 'smeterB' gauge (canvas doesn't exist —
+        // MeterPanel._createGauges skipped it) and sMeterHistoryB.push() is
+        // a no-op (canvas doesn't exist).
+        const gaugeKey   = receiver === 'B' ? 'smeterB' : 'smeter';
+        const history     = receiver === 'B' ? window.sMeterHistoryB : window.sMeterHistory;
+        const canvasId    = receiver === 'B' ? 'sMeterCanvasB' : 'sMeterCanvas';
+        const labelId     = receiver === 'B' ? 'sMeterValueB' : 'sMeterValue';
 
         // The S-meter gauge has hardcoded tick positions on a 0-255 scale and
         // ignores calibration tables for needle placement. To make the user's
@@ -2911,19 +2914,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // raw display, and snap-label keep using the un-translated raw value.
         // Reported by Jacek SP3L on #29; confirmed broken by Colin on bench
         // 2026-06-12 and traced to gauge.js:137 hardcoded majorTicks.
+        // Both VFOs share the single calibration table -- there's no
+        // per-receiver calibration in this codebase, and SM0;/SM1; both
+        // report on the same raw 0-255 scale.
         const gaugePos = window.calibrationEngine?.calibrateSMeterForGauge
             ? window.calibrationEngine.calibrateSMeterForGauge(value)
             : value;
-        if (window.meterPanel) window.meterPanel.update('smeter', gaugePos);
-        if (window.sMeterHistory) window.sMeterHistory.push(value);
-        if (typeof updateRawSMeterValueA === 'function') updateRawSMeterValueA(value);
-        const canvas = document.getElementById('sMeterCanvas');
+        if (window.meterPanel) window.meterPanel.update(gaugeKey, gaugePos);
+        if (history) history.push(value);
+        if (receiver === 'A' && typeof updateRawSMeterValueA === 'function') updateRawSMeterValueA(value);
+        const canvas = document.getElementById(canvasId);
         const sUnit = sMeterLabel(value);
         if (canvas) canvas.dataset.reading = sUnit;
         // Update the "S-Meter S5" title label under the gauge (matches SWR /
         // Power / Temp / etc. format). Element is rendered by SMeterGauge
         // when gaugeTitleShow is true (set in gauge.js).
-        const sLabel = document.getElementById('sMeterValue');
+        const sLabel = document.getElementById(labelId);
         if (sLabel) sLabel.textContent = sUnit;
     }
 
