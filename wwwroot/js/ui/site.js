@@ -2428,23 +2428,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // ▲ / ▼ buttons — visible when Settings > Accessibility >
-        // Show frequency arrow buttons is on (Yuri W4YSW request). Each
-        // click steps the currently-selected digit by 1 — same action as
-        // ArrowUp / ArrowDown and the mouse wheel.
-        if (upBtn) {
-            upBtn.onclick = function (e) {
-                e.preventDefault();
+        // Show frequency arrow buttons is on (Yuri W4YSW request). A single
+        // click/tap steps the currently-selected digit by 1 — same action as
+        // ArrowUp / ArrowDown and the mouse wheel. Press-and-hold repeats
+        // that same step every 500 ms until released, so reaching a distant
+        // frequency doesn't need dozens of individual clicks.
+        function bindHoldToRepeat(btn, direction) {
+            if (!btn) return;
+            let repeatTimer = null;
+            let firedByHold = false;
+
+            function doStep() {
                 ensureSelection();
-                stepSelectedDigit(1);
-            };
-        }
-        if (downBtn) {
-            downBtn.onclick = function (e) {
+                stepSelectedDigit(direction);
+            }
+            function start(e) {
                 e.preventDefault();
-                ensureSelection();
-                stepSelectedDigit(-1);
-            };
+                firedByHold = true;
+                doStep();
+                clearInterval(repeatTimer);
+                repeatTimer = setInterval(doStep, 500);
+            }
+            function stop() {
+                clearInterval(repeatTimer);
+                repeatTimer = null;
+            }
+
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('touchstart', start, { passive: false });
+            btn.addEventListener('mouseup', stop);
+            btn.addEventListener('mouseleave', stop);
+            btn.addEventListener('touchend', stop);
+            btn.addEventListener('touchcancel', stop);
+            window.addEventListener('blur', stop);
+
+            // Keyboard activation (Enter/Space) fires 'click' directly with
+            // no preceding mousedown/touchstart, so it still gets a single
+            // step. A pointer click/tap already stepped via start() above —
+            // firedByHold suppresses the duplicate step from the click that
+            // follows mouseup/touchend.
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (firedByHold) { firedByHold = false; return; }
+                doStep();
+            });
         }
+        bindHoldToRepeat(upBtn, 1);
+        bindHoldToRepeat(downBtn, -1);
 
         document.addEventListener('click', function (e) {
             // Don't clear selection on clicks inside the display OR inside

@@ -1816,7 +1816,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 | **ArrowLeft** / **ArrowRight** | Move the selection cursor | Highlights the digit to the left / right. Does not change the frequency. |
 | **Home** | Jump to the most-significant digit | Selection moves to the **leftmost** digit (tens of MHz). |
 | **End** | Jump to the least-significant digit | Selection moves to the **rightmost** digit (Hz). |
-| **▲ / ▼** buttons | Step the selected digit by ±1 | Only visible if Settings → Accessibility → **Show frequency up/down arrow buttons** is on. Each click does the same as one ArrowUp / ArrowDown. If no digit is selected, the first click auto-selects the kHz digit and steps it in one go (buttons are a deliberate action — unlike the keyboard, they don't need a "show me the cursor" first press). |
+| **▲ / ▼** buttons | Step the selected digit by ±1 | Only visible if Settings → Accessibility → **Show frequency up/down arrow buttons** is on. A click does the same as one ArrowUp / ArrowDown. If no digit is selected, the first click auto-selects the kHz digit and steps it in one go (buttons are a deliberate action — unlike the keyboard, they don't need a "show me the cursor" first press). **Press and hold to repeat** the same step every 500 ms until released — mouse, touch, and keyboard (Enter/Space) all work. |
 | Click anywhere outside the display + arrow buttons | Deselect | The selection is cleared; the next ArrowUp will start over with the "first press picks the kHz digit" behaviour. |
 
 A few extra notes:
@@ -2334,7 +2334,7 @@ If you can't use a mouse wheel — head-tracking input, on-screen keyboard users
 - **ArrowLeft / ArrowRight** move the selection cursor sideways.
 - **Home / End** jump the selection to the **leftmost** (most significant — tens of MHz) or **rightmost** (least significant — Hz) digit.
 - The first arrow press when nothing is selected just highlights the kHz digit — a second press then steps it. This protects against an accidental ArrowUp changing the radio without you realising a digit was selected.
-- Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown).
+- Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown). Press and hold to repeat that step every 500 ms until released.
 - Clicking outside the display deselects.
 
 Originally requested by Yuri W4YSW. Shipped in v2.3.9.

@@ -172,7 +172,29 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Unreleased — develop
 
-Changes queued for the next public release (v2.4.0 will also include the voice-control work currently in v2.4.0-pre1).
+Changes queued for the next public release, v2.4.0.
+
+### Headline feature — Voice Control v1
+
+Hands-free voice control of common operating actions, previewed across v2.4.0-pre1 through pre4 and now landing as a full feature. Recognition runs entirely on-PC via Windows' built-in speech engine (SAPI 5) — no audio ever leaves the machine. See [USER_MANUAL.md §17](USER_MANUAL.md#17-voice-control) for the complete reference.
+
+- **Independent mic button per VFO**, on the Index page next to each VFO's band/mode controls (replacing an earlier single navbar button) — press and hold VFO A's button to control VFO A, VFO B's to control VFO B. Only one VFO listens at a time; single-receiver radios (FTdx10, FT-710, FTDX3000) show just VFO A's button.
+- **Full command set**: set frequency, change band, step up/down with a configurable step size, band up/down, set mode, swap VFOs, set attenuator/preamp/AGC/AF gain, nudge IF filter width, transmit on/off, split on/off, spoken status read-back ("what frequency", "what mode", "what band"), help, and a macro group (noise reduction, noise blanker, copy A↔B, fine step, roofing filter).
+- **Spoken confirmation after every command** ("Move to fourteen point zero seven four megahertz, successful") — the safety net against misrecognition, since a misheard command is easy to catch by ear before it does anything unwanted.
+- **Low-confidence matches are rejected** rather than fuzzy-fitted to the nearest rule, so background noise or an ambient TV can't accidentally trigger a command.
+- **Voice Language Pack Manager** (Settings → Voice Control): a full phrase editor with hot-reload (no restart needed to change wording), a macro editor for custom CAT command sequences, per-row "Try it" mic testing, a **Test this pack** dry-run modal for checking phrases without touching the radio, version history (last 5 saves/imports, one-click undo), and export/import of shareable `.zip` language packs with per-collision merge resolution.
+- **Diagnostics panel** (Settings → Voice Control) shows engine state, last phrase heard, last intent matched, active language, installed pack version, and last recognition confidence — plus a filtered Voice Control Log on the Diagnostics page for troubleshooting without digging through the raw log file.
+- **Multi-language architecture**, though only English (UK) ships as the built-in default today — the Active language dropdown, pack import, and hand-authored `Commands.<culture>.json` files are all already wired up for anyone who wants to contribute another language.
+
+### Dual-VFO S-meter gauge restored
+
+v2.3.9 dropped the top-row S-meter to a single gauge (VFO A/MAIN only), on the belief that the SUB receiver's `SM1;` reading was junk on the FTdx101 family. That belief was never re-verified and turned out to be wrong. The second gauge is back: on dual-receiver radios (FTdx101MP/D) the top meter row now shows **two S-meter gauges and two 30-second history strips**, one per VFO, confirmed against a live FTdx101MP. Single-receiver radios (FTdx10, FT-710, FTDX3000, FT-991A) are unaffected — they only ever had one gauge.
+
+Also fixed while working on this: the S-meter history strip(s) would **slowly grow wider the longer YWC stayed open**. The strip's canvas was styled at 100% of a container that only set a `min-width`, so the container's actual width ended up depending on the canvas's own backing-store size — every resize made the canvas a little bigger, which made the container a little bigger, which triggered another resize. The container now has a fixed width, so the strip holds steady.
+
+### Frequency ▲/▼ buttons now repeat while held
+
+The optional on-screen frequency ▲/▼ buttons (Settings → Accessibility → "Show frequency arrow buttons") used to step the selected digit once per click, which made reaching a distant frequency a lot of clicking. Press-and-hold now repeats that same step every 500 ms until released — mouse, touch, and keyboard (Enter/Space) all supported.
 
 ### Spectrum display — draggable splitter
 
