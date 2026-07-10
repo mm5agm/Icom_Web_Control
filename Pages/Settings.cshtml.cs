@@ -176,6 +176,7 @@ namespace Yaesu_Web_Control.Pages
                 current.SdrDeviceKeyA     = Settings.SdrDeviceKeyA ?? string.Empty;
                 current.SdrDeviceKeyB     = Settings.SdrDeviceKeyB ?? string.Empty;
                 current.SdrDeviceKey      = string.Empty;  // legacy field — kept blank in v2.3.0+ files
+                current.SdrplayInstallPath = Settings.SdrplayInstallPath ?? string.Empty;
                 current.SdrIfFrequencyHz  = Settings.SdrIfFrequencyHz;
                 // Settings page binds a single Sample Rate dropdown — treat that
                 // as a "reset both VFOs to this rate" control. Per-VFO divergence
