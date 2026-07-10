@@ -1,7 +1,7 @@
 
 # Yaesu Web Control
 
-![Latest release](https://img.shields.io/badge/Latest%20release-v2.3.9-blue?style=flat-square)
+![Latest release](https://img.shields.io/badge/Latest%20release-v2.4.0-blue?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Yaesu_Web_Control/latest/Yaesu_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
 
@@ -172,9 +172,9 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Release Notes
 
-## Unreleased — develop
+## 2026-07-10 - v2.4.0
 
-Changes queued for the next public release, v2.4.0.
+Headline release: **Voice Control v1** — hands-free operation via on-PC speech recognition, previewed across four pre-releases and now fully landed with independent per-VFO mic buttons and a full Voice Language Pack Manager. Alongside it: the dual-VFO S-meter gauge is back, frequency ▲/▼ buttons now repeat while held, spectrum panels gained a draggable splitter, and a batch of CAT-command fixes reported by Alessandro IK2XRW, Thomas OZ1JTE, Bill W1WRH, solson888, and Jacek SP3L.
 
 ### Headline feature — Voice Control v1
 
