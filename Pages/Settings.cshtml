@@ -48,14 +48,6 @@
 
 <div class="mt-4">
 
-    @if (!string.IsNullOrEmpty(Model.StatusMessage))
-    {
-        <div class="alert @(Model.StatusMessage.Contains("success") || Model.StatusMessage.Contains("✓") ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
-            @Model.StatusMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
-
     @* Restart-required banner — shown when a setting like the radio model was
        changed and the running app needs a restart for it to fully take effect.
        Bigger, brighter, and non-dismissible compared to the StatusMessage above,
@@ -201,7 +193,7 @@
         </div>
     </div>
 
-    <form method="post">
+    <form method="post" id="settingsForm">
 
     <!-- Accessibility section -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
@@ -2084,9 +2076,36 @@
         </div>
     </details>
 
+    @{ var isSaveSuccess = !string.IsNullOrEmpty(Model.StatusMessage) && (Model.StatusMessage.Contains("success") || Model.StatusMessage.Contains("✓")); }
+
+    @* Placed right next to the Save button rather than at the top of the
+       page — the user just clicked Save from here, so this is exactly where
+       their eyes already are. A banner that only appeared at the very top
+       of this long page was easy to miss and looked like the save had
+       silently failed (#65, iu1teu). Auto-dismisses after a few seconds. *@
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div id="settingsStatusBanner"
+             class="alert @(isSaveSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show"
+             role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        <script>
+            document.getElementById('settingsStatusBanner').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(function () {
+                var el = document.getElementById('settingsStatusBanner');
+                if (el && window.bootstrap) {
+                    bootstrap.Alert.getOrCreateInstance(el).close();
+                }
+            }, 6000);
+        </script>
+    }
+
     <div class="mt-4 mb-4">
-        <button type="submit" class="btn btn-primary btn-lg">
-            <i class="bi bi-save"></i> Save Settings
+        <button type="submit" id="saveSettingsBtn" class="btn btn-primary btn-lg" data-save-success="@(isSaveSuccess ? "1" : "0")">
+            <i class="bi @(isSaveSuccess ? "bi-check-circle-fill" : "bi-save")" id="saveSettingsIcon"></i>
+            <span id="saveSettingsLabel">@(isSaveSuccess ? "Saved" : "Save Settings")</span>
         </button>
         <button type="button" class="btn btn-success btn-lg ms-2" onclick="testConnection()">
             <i class="bi bi-plug"></i> Test Connection
@@ -2096,6 +2115,34 @@
         </a>
     </div>
     </form>
+
+    <script>
+        // Save button feedback: "Saving…" the instant the form is submitted
+        // (the POST → redirect → reload round trip takes a few seconds, and
+        // without this the button just sits there looking unresponsive),
+        // then "Saved ✓" on the reloaded page after a successful save,
+        // reverting back to normal after a few seconds. #65 follow-up.
+        (function () {
+            var form = document.getElementById('settingsForm');
+            var btn = document.getElementById('saveSettingsBtn');
+            var icon = document.getElementById('saveSettingsIcon');
+            var label = document.getElementById('saveSettingsLabel');
+            if (!form || !btn || !icon || !label) return;
+
+            form.addEventListener('submit', function () {
+                btn.disabled = true;
+                icon.className = 'spinner-border spinner-border-sm';
+                label.textContent = 'Saving…';
+            });
+
+            if (btn.dataset.saveSuccess === '1') {
+                setTimeout(function () {
+                    icon.className = 'bi bi-save';
+                    label.textContent = 'Save Settings';
+                }, 3000);
+            }
+        })();
+    </script>
 
     <!-- Backup / Restore — outside the main form so the import button doesn't trigger a save -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>

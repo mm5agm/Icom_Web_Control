@@ -13,7 +13,12 @@ namespace Yaesu_Web_Control.Services
         private readonly SemaphoreSlim _serialSemaphore = new(1, 1);
         private readonly ILogger<CatMultiplexerService> _logger;
         private readonly ConcurrentQueue<CatRequest> _commandQueue = new();
-        private readonly CancellationTokenSource _cancellationTokenSource = new();
+        // Recreated on every reconnect (see CloseSerialPortAsync) — a single
+        // CancellationTokenSource can only be cancelled once, so reusing the
+        // same instance across a disconnect/reconnect cycle would leave
+        // ProcessCommandQueueAsync permanently cancelled after the first
+        // disconnect.
+        private CancellationTokenSource _cancellationTokenSource = new();
         private Task? _processingTask;
 
         // Auto-Information support
@@ -87,8 +92,23 @@ namespace Yaesu_Web_Control.Services
             {
                 if (_serialPort?.IsOpen == true)
                 {
-                    _logger.LogInformation("Port {PortName} already connected", portName);
-                    return true;
+                    if (string.Equals(_serialPort.PortName, portName, StringComparison.OrdinalIgnoreCase)
+                        && _serialPort.BaudRate == baudRate)
+                    {
+                        _logger.LogInformation("Port {PortName} already connected", portName);
+                        return true;
+                    }
+
+                    // Settings changed the port/baud rate while a connection was
+                    // already open (e.g. Settings page save). Previously this
+                    // branch just returned true without ever opening the new
+                    // port, silently ignoring the change (#65 follow-up,
+                    // reported by iu1teu). Close the old port first so the new
+                    // one actually gets opened below.
+                    _logger.LogInformation(
+                        "Serial settings changed ({OldPort}@{OldBaud} → {NewPort}@{NewBaud}) — reconnecting",
+                        _serialPort.PortName, _serialPort.BaudRate, portName, baudRate);
+                    await CloseSerialPortAsync();
                 }
 
                 var availablePorts = SerialPort.GetPortNames();
@@ -316,42 +336,55 @@ namespace Yaesu_Web_Control.Services
                 _logger.LogWarning("DisconnectAsync: timed out waiting for serial semaphore — forcing disconnect without lock");
             try
             {
-                _cancellationTokenSource.Cancel();
-
-                if (_processingTask != null)
-                {
-                    await _processingTask;
-                }
-
-                if (_serialPort?.IsOpen == true)
-                {
-                    if (_autoInformationEnabled)
-                    {
-                        try
-                        {
-                            var cmdBytes = Encoding.ASCII.GetBytes("AI0;");
-                            _serialPort.Write(cmdBytes, 0, cmdBytes.Length);
-                            await Task.Delay(100);
-                        }
-                        catch { /* Ignore errors during disconnect */ }
-                    }
-
-                    _serialPort.DtrEnable = false;
-                    _serialPort.RtsEnable = false;
-                    _serialPort.DiscardInBuffer();
-                    _serialPort.DiscardOutBuffer();
-                    _serialPort.Close();
-                    _logger.LogInformation("Disconnected from serial port");
-                }
-
-                _serialPort?.Dispose();
-                _serialPort = null;
-                _autoInformationEnabled = false;
+                await CloseSerialPortAsync();
             }
             finally
             {
                 if (acquired) _serialSemaphore.Release();
             }
+        }
+
+        // Shared by DisconnectAsync (acquires _serialSemaphore itself) and
+        // ConnectAsync's reconnect path (already holds the semaphore) — must
+        // NOT acquire _serialSemaphore itself, or ConnectAsync would deadlock.
+        private async Task CloseSerialPortAsync()
+        {
+            _cancellationTokenSource.Cancel();
+
+            if (_processingTask != null)
+            {
+                await _processingTask;
+            }
+
+            if (_serialPort?.IsOpen == true)
+            {
+                if (_autoInformationEnabled)
+                {
+                    try
+                    {
+                        var cmdBytes = Encoding.ASCII.GetBytes("AI0;");
+                        _serialPort.Write(cmdBytes, 0, cmdBytes.Length);
+                        await Task.Delay(100);
+                    }
+                    catch { /* Ignore errors during disconnect */ }
+                }
+
+                _serialPort.DtrEnable = false;
+                _serialPort.RtsEnable = false;
+                _serialPort.DiscardInBuffer();
+                _serialPort.DiscardOutBuffer();
+                _serialPort.Close();
+                _logger.LogInformation("Disconnected from serial port");
+            }
+
+            _serialPort?.Dispose();
+            _serialPort = null;
+            _autoInformationEnabled = false;
+
+            // Recreate so the next ConnectAsync's command-queue processor
+            // gets a fresh, non-cancelled token.
+            _cancellationTokenSource.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
         }
 
         public void Dispose()
