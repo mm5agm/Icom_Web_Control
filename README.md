@@ -103,6 +103,7 @@ The application includes a real-time spectrum display and waterfall, intended fo
 - Click anywhere on a spectrum panel to tune the corresponding VFO to that frequency (panel A tunes VFO A, panel B tunes VFO B)
 - Mouse wheel over a spectrum panel tunes that VFO up/down in 1 kHz steps
 - Frequency axis labels automatically track each VFO
+- Waterfall Speed slider (next to Low/High/Gain) slows the waterfall scroll rate down to 1/128 of full speed, independently per VFO — the spectrum trace above it is unaffected and always updates live
 
 ### Why two SDRs? (and why two RSP1Bs rather than one RSPduo)
 

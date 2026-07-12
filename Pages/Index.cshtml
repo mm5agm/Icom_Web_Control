@@ -583,6 +583,9 @@
                         <label class="text-nowrap mb-0 ms-2" title="Pre-dB digital gain — brightens the whole trace so weak signals climb into the Low/High window. Does not change the frequency span (use the kHz/MHz buttons for that).">Gain</label>
                         <input type="range" class="form-range spectrum-gain-slider" data-vfo="A" min="0" max="30" step="1" value="@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainA))))" aria-label="VFO A spectrum digital gain (dB)" style="flex:1; min-width:60px;">
                         <span class="text-monospace spectrum-gain-label" data-vfo="A" style="min-width:3.5em; text-align:right;">+@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainA)))) dB</span>
+                        <label class="text-nowrap mb-0 ms-2" title="How fast the waterfall scrolls, from full speed down to 1/128. Does not affect the spectrum trace above it.">Speed</label>
+                        <input type="range" class="form-range spectrum-speed-slider" data-vfo="A" min="0" max="7" step="1" value="0" aria-label="VFO A waterfall scroll speed" style="flex:1; min-width:60px;">
+                        <span class="text-monospace spectrum-speed-label" data-vfo="A" style="min-width:3.5em; text-align:right;">Full</span>
                     </div>
                     <div class="card-body p-0">
                         <canvas id="spectrumCanvasA" role="img" aria-hidden="true" aria-label="RF spectrum display VFO A" style="display:block; width:100%;"></canvas>
@@ -618,6 +621,9 @@
                         <label class="text-nowrap mb-0 ms-2" title="Pre-dB digital gain — brightens the whole trace so weak signals climb into the Low/High window. Does not change the frequency span (use the kHz/MHz buttons for that).">Gain</label>
                         <input type="range" class="form-range spectrum-gain-slider" data-vfo="B" min="0" max="30" step="1" value="@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainB))))" aria-label="VFO B spectrum digital gain (dB)" style="flex:1; min-width:60px;">
                         <span class="text-monospace spectrum-gain-label" data-vfo="B" style="min-width:3.5em; text-align:right;">+@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainB)))) dB</span>
+                        <label class="text-nowrap mb-0 ms-2" title="How fast the waterfall scrolls, from full speed down to 1/128. Does not affect the spectrum trace above it.">Speed</label>
+                        <input type="range" class="form-range spectrum-speed-slider" data-vfo="B" min="0" max="7" step="1" value="0" aria-label="VFO B waterfall scroll speed" style="flex:1; min-width:60px;">
+                        <span class="text-monospace spectrum-speed-label" data-vfo="B" style="min-width:3.5em; text-align:right;">Full</span>
                     </div>
                     <div class="card-body p-0">
                         <canvas id="spectrumCanvasB" role="img" aria-hidden="true" aria-label="RF spectrum display VFO B" style="display:block; width:100%;"></canvas>
@@ -2489,6 +2495,33 @@
                     });
                 });
             })();
+
+            // Waterfall scroll speed — purely client-side (no backend/worker
+            // involvement, unlike the DSP sliders above): it only changes how
+            // often SpectrumPanel advances the waterfall by one row per
+            // incoming FFT frame. Persisted in localStorage by the panel
+            // itself. The slider drags across an *index* into
+            // SpectrumPanel.WATERFALL_SPEEDS (1,2,4,...,128) rather than the
+            // divisor itself, since the divisors aren't evenly spaced.
+            ['A', 'B'].forEach(vfo => {
+                const slider = document.querySelector(`.spectrum-speed-slider[data-vfo="${vfo}"]`);
+                const label  = document.querySelector(`.spectrum-speed-label[data-vfo="${vfo}"]`);
+                const panel  = vfo === 'B' ? spectrumPanelB : spectrumPanelA;
+                if (!slider || !label || !panel) return;
+
+                const speeds = SpectrumPanel.WATERFALL_SPEEDS;
+                const formatSpeed = (d) => d === 1 ? 'Full' : `1/${d}`;
+
+                const initialIndex = Math.max(0, speeds.indexOf(panel.getWaterfallSpeed()));
+                slider.value = String(initialIndex);
+                label.textContent = formatSpeed(speeds[initialIndex]);
+
+                slider.addEventListener('input', () => {
+                    const divisor = speeds[parseInt(slider.value, 10)];
+                    label.textContent = formatSpeed(divisor);
+                    panel.setWaterfallSpeed(divisor);
+                });
+            });
 
             // Span selector — POST new sample rate for this VFO and restart
             // the corresponding worker. data-vfo on each button tells the

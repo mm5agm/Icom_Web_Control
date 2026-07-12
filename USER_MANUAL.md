@@ -321,6 +321,8 @@ The spectrum display is only visible if an SDR device has been configured in Set
 
 **Resize spectrum vs waterfall** — Hover the horizontal boundary between the spectrum trace (top) and the waterfall (bottom); the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room — useful when you're hunting weak signals close to the noise floor. Drag down to give the waterfall more history. The ratio is remembered per VFO across browser reloads, so the next time you open YWC the panel is back the way you left it. Two short grey grip-bars at the centre of the boundary mark the handle; they turn cyan while you're dragging.
 
+**Speed slider** — The slider next to Gain controls how fast the waterfall scrolls, from **Full** speed down to **1/128**. Drag it left to slow the waterfall down if signal trails are scrolling past faster than you can read them; the spectrum trace above it keeps updating live regardless of this setting. Set independently per VFO and remembered across browser reloads.
+
 **dB range** — The dropdown beside the **Hold** button picks the vertical scale of the spectrum trace, in dBFS:
 
 - **0/-120** (default) — the full SDR range; signals span the whole vertical height of the spectrum panel.
