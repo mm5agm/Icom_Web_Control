@@ -179,7 +179,7 @@ Second pre-release in the 2.4.2 line, fixing two more reporter-found bugs. Not a
 
 ### "Initialising…" spinner never clears even though the app is live ([#73](https://github.com/mm5agm/Yaesu_Web_Control/issues/73))
 
-Reported by wa6auf11 (FTdx101D) — the app would connect, the SignalR feed would be live (meters updating, frequency tracking the radio), but the startup overlay just never went away. Cause: the front-end poll that's responsible for hiding the overlay gave up permanently after a single failed HTTP request instead of retrying, so a one-off network hiccup during startup could strand the overlay forever with a fully working app underneath it. Fixed: the poll now retries on failure the same way it already did on a thrown error.
+Reported by wa6auf (FTdx101D) — the app would connect, the SignalR feed would be live (meters updating, frequency tracking the radio), but the startup overlay just never went away. Cause: the front-end poll that's responsible for hiding the overlay gave up permanently after a single failed HTTP request instead of retrying, so a one-off network hiccup during startup could strand the overlay forever with a fully working app underneath it. Fixed: the poll now retries on failure the same way it already did on a thrown error.
 
 ### FTDX3000 frequency display freezes over a VSPE virtual COM port ([#74](https://github.com/mm5agm/Yaesu_Web_Control/issues/74))
 
