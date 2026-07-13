@@ -173,6 +173,22 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Release Notes
 
+## 2026-07-13 - v2.4.2-pre2 (pre-release)
+
+Second pre-release in the 2.4.2 line, fixing two more reporter-found bugs. Not a general recommendation to upgrade — if v2.4.1 is working fine for you, there's no need to touch this; if you're hitting either symptom below, please do try it.
+
+### "Initialising…" spinner never clears even though the app is live ([#73](https://github.com/mm5agm/Yaesu_Web_Control/issues/73))
+
+Reported by wa6auf11 (FTdx101D) — the app would connect, the SignalR feed would be live (meters updating, frequency tracking the radio), but the startup overlay just never went away. Cause: the front-end poll that's responsible for hiding the overlay gave up permanently after a single failed HTTP request instead of retrying, so a one-off network hiccup during startup could strand the overlay forever with a fully working app underneath it. Fixed: the poll now retries on failure the same way it already did on a thrown error.
+
+### FTDX3000 frequency display freezes over a VSPE virtual COM port ([#74](https://github.com/mm5agm/Yaesu_Web_Control/issues/74))
+
+Reported by iu1teu, who runs YWC through VSPE (Virtual Serial Ports Emulator) to share one physical COM port with other CAT applications. Meters kept updating live, but the frequency display would freeze — a strong clue, since frequency is the one value YWC only ever learns about via the radio's unsolicited auto-info push, not by polling. Cause: before sending each queued CAT command, YWC discarded any bytes already sitting in the serial receive buffer to clear stale data — but on a slower virtual port, a genuine unsolicited frequency push could land in that buffer in the split second before the next command was sent, and got silently thrown away with it. Real hardware is fast enough that this race rarely loses; a virtual port emulator is not. Fixed: pending bytes are now drained through the normal message pipeline instead of being discarded, so an auto-info push arriving at the wrong moment is processed instead of dropped. See also [§15.6](USER_MANUAL.md#156-can-i-use-vspe-omnirig-com0com-or-a-similar-virtual-com-port-sharer) for background on virtual COM port sharers and YWC.
+
+## 2026-07-11 - v2.4.2-pre1 (pre-release)
+
+First pre-release in the 2.4.2 line. Fixed a startup redirect loop that made the FTDX3000 completely unusable: YWC sent a command during startup that other radios in the range respond to, but the FTDX3000 doesn't, and YWC was treating the missing response as fatal instead of just moving on. Reported and confirmed by iu1teu on [#65](https://github.com/mm5agm/Yaesu_Web_Control/issues/65).
+
 ## 2026-07-10 - v2.4.1
 
 Bug-fix release, out of the normal cadence, because the bug it fixes turned out to block basic connectivity for real users on day one of v2.4.0.

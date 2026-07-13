@@ -306,10 +306,21 @@ namespace Yaesu_Web_Control.Services
                     return;
                 }
 
-                // Clear stale data
+                // Drain any bytes that arrived before this command was issued,
+                // routing them through the normal message pipeline instead of
+                // discarding them. This used to call DiscardInBuffer() here,
+                // which silently ate unsolicited FA/FB auto-info pushes that
+                // happened to land in the OS receive buffer just before the
+                // next queued command started — the only way YWC ever learns
+                // about a frequency change, since nothing polls for FA/FB.
+                // On real hardware DataReceived usually wins that race, but
+                // over a slower virtual serial port (e.g. VSPE) it doesn't,
+                // reported by iu1teu on #74 as FTDX3000 frequency updates
+                // never arriving over a VSPE-routed connection.
                 if (_serialPort.BytesToRead > 0)
                 {
-                    _serialPort.DiscardInBuffer();
+                    var pending = _serialPort.ReadExisting();
+                    _messageBuffer.AppendData(pending);
                 }
 
                 var fullCommand = request.Command.EndsWith(";") ? request.Command : request.Command + ";";

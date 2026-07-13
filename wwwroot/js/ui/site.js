@@ -1539,7 +1539,12 @@ async function pollInitStatus() {
 
     try {
         const response = await fetch('/api/status/init');
-        if (!response.ok) return;
+        if (!response.ok) {
+            if (!initPollingStopped) {
+                setTimeout(pollInitStatus, 2000);
+            }
+            return;
+        }
         const data = await response.json();
         const overlay = document.getElementById('initOverlay');
         const statusText = document.getElementById('initStatusText');

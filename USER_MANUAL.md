@@ -1888,6 +1888,7 @@ A **Feature request** template is also available for ideas / improvements rather
 - Check the COM port in Settings. Go to **Diagnostics → Ports** to see which ports are available.
 - Check the baud rate in Settings matches the radio's **Menu → CAT Rate** setting (default 38400).
 - Click **Test Connection** in Settings.
+- If meters and frequency are otherwise updating live and only the overlay itself is stuck, this was a known bug (a one-off network hiccup during startup could strand the overlay permanently) fixed in v2.4.2-pre2 — just reload the page, or update to the latest version.
 
 **Frequency display shows 0 or does not update**
 
@@ -2025,6 +2026,8 @@ Symptoms when there's a port sharer in the chain:
 
 - **"Test Connection" fails** with a "COM port opened but the radio did not respond to a CAT probe" error (YWC v2.3.0+ catches this case explicitly).
 - Or worse — the port opens, YWC reports connected, but the frequency/mode displays never follow the radio's actual state. CAT chatter is being swallowed somewhere between YWC and the radio.
+
+> **Update (v2.4.2-pre2):** one specific cause of the second symptom is fixed — a frequency-only freeze (meters still live) over VSPE, caused by YWC discarding a receive-buffer race that a virtual port's added latency made much easier to hit than on real hardware. See [#74](https://github.com/mm5agm/Yaesu_Web_Control/issues/74). This doesn't make VSPE (or other port sharers) a generally supported or tested configuration — the advice below still stands — but if this was your exact symptom, it's worth updating.
 
 Why this happens in practice:
 
