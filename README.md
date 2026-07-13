@@ -173,6 +173,10 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Release Notes
 
+## 2026-07-13 - v2.4.2-pre3 (pre-release)
+
+Third pre-release in the 2.4.2 line. My pre2 fix for #74 (draining pending serial bytes instead of discarding them) introduced a new bug: it made two different threads write to the same CAT message buffer at once, and that buffer wasn't thread-safe. The corruption this caused explains why pre2 testers were still seeing #74's frozen frequency display, and also explains wa6auf's #73 report of the startup overlay taking well over a minute to clear (a slow-motion CAT session, with every response and even unrelated file reads dragging to seconds each) even after the pre2 overlay-retry fix landed. Fixed: the buffer's reads and writes are now protected by a lock, so the two writer threads can no longer step on each other. Not yet confirmed against real hardware — if you're iu1teu or wa6auf, this is the one to retest.
+
 ## 2026-07-13 - v2.4.2-pre2 (pre-release)
 
 Second pre-release in the 2.4.2 line, fixing two more reporter-found bugs. Not a general recommendation to upgrade — if v2.4.1 is working fine for you, there's no need to touch this; if you're hitting either symptom below, please do try it.

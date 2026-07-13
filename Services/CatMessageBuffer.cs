@@ -9,6 +9,15 @@ namespace Yaesu_Web_Control.Services
     public class CatMessageBuffer
     {
         private readonly StringBuilder _buffer = new();
+        // StringBuilder isn't thread-safe. Since v2.4.2-pre2, AppendData is
+        // called both from SerialPort.DataReceived (its own background thread)
+        // and from CatMultiplexerService's per-command pending-bytes drain
+        // (the command-queue processing thread) — two concurrent writers
+        // where there used to be only one. Unsynchronized concurrent
+        // Append/Remove/ToString on the same StringBuilder can corrupt its
+        // internal state, silently dropping or garbling bytes (a lost
+        // semicolon means a message is never extracted) rather than throwing.
+        private readonly object _bufferLock = new();
 
         public event EventHandler<CatMessageReceivedEventArgs>? MessageReceived;
 
@@ -23,15 +32,28 @@ namespace Yaesu_Web_Control.Services
         {
             if (string.IsNullOrEmpty(data)) return;
 
-            _buffer.Append(data);
-            ProcessMessages();
+            List<string> messages;
+            lock (_bufferLock)
+            {
+                _buffer.Append(data);
+                messages = ExtractCompleteMessages();
+            }
+
+            // Dispatch outside the lock so downstream handlers can't deadlock
+            // against another AppendData call.
+            foreach (var message in messages)
+            {
+                OnMessageReceived(message);
+            }
         }
 
         /// <summary>
-        /// Extract and dispatch complete messages (ending with semicolon)
+        /// Extract complete messages (ending with semicolon). Caller must hold _bufferLock.
         /// </summary>
-        private void ProcessMessages()
+        private List<string> ExtractCompleteMessages()
         {
+            var messages = new List<string>();
+
             while (true)
             {
                 string bufferContent = _buffer.ToString();
@@ -47,13 +69,14 @@ namespace Yaesu_Web_Control.Services
                 string message = bufferContent.Substring(0, semicolonIndex + 1);
                 _buffer.Remove(0, semicolonIndex + 1);
 
-                // Dispatch message
-                if (message.Length >= 3) // Minimum: "XX;"
+                // Minimum: "XX;"
+                if (message.Length >= 3)
                 {
-                    // Debug logging removed as part of cleanup
-                    OnMessageReceived(message);
+                    messages.Add(message);
                 }
             }
+
+            return messages;
         }
 
         private void OnMessageReceived(string message)
@@ -63,7 +86,10 @@ namespace Yaesu_Web_Control.Services
 
         public void Clear()
         {
-            _buffer.Clear();
+            lock (_bufferLock)
+            {
+                _buffer.Clear();
+            }
         }
 
         public async Task<string> WaitForResponseAsync(string prefix, CancellationToken cancellationToken)
