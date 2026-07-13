@@ -74,9 +74,9 @@ namespace Yaesu_Web_Control.Services
             {
                 try
                 {
-                    _logger.LogInformation("[MeterPolling][DEBUG] Polling TX status...");
+                    _logger.LogDebug("[MeterPolling][DEBUG] Polling TX status...");
                     var txResponse = await _multiplexer.SendCommandAsync("TX;", "MeterPoll", stoppingToken);
-                    _logger.LogInformation("[MeterPolling][DEBUG] TX response: {0}", txResponse);
+                    _logger.LogDebug("[MeterPolling][DEBUG] TX response: {0}", txResponse);
 
                     // Connection health tracking: only applies once the radio has been successfully
                     // initialised (IsConnected = true). Null responses mean no reply from the radio.
@@ -114,11 +114,11 @@ namespace Yaesu_Web_Control.Services
                     }
                     bool isTransmitting = _stableIsTransmitting;
                     _stateService.IsTransmitting = isTransmitting;
-                    _logger.LogInformation("[MeterPolling] TX poll: raw='{Raw}', rawTX={RawTX}, stableTX={StableTX}", txResponse, rawIsTransmitting, isTransmitting);
+                    _logger.LogDebug("[MeterPolling] TX poll: raw='{Raw}', rawTX={RawTX}, stableTX={StableTX}", txResponse, rawIsTransmitting, isTransmitting);
 
-                    _logger.LogInformation("[MeterPolling][DEBUG] Polling S-Meter A...");
+                    _logger.LogDebug("[MeterPolling][DEBUG] Polling S-Meter A...");
                     var smAResponse = await _multiplexer.SendCommandAsync(CatCommands.SMeterMain + ";", "MeterPoll", stoppingToken);
-                    _logger.LogInformation("[MeterPolling][DEBUG] S-Meter A response: {0}", smAResponse);
+                    _logger.LogDebug("[MeterPolling][DEBUG] S-Meter A response: {0}", smAResponse);
                     int sMeterA = CatCommands.ParseSMeter(smAResponse ?? "");
 
                     // Zero-flash debounce (see _sMeterZeroCount comment). Apply
@@ -146,9 +146,9 @@ namespace Yaesu_Web_Control.Services
                     }
                     else
                     {
-                        _logger.LogInformation("[MeterPolling][DEBUG] Polling S-Meter B...");
+                        _logger.LogDebug("[MeterPolling][DEBUG] Polling S-Meter B...");
                         var smBResponse = await _multiplexer.SendCommandAsync(CatCommands.SMeterSub + ";", "MeterPoll", stoppingToken);
-                        _logger.LogInformation("[MeterPolling][DEBUG] S-Meter B response: {0}", smBResponse);
+                        _logger.LogDebug("[MeterPolling][DEBUG] S-Meter B response: {0}", smBResponse);
                         int sMeterB = CatCommands.ParseSMeter(smBResponse ?? "");
 
                         if (sMeterB == 0)
@@ -165,15 +165,15 @@ namespace Yaesu_Web_Control.Services
                         }
                     }
 
-                    _logger.LogInformation("[MeterPolling][DEBUG] Polling Power Meter...");
+                    _logger.LogDebug("[MeterPolling][DEBUG] Polling Power Meter...");
                     var powerResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterPower + ";", "MeterPoll", stoppingToken);
-                    _logger.LogInformation("[MeterPolling][DEBUG] Power Meter response: {0}", powerResponse);
+                    _logger.LogDebug("[MeterPolling][DEBUG] Power Meter response: {0}", powerResponse);
                     int power = CatCommands.ParseMeterReading(powerResponse ?? "");
-                    _logger.LogInformation("[MeterPolling][DEBUG] TX={IsTransmitting} Power raw='{Raw}', parsed={Value}", isTransmitting, powerResponse, power);
+                    _logger.LogDebug("[MeterPolling][DEBUG] TX={IsTransmitting} Power raw='{Raw}', parsed={Value}", isTransmitting, powerResponse, power);
                     if (isTransmitting)
                     {
                         _stateService.PowerMeter = power;
-                        _logger.LogInformation("[MeterPolling] Power meter (TX): raw='{Raw}', value={Value}", powerResponse, power);
+                        _logger.LogDebug("[MeterPolling] Power meter (TX): raw='{Raw}', value={Value}", powerResponse, power);
                     }
                     else
                     {
@@ -181,7 +181,7 @@ namespace Yaesu_Web_Control.Services
                         if (_stateService.PowerMeter != 0)
                         {
                             _stateService.PowerMeter = 0;
-                            _logger.LogInformation("[MeterPolling] Power meter (not TX): value=0");
+                            _logger.LogDebug("[MeterPolling] Power meter (not TX): value=0");
                         }
                     }
 
@@ -203,24 +203,24 @@ namespace Yaesu_Web_Control.Services
                     int swr;
                     if (useRm0Pair)
                     {
-                        _logger.LogInformation("[MeterPolling][DEBUG] Polling Compression+SWR (MS13+RM0)... TX={IsTransmitting}", isTransmitting);
+                        _logger.LogDebug("[MeterPolling][DEBUG] Polling Compression+SWR (MS13+RM0)... TX={IsTransmitting}", isTransmitting);
                         await _multiplexer.SendCommandAsync(CatCommands.SetMetersCompAndSWR + ";", "MeterPoll", stoppingToken);
                         var compSwrResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterBoth + ";", "MeterPoll", stoppingToken);
-                        _logger.LogInformation("[MeterPolling][DEBUG] MS13+RM0 response: '{Raw}'", compSwrResponse);
+                        _logger.LogDebug("[MeterPolling][DEBUG] MS13+RM0 response: '{Raw}'", compSwrResponse);
                         compression = CatCommands.ParseRm0LeftMeter(compSwrResponse ?? "");
                         swr         = CatCommands.ParseRm0RightMeter(compSwrResponse ?? "");
                     }
                     else
                     {
-                        _logger.LogInformation("[MeterPolling][DEBUG] Polling Compression (RM3) and SWR (RM6) directly... TX={IsTransmitting}", isTransmitting);
+                        _logger.LogDebug("[MeterPolling][DEBUG] Polling Compression (RM3) and SWR (RM6) directly... TX={IsTransmitting}", isTransmitting);
                         var compResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterComp + ";", "MeterPoll", stoppingToken);
-                        _logger.LogInformation("[MeterPolling][DEBUG] RM3 response: '{Raw}'", compResponse);
+                        _logger.LogDebug("[MeterPolling][DEBUG] RM3 response: '{Raw}'", compResponse);
                         compression = CatCommands.ParseMeterReading(compResponse ?? "");
                         var swrResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterSWR + ";", "MeterPoll", stoppingToken);
-                        _logger.LogInformation("[MeterPolling][DEBUG] RM6 response: '{Raw}'", swrResponse);
+                        _logger.LogDebug("[MeterPolling][DEBUG] RM6 response: '{Raw}'", swrResponse);
                         swr = CatCommands.ParseMeterReading(swrResponse ?? "");
                     }
-                    _logger.LogInformation("[MeterPolling][DEBUG] TX={IsTransmitting} Compression={Comp} SWR={SWR}", isTransmitting, compression, swr);
+                    _logger.LogDebug("[MeterPolling][DEBUG] TX={IsTransmitting} Compression={Comp} SWR={SWR}", isTransmitting, compression, swr);
                     _stateService.SWRMeter = isTransmitting ? swr : 0;
                     if (isTransmitting)
                     {
@@ -232,15 +232,15 @@ namespace Yaesu_Web_Control.Services
                             _stateService.CompressionMeter = 0;
                     }
 
-                    _logger.LogInformation("[MeterPolling][DEBUG] Polling IDD Meter...");
+                    _logger.LogDebug("[MeterPolling][DEBUG] Polling IDD Meter...");
                     var iddResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterIDD + ";", "MeterPoll", stoppingToken);
-                    _logger.LogInformation("[MeterPolling][DEBUG] IDD Meter response: {0}", iddResponse);
+                    _logger.LogDebug("[MeterPolling][DEBUG] IDD Meter response: {0}", iddResponse);
                     int idd = CatCommands.ParseMeterReading(iddResponse ?? "");
                     _stateService.IDDMeter = idd;
 
-                    _logger.LogInformation("[MeterPolling][DEBUG] Polling ALC Meter...");
+                    _logger.LogDebug("[MeterPolling][DEBUG] Polling ALC Meter...");
                     var alcResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterALC + ";", "MeterPoll", stoppingToken);
-                    _logger.LogInformation("[MeterPolling][DEBUG] ALC Meter response: {0}", alcResponse);
+                    _logger.LogDebug("[MeterPolling][DEBUG] ALC Meter response: {0}", alcResponse);
                     int alc = CatCommands.ParseMeterReading(alcResponse ?? "");
                     if (isTransmitting)
                     {
@@ -252,15 +252,15 @@ namespace Yaesu_Web_Control.Services
                             _stateService.ALCMeter = 0;
                     }
 
-                    _logger.LogInformation("[MeterPolling][DEBUG] Polling VDD Meter...");
+                    _logger.LogDebug("[MeterPolling][DEBUG] Polling VDD Meter...");
                     var vddResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterVDD + ";", "MeterPoll", stoppingToken);
-                    _logger.LogInformation("[MeterPolling][DEBUG] VDD Meter response: {0}", vddResponse);
+                    _logger.LogDebug("[MeterPolling][DEBUG] VDD Meter response: {0}", vddResponse);
                     int vdd = CatCommands.ParseMeterReading(vddResponse ?? "");
                     _stateService.VDDMeter = vdd;
 
-                    _logger.LogInformation("[MeterPolling][DEBUG] Polling Temperature...");
+                    _logger.LogDebug("[MeterPolling][DEBUG] Polling Temperature...");
                     var tempResponse = await _multiplexer.SendCommandAsync(CatCommands.MeterTemp + ";", "MeterPoll", stoppingToken);
-                    _logger.LogInformation("[MeterPolling][DEBUG] Temperature response: {0}", tempResponse);
+                    _logger.LogDebug("[MeterPolling][DEBUG] Temperature response: {0}", tempResponse);
                     int temp = CatCommands.ParseMeterReading(tempResponse ?? "");
                     _stateService.Temperature = temp;
 

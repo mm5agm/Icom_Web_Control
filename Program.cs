@@ -198,16 +198,42 @@ Log.Logger = new LoggerConfiguration()
     // — invaluable for diagnosing shutdown stalls.
     .MinimumLevel.Override("Microsoft.Hosting.Lifetime", Serilog.Events.LogEventLevel.Information)
     .Enrich.FromLogContext()
-    .WriteTo.File(
+    // Wrap the file sink in Serilog.Sinks.Async so log writes happen on a
+    // dedicated background thread rather than on the calling thread. The bare
+    // synchronous File sink — especially with shared:true (a cross-process
+    // mutex taken per event) — blocks whichever thread logs, and under the
+    // startup logging flood (54-command init burst + concurrent meter polling,
+    // each CAT response emitting several lines) that blocked dozens of
+    // thread-pool threads at once. The pool then injected replacements at only
+    // ~1/sec, dilating the whole app — including the init burst's Task.Delay
+    // continuations — to roughly 1 Hz, so the init sequence never reached the
+    // DT0 step and the app hung at "Initializing". Intermittent because it
+    // depends on disk / AV / file-lock timing (issue #73, wa6auf). Dropped
+    // shared:true as well — YWC is the only writer of this file.
+    .WriteTo.Async(a => a.File(
         Path.Combine(logDir, "ywc-.log"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 7,
-        shared: true,
         flushToDiskInterval: TimeSpan.FromSeconds(1),
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"))
     .CreateLogger();
 
 Log.Information("Yaesu Web Control starting (v{Version})", Yaesu_Web_Control.AppVersion.Current);
+
+// Raise the thread-pool floor so cold start doesn't bottleneck on the pool's
+// ~1/sec starvation-recovery thread injection. Startup fires many concurrent
+// hosted services (radio init burst, meter polling, rigctld, SignalR) at once;
+// if any of them briefly blocks a pool thread, a low floor forces new work to
+// wait ~1s per thread for the pool to grow. A modest floor absorbs that spike.
+// Belt-and-suspenders alongside the async logging sink above (issue #73).
+{
+    ThreadPool.GetMinThreads(out int minWorker, out int minIo);
+    int targetWorker = Math.Max(minWorker, Math.Max(16, Environment.ProcessorCount * 2));
+    int targetIo = Math.Max(minIo, 16);
+    ThreadPool.SetMinThreads(targetWorker, targetIo);
+    Log.Information("ThreadPool min threads set: worker {Worker} (was {OldWorker}), IO {Io} (was {OldIo}); processors={Cpu}",
+        targetWorker, minWorker, targetIo, minIo, Environment.ProcessorCount);
+}
 
 var builder = WebApplication.CreateBuilder(args);
 

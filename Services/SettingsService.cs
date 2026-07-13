@@ -27,16 +27,22 @@ namespace Yaesu_Web_Control.Services
             await _semaphore.WaitAsync();
             try
             {
-                _logger.LogInformation("GetSettingsAsync called. File exists: {Exists}", File.Exists(_settingsFilePath));
+                // These fire on every meter-poll cycle (GetSettingsAsync is
+                // called ~2 Hz). At Information level — and especially dumping
+                // the entire settings JSON — they were a major contributor to
+                // the synchronous-logging flood that starved the thread pool
+                // during startup (issue #73). Kept at Debug so they're still
+                // available when explicitly troubleshooting settings.
+                _logger.LogDebug("GetSettingsAsync called. File exists: {Exists}", File.Exists(_settingsFilePath));
 
                 if (File.Exists(_settingsFilePath))
                 {
                     var json = await File.ReadAllTextAsync(_settingsFilePath);
-                    _logger.LogInformation("Raw JSON read: {Json}", json);
+                    _logger.LogDebug("Raw JSON read: {Json}", json);
 
                     _cachedSettings = JsonSerializer.Deserialize<ApplicationSettings>(json) ?? new ApplicationSettings();
 
-                    _logger.LogInformation("Settings deserialized: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
+                    _logger.LogDebug("Settings deserialized: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
                         _cachedSettings.SerialPort, _cachedSettings.BaudRate, _cachedSettings.WebAddress, _cachedSettings.HttpPort);
 
                     MigrateSdrDeviceKey(_cachedSettings);

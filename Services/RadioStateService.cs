@@ -67,7 +67,12 @@ namespace Yaesu_Web_Control.Services
         {
             if (!EqualityComparer<T>.Default.Equals(field, value))
             {
-                _logger.LogInformation("[SetField] Setting {Property} from {OldValue} to {NewValue}", propertyName, field, value);
+                // Debug, not Information: SetField runs on every CAT response
+                // (dozens per second during the init burst and AI streaming).
+                // At Information these three lines per change were a primary
+                // source of the synchronous-logging flood that starved the
+                // thread pool during startup (issue #73).
+                _logger.LogDebug("[SetField] Setting {Property} from {OldValue} to {NewValue}", propertyName, field, value);
                 field = value;
                 OnPropertyChanged(propertyName);
                 BroadcastUpdate(propertyName!, value!);
@@ -75,12 +80,12 @@ namespace Yaesu_Web_Control.Services
                 // Only save after initialization is complete
                 if (IsInitialized)
                 {
-                    _logger.LogInformation("[SetField] Persisting state (IsInitialized=true, {Property}={Value})", propertyName, value);
+                    _logger.LogDebug("[SetField] Persisting state (IsInitialized=true, {Property}={Value})", propertyName, value);
                     _statePersistence.Save(this.ToRadioState());
                 }
                 else
                 {
-                    _logger.LogWarning("[SetField] NOT persisting {Property} (IsInitialized=false)", propertyName);
+                    _logger.LogDebug("[SetField] NOT persisting {Property} (IsInitialized=false)", propertyName);
                 }
             }
             else
@@ -122,7 +127,7 @@ namespace Yaesu_Web_Control.Services
 
         private void BroadcastUpdate(string property, object value)
         {
-            _logger.LogInformation("[BroadcastUpdate] Broadcasting {Property} = {Value}", property, value);
+            _logger.LogDebug("[BroadcastUpdate] Broadcasting {Property} = {Value}", property, value);
             if (property == "PowerMeter")
             {
                 _logger.LogWarning("[DEBUG][PowerMeter] Broadcasting PowerMeter value: {@Value}", value);

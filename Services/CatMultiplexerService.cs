@@ -548,6 +548,21 @@ namespace Yaesu_Web_Control.Services
         /// Send initialization commands quickly without waiting for individual responses.
         /// Responses are handled asynchronously via Auto Information mode.
         /// </summary>
+        // Diagnostic for issue #73: log the thread pool's available-thread
+        // headroom. When the pool is starved (all threads blocked, replacements
+        // injected at only ~1/sec), available worker threads sit at or near 0
+        // and every await continuation — including this init burst's Task.Delay
+        // — stalls ~1s each, dilating startup to ~1 Hz and hanging init. If the
+        // async-logging + min-threads fixes work, these numbers stay healthy.
+        private void LogThreadPoolState(string phase)
+        {
+            ThreadPool.GetAvailableThreads(out int availWorker, out int availIo);
+            ThreadPool.GetMaxThreads(out int maxWorker, out int maxIo);
+            _logger.LogInformation(
+                "[ThreadPoolDiag] {Phase}: worker avail {AvailWorker}/{MaxWorker}, IO avail {AvailIo}/{MaxIo}, pending work items {Pending}",
+                phase, availWorker, maxWorker, availIo, maxIo, ThreadPool.PendingWorkItemCount);
+        }
+
         private async Task SendInitializationCommandsFastAsync(string[] commands)
         {
             if (_serialPort?.IsOpen != true)
@@ -569,6 +584,10 @@ namespace Yaesu_Web_Control.Services
 
                 if ((i + 1) % batchSize == 0)
                 {
+                    // Per-batch diagnostic: the timestamps between these lines
+                    // reveal whether the burst is running at full speed (<1s
+                    // total) or dilated by thread-pool starvation (issue #73).
+                    LogThreadPoolState($"init-burst after cmd {i + 1}/{commands.Length}");
                     await Task.Delay(interBatchDelayMs);
                 }
             }
@@ -577,6 +596,7 @@ namespace Yaesu_Web_Control.Services
         public async Task InitializeRadioAsync()
         {
             _logger.LogWarning("[CatMultiplexerService] InitializeRadioAsync starting...");
+            LogThreadPoolState("init-start");
             _initializationCompletionSource = new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -590,6 +610,7 @@ namespace Yaesu_Web_Control.Services
             // Settle time after the fast burst before sending DT0
             await Task.Delay(100);
 
+            LogThreadPoolState("init-burst-complete, before DT0");
             _logger.LogWarning("[CatMultiplexerService] Sending DT0 command (raw)...");
 
             // Send DT0 raw — do NOT use SendCommandAsync here.
