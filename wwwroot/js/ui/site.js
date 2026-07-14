@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- SignalR connection setup and disconnect on page unload ---
     if (window.signalRConnection === undefined) {
-        window.signalRConnection = new signalR.HubConnectionBuilder().withUrl("/radioHub").build();
+        window.signalRConnection = new signalR.HubConnectionBuilder().withUrl("/radioHub").withAutomaticReconnect().build();
         window.signalRConnection.start().catch(function (err) { });
         // Heartbeat: send every 5 seconds
         window.signalRHeartbeatInterval = setInterval(function () {
@@ -853,6 +853,7 @@ async function checkTxStatus() {
 // ---------------------------------------------------------------------------
 const connection = new signalR.HubConnectionBuilder()
     .withUrl("/radioHub")
+    .withAutomaticReconnect()
     .build();
 
 // Redirect to Settings page if the backend signals an init failure
