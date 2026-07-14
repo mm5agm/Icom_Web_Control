@@ -1532,6 +1532,8 @@
                             <span asp-validation-for="Settings.RadioModel" class="text-danger"></span>
                         </div>
                         <div class="mb-3" id="optionalFiltersSection">
+                            <!-- Forces the form to always post this key, even with every filter unchecked — otherwise the binder leaves the list at its default instead of empty. -->
+                            <input type="hidden" name="Settings.InstalledRoofingFilters" value="" />
                             <label class="form-label fw-bold">Roofing Filters Installed</label>
                             <div id="filtersMpNote" style="display:@(Model.Settings.RadioModel == "FTdx101MP" ? "block" : "none")">
                                 <div class="alert alert-info py-2 mb-0">

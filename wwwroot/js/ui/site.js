@@ -3314,8 +3314,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-pollInitStatus();
-
 // Screen-reader hover announcements via ARIA live region.
 // NVDA may have mouse tracking or tooltip reporting disabled; live regions
 // are always announced regardless of those settings.
