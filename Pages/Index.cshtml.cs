@@ -110,10 +110,17 @@ namespace Yaesu_Web_Control.Pages
 
         public async Task<IActionResult> OnGetAsync()
         {
-            if (Yaesu_Web_Control.Services.AppStatus.InitializationStatus == "error")
-            {
-                return RedirectToPage("/Settings");
-            }
+            // Deliberately no server-side redirect to Settings on
+            // InitializationStatus == "error" here. If radio initialization
+            // keeps failing (e.g. an unhandled exception deep in the init
+            // sequence — see Issue #65, FTDX3000), that status flag can get
+            // stuck at "error" indefinitely, since nothing resets it except
+            // a fully successful re-init. A hard redirect here trapped users
+            // on the Settings page with no way back to Home even after they
+            // proved the radio was reachable (Test Connection succeeding).
+            // The client-side initOverlay/pollInitStatus in site.js already
+            // surfaces the error with a link to Settings without forcing
+            // navigation, which is the correct, non-trapping UX.
 
             // Load app button visibility and names
             var settings = await _settingsService.GetSettingsAsync();

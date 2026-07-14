@@ -321,6 +321,8 @@ The spectrum display is only visible if an SDR device has been configured in Set
 
 **Resize spectrum vs waterfall** — Hover the horizontal boundary between the spectrum trace (top) and the waterfall (bottom); the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room — useful when you're hunting weak signals close to the noise floor. Drag down to give the waterfall more history. The ratio is remembered per VFO across browser reloads, so the next time you open YWC the panel is back the way you left it. Two short grey grip-bars at the centre of the boundary mark the handle; they turn cyan while you're dragging.
 
+**Speed slider** — The slider next to Gain controls how fast the waterfall scrolls, from **Full** speed down to **1/128**. Drag it left to slow the waterfall down if signal trails are scrolling past faster than you can read them; the spectrum trace above it keeps updating live regardless of this setting. Set independently per VFO and remembered across browser reloads.
+
 **dB range** — The dropdown beside the **Hold** button picks the vertical scale of the spectrum trace, in dBFS:
 
 - **0/-120** (default) — the full SDR range; signals span the whole vertical height of the spectrum panel.
@@ -1886,6 +1888,7 @@ A **Feature request** template is also available for ideas / improvements rather
 - Check the COM port in Settings. Go to **Diagnostics → Ports** to see which ports are available.
 - Check the baud rate in Settings matches the radio's **Menu → CAT Rate** setting (default 38400).
 - Click **Test Connection** in Settings.
+- If meters and frequency are otherwise updating live and only the overlay itself is stuck, this was a known bug (a one-off network hiccup during startup could strand the overlay permanently) fixed in v2.4.2-pre2 — just reload the page, or update to the latest version.
 
 **Frequency display shows 0 or does not update**
 
@@ -2023,6 +2026,8 @@ Symptoms when there's a port sharer in the chain:
 
 - **"Test Connection" fails** with a "COM port opened but the radio did not respond to a CAT probe" error (YWC v2.3.0+ catches this case explicitly).
 - Or worse — the port opens, YWC reports connected, but the frequency/mode displays never follow the radio's actual state. CAT chatter is being swallowed somewhere between YWC and the radio.
+
+> **Update (v2.4.2-pre2):** one specific cause of the second symptom is fixed — a frequency-only freeze (meters still live) over VSPE, caused by YWC discarding a receive-buffer race that a virtual port's added latency made much easier to hit than on real hardware. See [#74](https://github.com/mm5agm/Yaesu_Web_Control/issues/74). This doesn't make VSPE (or other port sharers) a generally supported or tested configuration — the advice below still stands — but if this was your exact symptom, it's worth updating.
 
 Why this happens in practice:
 

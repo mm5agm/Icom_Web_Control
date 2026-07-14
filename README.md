@@ -103,6 +103,7 @@ The application includes a real-time spectrum display and waterfall, intended fo
 - Click anywhere on a spectrum panel to tune the corresponding VFO to that frequency (panel A tunes VFO A, panel B tunes VFO B)
 - Mouse wheel over a spectrum panel tunes that VFO up/down in 1 kHz steps
 - Frequency axis labels automatically track each VFO
+- Waterfall Speed slider (next to Low/High/Gain) slows the waterfall scroll rate down to 1/128 of full speed, independently per VFO — the spectrum trace above it is unaffected and always updates live
 
 ### Why two SDRs? (and why two RSP1Bs rather than one RSPduo)
 
@@ -171,6 +172,38 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 ---
 
 ## Release Notes
+
+## 2026-07-14 - v2.4.2-pre6 (pre-release)
+
+Sixth pre-release in the 2.4.2 line, addressing two more issues wa6auf isolated while retesting pre5 on his FTdx101D. First, unchecking every optional roofing filter checkbox on the Settings page and saving would silently bring them back checked — the checkboxes post nothing at all to the server when none are ticked, and ASP.NET Core's model binder was leaving that field completely untouched in that case rather than clearing it, so the previously-saved filters just stuck around. Added a small hidden field that guarantees the form always submits something for that setting, so an all-unchecked save is now handled correctly. Second, the intermittent "stuck at Initializing" he saw specifically when starting YWC with the radio already powered on turned out not to be a connection problem at all — his own screenshots showed live meter readings changing while the "Initializing" overlay sat frozen on screen, which only makes sense if the radio link was actually fine and just the on-screen status got stuck. Traced it to the page accidentally starting two copies of the same status-check loop, which could race each other right at the moment startup finished and leave the overlay believing it was still waiting. Removed the duplicate. Neither fix has been hardware-confirmed yet — wa6auf, if you get a chance to put pre6 through the same paces (both the filter checkboxes and a few restarts with the radio already on), that would be very helpful.
+
+## 2026-07-14 - v2.4.2-pre5 (pre-release)
+
+Fifth pre-release in the 2.4.2 line. Looking into wa6auf's report that a Settings-page save "seemed to crash the server" (after pre4 had already fixed his original #73 startup hang), I found no crash at all in his log — instead, YWC's own designed 30-second idle-shutdown had fired: when every browser tab's live connection drops, the backend waits 30 seconds for one to reconnect and then quits the whole process if none does, which looks exactly like a crash if you're not expecting it. Digging into why a reconnect wouldn't land in time, I found a real gap: the browser-side connection was built without SignalR's automatic-reconnect option, so any transient drop — a network blip, a brief server stall — had no way to recover short of manually reloading the page. I can't reproduce wa6auf's exact trigger myself (repeating his steps on my own FTdx101MP didn't cause a drop), so I can't say for certain this is what he hit, but the missing reconnect logic was a genuine gap regardless, and I've confirmed a forced disconnect now recovers on its own without a reload. wa6auf, if you get a chance to retest and see whether this holds up under whatever you were doing before, that's the most useful next step.
+
+## 2026-07-13 - v2.4.2-pre4 (pre-release)
+
+Fourth pre-release in the 2.4.2 line. wa6auf retested pre3 and #73 was still happening — the CAT-buffer lock in pre3 was a real fix for a real bug, but it wasn't the one causing his startup hang. Going back through his new log line by line: during startup, dozens of CAT responses and meter polls generate a burst of log lines, and YWC's file logger was writing every one of them synchronously (and, on top of that, taking a cross-process file lock per line). Under enough concurrent load that can block enough thread-pool threads at once that the whole app slows to roughly one operation per second — including the startup command burst, which then never finishes within the time wa6auf was willing to wait. It's a threshold effect: whether it hits depends on antivirus scanning, core count and disk speed, which is my best guess as to why this shows up for him and not (yet) for anyone else. Fixed: logging now goes through an async sink instead of blocking the calling thread, the noisiest per-poll log lines are dropped to Debug level, and the thread pool's minimum thread count is raised so a startup burst has headroom. I've also added thread-pool diagnostic log lines during startup so the next log will show directly whether this was actually the problem. As with pre2 and pre3, I can't reproduce this myself and haven't been able to confirm it against real hardware — wa6auf, if you get a chance to retest, that's the most useful thing that could happen next.
+
+## 2026-07-13 - v2.4.2-pre3 (pre-release)
+
+Third pre-release in the 2.4.2 line. My pre2 fix for #74 (draining pending serial bytes instead of discarding them) introduced a new bug: it made two different threads write to the same CAT message buffer at once, and that buffer wasn't thread-safe. The corruption this caused explains why pre2 testers were still seeing #74's frozen frequency display, and also explains wa6auf's #73 report of the startup overlay taking well over a minute to clear (a slow-motion CAT session, with every response and even unrelated file reads dragging to seconds each) even after the pre2 overlay-retry fix landed. Fixed: the buffer's reads and writes are now protected by a lock, so the two writer threads can no longer step on each other. Not yet confirmed against real hardware — if you're iu1teu or wa6auf, this is the one to retest.
+
+## 2026-07-13 - v2.4.2-pre2 (pre-release)
+
+Second pre-release in the 2.4.2 line, fixing two more reporter-found bugs. Not a general recommendation to upgrade — if v2.4.1 is working fine for you, there's no need to touch this; if you're hitting either symptom below, please do try it.
+
+### "Initialising…" spinner never clears even though the app is live ([#73](https://github.com/mm5agm/Yaesu_Web_Control/issues/73))
+
+Reported by wa6auf (FTdx101D) — the app would connect, the SignalR feed would be live (meters updating, frequency tracking the radio), but the startup overlay just never went away. Cause: the front-end poll that's responsible for hiding the overlay gave up permanently after a single failed HTTP request instead of retrying, so a one-off network hiccup during startup could strand the overlay forever with a fully working app underneath it. Fixed: the poll now retries on failure the same way it already did on a thrown error.
+
+### FTDX3000 frequency display freezes over a VSPE virtual COM port ([#74](https://github.com/mm5agm/Yaesu_Web_Control/issues/74))
+
+Reported by iu1teu, who runs YWC through VSPE (Virtual Serial Ports Emulator) to share one physical COM port with other CAT applications. Meters kept updating live, but the frequency display would freeze — a strong clue, since frequency is the one value YWC only ever learns about via the radio's unsolicited auto-info push, not by polling. Cause: before sending each queued CAT command, YWC discarded any bytes already sitting in the serial receive buffer to clear stale data — but on a slower virtual port, a genuine unsolicited frequency push could land in that buffer in the split second before the next command was sent, and got silently thrown away with it. Real hardware is fast enough that this race rarely loses; a virtual port emulator is not. Fixed: pending bytes are now drained through the normal message pipeline instead of being discarded, so an auto-info push arriving at the wrong moment is processed instead of dropped. See also [§15.6](USER_MANUAL.md#156-can-i-use-vspe-omnirig-com0com-or-a-similar-virtual-com-port-sharer) for background on virtual COM port sharers and YWC.
+
+## 2026-07-11 - v2.4.2-pre1 (pre-release)
+
+First pre-release in the 2.4.2 line. Fixed a startup redirect loop that made the FTDX3000 completely unusable: YWC sent a command during startup that other radios in the range respond to, but the FTDX3000 doesn't, and YWC was treating the missing response as fatal instead of just moving on. Reported and confirmed by iu1teu on [#65](https://github.com/mm5agm/Yaesu_Web_Control/issues/65).
 
 ## 2026-07-10 - v2.4.1
 

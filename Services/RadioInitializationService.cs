@@ -149,18 +149,23 @@ namespace Yaesu_Web_Control.Services
                     logger.LogWarning(ex, "[RadioInitializationService] TX0; safety RX-enforce failed (non-fatal)");
                 }
 
-                // Send initialization commands and wait for DT0 response (with timeout)
+                // Send initialization commands and wait for DT0 response (with timeout).
+                // CatMultiplexerService.InitializeRadioAsync() enforces its own internal
+                // 5s wait for the DT0 response and throws TimeoutException directly if it
+                // doesn't arrive (it takes no CancellationToken, so a CTS here can't touch
+                // it). Some radios don't send a DT0 response at all — confirmed via
+                // iu1teu's log on Issue #65: the FTDX3000 never responds to DT0;, so this
+                // fired on every single connection attempt and (before this fix) the
+                // TimeoutException fell through to the top-level catch-all below, aborting
+                // the whole initialization and bouncing the user to Settings in a loop.
                 logger.LogInformation("[RadioInitializationService] Sending full initialization sequence and waiting for DT0 (timeout 5s)...");
-
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, cts.Token);
 
                 try
                 {
                     await multiplexer.InitializeRadioAsync();
                     logger.LogInformation("[RadioInitializationService] ✓ DT0 received, initialization sequence complete.");
                 }
-                catch (OperationCanceledException) when (cts.IsCancellationRequested)
+                catch (TimeoutException)
                 {
                     logger.LogWarning("[RadioInitializationService] ⚠ Timeout waiting for DT0 response - continuing anyway");
                 }

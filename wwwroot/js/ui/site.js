@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- SignalR connection setup and disconnect on page unload ---
     if (window.signalRConnection === undefined) {
-        window.signalRConnection = new signalR.HubConnectionBuilder().withUrl("/radioHub").build();
+        window.signalRConnection = new signalR.HubConnectionBuilder().withUrl("/radioHub").withAutomaticReconnect().build();
         window.signalRConnection.start().catch(function (err) { });
         // Heartbeat: send every 5 seconds
         window.signalRHeartbeatInterval = setInterval(function () {
@@ -853,6 +853,7 @@ async function checkTxStatus() {
 // ---------------------------------------------------------------------------
 const connection = new signalR.HubConnectionBuilder()
     .withUrl("/radioHub")
+    .withAutomaticReconnect()
     .build();
 
 // Redirect to Settings page if the backend signals an init failure
@@ -1539,7 +1540,12 @@ async function pollInitStatus() {
 
     try {
         const response = await fetch('/api/status/init');
-        if (!response.ok) return;
+        if (!response.ok) {
+            if (!initPollingStopped) {
+                setTimeout(pollInitStatus, 2000);
+            }
+            return;
+        }
         const data = await response.json();
         const overlay = document.getElementById('initOverlay');
         const statusText = document.getElementById('initStatusText');
@@ -3307,8 +3313,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (bControls) bControls.style.display = '';
     }
 });
-
-pollInitStatus();
 
 // Screen-reader hover announcements via ARIA live region.
 // NVDA may have mouse tracking or tooltip reporting disabled; live regions

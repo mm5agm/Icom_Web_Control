@@ -13,7 +13,12 @@ namespace Yaesu_Web_Control.Services
         private readonly SemaphoreSlim _serialSemaphore = new(1, 1);
         private readonly ILogger<CatMultiplexerService> _logger;
         private readonly ConcurrentQueue<CatRequest> _commandQueue = new();
-        private readonly CancellationTokenSource _cancellationTokenSource = new();
+        // Recreated on every reconnect (see CloseSerialPortAsync) — a single
+        // CancellationTokenSource can only be cancelled once, so reusing the
+        // same instance across a disconnect/reconnect cycle would leave
+        // ProcessCommandQueueAsync permanently cancelled after the first
+        // disconnect.
+        private CancellationTokenSource _cancellationTokenSource = new();
         private Task? _processingTask;
 
         // Auto-Information support
@@ -87,8 +92,23 @@ namespace Yaesu_Web_Control.Services
             {
                 if (_serialPort?.IsOpen == true)
                 {
-                    _logger.LogInformation("Port {PortName} already connected", portName);
-                    return true;
+                    if (string.Equals(_serialPort.PortName, portName, StringComparison.OrdinalIgnoreCase)
+                        && _serialPort.BaudRate == baudRate)
+                    {
+                        _logger.LogInformation("Port {PortName} already connected", portName);
+                        return true;
+                    }
+
+                    // Settings changed the port/baud rate while a connection was
+                    // already open (e.g. Settings page save). Previously this
+                    // branch just returned true without ever opening the new
+                    // port, silently ignoring the change (#65 follow-up,
+                    // reported by iu1teu). Close the old port first so the new
+                    // one actually gets opened below.
+                    _logger.LogInformation(
+                        "Serial settings changed ({OldPort}@{OldBaud} → {NewPort}@{NewBaud}) — reconnecting",
+                        _serialPort.PortName, _serialPort.BaudRate, portName, baudRate);
+                    await CloseSerialPortAsync();
                 }
 
                 var availablePorts = SerialPort.GetPortNames();
@@ -286,10 +306,21 @@ namespace Yaesu_Web_Control.Services
                     return;
                 }
 
-                // Clear stale data
+                // Drain any bytes that arrived before this command was issued,
+                // routing them through the normal message pipeline instead of
+                // discarding them. This used to call DiscardInBuffer() here,
+                // which silently ate unsolicited FA/FB auto-info pushes that
+                // happened to land in the OS receive buffer just before the
+                // next queued command started — the only way YWC ever learns
+                // about a frequency change, since nothing polls for FA/FB.
+                // On real hardware DataReceived usually wins that race, but
+                // over a slower virtual serial port (e.g. VSPE) it doesn't,
+                // reported by iu1teu on #74 as FTDX3000 frequency updates
+                // never arriving over a VSPE-routed connection.
                 if (_serialPort.BytesToRead > 0)
                 {
-                    _serialPort.DiscardInBuffer();
+                    var pending = _serialPort.ReadExisting();
+                    _messageBuffer.AppendData(pending);
                 }
 
                 var fullCommand = request.Command.EndsWith(";") ? request.Command : request.Command + ";";
@@ -316,42 +347,55 @@ namespace Yaesu_Web_Control.Services
                 _logger.LogWarning("DisconnectAsync: timed out waiting for serial semaphore — forcing disconnect without lock");
             try
             {
-                _cancellationTokenSource.Cancel();
-
-                if (_processingTask != null)
-                {
-                    await _processingTask;
-                }
-
-                if (_serialPort?.IsOpen == true)
-                {
-                    if (_autoInformationEnabled)
-                    {
-                        try
-                        {
-                            var cmdBytes = Encoding.ASCII.GetBytes("AI0;");
-                            _serialPort.Write(cmdBytes, 0, cmdBytes.Length);
-                            await Task.Delay(100);
-                        }
-                        catch { /* Ignore errors during disconnect */ }
-                    }
-
-                    _serialPort.DtrEnable = false;
-                    _serialPort.RtsEnable = false;
-                    _serialPort.DiscardInBuffer();
-                    _serialPort.DiscardOutBuffer();
-                    _serialPort.Close();
-                    _logger.LogInformation("Disconnected from serial port");
-                }
-
-                _serialPort?.Dispose();
-                _serialPort = null;
-                _autoInformationEnabled = false;
+                await CloseSerialPortAsync();
             }
             finally
             {
                 if (acquired) _serialSemaphore.Release();
             }
+        }
+
+        // Shared by DisconnectAsync (acquires _serialSemaphore itself) and
+        // ConnectAsync's reconnect path (already holds the semaphore) — must
+        // NOT acquire _serialSemaphore itself, or ConnectAsync would deadlock.
+        private async Task CloseSerialPortAsync()
+        {
+            _cancellationTokenSource.Cancel();
+
+            if (_processingTask != null)
+            {
+                await _processingTask;
+            }
+
+            if (_serialPort?.IsOpen == true)
+            {
+                if (_autoInformationEnabled)
+                {
+                    try
+                    {
+                        var cmdBytes = Encoding.ASCII.GetBytes("AI0;");
+                        _serialPort.Write(cmdBytes, 0, cmdBytes.Length);
+                        await Task.Delay(100);
+                    }
+                    catch { /* Ignore errors during disconnect */ }
+                }
+
+                _serialPort.DtrEnable = false;
+                _serialPort.RtsEnable = false;
+                _serialPort.DiscardInBuffer();
+                _serialPort.DiscardOutBuffer();
+                _serialPort.Close();
+                _logger.LogInformation("Disconnected from serial port");
+            }
+
+            _serialPort?.Dispose();
+            _serialPort = null;
+            _autoInformationEnabled = false;
+
+            // Recreate so the next ConnectAsync's command-queue processor
+            // gets a fresh, non-cancelled token.
+            _cancellationTokenSource.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
         }
 
         public void Dispose()
@@ -504,6 +548,21 @@ namespace Yaesu_Web_Control.Services
         /// Send initialization commands quickly without waiting for individual responses.
         /// Responses are handled asynchronously via Auto Information mode.
         /// </summary>
+        // Diagnostic for issue #73: log the thread pool's available-thread
+        // headroom. When the pool is starved (all threads blocked, replacements
+        // injected at only ~1/sec), available worker threads sit at or near 0
+        // and every await continuation — including this init burst's Task.Delay
+        // — stalls ~1s each, dilating startup to ~1 Hz and hanging init. If the
+        // async-logging + min-threads fixes work, these numbers stay healthy.
+        private void LogThreadPoolState(string phase)
+        {
+            ThreadPool.GetAvailableThreads(out int availWorker, out int availIo);
+            ThreadPool.GetMaxThreads(out int maxWorker, out int maxIo);
+            _logger.LogInformation(
+                "[ThreadPoolDiag] {Phase}: worker avail {AvailWorker}/{MaxWorker}, IO avail {AvailIo}/{MaxIo}, pending work items {Pending}",
+                phase, availWorker, maxWorker, availIo, maxIo, ThreadPool.PendingWorkItemCount);
+        }
+
         private async Task SendInitializationCommandsFastAsync(string[] commands)
         {
             if (_serialPort?.IsOpen != true)
@@ -525,6 +584,10 @@ namespace Yaesu_Web_Control.Services
 
                 if ((i + 1) % batchSize == 0)
                 {
+                    // Per-batch diagnostic: the timestamps between these lines
+                    // reveal whether the burst is running at full speed (<1s
+                    // total) or dilated by thread-pool starvation (issue #73).
+                    LogThreadPoolState($"init-burst after cmd {i + 1}/{commands.Length}");
                     await Task.Delay(interBatchDelayMs);
                 }
             }
@@ -533,6 +596,7 @@ namespace Yaesu_Web_Control.Services
         public async Task InitializeRadioAsync()
         {
             _logger.LogWarning("[CatMultiplexerService] InitializeRadioAsync starting...");
+            LogThreadPoolState("init-start");
             _initializationCompletionSource = new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -546,6 +610,7 @@ namespace Yaesu_Web_Control.Services
             // Settle time after the fast burst before sending DT0
             await Task.Delay(100);
 
+            LogThreadPoolState("init-burst-complete, before DT0");
             _logger.LogWarning("[CatMultiplexerService] Sending DT0 command (raw)...");
 
             // Send DT0 raw — do NOT use SendCommandAsync here.

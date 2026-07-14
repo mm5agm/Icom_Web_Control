@@ -32,6 +32,16 @@ export class SpectrumPanel {
         this._waterfallRows = 0;
         this._waterfallCols = 0;
 
+        // Waterfall scroll speed — 1 scrolls a row every incoming FFT frame
+        // (full speed, the original fixed behaviour); higher values skip
+        // frames so the waterfall scrolls slower, e.g. 4 = one row every 4th
+        // frame. The spectrum trace above it still updates every frame — this
+        // only throttles the waterfall's fall-through rate. Requested by a
+        // reporter who found the default too fast to read at a glance.
+        // Persisted per-VFO like the split ratio.
+        this._waterfallSpeed = this._loadWaterfallSpeed();
+        this._waterfallFrameCounter = 0;
+
         this._errorDetail = null;
 
         // Last received spectrum data; held so the canvas can be redrawn on resize.
@@ -108,6 +118,44 @@ export class SpectrumPanel {
         } catch (e) { /* localStorage may be unavailable */ }
     }
 
+    // Valid waterfall speed divisors — 1 (full speed) through 128 (1/128
+    // speed). Index into this array (not the divisor itself) is what the
+    // UI slider in Index.cshtml drags across, since the divisors themselves
+    // aren't evenly spaced.
+    static WATERFALL_SPEEDS = [1, 2, 4, 8, 16, 32, 64, 128];
+
+    _loadWaterfallSpeed() {
+        try {
+            const v = parseInt(localStorage.getItem('ywc.waterfallSpeed.' + this._vfo), 10);
+            if (SpectrumPanel.WATERFALL_SPEEDS.includes(v)) return v;
+        } catch (e) { /* localStorage may be unavailable */ }
+        return 1;
+    }
+
+    _saveWaterfallSpeed() {
+        try {
+            localStorage.setItem('ywc.waterfallSpeed.' + this._vfo, String(this._waterfallSpeed));
+        } catch (e) { /* localStorage may be unavailable */ }
+    }
+
+    /**
+     * Set how many incoming FFT frames the waterfall waits between scrolling
+     * a new row — 1 = every frame (full speed), 4 = one row every 4th frame
+     * (1/4 speed), etc. The spectrum trace is unaffected; it always updates
+     * on every frame. Invalid values are ignored.
+     * @param {number} divisor  One of SpectrumPanel.WATERFALL_SPEEDS.
+     */
+    setWaterfallSpeed(divisor) {
+        const d = parseInt(divisor, 10);
+        if (!SpectrumPanel.WATERFALL_SPEEDS.includes(d)) return;
+        this._waterfallSpeed = d;
+        this._waterfallFrameCounter = 0;
+        this._saveWaterfallSpeed();
+    }
+
+    /** Returns the current waterfall speed divisor (1 = full speed). */
+    getWaterfallSpeed() { return this._waterfallSpeed; }
+
     /**
      * Set the spectrum dB range. Called by the Low/High slider handler in
      * Index.cshtml whenever the user moves a slider. Persistence is handled
@@ -136,7 +184,13 @@ export class SpectrumPanel {
         this._lastBins    = bins;
         this._lastCentreHz = centreHz;
         this._lastSpanHz   = spanHz;
-        this._render();
+
+        // Only scroll the waterfall every Nth frame per _waterfallSpeed;
+        // the spectrum trace above it still redraws every frame regardless.
+        const shouldScrollWaterfall = (this._waterfallFrameCounter % this._waterfallSpeed) === 0;
+        this._waterfallFrameCounter++;
+
+        this._render(shouldScrollWaterfall);
     }
 
     /**
@@ -470,7 +524,11 @@ export class SpectrumPanel {
 
     // ── Rendering ────────────────────────────────────────────────────────────
 
-    _render() {
+    // @param {boolean} scrollWaterfall  Whether to advance the waterfall by
+    //   one row this frame. Defaults to true for the many forced-redraw call
+    //   sites (resize, dB range change, hold toggle, etc.) which historically
+    //   always scrolled; update() passes this explicitly per _waterfallSpeed.
+    _render(scrollWaterfall = true) {
         const canvas = document.getElementById(this._canvasId);
         if (!canvas || !this._lastBins) return;
 
@@ -489,7 +547,7 @@ export class SpectrumPanel {
         this._drawBandMarkers(ctx, W, specH);
         this._drawSpots(ctx, W, specH);
         this._drawDxBadge(ctx, W);
-        this._scrollWaterfall(ctx, bins, W, specH, wfH);
+        if (scrollWaterfall || !this._waterfallData) this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawPinnedCursor(ctx, W, specH);
         this._drawCrosshair(ctx, W, specH, spanHz);
         this._drawHoldOverlay(ctx, W, specH);
