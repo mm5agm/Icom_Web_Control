@@ -203,6 +203,8 @@ namespace Yaesu_Web_Control.Services
                     "R" => parts.Length > 1 ? SetRit(parts[1]) : "RPRT -1",
                     "c" => GetXit(),
                     "C" => parts.Length > 1 ? SetXit(parts[1]) : "RPRT -1",
+                    "u" => parts.Length > 1 ? await GetFuncAsync(parts[1], clientId) : "RPRT -1",
+                    "U" => parts.Length > 2 ? await SetFuncAsync(parts[1], parts[2], clientId) : "RPRT -1",
                     "q" => "RPRT 0",
                     _ => "RPRT -1"
                 };
@@ -229,6 +231,8 @@ namespace Yaesu_Web_Control.Services
                 "set_rit"       => parts.Length > 1 ? SetRit(parts[1]) : "RPRT -1",
                 "get_xit"       => GetXit(),
                 "set_xit"       => parts.Length > 1 ? SetXit(parts[1]) : "RPRT -1",
+                "get_func"      => parts.Length > 1 ? await GetFuncAsync(parts[1], clientId) : "RPRT -1",
+                "set_func"      => parts.Length > 2 ? await SetFuncAsync(parts[1], parts[2], clientId) : "RPRT -1",
                 "get_info"      => GetInfo(),
                 "set_band"      => parts.Length > 1 ? await SetBandAsync(parts[1], clientId) : "RPRT -1",
                 "get_powerstat" => "1",
@@ -417,6 +421,45 @@ namespace Yaesu_Web_Control.Services
                 return "RPRT 0";
             }
             return "RPRT -1";
+        }
+
+        // --- Functions (get_func / set_func) ---
+        // Only RIG_FUNC_TUNER is implemented — the ATU. Anything else falls
+        // through to RPRT -1, matching every other unimplemented rigctld
+        // command in this file.
+        private async Task<string> GetFuncAsync(string func, string clientId)
+        {
+            if (func.ToUpperInvariant() != "TUNER")
+                return "RPRT -1";
+
+            // AC reply format after the multiplexer strips the trailing ';':
+            //   "AC" P1 P2 P3   — 5 characters, P3 at index 4.
+            //   P3: 0=Tuner OFF, 1=Tuner ON, 2=Tuning Start/Stop
+            // Hamlib's get_func model is boolean, but the radio has a third
+            // "tuning in progress" state — report "on" during tuning too,
+            // since the tuner is engaged either way.
+            var response = await _multiplexer.SendCommandAsync("AC", clientId);
+            if (!string.IsNullOrEmpty(response) && response.StartsWith("AC") && response.Length >= 5)
+            {
+                var enabled = response[4] != '0';
+                _radioStateService.AtuEnabled = enabled;
+                return enabled ? "1" : "0";
+            }
+            return "RPRT -1";
+        }
+
+        private async Task<string> SetFuncAsync(string func, string value, string clientId)
+        {
+            if (func.ToUpperInvariant() != "TUNER")
+                return "RPRT -1";
+
+            // AC P1 P2 P3 ;  — P3=1 ATU ON, P3=0 ATU OFF (P1/P2 always 0).
+            // Same command the front-end ATU button uses (CatController.SetAtu).
+            var enabled = value == "1";
+            await _multiplexer.SendCommandAsync(enabled ? "AC001;" : "AC000;", clientId);
+            _radioStateService.AtuEnabled = enabled;
+            _logger.LogInformation("Rigctld set_func TUNER: {Enabled} (client: {ClientId})", enabled, clientId);
+            return "RPRT 0";
         }
 
         private async Task<string> GetLevelAsync(string level, string clientId)

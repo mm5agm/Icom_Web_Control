@@ -152,6 +152,14 @@ namespace Yaesu_Web_Control.Pages
                 var oldWebAddress = current.WebAddress;
                 var oldHttpPort   = current.HttpPort;
 
+                // Capture pre-change CAT connection values so the radio reconnect
+                // below only fires when something that actually affects the CAT
+                // link changed — previously it ran unconditionally on every save,
+                // including fields like Accessibility/Voice Control toggles that
+                // have nothing to do with the radio connection.
+                var oldSerialPort = current.SerialPort;
+                var oldBaudRate   = current.BaudRate;
+
                 // Capture pre-change SDR values so we can ask SdrManager to
                 // restart its worker(s) when any SDR-related setting changes.
                 // This makes adding/removing a VFO B SDR take effect immediately
@@ -243,18 +251,32 @@ namespace Yaesu_Web_Control.Pages
 
                 await _settingsService.SaveSettingsAsync(current);
 
-                // Reset initialization status so app will try again
-                Yaesu_Web_Control.Services.AppStatus.InitializationStatus = "initializing";
+                // Only reconnect the radio if something that actually affects the
+                // CAT link changed — Radio Model (different init command set),
+                // Serial Port, or Baud Rate. Previously this ran on every save
+                // regardless of which field changed, so even an unrelated toggle
+                // (e.g. Accessibility/Voice Control) would visibly reconnect the
+                // radio.
+                bool catConnectionChanged =
+                       !string.Equals(oldRadioModel, current.RadioModel, StringComparison.Ordinal)
+                    || !string.Equals(oldSerialPort, current.SerialPort, StringComparison.OrdinalIgnoreCase)
+                    || oldBaudRate != current.BaudRate;
 
-                // Automatic retry: trigger radio initialization in the background rather
-                // than awaiting it here. The full sequence (CAT burst, DT0 wait up to 5s,
-                // state restore, auto-info settle) can legitimately take several seconds,
-                // which was blocking this POST response and making Save appear to hang
-                // (wa6auf11, #73 follow-up). The existing initializing-overlay/polling on
-                // the main page already handles showing progress once redirected there.
-                // InitializeRadioAsync's own top-level catch means this never surfaces an
-                // unobserved exception.
-                _ = _radioInitializationService.InitializeRadioAsync();
+                if (catConnectionChanged)
+                {
+                    // Reset initialization status so app will try again
+                    Yaesu_Web_Control.Services.AppStatus.InitializationStatus = "initializing";
+
+                    // Automatic retry: trigger radio initialization in the background rather
+                    // than awaiting it here. The full sequence (CAT burst, DT0 wait up to 5s,
+                    // state restore, auto-info settle) can legitimately take several seconds,
+                    // which was blocking this POST response and making Save appear to hang
+                    // (wa6auf11, #73 follow-up). The existing initializing-overlay/polling on
+                    // the main page already handles showing progress once redirected there.
+                    // InitializeRadioAsync's own top-level catch means this never surfaces an
+                    // unobserved exception.
+                    _ = _radioInitializationService.InitializeRadioAsync();
+                }
 
                 // If any SDR-related setting changed, ask SdrManager to restart its
                 // worker(s) so the new configuration takes effect immediately.
