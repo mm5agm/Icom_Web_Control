@@ -273,6 +273,8 @@ A scrollable row of meters is displayed above the VFO panels. The leftmost slots
 | IDD | PA drain current in amps |
 | VDD | PA supply voltage in volts |
 
+> **Why the radio's own front-panel meter is stuck on COMP/SWR while YWC is running.** On the FTdx101MP and FTdx101D, the radio's documented CAT command for reading SWR directly returns stale or wrong values, so YWC works around it by repeatedly telling the radio to display Compression and SWR on its own meter and reading both at once — about twice a second, for as long as YWC is connected. This is what YWC needs to show you an accurate SWR reading, but it also means you can't pick a different meter pair from the radio's own front panel while YWC is running; whatever you select gets overridden within half a second. This is expected behaviour, not a fault — there's no radio-side setting that avoids it.
+
 **FTDX3000** — single S-meter (VFO A) plus the same seven TX meters — FTDX3000 is a single-receiver radio, so there is no VFO B S-meter.
 
 **FTdx10, FT-710** — single S-meter (VFO A) plus four TX meters (SWR, Power, Compression, ALC). The Temp, IDD, and VDD meters are not shown because those radios have a different power amplifier design that runs on 13.8 V; the high-voltage PA meters do not apply.

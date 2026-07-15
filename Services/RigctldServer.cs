@@ -367,6 +367,7 @@ namespace Yaesu_Web_Control.Services
         private async Task<string> SetPttAsync(string ptt, string clientId)
         {
             var command = ptt == "1" ? "TX1;" : "TX0;";
+            _logger.LogInformation("Rigctld set_ptt: {Ptt} (client: {ClientId})", ptt, clientId);
             await _multiplexer.SendCommandAsync(command, clientId);
             return "RPRT 0";
         }
