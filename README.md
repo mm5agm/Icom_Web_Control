@@ -173,6 +173,10 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Release Notes
 
+## Unreleased (on develop, not yet tagged)
+
+Since pre7, I've narrowed the Settings-save radio reconnect further. Pre7 made the reconnect run in the background instead of blocking the Save button, but it still fired on every single save regardless of which field changed — so ticking an unrelated toggle like an Accessibility or Voice Control option would still visibly reconnect the radio and reload the home page. The reconnect now only fires when something that actually affects the CAT link changes: Radio Model, Serial Port, or Baud Rate. Everything else saves and returns straight away.
+
 ## 2026-07-15 - v2.4.2-pre7 (pre-release)
 
 Seventh pre-release in the 2.4.2 line. After pre6, wa6auf reported that the very first Settings save after upgrading "just hung" (it self-resolved on a restart, and every save since worked fine). Looking at the Settings save handler, I found it was waiting on the full radio reconnect sequence — CAT command burst, up to a 5-second wait for a response, state restore, a settle delay — before the page would respond at all, so the Save button could legitimately sit there doing nothing visible for several seconds even when nothing was wrong. I've made that reconnect run in the background instead, so Save returns immediately and the existing initializing overlay on the main page shows progress the same way it does on startup. I haven't been able to reproduce wa6auf's exact one-off hang myself, so I can't say for certain this was the whole story — I've asked him for his log from that session to check for a related thread-pool contention issue I found already-instrumented in the code from an earlier fix. Either way, Settings save should no longer be able to visibly stall like this.
