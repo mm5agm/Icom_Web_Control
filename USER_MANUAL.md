@@ -1878,6 +1878,8 @@ If you're not already signed in to GitHub, you'll be asked to sign in first — 
 
 If you've got an F12 → Console error message, paste that into the **Screenshots / logs** section too — JavaScript errors are often the smoking gun for UI bugs that don't reproduce in the backend logs.
 
+**Attaching a log file.** For anything involving the radio connection, CAT commands, or rigctld (WSJT-X, Log4OM, etc.), the backend log is usually more useful than a screenshot. YWC writes one log file per day to `%APPDATA%\MM5AGM\Yaesu Web Control\logs\ywc-YYYYMMDD.log` — paste that path into Windows Explorer's address bar, find the file covering when the problem happened, and attach it to your GitHub report in the **Screenshots / logs** section. GitHub's attachment picker doesn't always accept a `.log` extension — if the upload fails, rename it to `.txt` or zip it first.
+
 A **Feature request** template is also available for ideas / improvements rather than bugs.
 
 > Please report on **GitHub** — not Groups.io. Groups.io threads scroll off and become impossible to find again. GitHub Issues stay open until fixed and closed when resolved, with the conversation preserved. See the [Issues page](https://github.com/mm5agm/Yaesu_Web_Control/issues).
