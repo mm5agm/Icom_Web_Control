@@ -173,6 +173,10 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Release Notes
 
+## 2026-07-15 - v2.4.2-pre9 (pre-release)
+
+Diagnostic follow-up to pre8. wa6auf reported that WSJT-X's "Test PTT" button does nothing against his FTDX101D over rigctld, even though Test CAT works and his WSJT-X radio settings are all correct. The log he sent didn't have enough detail to tell whether WSJT-X ever actually sends a PTT command to YWC, or whether YWC receives it and fails to act — the `set_ptt` rigctld command wasn't logged at all, unlike `set_freq` and `set_func`. This release adds that missing log line so the next capture will show definitively which side the problem is on. No behaviour change.
+
 ## 2026-07-15 - v2.4.2-pre8 (pre-release)
 
 Eighth pre-release in the 2.4.2 line, adding a feature request and carrying forward a follow-up fix from pre7.
