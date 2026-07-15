@@ -246,8 +246,15 @@ namespace Yaesu_Web_Control.Pages
                 // Reset initialization status so app will try again
                 Yaesu_Web_Control.Services.AppStatus.InitializationStatus = "initializing";
 
-                // Automatic retry: trigger radio initialization
-                await _radioInitializationService.InitializeRadioAsync();
+                // Automatic retry: trigger radio initialization in the background rather
+                // than awaiting it here. The full sequence (CAT burst, DT0 wait up to 5s,
+                // state restore, auto-info settle) can legitimately take several seconds,
+                // which was blocking this POST response and making Save appear to hang
+                // (wa6auf11, #73 follow-up). The existing initializing-overlay/polling on
+                // the main page already handles showing progress once redirected there.
+                // InitializeRadioAsync's own top-level catch means this never surfaces an
+                // unobserved exception.
+                _ = _radioInitializationService.InitializeRadioAsync();
 
                 // If any SDR-related setting changed, ask SdrManager to restart its
                 // worker(s) so the new configuration takes effect immediately.
