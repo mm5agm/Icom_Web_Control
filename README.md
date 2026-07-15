@@ -173,9 +173,13 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Release Notes
 
-## Unreleased (on develop, not yet tagged)
+## 2026-07-15 - v2.4.2-pre8 (pre-release)
 
-Since pre7, I've narrowed the Settings-save radio reconnect further. Pre7 made the reconnect run in the background instead of blocking the Save button, but it still fired on every single save regardless of which field changed — so ticking an unrelated toggle like an Accessibility or Voice Control option would still visibly reconnect the radio and reload the home page. The reconnect now only fires when something that actually affects the CAT link changes: Radio Model, Serial Port, or Baud Rate. Everything else saves and returns straight away.
+Eighth pre-release in the 2.4.2 line, adding a feature request and carrying forward a follow-up fix from pre7.
+
+iu1teu asked ([discussion #76](https://github.com/mm5agm/Yaesu_Web_Control/discussions/76)) for the antenna tuner to be controllable over rigctld, the same way WSJT-X and other Hamlib clients already drive frequency and mode through YWC. Added `get_func`/`set_func TUNER` (short forms `u`/`U`), wired to the same `AC` CAT command the on-screen ATU button already uses, so a rigctld client can query and toggle the tuner and see it reflected in the web UI's ATU indicator, and vice versa. Since Hamlib's `get_func` model is boolean but the radio also reports a "tuning in progress" third state, `get_func TUNER` reports "on" throughout an active tune cycle rather than inventing a three-state response — iu1teu's own suggested approach. Hardware-tested against my own FTdx101MP: driving the tuner on and off over rigctld correctly moved both the radio's physical TUNE LED and YWC's own ATU indicator.
+
+Also, I've narrowed the Settings-save radio reconnect further. Pre7 made the reconnect run in the background instead of blocking the Save button, but it still fired on every single save regardless of which field changed — so ticking an unrelated toggle like an Accessibility or Voice Control option would still visibly reconnect the radio and reload the home page. The reconnect now only fires when something that actually affects the CAT link changes: Radio Model, Serial Port, or Baud Rate. Everything else saves and returns straight away.
 
 ## 2026-07-15 - v2.4.2-pre7 (pre-release)
 
