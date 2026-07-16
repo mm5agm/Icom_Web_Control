@@ -55,11 +55,19 @@ function showServerStoppedOverlay() {
 
 function isTypingIntoEditable() {
     const active = document.activeElement;
-    return !!(active && (
+    if (active && (
         active.tagName === 'INPUT' ||
         active.tagName === 'TEXTAREA' ||
         active.isContentEditable
-    ));
+    )) return true;
+    // The on-screen frequency keypad is a text-entry surface even though focus
+    // sits on its buttons (a <dialog>, not an <input>). Treat it as "typing" so
+    // global shortcuts (TX toggle, fullscreen) don't fire while a frequency is
+    // being entered — otherwise a non-digit shortcut key sails past the keypad's
+    // own keydown handler (which only swallows digits/Escape/nav) to the rig.
+    const freqKb = document.getElementById('freqKeyboardDialog');
+    if (freqKb && freqKb.open) return true;
+    return false;
 }
 
 // --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
