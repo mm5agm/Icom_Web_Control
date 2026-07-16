@@ -366,7 +366,9 @@ namespace Yaesu_Web_Control.Services
 
         private async Task<string> SetPttAsync(string ptt, string clientId)
         {
-            var command = ptt == "1" ? "TX1;" : "TX0;";
+            // Hamlib set_ptt values: 0=off, 1=on, 2=on (mic), 3=on (data) — WSJT-X in
+            // Data/Pkt PTT mode sends 3, not 1, so any nonzero value must key the radio.
+            var command = ptt == "0" ? "TX0;" : "TX1;";
             _logger.LogInformation("Rigctld set_ptt: {Ptt} (client: {ClientId})", ptt, clientId);
             await _multiplexer.SendCommandAsync(command, clientId);
             return "RPRT 0";
