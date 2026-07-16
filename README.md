@@ -173,6 +173,14 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ## Release Notes
 
+## 2026-07-16 - v2.4.2-pre11 (pre-release)
+
+Two things in this build.
+
+**A transmit safety net for the WSJT-X / rigctld bridge (follow-up to pre10's PTT fix).** After pre10 got the radio keying correctly again, wa6auf found that using WSJT-X's Tune could leave the radio stuck transmitting — WSJT-X keyed it, but its "stop" never reached YWC, so the carrier stayed on until he dropped it by hand with YWC's own Transmit button. Whatever the reason a release goes missing, YWC shouldn't ever let itself be left transmitting, so I've added a safety net: if the radio is keyed through the rigctld bridge and no release arrives, YWC now forces it back to receive automatically — both if the connection drops while keyed, and after a timeout. I haven't been able to reproduce wa6auf's exact setup, so I'm treating this as a safeguard rather than a confirmed fix pending his retest.
+
+**A keyboard transmit shortcut and split-mode fixes (contributed by Fabio Valente).** Fabio added an optional keyboard shortcut to toggle transmit — off by default; set a key under Settings → Accessibility — fixed the inactive-VFO greying in split mode so the TX button and split badge stay full-colour and clickable, and hardened the transmit-state detection so the on-screen TX indicator clears the instant you unkey. Thank you Fabio. The greying fix applies to the single-receiver radios (FTdx10 / FT-710 / FTDX3000); it's been tested on Fabio's FT-DX-10 and the transmit changes on my FTdx101.
+
 ## 2026-07-16 - v2.4.2-pre10 (pre-release)
 
 Follow-up to pre9's diagnostic logging on the WSJT-X PTT issue wa6auf reported. The new log line pointed at something concrete: WSJT-X sent `set_ptt 3`, not `1` — Hamlib's PTT code for "on, via the data port," which it uses when its PTT method is running in Data/Pkt mode. YWC's rigctld handler only recognised an exact `1` as "key the radio," so that `3` was silently treated as "off" instead, which lines up with "nothing happens" when Test PTT is pressed. This release treats any non-zero PTT value as "on." I haven't been able to reproduce wa6auf's exact setup myself, so I'm treating this as a likely cause rather than a confirmed fix pending his retest.
