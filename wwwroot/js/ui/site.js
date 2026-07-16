@@ -53,11 +53,27 @@ function showServerStoppedOverlay() {
     try { window.sMeterHistoryB?.stop?.();   } catch { /* ignore */ }
 }
 
+function isTypingIntoEditable() {
+    const active = document.activeElement;
+    if (active && (
+        active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' ||
+        active.isContentEditable
+    )) return true;
+    // The on-screen frequency keypad is a text-entry surface even though focus
+    // sits on its buttons (a <dialog>, not an <input>). Treat it as "typing" so
+    // global shortcuts (TX toggle, fullscreen) don't fire while a frequency is
+    // being entered — otherwise a non-digit shortcut key sails past the keypad's
+    // own keydown handler (which only swallows digits/Escape/nav) to the rig.
+    const freqKb = document.getElementById('freqKeyboardDialog');
+    if (freqKb && freqKb.open) return true;
+    return false;
+}
+
 // --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
 document.addEventListener('keydown', function (e) {
     // Ignore if typing in an input, textarea, or contenteditable
-    const active = document.activeElement;
-    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+    if (isTypingIntoEditable()) return;
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // Bare F only — guarding against modifiers stops YWC from stealing
         // Ctrl+F (browser find-in-page) and Cmd+F on Mac.
@@ -73,6 +89,28 @@ document.addEventListener('keydown', function (e) {
             e.preventDefault();
         }
     }
+});
+
+// Optional browser TX shortcut. Disabled by default; when configured, it
+// toggles transmit using the same /api/cat/tx flow as the on-screen button.
+document.addEventListener('keydown', function (e) {
+    const configuredKey = window.ywcTxToggleKey;
+    // Empty string only — do not use falsy check; a legacy " " must still match.
+    if (configuredKey == null || configuredKey === '' || isTypingIntoEditable()) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+
+    // Settings stores Space as the token "Space" (HTML cannot round-trip " ").
+    // Accept both the token and a legacy lone-space value.
+    const isSpaceShortcut = configuredKey === 'Space' || configuredKey === ' ';
+    const keyMatches = isSpaceShortcut
+        ? (e.key === ' ')
+        : (configuredKey.length === 1 && e.key.length === 1
+            ? e.key.toLowerCase() === configuredKey.toLowerCase()
+            : e.key === configuredKey);
+    if (!keyMatches) return;
+
+    e.preventDefault();
+    toggleTx();
 });
 
 // Add/remove fullscreen-mode class on body when entering/exiting fullscreen
@@ -589,8 +627,9 @@ let txVfo = 0; // 0 = VFO A, 1 = VFO B (the TX VFO — only flips with split)
 let activeVfo = 0;
 
 // Apply the .vfo-inactive class to whichever VFO panel is NOT the active
-// (TX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
-// Dual-receiver radios (FTdx101MP/D) leave both panels active because each
+// (RX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
+// CSS greys only that panel's .card-body (header stays normal so TX looks
+// enabled). Dual-receiver radios leave both panels active because each
 // VFO is its own physical receiver chain. The data-single-receiver
 // attribute on #vfoRow is rendered server-side from RadioCapabilities.cs.
 // See docs/decisions/0003-single-vs-dual-receiver-ui.md.
@@ -636,9 +675,10 @@ function applyVfoActiveStyling() {
     // (VS command) for both cases is deterministic and matches what the
     // radio is actually doing.
     //
-    // The TX button and SPLIT badge land on the grey panel in split mode
-    // (R8) automatically because updateTxButton / updateSplitButton derive
-    // the TX position as "opposite of active" on single-receiver radios.
+    // The TX button and SPLIT badge land on the inactive panel in split
+    // mode (R8) because updateTxButton / updateSplitButton derive the TX
+    // position as "opposite of active" on single-receiver radios. The
+    // card header is not greyed, so TX stays full-colour and clickable.
     //
     // The spectrum panel is NOT greyed — on single-receiver radios the
     // single spectrum always shows the live receive signal. The second
@@ -649,10 +689,10 @@ function applyVfoActiveStyling() {
 
     activeCol.classList.remove('vfo-inactive', 'vfo-tx-editable');
     inactiveCol.classList.add('vfo-inactive');
-    // R10/R11: in split mode the grey panel IS the TX VFO — operators must
-    // still be able to set the TX frequency from YWC without un-splitting.
-    // The .vfo-tx-editable class re-enables pointer-events on the frequency
-    // display while leaving every other control on the grey panel read-only.
+    // R10/R11: in split mode the inactive panel IS the TX VFO — operators
+    // must still be able to set the TX frequency from YWC without
+    // un-splitting. .vfo-tx-editable re-enables the frequency field while
+    // leaving every other card-body control read-only.
     inactiveCol.classList.toggle('vfo-tx-editable', splitOn);
 
     // Make sure neither spectrum carries a stale inactive class from a
@@ -698,7 +738,7 @@ async function toggleTx() {
             const data = await response.json();
             isTransmitting = data.transmitting;
             updateTxButton();
-
+            updateTxIndicators(isTransmitting);
         } else {
 
         }
@@ -772,10 +812,10 @@ function updateSplitButton() {
         btn.textContent = active ? 'Split ON' : 'Split';
     }
 
-    // R8: the SPLIT TX badge belongs on the TX VFO's header — the grey
-    // panel. On single-receiver radios the TX VFO is the OPPOSITE of the
-    // active VFO; on dual-receiver radios it's whichever VFO the FT
-    // command points to. Show one badge, hide the other.
+    // R8: the SPLIT TX badge belongs on the TX VFO's header. On
+    // single-receiver radios the TX VFO is the OPPOSITE of the active VFO;
+    // on dual-receiver radios it's whichever VFO the FT command points to.
+    // Show one badge, hide the other.
     let txVfoIdx;
     if (isSingleReceiver) {
         txVfoIdx = (activeVfo === 0) ? 1 : 0;   // opposite of RX
