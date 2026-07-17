@@ -68,6 +68,7 @@
     - 15.6 [Can I use VSPE / OmniRig / com0com?](#156-can-i-use-vspe-omnirig-com0com-or-a-similar-virtual-com-port-sharer)
     - 15.7 [What is the TX button for?](#157-what-is-the-tx-button-for-when-i-press-it-the-radio-goes-into-tx-mode-but-theres-no-audio-from-my-microphone)
     - 15.8 [Why was Alexa voice control dropped in favour of the built-in microphone?](#158-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method)
+    - 15.9 [WSJT-X is very slow to key the radio (long PTT / Tune delay)](#159-wsjt-x-is-very-slow-to-key-the-radio-1020-second-delay-on-ptt--tune)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -2084,6 +2085,26 @@ What people use it for in practice:
 3. **Digital-mode keying tests.** When WSJT-X (or similar) is feeding audio into the rear DATA jack, the TX button gives you a CAT-driven way to verify the keying side of the path without starting a real QSO.
 
 To transmit voice from your microphone, press the PTT button on the mic itself.
+
+---
+
+### 15.9 WSJT-X is very slow to key the radio (10–20 second delay on PTT / Tune)
+
+If pressing **Test PTT** or **Tune** in WSJT-X takes ten to twenty seconds before the radio actually transmits — and sometimes seems to stay in transmit afterwards — the delay is almost certainly **not** in YWC.
+
+When this was traced from an operator's logs ([issue #73](https://github.com/mm5agm/Yaesu_Web_Control/issues/73)), YWC was keying the radio within about 40 *milliseconds* of receiving each PTT command — the wait was happening *before* the command ever reached YWC. WSJT-X talks to YWC's rigctld server over the local loopback address (`127.0.0.1`), and on some Windows machines that loopback path can be bottlenecked by legacy networking.
+
+The fix that resolved it for that operator: **disable NetBIOS over TCP/IP**. It's a legacy protocol that can slow down local loopback traffic. To disable it:
+
+1. Open **Network Connections** (press **Win + R**, type `ncpa.cpl`, press Enter).
+2. Right-click your active network adapter → **Properties**.
+3. Select **Internet Protocol Version 4 (TCP/IPv4)** → **Properties**.
+4. Click **Advanced…**, then open the **WINS** tab.
+5. Under *NetBIOS setting*, choose **Disable NetBIOS over TCP/IP**, then **OK** out.
+
+This is a machine-specific networking quirk rather than a YWC bug, so it won't affect most setups — but if you're seeing long PTT delays with an otherwise-working WSJT-X ↔ YWC link, it's the first thing to try.
+
+As a safety backstop, YWC (v2.4.2 and later) will force the radio back to receive if a program keys it through rigctld and never sends the matching release, so a stuck transmit can't be left keyed indefinitely — but that's a safety net, not a cure for the delay. The loopback fix above is the real solution.
 
 ---
 
