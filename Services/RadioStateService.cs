@@ -22,6 +22,12 @@ namespace Yaesu_Web_Control.Services
         // writing to *A state — see #34 R2 controls-bleed-across-panels fix.
         public bool IsSingleReceiver { get; set; } = false;
 
+        // Configured radio model (e.g. "FTDX3000"). Set by RadioInitialization-
+        // Service at startup. The dispatcher uses this to normalise model-
+        // specific CAT read codes — notably the FTDX3000 roofing-filter answer,
+        // whose read code space differs from its set code space.
+        public string RadioModel { get; set; } = "";
+
         private RadioState _initialState;
 
         public RadioStateService(

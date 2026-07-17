@@ -130,6 +130,7 @@ namespace Yaesu_Web_Control.Services
                 // currently active per VS, instead of always writing to *A
                 // state. See #34 R2 controls-bleed fix.
                 radioStateService.IsSingleReceiver = RadioCapabilities.IsSingleReceiver(settings.RadioModel);
+                radioStateService.RadioModel = settings.RadioModel;
                 logger.LogInformation("[RadioInitializationService] Radio responded to FA;: {Response}", faResponse);
 
                 // Safety: force the radio into RX before doing anything else.
