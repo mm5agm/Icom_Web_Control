@@ -6,13 +6,21 @@
     public class CatMessageDispatcher
     {
         private readonly RadioStateService _stateService;
+        private readonly ILogger<CatMessageDispatcher> _logger;
 
         // Callback for initialization complete
         public Action? OnInitializationComplete { get; set; }
 
-        public CatMessageDispatcher(RadioStateService stateService)
+        // Invoked after a VS change on single-receiver radios once init is
+        // complete. CatMultiplexerService wires a debounced per-VFO re-query.
+        public Action? OnActiveVfoChanged { get; set; }
+
+        public CatMessageDispatcher(
+            RadioStateService stateService,
+            ILogger<CatMessageDispatcher> logger)
         {
             _stateService = stateService;
+            _logger = logger;
             _ = ProcessPendingAsync();
         }
 
@@ -28,17 +36,22 @@
         // write the new VFO's values to the OLD ActiveVfo's slot.
         //
         // Pre5 fix (Jacek SP3L #34, after pre4): buffer single-receiver
-        // P1=0-Fixed broadcasts for 300 ms before applying. If VS arrives
-        // during the buffer window (indicating a swap), the queued updates
-        // route to the NEW ActiveVfo when they're applied. Dual-receiver
-        // (FTdx101) routes immediately by P1 -- no race possible there.
+        // P1=0-Fixed broadcasts for 300 ms before applying so A/B-press
+        // broadcasts that arrive before VS can settle. Updates whose
+        // ActiveVfo changed between enqueue and flush are dropped — any
+        // broadcast spanning a VS boundary is ambiguous; ground truth comes
+        // from the post-VS re-query burst. Dual-receiver (FTdx101) routes
+        // immediately by P1 — no race possible there.
         //
         // Items process in arrival order on a single consumer task so
         // last-write-wins semantics for the same property are preserved.
 
         private const int BufferDelayMs = 300;
 
-        private sealed record PendingDispatch(DateTimeOffset EnqueuedAt, Action<bool> Apply);
+        private sealed record PendingDispatch(
+            DateTimeOffset EnqueuedAt,
+            int ActiveVfoAtEnqueue,
+            Action<bool> Apply);
 
         private readonly System.Threading.Channels.Channel<PendingDispatch> _pending
             = System.Threading.Channels.Channel.CreateUnbounded<PendingDispatch>();
@@ -50,6 +63,13 @@
                 var age = DateTimeOffset.UtcNow - item.EnqueuedAt;
                 var wait = TimeSpan.FromMilliseconds(BufferDelayMs) - age;
                 if (wait > TimeSpan.Zero) await Task.Delay(wait);
+                if (_stateService.ActiveVfo != item.ActiveVfoAtEnqueue)
+                {
+                    _logger.LogDebug(
+                        "Dropped buffered P1=0-Fixed update: ActiveVfo changed {Old} → {New} during {DelayMs} ms buffer",
+                        item.ActiveVfoAtEnqueue, _stateService.ActiveVfo, BufferDelayMs);
+                    continue;
+                }
                 try { item.Apply(_stateService.ActiveVfo == 1); }
                 catch { /* per-item failures shouldn't break the consumer */ }
             }
@@ -58,9 +78,9 @@
         /// <summary>
         /// Apply a per-VFO receive-control update. On dual-receiver radios,
         /// writes immediately using the message's P1. On single-receiver
-        /// radios, buffers the update for 300 ms then applies using whichever
-        /// ActiveVfo is current at apply-time (after any VS broadcast that
-        /// arrived during the buffer window). See class comment above.
+        /// radios, buffers the update for 300 ms then applies using ActiveVfo
+        /// at apply-time unless ActiveVfo changed since enqueue (drop). See
+        /// class comment above.
         /// </summary>
         /// <param name="p1Char">The P1 character from the CAT message (used
         /// on dual-receiver only).</param>
@@ -70,7 +90,10 @@
         {
             if (_stateService.IsSingleReceiver)
             {
-                _pending.Writer.TryWrite(new PendingDispatch(DateTimeOffset.UtcNow, apply));
+                _pending.Writer.TryWrite(new PendingDispatch(
+                    DateTimeOffset.UtcNow,
+                    _stateService.ActiveVfo,
+                    apply));
             }
             else
             {
@@ -459,7 +482,16 @@
                         // R2 root cause: dispatcher had no case for VS so the
                         // radio's broadcast was silently dropped.
                         if (message.Length >= 4 && int.TryParse(message.Substring(2, 1), out int activeVfo))
+                        {
+                            var previous = _stateService.ActiveVfo;
                             _stateService.ActiveVfo = activeVfo;
+                            if (_stateService.IsSingleReceiver
+                                && _stateService.IsInitialized
+                                && previous != activeVfo)
+                            {
+                                OnActiveVfoChanged?.Invoke();
+                            }
+                        }
                         break;
                     case "AC":
                         // AC{P1}{P2}{P3}; per FTdx10 / FTdx101MP CAT manual page 6:

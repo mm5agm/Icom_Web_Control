@@ -24,10 +24,16 @@ namespace Yaesu_Web_Control.Services
         // Auto-Information support
         private readonly CatMessageBuffer _messageBuffer;
         private readonly CatMessageDispatcher _messageDispatcher;
+        private readonly RadioStateService _radioStateService;
         private bool _autoInformationEnabled = false;
 
         private readonly ConcurrentDictionary<string, TaskCompletionSource<string>> _pendingResponses = new();
         private TaskCompletionSource<bool>? _initializationCompletionSource;
+
+        // Debounced post-VS re-query for single-receiver radios (cancel-and-
+        // restart on rapid A/B flips).
+        private CancellationTokenSource? _vsRequeryCts;
+        private const int VsRequerySettleMs = 500;
 
         public bool IsConnected => _serialPort?.IsOpen ?? false;
 
@@ -37,15 +43,50 @@ namespace Yaesu_Web_Control.Services
             ILogger<CatMultiplexerService> logger,
             CatMessageBuffer messageBuffer,
             CatMessageDispatcher messageDispatcher,
-            ISettingsService settingsService)
+            ISettingsService settingsService,
+            RadioStateService radioStateService)
         {
             _logger = logger;
             _messageBuffer = messageBuffer;
             _messageDispatcher = messageDispatcher;
             _settingsService = settingsService;
+            _radioStateService = radioStateService;
 
             _messageBuffer.MessageReceived += OnMessageReceived;
             _messageDispatcher.OnInitializationComplete = SignalInitializationComplete;
+            _messageDispatcher.OnActiveVfoChanged = SchedulePostVsRequery;
+        }
+
+        private void SchedulePostVsRequery()
+        {
+            if (!_radioStateService.IsSingleReceiver || !_radioStateService.IsInitialized)
+                return;
+
+            _vsRequeryCts?.Cancel();
+            _vsRequeryCts?.Dispose();
+            _vsRequeryCts = new CancellationTokenSource();
+            var token = _vsRequeryCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(VsRequerySettleMs, token);
+                    _logger.LogDebug(
+                        "Post-VS re-query: reading active VFO {Vfo} receive controls after A/B switch",
+                        _radioStateService.ActiveVfo == 0 ? "A" : "B");
+                    foreach (var q in CatCommands.SingleReceiverPerVfoQueries)
+                        await SendCommandAndDispatchAsync(q, "VsRequery", token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Rapid A/B flip — a newer re-query superseded this one.
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Post-VS per-VFO re-query failed");
+                }
+            }, token);
         }
 
         private void OnMessageReceived(object? sender, CatMessageReceivedEventArgs e)
@@ -396,10 +437,16 @@ namespace Yaesu_Web_Control.Services
             // gets a fresh, non-cancelled token.
             _cancellationTokenSource.Dispose();
             _cancellationTokenSource = new CancellationTokenSource();
+
+            _vsRequeryCts?.Cancel();
+            _vsRequeryCts?.Dispose();
+            _vsRequeryCts = null;
         }
 
         public void Dispose()
         {
+            _vsRequeryCts?.Cancel();
+            _vsRequeryCts?.Dispose();
             DisconnectAsync().GetAwaiter().GetResult();
             _serialSemaphore?.Dispose();
             _cancellationTokenSource?.Dispose();

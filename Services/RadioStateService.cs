@@ -65,6 +65,8 @@ namespace Yaesu_Web_Control.Services
             IfWidthB = _initialState.IfWidthB ?? "8";
             IfShiftA = _initialState.IfShiftA;
             IfShiftB = _initialState.IfShiftB;
+            AfGainA = _initialState.AfGainA;
+            AfGainB = _initialState.AfGainB;
         }
 
         public RadioState InitialState => _initialState;
@@ -457,9 +459,9 @@ namespace Yaesu_Web_Control.Services
         private int? _temperature;
         public int? Temperature { get => _temperature; set => SetField(ref _temperature, value); }
 
-        private int _afGainA = 128;
+        private int _afGainA;
         public int AfGainA { get => _afGainA; set => SetField(ref _afGainA, value); }
-        private int _afGainB = 128;
+        private int _afGainB;
         public int AfGainB { get => _afGainB; set => SetField(ref _afGainB, value); }
 
         private int _micGain = 50;
