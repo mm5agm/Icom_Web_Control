@@ -167,13 +167,17 @@
         // Yuri W4YSW request 2026-06-17.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
 
-        // Browser key that toggles TX (transmit). Empty string = disabled.
+        // Browser key that toggles TX (transmit). Empty / null = disabled.
         // Stored as a KeyboardEvent.key value such as "t" or "F8", except
         // Space which is stored as the token "Space" (a lone " " cannot
         // survive HTML form / input value round-trips).
         // Ignored while typing in inputs to avoid accidental keying during
         // form entry or frequency editing.
-        public string TxToggleKey { get; set; } = "";
+        // Nullable so an empty input does not get an implicit [Required] from
+        // <Nullable>enable</Nullable> — that would make jQuery unobtrusive
+        // validation silently block the entire Settings form (same class of
+        // bug as #65 / SdrplayInstallPath and the DX-cluster fields).
+        public string? TxToggleKey { get; set; } = "";
 
         // ── Voice Control (in-process SAPI) ───────────────────────────────
         // When true, the navbar mic button is shown and the SAPI recogniser
