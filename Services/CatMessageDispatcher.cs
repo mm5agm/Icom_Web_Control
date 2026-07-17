@@ -174,27 +174,22 @@
                     case "RF":
                         // Example: RF06; (VFO A, 12kHz filter), RF19; (VFO B, 600Hz filter)
                         // Response format: RF + P1 (0=Main/A, 1=Sub/B) + P3 (filter code 6-A)
-                        // Single-receiver radios (FTdx10 etc.): P1 is always 0 — mirror to both VFOs.
+                        // Single-receiver: P1 is "0 Fixed" — routes via SetPerVfo's 300 ms
+                        // buffer so A/B-press broadcasts land on the new ActiveVfo.
                         if (message.Length >= 4)
                         {
-                            var vfo = message[2]; // '0' for A, '1' for B
                             var filterCode = message[3].ToString();
-                            if (_stateService.IsSingleReceiver)
-                            {
-                                // FTDX3000 answers RF in a read-code space (P3) that
-                                // differs from its dropdown set codes (P2); normalise
-                                // so the UI stays in sync. Other single-receiver
-                                // radios (FTdx10) already report in dropdown codes.
-                                var code = _stateService.RadioModel == "FTDX3000"
-                                    ? Ftdx3000Roofing.NormalizeReadCode(filterCode)
-                                    : filterCode;
-                                _stateService.RoofingFilterA = code;
-                                _stateService.RoofingFilterB = code;
-                            }
-                            else if (vfo == '0')
-                                _stateService.RoofingFilterA = filterCode;
-                            else if (vfo == '1')
-                                _stateService.RoofingFilterB = filterCode;
+                            // FTDX3000 answers RF in a read-code space (P3) that
+                            // differs from its dropdown set codes (P2); normalise
+                            // so the UI stays in sync. Other single-receiver
+                            // radios (FTdx10) already report in dropdown codes.
+                            var code = _stateService.RadioModel == "FTDX3000"
+                                ? Ftdx3000Roofing.NormalizeReadCode(filterCode)
+                                : filterCode;
+                            SetPerVfo(message[2], routeB => {
+                                if (routeB) _stateService.RoofingFilterB = code;
+                                else        _stateService.RoofingFilterA = code;
+                            });
                         }
                         break;
                     case "GT":

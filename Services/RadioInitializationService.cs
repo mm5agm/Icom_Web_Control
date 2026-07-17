@@ -413,6 +413,7 @@ namespace Yaesu_Web_Control.Services
                     string[] perVfoQueries = {
                         "MD0;",          // mode is per-VFO at the CAT level but the radio
                                          // updates display mode on swap so re-read for safety
+                        "RF0;",          // roofing filter (per-VFO on single-receiver)
                         "GT0;",          // AGC
                         "PA0;",          // IPO/AMP
                         "RA0;",          // Attenuator

@@ -875,7 +875,8 @@ namespace Yaesu_Web_Control.Controllers
 
         /// <summary>
         /// FTdx10 single-receiver roofing filter: RF0 P2 set / RF0 P3 read.
-        /// Mirrors the result to both VFO slots so both panels stay in sync.
+        /// Per-VFO state is tracked in the active VFO slot (inactive panel is
+        /// not editable on single-receiver radios).
         /// </summary>
         private async Task<IActionResult> SetFtdx10RoofingFilterAsync(RoofingFilterRequest request)
         {
@@ -893,8 +894,8 @@ namespace Yaesu_Web_Control.Controllers
             if (!string.IsNullOrEmpty(rfReadResponse) && rfReadResponse.Length >= 4)
             {
                 var actualFilter = rfReadResponse[3].ToString();
-                _radioStateService.RoofingFilterA = actualFilter;
-                _radioStateService.RoofingFilterB = actualFilter;
+                if (_radioStateService.ActiveVfo == 1) _radioStateService.RoofingFilterB = actualFilter;
+                else                                   _radioStateService.RoofingFilterA = actualFilter;
 
                 if (actualFilter != request.Filter)
                 {
@@ -909,8 +910,8 @@ namespace Yaesu_Web_Control.Controllers
                 return Ok(new { message = $"Roofing filter {filterName} selected", filter = actualFilter, filterName });
             }
 
-            _radioStateService.RoofingFilterA = request.Filter;
-            _radioStateService.RoofingFilterB = request.Filter;
+            if (_radioStateService.ActiveVfo == 1) _radioStateService.RoofingFilterB = request.Filter;
+            else                                   _radioStateService.RoofingFilterA = request.Filter;
             var fallbackName = FtdxTenRoofingFilterNames.GetValueOrDefault(request.Filter, request.Filter);
             return Ok(new { message = $"Roofing filter {fallbackName} selected", filter = request.Filter, filterName = fallbackName });
         }
@@ -920,8 +921,8 @@ namespace Yaesu_Web_Control.Controllers
         /// The read-back code (P3) uses a different value space than the set code
         /// (P2) — 600 Hz reads back as 7, 300 Hz as 8, and AUTO reports the
         /// filter in circuit (4/5/6/9/A) — so the read code is normalised back
-        /// to the dropdown's set-code space and mirrored to both VFO slots
-        /// (single receiver). See <see cref="Ftdx3000Roofing"/>.
+        /// to the dropdown's set-code space. Per-VFO state is tracked in the
+        /// active VFO slot. See <see cref="Ftdx3000Roofing"/>.
         /// </summary>
         private async Task<IActionResult> SetFtdx3000RoofingFilterAsync(RoofingFilterRequest request)
         {
@@ -935,8 +936,8 @@ namespace Yaesu_Web_Control.Controllers
             var displayName = Ftdx3000Roofing.ReadCodeNames.GetValueOrDefault(readCode,
                               Ftdx3000Roofing.SetCodeNames.GetValueOrDefault(stateCode, stateCode));
 
-            _radioStateService.RoofingFilterA = stateCode;
-            _radioStateService.RoofingFilterB = stateCode;
+            if (_radioStateService.ActiveVfo == 1) _radioStateService.RoofingFilterB = stateCode;
+            else                                   _radioStateService.RoofingFilterA = stateCode;
             _logger.LogInformation("Set roofing filter (FTDX3000) to {Filter} (read code {ReadCode})", displayName, readCode);
             return Ok(new { message = $"Roofing filter set to {displayName}", filter = stateCode, filterName = displayName });
         }
