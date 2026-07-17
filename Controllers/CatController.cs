@@ -717,19 +717,22 @@ namespace Yaesu_Web_Control.Controllers
             { "A", "5" }   // 300 Hz (option)
         };
 
-        // FTdx10 roofing filter display names (RU command code -> display name)
+        // FTdx10 roofing filter display names (RF read code P3 -> display name)
         private static readonly Dictionary<string, string> FtdxTenRoofingFilterNames = new()
         {
-            { "1", "15 kHz" },
-            { "2", "6 kHz" },
-            { "3", "3 kHz" }
+            { "6", "12 kHz" },
+            { "7", "3 kHz" },
+            { "9", "500 Hz" },
+            { "A", "300 Hz" }
         };
 
-        // FTDX3000 roofing filter display names (RF0x code -> display name)
-        private static readonly Dictionary<string, string> Ftdx3000RoofingFilterNames = new()
+        // FTdx10 roofing filter set codes (read code P3 -> set code P2 used in RF command)
+        private static readonly Dictionary<string, string> FtdxTenRoofingFilterSetCodes = new()
         {
-            { "0", "Auto" }, { "1", "15 kHz" }, { "2", "6 kHz" },
-            { "3", "3 kHz" }, { "4", "600 Hz" }, { "5", "300 Hz" }
+            { "6", "1" },  // 12 kHz
+            { "7", "2" },  // 3 kHz
+            { "9", "4" },  // 500 Hz
+            { "A", "5" }   // 300 Hz (optional)
         };
 
         [HttpPost("roofingfilter/a")]
@@ -747,21 +750,14 @@ namespace Yaesu_Web_Control.Controllers
                 bool isFt710   = settings.RadioModel == "FT-710";
                 bool isFtdx3000 = settings.RadioModel == "FTDX3000";
 
-                if (isFtdx10 || isFt710)
+                if (isFt710)
                     return Ok(new { message = "Roofing filter is selected automatically by the radio" });
 
+                if (isFtdx10)
+                    return await SetFtdx10RoofingFilterAsync(request);
+
                 if (isFtdx3000)
-                {
-                    // FTDX3000: P1 is always 0 (single receiver); code is the filter number directly
-                    await _catClient.SendCommandAsync($"RF0{request.Filter};", "WebUI", CancellationToken.None);
-                    await Task.Delay(100);
-                    var readback = await _catClient.SendCommandAsync("RF0;", "WebUI", CancellationToken.None);
-                    var actualCode = readback?.Length >= 4 ? readback[3].ToString() : request.Filter;
-                    var displayName = Ftdx3000RoofingFilterNames.GetValueOrDefault(actualCode, actualCode);
-                    _radioStateService.RoofingFilterA = actualCode;
-                    _logger.LogInformation("Set Main roofing filter (FTDX3000) to {Filter}", displayName);
-                    return Ok(new { message = $"Roofing filter set to {displayName}", filter = actualCode, filterName = displayName });
-                }
+                    return await SetFtdx3000RoofingFilterAsync(request);
 
                 // FTdx101MP/D: RF command with set code conversion
                 if (!RoofingFilterSetCodes.TryGetValue(request.Filter, out var setCode))
@@ -823,21 +819,14 @@ namespace Yaesu_Web_Control.Controllers
                 bool isFt710   = settings.RadioModel == "FT-710";
                 bool isFtdx3000 = settings.RadioModel == "FTDX3000";
 
-                if (isFtdx10 || isFt710)
+                if (isFt710)
                     return Ok(new { message = "Roofing filter is selected automatically by the radio" });
 
+                if (isFtdx10)
+                    return await SetFtdx10RoofingFilterAsync(request);
+
                 if (isFtdx3000)
-                {
-                    // FTDX3000 has a single receiver — P1 is always 0; VFO B shares the same filter
-                    await _catClient.SendCommandAsync($"RF0{request.Filter};", "WebUI", CancellationToken.None);
-                    await Task.Delay(100);
-                    var readback = await _catClient.SendCommandAsync("RF0;", "WebUI", CancellationToken.None);
-                    var actualCode = readback?.Length >= 4 ? readback[3].ToString() : request.Filter;
-                    var displayName = Ftdx3000RoofingFilterNames.GetValueOrDefault(actualCode, actualCode);
-                    _radioStateService.RoofingFilterB = actualCode;
-                    _logger.LogInformation("Set Sub roofing filter (FTDX3000) to {Filter}", displayName);
-                    return Ok(new { message = $"Roofing filter set to {displayName}", filter = actualCode, filterName = displayName });
-                }
+                    return await SetFtdx3000RoofingFilterAsync(request);
 
                 // FTdx101MP/D: RF command with set code conversion
                 if (!RoofingFilterSetCodes.TryGetValue(request.Filter, out var setCode))
@@ -882,6 +871,74 @@ namespace Yaesu_Web_Control.Controllers
             {
                 _requestSemaphore.Release();
             }
+        }
+
+        /// <summary>
+        /// FTdx10 single-receiver roofing filter: RF0 P2 set / RF0 P3 read.
+        /// Mirrors the result to both VFO slots so both panels stay in sync.
+        /// </summary>
+        private async Task<IActionResult> SetFtdx10RoofingFilterAsync(RoofingFilterRequest request)
+        {
+            if (!FtdxTenRoofingFilterSetCodes.TryGetValue(request.Filter, out var setCode))
+                return BadRequest(new { error = $"Invalid filter code: {request.Filter}" });
+
+            var rfCommand = $"RF0{setCode};";
+            _logger.LogInformation("Sending roofing filter command (FTdx10): {Command}", rfCommand);
+            await _catClient.SendCommandAsync(rfCommand, "WebUI", CancellationToken.None);
+
+            await Task.Delay(100);
+            var rfReadResponse = await _catClient.SendCommandAsync("RF0;", "WebUI", CancellationToken.None);
+            _logger.LogInformation("Read back roofing filter response (FTdx10): {Response}", rfReadResponse);
+
+            if (!string.IsNullOrEmpty(rfReadResponse) && rfReadResponse.Length >= 4)
+            {
+                var actualFilter = rfReadResponse[3].ToString();
+                _radioStateService.RoofingFilterA = actualFilter;
+                _radioStateService.RoofingFilterB = actualFilter;
+
+                if (actualFilter != request.Filter)
+                {
+                    var requestedName = FtdxTenRoofingFilterNames.GetValueOrDefault(request.Filter, request.Filter);
+                    var actualName = FtdxTenRoofingFilterNames.GetValueOrDefault(actualFilter, actualFilter);
+                    _logger.LogWarning("Roofing filter {Requested} not available, radio returned {Actual}", requestedName, actualName);
+                    return Ok(new { message = $"Filter {requestedName} not installed. Using {actualName}.", warning = true, filter = actualFilter, filterName = actualName });
+                }
+
+                var filterName = FtdxTenRoofingFilterNames.GetValueOrDefault(actualFilter, actualFilter);
+                _logger.LogInformation("Set roofing filter (FTdx10) to {Filter}", filterName);
+                return Ok(new { message = $"Roofing filter {filterName} selected", filter = actualFilter, filterName });
+            }
+
+            _radioStateService.RoofingFilterA = request.Filter;
+            _radioStateService.RoofingFilterB = request.Filter;
+            var fallbackName = FtdxTenRoofingFilterNames.GetValueOrDefault(request.Filter, request.Filter);
+            return Ok(new { message = $"Roofing filter {fallbackName} selected", filter = request.Filter, filterName = fallbackName });
+        }
+
+        /// <summary>
+        /// FTDX3000 single-receiver roofing filter: RF0 P2 set / RF0 P3 read.
+        /// The read-back code (P3) uses a different value space than the set code
+        /// (P2) — 600 Hz reads back as 7, 300 Hz as 8, and AUTO reports the
+        /// filter in circuit (4/5/6/9/A) — so the read code is normalised back
+        /// to the dropdown's set-code space and mirrored to both VFO slots
+        /// (single receiver). See <see cref="Ftdx3000Roofing"/>.
+        /// </summary>
+        private async Task<IActionResult> SetFtdx3000RoofingFilterAsync(RoofingFilterRequest request)
+        {
+            // P1 is always 0 (single receiver); the set code is the filter number directly.
+            await _catClient.SendCommandAsync($"RF0{request.Filter};", "WebUI", CancellationToken.None);
+            await Task.Delay(100);
+            var readback = await _catClient.SendCommandAsync("RF0;", "WebUI", CancellationToken.None);
+
+            var readCode = readback?.Length >= 4 ? readback[3].ToString() : request.Filter;
+            var stateCode = Ftdx3000Roofing.NormalizeReadCode(readCode);
+            var displayName = Ftdx3000Roofing.ReadCodeNames.GetValueOrDefault(readCode,
+                              Ftdx3000Roofing.SetCodeNames.GetValueOrDefault(stateCode, stateCode));
+
+            _radioStateService.RoofingFilterA = stateCode;
+            _radioStateService.RoofingFilterB = stateCode;
+            _logger.LogInformation("Set roofing filter (FTDX3000) to {Filter} (read code {ReadCode})", displayName, readCode);
+            return Ok(new { message = $"Roofing filter set to {displayName}", filter = stateCode, filterName = displayName });
         }
 
         [HttpPost("mode/{receiver}")]

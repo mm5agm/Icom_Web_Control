@@ -512,7 +512,9 @@ namespace Yaesu_Web_Control.Services
             await SendCommand("PA0;", true);
             await SendCommand("PA1;", true);
             await SendCommand("RF0;", true);
-            await SendCommand("RF1;", true);
+            var initSettings = await _settingsService.GetSettingsAsync();
+            if (RadioCapabilities.IsDualReceiver(initSettings.RadioModel))
+                await SendCommand("RF1;", true);
             await SendCommand("ID;", true);
             await SendCommand("CS;", true);
             await SendCommand("ML0;", true);

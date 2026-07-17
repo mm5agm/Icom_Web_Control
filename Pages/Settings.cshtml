@@ -1589,21 +1589,16 @@
                                 </div>
                             </div>
                             <div id="filtersFtdx10Section" style="display:@(Model.Settings.RadioModel == "FTdx10" ? "block" : "none")">
-                                <div class="alert alert-info py-2 mb-2">
-                                    The FTdx10 selects its roofing filter automatically — there is no CAT command to control it.
-                                    The radio switches to the appropriate filter based on DSP bandwidth and mode.
-                                    Tick any optional filters you have installed for your own reference.
+                                <div class="form-text mb-2">
+                                    The FTdx10 roofing filter is selectable via CAT. 12 kHz, 3 kHz, and 500 Hz
+                                    are fitted as standard. Tick the optional filter if you have it installed.
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter4" name="Settings.InstalledRoofingFilters" value="4"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("4") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter4">1.2 kHz installed (optional — YF-130CN)</label>
+                                    <input class="form-check-input" type="checkbox" id="filterFtdx10A" name="Settings.InstalledRoofingFilters" value="A"
+                                           @(Model.Settings.InstalledRoofingFilters.Contains("A") ? "checked" : "") />
+                                    <label class="form-check-label" for="filterFtdx10A">300 Hz (optional — YF-130CW)</label>
                                 </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter5" name="Settings.InstalledRoofingFilters" value="5"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("5") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter5">300 Hz installed (optional — YF-130CW)</label>
-                                </div>
+                                <div class="form-text text-muted mt-1">12 kHz, 3 kHz, and 500 Hz are always shown.</div>
                             </div>
                             <div id="filtersFt710Section" style="display:@(Model.Settings.RadioModel == "FT-710" ? "block" : "none")">
                                 <div class="alert alert-info py-2 mb-0">
