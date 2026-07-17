@@ -223,12 +223,16 @@
             <div class="mb-3">
                 <label class="form-label fw-semibold" for="Settings_TxToggleKey">TX toggle key</label>
                 <div class="d-flex flex-wrap align-items-center gap-2">
+                    @* data-val="false": optional blank must never get client-side
+                       required (same silent-block class of bug as #65). Server
+                       already ModelState.Remove's this field. *@
                     <input asp-for="Settings.TxToggleKey"
                            class="form-control"
                            id="Settings_TxToggleKey"
                            style="max-width: 220px;"
                            readonly
                            autocomplete="off"
+                           data-val="false"
                            aria-describedby="txToggleKeyHelp txToggleKeyDisplay" />
                     <button type="button" class="btn btn-outline-primary btn-sm" id="txToggleKeySetBtn">
                         Set key
@@ -2142,34 +2146,6 @@
     </div>
     </form>
 
-    <script>
-        // Save button feedback: "Saving…" the instant the form is submitted
-        // (the POST → redirect → reload round trip takes a few seconds, and
-        // without this the button just sits there looking unresponsive),
-        // then "Saved ✓" on the reloaded page after a successful save,
-        // reverting back to normal after a few seconds. #65 follow-up.
-        (function () {
-            var form = document.getElementById('settingsForm');
-            var btn = document.getElementById('saveSettingsBtn');
-            var icon = document.getElementById('saveSettingsIcon');
-            var label = document.getElementById('saveSettingsLabel');
-            if (!form || !btn || !icon || !label) return;
-
-            form.addEventListener('submit', function () {
-                btn.disabled = true;
-                icon.className = 'spinner-border spinner-border-sm';
-                label.textContent = 'Saving…';
-            });
-
-            if (btn.dataset.saveSuccess === '1') {
-                setTimeout(function () {
-                    icon.className = 'bi bi-save';
-                    label.textContent = 'Save Settings';
-                }, 3000);
-            }
-        })();
-    </script>
-
     <!-- Backup / Restore — outside the main form so the import button doesn't trigger a save -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
         <summary><i class="bi bi-box-arrow-up" aria-hidden="true"></i>&nbsp;Backup &amp; Restore</summary>
@@ -2315,6 +2291,75 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Must run AFTER _ValidationScriptsPartial so jQuery Validate is present.
+        // "Saving…" only when the form will actually POST. Previously the spinner
+        // ran even when unobtrusive validation cancelled the post (blank optional
+        // fields with implicit [Required]) — looked like a save that "didn't persist".
+        (function () {
+            var form = document.getElementById('settingsForm');
+            var btn = document.getElementById('saveSettingsBtn');
+            var icon = document.getElementById('saveSettingsIcon');
+            var label = document.getElementById('saveSettingsLabel');
+            if (!form || !btn || !icon || !label) return;
+
+            function resetSaveButton() {
+                btn.disabled = false;
+                icon.className = 'bi bi-save';
+                label.textContent = 'Save Settings';
+            }
+
+            function markSaving() {
+                btn.disabled = true;
+                icon.className = 'spinner-border spinner-border-sm';
+                label.textContent = 'Saving…';
+            }
+
+            function revealFirstInvalid() {
+                var invalid = form.querySelector('.input-validation-error, :invalid');
+                if (!invalid) return;
+                var section = invalid.closest('details.settings-section');
+                if (section) section.open = true;
+                invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (typeof invalid.focus === 'function') invalid.focus();
+            }
+
+            if (window.jQuery) {
+                var $form = window.jQuery(form);
+                $form.on('invalid-form.validate', function () {
+                    resetSaveButton();
+                    revealFirstInvalid();
+                });
+                // Only flip the button to Saving… when Validate says the post may proceed.
+                $form.on('submit', function (e) {
+                    if ($form.data('validator') && !$form.valid()) {
+                        e.preventDefault();
+                        resetSaveButton();
+                        revealFirstInvalid();
+                        return;
+                    }
+                    markSaving();
+                });
+            } else {
+                form.addEventListener('submit', function (e) {
+                    if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                        e.preventDefault();
+                        resetSaveButton();
+                        revealFirstInvalid();
+                        return;
+                    }
+                    markSaving();
+                });
+            }
+
+            if (btn.dataset.saveSuccess === '1') {
+                setTimeout(function () {
+                    icon.className = 'bi bi-save';
+                    label.textContent = 'Save Settings';
+                }, 3000);
+            }
+        })();
+    </script>
     <script type="module">
         // hwVer (per SDRplay API header) → friendly model name. Kept in sync
         // with the C# HwVerToModel in Services/Sdr/SdrplayDevice.cs.
