@@ -717,7 +717,8 @@
                         <!-- Middle: Band buttons + Mode/Antenna below + filter scope -->
                         <div class="flex-grow-1 d-flex flex-column gap-1">
                             @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create("unused", "A", Model.SelectedBandA))
-                            <div class="d-flex gap-2 mt-1">
+                            <div class="d-flex align-items-center gap-2 mt-1">
+                                <label class="vfo-control-label" for="modeSelectA">Mode</label>
                                 <select class="form-select form-select-sm vfo-mode-select" id="modeSelectA"
                                         aria-label="VFO A mode"
                                         title="VFO A mode"
@@ -1125,7 +1126,8 @@
                         <!-- Middle: Band buttons + Mode/Antenna below -->
                         <div class="flex-grow-1 band-buttons-shifted d-flex flex-column gap-1">
                             @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create("unused", "B", Model.SelectedBandB))
-                            <div class="d-flex gap-2 mt-1">
+                            <div class="d-flex align-items-center gap-2 mt-1">
+                                <label class="vfo-control-label" for="modeSelectB">Mode</label>
                                 <select class="form-select form-select-sm vfo-mode-select" id="modeSelectB"
                                         aria-label="VFO B mode"
                                         title="VFO B mode"
