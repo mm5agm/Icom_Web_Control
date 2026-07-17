@@ -953,29 +953,22 @@ namespace Yaesu_Web_Control.Controllers
                 await EnsureConnectedAsync();
                 string displayMode = CatCodeToMode.TryGetValue(request.Mode, out var modeName) ? modeName : request.Mode;
 
-                bool vfoIsA = receiver.ToUpper() == "A";
-                if (vfoIsA)
-                {
-                    await _catClient.SendCommandAsync($"MD0{request.Mode};", "User");
-                    _radioStateService.ModeA = displayMode;
-                }
-                else if (receiver.ToUpper() == "B")
-                {
-                    await _catClient.SendCommandAsync($"MD1{request.Mode};", "User");
-                    _radioStateService.ModeB = displayMode;
-                }
-                else
-                {
+                var recv = receiver.ToUpperInvariant();
+                if (recv != "A" && recv != "B")
                     return BadRequest(new { error = "Invalid receiver specified" });
-                }
+
+                await _catClient.SendCommandAsync($"MD{VfoP1Outgoing(recv)}{request.Mode};", "User");
+                if (VfoIsB(recv)) _radioStateService.ModeB = displayMode;
+                else               _radioStateService.ModeA = displayMode;
 
                 // Re-apply Contour and APF state — mode changes on the FTdx101 cause the
                 // radio to restore its per-mode Contour/APF settings, overriding what we have set.
                 var modeSettings = await _settingsService.GetSettingsAsync();
                 bool isFtdx3000 = modeSettings.RadioModel == "FTDX3000";
+                bool targetB = VfoIsB(recv);
                 // P1=0 on FTDX3000 (special CO format) and on every single-receiver
                 // model (P1 Fixed=0). Dual-receiver -> P1 by VFO.
-                string p1 = isFtdx3000 ? "0" : VfoP1Outgoing(vfoIsA ? "A" : "B");
+                string p1 = isFtdx3000 ? "0" : VfoP1Outgoing(recv);
 
                 if (isFtdx3000)
                 {
@@ -1000,10 +993,10 @@ namespace Yaesu_Web_Control.Controllers
                 }
                 else
                 {
-                    bool contourOn  = vfoIsA ? _radioStateService.ContourOnA  : _radioStateService.ContourOnB;
-                    int  contourHz  = vfoIsA ? _radioStateService.ContourFreqA : _radioStateService.ContourFreqB;
-                    bool apfOn      = vfoIsA ? _radioStateService.ApfOnA       : _radioStateService.ApfOnB;
-                    int  apfHz      = vfoIsA ? _radioStateService.ApfFreqA     : _radioStateService.ApfFreqB;
+                    bool contourOn  = targetB ? _radioStateService.ContourOnB  : _radioStateService.ContourOnA;
+                    int  contourHz  = targetB ? _radioStateService.ContourFreqB : _radioStateService.ContourFreqA;
+                    bool apfOn      = targetB ? _radioStateService.ApfOnB       : _radioStateService.ApfOnA;
+                    int  apfHz      = targetB ? _radioStateService.ApfFreqB     : _radioStateService.ApfFreqA;
 
                     int  cFreq = Math.Max(100, Math.Min(3200, contourHz));
                     await _catClient.SendCommandAsync($"CO{p1}0000{(contourOn ? 1 : 0)};", "User");
@@ -1014,7 +1007,7 @@ namespace Yaesu_Web_Control.Controllers
                     await _catClient.SendCommandAsync($"CO{p1}3{aVvvv:D4};", "User");
                 }
 
-                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", vfoIsA ? "0" : "1", request.Mode, receiver);
+                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", VfoP1Outgoing(recv), request.Mode, recv);
                 return Ok(new { message = $"Mode {displayMode} selected for Receiver {receiver}" });
             }
             catch (Exception ex)

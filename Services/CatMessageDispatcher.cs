@@ -124,9 +124,10 @@
                         break;
                     case "MD":
                         // Example: MD01; (VFO A, LSB), MD12; (VFO B, USB)
+                        // Single-receiver: P1 is "0 Fixed" — routes via SetPerVfo's
+                        // 300 ms buffer so A/B-press broadcasts land on ActiveVfo.
                         if (message.Length >= 5)
                         {
-                            var vfo = message[2]; // '0' for A, '1' for B
                             var modeCode = message[3];
                             string? mode = modeCode switch
                             {
@@ -149,10 +150,10 @@
                             };
                             if (mode != null)
                             {
-                                if (vfo == '0')
-                                    _stateService.ModeA = mode;
-                                else if (vfo == '1')
-                                    _stateService.ModeB = mode;
+                                SetPerVfo(message[2], routeB => {
+                                    if (routeB) _stateService.ModeB = mode;
+                                    else        _stateService.ModeA = mode;
+                                });
                             }
                         }
                         break;
