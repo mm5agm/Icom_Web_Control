@@ -181,6 +181,16 @@ YWC is mostly my own work, but I'm grateful for the community contributions that
 
 ## Release Notes
 
+## 2026-07-17 - v2.4.2-pre12 (pre-release)
+
+Two contributions from Fabio Valente (CR7CDC), both focused on the single-receiver radios (FTdx10 / FT-710 / FTDX3000).
+
+**Roofing filter fixes.** The FTdx10's roofing filter is now selectable from the VFO panels — it was previously assumed to be automatic and offered no control. On the FTDX3000, the roofing read-back is corrected: the radio reports its filter in a different code space than the one used to set it, which had mislabelled 600 Hz / 300 Hz and desynced the dropdown while in AUTO. Both were verified against the CAT manuals and Hamlib's roofing-filter tables.
+
+**Single-receiver VFO handling.** A set of fixes for how YWC tracks which VFO is active on single-receiver radios: settings changed on VFO B no longer carry over to VFO A when you switch, memory recall now tunes the *active* VFO rather than always VFO A, and the display re-reads the radio after a front-panel A/B press so it stays in step. Also fixed — a browser tab or device that connects *after* startup (a second tab, a phone, a remote session) now receives the full current state on connect, instead of showing defaults for things like Split and the active-VFO indicator.
+
+I've tested these on my own FTdx101 (dual-receiver) to confirm nothing regressed there, and Fabio has tested on his FTdx10 — but the single-receiver behaviour would really benefit from confirmation on an FTdx10, FT-710 or FTDX3000. If you run one of those, this is a good release to try and report back on.
+
 ## 2026-07-16 - v2.4.2-pre11 (pre-release)
 
 Two things in this build.
