@@ -171,6 +171,14 @@ If you're talking to another Yaesu operator running an older YWC, **a heads-up t
 
 ---
 
+## Contributors
+
+YWC is mostly my own work, but I'm grateful for the community contributions that have improved it:
+
+- **Fabio Valente (CR7CDC)** — an optional keyboard transmit shortcut plus split-mode UI fixes ([#79](https://github.com/mm5agm/Yaesu_Web_Control/pull/79)); FTdx10 roofing-filter CAT support and an FTDX3000 roofing read-code fix ([#80](https://github.com/mm5agm/Yaesu_Web_Control/pull/80)); and a set of single-receiver VFO routing fixes, including correct state on late-joining browser tabs and devices ([#81](https://github.com/mm5agm/Yaesu_Web_Control/pull/81)).
+
+---
+
 ## Release Notes
 
 ## 2026-07-16 - v2.4.2-pre11 (pre-release)
