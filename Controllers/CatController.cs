@@ -875,7 +875,8 @@ namespace Yaesu_Web_Control.Controllers
 
         /// <summary>
         /// FTdx10 single-receiver roofing filter: RF0 P2 set / RF0 P3 read.
-        /// Mirrors the result to both VFO slots so both panels stay in sync.
+        /// Per-VFO state is tracked in the active VFO slot (inactive panel is
+        /// not editable on single-receiver radios).
         /// </summary>
         private async Task<IActionResult> SetFtdx10RoofingFilterAsync(RoofingFilterRequest request)
         {
@@ -893,8 +894,8 @@ namespace Yaesu_Web_Control.Controllers
             if (!string.IsNullOrEmpty(rfReadResponse) && rfReadResponse.Length >= 4)
             {
                 var actualFilter = rfReadResponse[3].ToString();
-                _radioStateService.RoofingFilterA = actualFilter;
-                _radioStateService.RoofingFilterB = actualFilter;
+                if (_radioStateService.ActiveVfo == 1) _radioStateService.RoofingFilterB = actualFilter;
+                else                                   _radioStateService.RoofingFilterA = actualFilter;
 
                 if (actualFilter != request.Filter)
                 {
@@ -909,8 +910,8 @@ namespace Yaesu_Web_Control.Controllers
                 return Ok(new { message = $"Roofing filter {filterName} selected", filter = actualFilter, filterName });
             }
 
-            _radioStateService.RoofingFilterA = request.Filter;
-            _radioStateService.RoofingFilterB = request.Filter;
+            if (_radioStateService.ActiveVfo == 1) _radioStateService.RoofingFilterB = request.Filter;
+            else                                   _radioStateService.RoofingFilterA = request.Filter;
             var fallbackName = FtdxTenRoofingFilterNames.GetValueOrDefault(request.Filter, request.Filter);
             return Ok(new { message = $"Roofing filter {fallbackName} selected", filter = request.Filter, filterName = fallbackName });
         }
@@ -920,8 +921,8 @@ namespace Yaesu_Web_Control.Controllers
         /// The read-back code (P3) uses a different value space than the set code
         /// (P2) — 600 Hz reads back as 7, 300 Hz as 8, and AUTO reports the
         /// filter in circuit (4/5/6/9/A) — so the read code is normalised back
-        /// to the dropdown's set-code space and mirrored to both VFO slots
-        /// (single receiver). See <see cref="Ftdx3000Roofing"/>.
+        /// to the dropdown's set-code space. Per-VFO state is tracked in the
+        /// active VFO slot. See <see cref="Ftdx3000Roofing"/>.
         /// </summary>
         private async Task<IActionResult> SetFtdx3000RoofingFilterAsync(RoofingFilterRequest request)
         {
@@ -935,8 +936,8 @@ namespace Yaesu_Web_Control.Controllers
             var displayName = Ftdx3000Roofing.ReadCodeNames.GetValueOrDefault(readCode,
                               Ftdx3000Roofing.SetCodeNames.GetValueOrDefault(stateCode, stateCode));
 
-            _radioStateService.RoofingFilterA = stateCode;
-            _radioStateService.RoofingFilterB = stateCode;
+            if (_radioStateService.ActiveVfo == 1) _radioStateService.RoofingFilterB = stateCode;
+            else                                   _radioStateService.RoofingFilterA = stateCode;
             _logger.LogInformation("Set roofing filter (FTDX3000) to {Filter} (read code {ReadCode})", displayName, readCode);
             return Ok(new { message = $"Roofing filter set to {displayName}", filter = stateCode, filterName = displayName });
         }
@@ -952,29 +953,22 @@ namespace Yaesu_Web_Control.Controllers
                 await EnsureConnectedAsync();
                 string displayMode = CatCodeToMode.TryGetValue(request.Mode, out var modeName) ? modeName : request.Mode;
 
-                bool vfoIsA = receiver.ToUpper() == "A";
-                if (vfoIsA)
-                {
-                    await _catClient.SendCommandAsync($"MD0{request.Mode};", "User");
-                    _radioStateService.ModeA = displayMode;
-                }
-                else if (receiver.ToUpper() == "B")
-                {
-                    await _catClient.SendCommandAsync($"MD1{request.Mode};", "User");
-                    _radioStateService.ModeB = displayMode;
-                }
-                else
-                {
+                var recv = receiver.ToUpperInvariant();
+                if (recv != "A" && recv != "B")
                     return BadRequest(new { error = "Invalid receiver specified" });
-                }
+
+                await _catClient.SendCommandAsync($"MD{VfoP1Outgoing(recv)}{request.Mode};", "User");
+                if (VfoIsB(recv)) _radioStateService.ModeB = displayMode;
+                else               _radioStateService.ModeA = displayMode;
 
                 // Re-apply Contour and APF state — mode changes on the FTdx101 cause the
                 // radio to restore its per-mode Contour/APF settings, overriding what we have set.
                 var modeSettings = await _settingsService.GetSettingsAsync();
                 bool isFtdx3000 = modeSettings.RadioModel == "FTDX3000";
+                bool targetB = VfoIsB(recv);
                 // P1=0 on FTDX3000 (special CO format) and on every single-receiver
                 // model (P1 Fixed=0). Dual-receiver -> P1 by VFO.
-                string p1 = isFtdx3000 ? "0" : VfoP1Outgoing(vfoIsA ? "A" : "B");
+                string p1 = isFtdx3000 ? "0" : VfoP1Outgoing(recv);
 
                 if (isFtdx3000)
                 {
@@ -999,10 +993,10 @@ namespace Yaesu_Web_Control.Controllers
                 }
                 else
                 {
-                    bool contourOn  = vfoIsA ? _radioStateService.ContourOnA  : _radioStateService.ContourOnB;
-                    int  contourHz  = vfoIsA ? _radioStateService.ContourFreqA : _radioStateService.ContourFreqB;
-                    bool apfOn      = vfoIsA ? _radioStateService.ApfOnA       : _radioStateService.ApfOnB;
-                    int  apfHz      = vfoIsA ? _radioStateService.ApfFreqA     : _radioStateService.ApfFreqB;
+                    bool contourOn  = targetB ? _radioStateService.ContourOnB  : _radioStateService.ContourOnA;
+                    int  contourHz  = targetB ? _radioStateService.ContourFreqB : _radioStateService.ContourFreqA;
+                    bool apfOn      = targetB ? _radioStateService.ApfOnB       : _radioStateService.ApfOnA;
+                    int  apfHz      = targetB ? _radioStateService.ApfFreqB     : _radioStateService.ApfFreqA;
 
                     int  cFreq = Math.Max(100, Math.Min(3200, contourHz));
                     await _catClient.SendCommandAsync($"CO{p1}0000{(contourOn ? 1 : 0)};", "User");
@@ -1013,7 +1007,7 @@ namespace Yaesu_Web_Control.Controllers
                     await _catClient.SendCommandAsync($"CO{p1}3{aVvvv:D4};", "User");
                 }
 
-                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", vfoIsA ? "0" : "1", request.Mode, receiver);
+                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", VfoP1Outgoing(recv), request.Mode, recv);
                 return Ok(new { message = $"Mode {displayMode} selected for Receiver {receiver}" });
             }
             catch (Exception ex)
