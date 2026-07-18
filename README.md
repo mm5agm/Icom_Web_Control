@@ -181,6 +181,14 @@ YWC is mostly my own work, but I'm grateful for the community contributions that
 
 ## Release Notes
 
+## 2026-07-18 - v2.4.2-pre14 (pre-release)
+
+Two radio-specific fixes.
+
+**FTdx101: the active VFO is shown again.** On the dual-receiver FTdx101, the panel that the main tuning knob currently controls (MAIN or SUB) now has a subtle highlight, and it follows along live when you select MAIN/SUB on the radio. You can also click a VFO panel's header to make that band active from the browser. This indicator had been lost in an earlier VFO-panel rework — thanks to Pierre VK6IS for spotting it. Tested on my own FTdx101MP.
+
+**FTDX3000: the Split button works now.** The Split button was sending a command the FTDX3000 doesn't have, so it silently did nothing on that radio. It's now driven through the correct command (the one that selects which VFO transmits). Thanks to Giovanni (iu1teu) for confirming the fault on his FTDX3000 — this fix is on his radio's word rather than mine, so I'd welcome his confirmation that it now behaves.
+
 ## 2026-07-17 - v2.4.2-pre13 (pre-release)
 
 Point fix on top of pre12. The keyboard TX-toggle shortcut added in pre11 introduced a regression where the **Settings page would silently fail to save** whenever the TX toggle key was left blank (which it is by default, and always on a fresh install) — the same class of problem as the earlier Settings-save bug: an empty optional field was being treated as required and the browser quietly blocked the whole form before it could be submitted. That's fixed, and the Save button now only shows "Saving…" when the form is genuinely being submitted (and jumps to the offending field if something really is invalid). Thanks to Fabio Valente (CR7CDC) for catching and fixing his own earlier change. If you were on pre11 or pre12, this is the one to move to.
