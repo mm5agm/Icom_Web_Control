@@ -1729,6 +1729,42 @@ namespace Yaesu_Web_Control.Controllers
             {
                 await EnsureConnectedAsync();
 
+                // FTDX3000 has no ST command (confirmed no-op by iu1teu/Giovanni on
+                // #78) — split is driven by FT instead: FT2; = TX on VFO A (no split,
+                // TX=RX), FT3; = TX on VFO B (split). Read-back FT; answers FT0 (TX=A)
+                // / FT1 (TX=B). The other supported models (FTdx101/FTdx10/FT-710) all
+                // have ST, so they fall through to the ST path below.
+                var splitSettings = await _settingsService.GetSettingsAsync();
+                if (splitSettings.RadioModel == "FTDX3000")
+                {
+                    if (mode == 2)
+                    {
+                        // Quick split: VFO B = VFO A + 5 kHz, then transmit on B.
+                        var faQs = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
+                        if (!string.IsNullOrWhiteSpace(faQs) && faQs.StartsWith("FA") &&
+                            long.TryParse(faQs.Substring(2).TrimEnd(';'), out long freqAqs))
+                        {
+                            long freqBqs = Math.Min(freqAqs + 5000, 75_000_000);
+                            await _catClient.SendCommandAsync($"FB{freqBqs:D11};", "WebUI", CancellationToken.None);
+                            _radioStateService.FrequencyB = freqBqs;
+                        }
+                    }
+
+                    bool ftSplitOn = mode != 0;               // mode 1 or 2 → split on
+                    await _catClient.SendCommandAsync(ftSplitOn ? "FT3;" : "FT2;", "WebUI", CancellationToken.None);
+
+                    var ftResp = await _catClient.SendCommandAsync("FT;", "WebUI", CancellationToken.None);
+                    int ftTxVfo = ftSplitOn ? 1 : 0;
+                    if (!string.IsNullOrWhiteSpace(ftResp) && ftResp.StartsWith("FT") && ftResp.Length >= 3)
+                        ftTxVfo = ftResp[2] == '1' ? 1 : 0;
+                    _radioStateService.TxVfo = ftTxVfo;
+                    int ftSplitMode = ftTxVfo == 1 ? 1 : 0;
+                    _radioStateService.SplitMode = ftSplitMode;
+                    _logger.LogInformation("Split (FTDX3000) via FT: TX VFO = {TxVfo}, splitMode = {Mode}",
+                        ftTxVfo == 1 ? "B" : "A", ftSplitMode);
+                    return Ok(new { splitMode = ftSplitMode });
+                }
+
                 if (mode == 2)
                 {
                     // Quick Split: implement explicitly so it works whether split is already on or off.
