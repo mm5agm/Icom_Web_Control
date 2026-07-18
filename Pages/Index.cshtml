@@ -133,6 +133,14 @@
 <style>
     #saveMemBtnA, #saveMemBtnB { font-weight: 700 !important; font-size: 0.85rem !important; color: #212529 !important; }
 
+    /* Dual-receiver (FTdx101) active-band highlight: a subtle amber ring on
+       the VFO panel the main tuning knob currently controls (MAIN or SUB).
+       box-shadow so it never shifts layout; both receivers stay full-colour. */
+    .vfo-active > .card.receiver-card {
+        box-shadow: 0 0 0 2px #ffc107, 0 0 10px rgba(255, 193, 7, 0.5);
+        transition: box-shadow 0.2s ease;
+    }
+
     /* Single-receiver radios (FTdx10, FT-710, FTDX3000): the inactive VFO
        card BODY is greyed and made non-interactive. The card HEADER stays
        normal so TX / ZIN / badges remain full-colour and clickable — dimming

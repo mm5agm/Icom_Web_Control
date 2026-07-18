@@ -1769,6 +1769,36 @@ namespace Yaesu_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        // Set the active/operating band on dual-receiver radios (FTdx101).
+        // VS selects which band the main tuning knob controls: 0 = MAIN (VFO A),
+        // 1 = SUB (VFO B). The radio auto-broadcasts VS, so the UI highlight
+        // follows automatically; we also set ActiveVfo here to avoid UI flicker.
+        [HttpPost("active-vfo/{vfo}")]
+        public async Task<IActionResult> SetActiveVfo(string vfo)
+        {
+            var v = vfo.ToUpperInvariant();
+            if (v != "A" && v != "B")
+                return BadRequest(new { error = "VFO must be A or B" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                await EnsureConnectedAsync();
+                var vs = v == "B" ? 1 : 0;
+                await _catClient.SendCommandAsync($"VS{vs};", "WebUI", CancellationToken.None);
+                _radioStateService.ActiveVfo = vs;
+                _logger.LogInformation("Active VFO set to {Vfo} (VS{Vs})", v, vs);
+                return Ok(new { activeVfo = vs });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting active VFO");
+                return StatusCode(500, new { error = "Failed to set active VFO" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
         [HttpPost("swap-vfo")]
         public async Task<IActionResult> SwapVfo()
         {

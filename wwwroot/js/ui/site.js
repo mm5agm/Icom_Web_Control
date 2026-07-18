@@ -649,13 +649,26 @@ function applyVfoActiveStyling() {
 
     const singleReceiver = vfoRow.dataset.singleReceiver === 'true';
     if (!singleReceiver) {
-        // Dual-receiver: both panels are real receivers, both stay active.
+        // Dual-receiver (FTdx101): both panels are real receivers, so neither
+        // is greyed. But still show WHICH band is active — the MAIN/SUB band
+        // the main tuning knob controls — with a subtle highlight, driven by
+        // activeVfo (VS: 0 = MAIN/A, 1 = SUB/B). The radio auto-broadcasts VS
+        // when you press MAIN⇄SUB-select on the front panel, so this follows
+        // live. (Restores an indicator dropped in the ADR-0003 rework — Pierre
+        // VK6IS #FTdx101.)
         aCol.classList.remove('vfo-inactive');
         bCol.classList.remove('vfo-inactive');
         aSpec?.classList.remove('vfo-inactive');
         bSpec?.classList.remove('vfo-inactive');
+        aCol.classList.toggle('vfo-active', activeVfo === 0);
+        bCol.classList.toggle('vfo-active', activeVfo === 1);
         return;
     }
+
+    // Single-receiver uses greying (below), not the active highlight — clear
+    // any stale highlight in case the RadioModel was switched mid-session.
+    aCol.classList.remove('vfo-active');
+    bCol.classList.remove('vfo-active');
 
     // Single-receiver: white = active VFO (the one currently RECEIVING),
     // grey = the other one. This is true in BOTH normal and split mode:
@@ -863,6 +876,15 @@ async function swapVfo() {
     try {
         await fetch('/api/cat/swap-vfo', { method: 'POST' });
         // FrequencyA/B updates arrive via SignalR; the endpoint also broadcasts immediately
+    } catch {}
+}
+
+// Dual-receiver only: make a VFO the active (MAIN/SUB) band by sending VS.
+// The ActiveVfo update arrives via SignalR and moves the highlight; setting
+// it server-side too avoids flicker.
+async function setActiveVfo(vfo) {
+    try {
+        await fetch(`/api/cat/active-vfo/${vfo}`, { method: 'POST' });
     } catch {}
 }
 
@@ -1780,6 +1802,26 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('swapVfoBtn')?.addEventListener('click', swapVfo);
     document.getElementById('copyBtoABtn')?.addEventListener('click', () => copyVfo('ba'));
     document.getElementById('copyAtoBBtn')?.addEventListener('click', () => copyVfo('ab'));
+
+    // Dual-receiver only: click a VFO panel's header to make it the active
+    // (MAIN/SUB) band. Ignored on single-receiver (greying already shows the
+    // active VFO) and when the click lands on a control inside the header.
+    (function wireVfoActiveSelect() {
+        const vfoRow = document.getElementById('vfoRow');
+        if (!vfoRow || vfoRow.dataset.singleReceiver === 'true') return;
+        const wire = (colId, vfo) => {
+            const header = document.querySelector(`#${colId} .card-header`);
+            if (!header) return;
+            header.style.cursor = 'pointer';
+            header.title = `Click to make VFO ${vfo} the active (MAIN/SUB) band`;
+            header.addEventListener('click', (e) => {
+                if (e.target.closest('button, input, select, a, [role="button"], .badge')) return;
+                setActiveVfo(vfo);
+            });
+        };
+        wire('vfoACol', 'A');
+        wire('vfoBCol', 'B');
+    })();
 
     // Clarifier: seed JS state from server-rendered HTML values
     const clarSlider = document.getElementById('clarOffsetSlider');
