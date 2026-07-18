@@ -152,6 +152,10 @@ docs/*
 !docs/VoiceControl/
 docs/VoiceControl/*
 !docs/VoiceControl/*.md
+# …and design/planning docs (markdown only, same rule).
+!docs/design/
+docs/design/*
+!docs/design/*.md
 
 # Runtime logs
 *.log
