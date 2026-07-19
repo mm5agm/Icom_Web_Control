@@ -13,6 +13,8 @@
 >
 > **⛔ Work is GATED:** do **not** start the rebrand/carve or any coding until Colin (MM5AGM) has the IC-7300 MkII in hand **and** explicitly says go. Until then this repo is scaffolding only. When he says go, the design doc's **Phase 0 → Phase 1** checklist is the starting point.
 >
+> **🔔 SESSION-START REMINDER (do this in your first reply, every IWC session):** greet Colin with a one-line reminder that IWC is parked waiting on the **IC-7300 MkII**, and that all he has to do is say **"go"** once the radio is in hand to kick off Phase 1. Keep it brief; don't start any work until he actually says go.
+>
 > **Everything below this banner is inherited verbatim from YWC.** It accurately describes the parts IWC keeps (SignalR pipeline, gauges, spectrum frontend, settings, rigctld, voice), but the Yaesu-specific CAT sections will be replaced during the carve — treat them as reference, not current IWC truth, until this file is rewritten in Phase 1.
 
 ---
