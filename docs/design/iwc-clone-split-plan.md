@@ -1,10 +1,24 @@
 # Icom Web Control (IWC) — Clone-and-Split Plan
 
-**Status:** design agreed, not yet started. Trigger to begin = I have an IC-705 in hand and say go.
-**Target radio (v1):** Icom IC-705, CI-V over USB (`FE FE` … `FD`, default radio address `0xA4`).
+**Status:** design agreed, not yet started. Trigger to begin = I have the IC-7300 MkII in hand and say go.
+**Target radio (v1):** Icom **IC-7300 MkII**, CI-V over USB Type-C (`FE FE` … `FD`, default radio address **`0xB6`**, controller `0xE0`).
 **End goal:** full feature parity with YWC *wherever the Icom radio supports the feature* — including **voice control**, which is required (partially-sighted users: Yuri W4YSW, Thomas OZ1JTE, Bill W1WRH).
 
-This document supersedes the older "clone whole YWC and cut Yaesu code" idea.
+This document supersedes the older "clone whole YWC and cut Yaesu code" idea. (Radio target changed from IC-705 to IC-7300 MkII on 2026-07-19 — see the verified-facts section below; the plan is unchanged and if anything simpler.)
+
+---
+
+## Target radio — IC-7300 MkII, facts verified from the manuals (2026-07-19)
+
+Manuals in `docs/manuals/`: `IC-7300MK2_ENG_CI-V_0.pdf`, `IC-7300MK2_ENG_Basic_2b.pdf`, `IC-7300MK2_ENG_Advanced_0.pdf`. USB driver guide is `IC-705_USB_driver_ENG_Inst_USB3_4.pdf` (Icom's shared USB driver — same one across current models).
+
+- **CI-V address `B6`** (controller `E0`). Frame `FE FE B6 E0 Cn Sc <data> FD`; ack `FB`=OK / `FA`=NG. **Read the ID at connect via `19 00`, don't hard-code** — same auto-detect approach the doc already uses.
+- **Single-receiver radio** — one receiver, VFO A/B. Maps directly onto YWC's existing FTdx10 / FT-710 single-receiver UI path (see `docs/decisions/0003-single-vs-dual-receiver-ui.md`). Simpler than the FTdx101's dual-receiver machinery.
+- **Coverage:** RX 0.030–74.8 MHz; TX = HF ham bands **+ 6m (50–54)**, and **4m (70–70.5) on European versions only** — my UK/Region-1 unit likely has 4m (same bonus as the FTdx101MP). **No VHF/UHF** — this sidesteps the wider-range scaling pitfalls that bit the FTX-1 VHF/UHF memories (#71). Band control is HF+6m(+4m), nothing exotic.
+- **Modes:** USB/LSB, CW, RTTY, AM, FM. No DV/D-STAR (that was a 705-only concern — now moot).
+- **101 memory channels** (incl. 2 scan edges).
+- **Scope over CI-V CONFIRMED — this is the key win, and the original IC-7300's big limitation is gone.** Command **`27 00`**, waveform **475 points**, values **0–160 (`00`–`A0`)**, modes Center/Fixed/**SCROLL-C**/**SCROLL-F**. Over **USB it arrives as 11 sequential segments** (1st = header only, 2nd–11th = min header + data); the decoder reassembles them. Control commands: `27 11` (wave output on/off), `27 14` (mode), `27 15` (span), `27 1E` (fixed edges), `27 19` (ref level). So IWC needs **no SDRplay, no worker exe, no FFT** — identical shape to the IC-705 plan.
+- **Bonus the MkII adds over both the original IC-7300 and the 705's USB path: a rear [LAN] port.** Over LAN the scope is sent **all at once (490-length, no chunking)** and faster. USB is the simpler first target; LAN is a ready-made "make the waterfall faster later" upgrade with no new protocol work — just skip the reassembly step.
 
 ---
 
@@ -48,7 +62,7 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 |---|---|---|
 | SignalR transport | `RadioHub.cs`, `wwwroot/js/websocket/*` | `{property,value}` envelope + `WsUpdatePipeline` are 100% agnostic. Verbatim. |
 | Gauges/meters (frontend) | `wwwroot/js/guages/*` | Pure rendering. Verbatim. |
-| Spectrum (frontend) | `wwwroot/js/sdr/*` | `SpectrumPanel`/`SdrSpectrumPipeline` render bins regardless of source. Kept — the IC-705 scope (`27 00`) just becomes a new data source. |
+| Spectrum (frontend) | `wwwroot/js/sdr/*` | `SpectrumPanel`/`SdrSpectrumPipeline` render bins regardless of source. Kept — the IC-7300 MkII scope (`27 00`) just becomes a new data source. |
 | Settings/state plumbing | `SettingsService`, `ISettingsService`, `RadioStatePersistenceService`, `AppStatus`, `AppMemory`, `ProcessStatusCacheService`, `HttpPortInfo` | Trim Yaesu fields from `ApplicationSettings`. |
 | Host/OS glue | `Program.cs` (rewire DI), `BrowserLauncher`, `SystemTrayService` | Keep skeleton, swap CAT registrations. |
 | rigctld | `Services/RigctldServer.cs` | Hamlib protocol is radio-agnostic. Repoint to `IRadioController`. |
@@ -70,7 +84,7 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 | — (new) | **`IRadioController` + `CivRadioController`** | The semantic seam. Only class that emits CI-V. |
 | `MeterPollingService.cs` | keep name, rewrite command set | 10 Hz `IHostedService` structure reusable; poll `1C`/`15` sub-commands. |
 | `RadioInitializationService.cs` | keep name, rewrite handshake | CI-V transceive-mode setup. |
-| `RadioCapabilities.cs` | rewrite for Icom models | IC-705 first; per-model band/meter gating. |
+| `RadioCapabilities.cs` | rewrite for Icom models | IC-7300 MkII first (single-receiver, HF+6m+4m); per-model band/meter gating. |
 | `wwwroot/js/orchestrators/FTdx101Meters.js` | `Ic705Meters.js` | New orchestrator wiring ws → calibration → MeterPanel. |
 | `wwwroot/js/calibration/*` | new Icom calibration tables | Icom S-meter scaling differs. |
 | — (new) | **`CivScopeDecoder`** | Parse `27 00` frames, reassemble the 11 USB chunks → 475 bins → existing `SpectrumPanel`. Replaces the whole SDRplay backend. wfview (GPL) is a study reference — implement fresh from the spec. |
@@ -83,7 +97,7 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 
 ### DROP FOR GOOD
 
-- **The entire SDRplay backend** — `Services/Sdr/*` (`SdrManager`, `SdrplayDevice`, `SoapySdrDevice`, `FftProcessor`, `FrameReader`, `WorkerProcess`, …), the `Workers/Yaesu_Sdr_Worker/*` project, the dual-process csproj wiring, `sdrplay_api.dll` P/Invoke, and `soapysdr-dist/*`. **This is the big IC-705 simplification win:** the radio does its own FFT and hands over 475 calibrated bins over CI-V (`27 00`), so IWC needs no SDR hardware, no worker exe, no struct-offset grief. The spectrum *frontend* (`wwwroot/js/sdr/*`, above) stays and gets its bins from the CI-V scope decoder instead. *(An external-SDR panadapter could return later as an optional feature, but it is explicitly out of v1.)*
+- **The entire SDRplay backend** — `Services/Sdr/*` (`SdrManager`, `SdrplayDevice`, `SoapySdrDevice`, `FftProcessor`, `FrameReader`, `WorkerProcess`, …), the `Workers/Yaesu_Sdr_Worker/*` project, the dual-process csproj wiring, `sdrplay_api.dll` P/Invoke, and `soapysdr-dist/*`. **This is the big simplification win:** the radio does its own FFT and hands over 475 calibrated bins over CI-V (`27 00`), so IWC needs no SDR hardware, no worker exe, no struct-offset grief. The spectrum *frontend* (`wwwroot/js/sdr/*`, above) stays and gets its bins from the CI-V scope decoder instead. *(An external-SDR panadapter could return later as an optional feature, but it is explicitly out of v1.)*
 - **`Services/VcTune/*` (≈45 files)** + `Controllers/VcTuneController.cs` — the older, heavily-abstracted "VC-Tune" subsystem, superseded by the lean `Services/Voice/*` stack (nothing references it except `VCTuneRecognizer`/`Program.cs`). Do **not** carry it; rebuild any still-used capability minimally behind the seam. *(Confirm this is agreed-legacy before banking.)*
 
 ---
@@ -91,7 +105,7 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 ## Phased implementation plan
 
 **Phase 0 — prep (do before the radio arrives)**
-- Confirm IC-705 + CI-V-over-USB target and radio address.
+- Target confirmed: IC-7300 MkII, CI-V over USB Type-C, address `B6` (read via `19 00` at connect).
 - Extract the needed CI-V command subset from the CI-V reference in `docs/manuals/` into a table (cmd, sub-cmd, BCD layout). This becomes the build checklist.
 
 **Phase 1 — clone & carve (one sitting)**
@@ -109,7 +123,7 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 3. S-meter (`15 02`) → existing gauge
 4. PTT / TX status, power/SWR meters (`15 11`/`15 12`)
 5. Band/VFO select, split
-6. Scope waveform stream (`27 00`, 475 bins) → existing `SpectrumPanel` — **no SDRplay needed**
+6. Scope waveform stream (`27 00`, 475 bins, 11 USB segments reassembled) → existing `SpectrumPanel` — **no SDRplay needed**. (Later: switch the feed to the rear LAN port for a faster, single-segment 490-bin stream — no protocol rewrite, just skip reassembly.)
 
 **Phase 4 — parity & polish**
 - rigctld verification (WSJT-X), settings/diagnostics rebrand.
