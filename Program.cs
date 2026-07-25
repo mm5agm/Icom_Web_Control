@@ -217,15 +217,18 @@ builder.Services.AddSingleton<CatMultiplexerService>();
 // Register the main CAT client for the web app
 builder.Services.AddSingleton<ICatClient, MultiplexedCatClient>();
 
-// ── IRadioController seam (Phase 1) ─────────────────────────────────────────
-// The semantic, protocol-free seam IWC introduces. Today it is backed by the
-// canned StubRadioController (no hardware); Phase 2 swaps in CivRadioController
-// speaking real CI-V to the IC-7300 MkII. Registered once and exposed both as
-// the seam (IRadioController) and as the hosted canned-data feeder.
+// ── IRadioController seam (Phase 2) ─────────────────────────────────────────
+// The semantic, protocol-free seam IWC introduces. Phase 2 backs it with the
+// real CI-V link: CivBusService owns the serial port and frames the bus;
+// CivRadioController is the single class below the seam that emits CI-V and,
+// as a hosted service, connects to the IC-7300 MkII and polls VFO-A frequency
+// into RadioStateService → SignalR. The Phase 1 canned StubRadioController is
+// retained in the tree (unregistered) as a no-hardware fallback for reference.
 // See docs/design/iwc-clone-split-plan.md.
-builder.Services.AddSingleton<StubRadioController>();
-builder.Services.AddSingleton<IRadioController>(sp => sp.GetRequiredService<StubRadioController>());
-builder.Services.AddHostedService(sp => sp.GetRequiredService<StubRadioController>());
+builder.Services.AddSingleton<Icom_Web_Control.Services.Civ.ICivClient, Icom_Web_Control.Services.Civ.CivBusService>();
+builder.Services.AddSingleton<CivRadioController>();
+builder.Services.AddSingleton<IRadioController>(sp => sp.GetRequiredService<CivRadioController>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<CivRadioController>());
 
 // Register the rigctld server as a background service
 builder.Services.AddHostedService<RigctldServer>();

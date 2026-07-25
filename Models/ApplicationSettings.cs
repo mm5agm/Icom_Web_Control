@@ -3,8 +3,11 @@
     public class ApplicationSettings
     {
         // Connection Settings
-        public string SerialPort { get; set; } = "COM3";
-        public int BaudRate { get; set; } = 38400;
+        // IWC defaults are the verified IC-7300 MkII CI-V values (2026-07-25):
+        // COM8 = "IC-7300MK2 Serial Port A (CI-V)", 19200 8N1. Change the port
+        // in Settings if the radio enumerates elsewhere on another machine.
+        public string SerialPort { get; set; } = "COM8";
+        public int BaudRate { get; set; } = 19200;
         public string WebAddress { get; set; } = "0.0.0.0"; // Bind to all interfaces
 
         // HTTP port the web server listens on. Default 8080. If that port is
@@ -13,7 +16,7 @@
         // know 8080 always clashes on their machine (e.g. Plex, Jenkins).
         public int HttpPort { get; set; } = 8080;
 
-        public string RadioModel { get; set; } = "FTdx101MP"; // MP = dual receiver, D = single receiver
+        public string RadioModel { get; set; } = "IC-7300MK2"; // Icom single-receiver HF+6m(+4m EU)
 
 
         // External Applications - Command Lines.
