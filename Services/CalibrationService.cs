@@ -1,6 +1,6 @@
-﻿using Yaesu_Web_Control.Models.Calibration;
+﻿using Icom_Web_Control.Models.Calibration;
 
-namespace Yaesu_Web_Control.Services;
+namespace Icom_Web_Control.Services;
 
 public interface ICalibrationService
 {

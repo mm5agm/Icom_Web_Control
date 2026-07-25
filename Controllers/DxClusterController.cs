@@ -1,9 +1,9 @@
 using System.Net.Sockets;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]

@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Yaesu_Web_Control.Hubs;
-using Yaesu_Web_Control.Services;
-using Yaesu_Web_Control.Models.Calibration;
+using Icom_Web_Control.Hubs;
+using Icom_Web_Control.Services;
+using Icom_Web_Control.Models.Calibration;
 
 [ApiController]
 [Route("api/calibration")]

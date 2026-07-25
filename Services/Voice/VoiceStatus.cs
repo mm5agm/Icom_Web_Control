@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Yaesu_Web_Control.Services.Voice
+namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>
     /// Lifecycle state of the voice recogniser. Broadcast over SignalR as

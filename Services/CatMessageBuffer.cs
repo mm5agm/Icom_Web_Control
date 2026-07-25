@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Buffers incoming CAT serial data and splits it into complete messages

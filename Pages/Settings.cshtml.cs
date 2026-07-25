@@ -3,13 +3,13 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
-using Yaesu_Web_Control.Hubs;
-using Yaesu_Web_Control.Models;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Hubs;
+using Icom_Web_Control.Models;
+using Icom_Web_Control.Services;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
-namespace Yaesu_Web_Control.Pages
+namespace Icom_Web_Control.Pages
 {
     public class SettingsModel : PageModel
     {
@@ -264,7 +264,7 @@ namespace Yaesu_Web_Control.Pages
                 if (catConnectionChanged)
                 {
                     // Reset initialization status so app will try again
-                    Yaesu_Web_Control.Services.AppStatus.InitializationStatus = "initializing";
+                    Icom_Web_Control.Services.AppStatus.InitializationStatus = "initializing";
 
                     // Automatic retry: trigger radio initialization in the background rather
                     // than awaiting it here. The full sequence (CAT burst, DT0 wait up to 5s,
@@ -317,11 +317,11 @@ namespace Yaesu_Web_Control.Pages
         /// Restart Now action — invoked from the restart-required banner on the
         /// Settings page. Spawns a small detached helper that waits two seconds
         /// then relaunches the YWC executable, broadcasts ServerShutdown so any
-        /// open browser tab shows the existing "Yaesu Web Control has stopped"
+        /// open browser tab shows the existing "Icom Web Control has stopped"
         /// overlay, and stops the host. The user reloads the browser once the
         /// app is back up.
         ///
-        /// Restart only works when running as the published `Yaesu_Web_Control.exe`
+        /// Restart only works when running as the published `Icom_Web_Control.exe`
         /// — if YWC was launched via `dotnet run` the auto-relaunch path is
         /// skipped, but the host still stops cleanly. Dev users can rerun
         /// `dotnet run` manually.
@@ -350,7 +350,7 @@ namespace Yaesu_Web_Control.Pages
             {
                 var exePath = Process.GetCurrentProcess().MainModule?.FileName;
                 if (!string.IsNullOrEmpty(exePath) &&
-                    exePath.EndsWith("Yaesu_Web_Control.exe", StringComparison.OrdinalIgnoreCase) &&
+                    exePath.EndsWith("Icom_Web_Control.exe", StringComparison.OrdinalIgnoreCase) &&
                     System.IO.File.Exists(exePath))
                 {
                     Process.Start(new ProcessStartInfo

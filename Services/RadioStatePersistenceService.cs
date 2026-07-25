@@ -3,7 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Hosting;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class RadioStatePersistenceService
     {
@@ -18,7 +18,7 @@ namespace Yaesu_Web_Control.Services
             _logger = logger;
 
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var stateDir = Path.Combine(appDataPath, "MM5AGM", "Yaesu Web Control");
+            var stateDir = Path.Combine(appDataPath, "MM5AGM", "Icom Web Control");
             Directory.CreateDirectory(stateDir);
             _filePath = Path.Combine(stateDir, "radio_state.json");
         }

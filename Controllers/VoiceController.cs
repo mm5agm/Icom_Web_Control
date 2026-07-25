@@ -2,11 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
-using Yaesu_Web_Control.Models;
-using Yaesu_Web_Control.Services;
-using Yaesu_Web_Control.Services.Voice;
+using Icom_Web_Control.Models;
+using Icom_Web_Control.Services;
+using Icom_Web_Control.Services.Voice;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     /// <summary>
     /// HTTP entry points for the on-screen mic button. The frontend POSTs
@@ -129,7 +129,7 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                var path = Path.Combine(appData, "MM5AGM", "Yaesu Web Control", "Grammars");
+                var path = Path.Combine(appData, "MM5AGM", "Icom Web Control", "Grammars");
                 Directory.CreateDirectory(path);
                 Process.Start(new ProcessStartInfo
                 {
@@ -150,7 +150,7 @@ namespace Yaesu_Web_Control.Controllers
         /// the "Voice Control Log" panel on the Diagnostics page. A bug
         /// reporter clicks the panel, copies the output, pastes it into a
         /// GitHub issue -- without ever having to know the log file lives at
-        /// %APPDATA%\MM5AGM\Yaesu Web Control\logs\ywc-YYYYMMDD.log or that
+        /// %APPDATA%\MM5AGM\Icom Web Control\logs\iwc-YYYYMMDD.log or that
         /// they need to grep it. The full log can grow to many MB; this
         /// endpoint reads only the tail and filters server-side so the
         /// reporter sees a focused, copy-pastable list.
@@ -865,18 +865,18 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                var logDir = Path.Combine(appData, "MM5AGM", "Yaesu Web Control", "logs");
+                var logDir = Path.Combine(appData, "MM5AGM", "Icom Web Control", "logs");
                 if (!Directory.Exists(logDir))
                     return Ok(new { lines = Array.Empty<string>(), source = (string?)null, note = "Log folder doesn't exist yet." });
 
                 // Pick today's file, falling back to whatever is newest if the
                 // run started on a previous day and hasn't rolled over yet.
-                var todayName = $"ywc-{DateTime.Now:yyyyMMdd}.log";
+                var todayName = $"iwc-{DateTime.Now:yyyyMMdd}.log";
                 var todayPath = Path.Combine(logDir, todayName);
                 string? sourcePath = System.IO.File.Exists(todayPath)
                     ? todayPath
                     : new DirectoryInfo(logDir)
-                        .GetFiles("ywc-*.log")
+                        .GetFiles("iwc-*.log")
                         .OrderByDescending(f => f.LastWriteTimeUtc)
                         .FirstOrDefault()?.FullName;
 

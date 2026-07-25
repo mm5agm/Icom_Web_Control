@@ -1,12 +1,12 @@
 ﻿using System.Text.Json;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class MemoryService
     {
         public static readonly string MemoriesPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control", "memories.json");
+            "MM5AGM", "Icom Web Control", "memories.json");
 
         private readonly SemaphoreSlim _lock = new(1, 1);
         private List<AppMemory> _memories = new();

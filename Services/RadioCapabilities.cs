@@ -1,4 +1,4 @@
-namespace Yaesu_Web_Control.Services;
+namespace Icom_Web_Control.Services;
 
 // Capability lookup for per-model behaviour differences. Currently used only
 // for the dual- vs single-receiver UI decision (active-VFO greying-out and

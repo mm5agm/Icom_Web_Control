@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.Json;
 
-namespace Yaesu_Web_Control.Pages
+namespace Icom_Web_Control.Pages
 {
     // Add this at the top or in a suitable namespace
     public class RadioStateViewModel

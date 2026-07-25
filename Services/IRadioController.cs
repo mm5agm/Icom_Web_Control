@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Which receiver / VFO a semantic operation targets. Protocol-free — the

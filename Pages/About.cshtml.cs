@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Win32;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Pages
+namespace Icom_Web_Control.Pages
 {
     public class AboutModel : PageModel
     {

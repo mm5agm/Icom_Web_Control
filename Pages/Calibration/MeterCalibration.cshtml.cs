@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Yaesu_Web_Control.Models.Calibration;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Models.Calibration;
+using Icom_Web_Control.Services;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Yaesu_Web_Control.Pages.Calibration
+namespace Icom_Web_Control.Pages.Calibration
 {
     public class MeterCalibrationModel : PageModel
     {
@@ -17,7 +17,7 @@ namespace Yaesu_Web_Control.Pages.Calibration
         }
 
         [BindProperty]
-        public Yaesu_Web_Control.Models.Calibration.MeterCalibration Calibration { get; set; } = new Yaesu_Web_Control.Models.Calibration.MeterCalibration
+        public Icom_Web_Control.Models.Calibration.MeterCalibration Calibration { get; set; } = new Icom_Web_Control.Models.Calibration.MeterCalibration
         {
             Name = "S-Meter",
             Type = "s_meter",
@@ -62,7 +62,7 @@ namespace Yaesu_Web_Control.Pages.Calibration
                     .Where(m => m.Name != "S-Meter")
                     .ToList()
             };
-            file.Meters.Add(new Yaesu_Web_Control.Models.Calibration.MeterCalibration
+            file.Meters.Add(new Icom_Web_Control.Models.Calibration.MeterCalibration
             {
                 Name = "S-Meter",
                 Type = "s_meter",

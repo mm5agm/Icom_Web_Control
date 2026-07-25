@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -12,14 +12,14 @@ using System.Text.Json;
 using System.Windows.Forms;
 
 // ── Single-instance guard ────────────────────────────────────────────────────
-const string MutexName = "Global\\Yaesu_Web_Control_SingleInstance";
+const string MutexName = "Global\\Icom_Web_Control_SingleInstance";
 var mutex = new Mutex(initiallyOwned: true, name: MutexName, out bool createdNew);
 
 if (!createdNew)
 {
 #pragma warning disable CA1416
     MessageBox.Show(
-        "Yaesu Web Control is already running.",
+        "Icom Web Control is already running.",
         "Already Running",
         MessageBoxButtons.OK,
         MessageBoxIcon.Information);
@@ -116,7 +116,7 @@ static int LoadConfiguredHttpPort()
     {
         var path = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control", "appsettings.user.json");
+            "MM5AGM", "Icom Web Control", "appsettings.user.json");
         if (!File.Exists(path)) return 8080;
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
         if (doc.RootElement.TryGetProperty("HttpPort", out var p) && p.TryGetInt32(out int port))
@@ -135,7 +135,7 @@ static int LoadConfiguredHttpPort()
 // hangs, CAT timeouts, SDR init failures and anything else the user can't see.
 var logDir = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-    "MM5AGM", "Yaesu Web Control", "logs");
+    "MM5AGM", "Icom Web Control", "logs");
 try { Directory.CreateDirectory(logDir); } catch { /* fall through, Serilog will surface the problem */ }
 
 Log.Logger = new LoggerConfiguration()
@@ -160,14 +160,14 @@ Log.Logger = new LoggerConfiguration()
     // depends on disk / AV / file-lock timing (issue #73, wa6auf). Dropped
     // shared:true as well — YWC is the only writer of this file.
     .WriteTo.Async(a => a.File(
-        Path.Combine(logDir, "ywc-.log"),
+        Path.Combine(logDir, "iwc-.log"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 7,
         flushToDiskInterval: TimeSpan.FromSeconds(1),
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"))
     .CreateLogger();
 
-Log.Information("Yaesu Web Control starting (v{Version})", Yaesu_Web_Control.AppVersion.Current);
+Log.Information("Icom Web Control starting (v{Version})", Icom_Web_Control.AppVersion.Current);
 
 // Raise the thread-pool floor so cold start doesn't bottleneck on the pool's
 // ~1/sec starvation-recovery thread injection. Startup fires many concurrent
@@ -284,11 +284,11 @@ if (chosenPort < 0)
     var diag = string.Join("\n",
         triedPorts.Select(p => $"  {p,5} — {GetPortOwner(p) ?? "unknown / Windows-reserved"}"));
     MessageBox.Show(
-        $"Yaesu Web Control couldn't find a free TCP port to listen on.\n\n" +
+        $"Icom Web Control couldn't find a free TCP port to listen on.\n\n" +
         $"Tried ports {triedPorts.First()}–{triedPorts.Last()}:\n\n{diag}\n\n" +
-        $"Either close one of those programs, or open Yaesu Web Control's\n" +
+        $"Either close one of those programs, or open Icom Web Control's\n" +
         $"Settings page on a working installation and change the HttpPort\n" +
-        $"value in %APPDATA%\\MM5AGM\\Yaesu Web Control\\appsettings.user.json\n" +
+        $"value in %APPDATA%\\MM5AGM\\Icom Web Control\\appsettings.user.json\n" +
         $"to a free port (e.g. 9080), then restart.",
         "No free port available",
         MessageBoxButtons.OK,
@@ -316,23 +316,23 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<WsjtxUdpService>()
 builder.Services.AddSingleton<ProcessStatusCacheService>();
 
 // Register radio memories service
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryService>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryBankService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.MemoryService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.MemoryBankService>();
 
 // Register DX cluster service — single instance shared between controllers and
 // the background hosted service so the API can read the spot buffer.
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.DxClusterService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.DxClusterService>());
+builder.Services.AddSingleton<Icom_Web_Control.Services.DxClusterService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.Services.DxClusterService>());
 
 // Voice control (in-process SAPI). VoiceControlService is the IHostedService
 // that owns the SpeechRecognitionEngine; IntentDispatcher maps recognised
 // intents to CAT actions; VoiceTtsService speaks confirmation phrases;
 // VoiceController exposes /api/voice/*. See docs/VoiceControl/v1-plan.md.
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.IntentDispatcher>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceTtsService>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoicePhraseStore>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceControlService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Voice.VoiceControlService>());
+builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.IntentDispatcher>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoiceTtsService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoicePhraseStore>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoiceControlService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.Services.Voice.VoiceControlService>());
 
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and
@@ -387,9 +387,9 @@ try
     app.MapControllers();
 
     // MAP SIGNALR HUB:
-    app.MapHub<Yaesu_Web_Control.Hubs.RadioHub>("/radioHub");
+    app.MapHub<Icom_Web_Control.Hubs.RadioHub>("/radioHub");
 
-    app.MapGet("/api/status/init", () => new { status = Yaesu_Web_Control.Services.AppStatus.InitializationStatus });
+    app.MapGet("/api/status/init", () => new { status = Icom_Web_Control.Services.AppStatus.InitializationStatus });
 
     app.MapGet("/api/ports", () =>
     {
@@ -402,7 +402,7 @@ try
     {
         var userPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control", "labels.json");
+            "MM5AGM", "Icom Web Control", "labels.json");
 
         if (!File.Exists(userPath))
         {
@@ -459,7 +459,7 @@ catch (Exception ex)
     else
     {
         MessageBox.Show(
-            $"Yaesu Web Control failed to start:\n\n{ex.Message}",
+            $"Icom Web Control failed to start:\n\n{ex.Message}",
             "Startup Error",
             MessageBoxButtons.OK,
             MessageBoxIcon.Error);

@@ -33,10 +33,10 @@ Before making any changes, read and follow all rules in `.claude/rules.md` and `
 
 ```bash
 # Build
-dotnet build Yaesu_Web_Control.csproj
+dotnet build Icom_Web_Control.csproj
 
 # Run (launches WinForms host + Kestrel on http://0.0.0.0:8080)
-dotnet run --project Yaesu_Web_Control.csproj
+dotnet run --project Icom_Web_Control.csproj
 
 # Publish self-contained
 dotnet publish -c Release -r win-x64 --self-contained

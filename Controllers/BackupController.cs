@@ -1,8 +1,8 @@
 using System.IO.Compression;
 using Microsoft.AspNetCore.Mvc;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     /// <summary>
     /// Export / import everything the operator has customised in YWC as a
@@ -10,7 +10,7 @@ namespace Yaesu_Web_Control.Controllers
     /// Replaces the v2.0.0 settings-only backup with a clean one-file PC
     /// migration path.
     ///
-    /// Files included (whichever exist in %APPDATA%\MM5AGM\Yaesu Web Control\):
+    /// Files included (whichever exist in %APPDATA%\MM5AGM\Icom Web Control\):
     ///   appsettings.user.json   user settings
     ///   memories.json           memory channels
     ///   memory-banks.json       saved memory banks

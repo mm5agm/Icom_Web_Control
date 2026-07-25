@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using Yaesu_Web_Control.Models;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Models;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     /// <summary>
     /// Export and import the entire user settings file. Designed for moving

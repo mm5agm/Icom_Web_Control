@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]

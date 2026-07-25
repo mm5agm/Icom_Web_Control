@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Models;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class SettingsService : ISettingsService
     {
@@ -14,7 +14,7 @@ namespace Yaesu_Web_Control.Services
         {
             var appData = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MM5AGM", "Yaesu Web Control");
+                "MM5AGM", "Icom Web Control");
             MigrateAppDataIfNeeded(appData);
             Directory.CreateDirectory(appData);
             _settingsFilePath = Path.Combine(appData, "appsettings.user.json");

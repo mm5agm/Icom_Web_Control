@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Yaesu_Web_Control.Services;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Services;
+using Icom_Web_Control.Models;
 using System.Text.Json;
 using System.Threading;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]

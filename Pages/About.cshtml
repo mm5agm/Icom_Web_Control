@@ -1,19 +1,19 @@
 @page
-@model Yaesu_Web_Control.Pages.AboutModel
+@model Icom_Web_Control.Pages.AboutModel
 @{
-    ViewData["Title"] = "About Yaesu Web Control";
+    ViewData["Title"] = "About Icom Web Control";
 }
 
 <div class="container my-4" style="max-width: 760px;">
 
-    <h1 class="mb-1">Yaesu Web Control</h1>
+    <h1 class="mb-1">Icom Web Control</h1>
     <p class="text-muted mb-3">
         Version <strong>@Model.Version</strong>
         &nbsp;·&nbsp; Released @Model.ReleaseDate
     </p>
     <p class="text-muted mb-4">
         © 2026 Colin Campbell (MM5AGM) ·
-        <a href="https://github.com/mm5agm/Yaesu_Web_Control/blob/main/LICENSE" target="_blank" rel="noopener">GNU General Public License v3.0</a>
+        <a href="https://github.com/mm5agm/Icom_Web_Control/blob/main/LICENSE" target="_blank" rel="noopener">GNU General Public License v3.0</a>
     </p>
 
     <h5>About this project</h5>
@@ -37,11 +37,11 @@
             📖 <a asp-page="/UserManual">User Manual</a> &mdash; comprehensive documentation, with screenshots
         </li>
         <li>
-            💬 <a href="https://github.com/mm5agm/Yaesu_Web_Control/discussions" target="_blank" rel="noopener">Discussions</a>
+            💬 <a href="https://github.com/mm5agm/Icom_Web_Control/discussions" target="_blank" rel="noopener">Discussions</a>
             &mdash; questions, ideas, feature requests
         </li>
         <li>
-            📦 <a href="https://github.com/mm5agm/Yaesu_Web_Control" target="_blank" rel="noopener">Source code on GitHub</a>
+            📦 <a href="https://github.com/mm5agm/Icom_Web_Control" target="_blank" rel="noopener">Source code on GitHub</a>
         </li>
         <li>
             ☕ <a href="https://paypal.me/mm5agm" target="_blank" rel="noopener">Sponsor / Buy Me a Coffee</a>
@@ -207,7 +207,7 @@ Tested fw      @Model.TestedFirmwareSummary</pre>
                     '(Drag-and-drop screenshots here. Any F12 console errors below.)\n\n' +
                     '```\n\n```\n\n' +
                     '## Anything else?\n\n';
-                const url = 'https://github.com/mm5agm/Yaesu_Web_Control/issues/new'
+                const url = 'https://github.com/mm5agm/Icom_Web_Control/issues/new'
                           + '?template=bug_report.md'
                           + '&body=' + encodeURIComponent(body);
                 window.open(url, '_blank', 'noopener');

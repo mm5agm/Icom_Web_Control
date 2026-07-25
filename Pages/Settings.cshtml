@@ -1,5 +1,5 @@
 ﻿@page
-@model Yaesu_Web_Control.Pages.SettingsModel
+@model Icom_Web_Control.Pages.SettingsModel
 
 <style>
     /* Collapsible Settings sections — native <details>/<summary> for
@@ -56,7 +56,7 @@
     {
         <div class="alert alert-warning border-3 d-flex flex-wrap align-items-center gap-3" role="alert" aria-live="polite">
             <div class="flex-grow-1">
-                <h5 class="mb-1"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart Yaesu Web Control to apply your changes</h5>
+                <h5 class="mb-1"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart Icom Web Control to apply your changes</h5>
                 <div class="mb-0">
                     You changed the <strong>@Model.RestartRequiredReason</strong>.
                     Most settings take effect immediately, but this one needs a restart so every part of the app — and any open browser tabs from before the change — picks up the new value cleanly.
@@ -64,7 +64,7 @@
             </div>
             <form method="post" asp-page-handler="Restart" class="m-0">
                 <button type="submit" class="btn btn-warning fw-bold"
-                        title="Stop the app and relaunch it. Your browser will briefly show the 'Yaesu Web Control has stopped' overlay; reload this tab when the app is back.">
+                        title="Stop the app and relaunch it. Your browser will briefly show the 'Icom Web Control has stopped' overlay; reload this tab when the app is back.">
                     <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart Now
                 </button>
             </form>
@@ -200,11 +200,11 @@
         <summary><i class="bi bi-universal-access" aria-hidden="true"></i>&nbsp;Accessibility</summary>
         <div class="section-body">
             <p class="text-muted small mb-3">
-                Settings to make Yaesu Web Control easier to use for operators with disabilities.
+                Settings to make Icom Web Control easier to use for operators with disabilities.
                 The frequency display is fully keyboard-driven: focus it with Tab, then use ↑/↓ to step
                 the selected digit, ←/→ to move the selection, PageUp/PageDown for 10× steps, and
                 Home/End to jump to the most/least significant digit. Got a suggestion?
-                <a href="https://github.com/mm5agm/Yaesu_Web_Control/discussions" target="_blank" rel="noopener">Open a GitHub discussion</a>.
+                <a href="https://github.com/mm5agm/Icom_Web_Control/discussions" target="_blank" rel="noopener">Open a GitHub discussion</a>.
             </p>
             <div class="mb-3 form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch"
@@ -365,7 +365,7 @@
                     <i class="bi bi-mic" aria-hidden="true"></i>&nbsp;Test this pack
                 </button>
                 <div class="form-text">
-                    Opens <code>%APPDATA%\MM5AGM\Yaesu Web Control\Grammars\</code> in Explorer.
+                    Opens <code>%APPDATA%\MM5AGM\Icom Web Control\Grammars\</code> in Explorer.
                     The <code>Commands.&lt;culture&gt;.json</code> file above is the live, editable
                     command set; the matching <code>.srgs</code> file is a generated, human-readable
                     copy for reference and sharing — it is not loaded live by the speech engine.
@@ -1701,7 +1701,7 @@
                             <input asp-for="Settings.HttpPort" type="number" min="1" max="65535" class="form-control" style="max-width: 12em;" />
                             <div class="form-text">
                                 Default <strong>8080</strong>. If that port is already used by another program on your PC
-                                (Plex, Jenkins, etc.), Yaesu Web Control automatically tries 8081–8089 at startup and uses the first free one.
+                                (Plex, Jenkins, etc.), Icom Web Control automatically tries 8081–8089 at startup and uses the first free one.
                                 The port actually in use right now is <strong>@Model.CurrentRunningPort</strong>.
                                 Pin a specific port here only if you need to override that behaviour (e.g. you always want 9080).
                             </div>

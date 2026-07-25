@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Yaesu_Web_Control.Models
+namespace Icom_Web_Control.Models
 {
     /// <summary>
     /// Optional metadata alongside a voice language pack, persisted as

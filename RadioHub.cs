@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Hosting;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Hubs
+namespace Icom_Web_Control.Hubs
 {
     public class RadioHub : Hub
     {

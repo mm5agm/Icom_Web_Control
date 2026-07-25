@@ -1,8 +1,8 @@
 using System.Speech.Recognition;
 using System.Xml.Linq;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Models;
 
-namespace Yaesu_Web_Control.Services.Voice
+namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>
     /// Builds a SAPI grammar from a <see cref="VoicePhrasesConfig"/>. All

@@ -3,10 +3,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.Speech.Recognition;
-using Yaesu_Web_Control.Hubs;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Hubs;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Services.Voice
+namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>
     /// In-process voice control via Windows SAPI 5 / System.Speech.Recognition.

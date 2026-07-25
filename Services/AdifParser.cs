@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Minimal ADIF (Amateur Data Interchange Format) parser. Reads only the

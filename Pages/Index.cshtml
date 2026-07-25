@@ -1,7 +1,7 @@
 ﻿@page
-@model Yaesu_Web_Control.Pages.IndexModel
+@model Icom_Web_Control.Pages.IndexModel
 @{
-    ViewData["Title"]     = "Yaesu Web Control";
+    ViewData["Title"]     = "Icom Web Control";
     ViewData["BodyRole"]  = "application";
     ViewData["BodyLabel"] = "Yaesu radio control panel";
     var allModes = new[] {
@@ -22,14 +22,14 @@
     // editing it via CAT would silently swap the radio's active VFO.
     // Dual-receiver radios (FTdx101MP/D) keep both panels active because
     // each VFO is its own physical receiver chain.
-    bool isSingleReceiver  = Yaesu_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
-    bool hasAntennaSelector = Yaesu_Web_Control.Services.RadioCapabilities.HasAntennaSelector(Model.RadioModel);
+    bool isSingleReceiver  = Icom_Web_Control.Services.RadioCapabilities.IsSingleReceiver(Model.RadioModel);
+    bool hasAntennaSelector = Icom_Web_Control.Services.RadioCapabilities.HasAntennaSelector(Model.RadioModel);
     // Render VC Tune controls only when both the model supports VC Tune (FTdx101MP)
     // AND the hardware ID is positively confirmed to support VT CAT commands.
     // Empty/unknown ID → hidden (user can reload once radio connects and ID; is received).
-    bool hasVcTune    = Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneMain(Model.RadioModel)
-                     && Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneCat(Model.RadioState.Id);
-    bool hasVcTuneSub = Yaesu_Web_Control.Services.RadioCapabilities.SupportsVCTuneSubStatic(Model.RadioModel);
+    bool hasVcTune    = Icom_Web_Control.Services.RadioCapabilities.SupportsVCTuneMain(Model.RadioModel)
+                     && Icom_Web_Control.Services.RadioCapabilities.SupportsVCTuneCat(Model.RadioState.Id);
+    bool hasVcTuneSub = Icom_Web_Control.Services.RadioCapabilities.SupportsVCTuneSubStatic(Model.RadioModel);
 
     string clarModeInit = (Model.RadioState.RxClarOn, Model.RadioState.TxClarOn) switch
     {

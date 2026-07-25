@@ -1,10 +1,10 @@
-﻿using Yaesu_Web_Control.Hubs;
+﻿using Icom_Web_Control.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class RadioStateService : INotifyPropertyChanged, IRadioStateService
     {

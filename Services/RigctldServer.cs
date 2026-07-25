@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Implements a rigctld-compatible TCP server for WSJT-X and other Hamlib clients

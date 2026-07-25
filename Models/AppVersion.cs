@@ -1,4 +1,4 @@
-namespace Yaesu_Web_Control;
+namespace Icom_Web_Control;
 
 public static class AppVersion
 {

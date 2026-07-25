@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using IOFile = System.IO.File;
 
-namespace Yaesu_Web_Control.Pages
+namespace Icom_Web_Control.Pages
 {
     public class LabelsModel : PageModel
     {
@@ -18,7 +18,7 @@ namespace Yaesu_Web_Control.Pages
 
         private static readonly string UserLabelsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control", "labels.json");
+            "MM5AGM", "Icom Web Control", "labels.json");
 
         public LabelsModel(IWebHostEnvironment env)
         {

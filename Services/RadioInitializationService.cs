@@ -5,11 +5,11 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Yaesu_Web_Control.Hubs;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Hubs;
+using Icom_Web_Control.Models;
 using System.Diagnostics; // Place at the top of the file if not already present
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class RadioInitializationService : BackgroundService
     {

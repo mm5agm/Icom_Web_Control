@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// ICatClient implementation that uses the multiplexer instead of direct serial access

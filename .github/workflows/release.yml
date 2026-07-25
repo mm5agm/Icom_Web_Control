@@ -41,7 +41,7 @@ jobs:
 
       - name: Publish 64-bit self-contained app
         run: |
-          dotnet publish Yaesu_Web_Control.csproj `
+          dotnet publish Icom_Web_Control.csproj `
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
@@ -67,27 +67,27 @@ jobs:
           $found = Get-ChildItem -Filter "*Setup*.exe" | Select-Object -First 1
           if (!$found) { Write-Error "No *Setup*.exe found after NSIS ran"; exit 1 }
           Write-Host "NSIS produced: $($found.FullName)"
-          if ($found.Name -ne "Yaesu_Web_Control_Setup.exe") {
-            Rename-Item $found.FullName "Yaesu_Web_Control_Setup.exe"
-            Write-Host "Renamed to Yaesu_Web_Control_Setup.exe"
+          if ($found.Name -ne "Icom_Web_Control_Setup.exe") {
+            Rename-Item $found.FullName "Icom_Web_Control_Setup.exe"
+            Write-Host "Renamed to Icom_Web_Control_Setup.exe"
           }
         shell: pwsh
 
       - name: Verify installer was created
         run: |
-          if (!(Test-Path "Yaesu_Web_Control_Setup.exe")) {
-            Write-Error "Yaesu_Web_Control_Setup.exe not found after build"
+          if (!(Test-Path "Icom_Web_Control_Setup.exe")) {
+            Write-Error "Icom_Web_Control_Setup.exe not found after build"
             exit 1
           }
-          Write-Host "OK: $('{0:N0}' -f (Get-Item Yaesu_Web_Control_Setup.exe).Length) bytes"
+          Write-Host "OK: $('{0:N0}' -f (Get-Item Icom_Web_Control_Setup.exe).Length) bytes"
         shell: pwsh
 
       - name: Upload installer as workflow artifact
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: Yaesu_Web_Control_Setup
-          path: Yaesu_Web_Control_Setup.exe
+          name: Icom_Web_Control_Setup
+          path: Icom_Web_Control_Setup.exe
 
       - name: Upload installer to GitHub Release
         if: github.event_name == 'release' || github.event.inputs.tag != ''
@@ -101,7 +101,7 @@ jobs:
 
           Write-Host "Uploading installer to release: $tag"
 
-          gh release upload "$tag" "Yaesu_Web_Control_Setup.exe" --clobber
+          gh release upload "$tag" "Icom_Web_Control_Setup.exe" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh

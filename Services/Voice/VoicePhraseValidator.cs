@@ -1,6 +1,6 @@
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Models;
 
-namespace Yaesu_Web_Control.Services.Voice
+namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>Severity of a <see cref="ValidationIssue"/> — errors block save/install, warnings don't.</summary>
     public enum ValidationSeverity

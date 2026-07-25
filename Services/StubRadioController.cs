@@ -3,10 +3,10 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Yaesu_Web_Control.Hubs;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Hubs;
+using Icom_Web_Control.Models;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Phase 1 stand-in for the real radio link. It implements the semantic

@@ -1,8 +1,8 @@
 ﻿using System.Text.Json;
-using Yaesu_Web_Control.Models.Calibration;
+using Icom_Web_Control.Models.Calibration;
 using Microsoft.Extensions.Hosting;
 
-namespace Yaesu_Web_Control.Services;
+namespace Icom_Web_Control.Services;
 
 public class CalibrationStorage
 {
@@ -29,7 +29,7 @@ public class CalibrationStorage
         _userPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "MM5AGM",
-            "Yaesu Web Control",
+            "Icom Web Control",
             "calibration.user.json");
     }
 

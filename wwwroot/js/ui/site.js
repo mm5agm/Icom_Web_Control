@@ -3578,14 +3578,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!meta) return;
         const current = meta.content.trim();
         try {
-            const resp = await fetch('https://api.github.com/repos/mm5agm/Yaesu_Web_Control/releases/latest', {
+            const resp = await fetch('https://api.github.com/repos/mm5agm/Icom_Web_Control/releases/latest', {
                 headers: { Accept: 'application/vnd.github+json' }
             });
             if (!resp.ok) return;
             const data = await resp.json();
             const latest = (data.tag_name || '').replace(/^v/i, '');
             if (latest && _isNewer(latest, current)) {
-                _showUpdateBanner(latest, data.html_url || 'https://github.com/mm5agm/Yaesu_Web_Control/releases');
+                _showUpdateBanner(latest, data.html_url || 'https://github.com/mm5agm/Icom_Web_Control/releases');
             }
         } catch { /* network unavailable or rate limited — silently skip */ }
     }

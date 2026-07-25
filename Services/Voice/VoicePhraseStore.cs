@@ -1,12 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Models;
 
-namespace Yaesu_Web_Control.Services.Voice
+namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>
     /// Reads and writes voice language packs. Storage is per-locale:
-    /// %APPDATA%\MM5AGM\Yaesu Web Control\Grammars\&lt;culture&gt;\Commands.&lt;culture&gt;.json
+    /// %APPDATA%\MM5AGM\Icom Web Control\Grammars\&lt;culture&gt;\Commands.&lt;culture&gt;.json
     /// (+ a sibling Commands.&lt;culture&gt;.meta.json), per
     /// docs/VoiceControl/language-pack-manager-design.md §1.6. Multiple
     /// cultures can be installed side by side; which one is actually loaded
@@ -24,7 +24,7 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private static readonly string AppDataRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control");
+            "MM5AGM", "Icom Web Control");
 
         private static readonly string LegacyFilePath = Path.Combine(AppDataRoot, "voice_phrases.json");
         private static readonly string GrammarsRoot = Path.Combine(AppDataRoot, "Grammars");

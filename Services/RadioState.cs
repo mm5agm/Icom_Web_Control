@@ -1,4 +1,4 @@
-﻿namespace Yaesu_Web_Control.Services
+﻿namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Represents the persistent state of the radio (both receivers A and B).

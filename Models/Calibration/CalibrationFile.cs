@@ -1,6 +1,6 @@
 ﻿
 using System.Text.Json.Serialization;
-namespace Yaesu_Web_Control.Models.Calibration;
+namespace Icom_Web_Control.Models.Calibration;
 
 public class CalibrationFile
 {

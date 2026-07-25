@@ -3,12 +3,12 @@ using System.Drawing;
 using System.Windows.Forms;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
-using Yaesu_Web_Control.Hubs;
+using Icom_Web_Control.Hubs;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
-    /// Adds a small Yaesu Web Control icon to the Windows system tray so the
+    /// Adds a small Icom Web Control icon to the Windows system tray so the
     /// operator can:
     ///   - tell at a glance that YWC is running, and
     ///   - shut it down cleanly without resorting to Task Manager.
@@ -106,18 +106,18 @@ namespace Yaesu_Web_Control.Services
                 Icon icon = LoadTrayIcon();
 
                 var menu = new ContextMenuStrip();
-                menu.Items.Add(new ToolStripMenuItem("Open Yaesu Web Control", null, OnOpenBrowser));
+                menu.Items.Add(new ToolStripMenuItem("Open Icom Web Control", null, OnOpenBrowser));
                 menu.Items.Add(new ToolStripSeparator());
                 menu.Items.Add(new ToolStripMenuItem("About — version " + AppVersion.Current, null, OnAbout));
                 menu.Items.Add(new ToolStripMenuItem("Open user data folder", null, OnOpenAppDataFolder));
                 menu.Items.Add(new ToolStripSeparator());
-                menu.Items.Add(new ToolStripMenuItem("Exit Yaesu Web Control", null, OnExit));
+                menu.Items.Add(new ToolStripMenuItem("Exit Icom Web Control", null, OnExit));
 
                 _notifyIcon = new NotifyIcon
                 {
                     Icon = icon,
                     Visible = true,
-                    Text = $"Yaesu Web Control v{AppVersion.Current} — running on {_portInfo.RootUrl}",
+                    Text = $"Icom Web Control v{AppVersion.Current} — running on {_portInfo.RootUrl}",
                     ContextMenuStrip = menu,
                 };
                 // Double-click the tray icon -> open the browser. Most
@@ -173,13 +173,13 @@ namespace Yaesu_Web_Control.Services
         private void OnAbout(object? sender, EventArgs e)
         {
             MessageBox.Show(
-                $"Yaesu Web Control v{AppVersion.Current}\n" +
+                $"Icom Web Control v{AppVersion.Current}\n" +
                 $"Released {AppVersion.ReleaseDate}\n\n" +
                 "Copyright Colin Campbell (MM5AGM)\n" +
                 "Released under the GNU General Public License v3.0.\n\n" +
                 "For full About details, open the app in your browser " +
                 "and click About in the top navigation bar.",
-                "About Yaesu Web Control",
+                "About Icom Web Control",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -190,7 +190,7 @@ namespace Yaesu_Web_Control.Services
             {
                 var folder = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "MM5AGM", "Yaesu Web Control");
+                    "MM5AGM", "Icom Web Control");
                 if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
                 Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
             }
@@ -203,9 +203,9 @@ namespace Yaesu_Web_Control.Services
         private void OnExit(object? sender, EventArgs e)
         {
             var ok = MessageBox.Show(
-                "Stop Yaesu Web Control?\n\nWSJT-X / Log4OM / JTAlert / GridTracker / Fldigi " +
+                "Stop Icom Web Control?\n\nWSJT-X / Log4OM / JTAlert / GridTracker / Fldigi " +
                 "will lose their CAT connection until YWC is restarted.",
-                "Exit Yaesu Web Control",
+                "Exit Icom Web Control",
                 MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Question);
             if (ok != DialogResult.OK) return;
@@ -243,7 +243,7 @@ namespace Yaesu_Web_Control.Services
             // Small deliberate delay before StopApplication so the SignalR
             // broadcast above has time to actually traverse the WebSocket and
             // reach the browser before Kestrel starts tearing connections down
-            // — otherwise the "Yaesu Web Control has stopped" overlay never
+            // — otherwise the "Icom Web Control has stopped" overlay never
             // gets to render. The previous 5-second STA-thread hang was
             // accidentally providing this grace window; with the hang fixed
             // (~1.2 s total exit), we need ~250 ms explicit delay to keep the

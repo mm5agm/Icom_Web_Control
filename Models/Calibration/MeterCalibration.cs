@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
 
-namespace Yaesu_Web_Control.Models.Calibration
+namespace Icom_Web_Control.Models.Calibration
 {
     // Represents a single calibration point for a meter
     public class CalibrationPoint

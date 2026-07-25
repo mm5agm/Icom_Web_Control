@@ -1,4 +1,4 @@
-﻿namespace Yaesu_Web_Control.Services
+﻿namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Routes CAT messages to appropriate handlers and updates radio state

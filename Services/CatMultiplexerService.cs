@@ -2,7 +2,7 @@
 using System.IO.Ports;
 using System.Text;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Central CAT multiplexer that owns the serial port and services multiple clients
