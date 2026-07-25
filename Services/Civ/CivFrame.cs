@@ -46,6 +46,17 @@ namespace Icom_Web_Control.Services.Civ
         public const byte CmdReadMode = 0x04;
         public const byte CmdSetMode = 0x06;
 
+        // Phase 3 block 2 — DATA mode + filter width (command 1A, sub 06). On
+        // the IC-7300 a "data" mode (USB-D / LSB-D / FM-D, used for FT8 etc.)
+        // is the base mode plus this flag, not a distinct mode byte.
+        //   Read : send 1A 06                     → reply 1A 06 <dataOn> <filter>
+        //   Set  : send 1A 06 <dataOn> <filter>   → reply FB / FA
+        // dataOn: 00=OFF, 01=ON (SSB/AM/FM only; fixed OFF for CW/RTTY).
+        // filter: 00 when data OFF, else 01=FIL1 / 02=FIL2 / 03=FIL3.
+        // Manual constraint: when dataOn=00, filter must be 00.
+        public const byte CmdMenu = 0x1A;
+        public const byte SubDataMode = 0x06;
+
         // Radio's one-byte acknowledgements to a set/write command.
         public const byte AckOk = 0xFB; // completed
         public const byte AckNg = 0xFA; // not good (rejected / bad frame)

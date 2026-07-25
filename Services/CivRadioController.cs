@@ -124,54 +124,106 @@ namespace Icom_Web_Control.Services
             if (reply == null || reply.Cmd != CivProtocol.CmdReadMode || reply.Data.Length < 1)
                 return vfo == RadioVfo.A ? (_state.ModeA ?? "") : (_state.ModeB ?? "");
 
-            return ModeByteToName.TryGetValue(reply.Data[0], out var name) ? name : $"?{reply.Data[0]:X2}";
+            byte baseByte = reply.Data[0];
+
+            // On SSB/AM/FM the mode may additionally be a "data" mode (USB-D
+            // etc.). CW/RTTY have no data variant, so skip the extra read.
+            bool data = false;
+            if (BaseSupportsData(baseByte))
+                data = await ReadDataModeAsync(cancellationToken);
+
+            return NameForMode(baseByte, data);
         }
 
         public async Task SetModeAsync(RadioVfo vfo, string mode, CancellationToken cancellationToken = default)
         {
-            if (!ModeNameToByte.TryGetValue(mode, out var modeByte))
+            if (!ModeNameToIcom.TryGetValue(mode, out var target))
             {
-                // Icom data modes (USB-D etc.) need 1A 06 and land in a later
-                // block; core modes are handled here.
+                // Modes with no IC-7300 CI-V equivalent (PSK, FM-N, AM-N, …).
                 _logger.LogWarning("[CivRadioController] Unsupported mode '{Mode}' — ignored", mode);
                 return;
             }
 
-            // Mode byte only: the radio keeps its current filter (FIL1/2/3).
-            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdSetMode, modeByte);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
-            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+            // 1) Base mode (command 06, mode byte only — radio keeps its filter).
+            var baseFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSetMode, target.BaseByte);
+            var baseReply = await _bus.TransactAsync(baseFrame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (baseReply == null || baseReply.Cmd != CivProtocol.AckOk)
             {
-                var name = ModeByteToName.TryGetValue(modeByte, out var n) ? n : mode;
-                if (vfo == RadioVfo.A) _state.ModeA = name; else _state.ModeB = name;
+                _logger.LogWarning("[CivRadioController] Set base mode for '{Mode}' was not acknowledged", mode);
+                return;
             }
-            else
+
+            // 2) DATA flag (command 1A 06), only where the base mode has one.
+            //    Enabling data needs a filter (FIL1); disabling forces 00/00.
+            if (BaseSupportsData(target.BaseByte))
             {
-                _logger.LogWarning("[CivRadioController] Set mode '{Mode}' was not acknowledged", mode);
+                byte dataOn = target.Data ? (byte)0x01 : (byte)0x00;
+                byte filter = target.Data ? (byte)0x01 : (byte)0x00;
+                var dataFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                    CivProtocol.CmdMenu, CivProtocol.SubDataMode, dataOn, filter);
+                var dataReply = await _bus.TransactAsync(dataFrame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+                if (dataReply == null || dataReply.Cmd != CivProtocol.AckOk)
+                    _logger.LogWarning("[CivRadioController] Set DATA flag for '{Mode}' was not acknowledged", mode);
             }
+
+            var name = NameForMode(target.BaseByte, target.Data);
+            if (vfo == RadioVfo.A) _state.ModeA = name; else _state.ModeB = name;
         }
 
-        // CI-V mode byte (command 04/06 data 1) ↔ the display strings already
-        // spoken by RadioStateService, the web mode dropdown, voice, and
-        // rigctld. The IC-7300's native modes; "-U"/"-L" follows the existing
-        // UI vocabulary — CW normal is the USB side ("CW-U"), CW-R the LSB side
-        // ("CW-L"); RTTY normal is the LSB side ("RTTY-L"), RTTY-R the USB side.
-        private static readonly Dictionary<byte, string> ModeByteToName = new()
+        /// <summary>Read the DATA on/off flag (command 1A 06). False on any miss.</summary>
+        private async Task<bool> ReadDataModeAsync(CancellationToken cancellationToken)
         {
-            [0x00] = "LSB", [0x01] = "USB", [0x02] = "AM",
-            [0x03] = "CW-U", [0x04] = "RTTY-L", [0x05] = "FM",
-            [0x07] = "CW-L", [0x08] = "RTTY-U",
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubDataMode);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: cancellationToken);
+            // Reply body is 1A 06 <dataOn> <filter>: Data = [06, dataOn, filter].
+            if (reply != null && reply.Cmd == CivProtocol.CmdMenu
+                && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubDataMode)
+                return reply.Data[1] != 0;
+            return false;
+        }
+
+        private static bool BaseSupportsData(byte baseByte)
+            => baseByte is 0x00 or 0x01 or 0x02 or 0x05; // LSB, USB, AM, FM
+
+        // CI-V base-mode byte (+ DATA flag) → the display strings already spoken
+        // by RadioStateService, the web mode dropdown, voice, and rigctld. The
+        // "-U"/"-L" suffix follows the existing UI vocabulary — CW normal is the
+        // USB side ("CW-U"), CW-R the LSB side ("CW-L"); RTTY normal is the LSB
+        // side ("RTTY-L"), RTTY-R the USB side. Data variants: USB-D→"DATA-U",
+        // LSB-D→"DATA-L", FM-D→"DATA-FM".
+        private static string NameForMode(byte baseByte, bool data) => baseByte switch
+        {
+            0x00 => data ? "DATA-L" : "LSB",
+            0x01 => data ? "DATA-U" : "USB",
+            0x02 => "AM",   // AM-data has no distinct UI string; report as AM
+            0x03 => "CW-U",
+            0x04 => "RTTY-L",
+            0x05 => data ? "DATA-FM" : "FM",
+            0x07 => "CW-L",
+            0x08 => "RTTY-U",
+            _ => $"?{baseByte:X2}",
         };
 
-        private static readonly Dictionary<string, byte> ModeNameToByte = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["LSB"] = 0x00, ["USB"] = 0x01, ["AM"] = 0x02,
-            ["CW-U"] = 0x03, ["CW"] = 0x03,
-            ["RTTY-L"] = 0x04, ["RTTY"] = 0x04,
-            ["FM"] = 0x05,
-            ["CW-L"] = 0x07, ["CW-R"] = 0x07,
-            ["RTTY-U"] = 0x08, ["RTTY-R"] = 0x08,
-        };
+        // Display string → (base-mode byte, DATA flag). Covers every mode the
+        // IC-7300 exposes over CI-V; Yaesu-only strings (PSK, FM-N, AM-N,
+        // DATA-FM-N) are intentionally absent and rejected by SetModeAsync.
+        private static readonly Dictionary<string, (byte BaseByte, bool Data)> ModeNameToIcom =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["LSB"] = (0x00, false),
+                ["USB"] = (0x01, false),
+                ["AM"] = (0x02, false),
+                ["CW-U"] = (0x03, false), ["CW"] = (0x03, false),
+                ["RTTY-L"] = (0x04, false), ["RTTY"] = (0x04, false),
+                ["FM"] = (0x05, false),
+                ["CW-L"] = (0x07, false), ["CW-R"] = (0x07, false),
+                ["RTTY-U"] = (0x08, false), ["RTTY-R"] = (0x08, false),
+                ["DATA-L"] = (0x00, true),
+                ["DATA-U"] = (0x01, true),
+                ["DATA-FM"] = (0x05, true),
+            };
 
         // Not yet implemented behind CI-V (later Phase 3 blocks). Safe
         // placeholders so the seam's other callers never throw.

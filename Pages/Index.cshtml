@@ -4,12 +4,15 @@
     ViewData["Title"]     = "Icom Web Control";
     ViewData["BodyRole"]  = "application";
     ViewData["BodyLabel"] = "Yaesu radio control panel";
+    // The IC-7300's CI-V mode set. Data variants (USB-D/LSB-D/FM-D) map to
+    // DATA-U/DATA-L/DATA-FM via command 1A 06; the Yaesu-only strings
+    // (FM-N, AM-N, DATA-FM-N, PSK) have no IC-7300 equivalent and are dropped.
     var allModes = new[] {
-        "LSB", "USB", "CW-U", "CW-L", "FM", "FM-N", "AM", "AM-N", "RTTY-L", "RTTY-U",
-        "DATA-L", "DATA-U", "DATA-FM", "DATA-FM-N", "PSK"
+        "LSB", "USB", "CW-U", "CW-L", "FM", "AM", "RTTY-L", "RTTY-U",
+        "DATA-L", "DATA-U", "DATA-FM"
     };
     // Display label shown in the dropdown — value stays as the CAT mode string.
-    string ModeLabel(string m) => m == "DATA-FM-N" ? "D-FM-N" : m;
+    string ModeLabel(string m) => m;
 
     bool isFtdx10  = Model.RadioModel == "FTdx10";
     bool isFt710   = Model.RadioModel == "FT-710";
