@@ -57,6 +57,17 @@ namespace Icom_Web_Control.Services.Civ
         public const byte CmdMenu = 0x1A;
         public const byte SubDataMode = 0x06;
 
+        // Phase 3 block 3 — meters (command 15 family). Sub 02 = S-meter.
+        //   Read : send 15 02   → reply 15 02 <d1> <d2>
+        // The level is a 0–255 value as two big-endian BCD bytes (unlike the
+        // little-endian frequency): 00 00=S0, 01 20=S9, 02 41=S9+60 dB, 02 55=255.
+        // Decode with value = <d1 as BCD>*100 + <d2 as BCD>; see BcdByte.
+        public const byte CmdReadMeter = 0x15;
+        public const byte SubSMeter = 0x02;
+
+        /// <summary>Decode one packed-BCD byte (two decimal digits) to 0–99.</summary>
+        public static int BcdByte(byte b) => ((b >> 4) & 0x0F) * 10 + (b & 0x0F);
+
         // Radio's one-byte acknowledgements to a set/write command.
         public const byte AckOk = 0xFB; // completed
         public const byte AckNg = 0xFA; // not good (rejected / bad frame)

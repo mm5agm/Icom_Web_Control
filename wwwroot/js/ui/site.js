@@ -1071,6 +1071,17 @@ connection.on("RadioStateUpdate", function (update) {
         if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('B', update.value);
     }
 
+    // --- S-METER (push) ---
+    // The backend polls command 15 02 at ~6–7 Hz and broadcasts SMeterA/B.
+    // Drive the gauge here so the needle tracks the radio smoothly; the 500 ms
+    // status poll still updates it as a fallback if a broadcast is missed.
+    if (update.property === "SMeterA" && typeof window.updateSMeter === 'function') {
+        window.updateSMeter('A', update.value);
+    }
+    if (update.property === "SMeterB" && typeof window.updateSMeter === 'function') {
+        window.updateSMeter('B', update.value);
+    }
+
     // --- ANTENNA CHANGE ---
     // The radio does not auto-broadcast AN changes from the front panel,
     // so MeterPollingService polls AN0/AN1 every couple of seconds and
@@ -3050,6 +3061,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const sLabel = document.getElementById(labelId);
         if (sLabel) sLabel.textContent = sUnit;
     }
+    // Exposed so the outer SignalR RadioStateUpdate handler (different scope)
+    // can drive the needle at the backend poll rate instead of waiting for the
+    // 500 ms status poll — see the "SMeterA"/"SMeterB" cases there.
+    window.updateSMeter = updateSMeter;
 
     // Update MIC bar meter (0-255 raw value)
     function updateMICMeter(value) {

@@ -31,7 +31,8 @@ namespace Icom_Web_Control.Services
     /// </summary>
     public sealed class CivRadioController : BackgroundService, IRadioController
     {
-        private const int PollIntervalMs = 300;
+        private const int PollIntervalMs = 150;      // ~6–7 Hz — snappy meters/dial
+        private const int ModePollEveryNLoops = 3;    // mode changes rarely; ~2 Hz is plenty
         private const int ReconnectDelayMs = 3000;
         private const int MaxConsecutiveReadMisses = 5;
 
@@ -225,11 +226,25 @@ namespace Icom_Web_Control.Services
                 ["DATA-FM"] = (0x05, true),
             };
 
+        // -- S-meter (Phase 3 block 3) -----------------------------------------
+
+        public async Task<int> ReadSMeterAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
+        {
+            // Command 15 02 → 15 02 <d1> <d2>, level 0–255 as two big-endian
+            // BCD bytes (00 00=S0, 01 20=S9, 02 41=S9+60 dB).
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdReadMeter, CivProtocol.SubSMeter);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadMeter, cancellationToken: cancellationToken);
+            // Reply body is 15 02 <d1> <d2>: Data = [02, d1, d2].
+            if (reply == null || reply.Cmd != CivProtocol.CmdReadMeter
+                || reply.Data.Length < 3 || reply.Data[0] != CivProtocol.SubSMeter)
+                return vfo == RadioVfo.A ? (_state.SMeterA ?? 0) : (_state.SMeterB ?? 0);
+
+            return CivProtocol.BcdByte(reply.Data[1]) * 100 + CivProtocol.BcdByte(reply.Data[2]);
+        }
+
         // Not yet implemented behind CI-V (later Phase 3 blocks). Safe
         // placeholders so the seam's other callers never throw.
-
-        public Task<int> ReadSMeterAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
-            => Task.FromResult(vfo == RadioVfo.A ? (_state.SMeterA ?? 0) : (_state.SMeterB ?? 0));
 
         public Task<bool> GetTransmitAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_state.IsTransmitting);
@@ -273,8 +288,9 @@ namespace Icom_Web_Control.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("[CivRadioController] Phase-2 CI-V link starting.");
+            _logger.LogInformation("[CivRadioController] Phase-3 CI-V link starting.");
             int misses = 0;
+            long loop = 0;
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -294,6 +310,8 @@ namespace Icom_Web_Control.Services
 
                 try
                 {
+                    // Frequency (command 03) is the liveness signal — the only
+                    // read that counts misses and can drop the link.
                     long hz = await GetFrequencyHzAsync(RadioVfo.A, stoppingToken);
                     if (hz > 0)
                     {
@@ -305,15 +323,23 @@ namespace Icom_Web_Control.Services
                         _logger.LogWarning("[CivRadioController] {Misses} consecutive frequency-read misses — dropping link", misses);
                         await _bus.CloseAsync();
                         await SetConnectedAsync(false);
-                        continue; // link is down — don't chase a mode read
+                        continue; // link is down — don't chase further reads
                     }
 
-                    // Mode (command 04) is best-effort: the frequency read above
-                    // is the liveness signal, so a mode miss must not inflate
-                    // `misses` or drop the link. Skip "?XX" (unmapped) values.
-                    var modeName = await GetModeAsync(RadioVfo.A, stoppingToken);
-                    if (!string.IsNullOrEmpty(modeName) && !modeName.StartsWith('?'))
-                        _state.ModeA = modeName; // broadcasts ModeA on change
+                    // S-meter (command 15 02) every loop — the fast-moving meter.
+                    // Best-effort: a miss returns the last value and never drops
+                    // the link.
+                    _state.SMeterA = await ReadSMeterAsync(RadioVfo.A, stoppingToken);
+
+                    // Mode (command 04, plus 1A 06 on SSB/AM/FM) is slower to
+                    // change, so poll it less often to keep the bus free for the
+                    // meter. Skip "?XX" (unmapped) values.
+                    if (loop % ModePollEveryNLoops == 0)
+                    {
+                        var modeName = await GetModeAsync(RadioVfo.A, stoppingToken);
+                        if (!string.IsNullOrEmpty(modeName) && !modeName.StartsWith('?'))
+                            _state.ModeA = modeName; // broadcasts ModeA on change
+                    }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -324,6 +350,7 @@ namespace Icom_Web_Control.Services
                     _logger.LogWarning(ex, "[CivRadioController] Radio poll failed");
                 }
 
+                loop++;
                 await DelayQuiet(PollIntervalMs, stoppingToken);
             }
 
