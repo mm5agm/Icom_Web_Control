@@ -17,6 +17,10 @@ namespace Icom_Web_Control.Controllers
         private readonly RadioStatePersistenceService _statePersistence;
         private readonly RadioInitializationService _radioInitService;
         private readonly AudioFilterMapService _audioFilterMap;
+        // Phase 3: the semantic seam. Frequency set is repointed here (real CI-V
+        // via CivRadioController) while the rest of this controller still speaks
+        // the inert Yaesu _catClient until each command is migrated in turn.
+        private readonly IRadioController _radio;
         private static readonly SemaphoreSlim _requestSemaphore = new(1, 1);
 
         // -- P1=0-Fixed outgoing-command helpers -------------------------------
@@ -301,7 +305,8 @@ namespace Icom_Web_Control.Controllers
             RadioStateService radioStateService,
             RadioStatePersistenceService statePersistence,
             RadioInitializationService radioInitService,
-            AudioFilterMapService audioFilterMap)
+            AudioFilterMapService audioFilterMap,
+            IRadioController radio)
         {
             _catClient = catClient;
             _settingsService = settingsService;
@@ -310,6 +315,7 @@ namespace Icom_Web_Control.Controllers
             _statePersistence = statePersistence;
             _radioInitService = radioInitService;
             _audioFilterMap = audioFilterMap;
+            _radio = radio;
         }
 
         private async Task EnsureConnectedAsync()
@@ -402,15 +408,17 @@ namespace Icom_Web_Control.Controllers
             _logger.LogInformation("[API] SetFrequencyA called: freq={Freq}", request.FrequencyHz);
             try
             {
-                await EnsureConnectedAsync();
                 var freq = request.FrequencyHz;
                 if (freq < 30000 || freq > 75000000)
                     return BadRequest(new { error = "Frequency out of range" });
 
-                var command = $"FA{freq:D9};";
-                await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
 
-                _radioStateService.FrequencyA = freq;
+                // Phase 3: set frequency via the CI-V seam (command 05). The
+                // seam updates RadioStateService on the radio's ACK; the ~3 Hz
+                // poll then confirms the value the radio actually landed on.
+                await _radio.SetFrequencyHzAsync(RadioVfo.A, freq, CancellationToken.None);
 
                 _logger.LogInformation("Set Receiver A frequency to {Freq}", freq);
                 _logger.LogInformation("[API] SetFrequencyA completed: freq={Freq}", freq);
@@ -436,15 +444,15 @@ namespace Icom_Web_Control.Controllers
             _logger.LogInformation("[API] SetFrequencyB called: freq={Freq}", request.FrequencyHz);
             try
             {
-                await EnsureConnectedAsync();
                 var freq = request.FrequencyHz;
                 if (freq < 30000 || freq > 75000000)
                     return BadRequest(new { error = "Frequency out of range" });
 
-                var command = $"FB{freq:D9};";
-                await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
 
-                _radioStateService.FrequencyB = freq;
+                // Phase 3: set frequency via the CI-V seam (command 05).
+                await _radio.SetFrequencyHzAsync(RadioVfo.B, freq, CancellationToken.None);
 
                 _logger.LogInformation("Set Receiver B frequency to {Freq}", freq);
                 _logger.LogInformation("[API] SetFrequencyB completed: freq={Freq}", freq);

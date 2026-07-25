@@ -21,19 +21,25 @@ namespace Icom_Web_Control.Services.Voice
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hub;
+        // Phase 3: the semantic seam. Frequency-set voice intents are repointed
+        // here (real CI-V) while the remaining intents still use the inert
+        // Yaesu _catClient until each is migrated in turn.
+        private readonly IRadioController _radio;
 
         public IntentDispatcher(
             ILogger<IntentDispatcher> logger,
             ICatClient catClient,
             RadioStateService state,
             ISettingsService settings,
-            IHubContext<RadioHub> hub)
+            IHubContext<RadioHub> hub,
+            IRadioController radio)
         {
             _logger = logger;
             _catClient = catClient;
             _state = state;
             _settings = settings;
             _hub = hub;
+            _radio = radio;
         }
 
         // §6.5 dry-run testing: when set, SendCommand() logs the CAT string
@@ -141,9 +147,7 @@ namespace Icom_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] SetFrequency {Hz} out of range", hz);
                 return new DispatchResult(false, phrase);
             }
-            var command = $"{(VfoIsB ? "FB" : "FA")}{hz:D9};";
-            await SendCommand(command, ct);
-            if (VfoIsB) _state.FrequencyB = hz; else _state.FrequencyA = hz;
+            await SetRadioFrequency(VfoIsB ? RadioVfo.B : RadioVfo.A, hz, ct);
             _logger.LogInformation("[Voice] SetFrequency -> {Hz} Hz (VFO {Vfo})", hz, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
@@ -303,8 +307,7 @@ namespace Icom_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] NudgeFrequency would go out of range ({Next})", next);
                 return new DispatchResult(false, phrase);
             }
-            await SendCommand($"{(isB ? "FB" : "FA")}{next:D9};", ct);
-            if (isB) _state.FrequencyB = next; else _state.FrequencyA = next;
+            await SetRadioFrequency(isB ? RadioVfo.B : RadioVfo.A, next, ct);
             _logger.LogInformation("[Voice] NudgeFrequency {Dir} -> {Hz} Hz (VFO {Vfo})",
                 direction > 0 ? "up" : "down", next, CurrentVfo);
             return new DispatchResult(true, phrase);
@@ -548,6 +551,23 @@ namespace Icom_Web_Control.Services.Voice
                 return Task.FromResult(string.Empty);
             }
             return _catClient.SendCommandAsync(command, "Voice", ct);
+        }
+
+        /// <summary>
+        /// Set a VFO's frequency through the CI-V seam, honouring the §6.5
+        /// dry-run flag (no radio traffic during a pack test). The seam updates
+        /// RadioStateService on the radio's ACK; in dry-run we set state
+        /// optimistically so the confirmation phrase still reflects the move.
+        /// </summary>
+        private async Task SetRadioFrequency(RadioVfo vfo, long hz, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set VFO {Vfo} to {Hz} Hz", vfo, hz);
+                if (vfo == RadioVfo.B) _state.FrequencyB = hz; else _state.FrequencyA = hz;
+                return;
+            }
+            await _radio.SetFrequencyHzAsync(vfo, hz, ct);
         }
 
         // -- helpers -------------------------------------------------------
