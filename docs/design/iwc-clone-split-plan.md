@@ -118,10 +118,10 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 - **Accessibility win already here:** voice readback ("what's my frequency?") + TTS works the moment `GetFrequencyHz` is real. Put in front of Yuri/Thomas early.
 
 **Phase 3 — additive command roadmap** (one block per commit; each lights up touch + voice + rigctld together)
-1. Set frequency (`05`) — click-to-tune + "set frequency…" voice
-2. Read/set mode (`04`/`06`)
-3. S-meter (`15 02`) → existing gauge
-4. PTT / TX status, power/SWR meters (`15 11`/`15 12`)
+1. ✅ Set frequency (`05`) — click-to-tune + keypad + "set frequency…" voice
+2. ✅ Read/set mode (`04`/`06`, plus DATA modes via `1A 06` → DATA-U/L/FM; full IC-7300 mode set, dropdown trimmed)
+3. ✅ S-meter (`15 02`, big-endian BCD) → existing gauge; poll loop restructured (freq=liveness every loop, S-meter every loop, mode every 3rd), 150 ms interval, SignalR push for smooth needle
+4. PTT / TX status, power/SWR meters (`1C 00`, `15 11`/`15 12`)
 5. Band/VFO select, split
 6. Scope waveform stream (`27 00`, 475 bins, 11 USB segments reassembled) → existing `SpectrumPanel` — **no SDRplay needed**. (Later: switch the feed to the rear LAN port for a faster, single-segment 490-bin stream — no protocol rewrite, just skip reassembly.)
 
@@ -134,3 +134,30 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 ## Why this order
 
 After Phase 1 there's a running app with a hole where the protocol goes. Every phase after is "implement one CI-V method behind one semantic call, watch touch + voice + Hamlib come alive together." That is the gradual, always-tested build — without re-inventing the SignalR/gauge/spectrum/settings/voice scaffolding YWC already got right. "Full parity where the Icom supports it" reduces to one honest checklist against the CI-V reference.
+
+---
+
+## Phase 5 (future) — "Pseudo-dual-receiver" via single-RX time-slicing
+
+**Depends on:** Phase 3 block 6 (scope). Uses primitives from blocks 1–3 (set freq `05`, set mode `06`/`1A 06`, read S-meter `15 02`) and block 6 (scope `27 00`).
+
+**Idea (MM5AGM):** the IC-7300 MkII has one receiver, but if we flick the operating VFO between two frequencies/modes fast enough, the *display* can present as two receivers — a spectrum panel per "VFO", each with its own frequency/mode/S-meter. Clicking a panel commits to it as the single active receiver.
+
+**The hard constraint that shapes the whole feature — one RX = one audio stream.** You cannot split the audio by time-slicing: alternating the audio A/B/A/B produces chopped, garbled speech/CW, not two simultaneous signals. The IC-7300 MkII has no dual-watch hardware (that is IC-7610-class). So the illusion is **visual only**; listening always commits to exactly one VFO.
+
+**Chosen model — "primary + silent visual watch":**
+- One VFO is **primary**: it holds the operating frequency/mode and gets **continuous audio**. Its panel is the normal live receiver.
+- The other VFO is a **silent watch**: the supervisor spends spare CI-V bus time briefly retuning to it, grabbing its scope + S-meter (+ freq/mode), and returning to primary. Its panel answers "is there activity there / is the DX still up / is my other net busy" at a glance — no audio.
+- **Clicking the watch panel promotes it to primary** (audio + full attention swap to it). This is the "click a spectrum → revert to single receiver" behaviour: it is really "choose which VFO you're actually listening to."
+
+**Design decision still open — snapshot vs. rapid-alternate:**
+- **Snapshot (recommended):** park on primary (audio rock-solid), peek at the watch VFO every ~1–2 s, come back. Protects the listening experience, which is the thing that actually matters. The watch panel updates slowly but usefully.
+- **Rapid-alternate:** both panels near-live by switching continuously — but audio must still commit to one, and the constant retuning fights the primary's own scope sweep and audio continuity. More flicker, little real gain over snapshot given the audio limit.
+
+**Reuses what already exists:** the dual-VFO spectrum scaffolding carried over from YWC — `SpectrumPanel` is instance-able per-VFO ("A"/"B"), the two card containers (`spectrumContainerA/B`), and the **Mono A / Mono B / Both** toggle (`localStorage.ywc.spectrumMode`). This feature repoints that shell from "two SDR devices" to "one radio, time-sliced," driven by a small supervisor above the `IRadioController` seam. No new spectrum frontend.
+
+**Constraints / cautions:**
+- **Scope transfer speed is the real bottleneck, not the switching.** Over USB CI-V a `27 00` frame is 475 bins in 11 segments ≈ ~0.3 s to transfer at 19200 baud, so two alternating scopes refresh at ~1 Hz each. Treat smooth "Both" mode as a **rear-LAN-port-era** feature (faster single-segment stream); ship a slower USB version first.
+- **Prefer keeping both VFOs on the same band.** Frequency changes within a band are pure DSP — instant, silent, zero relay wear. Crossing bands clicks band-pass/tuner relays on every switch (mechanical wear + audible clunk). If both signals fall inside one **fixed-mode** scope span, don't switch the scope at all — one sweep shows both, with two cursors (elegant for two stations close together).
+- **TX always commits to primary** — only one VFO can transmit; that's just existing split semantics.
+- **Accessibility angle:** the silent watch could gain a voice/tone cue ("signal on VFO B") for partially-sighted ops, turning a visual-first feature into an audible watch too.
