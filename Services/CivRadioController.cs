@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
@@ -112,13 +113,68 @@ namespace Icom_Web_Control.Services
             }
         }
 
-        // Not yet implemented behind CI-V (Phase 3). Safe placeholders so the
-        // seam's other callers (rigctld, voice — repointed later) never throw.
-        public Task<string> GetModeAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
-            => Task.FromResult(vfo == RadioVfo.A ? (_state.ModeA ?? "") : (_state.ModeB ?? ""));
+        // -- Mode (Phase 3 block 2) --------------------------------------------
 
-        public Task SetModeAsync(RadioVfo vfo, string mode, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+        public async Task<string> GetModeAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
+        {
+            // Single-receiver: command 04 reads the current operating mode. Both
+            // A and B map to it until per-VFO addressing arrives.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdReadMode);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadMode, cancellationToken: cancellationToken);
+            if (reply == null || reply.Cmd != CivProtocol.CmdReadMode || reply.Data.Length < 1)
+                return vfo == RadioVfo.A ? (_state.ModeA ?? "") : (_state.ModeB ?? "");
+
+            return ModeByteToName.TryGetValue(reply.Data[0], out var name) ? name : $"?{reply.Data[0]:X2}";
+        }
+
+        public async Task SetModeAsync(RadioVfo vfo, string mode, CancellationToken cancellationToken = default)
+        {
+            if (!ModeNameToByte.TryGetValue(mode, out var modeByte))
+            {
+                // Icom data modes (USB-D etc.) need 1A 06 and land in a later
+                // block; core modes are handled here.
+                _logger.LogWarning("[CivRadioController] Unsupported mode '{Mode}' — ignored", mode);
+                return;
+            }
+
+            // Mode byte only: the radio keeps its current filter (FIL1/2/3).
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdSetMode, modeByte);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+            {
+                var name = ModeByteToName.TryGetValue(modeByte, out var n) ? n : mode;
+                if (vfo == RadioVfo.A) _state.ModeA = name; else _state.ModeB = name;
+            }
+            else
+            {
+                _logger.LogWarning("[CivRadioController] Set mode '{Mode}' was not acknowledged", mode);
+            }
+        }
+
+        // CI-V mode byte (command 04/06 data 1) ↔ the display strings already
+        // spoken by RadioStateService, the web mode dropdown, voice, and
+        // rigctld. The IC-7300's native modes; "-U"/"-L" follows the existing
+        // UI vocabulary — CW normal is the USB side ("CW-U"), CW-R the LSB side
+        // ("CW-L"); RTTY normal is the LSB side ("RTTY-L"), RTTY-R the USB side.
+        private static readonly Dictionary<byte, string> ModeByteToName = new()
+        {
+            [0x00] = "LSB", [0x01] = "USB", [0x02] = "AM",
+            [0x03] = "CW-U", [0x04] = "RTTY-L", [0x05] = "FM",
+            [0x07] = "CW-L", [0x08] = "RTTY-U",
+        };
+
+        private static readonly Dictionary<string, byte> ModeNameToByte = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["LSB"] = 0x00, ["USB"] = 0x01, ["AM"] = 0x02,
+            ["CW-U"] = 0x03, ["CW"] = 0x03,
+            ["RTTY-L"] = 0x04, ["RTTY"] = 0x04,
+            ["FM"] = 0x05,
+            ["CW-L"] = 0x07, ["CW-R"] = 0x07,
+            ["RTTY-U"] = 0x08, ["RTTY-R"] = 0x08,
+        };
+
+        // Not yet implemented behind CI-V (later Phase 3 blocks). Safe
+        // placeholders so the seam's other callers never throw.
 
         public Task<int> ReadSMeterAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
             => Task.FromResult(vfo == RadioVfo.A ? (_state.SMeterA ?? 0) : (_state.SMeterB ?? 0));
@@ -197,7 +253,15 @@ namespace Icom_Web_Control.Services
                         _logger.LogWarning("[CivRadioController] {Misses} consecutive frequency-read misses — dropping link", misses);
                         await _bus.CloseAsync();
                         await SetConnectedAsync(false);
+                        continue; // link is down — don't chase a mode read
                     }
+
+                    // Mode (command 04) is best-effort: the frequency read above
+                    // is the liveness signal, so a mode miss must not inflate
+                    // `misses` or drop the link. Skip "?XX" (unmapped) values.
+                    var modeName = await GetModeAsync(RadioVfo.A, stoppingToken);
+                    if (!string.IsNullOrEmpty(modeName) && !modeName.StartsWith('?'))
+                        _state.ModeA = modeName; // broadcasts ModeA on change
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -205,7 +269,7 @@ namespace Icom_Web_Control.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "[CivRadioController] Frequency poll failed");
+                    _logger.LogWarning(ex, "[CivRadioController] Radio poll failed");
                 }
 
                 await DelayQuiet(PollIntervalMs, stoppingToken);

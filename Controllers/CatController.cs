@@ -958,64 +958,24 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                await EnsureConnectedAsync();
-                string displayMode = CatCodeToMode.TryGetValue(request.Mode, out var modeName) ? modeName : request.Mode;
-
                 var recv = receiver.ToUpperInvariant();
                 if (recv != "A" && recv != "B")
                     return BadRequest(new { error = "Invalid receiver specified" });
 
-                await _catClient.SendCommandAsync($"MD{VfoP1Outgoing(recv)}{request.Mode};", "User");
-                if (VfoIsB(recv)) _radioStateService.ModeB = displayMode;
-                else               _radioStateService.ModeA = displayMode;
+                // The web dropdown still posts the legacy CAT mode code (1..F);
+                // map it to the display string the seam speaks (e.g. "2" → "USB").
+                string displayMode = CatCodeToMode.TryGetValue(request.Mode, out var modeName) ? modeName : request.Mode;
 
-                // Re-apply Contour and APF state — mode changes on the FTdx101 cause the
-                // radio to restore its per-mode Contour/APF settings, overriding what we have set.
-                var modeSettings = await _settingsService.GetSettingsAsync();
-                bool isFtdx3000 = modeSettings.RadioModel == "FTDX3000";
-                bool targetB = VfoIsB(recv);
-                // P1=0 on FTDX3000 (special CO format) and on every single-receiver
-                // model (P1 Fixed=0). Dual-receiver -> P1 by VFO.
-                string p1 = isFtdx3000 ? "0" : VfoP1Outgoing(recv);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
 
-                if (isFtdx3000)
-                {
-                    bool cOn = _radioStateService.ContourOnA;
-                    bool aOn = _radioStateService.ApfOnA;
-                    if (cOn)
-                    {
-                        await _catClient.SendCommandAsync("CO0001;", "User");
-                        int vv = Math.Max(1, Math.Min(40, _radioStateService.ContourFreqA / 100));
-                        await _catClient.SendCommandAsync($"CO01{vv:D2};", "User");
-                    }
-                    else if (aOn)
-                    {
-                        await _catClient.SendCommandAsync("CO0002;", "User");
-                        int vv = Math.Max(0, Math.Min(20, (_radioStateService.ApfFreqA / 25) + 10));
-                        await _catClient.SendCommandAsync($"CO02{vv:D2};", "User");
-                    }
-                    else
-                    {
-                        await _catClient.SendCommandAsync("CO0000;", "User");
-                    }
-                }
-                else
-                {
-                    bool contourOn  = targetB ? _radioStateService.ContourOnB  : _radioStateService.ContourOnA;
-                    int  contourHz  = targetB ? _radioStateService.ContourFreqB : _radioStateService.ContourFreqA;
-                    bool apfOn      = targetB ? _radioStateService.ApfOnB       : _radioStateService.ApfOnA;
-                    int  apfHz      = targetB ? _radioStateService.ApfFreqB     : _radioStateService.ApfFreqA;
+                // Phase 3 block 2: set mode via the CI-V seam (command 06). The
+                // seam updates RadioStateService on the radio's ACK; the poll
+                // loop's command-04 read then confirms it. No Yaesu Contour/APF
+                // re-apply — that was FTdx101-specific and does not apply here.
+                await _radio.SetModeAsync(VfoIsB(recv) ? RadioVfo.B : RadioVfo.A, displayMode, CancellationToken.None);
 
-                    int  cFreq = Math.Max(100, Math.Min(3200, contourHz));
-                    await _catClient.SendCommandAsync($"CO{p1}0000{(contourOn ? 1 : 0)};", "User");
-                    await _catClient.SendCommandAsync($"CO{p1}1{cFreq:D4};", "User");
-
-                    int  aVvvv = Math.Max(0, Math.Min(50, (apfHz / 10) + 25));
-                    await _catClient.SendCommandAsync($"CO{p1}2000{(apfOn ? 1 : 0)};", "User");
-                    await _catClient.SendCommandAsync($"CO{p1}3{aVvvv:D4};", "User");
-                }
-
-                _logger.LogInformation("Sending CAT command: MD{Vfo}{Mode}; for Receiver {Receiver}", VfoP1Outgoing(recv), request.Mode, recv);
+                _logger.LogInformation("Set Receiver {Receiver} mode to {Mode}", recv, displayMode);
                 return Ok(new { message = $"Mode {displayMode} selected for Receiver {receiver}" });
             }
             catch (Exception ex)

@@ -37,6 +37,15 @@ namespace Icom_Web_Control.Services.Civ
         public const byte CmdReadId = 0x19;        // sub-command 0x00 = read transceiver ID
         public const byte SubReadId = 0x00;
 
+        // Phase 3 block 2 — operating mode.
+        //   Read : send 04            → reply 04 <mode> <filter>
+        //   Set  : send 06 <mode>     → reply FB / FA
+        // <mode> is a single byte (LSB=00, USB=01, AM=02, CW=03, RTTY=04,
+        // FM=05, CW-R=07, RTTY-R=08); <filter> (FIL1/2/3) is reported on read
+        // and left untouched on set (mode byte only).
+        public const byte CmdReadMode = 0x04;
+        public const byte CmdSetMode = 0x06;
+
         // Radio's one-byte acknowledgements to a set/write command.
         public const byte AckOk = 0xFB; // completed
         public const byte AckNg = 0xFA; // not good (rejected / bad frame)

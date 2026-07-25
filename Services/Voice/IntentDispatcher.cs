@@ -206,11 +206,10 @@ namespace Icom_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] SetMode missing/invalid mode parameter");
                 return new DispatchResult(false, "Set mode");
             }
-            // CatCommands.FormatMode handles the Yaesu-mode-string -> MD code
-            // translation.
-            var command = CatCommands.FormatMode(mode, isSubVfo: VfoIsB);
-            await SendCommand(command, ct);
-            if (VfoIsB) _state.ModeB = mode; else _state.ModeA = mode;
+            // Phase 3 block 2: set mode through the CI-V seam (command 06). The
+            // recognised `mode` is already a display string ("USB", "CW-U", …),
+            // which is exactly what the seam speaks.
+            await SetRadioMode(VfoIsB ? RadioVfo.B : RadioVfo.A, mode, ct);
             _logger.LogInformation("[Voice] SetMode -> {Mode} (VFO {Vfo})", mode, CurrentVfo);
             return new DispatchResult(true, $"Mode {ModeForSpeech(mode)}");
         }
@@ -568,6 +567,22 @@ namespace Icom_Web_Control.Services.Voice
                 return;
             }
             await _radio.SetFrequencyHzAsync(vfo, hz, ct);
+        }
+
+        /// <summary>
+        /// Set a VFO's mode through the CI-V seam, honouring the §6.5 dry-run
+        /// flag. As with <see cref="SetRadioFrequency"/>, dry-run sets state
+        /// optimistically so the spoken confirmation still reflects the change.
+        /// </summary>
+        private async Task SetRadioMode(RadioVfo vfo, string mode, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set VFO {Vfo} to mode {Mode}", vfo, mode);
+                if (vfo == RadioVfo.B) _state.ModeB = mode; else _state.ModeA = mode;
+                return;
+            }
+            await _radio.SetModeAsync(vfo, mode, ct);
         }
 
         // -- helpers -------------------------------------------------------
