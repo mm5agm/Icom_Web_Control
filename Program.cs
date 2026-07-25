@@ -217,6 +217,16 @@ builder.Services.AddSingleton<CatMultiplexerService>();
 // Register the main CAT client for the web app
 builder.Services.AddSingleton<ICatClient, MultiplexedCatClient>();
 
+// ── IRadioController seam (Phase 1) ─────────────────────────────────────────
+// The semantic, protocol-free seam IWC introduces. Today it is backed by the
+// canned StubRadioController (no hardware); Phase 2 swaps in CivRadioController
+// speaking real CI-V to the IC-7300 MkII. Registered once and exposed both as
+// the seam (IRadioController) and as the hosted canned-data feeder.
+// See docs/design/iwc-clone-split-plan.md.
+builder.Services.AddSingleton<StubRadioController>();
+builder.Services.AddSingleton<IRadioController>(sp => sp.GetRequiredService<StubRadioController>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<StubRadioController>());
+
 // Register the rigctld server as a background service
 builder.Services.AddHostedService<RigctldServer>();
 
@@ -229,15 +239,23 @@ builder.Services.AddSingleton<ISettingsService, SettingsService>();
 builder.Services.AddSingleton<AudioFilterMapService>();
 
 
-// Add after existing service registrations
-builder.Services.AddHostedService<MeterPollingService>();
+// MeterPollingService — Yaesu CAT meter polling. Parked in Phase 1: it polls
+// the (unopened) serial multiplexer and would fight StubRadioController over
+// IsConnected/meter state. Phase 3 rebuilds meter reading over CI-V behind the
+// IRadioController seam and re-enables a hosted poller.
+// builder.Services.AddHostedService<MeterPollingService>();
 
 // Register the radio state service — reuse the same singleton instance as RadioStateService
 builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<RadioStateService>());
 
-// Register the radio initialization service
+// RadioInitializationService — still registered as a singleton (CatController
+// injects it for the radio-power re-init path), but NOT started as a hosted
+// service in Phase 1: there is no CI-V transport yet, so its Yaesu serial
+// connect would just time out. Phase 2 restores the hosted registration with a
+// CI-V-aware connect sequence. StubRadioController now supplies the "connected +
+// canned data" story at startup.
 builder.Services.AddSingleton<RadioInitializationService>();
-builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioInitializationService>());
+// builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioInitializationService>());
 
 // ADD THIS LINE for Razor Pages support:
 builder.Services.AddRazorPages();
