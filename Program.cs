@@ -128,57 +128,6 @@ static int LoadConfiguredHttpPort()
     return 8080;
 }
 
-// ── Suppress Windows critical-error dialogs during DLL load ─────────────────
-// When SoapySDR enumerates plugins (HackRF, RTL-SDR, Airspy, etc.), Windows
-// tries to resolve each plugin's import table. If a plugin's dependencies
-// conflict with whatever happens to be on the user's system — e.g.
-// system32 has a newer hackrf.dll that needs libusb 1.0.27+ functions while
-// YWC bundles an older libusb-1.0.dll, OR vice versa — Windows pops up a
-// modal "Entry Point Not Found" dialog and waits for the user to click OK.
-// That's startling and unhelpful since YWC handles plugin load failures
-// gracefully anyway (the affected SDR just doesn't appear in the device list).
-//
-// SEM_FAILCRITICALERRORS + SEM_NOOPENFILEERRORBOX suppress the dialog so the
-// process can fail the DLL load silently and carry on. Reported by the user
-// on v2.3.1 — the Settings-page auto-scan triggered the dialog because a
-// system32 hackrf.dll from some other SDR software conflicted with YWC's
-// bundled libusb.
-NativeWin32.SetErrorMode(NativeWin32.SEM_FAILCRITICALERRORS | NativeWin32.SEM_NOOPENFILEERRORBOX);
-
-// ── Native library resolver (SoapySDR + sdrplay_api) ────────────────────────
-// .NET P/Invoke on Windows does not search PATH directories by default, so
-// DLLs that aren't next to the app or in System32 silently fail to load.
-// One resolver lambda handles both DLLs — SetDllImportResolver can only be
-// called *once* per assembly, so anything we want to resolve has to share
-// this single registration.
-//
-// SDRplay history: observed on IK2XRW Alessandro's system (#53, 2026-06-26)
-// where the SDRplay install didn't add its bin folder to PATH, so the SDR
-// scan returned nothing. SdrplayDllResolver.TryResolve tries the user-
-// configured path, the app directory, then the standard Program Files
-// locations before falling back to default search.
-NativeLibrary.SetDllImportResolver(
-    System.Reflection.Assembly.GetExecutingAssembly(),
-    static (name, _, _) =>
-    {
-        if (name == "SoapySDR")
-        {
-            // Installed layout: <app>\SoapySDR\bin\SoapySDR.dll
-            var path = Path.Combine(AppContext.BaseDirectory, "SoapySDR", "bin", "SoapySDR.dll");
-            // Developer fallback: C:\SoapySDR\bin\SoapySDR.dll (build machine only)
-            if (!File.Exists(path))
-                path = @"C:\SoapySDR\bin\SoapySDR.dll";
-            if (File.Exists(path) && NativeLibrary.TryLoad(path, out IntPtr h))
-                return h;
-        }
-        else if (name == Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.DllName)
-        {
-            if (Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.TryResolve(out IntPtr h))
-                return h;
-        }
-        return IntPtr.Zero;   // fall back to default resolution for all other DLLs
-    });
-
 // ── Serilog file logging ────────────────────────────────────────────────────
 // YWC is a WinExe (no console window) so stdout-based loggers are invisible.
 // Wire up Serilog with a rolling-daily file sink under %APPDATA% so we have a
@@ -283,29 +232,11 @@ builder.Services.AddSingleton<AudioFilterMapService>();
 // Add after existing service registrations
 builder.Services.AddHostedService<MeterPollingService>();
 
-// SDR spectrum display — reads IQ samples, computes FFT, broadcasts via SignalR
-// Registered as singleton so the span-change API endpoint can call RequestRestart().
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Sdr.SdrManager>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Sdr.SdrManager>());
-
 // Register the radio state service — reuse the same singleton instance as RadioStateService
 builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<RadioStateService>());
 
 // Register the radio initialization service
 builder.Services.AddSingleton<RadioInitializationService>();
-
-// VC Tune preselector control
-builder.Services.AddSingleton<CatRequestSemaphore>();
-builder.Services.AddSingleton<IVCTuneCommandBuilder, VCTuneCommandBuilder>();
-builder.Services.AddSingleton<IVCTuneResponseParser, VCTuneResponseParser>();
-builder.Services.AddSingleton<IVCTuneStateMachine, VCTuneStateMachine>();
-builder.Services.AddSingleton<IVCTuneConfigurationStore, VCTuneConfigurationStore>();
-builder.Services.AddSingleton<VCTuneDiagnostics>();
-builder.Services.AddSingleton<VCTuneHelpProvider>();
-builder.Services.AddSingleton<VCTuneModule>();
-builder.Services.AddSingleton<VCTuneIntegrationHarness>();
-builder.Services.AddSingleton<IVcTuneService, VcTuneService>();
-builder.Services.AddSingleton<VCTuneViewModel>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioInitializationService>());
 
 // ADD THIS LINE for Razor Pages support:
@@ -381,7 +312,6 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.
 // VoiceController exposes /api/voice/*. See docs/VoiceControl/v1-plan.md.
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.IntentDispatcher>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceTtsService>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VCTuneRecognizer>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoicePhraseStore>();
 builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceControlService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Voice.VoiceControlService>());
@@ -466,30 +396,6 @@ try
         return Results.File(userPath, "application/json");
     });
 
-    app.MapPost("/api/sdr/span", async (
-        [Microsoft.AspNetCore.Mvc.FromQuery] double hz,
-        [Microsoft.AspNetCore.Mvc.FromQuery] string? sdrId,
-        Yaesu_Web_Control.Services.ISettingsService settings,
-        Yaesu_Web_Control.Services.Sdr.SdrManager sdr) =>
-    {
-        double[] valid = [62_500, 125_000, 250_000, 500_000, 1_024_000, 2_048_000, 2_500_000, 3_200_000];
-        if (Array.IndexOf(valid, hz) < 0) return Results.BadRequest("Invalid span value.");
-
-        // sdrId defaults to "A" for backward compatibility with any caller
-        // that doesn't supply it. v2.3.0+ frontend always sends an explicit
-        // "A" or "B"; older code paths (or third-party clients) get the
-        // single-SDR behaviour.
-        var target = (sdrId ?? "A").ToUpperInvariant();
-        if (target != "A" && target != "B") return Results.BadRequest("sdrId must be A or B.");
-
-        var s = await settings.GetSettingsAsync();
-        if (target == "A") s.SdrSampleRateHzA = hz;
-        else               s.SdrSampleRateHzB = hz;
-        await settings.SaveSettingsAsync(s);
-        sdr.RequestRestart();
-        return Results.Ok();
-    });
-
     // Open browser automatically when app starts (but not when debugging in Visual Studio)
     var browserLauncher = app.Services.GetRequiredService<BrowserLauncher>();
     var portInfo        = app.Services.GetRequiredService<HttpPortInfo>();
@@ -545,25 +451,4 @@ catch (Exception ex)
     throw;
 }
 
-// Win32 P/Invokes used during YWC startup. Kept at the end of Program.cs
-// rather than scattered through the top-level statements so the bootstrap
-// logic stays readable.
-internal static class NativeWin32
-{
-    /// <summary>
-    /// The system does not display the critical-error-handler message box.
-    /// Failing DLL loads return an error code to the caller instead of
-    /// showing the "Entry Point Not Found" / "DLL was not found" dialogs.
-    /// </summary>
-    public const uint SEM_FAILCRITICALERRORS = 0x0001;
-
-    /// <summary>
-    /// The OpenFile function does not display a message box when it fails
-    /// to find a file. Belt-and-braces alongside SEM_FAILCRITICALERRORS.
-    /// </summary>
-    public const uint SEM_NOOPENFILEERRORBOX = 0x8000;
-
-    [DllImport("kernel32.dll")]
-    public static extern uint SetErrorMode(uint uMode);
-}
 

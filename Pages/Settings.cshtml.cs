@@ -6,7 +6,6 @@ using System.Diagnostics;
 using Yaesu_Web_Control.Hubs;
 using Yaesu_Web_Control.Models;
 using Yaesu_Web_Control.Services;
-using Yaesu_Web_Control.Services.Sdr;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
@@ -20,7 +19,6 @@ namespace Yaesu_Web_Control.Pages
         private readonly IHostApplicationLifetime _lifetime;
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly HttpPortInfo _portInfo;
-        private readonly SdrManager _sdrManager;
 
         /// <summary>
         /// The port YWC is actually listening on right now. This is the port
@@ -65,8 +63,7 @@ namespace Yaesu_Web_Control.Pages
             RadioInitializationService radioInitializationService,
             IHostApplicationLifetime lifetime,
             IHubContext<RadioHub> hubContext,
-            HttpPortInfo portInfo,
-            SdrManager sdrManager)
+            HttpPortInfo portInfo)
         {
             _settingsService = settingsService;
             _logger = logger;
@@ -74,7 +71,6 @@ namespace Yaesu_Web_Control.Pages
             _lifetime = lifetime;
             _hubContext = hubContext;
             _portInfo = portInfo;
-            _sdrManager = sdrManager;
         }
 
         public async Task<IActionResult> OnGetAsync()
@@ -87,9 +83,6 @@ namespace Yaesu_Web_Control.Pages
             // A-side rate as the pre-selected option so the dropdown reflects
             // a sensible value rather than the legacy zero placeholder.
             Settings.SdrSampleRateHz = Settings.SdrSampleRateHzA;
-            // Auto-detect the SDRplay install dir so the page can show the
-            // user where the resolver is finding it (or that it's not).
-            DetectedSdrplayInstallPath = SdrplayDllResolver.DetectInstallDir();
             NetworkAddresses = GetLocalIPAddresses();
             return Page();
         }
@@ -282,24 +275,6 @@ namespace Yaesu_Web_Control.Pages
                     // InitializeRadioAsync's own top-level catch means this never surfaces an
                     // unobserved exception.
                     _ = _radioInitializationService.InitializeRadioAsync();
-                }
-
-                // If any SDR-related setting changed, ask SdrManager to restart its
-                // worker(s) so the new configuration takes effect immediately.
-                // Without this, adding/removing/changing an SDR would silently
-                // require a full app restart — the SdrManager loop only re-reads
-                // settings when its CancellationToken fires.
-                bool sdrChanged =
-                       !string.Equals(oldSdrA,  current.SdrDeviceKeyA ?? string.Empty, StringComparison.Ordinal)
-                    || !string.Equals(oldSdrB,  current.SdrDeviceKeyB ?? string.Empty, StringComparison.Ordinal)
-                    || oldSdrIfHz   != current.SdrIfFrequencyHz
-                    || oldSdrSrHzA  != current.SdrSampleRateHzA
-                    || oldSdrSrHzB  != current.SdrSampleRateHzB
-                    || oldSdrFft    != current.SdrFftSize;
-                if (sdrChanged)
-                {
-                    _logger.LogInformation("Settings: SDR settings changed — restarting SdrManager workers");
-                    _sdrManager.RequestRestart();
                 }
 
                 StatusMessage = "✓ Settings saved successfully.";
