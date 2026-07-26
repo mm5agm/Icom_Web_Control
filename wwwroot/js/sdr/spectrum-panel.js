@@ -42,6 +42,14 @@ export class SpectrumPanel {
         this._waterfallSpeed = this._loadWaterfallSpeed();
         this._waterfallFrameCounter = 0;
 
+        // Waterfall brightness — a dB offset added to each bin before it is
+        // mapped to a thermal colour. 0 = no lift (raw Low/High window); higher
+        // values push weak signals further up the colour scale so a dark
+        // waterfall brightens. This is YWC's old "gain" brightening as a
+        // dedicated slider, independent of the spectrum trace. Persisted
+        // per-VFO like the scroll speed and split ratio.
+        this._wfBrightDb = this._loadWaterfallBrightness();
+
         this._errorDetail = null;
 
         // Last received spectrum data; held so the canvas can be redrawn on resize.
@@ -155,6 +163,41 @@ export class SpectrumPanel {
 
     /** Returns the current waterfall speed divisor (1 = full speed). */
     getWaterfallSpeed() { return this._waterfallSpeed; }
+
+    // Waterfall brightness range, in dB of lift. 0 = off; MAX chosen so a
+    // signal sitting on the noise floor can be pushed near full colour.
+    static WATERFALL_BRIGHT_MAX = 60;
+
+    _loadWaterfallBrightness() {
+        try {
+            const v = parseInt(localStorage.getItem('ywc.waterfallBright.' + this._vfo), 10);
+            if (isFinite(v) && v >= 0 && v <= SpectrumPanel.WATERFALL_BRIGHT_MAX) return v;
+        } catch (e) { /* localStorage may be unavailable */ }
+        return 0;
+    }
+
+    _saveWaterfallBrightness() {
+        try {
+            localStorage.setItem('ywc.waterfallBright.' + this._vfo, String(this._wfBrightDb));
+        } catch (e) { /* localStorage may be unavailable */ }
+    }
+
+    /**
+     * Set the waterfall brightness lift, in dB (0 … WATERFALL_BRIGHT_MAX).
+     * Only the waterfall's colour mapping is affected — the spectrum trace is
+     * unchanged. Takes effect on the next scrolled-in rows (history keeps its
+     * existing colours, same as a scroll-speed change).
+     * @param {number} db  dB of lift; clamped to the valid range.
+     */
+    setWaterfallBrightness(db) {
+        const v = parseInt(db, 10);
+        if (!isFinite(v)) return;
+        this._wfBrightDb = Math.max(0, Math.min(SpectrumPanel.WATERFALL_BRIGHT_MAX, v));
+        this._saveWaterfallBrightness();
+    }
+
+    /** Returns the current waterfall brightness lift in dB (0 = off). */
+    getWaterfallBrightness() { return this._wfBrightDb; }
 
     /**
      * Set the spectrum dB range. Called by the Low/High slider handler in
@@ -525,10 +568,14 @@ export class SpectrumPanel {
     // ── Rendering ────────────────────────────────────────────────────────────
 
     // @param {boolean} scrollWaterfall  Whether to advance the waterfall by
-    //   one row this frame. Defaults to true for the many forced-redraw call
-    //   sites (resize, dB range change, hold toggle, etc.) which historically
-    //   always scrolled; update() passes this explicitly per _waterfallSpeed.
-    _render(scrollWaterfall = true) {
+    //   one row this frame. Defaults to FALSE so the many cosmetic forced
+    //   redraws (crosshair on mousemove, cursor, hold, resize, dB/Bright
+    //   changes) repaint the spectrum WITHOUT scrolling the waterfall — moving
+    //   the mouse must not make the waterfall march. Only update(), fed by a
+    //   real FFT frame, passes true (throttled by _waterfallSpeed). The
+    //   !_waterfallData guard below still lets the very first paint build the
+    //   buffer regardless.
+    _render(scrollWaterfall = false) {
         const canvas = document.getElementById(this._canvasId);
         if (!canvas || !this._lastBins) return;
 
@@ -1086,7 +1133,7 @@ export class SpectrumPanel {
         // Draw new row at the top.
         for (let x = 0; x < W; x++) {
             const binIdx = Math.floor((x / W) * N);
-            const [r, g, b] = SpectrumPanel._dbToColor(bins[binIdx]);
+            const [r, g, b] = this._dbToColor(bins[binIdx]);
             const p = x * 4;
             data[p + 0] = r;
             data[p + 1] = g;
@@ -1172,11 +1219,20 @@ export class SpectrumPanel {
     // ── Color mapping ────────────────────────────────────────────────────────
 
     /**
-     * Maps a dBFS value (−120 … 0) to an RGB thermal colour.
-     * Black → blue → cyan → green → yellow → red.
+     * Maps a dBFS value to an RGB thermal colour: black → blue → cyan →
+     * green → yellow → red.
+     *
+     * The waterfall uses a FIXED reference window (−120 … 0 dBFS), deliberately
+     * independent of the Low/High trace sliders, so "Bright = Off" always means
+     * the same dark baseline. The Bright slider (_wfBrightDb) is the only thing
+     * that lifts weak signals up the colour scale — it's YWC's old "gain"
+     * brightening, as a dedicated waterfall control. Instance method (not
+     * static) so it can read the per-panel brightness.
      */
-    static _dbToColor(db) {
-        const t = Math.max(0, Math.min(1, (db + 120) / 120));
+    _dbToColor(db) {
+        // Bright slider adds _wfBrightDb of lift before mapping into the fixed
+        // 120 dB window; at Off (0) the mapping is the original dark baseline.
+        const t = Math.max(0, Math.min(1, (db + this._wfBrightDb + 120) / 120));
         if (t < 0.2)  return [0,                   0,                   Math.round(t * 5 * 180)];
         if (t < 0.4)  return [0,                   Math.round((t - 0.2) * 5 * 200), 180];
         if (t < 0.6)  return [0,                   200,                 Math.round(180 - (t - 0.4) * 5 * 180)];
