@@ -122,8 +122,9 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 2. ✅ Read/set mode (`04`/`06`, plus DATA modes via `1A 06` → DATA-U/L/FM; full IC-7300 mode set, dropdown trimmed)
 3. ✅ S-meter (`15 02`, big-endian BCD) → existing gauge; poll loop restructured (freq=liveness every loop, S-meter every loop, mode every 3rd), 150 ms interval, SignalR push for smooth needle
 4. ✅ PTT / TX status, power/SWR meters (`1C 00`, `15 11`/`15 12`) — software PTT (web + API + voice), Po/SWR gauges rise on TX / zero on RX; hardware-verified into dummy load
-5. Band/VFO select, split
+5. Band/VFO select, split — VFO-select (`07 00`/`07 01`), exchange (`07 B0`), equalize (`07 A0`), split read/set (`0F`), plus **true per-VFO readout** via `25` (selected/unselected freq) and `26` (selected/unselected mode+DATA+filter in one frame). Note: `25`/`26` address *selected/unselected*, not A/B — track `ActiveVfo` from our own `07` sends (front-panel A/B presses are a known desync). (MM5AGM chose full per-VFO scope over active-VFO-only.)
 6. Scope waveform stream (`27 00`, 475 bins, 11 USB segments reassembled) → existing `SpectrumPanel` — **no SDRplay needed**. (Later: switch the feed to the rear LAN port for a faster, single-segment 490-bin stream — no protocol rewrite, just skip reassembly.)
+7. **Radio power on/off (`18`)** — MM5AGM request. `18 00` = OFF (plain frame); `18 01` = ON but the CI-V circuit is asleep, so it must be prefixed with a baud-dependent burst of wake-up `FE` bytes (**19200 → 25 × `FE`**, 9600 → 13, 4800 → 7) before `FE FE B6 E0 18 01 FD`. **Gotcha:** remote power-on only works if USB stayed enumerated while "off" (soft shutdown via `18 00`/standby) — a front-panel power-off that drops USB removes the COM port, leaving nothing to send `18 01` to. Related menu `01 09` "Power OFF Setting (for Remote Control)". Seam: one `SetPowerAsync(bool)` method + a UI power button (accessibility/remote-op win). Small block; independent of the others.
 
 **Phase 4 — parity & polish**
 - rigctld verification (WSJT-X), settings/diagnostics rebrand.
