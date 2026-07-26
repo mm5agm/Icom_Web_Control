@@ -189,3 +189,18 @@ After Phase 1 there's a running app with a hole where the protocol goes. Every p
 **UI:** an on-screen toggle button (per MM5AGM) shows/hides a CW-text panel; off by default. Independent of the pseudo-dual-receiver work — can land any time after the audio path is decided.
 
 **Open decisions before building:** client-side vs server-side decode (leaning server-side for remote parity); which audio device/stream; whether to gate the panel behind a Settings toggle as well as the on-screen button.
+
+### 6a — Software ZIN / auto-zero-beat (rides the CW audio path)
+
+**What it is:** the Icom equivalent of Yaesu's **ZIN** is the front-panel **AUTOTUNE** function — it nudges the VFO so a received CW signal lands exactly on the operator's set CW pitch (zero-beat). Useful for netting onto a station before answering; a natural companion to CW decode.
+
+**Why it can't be a CAT passthrough:** there is **no CI-V command that triggers AUTOTUNE**. The only related opcode, `1A 05 00 58`, merely *assigns* the AUTOTUNE function to the multifunction button — it does not fire the action. So IWC cannot ask the radio to zero-beat; it must do the zero-beat itself.
+
+**How IWC does it (software ZIN):** this is a small extension of the CW-decode tone detector, so it reuses the same receive-audio path (option (b) above):
+1. Detect the dominant CW tone in the passband → its audio frequency `f_tone` (Hz). The Goertzel/FFT front-end of the decoder already produces this.
+2. Read the operator's target CW pitch `f_pitch` (the sidetone/BFO offset the radio zero-beats to).
+3. Compute the error `Δ = f_tone − f_pitch` and QSY: `SetFrequencyAsync(currentHz ± Δ)` through the existing `IRadioController` seam. **Sign depends on sideband** — CW-U (USB CW) and CW-L (LSB CW) move the VFO in opposite directions for the same audio-tone error; resolve from the current CW mode.
+
+**UI:** a "ZIN" (or "Zero-beat") on-screen button next to the CW-decode toggle; one-shot action (measure → single QSY), not a continuous servo. Works for remote operators too — which the radio's own front-panel AUTOTUNE never could.
+
+**⚠️ Open item before building:** confirm the **exact CI-V read for the CW pitch** so the target tone `f_pitch` is precise rather than assumed (the IC-7300 MkII CW pitch is a SET-menu value in the `1A 05 nn nn` family — nail down the sub-address and its Hz encoding from `docs/manuals/IC-7300MK2_ENG_CI-V_0.pdf` at implementation time). Until confirmed, ZIN could fall back to a user-entered pitch, but reading it from the radio is the correct source of truth.
