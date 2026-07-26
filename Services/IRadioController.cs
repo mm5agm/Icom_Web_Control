@@ -57,5 +57,26 @@ namespace Icom_Web_Control.Services
 
         Task<bool> GetTransmitAsync(CancellationToken cancellationToken = default);
         Task SetTransmitAsync(bool transmit, CancellationToken cancellationToken = default);
+
+        // -- VFO / split (Phase 3 block 5) --------------------------------------
+        // GetFrequencyHzAsync / SetFrequencyHzAsync / GetModeAsync / SetModeAsync
+        // above already take a RadioVfo and, from block 5, address each VFO
+        // independently (CI-V 25/26). The members below add the operations that
+        // have no per-VFO frequency/mode equivalent.
+
+        /// <summary>Make <paramref name="vfo"/> the operating (selected) VFO (CI-V 07 00/01).</summary>
+        Task SelectVfoAsync(RadioVfo vfo, CancellationToken cancellationToken = default);
+
+        /// <summary>Exchange the contents of VFO A and VFO B; the selected VFO stays selected (CI-V 07 B0).</summary>
+        Task ExchangeVfosAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Make both VFOs equal — Icom "equalize" (CI-V 07 A0).</summary>
+        Task EqualizeVfosAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Read split state — true when transmitting on the other VFO (CI-V 0F).</summary>
+        Task<bool> GetSplitAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Turn split on or off (CI-V 0F 01/00).</summary>
+        Task SetSplitAsync(bool on, CancellationToken cancellationToken = default);
     }
 }

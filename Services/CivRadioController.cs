@@ -33,6 +33,7 @@ namespace Icom_Web_Control.Services
     {
         private const int PollIntervalMs = 150;      // ~6–7 Hz — snappy meters/dial
         private const int ModePollEveryNLoops = 3;    // mode changes rarely; ~2 Hz is plenty
+        private const int SplitPollEveryNLoops = 4;    // split rarely toggles; ~1.5 Hz is plenty
         private const int ReconnectDelayMs = 3000;
         private const int MaxConsecutiveReadMisses = 5;
 
@@ -81,25 +82,63 @@ namespace Icom_Web_Control.Services
 
         public Task DisconnectAsync() => _bus.CloseAsync();
 
-        public async Task<long> GetFrequencyHzAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
+        // Per-VFO addressing (block 5): the operating (active) VFO keeps the
+        // hardware-proven operating commands 03/05 — frequency is also the poll
+        // loop's liveness signal, so it must never regress to an unproven path.
+        // The *other* VFO is reached without disturbing operation via 25 01
+        // (unselected). If 25 is unsupported, only the watch VFO goes blank; the
+        // link and the operating VFO are unaffected.
+
+        public Task<long> GetFrequencyHzAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
+            => vfo == ActiveVfo
+                ? ReadOperatingFrequencyAsync(cancellationToken)                       // command 03
+                : ReadFrequencyBySelectorAsync(CivProtocol.VfoUnselected, cancellationToken); // 25 01
+
+        /// <summary>Read the operating VFO frequency (command 03). -1 on any miss.</summary>
+        private async Task<long> ReadOperatingFrequencyAsync(CancellationToken cancellationToken)
         {
-            // The IC-7300 MkII is single-receiver: command 03 reads the current
-            // operating VFO. Per-VFO addressing (25/26) arrives in Phase 3; for
-            // now both A and B map to the operating frequency.
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdReadFrequency);
             var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadFrequency, cancellationToken: cancellationToken);
             if (reply == null || reply.Cmd != CivProtocol.CmdReadFrequency || reply.Data.Length < 5)
                 return -1;
-
             return CivProtocol.DecodeBcd(reply.Data.AsSpan(0, 5));
+        }
+
+        /// <summary>
+        /// Read a VFO frequency by selected/unselected selector (command 25).
+        /// Reply is <c>25 &lt;sel&gt; &lt;5 BCD LE&gt;</c>; -1 on any miss.
+        /// </summary>
+        private async Task<long> ReadFrequencyBySelectorAsync(byte sel, CancellationToken cancellationToken)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdVfoFrequency, sel);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdVfoFrequency, cancellationToken: cancellationToken);
+            // Reply body: 25 <sel> <5 BCD> → Data = [sel, b0..b4].
+            if (reply == null || reply.Cmd != CivProtocol.CmdVfoFrequency
+                || reply.Data.Length < 6 || reply.Data[0] != sel)
+                return -1;
+            return CivProtocol.DecodeBcd(reply.Data.AsSpan(1, 5));
         }
 
         public async Task SetFrequencyHzAsync(RadioVfo vfo, long frequencyHz, CancellationToken cancellationToken = default)
         {
             var bcd = CivProtocol.EncodeBcd(frequencyHz, 5);
-            var body = new byte[1 + bcd.Length];
-            body[0] = CivProtocol.CmdSetFrequency;
-            Array.Copy(bcd, 0, body, 1, bcd.Length);
+            byte[] body;
+            if (vfo == ActiveVfo)
+            {
+                // Operating VFO — command 05 (proven).
+                body = new byte[1 + bcd.Length];
+                body[0] = CivProtocol.CmdSetFrequency;
+                Array.Copy(bcd, 0, body, 1, bcd.Length);
+            }
+            else
+            {
+                // Other VFO — command 25 01, without switching the operating VFO.
+                body = new byte[2 + bcd.Length];
+                body[0] = CivProtocol.CmdVfoFrequency;
+                body[1] = CivProtocol.VfoUnselected;
+                Array.Copy(bcd, 0, body, 2, bcd.Length);
+            }
 
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
             var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
@@ -114,26 +153,41 @@ namespace Icom_Web_Control.Services
             }
         }
 
-        // -- Mode (Phase 3 block 2) --------------------------------------------
+        /// <summary>
+        /// The VFO the radio is currently operating on, tracked from our own 07
+        /// sends (there is no CI-V read for the active VFO). Maps
+        /// <see cref="RadioStateService.ActiveVfo"/> (0=A/1=B) to <see cref="RadioVfo"/>.
+        /// Front-panel A/B presses are the one known desync — a poll can't detect them.
+        /// </summary>
+        private RadioVfo ActiveVfo => _state.ActiveVfo == 1 ? RadioVfo.B : RadioVfo.A;
+
+        private static int VfoIndex(RadioVfo vfo) => vfo == RadioVfo.B ? 1 : 0;
+
+        private void SetVfoFrequency(RadioVfo vfo, long hz)
+        {
+            if (vfo == RadioVfo.A) _state.FrequencyA = hz; else _state.FrequencyB = hz;
+        }
+
+        private void SetVfoMode(RadioVfo vfo, string mode)
+        {
+            if (vfo == RadioVfo.A) _state.ModeA = mode; else _state.ModeB = mode;
+        }
+
+        // -- Mode (Phase 3 blocks 2 + 5) ---------------------------------------
+        //
+        // Block 5 folds the former two-frame 06 + 1A 06 dance into the single
+        // atomic command 26, which carries <mode> <data> <filter> together and
+        // addresses either VFO via the selected/unselected selector. Mode reads
+        // are best-effort in the poll loop (a miss never drops the link), so
+        // unlike frequency there's no need to keep the legacy 04 path.
 
         public async Task<string> GetModeAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
         {
-            // Single-receiver: command 04 reads the current operating mode. Both
-            // A and B map to it until per-VFO addressing arrives.
-            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdReadMode);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadMode, cancellationToken: cancellationToken);
-            if (reply == null || reply.Cmd != CivProtocol.CmdReadMode || reply.Data.Length < 1)
+            byte sel = SelectorFor(vfo);
+            var m = await ReadVfoModeRawAsync(sel, cancellationToken);
+            if (!m.ok)
                 return vfo == RadioVfo.A ? (_state.ModeA ?? "") : (_state.ModeB ?? "");
-
-            byte baseByte = reply.Data[0];
-
-            // On SSB/AM/FM the mode may additionally be a "data" mode (USB-D
-            // etc.). CW/RTTY have no data variant, so skip the extra read.
-            bool data = false;
-            if (BaseSupportsData(baseByte))
-                data = await ReadDataModeAsync(cancellationToken);
-
-            return NameForMode(baseByte, data);
+            return NameForMode(m.mode, m.data != 0);
         }
 
         public async Task SetModeAsync(RadioVfo vfo, string mode, CancellationToken cancellationToken = default)
@@ -145,48 +199,50 @@ namespace Icom_Web_Control.Services
                 return;
             }
 
-            // 1) Base mode (command 06, mode byte only — radio keeps its filter).
-            var baseFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
-                CivProtocol.CmdSetMode, target.BaseByte);
-            var baseReply = await _bus.TransactAsync(baseFrame, CivProtocol.AckOk, cancellationToken: cancellationToken);
-            if (baseReply == null || baseReply.Cmd != CivProtocol.AckOk)
-            {
-                _logger.LogWarning("[CivRadioController] Set base mode for '{Mode}' was not acknowledged", mode);
-                return;
-            }
+            byte sel = SelectorFor(vfo);
 
-            // 2) DATA flag (command 1A 06), only where the base mode has one.
-            //    Enabling data needs a filter (FIL1); disabling forces 00/00.
-            if (BaseSupportsData(target.BaseByte))
+            // Preserve the VFO's current filter (FIL1/2/3); default FIL1 if it
+            // can't be read. In command 26 the filter is always 1–3 (unlike the
+            // 1A 06 form where it was 00 when data was off).
+            byte filter = 0x01;
+            var cur = await ReadVfoModeRawAsync(sel, cancellationToken);
+            if (cur.ok && cur.filter is >= 0x01 and <= 0x03) filter = cur.filter;
+
+            byte dataByte = target.Data ? (byte)0x01 : (byte)0x00;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdVfoMode, sel, target.BaseByte, dataByte, filter);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
             {
-                byte dataOn = target.Data ? (byte)0x01 : (byte)0x00;
-                byte filter = target.Data ? (byte)0x01 : (byte)0x00;
-                var dataFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
-                    CivProtocol.CmdMenu, CivProtocol.SubDataMode, dataOn, filter);
-                var dataReply = await _bus.TransactAsync(dataFrame, CivProtocol.AckOk, cancellationToken: cancellationToken);
-                if (dataReply == null || dataReply.Cmd != CivProtocol.AckOk)
-                    _logger.LogWarning("[CivRadioController] Set DATA flag for '{Mode}' was not acknowledged", mode);
+                _logger.LogWarning("[CivRadioController] Set mode '{Mode}' (26) was not acknowledged", mode);
+                return;
             }
 
             var name = NameForMode(target.BaseByte, target.Data);
             if (vfo == RadioVfo.A) _state.ModeA = name; else _state.ModeB = name;
         }
 
-        /// <summary>Read the DATA on/off flag (command 1A 06). False on any miss.</summary>
-        private async Task<bool> ReadDataModeAsync(CancellationToken cancellationToken)
+        /// <summary>
+        /// Read a VFO's mode/data/filter (command 26). Reply is
+        /// <c>26 &lt;sel&gt; &lt;mode&gt; &lt;data&gt; &lt;filter&gt;</c>;
+        /// <c>ok=false</c> on any miss.
+        /// </summary>
+        private async Task<(bool ok, byte mode, byte data, byte filter)> ReadVfoModeRawAsync(
+            byte sel, CancellationToken cancellationToken)
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
-                CivProtocol.CmdMenu, CivProtocol.SubDataMode);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: cancellationToken);
-            // Reply body is 1A 06 <dataOn> <filter>: Data = [06, dataOn, filter].
-            if (reply != null && reply.Cmd == CivProtocol.CmdMenu
-                && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubDataMode)
-                return reply.Data[1] != 0;
-            return false;
+                CivProtocol.CmdVfoMode, sel);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdVfoMode, cancellationToken: cancellationToken);
+            // Reply body: 26 <sel> <mode> <data> <filter> → Data = [sel, mode, data, filter].
+            if (reply == null || reply.Cmd != CivProtocol.CmdVfoMode
+                || reply.Data.Length < 4 || reply.Data[0] != sel)
+                return (false, 0, 0, 0);
+            return (true, reply.Data[1], reply.Data[2], reply.Data[3]);
         }
 
-        private static bool BaseSupportsData(byte baseByte)
-            => baseByte is 0x00 or 0x01 or 0x02 or 0x05; // LSB, USB, AM, FM
+        /// <summary>Map an A/B target to the 25/26 selected(00)/unselected(01) byte.</summary>
+        private byte SelectorFor(RadioVfo vfo)
+            => vfo == ActiveVfo ? CivProtocol.VfoSelected : CivProtocol.VfoUnselected;
 
         // CI-V base-mode byte (+ DATA flag) → the display strings already spoken
         // by RadioStateService, the web mode dropdown, voice, and rigctld. The
@@ -295,6 +351,88 @@ namespace Icom_Web_Control.Services
             return _state.IsTransmitting;
         }
 
+        // -- VFO select / exchange / split (Phase 3 block 5) -------------------
+
+        public async Task SelectVfoAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
+        {
+            // Command 07 00/01 — set-only; no read of the active VFO exists, so
+            // we mirror the change into RadioStateService.ActiveVfo, which is the
+            // source of truth SelectorFor / ActiveVfo read back.
+            byte v = vfo == RadioVfo.B ? CivProtocol.VfoSelectB : CivProtocol.VfoSelectA;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSelectVfo, v);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+                _state.ActiveVfo = vfo == RadioVfo.B ? 1 : 0;
+            else
+                _logger.LogWarning("[CivRadioController] Select VFO {Vfo} was not acknowledged", vfo);
+        }
+
+        public async Task ExchangeVfosAsync(CancellationToken cancellationToken = default)
+        {
+            // Command 07 B0 — swap A↔B; the selected VFO letter is unchanged, so
+            // ActiveVfo stays put. Swap the cached freq/mode for a snappy UI; the
+            // poll re-reads both within a couple of loops regardless.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSelectVfo, CivProtocol.VfoExchange);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+            {
+                (_state.FrequencyA, _state.FrequencyB) = (_state.FrequencyB, _state.FrequencyA);
+                (_state.ModeA, _state.ModeB) = (_state.ModeB, _state.ModeA);
+            }
+            else
+            {
+                _logger.LogWarning("[CivRadioController] Exchange VFOs was not acknowledged");
+            }
+        }
+
+        public async Task EqualizeVfosAsync(CancellationToken cancellationToken = default)
+        {
+            // Command 07 A0 — make both VFOs equal (the unselected takes the
+            // selected VFO's contents). Mirror selected → other in cache.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSelectVfo, CivProtocol.VfoEqualize);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+            {
+                if (ActiveVfo == RadioVfo.A) { _state.FrequencyB = _state.FrequencyA; _state.ModeB = _state.ModeA; }
+                else                          { _state.FrequencyA = _state.FrequencyB; _state.ModeA = _state.ModeB; }
+            }
+            else
+            {
+                _logger.LogWarning("[CivRadioController] Equalize VFOs was not acknowledged");
+            }
+        }
+
+        public async Task<bool> GetSplitAsync(CancellationToken cancellationToken = default)
+        {
+            // Command 0F with no data reads split; reply 0F <00=off|01=on>.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdSplit);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdSplit, cancellationToken: cancellationToken);
+            if (reply != null && reply.Cmd == CivProtocol.CmdSplit && reply.Data.Length >= 1)
+                return reply.Data[0] != 0;
+            return _state.SplitMode > 0; // keep last known on a miss
+        }
+
+        public async Task SetSplitAsync(bool on, CancellationToken cancellationToken = default)
+        {
+            byte v = on ? CivProtocol.SplitOn : CivProtocol.SplitOff;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSplit, v);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+            {
+                // Preserve a UI-set quick-split (2); only sync the on/off axis.
+                if (on) { if (_state.SplitMode == 0) _state.SplitMode = 1; }
+                else _state.SplitMode = 0;
+            }
+            else
+            {
+                _logger.LogWarning("[CivRadioController] Set split {State} was not acknowledged", on ? "ON" : "OFF");
+            }
+        }
+
         // -- Connect / identify -------------------------------------------------
 
         private async Task IdentifyAsync(CancellationToken cancellationToken)
@@ -353,13 +491,19 @@ namespace Icom_Web_Control.Services
 
                 try
                 {
-                    // Frequency (command 03) is the liveness signal — the only
-                    // read that counts misses and can drop the link.
-                    long hz = await GetFrequencyHzAsync(RadioVfo.A, stoppingToken);
+                    // Which VFO the radio is operating on decides how each panel
+                    // is addressed: the active VFO rides the proven operating
+                    // commands, the other is the "watch" VFO read via 25/26.
+                    RadioVfo active = ActiveVfo;
+                    RadioVfo other = active == RadioVfo.A ? RadioVfo.B : RadioVfo.A;
+
+                    // Operating frequency (command 03) is the liveness signal —
+                    // the only read that counts misses and can drop the link.
+                    long hz = await ReadOperatingFrequencyAsync(stoppingToken);
                     if (hz > 0)
                     {
                         misses = 0;
-                        _state.FrequencyA = hz; // broadcasts FrequencyA on change
+                        SetVfoFrequency(active, hz); // broadcasts on change
                     }
                     else if (++misses >= MaxConsecutiveReadMisses)
                     {
@@ -367,6 +511,15 @@ namespace Icom_Web_Control.Services
                         await _bus.CloseAsync();
                         await SetConnectedAsync(false);
                         continue; // link is down — don't chase further reads
+                    }
+
+                    // Watch VFO frequency (command 25 01) — best-effort, every
+                    // other loop. A miss (or an unsupported 25) just leaves the
+                    // last value; it never affects liveness.
+                    if (loop % 2 == 1)
+                    {
+                        long otherHz = await ReadFrequencyBySelectorAsync(CivProtocol.VfoUnselected, stoppingToken);
+                        if (otherHz > 0) SetVfoFrequency(other, otherHz);
                     }
 
                     // TX/RX status (command 1C 00) every loop — cheap, and it
@@ -395,14 +548,31 @@ namespace Icom_Web_Control.Services
                         if (_state.SWRMeter is not (null or 0)) _state.SWRMeter = 0;
                     }
 
-                    // Mode (command 04, plus 1A 06 on SSB/AM/FM) is slower to
-                    // change, so poll it less often to keep the bus free for the
-                    // meter. Skip "?XX" (unmapped) values.
+                    // Mode (command 26) changes rarely, so poll it less often to
+                    // keep the bus free for the meter, and interleave the two
+                    // VFOs onto different phases. Skip "?XX" (unmapped) values.
                     if (loop % ModePollEveryNLoops == 0)
                     {
-                        var modeName = await GetModeAsync(RadioVfo.A, stoppingToken);
+                        var modeName = await GetModeAsync(active, stoppingToken);
                         if (!string.IsNullOrEmpty(modeName) && !modeName.StartsWith('?'))
-                            _state.ModeA = modeName; // broadcasts ModeA on change
+                            SetVfoMode(active, modeName);
+                    }
+                    else if (loop % ModePollEveryNLoops == 1)
+                    {
+                        var modeName = await GetModeAsync(other, stoppingToken);
+                        if (!string.IsNullOrEmpty(modeName) && !modeName.StartsWith('?'))
+                            SetVfoMode(other, modeName);
+                    }
+
+                    // Split state (command 0F) — slow-moving; refresh a few times
+                    // a second. Reading only distinguishes on/off, so preserve a
+                    // UI-set quick-split (2). In split, the watch VFO transmits.
+                    if (loop % SplitPollEveryNLoops == 2)
+                    {
+                        bool split = await GetSplitAsync(stoppingToken);
+                        if (split) { if (_state.SplitMode == 0) _state.SplitMode = 1; }
+                        else _state.SplitMode = 0;
+                        _state.TxVfo = VfoIndex(split ? other : active);
                     }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

@@ -78,6 +78,43 @@ namespace Icom_Web_Control.Services.Civ
         public const byte SubPoMeter = 0x11;
         public const byte SubSwrMeter = 0x12;
 
+        // Phase 3 block 5 — VFO select, split, and true per-VFO frequency/mode.
+        //
+        // VFO select (command 07) — set-only, no read of the active VFO exists:
+        //   07 00 = switch to VFO mode, select VFO A
+        //   07 01 = switch to VFO mode, select VFO B
+        //   07 A0 = equalize (make VFO A and VFO B the same)
+        //   07 B0 = exchange VFO A with VFO B
+        public const byte CmdSelectVfo = 0x07;
+        public const byte VfoSelectA = 0x00;
+        public const byte VfoSelectB = 0x01;
+        public const byte VfoEqualize = 0xA0;
+        public const byte VfoExchange = 0xB0;
+
+        // Split (command 0F):
+        //   0F        (no data) → reply 0F <00=OFF | 01=ON>   (read)
+        //   0F 00 / 0F 01                                     (set OFF / ON)
+        public const byte CmdSplit = 0x0F;
+        public const byte SplitOff = 0x00;
+        public const byte SplitOn = 0x01;
+
+        // Per-VFO frequency (25) and mode+DATA+filter (26). Both take a selector
+        // byte that is NOT A/B but selected/unselected — the caller maps A/B onto
+        // it via the tracked active VFO (there is no CI-V read for "which VFO is
+        // active", so we track it from our own 07 sends):
+        //   00 = selected VFO, 01 = unselected VFO.
+        //   Freq read : send 25 <sel>                        → reply 25 <sel> <5 BCD LE>
+        //   Freq set  : send 25 <sel> <5 BCD LE>             → FB / FA
+        //   Mode read : send 26 <sel>                        → reply 26 <sel> <mode> <data> <filter>
+        //   Mode set  : send 26 <sel> <mode> <data> <filter> → FB / FA
+        // <mode> bytes are the same as command 04/06; <data> 00=OFF/01=ON;
+        // <filter> 01=FIL1 / 02=FIL2 / 03=FIL3. On set, <data>/<filter> may be
+        // omitted (radio then picks DATA OFF + the mode's default filter).
+        public const byte CmdVfoFrequency = 0x25;
+        public const byte CmdVfoMode = 0x26;
+        public const byte VfoSelected = 0x00;
+        public const byte VfoUnselected = 0x01;
+
         /// <summary>Decode one packed-BCD byte (two decimal digits) to 0–99.</summary>
         public static int BcdByte(byte b) => ((b >> 4) & 0x0F) * 10 + (b & 0x0F);
 

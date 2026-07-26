@@ -97,6 +97,44 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- VFO / split (Phase 3 block 5, canned) -----------------------------
+
+        private bool _split;
+
+        public Task SelectVfoAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
+        {
+            _state.ActiveVfo = vfo == RadioVfo.B ? 1 : 0;
+            return Task.CompletedTask;
+        }
+
+        public Task ExchangeVfosAsync(CancellationToken cancellationToken = default)
+        {
+            (_freqA, _freqB) = (_freqB, _freqA);
+            (_modeA, _modeB) = (_modeB, _modeA);
+            _state.FrequencyA = _freqA; _state.FrequencyB = _freqB;
+            _state.ModeA = _modeA; _state.ModeB = _modeB;
+            return Task.CompletedTask;
+        }
+
+        public Task EqualizeVfosAsync(CancellationToken cancellationToken = default)
+        {
+            if (_state.ActiveVfo == 1) { _freqA = _freqB; _modeA = _modeB; }
+            else                       { _freqB = _freqA; _modeB = _modeA; }
+            _state.FrequencyA = _freqA; _state.FrequencyB = _freqB;
+            _state.ModeA = _modeA; _state.ModeB = _modeB;
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> GetSplitAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(_split);
+
+        public Task SetSplitAsync(bool on, CancellationToken cancellationToken = default)
+        {
+            _split = on;
+            _state.SplitMode = on ? 1 : 0;
+            return Task.CompletedTask;
+        }
+
         // -- Hosted canned-data feeder -----------------------------------------
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

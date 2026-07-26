@@ -1692,75 +1692,32 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
 
-                // FTDX3000 has no ST command (confirmed no-op by iu1teu/Giovanni on
-                // #78) — split is driven by FT instead: FT2; = TX on VFO A (no split,
-                // TX=RX), FT3; = TX on VFO B (split). Read-back FT; answers FT0 (TX=A)
-                // / FT1 (TX=B). The other supported models (FTdx101/FTdx10/FT-710) all
-                // have ST, so they fall through to the ST path below.
-                var splitSettings = await _settingsService.GetSettingsAsync();
-                if (splitSettings.RadioModel == "FTDX3000")
-                {
-                    if (mode == 2)
-                    {
-                        // Quick split: VFO B = VFO A + 5 kHz, then transmit on B.
-                        var faQs = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
-                        if (!string.IsNullOrWhiteSpace(faQs) && faQs.StartsWith("FA") &&
-                            long.TryParse(faQs.Substring(2).TrimEnd(';'), out long freqAqs))
-                        {
-                            long freqBqs = Math.Min(freqAqs + 5000, 75_000_000);
-                            await _catClient.SendCommandAsync($"FB{freqBqs:D11};", "WebUI", CancellationToken.None);
-                            _radioStateService.FrequencyB = freqBqs;
-                        }
-                    }
-
-                    bool ftSplitOn = mode != 0;               // mode 1 or 2 → split on
-                    await _catClient.SendCommandAsync(ftSplitOn ? "FT3;" : "FT2;", "WebUI", CancellationToken.None);
-
-                    var ftResp = await _catClient.SendCommandAsync("FT;", "WebUI", CancellationToken.None);
-                    int ftTxVfo = ftSplitOn ? 1 : 0;
-                    if (!string.IsNullOrWhiteSpace(ftResp) && ftResp.StartsWith("FT") && ftResp.Length >= 3)
-                        ftTxVfo = ftResp[2] == '1' ? 1 : 0;
-                    _radioStateService.TxVfo = ftTxVfo;
-                    int ftSplitMode = ftTxVfo == 1 ? 1 : 0;
-                    _radioStateService.SplitMode = ftSplitMode;
-                    _logger.LogInformation("Split (FTDX3000) via FT: TX VFO = {TxVfo}, splitMode = {Mode}",
-                        ftTxVfo == 1 ? "B" : "A", ftSplitMode);
-                    return Ok(new { splitMode = ftSplitMode });
-                }
-
+                // Phase 3 block 5: split via the CI-V seam (command 0F). Quick
+                // split (mode 2) is composed above the seam — set VFO B to VFO A
+                // + 5 kHz, then turn split on — so it works whether or not split
+                // was already active.
                 if (mode == 2)
                 {
-                    // Quick Split: implement explicitly so it works whether split is already on or off.
-                    // ST2; on the FTdx101 only executes the +5 kHz part when transitioning from off→on;
-                    // if split is already active the radio ignores the frequency offset. So we read
-                    // VFO A, compute +5 kHz, set VFO B directly, then enable split.
-                    var faResponse = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
-                    if (!string.IsNullOrWhiteSpace(faResponse) && faResponse.StartsWith("FA") &&
-                        long.TryParse(faResponse.Substring(2).TrimEnd(';'), out long freqA))
+                    long freqA = _radioStateService.FrequencyA;
+                    if (freqA > 0)
                     {
                         long freqB = Math.Min(freqA + 5000, 75_000_000);
-                        await _catClient.SendCommandAsync($"FB{freqB:D11};", "WebUI", CancellationToken.None);
-                        _radioStateService.FrequencyB = freqB;
+                        await _radio.SetFrequencyHzAsync(RadioVfo.B, freqB, CancellationToken.None);
                     }
-                    await _catClient.SendCommandAsync("ST1;", "WebUI", CancellationToken.None);
-                    _radioStateService.SplitMode = 1;
-                    _logger.LogInformation("Quick Split: VFO B set to VFO A + 5 kHz, split ON");
-                    return Ok(new { splitMode = 1 });
+                    await _radio.SetSplitAsync(true, CancellationToken.None);
+                    _radioStateService.SplitMode = 2; // seam sets 1; promote to quick-split
+                    _logger.LogInformation("Quick Split: VFO B = VFO A + 5 kHz, split ON");
+                    return Ok(new { splitMode = 2 });
                 }
 
-                await _catClient.SendCommandAsync($"ST{mode};", "WebUI", CancellationToken.None);
-
-                // Read back actual state
-                var stResponse = await _catClient.SendCommandAsync("ST;", "WebUI", CancellationToken.None);
-                int actualMode = mode;
-                if (!string.IsNullOrWhiteSpace(stResponse) && stResponse.StartsWith("ST"))
-                    int.TryParse(stResponse.Substring(2, 1), out actualMode);
-                _radioStateService.SplitMode = actualMode;
-
-                _logger.LogInformation("Split mode set to {Mode}", actualMode);
-                return Ok(new { splitMode = actualMode });
+                bool on = mode == 1;
+                await _radio.SetSplitAsync(on, CancellationToken.None);
+                _radioStateService.SplitMode = on ? 1 : 0;
+                _logger.LogInformation("Split mode set to {Mode}", mode);
+                return Ok(new { splitMode = mode });
             }
             catch (Exception ex)
             {
@@ -1770,10 +1727,10 @@ namespace Icom_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
-        // Set the active/operating band on dual-receiver radios (FTdx101).
-        // VS selects which band the main tuning knob controls: 0 = MAIN (VFO A),
-        // 1 = SUB (VFO B). The radio auto-broadcasts VS, so the UI highlight
-        // follows automatically; we also set ActiveVfo here to avoid UI flicker.
+        // Select the operating (active) VFO. On the IC-7300 this is CI-V command
+        // 07 00/01 — it also switches the radio out of memory into VFO mode. The
+        // seam mirrors the choice into RadioStateService.ActiveVfo, which is the
+        // source of truth for how the per-VFO 25/26 reads are addressed.
         [HttpPost("active-vfo/{vfo}")]
         public async Task<IActionResult> SetActiveVfo(string vfo)
         {
@@ -1785,12 +1742,12 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                var vs = v == "B" ? 1 : 0;
-                await _catClient.SendCommandAsync($"VS{vs};", "WebUI", CancellationToken.None);
-                _radioStateService.ActiveVfo = vs;
-                _logger.LogInformation("Active VFO set to {Vfo} (VS{Vs})", v, vs);
-                return Ok(new { activeVfo = vs });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+
+                await _radio.SelectVfoAsync(v == "B" ? RadioVfo.B : RadioVfo.A, CancellationToken.None);
+                _logger.LogInformation("Active VFO set to {Vfo} (CI-V 07)", v);
+                return Ok(new { activeVfo = v == "B" ? 1 : 0 });
             }
             catch (Exception ex)
             {
@@ -1807,47 +1764,13 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync("SV;", "WebUI", CancellationToken.None);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
 
-                // Read back both frequencies immediately — auto-info will also arrive but this avoids UI flicker
-                var faResponse = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
-                if (!string.IsNullOrWhiteSpace(faResponse) && faResponse.StartsWith("FA") &&
-                    long.TryParse(faResponse.Substring(2).TrimEnd(';'), out long freqA))
-                {
-                    _radioStateService.FrequencyA = freqA;
-                }
-
-                var fbResponse = await _catClient.SendCommandAsync("FB;", "WebUI", CancellationToken.None);
-                if (!string.IsNullOrWhiteSpace(fbResponse) && fbResponse.StartsWith("FB") &&
-                    long.TryParse(fbResponse.Substring(2).TrimEnd(';'), out long freqB))
-                {
-                    _radioStateService.FrequencyB = freqB;
-                }
-
-                // Re-query ATU state. On single-receiver radios like the
-                // FTdx10 the AC command is global at the CAT layer, but the
-                // radio firmware stores ATU on/off per-VFO internally and
-                // re-applies the now-active VFO's value after SV;. Reading
-                // it back here keeps YWC's display in sync. See issue #34
-                // discussion with Jacek SP3L for the empirical evidence.
-                //
-                // We parse the reply directly because the multiplexer
-                // consumes direct command replies into _pendingResponses
-                // before they reach CatMessageDispatcher.
-                try
-                {
-                    var acResponse = await _catClient.SendCommandAsync("AC;", "WebUI", CancellationToken.None);
-                    if (!string.IsNullOrEmpty(acResponse) && acResponse.StartsWith("AC") && acResponse.Length >= 5)
-                    {
-                        _radioStateService.AtuEnabled = acResponse[4] == '1';
-                    }
-                    _logger.LogDebug("Post-swap AC; reply: {Reply}", acResponse ?? "(null)");
-                }
-                catch (Exception acEx)
-                {
-                    _logger.LogDebug(acEx, "Post-swap AC; query failed (non-fatal)");
-                }
+                // Phase 3 block 5: exchange VFO A ↔ B via the CI-V seam (07 B0).
+                // The seam swaps the cached freq/mode immediately to avoid UI
+                // flicker; the poll confirms both within a couple of loops.
+                await _radio.ExchangeVfosAsync(CancellationToken.None);
 
                 _logger.LogInformation("VFO A and VFO B swapped");
                 return Ok(new { message = "VFO swapped" });
@@ -1861,13 +1784,14 @@ namespace Icom_Web_Control.Controllers
         }
 
         // POST /api/cat/copy-vfo/{direction}
-        //   direction = "ba" → copy VFO B to VFO A (Yaesu BA; CAT command)
-        //   direction = "ab" → copy VFO A to VFO B (Yaesu AB; CAT command)
+        //   direction = "ba" → copy VFO B to VFO A (source B unchanged)
+        //   direction = "ab" → copy VFO A to VFO B (source A unchanged)
         //
-        // Differs from swap (SV) in that it does NOT exchange — the source
-        // VFO keeps its value. Useful for transmitting on VFO B's frequency
-        // without enabling split: copy B→A and the radio's normal TX (which
-        // uses VFO A) is now on the desired frequency.
+        // Differs from swap in that it does NOT exchange — the source VFO keeps
+        // its value. The IC-7300 has no directional-copy CI-V command (only
+        // equalize 07 A0, which always copies selected→unselected), so this is
+        // composed above the seam: write the cached source freq+mode into the
+        // destination VFO via the per-VFO 25/26 path.
         [HttpPost("copy-vfo/{direction}")]
         public async Task<IActionResult> CopyVfo(string direction)
         {
@@ -1879,22 +1803,22 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                var cmd = dir == "ba" ? "BA;" : "AB;";
-                await _catClient.SendCommandAsync(cmd, "WebUI", CancellationToken.None);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
 
-                // Read back both frequencies so the UI reflects the new state immediately.
-                var faResponse = await _catClient.SendCommandAsync("FA;", "WebUI", CancellationToken.None);
-                if (!string.IsNullOrWhiteSpace(faResponse) && faResponse.StartsWith("FA") &&
-                    long.TryParse(faResponse.Substring(2).TrimEnd(';'), out long freqA))
+                if (dir == "ba")
                 {
-                    _radioStateService.FrequencyA = freqA;
+                    // Copy B → A.
+                    await _radio.SetFrequencyHzAsync(RadioVfo.A, _radioStateService.FrequencyB, CancellationToken.None);
+                    if (!string.IsNullOrEmpty(_radioStateService.ModeB))
+                        await _radio.SetModeAsync(RadioVfo.A, _radioStateService.ModeB, CancellationToken.None);
                 }
-                var fbResponse = await _catClient.SendCommandAsync("FB;", "WebUI", CancellationToken.None);
-                if (!string.IsNullOrWhiteSpace(fbResponse) && fbResponse.StartsWith("FB") &&
-                    long.TryParse(fbResponse.Substring(2).TrimEnd(';'), out long freqB))
+                else
                 {
-                    _radioStateService.FrequencyB = freqB;
+                    // Copy A → B.
+                    await _radio.SetFrequencyHzAsync(RadioVfo.B, _radioStateService.FrequencyA, CancellationToken.None);
+                    if (!string.IsNullOrEmpty(_radioStateService.ModeA))
+                        await _radio.SetModeAsync(RadioVfo.B, _radioStateService.ModeA, CancellationToken.None);
                 }
 
                 _logger.LogInformation("VFO copy {Dir} completed", dir.ToUpperInvariant());
