@@ -467,145 +467,81 @@ namespace Icom_Web_Control.Controllers
         }
 
         [HttpPost("band/a")]
-        public async Task<IActionResult> SetBandA([FromBody] BandRequest request)
-        {
-            if (!await _requestSemaphore.WaitAsync(2000))
-                return StatusCode(503, new { error = "Radio busy" });
-
-            _logger.LogInformation("[API] SetBandA called: band={Band}", request.Band);
-            try
-            {
-                await EnsureConnectedAsync();
-
-                if (!BandFreqs.TryGetValue(request.Band, out var freq))
-                    return BadRequest(new { error = "Invalid band" });
-
-                var settings = await _settingsService.GetSettingsAsync();
-
-                // Save current band profile before switching
-                var oldBand = _radioStateService.BandA;
-                if (!string.IsNullOrEmpty(oldBand))
-                {
-                    settings.BandProfilesA[oldBand] = new BandProfile
-                    {
-                        IfWidthCode = _radioStateService.IfWidthA,
-                        IfShiftHz   = _radioStateService.IfShiftA,
-                        Mode        = _radioStateService.ModeA ?? "",
-                        Antenna     = _radioStateService.AntennaA ?? ""
-                    };
-                    await _settingsService.SaveSettingsAsync(settings);
-                }
-
-                var command = $"FA{freq:D9};";
-                await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
-
-                var actualFreq = await _catClient.QueryFrequencyAAsync("WebUI", CancellationToken.None);
-                _radioStateService.SetBand("A", request.Band);
-                _radioStateService.FrequencyA = actualFreq;
-
-                // Restore saved profile for the new band if one exists
-                if (settings.BandProfilesA.TryGetValue(request.Band, out var profile))
-                {
-                    if (!string.IsNullOrEmpty(profile.IfWidthCode))
-                    {
-                        await _catClient.SendCommandAsync($"SH00{int.Parse(profile.IfWidthCode):D2};", "WebUI", CancellationToken.None);
-                        _radioStateService.IfWidthA = profile.IfWidthCode;
-                    }
-                    var sign = profile.IfShiftHz >= 0 ? '+' : '-';
-                    await _catClient.SendCommandAsync($"IS00{sign}{Math.Abs(profile.IfShiftHz):D4};", "WebUI", CancellationToken.None);
-                    _radioStateService.IfShiftA = profile.IfShiftHz;
-                    if (!string.IsNullOrEmpty(profile.Mode))
-                    {
-                        await _catClient.SendCommandAsync(CatCommands.FormatMode(profile.Mode, false), "WebUI", CancellationToken.None);
-                        _radioStateService.ModeA = profile.Mode;
-                    }
-                    if (!string.IsNullOrEmpty(profile.Antenna))
-                    {
-                        await _catClient.SendCommandAsync($"AN0{profile.Antenna};", "WebUI", CancellationToken.None);
-                        _radioStateService.AntennaA = profile.Antenna;
-                    }
-                }
-
-                _logger.LogInformation("[API] SetBandA completed: band={Band}, freq={Freq}", request.Band, actualFreq);
-                return Ok(new { message = $"Band {request.Band} selected", frequency = actualFreq });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error setting Receiver A band");
-                return StatusCode(500, new { error = "Failed to set band" });
-            }
-            finally
-            {
-                _requestSemaphore.Release();
-            }
-        }
+        public Task<IActionResult> SetBandA([FromBody] BandRequest request)
+            => SetBandAsync(RadioVfo.A, request.Band);
 
         [HttpPost("band/b")]
-        public async Task<IActionResult> SetBandB([FromBody] BandRequest request)
+        public Task<IActionResult> SetBandB([FromBody] BandRequest request)
+            => SetBandAsync(RadioVfo.B, request.Band);
+
+        // Band select via the CI-V seam, with a per-band "stacking register":
+        // leaving a band remembers where we were on it (freq + mode); returning
+        // to a band restores that spot. First-ever visit uses the band default
+        // and leaves the current mode untouched. The inherited Yaesu IF-width /
+        // IF-shift / antenna restore is dropped — none of it exists on the
+        // direct-sampling, single-antenna IC-7300.
+        private async Task<IActionResult> SetBandAsync(RadioVfo vfo, string band)
         {
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
 
-            _logger.LogInformation("[API] SetBandB called: band={Band}", request.Band);
+            var recv = vfo == RadioVfo.B ? "B" : "A";
+            _logger.LogInformation("[API] SetBand{Recv} called: band={Band}", recv, band);
             try
             {
-                await EnsureConnectedAsync();
-
-                if (!BandFreqs.TryGetValue(request.Band, out var freq))
+                if (string.IsNullOrWhiteSpace(band) || !BandFreqs.TryGetValue(band, out var defaultFreq))
                     return BadRequest(new { error = "Invalid band" });
 
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+
                 var settings = await _settingsService.GetSettingsAsync();
+                var profiles = vfo == RadioVfo.B ? settings.BandProfilesB : settings.BandProfilesA;
 
-                // Save current band profile before switching
-                var oldBand = _radioStateService.BandB;
-                if (!string.IsNullOrEmpty(oldBand))
+                // Stack the band we're leaving (only if we know where we were).
+                var oldBand = vfo == RadioVfo.B ? _radioStateService.BandB : _radioStateService.BandA;
+                var curFreq = vfo == RadioVfo.B ? _radioStateService.FrequencyB : _radioStateService.FrequencyA;
+                var curMode = vfo == RadioVfo.B ? _radioStateService.ModeB : _radioStateService.ModeA;
+                if (!string.IsNullOrEmpty(oldBand) && curFreq > 0)
                 {
-                    settings.BandProfilesB[oldBand] = new BandProfile
+                    profiles[oldBand] = new BandProfile
                     {
-                        IfWidthCode = _radioStateService.IfWidthB,
-                        IfShiftHz   = _radioStateService.IfShiftB,
-                        Mode        = _radioStateService.ModeB ?? "",
-                        Antenna     = _radioStateService.AntennaB ?? ""
+                        FrequencyHz = curFreq,
+                        Mode        = curMode ?? ""
                     };
-                    await _settingsService.SaveSettingsAsync(settings);
                 }
 
-                var command = $"FB{freq:D9};";
-                await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
-
-                var actualFreq = await _catClient.QueryFrequencyBAsync("WebUI", CancellationToken.None);
-                _radioStateService.SetBand("B", request.Band);
-                _radioStateService.FrequencyB = actualFreq;
-
-                // Restore saved profile for the new band if one exists
-                if (settings.BandProfilesB.TryGetValue(request.Band, out var profile))
+                // Where to land: the remembered spot for this band, else the default.
+                long targetFreq = defaultFreq;
+                string? targetMode = null;
+                if (profiles.TryGetValue(band, out var profile) && profile.FrequencyHz > 0)
                 {
-                    if (!string.IsNullOrEmpty(profile.IfWidthCode))
-                    {
-                        await _catClient.SendCommandAsync($"SH10{int.Parse(profile.IfWidthCode):D2};", "WebUI", CancellationToken.None);
-                        _radioStateService.IfWidthB = profile.IfWidthCode;
-                    }
-                    var sign = profile.IfShiftHz >= 0 ? '+' : '-';
-                    await _catClient.SendCommandAsync($"IS10{sign}{Math.Abs(profile.IfShiftHz):D4};", "WebUI", CancellationToken.None);
-                    _radioStateService.IfShiftB = profile.IfShiftHz;
-                    if (!string.IsNullOrEmpty(profile.Mode))
-                    {
-                        await _catClient.SendCommandAsync(CatCommands.FormatMode(profile.Mode, true), "WebUI", CancellationToken.None);
-                        _radioStateService.ModeB = profile.Mode;
-                    }
-                    if (!string.IsNullOrEmpty(profile.Antenna))
-                    {
-                        await _catClient.SendCommandAsync($"AN1{profile.Antenna};", "WebUI", CancellationToken.None);
-                        _radioStateService.AntennaB = profile.Antenna;
-                    }
+                    targetFreq = profile.FrequencyHz;
+                    targetMode = string.IsNullOrEmpty(profile.Mode) ? null : profile.Mode;
                 }
 
-                _logger.LogInformation("[API] SetBandB completed: band={Band}, freq={Freq}", request.Band, actualFreq);
-                return Ok(new { message = $"Band {request.Band} selected", frequency = actualFreq });
+                await _settingsService.SaveSettingsAsync(settings);
+
+                await _radio.SetFrequencyHzAsync(vfo, targetFreq, CancellationToken.None);
+                if (targetMode != null)
+                    await _radio.SetModeAsync(vfo, targetMode, CancellationToken.None);
+
+                _radioStateService.SetBand(recv, band);
+                if (vfo == RadioVfo.B) _radioStateService.FrequencyB = targetFreq;
+                else                   _radioStateService.FrequencyA = targetFreq;
+                if (targetMode != null)
+                {
+                    if (vfo == RadioVfo.B) _radioStateService.ModeB = targetMode;
+                    else                   _radioStateService.ModeA = targetMode;
+                }
+
+                _logger.LogInformation("[API] SetBand{Recv} completed: band={Band}, freq={Freq}, mode={Mode}",
+                    recv, band, targetFreq, targetMode ?? "(unchanged)");
+                return Ok(new { message = $"Band {band} selected", frequency = targetFreq });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error setting Receiver B band");
+                _logger.LogError(ex, "Error setting Receiver {Recv} band", recv);
                 return StatusCode(500, new { error = "Failed to set band" });
             }
             finally

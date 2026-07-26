@@ -256,14 +256,17 @@
         public int SquelchB { get; set; } = 0;
     }
 
-    // Stores per-band IF Width/Shift/Mode/Antenna so they are restored when the operator returns to a band.
+    // Per-band "stacking register": remembers where you were on each band
+    // (frequency + mode) so clicking back to the band returns you there.
+    // FrequencyHz == 0 means "no saved spot yet" — fall back to the band default.
+    // IfWidthCode/IfShiftHz/Antenna are inherited Yaesu fields, unused on the
+    // IC-7300 (direct-sampling, single antenna); kept only for profile back-compat.
     public class BandProfile
     {
+        public long FrequencyHz { get; set; } = 0;
+        public string Mode { get; set; } = "";
         public string IfWidthCode { get; set; } = "";
         public int IfShiftHz { get; set; } = 0;
-        public string Mode { get; set; } = "";
-        // Antenna selection ("1" / "2" / "3"). Empty for legacy profiles
-        // saved before this field existed — guard restore with IsNullOrEmpty.
         public string Antenna { get; set; } = "";
     }
 }
