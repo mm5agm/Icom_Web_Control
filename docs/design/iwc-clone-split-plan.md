@@ -121,7 +121,7 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 1. ✅ Set frequency (`05`) — click-to-tune + keypad + "set frequency…" voice
 2. ✅ Read/set mode (`04`/`06`, plus DATA modes via `1A 06` → DATA-U/L/FM; full IC-7300 mode set, dropdown trimmed)
 3. ✅ S-meter (`15 02`, big-endian BCD) → existing gauge; poll loop restructured (freq=liveness every loop, S-meter every loop, mode every 3rd), 150 ms interval, SignalR push for smooth needle
-4. PTT / TX status, power/SWR meters (`1C 00`, `15 11`/`15 12`)
+4. ✅ PTT / TX status, power/SWR meters (`1C 00`, `15 11`/`15 12`) — software PTT (web + API + voice), Po/SWR gauges rise on TX / zero on RX; hardware-verified into dummy load
 5. Band/VFO select, split
 6. Scope waveform stream (`27 00`, 475 bins, 11 USB segments reassembled) → existing `SpectrumPanel` — **no SDRplay needed**. (Later: switch the feed to the rear LAN port for a faster, single-segment 490-bin stream — no protocol rewrite, just skip reassembly.)
 
@@ -162,3 +162,18 @@ After Phase 1 there's a running app with a hole where the protocol goes. Every p
 - **Prefer keeping both VFOs on the same band.** Frequency changes within a band are pure DSP — instant, silent, zero relay wear. Crossing bands clicks band-pass/tuner relays on every switch (mechanical wear + audible clunk). If both signals fall inside one **fixed-mode** scope span, don't switch the scope at all — one sweep shows both, with two cursors (elegant for two stations close together).
 - **TX always commits to primary** — only one VFO can transmit; that's just existing split semantics.
 - **Accessibility angle:** the silent watch could gain a voice/tone cue ("signal on VFO B") for partially-sighted ops, turning a visual-first feature into an audible watch too.
+
+---
+
+## Phase 6 (future) — CW decode on screen (MM5AGM request)
+
+**Idea:** decode received CW and show the text live in the app, toggled on/off by an on-screen button.
+
+**The source question — this is NOT a simple CAT read.** The IC-7300 / MkII decodes CW *internally* for its own front-panel display, but **does not expose the decoded ASCII text over CI-V.** There is no "read decoded CW" command. So IWC has to decode the audio itself:
+- **Where the audio is:** the radio presents USB audio (the same codec WSJT-X/fldigi use). A CW decoder needs that receive-audio stream.
+- **Decode options:** (a) do it in the browser off the operator's local audio via Web Audio API + a Goertzel/FFT tone detector + Morse timing state machine — keeps it client-side, no server audio plumbing; or (b) decode server-side from the radio's USB audio device and push text over SignalR (`CwDecode` envelope) like any other state update. (b) matches the existing architecture (server owns the radio, frontend renders pushed state) and works for remote operators who don't have the audio locally.
+- **Accessibility tie-in:** decoded CW could also feed the existing `window.voiceAnnounce` hooks (the voice-announcement system inline in `Index.cshtml`) to read the text aloud — directly useful for partially-sighted CW ops.
+
+**UI:** an on-screen toggle button (per MM5AGM) shows/hides a CW-text panel; off by default. Independent of the pseudo-dual-receiver work — can land any time after the audio path is decided.
+
+**Open decisions before building:** client-side vs server-side decode (leaning server-side for remote parity); which audio device/stream; whether to gate the panel behind a Settings toggle as well as the on-screen button.
