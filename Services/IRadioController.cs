@@ -58,6 +58,17 @@ namespace Icom_Web_Control.Services
         Task<bool> GetTransmitAsync(CancellationToken cancellationToken = default);
         Task SetTransmitAsync(bool transmit, CancellationToken cancellationToken = default);
 
+        // -- RF output power set (CI-V 14 0A) -----------------------------------
+        // Power is expressed to the app as a 0–100 % level (the radio's native
+        // form for CI-V 14 0A). The 100 W IC-7300 family maps watts 1:1 to
+        // percent; a future higher-power radio would scale in its own controller.
+
+        /// <summary>Read RF output power as a 0–100 % level (CI-V 14 0A read). -1 on a miss.</summary>
+        Task<int> GetRfPowerPercentAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set RF output power as a 0–100 % level (CI-V 14 0A set, scaled to 0–255).</summary>
+        Task SetRfPowerPercentAsync(int percent, CancellationToken cancellationToken = default);
+
         // -- VFO / split (Phase 3 block 5) --------------------------------------
         // GetFrequencyHzAsync / SetFrequencyHzAsync / GetModeAsync / SetModeAsync
         // above already take a RadioVfo and, from block 5, address each VFO

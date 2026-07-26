@@ -78,6 +78,29 @@ namespace Icom_Web_Control.Services.Civ
         public const byte SubPoMeter = 0x11;
         public const byte SubSwrMeter = 0x12;
 
+        // The remaining 15-family meters (same 0–255 big-endian BCD form as
+        // above). ALC/COMP read 00 00 while receiving; Id is ~0 on RX and rises
+        // on TX; Vd (PA supply) reads the idle rail on RX (~13.8 V) and sags
+        // under load on TX. The IC-7300 has NO temperature meter over CI-V —
+        // that inherited YWC gauge is dropped for this radio.
+        //   ALC  : 15 13  (00 00=min … 01 20=max)
+        //   COMP : 15 14  (00 00=0 dB … 02 10=30 dB)
+        //   Vd   : 15 15  (00 00=0 V, 00 13=10 V, 02 41=16 V)
+        //   Id   : 15 16  (00 00=0, 00 97=10 A, 01 46=15 A, 02 41=25 A)
+        public const byte SubAlcMeter = 0x13;
+        public const byte SubCompMeter = 0x14;
+        public const byte SubVdMeter = 0x15;
+        public const byte SubIdMeter = 0x16;
+
+        // RF output power set (command 14, sub 0A). Unlike the
+        // Yaesu "PCnnn;" watts command, the IC-7300 sets power as a 0000–0255
+        // level in two big-endian BCD bytes (same packing as the meters)
+        // mapping to 0–100 %: 00 00=0 %, 01 43=50 %, 02 55=100 %.
+        //   Read : send 14 0A            → reply 14 0A <d1> <d2>
+        //   Set  : send 14 0A <d1> <d2>  → FB / FA
+        public const byte CmdSetLevel = 0x14;
+        public const byte SubRfPower = 0x0A;
+
         // Phase 3 block 5 — VFO select, split, and true per-VFO frequency/mode.
         //
         // VFO select (command 07) — set-only, no read of the active VFO exists:

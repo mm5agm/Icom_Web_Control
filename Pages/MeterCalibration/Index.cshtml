@@ -11,7 +11,7 @@
         <div class="header-actions">
             <button id="saveAllBtn" class="btn-save">Save Calibration</button>
             <button id="resetViewBtn" class="btn-secondary">Reload From File</button>
-            <button id="resetDefaultsBtn" class="btn-secondary" title="Discard your customisations and reload the calibration shipped with YWC for your radio model">Reset to Defaults</button>
+            <button id="resetDefaultsBtn" class="btn-secondary" title="Discard your customisations and reload the calibration shipped with IWC for your radio model">Reset to Defaults</button>
             <button id="txBtn" class="btn-tx">TX</button>
             <button id="helpBtn" class="btn-help">? Help</button>
             <button type="button" onclick="window.open(window.location.origin + '/Diagnostics', 'diagnostics', 'width=1400,height=900,resizable=yes')" class="btn-help">Diagnostics</button>
@@ -30,7 +30,6 @@
             createSWRGauge,
             createCompressionGauge,
             createALCGauge,
-            createTempGauge,
             createIDDGauge,
             createVDDGauge
         } from "/js/guages/gaugeFactory.js";
@@ -41,7 +40,6 @@
             { name: "SWR", title: "SWR", type: "numeric", statusPath: ["swrMeter"], creator: createSWRGauge },
             { name: "Compression", title: "Compression", type: "numeric", statusPath: ["compressionMeter"], creator: createCompressionGauge },
             { name: "ALC", title: "ALC", type: "numeric", statusPath: ["alcMeter"], creator: createALCGauge },
-            { name: "TPA", title: "PA Temperature", type: "numeric", statusPath: ["temperature"], creator: createTempGauge },
             { name: "IDD", title: "IDD", type: "numeric", statusPath: ["iddMeter"], creator: createIDDGauge },
             { name: "VPA", title: "VDD", type: "numeric", statusPath: ["vddMeter"], creator: createVDDGauge }
         ];
@@ -192,7 +190,6 @@
                 "SWR": "swrMeterValue",
                 "Compression": "compressionMeterValue",
                 "ALC": "alcMeterValue",
-                "TPA": "paTemperatureValue",
                 "IDD": "iddMeterValue",
                 "VPA": "vddMeterValue"
             }[meterName];
@@ -344,7 +341,7 @@
         document.getElementById("resetDefaultsBtn").addEventListener("click", async () => {
             // Confirm because this discards user customisations.
             const ok = confirm(
-                "Reset calibration to the defaults shipped with YWC for your radio?\n\n" +
+                "Reset calibration to the defaults shipped with IWC for your radio?\n\n" +
                 "Any meter values you've adjusted yourself will be discarded.\n" +
                 "Use this after switching to a different radio model in Settings, " +
                 "or to start a fresh calibration from the shipped defaults."

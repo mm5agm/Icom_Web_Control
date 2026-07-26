@@ -33,13 +33,9 @@ export class FTdx101Meters {
         this._iddLast      = 0;
         this._iddZeroCount = 0;
 
-        // VDD filter state
-        this._lastValidVDD = 204;  // ~48 V default
-        this._vddLast      = 48;
-
-        // Temperature filter state
-        this._paTempLast      = 0;
-        this._paTempZeroCount = 0;
+        // VDD filter state — IC-7300 idles at ~13.8 V on the PA rail.
+        this._vddLast  = 13.8;
+        this._vddSkips = 0;
     }
 
     // ----------------------------------------------------------------
@@ -77,7 +73,6 @@ export class FTdx101Meters {
             case 'ALCMeter':         return this._processALC(rawValue);
             case 'IDDMeter':         return this._processIDD(rawValue);
             case 'VDDMeter':         return this._processVDD(rawValue);
-            case 'Temperature':      return this._processTemp(rawValue);
             default:                 return null;
         }
     }
@@ -88,7 +83,7 @@ export class FTdx101Meters {
      */
     isMeterProperty(property) {
         return ['PowerMeter', 'SWRMeter', 'CompressionMeter', 'ALCMeter',
-                'IDDMeter', 'VDDMeter', 'Temperature'].includes(property);
+                'IDDMeter', 'VDDMeter'].includes(property);
     }
 
     // ----------------------------------------------------------------
@@ -110,7 +105,7 @@ export class FTdx101Meters {
         if (this._powerHistory.length > this._powerHistoryLength) this._powerHistory.shift();
         const rawAvg      = this._powerHistory.reduce((s, v) => s + v, 0) / this._powerHistory.length;
         const watts       = this._calibration.calibrateNumeric('PWR', rawAvg);
-        const clampedWatts = Math.round(Math.max(0, Math.min(watts, 200)));
+        const clampedWatts = Math.round(Math.max(0, Math.min(watts, 100)));
         this._meterPanel.update('power', clampedWatts);
         return { skip: false, gaugeKey: 'power', displayValue: { watts: clampedWatts, rawAvg } };
     }
@@ -138,22 +133,25 @@ export class FTdx101Meters {
     }
 
     _processCompression(raw) {
+        // IC-7300 COMP meter: raw 0=0 dB, 130=15 dB, 210=30 dB (CI-V 15 14).
         const db = this._isTransmitting
-            ? Math.max(0, Math.min(20, this._calibration.calibrateNumeric('Compression', raw)))
+            ? Math.max(0, Math.min(30, this._calibration.calibrateNumeric('Compression', raw)))
             : 0;
         this._meterPanel.update('compression', db);
         return { skip: false, gaugeKey: 'compression', displayValue: { db } };
     }
 
     _processALC(raw) {
+        // IC-7300 ALC is a relative 0–100 % scale, not volts: the CI-V meter
+        // (15 13) reads raw 0=minimum … 120=maximum, so the calibration maps
+        // raw→percent and the gauge face is 0–100 %.
         if (!this._isTransmitting) {
             this._meterPanel.update('alc', 0);
-            return { skip: false, gaugeKey: 'alc', displayValue: { percent: 0, alcVolts: 0, rawValue: 0 } };
+            return { skip: false, gaugeKey: 'alc', displayValue: { percent: 0, rawValue: 0 } };
         }
-        const alcVolts = this._calibration.calibrateNumeric('ALC', raw);
-        const percent  = Math.round((raw / 255) * 100);
-        this._meterPanel.update('alc', raw);  // gauge uses raw 0–255 scale
-        return { skip: false, gaugeKey: 'alc', displayValue: { percent, alcVolts, rawValue: raw } };
+        const percent = Math.round(Math.max(0, Math.min(100, this._calibration.calibrateNumeric('ALC', raw))));
+        this._meterPanel.update('alc', percent);
+        return { skip: false, gaugeKey: 'alc', displayValue: { percent, rawValue: raw } };
     }
 
     _processIDD(raw) {
@@ -177,28 +175,17 @@ export class FTdx101Meters {
     }
 
     _processVDD(raw) {
-        const minRaw = 175;  // ~41.2 V — margin above gauge minimum
-        const maxRaw = 235;  // ~55 V
-        if (raw < minRaw || raw > maxRaw) return { skip: true };
-        this._lastValidVDD = raw;
-        const volts = this._calibration.calibrateNumeric('VPA', this._lastValidVDD);
-        if (Math.abs(volts - this._vddLast) > 3 && this._vddLast !== 0) return { skip: true };
-        this._vddLast = volts;
-        this._meterPanel.update('vdd', Math.max(40, Math.min(volts, 55)));
-        return { skip: false, gaugeKey: 'vdd', displayValue: { volts } };
-    }
-
-    _processTemp(tempC) {
-        if (tempC === 0) {
-            this._paTempZeroCount++;
-            if (this._paTempZeroCount < 2) return { skip: true };
-        } else {
-            this._paTempZeroCount = 0;
+        // IC-7300 Vd (PA supply): raw 0=0 V, 13=10 V, 241=16 V (CI-V 15 15).
+        // The rail is steady, so reject a single wild jump (>2 V) but let a
+        // genuine, persistent shift through on the next reading (bounded skip).
+        const volts = this._calibration.calibrateNumeric('VPA', raw);
+        if (this._vddLast !== 0 && Math.abs(volts - this._vddLast) > 2 && this._vddSkips < 1) {
+            this._vddSkips++;
+            return { skip: true };
         }
-        if (Math.abs(tempC - this._paTempLast) > 10 && this._paTempLast !== 0) return { skip: true };
-        this._paTempLast = tempC;
-        const calibrated = this._calibration.calibrateNumeric('TPA', tempC);
-        this._meterPanel.update('temp', calibrated);
-        return { skip: false, gaugeKey: 'temp', displayValue: { tempC: calibrated } };
+        this._vddSkips = 0;
+        this._vddLast = volts;
+        this._meterPanel.update('vdd', Math.max(10, Math.min(volts, 16)));
+        return { skip: false, gaugeKey: 'vdd', displayValue: { volts } };
     }
 }

@@ -23,8 +23,7 @@ export class MeterPanel {
      *     alc:         { canvasId: 'alcMeterCanvas' },
      *     compression: { canvasId: 'compressionMeterCanvas' },
      *     idd:         { canvasId: 'iddMeterCanvas' },
-     *     vdd:         { canvasId: 'vddMeterCanvas' },
-     *     temp:        { canvasId: 'tempMeterCanvas' }
+     *     vdd:         { canvasId: 'vddMeterCanvas' }
      *   }
      */
     constructor(config = {}) {

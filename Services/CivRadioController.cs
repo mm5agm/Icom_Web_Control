@@ -351,6 +351,44 @@ namespace Icom_Web_Control.Services
             return _state.IsTransmitting;
         }
 
+        // -- RF output power set (CI-V 14 0A) ----------------------------------
+
+        /// <summary>
+        /// Read RF output power (command 14 0A). The reply carries a 0–255 level
+        /// as two big-endian BCD bytes (same form as the 15-family meters); we
+        /// return it as a 0–100 % value. -1 on any miss.
+        /// </summary>
+        public async Task<int> GetRfPowerPercentAsync(CancellationToken cancellationToken = default)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSetLevel, CivProtocol.SubRfPower);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdSetLevel, cancellationToken: cancellationToken);
+            // Reply body is 14 0A <d1> <d2>: Data = [0A, d1, d2].
+            if (reply == null || reply.Cmd != CivProtocol.CmdSetLevel
+                || reply.Data.Length < 3 || reply.Data[0] != CivProtocol.SubRfPower)
+                return -1;
+            int level = CivProtocol.BcdByte(reply.Data[1]) * 100 + CivProtocol.BcdByte(reply.Data[2]);
+            return (int)Math.Round(Math.Clamp(level, 0, 255) * 100.0 / 255.0);
+        }
+
+        /// <summary>
+        /// Set RF output power (command 14 0A). The 0–100 % level is scaled to the
+        /// radio's 0–255 range and sent as two big-endian BCD bytes.
+        /// </summary>
+        public async Task SetRfPowerPercentAsync(int percent, CancellationToken cancellationToken = default)
+        {
+            int level = (int)Math.Round(Math.Clamp(percent, 0, 100) * 255.0 / 100.0);
+            byte d1 = (byte)(level / 100);                    // 0–2: a single BCD digit is its own value
+            int rem = level % 100;
+            byte d2 = (byte)(((rem / 10) << 4) | (rem % 10)); // packed BCD of the low two digits
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSetLevel, CivProtocol.SubRfPower, d1, d2);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set RF power {Percent}% (level {Level}) was not acknowledged",
+                    percent, level);
+        }
+
         // -- VFO select / exchange / split (Phase 3 block 5) -------------------
 
         public async Task SelectVfoAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
@@ -530,22 +568,41 @@ namespace Icom_Web_Control.Services
 
                     if (transmitting)
                     {
-                        // Transmitting: the S-meter is meaningless; Po (15 11) and
-                        // SWR (15 12) are the live needles. A -1 miss leaves the
-                        // last value in place.
+                        // Transmitting: the S-meter is meaningless; the TX needles
+                        // — Po (15 11), SWR (15 12), ALC (15 13), COMP (15 14) and
+                        // Id (15 16) — are live. A -1 miss leaves the last value.
                         int po = await ReadMeterAsync(CivProtocol.SubPoMeter, stoppingToken);
                         if (po >= 0) _state.PowerMeter = po;
                         int swr = await ReadMeterAsync(CivProtocol.SubSwrMeter, stoppingToken);
                         if (swr >= 0) _state.SWRMeter = swr;
+                        int alc = await ReadMeterAsync(CivProtocol.SubAlcMeter, stoppingToken);
+                        if (alc >= 0) _state.ALCMeter = alc;
+                        int comp = await ReadMeterAsync(CivProtocol.SubCompMeter, stoppingToken);
+                        if (comp >= 0) _state.CompressionMeter = comp;
+                        int id = await ReadMeterAsync(CivProtocol.SubIdMeter, stoppingToken);
+                        if (id >= 0) _state.IDDMeter = id;
                     }
                     else
                     {
                         // Receiving: S-meter (command 15 02) is the fast-moving
-                        // meter. Zero the TX needles once so they don't hang at
-                        // their last transmit reading after unkey.
+                        // meter. Zero the TX-only needles once so they don't hang
+                        // at their last transmit reading after unkey.
                         _state.SMeterA = await ReadSMeterAsync(RadioVfo.A, stoppingToken);
                         if (_state.PowerMeter is not (null or 0)) _state.PowerMeter = 0;
                         if (_state.SWRMeter is not (null or 0)) _state.SWRMeter = 0;
+                        if (_state.ALCMeter is not (null or 0)) _state.ALCMeter = 0;
+                        if (_state.CompressionMeter is not (null or 0)) _state.CompressionMeter = 0;
+                        if (_state.IDDMeter is not (null or 0)) _state.IDDMeter = 0;
+                    }
+
+                    // Vd — the PA supply rail (15 15) — is present in both states
+                    // (idle voltage on RX, sagging under load on TX), so read it
+                    // independently of the TX/RX branch but slowly; it moves
+                    // gently and shouldn't crowd out the S-meter.
+                    if (loop % SplitPollEveryNLoops == 0)
+                    {
+                        int vd = await ReadMeterAsync(CivProtocol.SubVdMeter, stoppingToken);
+                        if (vd >= 0) _state.VDDMeter = vd;
                     }
 
                     // Mode (command 26) changes rarely, so poll it less often to

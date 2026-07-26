@@ -995,29 +995,25 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                await EnsureConnectedAsync();
-
-                var settings = await _settingsService.GetSettingsAsync();
-                int maxPower = settings.RadioModel == "FTdx101MP" ? 200 : 100;
-
-                _logger.LogInformation("[API] Received SetPower request: receiver={Receiver}, Watts={Watts}, Model={Model}", receiver, request.Watts, settings.RadioModel);
-                _logger.LogInformation("[API] DEBUG: Received slider value = {Watts}", request.Watts);
+                // IC-7300 family is a 100 W radio; the slider's watts map 1:1 to
+                // the radio's 0–100 % RF-power level (CI-V 14 0A).
+                const int maxPower = 100;
 
                 if (request.Watts < 5 || request.Watts > maxPower)
-                    return BadRequest(new { error = $"Power out of range (5-{maxPower}W for {settings.RadioModel})" });
+                    return BadRequest(new { error = $"Power out of range (5-{maxPower}W)" });
 
-                var command = $"PC{request.Watts:D3};";
-                _logger.LogInformation("[API] Sending CAT command: {Command}", command);
-                await _catClient.SendCommandAsync(command, "WebUI", CancellationToken.None);
-                // Immediately send PC; to read back power
-                var readResponse = await _catClient.SendCommandAsync("PC;", "WebUI", CancellationToken.None);
-                int actualPower = ParsePower(readResponse ?? "");
-                _logger.LogInformation("[Slider][CAT] Sent PC command: watts={Watts}, readback={Readback}, actualPower={ActualPower}", request.Watts, readResponse, actualPower);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
 
-                _logger.LogInformation("[API] Setting Power to {ActualPower}", actualPower);
+                // Set RF power via the CI-V seam (command 14 0A),
+                // then read it back so the UI shows the level the radio landed on.
+                int percent = request.Watts;
+                await _radio.SetRfPowerPercentAsync(percent, CancellationToken.None);
+                int readback = await _radio.GetRfPowerPercentAsync(CancellationToken.None);
+                int actualPower = readback >= 0 ? readback : request.Watts;
                 _radioStateService.Power = actualPower;
 
-                _logger.LogInformation("[API] Power set to {Power}W on {RadioModel}", actualPower, settings.RadioModel);
+                _logger.LogInformation("[Slider][CAT] RF power set via CI-V: requested={Watts}W, readback={Actual}W", request.Watts, actualPower);
                 return Ok(new { message = $"Power set to {actualPower}W", maxPower = maxPower });
             }
             catch (Exception ex)
@@ -1029,20 +1025,6 @@ namespace Icom_Web_Control.Controllers
             {
                 _requestSemaphore.Release();
             }
-        }
-
-        // Add this helper method (put it near other helper methods like ParseSMeter)
-        private int ParsePower(string response)
-        {
-            // Response format: PC123; (3 digits for watts)
-            if (response.Length >= 5 && response.StartsWith("PC"))
-            {
-                if (int.TryParse(response.Substring(2, 3), out int watts))
-                {
-                    return watts;
-                }
-            }
-            return 100; // Default to 100W if can't parse
         }
 
         [HttpPost("afgain")]

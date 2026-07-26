@@ -431,19 +431,15 @@
                             </div>
                         </div>
                         @if (!isFtdx10 && !isFt710) {
-                        <!-- PA Temperature Meter — FTdx101/FTDX3000 only (high-voltage PA board) -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
-                            <div class="analog-meter-container">
-                                <canvas id="tempMeterCanvas" role="img" aria-hidden="true" aria-label="Amplifier temperature meter" data-a11y-key="meters.temp"></canvas>
-                            </div>
-                        </div>
-                        <!-- IDD Meter — FTdx101/FTDX3000 only -->
+                        @* IC-7300 reports Id (drain current) and Vd (PA supply) over CI-V, but
+                           has NO temperature meter over CI-V — the inherited PA-temp gauge is dropped. *@
+                        <!-- IDD Meter — drain current (CI-V 15 16) -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="iddMeterCanvas" role="img" aria-hidden="true" aria-label="Drain current meter" data-a11y-key="meters.idd"></canvas>
                             </div>
                         </div>
-                        <!-- VDD Meter — FTdx101/FTDX3000 only -->
+                        <!-- VDD Meter — PA supply voltage (CI-V 15 15) -->
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="vddMeterCanvas" role="img" aria-hidden="true" aria-label="Amplifier supply voltage meter" data-a11y-key="meters.vdd"></canvas>
@@ -467,7 +463,7 @@
                         <input type="range" class="flex-shrink-0" id="powerSlider"
                                aria-label="Transmit power"
                                title="Transmit power"
-                               min="5" max="200" step="5"
+                               min="5" max="100" step="5"
                                value="@Model.RadioState.Power"
                                style="width: clamp(80px, 10vw, 150px); height: 18px;"
                                oninput="window.radioControl.updatePowerDisplay(window.txVfo === 1 ? 'B' : 'A', this.value)"
@@ -2085,7 +2081,6 @@
                 swr:         { canvasId: 'swrMeterCanvas' },
                 compression: { canvasId: 'compressionMeterCanvas' },
                 alc:         { canvasId: 'alcMeterCanvas' },
-                temp:        { canvasId: 'tempMeterCanvas' },
                 idd:         { canvasId: 'iddMeterCanvas' },
                 vdd:         { canvasId: 'vddMeterCanvas' }
             });

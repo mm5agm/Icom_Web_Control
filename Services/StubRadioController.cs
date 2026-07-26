@@ -97,6 +97,20 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- RF output power set (CI-V 14 0A, canned) --------------------------
+
+        private int _rfPowerPercent = 100; // stub starts at full power
+
+        public Task<int> GetRfPowerPercentAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(_rfPowerPercent);
+
+        public Task SetRfPowerPercentAsync(int percent, CancellationToken cancellationToken = default)
+        {
+            _rfPowerPercent = Math.Clamp(percent, 0, 100);
+            _state.Power = _rfPowerPercent;
+            return Task.CompletedTask;
+        }
+
         // -- VFO / split (Phase 3 block 5, canned) -----------------------------
 
         private bool _split;
@@ -178,9 +192,9 @@ namespace Icom_Web_Control.Services
                 _state.ALCMeter = 0;
                 _state.CompressionMeter = 0;
 
-                // Slowly varying environmentals so those gauges aren't frozen.
-                _state.Temperature = 40 + (int)(10 * Math.Sin(phase / 4));
-                _state.VDDMeter = 130;
+                // IC-7300 has no temperature meter over CI-V; the PA rail idles
+                // near 13.8 V (raw ≈ 157 on the Vd scale: raw 13=10 V, 241=16 V).
+                _state.VDDMeter = 157;
                 _state.IDDMeter = 0;
 
                 try { await Task.Delay(500, stoppingToken); }

@@ -342,21 +342,15 @@ window.setAntenna = async function (receiver, antenna) {
     }
 };
 
-// Centralised radio -> max-power mapping. Source of truth used by both
-// updatePowerSliderMax implementations. Without this, only the two FTdx101
-// variants were named explicitly and other 100 W radios (FTdx10, FT-710,
-// FTDX3000, FT-991A) fell through to a 200 W cap (#37, SP3L-Jacek 2026-06-16).
+// Centralised radio -> max-power mapping. IWC targets the Icom IC-7300 family
+// (IC-7300 and IC-7300 MkII), both 100 W radios, so this is 100 W across the
+// board — the switch is kept only so a future higher-power Icom can be added.
 function modelMaxPower(model) {
-    if (!model) return 200;
-    switch (model.toLowerCase()) {
-        case "ftdx101mp": return 200;
-        case "ftdx101d":
-        case "ftdx10":
-        case "ft-710":
-        case "ftdx3000":
-        case "ft-991a":
+    switch ((model || "").toLowerCase()) {
+        case "ic-7300mk2":
+        case "ic-7300":
+        default:
             return 100;
-        default: return 200;
     }
 }
 window.modelMaxPower = modelMaxPower;
@@ -368,7 +362,7 @@ function updatePowerSliderMax(maxPower) {
     const model = (window.state && window.state.radioModel) || null;
     const actualMax = model
         ? modelMaxPower(model)
-        : (typeof maxPower === "number" ? maxPower : 200);
+        : (typeof maxPower === "number" ? maxPower : 100);
 
     if (slider) {
         slider.max = actualMax;
@@ -436,22 +430,23 @@ function updateMeterDomLabel(property, result) {
             break;
         }
         case 'ALCMeter': {
+            // IC-7300 ALC is a 0–100 % scale (see FTdx101Meters._processALC).
             const el  = document.getElementById('alcValue');
             const bar = document.getElementById('alcBar');
             const meterEl = document.getElementById('alcMeterValue');
-            const alcFormatted = window.MeterFormatters.alcVolts(dv.alcVolts);
-            if (el) el.textContent = window.MeterFormatters.percent(dv.percent);
+            const pct = dv.percent;
+            if (el) el.textContent = window.MeterFormatters.percent(pct);
             if (bar) {
-                bar.style.width = `${dv.percent}%`;
-                bar.setAttribute('aria-valuenow', dv.percent);
+                bar.style.width = `${pct}%`;
+                bar.setAttribute('aria-valuenow', pct);
                 bar.className = 'progress-bar';
-                if (dv.percent < 70)      bar.classList.add('bg-success');
-                else if (dv.percent < 90) bar.classList.add('bg-warning');
-                else                      bar.classList.add('bg-danger');
+                if (pct < 70)      bar.classList.add('bg-success');
+                else if (pct < 90) bar.classList.add('bg-warning');
+                else               bar.classList.add('bg-danger');
             }
-            if (meterEl) meterEl.textContent = alcFormatted;
+            if (meterEl) meterEl.textContent = String(pct);
             const alcCanvas = document.getElementById('alcMeterCanvas');
-            if (alcCanvas) alcCanvas.dataset.reading = alcFormatted;
+            if (alcCanvas) alcCanvas.dataset.reading = String(pct);
             break;
         }
         case 'IDDMeter': {
@@ -467,14 +462,6 @@ function updateMeterDomLabel(property, result) {
             const el = document.getElementById('vddMeterValue');
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('vddMeterCanvas');
-            if (canvas) canvas.dataset.reading = formatted;
-            break;
-        }
-        case 'Temperature': {
-            const formatted = window.MeterFormatters.tempOverlay(dv.tempC);
-            const el = document.getElementById('paTemperatureValue');
-            if (el) el.textContent = formatted;
-            const canvas = document.getElementById('tempMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
             break;
         }
@@ -2240,8 +2227,8 @@ document.addEventListener('DOMContentLoaded', function() {
         lastMode: { A: null, B: null },
         lastAntenna: { A: null, B: null },
         lastPower: { A: 100, B: 100 },
-        maxPower: 200,
-        radioModel: 'FTdx101MP',
+        maxPower: 100,
+        radioModel: 'IC-7300MK2',
         pollingInterval: null,
         operationInProgress: false,
         isTransmitting: false  // Track TX state for meter display
@@ -2845,21 +2832,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.radioModel !== undefined) {
                 state.radioModel = data.radioModel;
             }
-            // Always call updatePowerSliderMax to use latest radioModel
-            if (state.radioModel) {
-                const model = state.radioModel.toLowerCase();
-                if (model === "ftdx101d") {
-                    state.maxPower = 100;
-                } else if (model === "ftdx101mp") {
-                    state.maxPower = 200;
-                } else {
-                    const maxPower = (data.maxPower !== undefined) ? data.maxPower : 200;
-                    state.maxPower = maxPower;
-                }
-            } else {
-                const maxPower = (data.maxPower !== undefined) ? data.maxPower : 200;
-                state.maxPower = maxPower;
-            }
+            // IC-7300 family is 100 W; modelMaxPower is the single source of truth.
+            state.maxPower = window.modelMaxPower(state.radioModel);
             updatePowerSliderMax();
 
             state.lastMode.A = data.vfoA.mode;
@@ -3007,7 +2981,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const labelMax = document.getElementById('powerMaxLabel');
         const actualMax = state.radioModel
             ? window.modelMaxPower(state.radioModel)
-            : (typeof maxPower === "number" ? maxPower : 200);
+            : (typeof maxPower === "number" ? maxPower : 100);
 
         if (slider) {
             slider.max = actualMax;
@@ -3433,7 +3407,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // TX-only meter canvases have no reading until the radio transmits.
     // Pre-fill with '—' so hover always announces something (name + dash rather than name only).
     document.addEventListener('DOMContentLoaded', function () {
-        ['vddMeterCanvas', 'iddMeterCanvas', 'tempMeterCanvas', 'compressionMeterCanvas'].forEach(id => {
+        ['vddMeterCanvas', 'iddMeterCanvas', 'compressionMeterCanvas'].forEach(id => {
             const c = document.getElementById(id);
             if (c && !c.dataset.reading) c.dataset.reading = '—';
         });
