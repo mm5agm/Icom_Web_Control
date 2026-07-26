@@ -78,6 +78,24 @@ namespace Icom_Web_Control.Controllers
             return Ok(new { message = $"AF Gain {value} set for Receiver {receiver}" });
         }
 
+        // The spectrum scope is receiver-wide on the IC-7300 (one receiver), so
+        // either panel's span buttons drive the single 27 15 span. The body is
+        // the SPAN ± half-width in Hz; the displayed full width is twice it.
+        private static readonly int[] AllowedScopeSpansHz =
+            { 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000 };
+
+        [HttpPost("scopespan/{receiver}")]
+        public async Task<IActionResult> SetScopeSpan(string receiver, [FromBody] int hz)
+        {
+            if (Array.IndexOf(AllowedScopeSpansHz, hz) < 0)
+                return BadRequest(new { error = $"Scope span {hz} Hz not one of ±2.5k…±500k" });
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio not connected" });
+
+            await _radio.SetScopeSpanAsync(hz, CancellationToken.None);
+            return Ok(new { message = $"Scope span ±{hz} Hz set (Receiver {receiver})" });
+        }
+
         [HttpPost("micgain")]
         public async Task<IActionResult> SetMicGain([FromBody] MicGainRequest request)
         {

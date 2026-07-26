@@ -47,6 +47,12 @@ namespace Icom_Web_Control.Services
         // replaced with whatever actually answers (reply From byte) on connect.
         private byte _radioAddress = CivProtocol.DefaultRadioAddress;
 
+        // Spectrum scope (block 6): reassembles the unsolicited 27 00 waveform
+        // stream and counts broadcasts so we can re-assert "streaming" as a
+        // heartbeat for clients that load after the stream is already flowing.
+        private readonly CivScopeAssembler _scope = new();
+        private int _scopeBroadcasts;
+
         public CivRadioController(
             RadioStateService state,
             ICivClient bus,
@@ -59,6 +65,11 @@ namespace Icom_Web_Control.Services
             _settings = settings;
             _hubContext = hubContext;
             _logger = logger;
+
+            // The radio pushes 27 00 scope frames unsolicited (they never match a
+            // pending transaction), so they arrive here rather than through the
+            // request/reply path.
+            _bus.UnsolicitedFrame += OnUnsolicitedFrame;
         }
 
         public bool IsConnected => _bus.IsOpen;
@@ -84,8 +95,92 @@ namespace Icom_Web_Control.Services
             // a miss just leaves the existing default.
             await SeedRxControlsAsync(cancellationToken);
 
+            // Turn on the CI-V spectrum scope and its waveform-to-controller
+            // stream so the radio starts pushing 27 00 frames we reassemble into
+            // the web spectrum. Best-effort — a miss just means no scope trace.
+            await EnableScopeAsync(cancellationToken);
+
             return true;
         }
+
+        // -- Spectrum scope (Phase 3 block 6) ----------------------------------
+
+        /// <summary>
+        /// Enable the spectrum scope in Center mode and switch on the waveform
+        /// output to the controller. Center mode keeps the sweep centred on the
+        /// operating frequency, which is the assumption the web SpectrumPanel's
+        /// axis is built on. Sent once per connect; best-effort.
+        /// </summary>
+        private async Task EnableScopeAsync(CancellationToken ct)
+        {
+            await SendScopeSetAsync(CivProtocol.SubScopeMode, CivProtocol.ScopeModeCenter, "scope center mode", ct);
+            await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on", ct);
+            await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", ct);
+        }
+
+        /// <summary>Send a 27-family scope set (27 &lt;sub&gt; &lt;val&gt;) and expect an ack.</summary>
+        private async Task SendScopeSetAsync(byte sub, byte val, string what, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdScope, sub, val);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] {What} was not acknowledged", what);
+        }
+
+        /// <summary>
+        /// Set the scope span (Center mode). <paramref name="spanHz"/> is the radio
+        /// SPAN ± half-width in Hz (2500 … 500000) sent as 27 15 &lt;5-byte BCD&gt;.
+        /// The waveform-info span field reads back the same value, which the
+        /// assembler doubles for the displayed full width.
+        /// </summary>
+        public async Task SetScopeSpanAsync(int spanHz, CancellationToken cancellationToken = default)
+        {
+            // The radio stores the span field as the sent value ÷ 100 (verified
+            // on the IC-7300 MkII: sending 250000 yields span field 2500). So to
+            // set span field F (the ± half-width in Hz the waveform reports), send
+            // F × 100 as the 5-byte BCD payload. Values that don't map to a valid
+            // span field are NG-rejected by the radio.
+            var body = new byte[2 + 5];
+            body[0] = CivProtocol.CmdScope;
+            body[1] = CivProtocol.SubScopeSpan;
+            var bcd = CivProtocol.EncodeBcd((long)spanHz * 100, 5);
+            Array.Copy(bcd, 0, body, 2, 5);
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] scope span ±{SpanHz} Hz was not acknowledged", spanHz);
+        }
+
+        /// <summary>
+        /// Feed unsolicited frames to the scope assembler. Runs on the serial
+        /// reader thread; the assembler is single-threaded by that contract, and
+        /// the SignalR broadcast is fire-and-forget so we never block the reader.
+        /// </summary>
+        private void OnUnsolicitedFrame(object? sender, CivFrame frame)
+        {
+            if (frame.Cmd != CivProtocol.CmdScope)
+                return;
+            var sweep = _scope.Add(frame);
+            if (sweep == null)
+                return;
+
+            // Re-assert "streaming" on the first sweep and every ~30 thereafter
+            // so a client that loads mid-stream un-hides its spectrum panel.
+            if (_scopeBroadcasts++ % 30 == 0)
+                SendHub("SdrStatus", new { sdrId = "A", status = "streaming" });
+
+            SendHub("SpectrumUpdate", new
+            {
+                sdrId = "A",
+                bins = sweep.BinsDb,
+                centreHz = sweep.CentreHz,
+                spanHz = sweep.SpanHz,
+            });
+        }
+
+        private void SendHub(string property, object value)
+            => _ = _hubContext.Clients.All.SendAsync("RadioStateUpdate", new { property, value });
 
         /// <summary>
         /// One-shot read of the receiver-wide RX controls at connect, mirrored

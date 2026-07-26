@@ -189,6 +189,32 @@ namespace Icom_Web_Control.Services.Civ
         public const byte VfoSelected = 0x00;
         public const byte VfoUnselected = 0x01;
 
+        // Phase 3 block 6 — CI-V spectrum scope (command 27). Once BOTH the
+        // scope (27 10) AND the waveform-output-to-controller function (27 11,
+        // valid only through USB/LAN) are ON, the radio *streams* waveform
+        // frames at us unsolicited:
+        //   27 00 <VFO> <order> <div> [<mode> <info×10> <oor>] <bins…>  (radio → PC)
+        // Over USB one sweep is split into 11 frames: order 01 is a header
+        // (mode + centre/span + out-of-range, no bins); orders 02–11 carry the
+        // 475 waveform bytes (0x00–0xA0, one per bin) that concatenate left
+        // edge → right edge. See docs/manuals IC-7300MK2 CI-V p.15 / p.24–26,
+        // and CivScopeAssembler for the reassembly.
+        //   27 10 01/00 = spectrum scope ON/OFF
+        //   27 11 01/00 = waveform output to controller ON/OFF (USB/LAN only)
+        //   27 14 00    = Center scope mode — centres the sweep on the operating
+        //                 frequency, which is what the web SpectrumPanel assumes.
+        public const byte CmdScope         = 0x27;
+        public const byte SubScopeWaveform = 0x00;  // 27 00 — waveform data (radio → PC)
+        public const byte SubScopeOnOff    = 0x10;  // 27 10 — scope on/off
+        public const byte SubScopeOutput   = 0x11;  // 27 11 — waveform output to controller
+        public const byte SubScopeMode     = 0x14;  // 27 14 — center/fixed/scroll
+        public const byte ScopeModeCenter  = 0x00;  // 27 14 00
+        // 27 15 — span (Center / SCROLL-C mode), sent as a 5-byte BCD frequency.
+        // The value is the ± half-width in Hz: 2500, 5000, 10000, 25000, 50000,
+        // 100000, 250000 or 500000 (radio SPAN ±2.5k … ±500k). The reported
+        // waveform-info span field reads back the same value.
+        public const byte SubScopeSpan     = 0x15;  // 27 15
+
         /// <summary>Decode one packed-BCD byte (two decimal digits) to 0–99.</summary>
         public static int BcdByte(byte b) => ((b >> 4) & 0x0F) * 10 + (b & 0x0F);
 

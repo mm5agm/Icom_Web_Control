@@ -167,5 +167,14 @@ namespace Icom_Web_Control.Services
 
         /// <summary>Set the PBT outer (PBT2) shift (0–255, 128=centre).</summary>
         Task SetPbtOuterAsync(int value, CancellationToken cancellationToken = default);
+
+        // -- Spectrum scope span (Phase 3 block 6, CI-V 27 15) -----------------
+
+        /// <summary>
+        /// Set the scope span (Center mode). <paramref name="spanHz"/> is the radio
+        /// SPAN ± half-width in Hz: 2500, 5000, 10000, 25000, 50000, 100000,
+        /// 250000 or 500000. The displayed full width is twice this.
+        /// </summary>
+        Task SetScopeSpanAsync(int spanHz, CancellationToken cancellationToken = default);
     }
 }

@@ -592,12 +592,14 @@
                         <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO A</span>
                         <div class="d-flex align-items-center gap-2">
                             <div class="btn-group btn-group-sm" role="group" aria-label="VFO A spectrum span">
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 62_500 ? "active" : "")" data-hz="62500" data-vfo="A" data-a11y-key="spectrum.spanA62k" aria-label="VFO A span 62.5 kHz" title="VFO A span 62.5 kHz — narrowest available, best for a single QSO">62.5k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 125_000 ? "active" : "")" data-hz="125000" data-vfo="A" data-a11y-key="spectrum.spanA125k" aria-label="VFO A span 125 kHz" title="VFO A span 125 kHz — best for narrow bands like 30m / 60m">125k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 250_000 ? "active" : "")" data-hz="250000" data-vfo="A" data-a11y-key="spectrum.spanA250k" aria-label="VFO A span 250 kHz" title="VFO A span 250 kHz">250k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 500_000 ? "active" : "")" data-hz="500000" data-vfo="A" data-a11y-key="spectrum.spanA500k" aria-label="VFO A span 500 kHz" title="VFO A span 500 kHz">500k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span 1 MHz" title="VFO A span 1 MHz">1M</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzA == 2_048_000 ? "active" : "")" data-hz="2048000" data-vfo="A" data-a11y-key="spectrum.spanA2m" aria-label="VFO A span 2 MHz" title="VFO A span 2 MHz">2M</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="2500" data-vfo="A" data-a11y-key="spectrum.spanA5k" aria-label="VFO A span plus or minus 2.5 kHz" title="VFO A scope span ±2.5 kHz — narrowest, one QSO">±2.5k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="5000" data-vfo="A" data-a11y-key="spectrum.spanA10k" aria-label="VFO A span plus or minus 5 kHz" title="VFO A scope span ±5 kHz">±5k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="10000" data-vfo="A" data-a11y-key="spectrum.spanA20k" aria-label="VFO A span plus or minus 10 kHz" title="VFO A scope span ±10 kHz">±10k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="25000" data-vfo="A" data-a11y-key="spectrum.spanA50k" aria-label="VFO A span plus or minus 25 kHz" title="VFO A scope span ±25 kHz">±25k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="50000" data-vfo="A" data-a11y-key="spectrum.spanA100k" aria-label="VFO A span plus or minus 50 kHz" title="VFO A scope span ±50 kHz">±50k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="100000" data-vfo="A" data-a11y-key="spectrum.spanA200k" aria-label="VFO A span plus or minus 100 kHz" title="VFO A scope span ±100 kHz">±100k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="250000" data-vfo="A" data-a11y-key="spectrum.spanA500k" aria-label="VFO A span plus or minus 250 kHz" title="VFO A scope span ±250 kHz">±250k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="500000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span plus or minus 500 kHz" title="VFO A scope span ±500 kHz — widest">±500k</button>
                             </div>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="A" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
@@ -610,9 +612,6 @@
                         <label class="text-nowrap mb-0 ms-2" title="Display ceiling — bins above this dB level are clamped (SDR Console &quot;High&quot;)">High</label>
                         <input type="range" class="form-range spectrum-high-slider" data-vfo="A" min="-100" max="0" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbA))" aria-label="VFO A spectrum High (dB ceiling)" style="flex:1; min-width:60px;">
                         <span class="text-monospace spectrum-high-label" data-vfo="A" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbA))</span>
-                        <label class="text-nowrap mb-0 ms-2" title="Pre-dB digital gain — brightens the whole trace so weak signals climb into the Low/High window. Does not change the frequency span (use the kHz/MHz buttons for that).">Gain</label>
-                        <input type="range" class="form-range spectrum-gain-slider" data-vfo="A" min="0" max="30" step="1" value="@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainA))))" aria-label="VFO A spectrum digital gain (dB)" style="flex:1; min-width:60px;">
-                        <span class="text-monospace spectrum-gain-label" data-vfo="A" style="min-width:3.5em; text-align:right;">+@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainA)))) dB</span>
                         <label class="text-nowrap mb-0 ms-2" title="How fast the waterfall scrolls, from full speed down to 1/128. Does not affect the spectrum trace above it.">Speed</label>
                         <input type="range" class="form-range spectrum-speed-slider" data-vfo="A" min="0" max="7" step="1" value="0" aria-label="VFO A waterfall scroll speed" style="flex:1; min-width:60px;">
                         <span class="text-monospace spectrum-speed-label" data-vfo="A" style="min-width:3.5em; text-align:right;">Full</span>
@@ -630,12 +629,14 @@
                         <span class="small fw-bold"><i class="bi bi-broadcast-pin me-1" aria-hidden="true"></i>Spectrum — VFO B</span>
                         <div class="d-flex align-items-center gap-2">
                             <div class="btn-group btn-group-sm" role="group" aria-label="VFO B spectrum span">
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 62_500 ? "active" : "")" data-hz="62500" data-vfo="B" data-a11y-key="spectrum.spanB62k" aria-label="VFO B span 62.5 kHz" title="VFO B span 62.5 kHz — narrowest available, best for a single QSO">62.5k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 125_000 ? "active" : "")" data-hz="125000" data-vfo="B" data-a11y-key="spectrum.spanB125k" aria-label="VFO B span 125 kHz" title="VFO B span 125 kHz — best for narrow bands like 30m / 60m">125k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 250_000 ? "active" : "")" data-hz="250000" data-vfo="B" data-a11y-key="spectrum.spanB250k" aria-label="VFO B span 250 kHz" title="VFO B span 250 kHz">250k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 500_000 ? "active" : "")" data-hz="500000" data-vfo="B" data-a11y-key="spectrum.spanB500k" aria-label="VFO B span 500 kHz" title="VFO B span 500 kHz">500k</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 1_024_000 ? "active" : "")" data-hz="1024000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span 1 MHz" title="VFO B span 1 MHz">1M</button>
-                                <button type="button" class="btn btn-outline-light btn-sm span-btn @(Model.SdrSampleRateHzB == 2_048_000 ? "active" : "")" data-hz="2048000" data-vfo="B" data-a11y-key="spectrum.spanB2m" aria-label="VFO B span 2 MHz" title="VFO B span 2 MHz">2M</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="2500" data-vfo="B" data-a11y-key="spectrum.spanB5k" aria-label="VFO B span plus or minus 2.5 kHz" title="VFO B scope span ±2.5 kHz — narrowest, one QSO">±2.5k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="5000" data-vfo="B" data-a11y-key="spectrum.spanB10k" aria-label="VFO B span plus or minus 5 kHz" title="VFO B scope span ±5 kHz">±5k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="10000" data-vfo="B" data-a11y-key="spectrum.spanB20k" aria-label="VFO B span plus or minus 10 kHz" title="VFO B scope span ±10 kHz">±10k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="25000" data-vfo="B" data-a11y-key="spectrum.spanB50k" aria-label="VFO B span plus or minus 25 kHz" title="VFO B scope span ±25 kHz">±25k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="50000" data-vfo="B" data-a11y-key="spectrum.spanB100k" aria-label="VFO B span plus or minus 50 kHz" title="VFO B scope span ±50 kHz">±50k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="100000" data-vfo="B" data-a11y-key="spectrum.spanB200k" aria-label="VFO B span plus or minus 100 kHz" title="VFO B scope span ±100 kHz">±100k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="250000" data-vfo="B" data-a11y-key="spectrum.spanB500k" aria-label="VFO B span plus or minus 250 kHz" title="VFO B scope span ±250 kHz">±250k</button>
+                                <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="500000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span plus or minus 500 kHz" title="VFO B scope span ±500 kHz — widest">±500k</button>
                             </div>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
@@ -648,9 +649,6 @@
                         <label class="text-nowrap mb-0 ms-2" title="Display ceiling — bins above this dB level are clamped (SDR Console &quot;High&quot;)">High</label>
                         <input type="range" class="form-range spectrum-high-slider" data-vfo="B" min="-100" max="0" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbB))" aria-label="VFO B spectrum High (dB ceiling)" style="flex:1; min-width:60px;">
                         <span class="text-monospace spectrum-high-label" data-vfo="B" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbB))</span>
-                        <label class="text-nowrap mb-0 ms-2" title="Pre-dB digital gain — brightens the whole trace so weak signals climb into the Low/High window. Does not change the frequency span (use the kHz/MHz buttons for that).">Gain</label>
-                        <input type="range" class="form-range spectrum-gain-slider" data-vfo="B" min="0" max="30" step="1" value="@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainB))))" aria-label="VFO B spectrum digital gain (dB)" style="flex:1; min-width:60px;">
-                        <span class="text-monospace spectrum-gain-label" data-vfo="B" style="min-width:3.5em; text-align:right;">+@((int)Math.Round(20.0 * Math.Log10(Math.Max(0.0001, (double)Model.SdrSpectrumGainB)))) dB</span>
                         <label class="text-nowrap mb-0 ms-2" title="How fast the waterfall scrolls, from full speed down to 1/128. Does not affect the spectrum trace above it.">Speed</label>
                         <input type="range" class="form-range spectrum-speed-slider" data-vfo="B" min="0" max="7" step="1" value="0" aria-label="VFO B waterfall scroll speed" style="flex:1; min-width:60px;">
                         <span class="text-monospace spectrum-speed-label" data-vfo="B" style="min-width:3.5em; text-align:right;">Full</span>
@@ -1969,9 +1967,20 @@
 
             const spectrumPipeline = new SdrSpectrumPipeline();
 
-            // Per-VFO spectrum routing.
-            spectrumPipeline.onSpectrumUpdate('A', data => spectrumPanelA.update(data));
-            spectrumPipeline.onSpectrumUpdate('B', data => spectrumPanelB.update(data));
+            // Per-VFO spectrum routing. Also keep the span buttons in step with
+            // the span the radio reports (data.spanHz is the full width; the
+            // buttons carry the ± half-width), so changing SPAN on the radio's
+            // own front panel lights the matching button here. Only touch the
+            // DOM when the span actually changes — frames arrive ~30×/s.
+            const _lastSpanHz = { A: 0, B: 0 };
+            function syncSpanButtons(vfo, data) {
+                const span = data && data.spanHz;
+                if (!span || span === _lastSpanHz[vfo]) return;
+                _lastSpanHz[vfo] = span;
+                if (window.__markActiveSpan) window.__markActiveSpan(vfo, Math.round(span / 2));
+            }
+            spectrumPipeline.onSpectrumUpdate('A', data => { spectrumPanelA.update(data); syncSpanButtons('A', data); });
+            spectrumPipeline.onSpectrumUpdate('B', data => { spectrumPanelB.update(data); syncSpanButtons('B', data); });
 
             // Per-VFO status routing — drives the panel state + small badge in the header.
             function setStatusBadge(vfo, status) {
@@ -2202,60 +2211,24 @@
                 });
             });
 
-            // Spectrum DSP sliders — Low (dB floor) / High (dB ceiling) / Gain
-            // (pre-dB digital gain in dB). On change:
-            //   • update the visible label
-            //   • update the canvas y-axis via panel.setDbRange(high, low)
-            //   • debounced POST to /api/sdr/dsp/{vfo} which persists the
-            //     value and forwards a DspSettingsPayload to the worker
-            //     over the TCP control channel — so dB clamping and EMA
-            //     reset happen on the spectrum bins before they reach us.
-            // Initial slider values come from server-side settings via Razor.
+            // Spectrum DSP sliders — Low (dB floor) / High (dB ceiling). On the
+            // CI-V scope these are purely client-side: the radio streams a fixed
+            // 0–160 amplitude trace, so Low/High only reposition the canvas
+            // colour window via panel.setDbRange(high, low). (The old pre-dB
+            // "Gain" slider is gone — it drove the SDR worker, which the CI-V
+            // scope path doesn't use.) Initial values come from Razor settings.
             (function wireDspSliders() {
-                const debTimers = { A: null, B: null };
-                const DEBOUNCE_MS = 150;
-
-                function readVfoState(vfo) {
-                    const low  = parseFloat(document.querySelector(`.spectrum-low-slider[data-vfo="${vfo}"]`).value);
-                    const high = parseFloat(document.querySelector(`.spectrum-high-slider[data-vfo="${vfo}"]`).value);
-                    const gainDb = parseFloat(document.querySelector(`.spectrum-gain-slider[data-vfo="${vfo}"]`).value);
-                    const gainLinear = Math.pow(10, gainDb / 20);
-                    return { low, high, gainDb, gainLinear };
-                }
-
                 function applyToPanel(vfo, low, high) {
                     const panel = vfo === 'B' ? spectrumPanelB : spectrumPanelA;
                     if (panel && high > low) panel.setDbRange(high, low);
                 }
 
-                function scheduleSend(vfo) {
-                    if (debTimers[vfo]) clearTimeout(debTimers[vfo]);
-                    debTimers[vfo] = setTimeout(async () => {
-                        debTimers[vfo] = null;
-                        const s = readVfoState(vfo);
-                        if (!(s.high > s.low)) return;   // server would reject anyway
-                        try {
-                            await fetch(`/api/sdr/dsp/${vfo}`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    gainLinear: s.gainLinear,
-                                    dbFloor:    s.low,
-                                    dbCeiling:  s.high
-                                })
-                            });
-                        } catch { /* network error — slider stays at user's value */ }
-                    }, DEBOUNCE_MS);
-                }
-
                 ['A', 'B'].forEach(vfo => {
                     const lowSlider  = document.querySelector(`.spectrum-low-slider[data-vfo="${vfo}"]`);
                     const highSlider = document.querySelector(`.spectrum-high-slider[data-vfo="${vfo}"]`);
-                    const gainSlider = document.querySelector(`.spectrum-gain-slider[data-vfo="${vfo}"]`);
                     const lowLabel   = document.querySelector(`.spectrum-low-label[data-vfo="${vfo}"]`);
                     const highLabel  = document.querySelector(`.spectrum-high-label[data-vfo="${vfo}"]`);
-                    const gainLabel  = document.querySelector(`.spectrum-gain-label[data-vfo="${vfo}"]`);
-                    if (!lowSlider || !highSlider || !gainSlider) return;   // VFO B hidden when no SDR
+                    if (!lowSlider || !highSlider) return;   // VFO B hidden when no SDR
 
                     // Sync canvas range to server-rendered initial slider values.
                     applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
@@ -2268,7 +2241,6 @@
                         }
                         lowLabel.textContent = lowSlider.value;
                         applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
-                        scheduleSend(vfo);
                     });
                     highSlider.addEventListener('input', () => {
                         if (parseFloat(highSlider.value) <= parseFloat(lowSlider.value)) {
@@ -2277,11 +2249,6 @@
                         }
                         highLabel.textContent = highSlider.value;
                         applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
-                        scheduleSend(vfo);
-                    });
-                    gainSlider.addEventListener('input', () => {
-                        gainLabel.textContent = '+' + gainSlider.value + ' dB';
-                        scheduleSend(vfo);
                     });
                 });
             })();
@@ -2313,27 +2280,31 @@
                 });
             });
 
-            // Span selector — POST new sample rate for this VFO and restart
-            // the corresponding worker. data-vfo on each button tells the
-            // server which VFO to apply the change to so the other panel
-            // keeps its current bandwidth.
+            // Span selector — set the IC-7300's scope span (CI-V 27 15). data-hz
+            // is the ± half-width the radio wants (2500…500000); the displayed
+            // full width is twice it. The active button is also synced from the
+            // span reported in each incoming SpectrumUpdate (see below), so it
+            // follows spans changed on the radio's own front panel too.
+            function markActiveSpan(vfo, hz) {
+                document.querySelectorAll(`.span-btn[data-vfo="${vfo}"]`).forEach(b => {
+                    b.classList.toggle('active', parseInt(b.dataset.hz, 10) === hz);
+                });
+            }
             document.querySelectorAll('.span-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
-                    const hz  = btn.dataset.hz;
-                    const vfo = btn.dataset.vfo || 'A';   // default A for safety
+                    const hz  = parseInt(btn.dataset.hz, 10);
+                    const vfo = btn.dataset.vfo || 'A';
                     try {
-                        const res = await fetch(`/api/sdr/span?hz=${hz}&sdrId=${vfo}`, { method: 'POST' });
-                        if (res.ok) {
-                            // Move active state only among buttons for this VFO,
-                            // leaving the other VFO's group untouched.
-                            document
-                                .querySelectorAll(`.span-btn[data-vfo="${vfo}"]`)
-                                .forEach(b => b.classList.remove('active'));
-                            btn.classList.add('active');
-                        }
+                        const res = await fetch(`/api/cat/scopespan/${vfo}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(hz)
+                        });
+                        if (res.ok) markActiveSpan(vfo, hz);
                     } catch { /* network error — ignore */ }
                 });
             });
+            window.__markActiveSpan = markActiveSpan;
         });
         async function launchWsjtx() {
             try {

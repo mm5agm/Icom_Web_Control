@@ -225,6 +225,16 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- Spectrum scope span (CI-V 27 15, canned) --------------------------
+
+        private int _scopeSpanHz = 25000;
+
+        public Task SetScopeSpanAsync(int spanHz, CancellationToken cancellationToken = default)
+        {
+            _scopeSpanHz = spanHz;
+            return Task.CompletedTask;
+        }
+
         // -- Hosted canned-data feeder -----------------------------------------
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
