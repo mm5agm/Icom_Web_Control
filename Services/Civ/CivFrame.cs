@@ -113,6 +113,45 @@ namespace Icom_Web_Control.Services.Civ
         public const byte SubPbtOuter = 0x08;
         public const int  PbtCentre   = 128;   // 01 28 = passband centre / no shift
 
+        // Other 14-family RX levels — all the same 00 00–02 55 (0–255) form.
+        //   14 02 = RF gain,  14 03 = squelch,  14 06 = noise-reduction level,
+        //   14 12 = noise-blanker level,  14 0D = manual-notch position
+        // Notch position is centred like PBT (01 28 = middle of the passband;
+        // 00 00 moves higher, 02 55 moves lower).
+        public const byte SubRfGain   = 0x02;
+        public const byte SubSquelch  = 0x03;
+        public const byte SubNrLevel  = 0x06;
+        public const byte SubNotchPos = 0x0D;
+        public const byte SubNbLevel  = 0x12;
+        public const int  NotchCentre = 128;
+
+        // 16-family on/off & multi-state RX functions. Read: send 16 <sub> →
+        // reply 16 <sub> <val>; set: send 16 <sub> <val> → FB/FA.
+        //   16 02 = preamp (00=OFF, 01=P.AMP1, 02=P.AMP2)
+        //   16 12 = AGC time constant (01=FAST, 02=MID, 03=SLOW — no OFF/AUTO)
+        //   16 22 = noise blanker (00/01)
+        //   16 40 = noise reduction (00/01)
+        //   16 41 = auto notch (00/01)
+        //   16 48 = manual notch (00/01)
+        //   16 56 = IF filter shape (00=SHARP, 01=SOFT)
+        //   16 57 = manual-notch filter width (00=WIDE, 01=MID, 02=NAR)
+        public const byte CmdSetFunc      = 0x16;
+        public const byte SubPreamp       = 0x02;
+        public const byte SubAgc          = 0x12;
+        public const byte SubNoiseBlanker = 0x22;
+        public const byte SubNoiseReduction = 0x40;
+        public const byte SubAutoNotch    = 0x41;
+        public const byte SubManualNotch  = 0x48;
+        public const byte SubIfFilterShape    = 0x56;   // 00=SHARP, 01=SOFT
+        public const byte SubManualNotchWidth = 0x57;   // 00=WIDE, 01=MID, 02=NAR
+
+        // Attenuator (command 11) — single 20 dB pad on the IC-7300.
+        //   Read: send 11 → reply 11 <val>;  set: send 11 <val> → FB/FA
+        //   val: 00 = OFF, 20 (BCD, i.e. 0x20) = 20 dB ON
+        public const byte CmdAttenuator = 0x11;
+        public const byte AttOff        = 0x00;
+        public const byte AttOn20dB     = 0x20;
+
         // Phase 3 block 5 — VFO select, split, and true per-VFO frequency/mode.
         //
         // VFO select (command 07) — set-only, no read of the active VFO exists:

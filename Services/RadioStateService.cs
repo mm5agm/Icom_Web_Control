@@ -202,6 +202,16 @@ namespace Icom_Web_Control.Services
         public int ManualNotchFreqA { get => _manualNotchFreqA; set => SetField(ref _manualNotchFreqA, value); }
         private int _manualNotchFreqB = 1000;
         public int ManualNotchFreqB { get => _manualNotchFreqB; set => SetField(ref _manualNotchFreqB, value); }
+        // Manual-notch filter width (CI-V 16 57): "0"=WIDE "1"=MID "2"=NAR
+        private string _manualNotchWidthA = "1";
+        public string ManualNotchWidthA { get => _manualNotchWidthA; set => SetField(ref _manualNotchWidthA, value); }
+        private string _manualNotchWidthB = "1";
+        public string ManualNotchWidthB { get => _manualNotchWidthB; set => SetField(ref _manualNotchWidthB, value); }
+        // IF DSP filter shape (CI-V 16 56): "0"=SHARP "1"=SOFT
+        private string _ifShapeA = "0";
+        public string IfShapeA { get => _ifShapeA; set => SetField(ref _ifShapeA, value); }
+        private string _ifShapeB = "0";
+        public string IfShapeB { get => _ifShapeB; set => SetField(ref _ifShapeB, value); }
 
         private int? _rfMain;
         public int? RFMain { get => _rfMain; set => SetField(ref _rfMain, value); }
@@ -623,6 +633,10 @@ namespace Icom_Web_Control.Services
                 new("ManualNotchB", ManualNotchB),
                 new("ManualNotchFreqA", ManualNotchFreqA),
                 new("ManualNotchFreqB", ManualNotchFreqB),
+                new("ManualNotchWidthA", ManualNotchWidthA),
+                new("ManualNotchWidthB", ManualNotchWidthB),
+                new("IfShapeA", IfShapeA),
+                new("IfShapeB", IfShapeB),
                 new("IfWidthA", IfWidthA),
                 new("IfWidthB", IfWidthB),
                 new("IfShiftA", IfShiftA),
@@ -755,6 +769,10 @@ namespace Icom_Web_Control.Services
                 AutoNotchB = AutoNotchB,
                 ManualNotchA = ManualNotchA,
                 ManualNotchB = ManualNotchB,
+                ManualNotchWidthA = ManualNotchWidthA,
+                ManualNotchWidthB = ManualNotchWidthB,
+                IfShapeA = IfShapeA,
+                IfShapeB = IfShapeB,
                 IfWidthA = IfWidthA,
                 IfWidthB = IfWidthB,
                 IfShiftA = IfShiftA,

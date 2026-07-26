@@ -1255,76 +1255,76 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- AGC ---
     if (update.property === "AgcA") {
-        const selectEl = document.getElementById('agcSelectA');
-        // Values 5/6 (AUTO-FAST/MID/SLOW) are normalised to 4 (AUTO) by the dispatcher,
-        // but guard here too in case of a race.
-        if (selectEl) selectEl.value = (update.value === "5" || update.value === "6") ? "4" : update.value;
+        if (window.dspSetActive) window.dspSetActive('agcGroupA', update.value);
     }
     if (update.property === "AgcB") {
-        const selectEl = document.getElementById('agcSelectB');
-        if (selectEl) selectEl.value = (update.value === "5" || update.value === "6") ? "4" : update.value;
+        if (window.dspSetActive) window.dspSetActive('agcGroupB', update.value);
     }
 
-    // --- IPO/AMP ---
+    // --- PREAMP ---
     if (update.property === "IpoA") {
-        const el = document.getElementById('ipoSelectA');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('ipoGroupA', update.value);
     }
     if (update.property === "IpoB") {
-        const el = document.getElementById('ipoSelectB');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('ipoGroupB', update.value);
     }
 
     // --- ATTENUATOR ---
     if (update.property === "AttA") {
-        const el = document.getElementById('attSelectA');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('attGroupA', update.value);
     }
     if (update.property === "AttB") {
-        const el = document.getElementById('attSelectB');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('attGroupB', update.value);
     }
 
     // --- NOISE REDUCTION ---
     if (update.property === "NrA") {
-        const el = document.getElementById('nrSelectA');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('nrGroupA', update.value);
     }
     if (update.property === "NrB") {
-        const el = document.getElementById('nrSelectB');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('nrGroupB', update.value);
     }
 
     // --- MANUAL NOTCH FREQUENCY ---
     if (update.property === "ManualNotchFreqA") {
         const el = document.getElementById('manualNotchFreqA');
-        if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueA').textContent = update.value + ' Hz'; }
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ manualNotchFreqHz: parseInt(update.value) || 800 });
+        if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueA').textContent = update.value; }
     }
     if (update.property === "ManualNotchFreqB") {
         const el = document.getElementById('manualNotchFreqB');
-        if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueB').textContent = update.value + ' Hz'; }
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ manualNotchFreqHz: parseInt(update.value) || 800 });
+        if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueB').textContent = update.value; }
+    }
+
+    // --- MANUAL NOTCH WIDTH (WIDE/MID/NAR, CI-V 16 57) ---
+    if (update.property === "ManualNotchWidthA") {
+        if (window.dspSetActive) window.dspSetActive('mnWidthGroupA', update.value);
+    }
+    if (update.property === "ManualNotchWidthB") {
+        if (window.dspSetActive) window.dspSetActive('mnWidthGroupB', update.value);
+    }
+
+    // --- IF FILTER SHAPE (SHARP/SOFT, CI-V 16 56) ---
+    if (update.property === "IfShapeA") {
+        if (window.dspSetActive) window.dspSetActive('ifShapeGroupA', update.value);
+    }
+    if (update.property === "IfShapeB") {
+        if (window.dspSetActive) window.dspSetActive('ifShapeGroupB', update.value);
     }
 
     // --- NOISE BLANKER ---
     if (update.property === "NbA") {
-        const el = document.getElementById('nbSelectA');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('nbGroupA', update.value);
     }
     if (update.property === "NbB") {
-        const el = document.getElementById('nbSelectB');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('nbGroupB', update.value);
     }
 
-    // --- AUTO NOTCH ---
+    // --- AUTO NOTCH (folded into the single Notch group) ---
     if (update.property === "AutoNotchA") {
-        const el = document.getElementById('autoNotchSelectA');
-        if (el) el.value = update.value;
+        if (window.applyNotchState) window.applyNotchState('A', 'auto', update.value === '1');
     }
     if (update.property === "AutoNotchB") {
-        const el = document.getElementById('autoNotchSelectB');
-        if (el) el.value = update.value;
+        if (window.applyNotchState) window.applyNotchState('B', 'auto', update.value === '1');
     }
 
     // --- IF WIDTH ---
@@ -1449,15 +1449,13 @@ connection.on("RadioStateUpdate", function (update) {
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfFreqHz: apfState.B.freqHz });
     }
 
-    // --- MANUAL NOTCH ---
+    // --- MANUAL NOTCH (folded into the single Notch group) ---
     if (update.property === "ManualNotchA") {
-        const el = document.getElementById('manualNotchSelectA');
-        if (el) el.value = update.value;
+        if (window.applyNotchState) window.applyNotchState('A', 'manual', update.value === '1');
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ manualNotchOn: update.value === '1' });
     }
     if (update.property === "ManualNotchB") {
-        const el = document.getElementById('manualNotchSelectB');
-        if (el) el.value = update.value;
+        if (window.applyNotchState) window.applyNotchState('B', 'manual', update.value === '1');
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ manualNotchOn: update.value === '1' });
     }
 
@@ -1486,24 +1484,28 @@ connection.on("RadioStateUpdate", function (update) {
         if (window.updateAtuTuningState) window.updateAtuTuningState(tuning);
     }
 
-    // --- NB LEVEL ---
+    // --- NB LEVEL (radio shows 0–100%; CI-V carries 0–255, so scale down by 2.55) ---
     if (update.property === "NbLevelA") {
-        const el = document.getElementById('nbLevelSelectA');
-        if (el) el.value = update.value;
+        const s = document.getElementById('nbLevelSliderA'); const l = document.getElementById('nbLevelValueA');
+        const v = Math.round(parseInt(update.value) / 2.55);
+        if (s) s.value = v; if (l) l.textContent = v + '%';
     }
     if (update.property === "NbLevelB") {
-        const el = document.getElementById('nbLevelSelectB');
-        if (el) el.value = update.value;
+        const s = document.getElementById('nbLevelSliderB'); const l = document.getElementById('nbLevelValueB');
+        const v = Math.round(parseInt(update.value) / 2.55);
+        if (s) s.value = v; if (l) l.textContent = v + '%';
     }
 
-    // --- NR LEVEL (DNR algorithm on FTdx10) ---
+    // --- NR LEVEL (radio shows 0–15; CI-V carries 0–255, so scale down by 17) ---
     if (update.property === "NrLevelA") {
-        const el = document.getElementById('nrLevelSelectA');
-        if (el) el.value = update.value;
+        const s = document.getElementById('nrLevelSliderA'); const l = document.getElementById('nrLevelValueA');
+        const v = Math.round(parseInt(update.value) / 17);
+        if (s) s.value = v; if (l) l.textContent = v;
     }
     if (update.property === "NrLevelB") {
-        const el = document.getElementById('nrLevelSelectB');
-        if (el) el.value = update.value;
+        const s = document.getElementById('nrLevelSliderB'); const l = document.getElementById('nrLevelValueB');
+        const v = Math.round(parseInt(update.value) / 17);
+        if (s) s.value = v; if (l) l.textContent = v;
     }
 
     // --- RF GAIN ---
@@ -1702,7 +1704,7 @@ window.radioControl = {
     },
     setManualNotchFreq: async function (receiver, frequencyHz) {
         await fetch(`/api/cat/manualnotchfreq/${receiver.toLowerCase()}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frequencyHz }) });
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frequencyHz: parseInt(frequencyHz) }) });
     },
     setIfWidth: async function (receiver, code) {
         await fetch(`/api/cat/ifwidth/${receiver.toLowerCase()}`,

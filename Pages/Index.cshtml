@@ -128,6 +128,18 @@
         ("41","203.5"), ("42","206.5"), ("43","210.7"), ("44","218.1"), ("45","225.7"),
         ("46","229.1"), ("47","233.6"), ("48","241.8"), ("49","250.3"), ("50","254.1")
     };
+
+    // Renders one button of a DSP segmented button-group (replaces the old
+    // <select> dropdowns). `action` is the JS to run on click (the radioControl
+    // setter call). The button carries data-val so window.dspSetActive() can
+    // re-highlight it when a matching SignalR state update arrives.
+    string SegBtn(string group, string val, string label, string current, string action)
+    {
+        var active  = current == val ? " active" : "";
+        var pressed = current == val ? "true" : "false";
+        return $"<button type=\"button\" class=\"dsp-seg{active}\" data-val=\"{val}\" aria-pressed=\"{pressed}\" " +
+               $"onclick=\"window.dspSetActive('{group}','{val}'); {action}\">{label}</button>";
+    }
 }
 
 <!-- Cache-busted CSS reference -->
@@ -793,116 +805,91 @@
                         <div class="vfo-controls-column">
                             <div class="vfo-control-item">
                                 <label class="vfo-control-label">AGC</label>
-                                <select class="form-select form-select-sm" id="agcSelectA"
-                                        aria-label="VFO A AGC"
-                                        title="VFO A AGC"
-                                        onchange="window.radioControl.setAgc('A', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.AgcA == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.AgcA == "1" ? "selected" : null)">FAST</option>
-                                    <option value="2" selected="@(Model.RadioState.AgcA == "2" ? "selected" : null)">MID</option>
-                                    <option value="3" selected="@(Model.RadioState.AgcA == "3" ? "selected" : null)">SLOW</option>
-                                    <option value="4" selected="@(Model.RadioState.AgcA == "4" ? "selected" : null)">AUTO</option>
-                                </select>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A AGC" id="agcGroupA">
+                                    @Html.Raw(SegBtn("agcGroupA", "1", "FAST", Model.RadioState.AgcA, "window.radioControl.setAgc('A','1')"))
+                                    @Html.Raw(SegBtn("agcGroupA", "2", "MID",  Model.RadioState.AgcA, "window.radioControl.setAgc('A','2')"))
+                                    @Html.Raw(SegBtn("agcGroupA", "3", "SLOW", Model.RadioState.AgcA, "window.radioControl.setAgc('A','3')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">IPO/AMP</label>
-                                <select class="form-select form-select-sm" id="ipoSelectA"
-                                        aria-label="VFO A IPO amp"
-                                        title="VFO A IPO / amplifier"
-                                        onchange="window.radioControl.setIpo('A', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.IpoA == "0" ? "selected" : null)">IPO</option>
-                                    <option value="1" selected="@(Model.RadioState.IpoA == "1" ? "selected" : null)">AMP1</option>
-                                    <option value="2" selected="@(Model.RadioState.IpoA == "2" ? "selected" : null)">AMP2</option>
-                                </select>
+                                <label class="vfo-control-label">Preamp</label>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A preamp" id="ipoGroupA">
+                                    @Html.Raw(SegBtn("ipoGroupA", "0", "OFF",    Model.RadioState.IpoA, "window.radioControl.setIpo('A','0')"))
+                                    @Html.Raw(SegBtn("ipoGroupA", "1", "P.AMP1", Model.RadioState.IpoA, "window.radioControl.setIpo('A','1')"))
+                                    @Html.Raw(SegBtn("ipoGroupA", "2", "P.AMP2", Model.RadioState.IpoA, "window.radioControl.setIpo('A','2')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
                                 <label class="vfo-control-label">ATT</label>
-                                <select class="form-select form-select-sm" id="attSelectA"
-                                        aria-label="VFO A attenuator"
-                                        title="VFO A attenuator"
-                                        onchange="window.radioControl.setAttenuator('A', this.value)">
-                                    <option value="00" selected="@(Model.RadioState.AttA == "00" ? "selected" : null)">OFF</option>
-                                    <option value="06" selected="@(Model.RadioState.AttA == "06" ? "selected" : null)">6 dB</option>
-                                    <option value="12" selected="@(Model.RadioState.AttA == "12" ? "selected" : null)">12 dB</option>
-                                    <option value="18" selected="@(Model.RadioState.AttA == "18" ? "selected" : null)">18 dB</option>
-                                </select>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A attenuator" id="attGroupA">
+                                    @Html.Raw(SegBtn("attGroupA", "00", "OFF",   Model.RadioState.AttA, "window.radioControl.setAttenuator('A','00')"))
+                                    @Html.Raw(SegBtn("attGroupA", "20", "20 dB", Model.RadioState.AttA, "window.radioControl.setAttenuator('A','20')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR" : "NR")</label>
-                                <select class="form-select form-select-sm" id="nrSelectA"
-                                        aria-label="VFO A @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
-                                        title="VFO A @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
-                                        onchange="window.radioControl.setNr('A', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.NrA == "0" ? "selected" : null)">OFF</option>
-                                    @if (isFtdx10 || isFt710)
-                                    {
-                                        <option value="1" selected="@(Model.RadioState.NrA == "1" ? "selected" : null)">ON</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="1" selected="@(Model.RadioState.NrA == "1" ? "selected" : null)">NR1</option>
-                                        <option value="2" selected="@(Model.RadioState.NrA == "2" ? "selected" : null)">NR2</option>
-                                    }
-                                </select>
+                                <label class="vfo-control-label">NR</label>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A noise reduction" id="nrGroupA">
+                                    @Html.Raw(SegBtn("nrGroupA", "0", "OFF", Model.RadioState.NrA, "window.radioControl.setNr('A','0')"))
+                                    @Html.Raw(SegBtn("nrGroupA", "1", "ON",  Model.RadioState.NrA, "window.radioControl.setNr('A','1')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR No." : "NR Lvl")</label>
-                                <select class="form-select form-select-sm" id="nrLevelSelectA"
-                                        aria-label="VFO A @(isFtdx10 || isFt710 ? "DNR algorithm" : "NR level") (1-15)"
-                                        title="VFO A @(isFtdx10 || isFt710 ? "DNR algorithm (1=lightest, 15=heaviest)" : "NR depth (1=light, 15=heavy)")"
-                                        onchange="setNrLevel('A', this.value)">
-                                    @for (int i = 1; i <= 15; i++) {
-                                        <option value="@i" selected="@(Model.RadioState.NrLevelA == i ? "selected" : null)">@i</option>
-                                    }
-                                </select>
+                                <label class="vfo-control-label">NR Lvl</label>
+                                <input type="range" id="nrLevelSliderA" aria-label="VFO A noise reduction level" title="VFO A NR level (0–15, matches radio)" min="0" max="15" step="1" value="@((int)System.Math.Round(Model.RadioState.NrLevelA / 17.0))"
+                                       style="flex: 1; height: 16px;"
+                                       oninput="document.getElementById('nrLevelValueA').textContent = this.value"
+                                       onchange="setNrLevel('A', this.value)">
+                                <span id="nrLevelValueA" class="vfo-control-label" style="min-width: 36px; text-align: right;">@((int)System.Math.Round(Model.RadioState.NrLevelA / 17.0))</span>
                             </div>
                             <div class="vfo-control-item">
                                 <label class="vfo-control-label">NB</label>
-                                <select class="form-select form-select-sm" id="nbSelectA"
-                                        aria-label="VFO A noise blanker"
-                                        title="VFO A noise blanker"
-                                        onchange="window.radioControl.setNoiseBlanker('A', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.NbA == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.NbA == "1" ? "selected" : null)">ON</option>
-                                </select>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A noise blanker" id="nbGroupA">
+                                    @Html.Raw(SegBtn("nbGroupA", "0", "OFF", Model.RadioState.NbA, "window.radioControl.setNoiseBlanker('A','0')"))
+                                    @Html.Raw(SegBtn("nbGroupA", "1", "ON",  Model.RadioState.NbA, "window.radioControl.setNoiseBlanker('A','1')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
                                 <label class="vfo-control-label">NB Level</label>
-                                <select class="form-select form-select-sm" id="nbLevelSelectA"
-                                        aria-label="VFO A noise blanker level"
-                                        title="VFO A noise blanker depth (1=min, 20=max)"
-                                        onchange="setNbLevel('A', this.value)">
-                                    @for (int i = 1; i <= 20; i++) {
-                                        <option value="@i" selected="@(Model.RadioState.NbLevelA == i ? "selected" : null)">@i</option>
-                                    }
-                                </select>
+                                <input type="range" id="nbLevelSliderA" aria-label="VFO A noise blanker level" title="VFO A noise blanker level (0–100%, matches radio)" min="0" max="100" step="1" value="@((int)System.Math.Round(Model.RadioState.NbLevelA / 2.55))"
+                                       style="flex: 1; height: 16px;"
+                                       oninput="document.getElementById('nbLevelValueA').textContent = this.value + '%'"
+                                       onchange="setNbLevel('A', this.value)">
+                                <span id="nbLevelValueA" class="vfo-control-label" style="min-width: 36px; text-align: right;">@((int)System.Math.Round(Model.RadioState.NbLevelA / 2.55))%</span>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">Auto Notch</label>
-                                <select class="form-select form-select-sm" id="autoNotchSelectA"
-                                        aria-label="VFO A auto notch"
-                                        title="VFO A auto notch"
-                                        onchange="window.radioControl.setAutoNotch('A', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.AutoNotchA == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.AutoNotchA == "1" ? "selected" : null)">ON</option>
-                                </select>
+                                <label class="vfo-control-label">Notch</label>
+                                @{ var notchModeA = Model.RadioState.ManualNotchA == "1" ? "mn" : (Model.RadioState.AutoNotchA == "1" ? "an" : "off"); }
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A notch" id="notchGroupA"
+                                     data-auto="@(Model.RadioState.AutoNotchA == "1" ? "1" : "0")"
+                                     data-manual="@(Model.RadioState.ManualNotchA == "1" ? "1" : "0")">
+                                    @Html.Raw(SegBtn("notchGroupA", "off", "OFF", notchModeA, "window.setNotchMode('A','off')"))
+                                    @Html.Raw(SegBtn("notchGroupA", "an",  "AN",  notchModeA, "window.setNotchMode('A','an')"))
+                                    @Html.Raw(SegBtn("notchGroupA", "mn",  "MN",  notchModeA, "window.setNotchMode('A','mn')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">Man Notch</label>
-                                <select class="form-select form-select-sm" id="manualNotchSelectA"
-                                        aria-label="VFO A manual notch"
-                                        title="VFO A manual notch"
-                                        onchange="window.radioControl.setManualNotch('A', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.ManualNotchA == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.ManualNotchA == "1" ? "selected" : null)">ON</option>
-                                </select>
+                                <label class="vfo-control-label">MN Width</label>
+                                @{ var mnwA = Model.RadioState.ManualNotchWidthA; }
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A manual notch width" id="mnWidthGroupA">
+                                    @Html.Raw(SegBtn("mnWidthGroupA", "0", "WIDE", mnwA, "window.setManualNotchWidth('A','0')"))
+                                    @Html.Raw(SegBtn("mnWidthGroupA", "1", "MID",  mnwA, "window.setManualNotchWidth('A','1')"))
+                                    @Html.Raw(SegBtn("mnWidthGroupA", "2", "NAR",  mnwA, "window.setManualNotchWidth('A','2')"))
+                                </div>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">IF Shape</label>
+                                @{ var ifShapeA = Model.RadioState.IfShapeA; }
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A IF filter shape" id="ifShapeGroupA">
+                                    @Html.Raw(SegBtn("ifShapeGroupA", "0", "SHARP", ifShapeA, "window.setIfShape('A','0')"))
+                                    @Html.Raw(SegBtn("ifShapeGroupA", "1", "SOFT",  ifShapeA, "window.setIfShape('A','1')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
-                                <label class="vfo-control-label">Notch Hz</label>
-                                <input type="range" id="manualNotchFreqA" aria-label="VFO A manual notch frequency" title="VFO A manual notch frequency" min="10" max="3200" step="10" value="@Model.RadioState.ManualNotchFreqA"
+                                <label class="vfo-control-label">Notch Pos</label>
+                                <input type="range" id="manualNotchFreqA" aria-label="VFO A manual notch position" title="VFO A manual notch position (0=low, 128=centre, 255=high)" min="0" max="255" step="1" value="@Model.RadioState.ManualNotchFreqA"
                                        style="flex: 1; height: 16px;"
-                                       oninput="document.getElementById('manualNotchFreqValueA').textContent = this.value + ' Hz'; window.radioControl.setManualNotchFreq('A', this.value)">
-                                <span id="manualNotchFreqValueA" class="vfo-control-label" style="min-width: 52px; text-align: right;">@Model.RadioState.ManualNotchFreqA Hz</span>
+                                       oninput="document.getElementById('manualNotchFreqValueA').textContent = this.value; window.radioControl.setManualNotchFreq('A', this.value)">
+                                <span id="manualNotchFreqValueA" class="vfo-control-label" style="min-width: 52px; text-align: right;">@Model.RadioState.ManualNotchFreqA</span>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">RF Gain</label>
@@ -1133,116 +1120,91 @@
                         <div class="vfo-controls-column">
                             <div class="vfo-control-item">
                                 <label class="vfo-control-label">AGC</label>
-                                <select class="form-select form-select-sm" id="agcSelectB"
-                                        aria-label="VFO B AGC"
-                                        title="VFO B AGC"
-                                        onchange="window.radioControl.setAgc('B', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.AgcB == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.AgcB == "1" ? "selected" : null)">FAST</option>
-                                    <option value="2" selected="@(Model.RadioState.AgcB == "2" ? "selected" : null)">MID</option>
-                                    <option value="3" selected="@(Model.RadioState.AgcB == "3" ? "selected" : null)">SLOW</option>
-                                    <option value="4" selected="@(Model.RadioState.AgcB == "4" ? "selected" : null)">AUTO</option>
-                                </select>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B AGC" id="agcGroupB">
+                                    @Html.Raw(SegBtn("agcGroupB", "1", "FAST", Model.RadioState.AgcB, "window.radioControl.setAgc('B','1')"))
+                                    @Html.Raw(SegBtn("agcGroupB", "2", "MID",  Model.RadioState.AgcB, "window.radioControl.setAgc('B','2')"))
+                                    @Html.Raw(SegBtn("agcGroupB", "3", "SLOW", Model.RadioState.AgcB, "window.radioControl.setAgc('B','3')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">IPO/AMP</label>
-                                <select class="form-select form-select-sm" id="ipoSelectB"
-                                        aria-label="VFO B IPO amp"
-                                        title="VFO B IPO / amplifier"
-                                        onchange="window.radioControl.setIpo('B', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.IpoB == "0" ? "selected" : null)">IPO</option>
-                                    <option value="1" selected="@(Model.RadioState.IpoB == "1" ? "selected" : null)">AMP1</option>
-                                    <option value="2" selected="@(Model.RadioState.IpoB == "2" ? "selected" : null)">AMP2</option>
-                                </select>
+                                <label class="vfo-control-label">Preamp</label>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B preamp" id="ipoGroupB">
+                                    @Html.Raw(SegBtn("ipoGroupB", "0", "OFF",    Model.RadioState.IpoB, "window.radioControl.setIpo('B','0')"))
+                                    @Html.Raw(SegBtn("ipoGroupB", "1", "P.AMP1", Model.RadioState.IpoB, "window.radioControl.setIpo('B','1')"))
+                                    @Html.Raw(SegBtn("ipoGroupB", "2", "P.AMP2", Model.RadioState.IpoB, "window.radioControl.setIpo('B','2')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
                                 <label class="vfo-control-label">ATT</label>
-                                <select class="form-select form-select-sm" id="attSelectB"
-                                        aria-label="VFO B attenuator"
-                                        title="VFO B attenuator"
-                                        onchange="window.radioControl.setAttenuator('B', this.value)">
-                                    <option value="00" selected="@(Model.RadioState.AttB == "00" ? "selected" : null)">OFF</option>
-                                    <option value="06" selected="@(Model.RadioState.AttB == "06" ? "selected" : null)">6 dB</option>
-                                    <option value="12" selected="@(Model.RadioState.AttB == "12" ? "selected" : null)">12 dB</option>
-                                    <option value="18" selected="@(Model.RadioState.AttB == "18" ? "selected" : null)">18 dB</option>
-                                </select>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B attenuator" id="attGroupB">
+                                    @Html.Raw(SegBtn("attGroupB", "00", "OFF",   Model.RadioState.AttB, "window.radioControl.setAttenuator('B','00')"))
+                                    @Html.Raw(SegBtn("attGroupB", "20", "20 dB", Model.RadioState.AttB, "window.radioControl.setAttenuator('B','20')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR" : "NR")</label>
-                                <select class="form-select form-select-sm" id="nrSelectB"
-                                        aria-label="VFO B @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
-                                        title="VFO B @(isFtdx10 || isFt710 ? "digital noise reduction" : "noise reduction")"
-                                        onchange="window.radioControl.setNr('B', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.NrB == "0" ? "selected" : null)">OFF</option>
-                                    @if (isFtdx10 || isFt710)
-                                    {
-                                        <option value="1" selected="@(Model.RadioState.NrB == "1" ? "selected" : null)">ON</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="1" selected="@(Model.RadioState.NrB == "1" ? "selected" : null)">NR1</option>
-                                        <option value="2" selected="@(Model.RadioState.NrB == "2" ? "selected" : null)">NR2</option>
-                                    }
-                                </select>
+                                <label class="vfo-control-label">NR</label>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B noise reduction" id="nrGroupB">
+                                    @Html.Raw(SegBtn("nrGroupB", "0", "OFF", Model.RadioState.NrB, "window.radioControl.setNr('B','0')"))
+                                    @Html.Raw(SegBtn("nrGroupB", "1", "ON",  Model.RadioState.NrB, "window.radioControl.setNr('B','1')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">@(isFtdx10 || isFt710 ? "DNR No." : "NR Lvl")</label>
-                                <select class="form-select form-select-sm" id="nrLevelSelectB"
-                                        aria-label="VFO B @(isFtdx10 || isFt710 ? "DNR algorithm" : "NR level") (1-15)"
-                                        title="VFO B @(isFtdx10 || isFt710 ? "DNR algorithm (1=lightest, 15=heaviest)" : "NR depth (1=light, 15=heavy)")"
-                                        onchange="setNrLevel('B', this.value)">
-                                    @for (int i = 1; i <= 15; i++) {
-                                        <option value="@i" selected="@(Model.RadioState.NrLevelB == i ? "selected" : null)">@i</option>
-                                    }
-                                </select>
+                                <label class="vfo-control-label">NR Lvl</label>
+                                <input type="range" id="nrLevelSliderB" aria-label="VFO B noise reduction level" title="VFO B NR level (0–15, matches radio)" min="0" max="15" step="1" value="@((int)System.Math.Round(Model.RadioState.NrLevelB / 17.0))"
+                                       style="flex: 1; height: 16px;"
+                                       oninput="document.getElementById('nrLevelValueB').textContent = this.value"
+                                       onchange="setNrLevel('B', this.value)">
+                                <span id="nrLevelValueB" class="vfo-control-label" style="min-width: 36px; text-align: right;">@((int)System.Math.Round(Model.RadioState.NrLevelB / 17.0))</span>
                             </div>
                             <div class="vfo-control-item">
                                 <label class="vfo-control-label">NB</label>
-                                <select class="form-select form-select-sm" id="nbSelectB"
-                                        aria-label="VFO B noise blanker"
-                                        title="VFO B noise blanker"
-                                        onchange="window.radioControl.setNoiseBlanker('B', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.NbB == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.NbB == "1" ? "selected" : null)">ON</option>
-                                </select>
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B noise blanker" id="nbGroupB">
+                                    @Html.Raw(SegBtn("nbGroupB", "0", "OFF", Model.RadioState.NbB, "window.radioControl.setNoiseBlanker('B','0')"))
+                                    @Html.Raw(SegBtn("nbGroupB", "1", "ON",  Model.RadioState.NbB, "window.radioControl.setNoiseBlanker('B','1')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
                                 <label class="vfo-control-label">NB Level</label>
-                                <select class="form-select form-select-sm" id="nbLevelSelectB"
-                                        aria-label="VFO B noise blanker level"
-                                        title="VFO B noise blanker depth (1=min, 20=max)"
-                                        onchange="setNbLevel('B', this.value)">
-                                    @for (int i = 1; i <= 20; i++) {
-                                        <option value="@i" selected="@(Model.RadioState.NbLevelB == i ? "selected" : null)">@i</option>
-                                    }
-                                </select>
+                                <input type="range" id="nbLevelSliderB" aria-label="VFO B noise blanker level" title="VFO B noise blanker level (0–100%, matches radio)" min="0" max="100" step="1" value="@((int)System.Math.Round(Model.RadioState.NbLevelB / 2.55))"
+                                       style="flex: 1; height: 16px;"
+                                       oninput="document.getElementById('nbLevelValueB').textContent = this.value + '%'"
+                                       onchange="setNbLevel('B', this.value)">
+                                <span id="nbLevelValueB" class="vfo-control-label" style="min-width: 36px; text-align: right;">@((int)System.Math.Round(Model.RadioState.NbLevelB / 2.55))%</span>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">Auto Notch</label>
-                                <select class="form-select form-select-sm" id="autoNotchSelectB"
-                                        aria-label="VFO B auto notch"
-                                        title="VFO B auto notch"
-                                        onchange="window.radioControl.setAutoNotch('B', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.AutoNotchB == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.AutoNotchB == "1" ? "selected" : null)">ON</option>
-                                </select>
+                                <label class="vfo-control-label">Notch</label>
+                                @{ var notchModeB = Model.RadioState.ManualNotchB == "1" ? "mn" : (Model.RadioState.AutoNotchB == "1" ? "an" : "off"); }
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B notch" id="notchGroupB"
+                                     data-auto="@(Model.RadioState.AutoNotchB == "1" ? "1" : "0")"
+                                     data-manual="@(Model.RadioState.ManualNotchB == "1" ? "1" : "0")">
+                                    @Html.Raw(SegBtn("notchGroupB", "off", "OFF", notchModeB, "window.setNotchMode('B','off')"))
+                                    @Html.Raw(SegBtn("notchGroupB", "an",  "AN",  notchModeB, "window.setNotchMode('B','an')"))
+                                    @Html.Raw(SegBtn("notchGroupB", "mn",  "MN",  notchModeB, "window.setNotchMode('B','mn')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item">
-                                <label class="vfo-control-label">Man Notch</label>
-                                <select class="form-select form-select-sm" id="manualNotchSelectB"
-                                        aria-label="VFO B manual notch"
-                                        title="VFO B manual notch"
-                                        onchange="window.radioControl.setManualNotch('B', this.value)">
-                                    <option value="0" selected="@(Model.RadioState.ManualNotchB == "0" ? "selected" : null)">OFF</option>
-                                    <option value="1" selected="@(Model.RadioState.ManualNotchB == "1" ? "selected" : null)">ON</option>
-                                </select>
+                                <label class="vfo-control-label">MN Width</label>
+                                @{ var mnwB = Model.RadioState.ManualNotchWidthB; }
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B manual notch width" id="mnWidthGroupB">
+                                    @Html.Raw(SegBtn("mnWidthGroupB", "0", "WIDE", mnwB, "window.setManualNotchWidth('B','0')"))
+                                    @Html.Raw(SegBtn("mnWidthGroupB", "1", "MID",  mnwB, "window.setManualNotchWidth('B','1')"))
+                                    @Html.Raw(SegBtn("mnWidthGroupB", "2", "NAR",  mnwB, "window.setManualNotchWidth('B','2')"))
+                                </div>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">IF Shape</label>
+                                @{ var ifShapeB = Model.RadioState.IfShapeB; }
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B IF filter shape" id="ifShapeGroupB">
+                                    @Html.Raw(SegBtn("ifShapeGroupB", "0", "SHARP", ifShapeB, "window.setIfShape('B','0')"))
+                                    @Html.Raw(SegBtn("ifShapeGroupB", "1", "SOFT",  ifShapeB, "window.setIfShape('B','1')"))
+                                </div>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
-                                <label class="vfo-control-label">Notch Hz</label>
-                                <input type="range" id="manualNotchFreqB" aria-label="VFO B manual notch frequency" title="VFO B manual notch frequency" min="10" max="3200" step="10" value="@Model.RadioState.ManualNotchFreqB"
+                                <label class="vfo-control-label">Notch Pos</label>
+                                <input type="range" id="manualNotchFreqB" aria-label="VFO B manual notch position" title="VFO B manual notch position (0=low, 128=centre, 255=high)" min="0" max="255" step="1" value="@Model.RadioState.ManualNotchFreqB"
                                        style="flex: 1; height: 16px;"
-                                       oninput="document.getElementById('manualNotchFreqValueB').textContent = this.value + ' Hz'; window.radioControl.setManualNotchFreq('B', this.value)">
-                                <span id="manualNotchFreqValueB" class="vfo-control-label" style="min-width: 52px; text-align: right;">@Model.RadioState.ManualNotchFreqB Hz</span>
+                                       oninput="document.getElementById('manualNotchFreqValueB').textContent = this.value; window.radioControl.setManualNotchFreq('B', this.value)">
+                                <span id="manualNotchFreqValueB" class="vfo-control-label" style="min-width: 52px; text-align: right;">@Model.RadioState.ManualNotchFreqB</span>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">RF Gain</label>
@@ -2843,22 +2805,99 @@
             } catch (e) { console.error('setMonitorLevel error:', e); }
         }
 
+        // --- DSP SEGMENTED BUTTON GROUPS ---
+        // Highlights the button whose data-val matches `value` within the group,
+        // clearing the others. Used both by the inline onclick handlers (instant
+        // feedback) and by the SignalR state handlers in site.js (radio -> app).
+        window.dspSetActive = function (groupId, value) {
+            const group = document.getElementById(groupId);
+            if (!group) return;
+            const want = String(value);
+            group.querySelectorAll('.dsp-seg').forEach(function (btn) {
+                const on = btn.getAttribute('data-val') === want;
+                btn.classList.toggle('active', on);
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        };
+
+        // --- NOTCH (single OFF / AN / MN control, mirrors the radio's NOTCH button) ---
+        // The IC-7300 exposes auto-notch (16 41) and manual-notch (16 48) as two
+        // mutually-exclusive functions; the front-panel NOTCH button cycles
+        // OFF -> AN -> MN. We present that as one 3-way group and translate a
+        // click into the two underlying set commands (disable the other first so
+        // the radio never sees both on at once).
+        window.setNotchMode = async function (vfo, mode) {
+            window.dspSetActive('notchGroup' + vfo, mode);           // instant feedback
+            const group = document.getElementById('notchGroup' + vfo);
+            if (group) { group.dataset.auto = mode === 'an' ? '1' : '0'; group.dataset.manual = mode === 'mn' ? '1' : '0'; }
+            if (mode === 'mn') {
+                await window.radioControl.setAutoNotch(vfo, '0');
+                await window.radioControl.setManualNotch(vfo, '1');
+            } else if (mode === 'an') {
+                await window.radioControl.setManualNotch(vfo, '0');
+                await window.radioControl.setAutoNotch(vfo, '1');
+            } else {
+                await window.radioControl.setAutoNotch(vfo, '0');
+                await window.radioControl.setManualNotch(vfo, '0');
+            }
+        };
+
+        // Fold a radio-side auto/manual notch state update (SignalR) into the
+        // single 3-way group. Manual wins the display if both somehow report on.
+        window.applyNotchState = function (vfo, which, on) {
+            const group = document.getElementById('notchGroup' + vfo);
+            if (!group) return;
+            if (which === 'auto')   group.dataset.auto   = on ? '1' : '0';
+            if (which === 'manual') group.dataset.manual = on ? '1' : '0';
+            const mode = group.dataset.manual === '1' ? 'mn'
+                       : group.dataset.auto   === '1' ? 'an' : 'off';
+            window.dspSetActive('notchGroup' + vfo, mode);
+        };
+
+        // --- MANUAL NOTCH WIDTH (WIDE / MID / NAR, CI-V 16 57) ---
+        window.setManualNotchWidth = async function (vfo, code) {
+            window.dspSetActive('mnWidthGroup' + vfo, code);         // instant feedback
+            try {
+                await fetch(`/api/cat/manualnotchwidth/${vfo.toLowerCase()}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code })
+                });
+            } catch (e) { console.error('setManualNotchWidth error:', e); }
+        };
+
+        // --- IF FILTER SHAPE (SHARP / SOFT, CI-V 16 56) ---
+        window.setIfShape = async function (vfo, code) {
+            window.dspSetActive('ifShapeGroup' + vfo, code);         // instant feedback
+            try {
+                await fetch(`/api/cat/ifshape/${vfo.toLowerCase()}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code })
+                });
+            } catch (e) { console.error('setIfShape error:', e); }
+        };
+
         // --- NB LEVEL ---
+        // The IC-7300 shows NB level as 0–100%; CI-V (14 12) carries 0–255. The
+        // slider is 0–100 to match the radio; scale by 2.55 (255/100) on the way out.
         async function setNbLevel(receiver, level) {
             try {
+                const civ = Math.round(parseInt(level) * 2.55);
                 await fetch(`/api/cat/nblevel/${receiver.toLowerCase()}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ level: parseInt(level) })
+                    body: JSON.stringify({ level: Math.min(255, civ) })
                 });
             } catch (e) { console.error('setNbLevel error:', e); }
         }
 
-        // --- NR LEVEL (DNR algorithm on FTdx10) ---
+        // --- NR LEVEL ---
+        // The IC-7300 shows NR level as 0–15; CI-V (14 06) carries 0–255. The
+        // slider is 0–15 to match the radio; scale up by 17 (255/15) on the way out.
         async function setNrLevel(receiver, level) {
             try {
+                const civ = Math.round(parseInt(level) * 17);
                 await fetch(`/api/cat/nrlevel/${receiver.toLowerCase()}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ level: parseInt(level) })
+                    body: JSON.stringify({ level: Math.min(255, civ) })
                 });
             } catch (e) { console.error('setNrLevel error:', e); }
         }

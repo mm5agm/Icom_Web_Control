@@ -1059,6 +1059,8 @@ namespace Icom_Web_Control.Controllers
         public class NrRequest          { public string Code { get; set; } = string.Empty; }
         public class AttenuatorRequest  { public string Code { get; set; } = string.Empty; }
         public class ManualNotchRequest    { public string Enabled { get; set; } = "0"; }
+        public class ManualNotchWidthRequest { public string Code { get; set; } = "1"; }
+        public class IfShapeRequest        { public string Code { get; set; } = "0"; }
         public class NoiseBlankerRequest       { public string Enabled { get; set; } = "0"; }
         public class ManualNotchFreqRequest    { public int FrequencyHz { get; set; } = 1000; }
         public class IfWidthRequest            { public string Code { get; set; } = "8"; }
@@ -1067,7 +1069,8 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("agc/{receiver}")]
         public async Task<IActionResult> SetAgc(string receiver, [FromBody] AgcRequest request)
         {
-            var validCodes = new[] { "0", "1", "2", "3", "4" };
+            // IC-7300 AGC time constant (CI-V 16 12): 1=FAST, 2=MID, 3=SLOW.
+            var validCodes = new[] { "1", "2", "3" };
             if (!validCodes.Contains(request.Code))
                 return BadRequest(new { error = $"Invalid AGC code: {request.Code}" });
 
@@ -1076,13 +1079,12 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"GT{VfoP1Outgoing(receiver)}{request.Code};", "WebUI", CancellationToken.None);
-
-                if (VfoIsB(receiver)) _radioStateService.AgcB = request.Code;
-                else                  _radioStateService.AgcA = request.Code;
-
-                return Ok(new { message = $"AGC {receiver} set to {request.Code}" });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetAgcAsync(int.Parse(request.Code), CancellationToken.None);
+                _radioStateService.AgcA = request.Code;
+                _radioStateService.AgcB = request.Code;
+                return Ok(new { message = $"AGC set to {request.Code}" });
             }
             catch (Exception ex)
             {
@@ -1098,27 +1100,27 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("ipo/{receiver}")]
         public async Task<IActionResult> SetIpo(string receiver, [FromBody] IpoRequest request)
         {
+            // IC-7300 preamp (CI-V 16 02): 0=OFF, 1=P.AMP1, 2=P.AMP2.
             var validCodes = new[] { "0", "1", "2" };
             if (!validCodes.Contains(request.Code))
-                return BadRequest(new { error = $"Invalid IPO/AMP code: {request.Code}" });
+                return BadRequest(new { error = $"Invalid preamp code: {request.Code}" });
 
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
 
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"PA{VfoP1Outgoing(receiver)}{request.Code};", "WebUI", CancellationToken.None);
-
-                if (VfoIsB(receiver)) _radioStateService.IpoB = request.Code;
-                else                  _radioStateService.IpoA = request.Code;
-
-                return Ok(new { message = $"IPO/AMP {receiver} set to {request.Code}" });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetPreampAsync(int.Parse(request.Code), CancellationToken.None);
+                _radioStateService.IpoA = request.Code;
+                _radioStateService.IpoB = request.Code;
+                return Ok(new { message = $"Preamp set to {request.Code}" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error setting IPO/AMP");
-                return StatusCode(500, new { error = "Failed to set IPO/AMP" });
+                _logger.LogError(ex, "Error setting preamp");
+                return StatusCode(500, new { error = "Failed to set preamp" });
             }
             finally { _requestSemaphore.Release(); }
         }
@@ -1135,13 +1137,12 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"BC{VfoP1Outgoing(receiver)}{request.Code};", "WebUI", CancellationToken.None);
-
-                if (VfoIsB(receiver)) _radioStateService.AutoNotchB = request.Code;
-                else                  _radioStateService.AutoNotchA = request.Code;
-
-                return Ok(new { message = $"Auto Notch {receiver} set to {request.Code}" });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetAutoNotchAsync(request.Code == "1", CancellationToken.None);
+                _radioStateService.AutoNotchA = request.Code;
+                _radioStateService.AutoNotchB = request.Code;
+                return Ok(new { message = $"Auto Notch set to {request.Code}" });
             }
             catch (Exception ex)
             {
@@ -1154,7 +1155,9 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("nr/{receiver}")]
         public async Task<IActionResult> SetNr(string receiver, [FromBody] NrRequest request)
         {
-            var validCodes = new[] { "0", "1", "2" };
+            // IC-7300 noise reduction is a simple on/off (CI-V 16 40); depth is
+            // the separate NR level (14 06).
+            var validCodes = new[] { "0", "1" };
             if (!validCodes.Contains(request.Code))
                 return BadRequest(new { error = $"Invalid NR code: {request.Code}" });
 
@@ -1163,13 +1166,12 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"NR{VfoP1Outgoing(receiver)}{request.Code};", "WebUI", CancellationToken.None);
-
-                if (VfoIsB(receiver)) _radioStateService.NrB = request.Code;
-                else                  _radioStateService.NrA = request.Code;
-
-                return Ok(new { message = $"NR {receiver} set to {request.Code}" });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetNoiseReductionAsync(request.Code == "1", CancellationToken.None);
+                _radioStateService.NrA = request.Code;
+                _radioStateService.NrB = request.Code;
+                return Ok(new { message = $"NR set to {request.Code}" });
             }
             catch (Exception ex)
             {
@@ -1182,7 +1184,8 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("attenuator/{receiver}")]
         public async Task<IActionResult> SetAttenuator(string receiver, [FromBody] AttenuatorRequest request)
         {
-            var validCodes = new[] { "00", "06", "12", "18" };
+            // IC-7300 has a single 20 dB attenuator (CI-V 11): OFF ("00") or 20 dB ("20").
+            var validCodes = new[] { "00", "20" };
             if (!validCodes.Contains(request.Code))
                 return BadRequest(new { error = $"Invalid attenuator code: {request.Code}" });
 
@@ -1191,14 +1194,12 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                await EnsureConnectedAsync();
-                var catCode = request.Code switch { "00" => "0", "06" => "1", "12" => "2", "18" => "3", _ => "0" };
-                await _catClient.SendCommandAsync($"RA{VfoP1Outgoing(receiver)}{catCode};", "WebUI", CancellationToken.None);
-
-                if (VfoIsB(receiver)) _radioStateService.AttB = request.Code;
-                else                  _radioStateService.AttA = request.Code;
-
-                return Ok(new { message = $"Attenuator {receiver} set to {request.Code}" });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetAttenuatorAsync(request.Code == "20", CancellationToken.None);
+                _radioStateService.AttA = request.Code;
+                _radioStateService.AttB = request.Code;
+                return Ok(new { message = $"Attenuator set to {request.Code}" });
             }
             catch (Exception ex)
             {
@@ -1220,14 +1221,12 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                await EnsureConnectedAsync();
-                var val = request.Enabled == "1" ? "001" : "000";
-                await _catClient.SendCommandAsync($"BP{VfoP1Outgoing(receiver)}0{val};", "WebUI", CancellationToken.None);
-
-                if (VfoIsB(receiver)) _radioStateService.ManualNotchB = request.Enabled;
-                else                  _radioStateService.ManualNotchA = request.Enabled;
-
-                return Ok(new { message = $"Manual Notch {receiver} set to {request.Enabled}" });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetManualNotchAsync(request.Enabled == "1", CancellationToken.None);
+                _radioStateService.ManualNotchA = request.Enabled;
+                _radioStateService.ManualNotchB = request.Enabled;
+                return Ok(new { message = $"Manual Notch set to {request.Enabled}" });
             }
             catch (Exception ex)
             {
@@ -1240,27 +1239,84 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("manualnotchfreq/{receiver}")]
         public async Task<IActionResult> SetManualNotchFreq(string receiver, [FromBody] ManualNotchFreqRequest request)
         {
-            if (request.FrequencyHz < 10 || request.FrequencyHz > 3200)
-                return BadRequest(new { error = $"Notch frequency must be 10–3200 Hz" });
+            // IC-7300 manual-notch position (CI-V 14 0D) is a 0–255 value with
+            // 128 = centre of the passband — not a Hz frequency. The request
+            // field name is legacy; it now carries the 0–255 position.
+            if (request.FrequencyHz < 0 || request.FrequencyHz > 255)
+                return BadRequest(new { error = "Notch position must be 0–255" });
 
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
 
             try
             {
-                await EnsureConnectedAsync();
-                var catValue = request.FrequencyHz / 10;
-                await _catClient.SendCommandAsync($"BP{VfoP1Outgoing(receiver)}1{catValue:D3};", "WebUI", CancellationToken.None);
-
-                if (VfoIsB(receiver)) _radioStateService.ManualNotchFreqB = request.FrequencyHz;
-                else                  _radioStateService.ManualNotchFreqA = request.FrequencyHz;
-
-                return Ok(new { message = $"Manual Notch freq {receiver} set to {request.FrequencyHz} Hz" });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetNotchPositionAsync(request.FrequencyHz, CancellationToken.None);
+                _radioStateService.ManualNotchFreqA = request.FrequencyHz;
+                _radioStateService.ManualNotchFreqB = request.FrequencyHz;
+                return Ok(new { message = $"Manual Notch position set to {request.FrequencyHz}" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error setting Manual Notch frequency");
-                return StatusCode(500, new { error = "Failed to set Manual Notch frequency" });
+                _logger.LogError(ex, "Error setting Manual Notch position");
+                return StatusCode(500, new { error = "Failed to set Manual Notch position" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("manualnotchwidth/{receiver}")]
+        public async Task<IActionResult> SetManualNotchWidth(string receiver, [FromBody] ManualNotchWidthRequest request)
+        {
+            // IC-7300 manual-notch filter width (CI-V 16 57): 0=WIDE, 1=MID, 2=NAR.
+            var validCodes = new[] { "0", "1", "2" };
+            if (!validCodes.Contains(request.Code))
+                return BadRequest(new { error = $"Invalid Manual Notch width: {request.Code}" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetManualNotchWidthAsync(int.Parse(request.Code), CancellationToken.None);
+                _radioStateService.ManualNotchWidthA = request.Code;
+                _radioStateService.ManualNotchWidthB = request.Code;
+                return Ok(new { message = $"Manual Notch width set to {request.Code}" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting Manual Notch width");
+                return StatusCode(500, new { error = "Failed to set Manual Notch width" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("ifshape/{receiver}")]
+        public async Task<IActionResult> SetIfShape(string receiver, [FromBody] IfShapeRequest request)
+        {
+            // IC-7300 IF DSP filter shape (CI-V 16 56): 0=SHARP, 1=SOFT.
+            var validCodes = new[] { "0", "1" };
+            if (!validCodes.Contains(request.Code))
+                return BadRequest(new { error = $"Invalid IF shape: {request.Code}" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetIfFilterShapeAsync(int.Parse(request.Code), CancellationToken.None);
+                _radioStateService.IfShapeA = request.Code;
+                _radioStateService.IfShapeB = request.Code;
+                return Ok(new { message = $"IF shape set to {request.Code}" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting IF shape");
+                return StatusCode(500, new { error = "Failed to set IF shape" });
             }
             finally { _requestSemaphore.Release(); }
         }
@@ -1276,13 +1332,12 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"NB{VfoP1Outgoing(receiver)}{request.Enabled};", "WebUI", CancellationToken.None);
-
-                if (VfoIsB(receiver)) _radioStateService.NbB = request.Enabled;
-                else                  _radioStateService.NbA = request.Enabled;
-
-                return Ok(new { message = $"Noise Blanker {receiver} set to {request.Enabled}" });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetNoiseBlankerAsync(request.Enabled == "1", CancellationToken.None);
+                _radioStateService.NbA = request.Enabled;
+                _radioStateService.NbB = request.Enabled;
+                return Ok(new { message = $"Noise Blanker set to {request.Enabled}" });
             }
             catch (Exception ex)
             {
@@ -1944,16 +1999,18 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("nblevel/{receiver}")]
         public async Task<IActionResult> SetNbLevel(string receiver, [FromBody] NbLevelRequest request)
         {
-            if (request.Level < 1 || request.Level > 20)
-                return BadRequest(new { error = "NB level must be 1–20" });
+            // IC-7300 NB level (CI-V 14 12) is 0–255 (0–100 %).
+            if (request.Level < 0 || request.Level > 255)
+                return BadRequest(new { error = "NB level must be 0–255" });
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"NL{VfoP1Outgoing(receiver)}{request.Level:D3};", "WebUI", CancellationToken.None);
-                if (VfoIsB(receiver)) _radioStateService.NbLevelB = request.Level;
-                else                  _radioStateService.NbLevelA = request.Level;
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetNbLevelAsync(request.Level, CancellationToken.None);
+                _radioStateService.NbLevelA = request.Level;
+                _radioStateService.NbLevelB = request.Level;
                 return Ok();
             }
             catch (Exception ex)
@@ -1970,16 +2027,18 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("nrlevel/{receiver}")]
         public async Task<IActionResult> SetNrLevel(string receiver, [FromBody] NrLevelRequest request)
         {
-            if (request.Level < 1 || request.Level > 15)
-                return BadRequest(new { error = "NR level must be 1–15" });
+            // IC-7300 NR level (CI-V 14 06) is 0–255 (0–100 %).
+            if (request.Level < 0 || request.Level > 255)
+                return BadRequest(new { error = "NR level must be 0–255" });
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"RL{VfoP1Outgoing(receiver)}{request.Level:D2};", "WebUI", CancellationToken.None);
-                if (VfoIsB(receiver)) _radioStateService.NrLevelB = request.Level;
-                else                  _radioStateService.NrLevelA = request.Level;
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetNrLevelAsync(request.Level, CancellationToken.None);
+                _radioStateService.NrLevelA = request.Level;
+                _radioStateService.NrLevelB = request.Level;
                 return Ok();
             }
             catch (Exception ex)
@@ -2027,10 +2086,11 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"RG{VfoP1Outgoing(receiver)}{request.Value:D3};", "WebUI", CancellationToken.None);
-                if (VfoIsB(receiver)) _radioStateService.RfGainB = request.Value;
-                else                  _radioStateService.RfGainA = request.Value;
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetRfGainAsync(request.Value, CancellationToken.None);
+                _radioStateService.RfGainA = request.Value;
+                _radioStateService.RfGainB = request.Value;
                 return Ok();
             }
             catch (Exception ex)
@@ -2053,10 +2113,11 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"SQ{VfoP1Outgoing(receiver)}{request.Value:D3};", "WebUI", CancellationToken.None);
-                if (VfoIsB(receiver)) _radioStateService.SquelchB = request.Value;
-                else                  _radioStateService.SquelchA = request.Value;
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetSquelchAsync(request.Value, CancellationToken.None);
+                _radioStateService.SquelchA = request.Value;
+                _radioStateService.SquelchB = request.Value;
                 return Ok();
             }
             catch (Exception ex)

@@ -79,6 +79,54 @@ namespace Icom_Web_Control.Services
         /// <summary>Set AF (volume) level as a raw 0–255 value (CI-V 14 01 set).</summary>
         Task SetAfGainAsync(int value, CancellationToken cancellationToken = default);
 
+        // -- RX controls (receiver-wide on the IC-7300) -------------------------
+        // The single-receiver IC-7300 has one set of these, so — like AF gain
+        // and Twin PBT — they take no VFO. Levels are raw 0–255; the multi-state
+        // functions use the radio's own small integer codes. All read methods
+        // return -1 on a miss.
+
+        // 14-family levels (0–255).
+        Task<int> GetRfGainAsync(CancellationToken cancellationToken = default);
+        Task SetRfGainAsync(int value, CancellationToken cancellationToken = default);
+        Task<int> GetSquelchAsync(CancellationToken cancellationToken = default);
+        Task SetSquelchAsync(int value, CancellationToken cancellationToken = default);
+        Task<int> GetNrLevelAsync(CancellationToken cancellationToken = default);
+        Task SetNrLevelAsync(int value, CancellationToken cancellationToken = default);
+        Task<int> GetNbLevelAsync(CancellationToken cancellationToken = default);
+        Task SetNbLevelAsync(int value, CancellationToken cancellationToken = default);
+        /// <summary>Manual-notch position, 0–255 with 128 = centre of the passband (CI-V 14 0D).</summary>
+        Task<int> GetNotchPositionAsync(CancellationToken cancellationToken = default);
+        Task SetNotchPositionAsync(int value, CancellationToken cancellationToken = default);
+
+        /// <summary>Preamp: 0=OFF, 1=P.AMP1, 2=P.AMP2 (CI-V 16 02).</summary>
+        Task<int> GetPreampAsync(CancellationToken cancellationToken = default);
+        Task SetPreampAsync(int value, CancellationToken cancellationToken = default);
+        /// <summary>AGC time constant: 1=FAST, 2=MID, 3=SLOW (CI-V 16 12).</summary>
+        Task<int> GetAgcAsync(CancellationToken cancellationToken = default);
+        Task SetAgcAsync(int value, CancellationToken cancellationToken = default);
+        /// <summary>Noise blanker on/off (CI-V 16 22).</summary>
+        Task<bool> GetNoiseBlankerAsync(CancellationToken cancellationToken = default);
+        Task SetNoiseBlankerAsync(bool on, CancellationToken cancellationToken = default);
+        /// <summary>Noise reduction on/off (CI-V 16 40).</summary>
+        Task<bool> GetNoiseReductionAsync(CancellationToken cancellationToken = default);
+        Task SetNoiseReductionAsync(bool on, CancellationToken cancellationToken = default);
+        /// <summary>Auto-notch filter on/off (CI-V 16 41).</summary>
+        Task<bool> GetAutoNotchAsync(CancellationToken cancellationToken = default);
+        Task SetAutoNotchAsync(bool on, CancellationToken cancellationToken = default);
+        /// <summary>Manual-notch filter on/off (CI-V 16 48).</summary>
+        Task<bool> GetManualNotchAsync(CancellationToken cancellationToken = default);
+        Task SetManualNotchAsync(bool on, CancellationToken cancellationToken = default);
+        /// <summary>Manual-notch filter width: 0=WIDE, 1=MID, 2=NAR (CI-V 16 57).</summary>
+        Task<int> GetManualNotchWidthAsync(CancellationToken cancellationToken = default);
+        Task SetManualNotchWidthAsync(int value, CancellationToken cancellationToken = default);
+        /// <summary>IF DSP filter shape: 0=SHARP, 1=SOFT (CI-V 16 56).</summary>
+        Task<int> GetIfFilterShapeAsync(CancellationToken cancellationToken = default);
+        Task SetIfFilterShapeAsync(int value, CancellationToken cancellationToken = default);
+
+        /// <summary>Attenuator: the IC-7300's single 20 dB pad, on/off (CI-V 11).</summary>
+        Task<bool> GetAttenuatorAsync(CancellationToken cancellationToken = default);
+        Task SetAttenuatorAsync(bool on, CancellationToken cancellationToken = default);
+
         // -- VFO / split (Phase 3 block 5) --------------------------------------
         // GetFrequencyHzAsync / SetFrequencyHzAsync / GetModeAsync / SetModeAsync
         // above already take a RadioVfo and, from block 5, address each VFO

@@ -123,6 +123,18 @@
         public string ManualNotchB { get; set; } = "0";
 
         /// <summary>
+        /// Manual-notch filter width per VFO (CI-V 16 57): "0"=WIDE "1"=MID "2"=NAR
+        /// </summary>
+        public string ManualNotchWidthA { get; set; } = "1";
+        public string ManualNotchWidthB { get; set; } = "1";
+
+        /// <summary>
+        /// IF DSP filter shape per VFO (CI-V 16 56): "0"=SHARP "1"=SOFT
+        /// </summary>
+        public string IfShapeA { get; set; } = "0";
+        public string IfShapeB { get; set; } = "0";
+
+        /// <summary>
         /// IF Width per VFO: "0"=200Hz "1"=400Hz "2"=600Hz "3"=850Hz "4"=1200Hz
         ///                   "5"=1400Hz "6"=1800Hz "7"=2400Hz "8"=3000Hz
         /// </summary>

@@ -78,13 +78,83 @@ namespace Icom_Web_Control.Services
 
             await IdentifyAsync(cancellationToken);
 
-            // Seed the AF (volume) level so the slider shows the radio's real
-            // position on first paint rather than a default. Receiver-wide, so
-            // both panels mirror the one value. Best-effort — a miss leaves 0.
-            var af = await GetAfGainAsync(cancellationToken);
-            if (af >= 0) { _state.AfGainA = af; _state.AfGainB = af; }
+            // Seed the RX controls so every slider/dropdown shows the radio's
+            // real position on first paint rather than a default. All are
+            // receiver-wide, so both panels mirror the one value. Best-effort —
+            // a miss just leaves the existing default.
+            await SeedRxControlsAsync(cancellationToken);
 
             return true;
+        }
+
+        /// <summary>
+        /// One-shot read of the receiver-wide RX controls at connect, mirrored
+        /// into both A/B state fields. Best-effort; a missed read leaves the
+        /// existing value. The slow poll keeps AF gain live thereafter.
+        /// </summary>
+        private async Task SeedRxControlsAsync(CancellationToken ct)
+        {
+            var af = await GetAfGainAsync(ct);        if (af >= 0)  { _state.AfGainA = af;   _state.AfGainB = af; }
+            var rf = await GetRfGainAsync(ct);        if (rf >= 0)  { _state.RfGainA = rf;   _state.RfGainB = rf; }
+            var sq = await GetSquelchAsync(ct);       if (sq >= 0)  { _state.SquelchA = sq;  _state.SquelchB = sq; }
+            var nrl = await GetNrLevelAsync(ct);      if (nrl >= 0) { _state.NrLevelA = nrl; _state.NrLevelB = nrl; }
+            var nbl = await GetNbLevelAsync(ct);      if (nbl >= 0) { _state.NbLevelA = nbl; _state.NbLevelB = nbl; }
+            var np = await GetNotchPositionAsync(ct); if (np >= 0)  { _state.ManualNotchFreqA = np; _state.ManualNotchFreqB = np; }
+            var pa = await GetPreampAsync(ct);        if (pa >= 0)  { _state.IpoA = pa.ToString(); _state.IpoB = pa.ToString(); }
+            var agc = await GetAgcAsync(ct);          if (agc >= 0) { _state.AgcA = agc.ToString(); _state.AgcB = agc.ToString(); }
+            _state.NbA = await GetNoiseBlankerAsync(ct)   ? "1" : "0"; _state.NbB = _state.NbA;
+            _state.NrA = await GetNoiseReductionAsync(ct) ? "1" : "0"; _state.NrB = _state.NrA;
+            _state.AutoNotchA = await GetAutoNotchAsync(ct)   ? "1" : "0"; _state.AutoNotchB = _state.AutoNotchA;
+            _state.ManualNotchA = await GetManualNotchAsync(ct) ? "1" : "0"; _state.ManualNotchB = _state.ManualNotchA;
+            var mnw = await GetManualNotchWidthAsync(ct); if (mnw >= 0) { _state.ManualNotchWidthA = mnw.ToString(); _state.ManualNotchWidthB = _state.ManualNotchWidthA; }
+            var ifs = await GetIfFilterShapeAsync(ct);    if (ifs >= 0) { _state.IfShapeA = ifs.ToString(); _state.IfShapeB = _state.IfShapeA; }
+            _state.AttA = await GetAttenuatorAsync(ct) ? "20" : "00"; _state.AttB = _state.AttA;
+        }
+
+        // Rotating RX-control poll: mirror front-panel changes to AGC, preamp,
+        // NB, NR, notch, attenuator and the levels back to the app. These move
+        // rarely, so we read exactly one per poll loop and cycle through the
+        // set — each control refreshes roughly every couple of seconds without
+        // crowding out the S-meter / dial. AF gain has its own faster phase.
+        //
+        // Every branch reads the raw int (or command-11 byte) and only writes
+        // state when the read succeeded (>= 0): a bus miss must never blink a
+        // control to OFF. The state setters broadcast only on change, so a
+        // steady radio produces no SignalR traffic here.
+        private int _rxPollIndex;
+        private const int RxControlCount = 14;
+        private const int RxControlsPerLoop = 2;   // ~1.1 s to sweep all 14
+
+        private async Task PollNextRxControlAsync(CancellationToken ct)
+        {
+            switch (_rxPollIndex % RxControlCount)
+            {
+                case 0:  { int v = await ReadFunc16Async(CivProtocol.SubAgc, ct);    if (v >= 0) { _state.AgcA = v.ToString(); _state.AgcB = _state.AgcA; } break; }
+                case 1:  { int v = await ReadFunc16Async(CivProtocol.SubPreamp, ct); if (v >= 0) { _state.IpoA = v.ToString(); _state.IpoB = _state.IpoA; } break; }
+                case 2:  { int v = await ReadFunc16Async(CivProtocol.SubNoiseBlanker, ct);   if (v >= 0) { _state.NbA = v == 1 ? "1" : "0"; _state.NbB = _state.NbA; } break; }
+                case 3:  { int v = await ReadFunc16Async(CivProtocol.SubNoiseReduction, ct); if (v >= 0) { _state.NrA = v == 1 ? "1" : "0"; _state.NrB = _state.NrA; } break; }
+                case 4:  { int v = await ReadFunc16Async(CivProtocol.SubAutoNotch, ct);   if (v >= 0) { _state.AutoNotchA = v == 1 ? "1" : "0"; _state.AutoNotchB = _state.AutoNotchA; } break; }
+                case 5:  { int v = await ReadFunc16Async(CivProtocol.SubManualNotch, ct); if (v >= 0) { _state.ManualNotchA = v == 1 ? "1" : "0"; _state.ManualNotchB = _state.ManualNotchA; } break; }
+                case 6:  { int v = await ReadAttenuatorRawAsync(ct); if (v >= 0) { _state.AttA = v == CivProtocol.AttOn20dB ? "20" : "00"; _state.AttB = _state.AttA; } break; }
+                case 7:  { int v = await GetRfGainAsync(ct);        if (v >= 0) { _state.RfGainA = v;   _state.RfGainB = v; } break; }
+                case 8:  { int v = await GetSquelchAsync(ct);       if (v >= 0) { _state.SquelchA = v;  _state.SquelchB = v; } break; }
+                case 9:  { int v = await GetNrLevelAsync(ct);       if (v >= 0) { _state.NrLevelA = v;  _state.NrLevelB = v; } break; }
+                case 10: { int v = await GetNbLevelAsync(ct);       if (v >= 0) { _state.NbLevelA = v;  _state.NbLevelB = v; } break; }
+                case 11: { int v = await GetNotchPositionAsync(ct); if (v >= 0) { _state.ManualNotchFreqA = v; _state.ManualNotchFreqB = v; } break; }
+                case 12: { int v = await ReadFunc16Async(CivProtocol.SubManualNotchWidth, ct); if (v >= 0) { _state.ManualNotchWidthA = v.ToString(); _state.ManualNotchWidthB = _state.ManualNotchWidthA; } break; }
+                case 13: { int v = await ReadFunc16Async(CivProtocol.SubIfFilterShape, ct);    if (v >= 0) { _state.IfShapeA = v.ToString(); _state.IfShapeB = _state.IfShapeA; } break; }
+            }
+            _rxPollIndex++;
+        }
+
+        /// <summary>Read the attenuator (command 11) as its raw byte. -1 on a miss; 0x20 = 20 dB.</summary>
+        private async Task<int> ReadAttenuatorRawAsync(CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdAttenuator);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdAttenuator, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.CmdAttenuator || reply.Data.Length < 1)
+                return -1;
+            return reply.Data[0];
         }
 
         public Task DisconnectAsync() => _bus.CloseAsync();
@@ -454,6 +524,81 @@ namespace Icom_Web_Control.Services
                 _logger.LogWarning("[CivRadioController] Set {What} to {Level} was not acknowledged", what, level);
         }
 
+        // -- RX controls (receiver-wide) ---------------------------------------
+        // 14-family levels reuse the shared BCD helpers; the 16-family functions
+        // and the attenuator get their own small read/write helpers below.
+
+        public Task<int> GetRfGainAsync(CancellationToken ct = default) => ReadLevel14Async(CivProtocol.SubRfGain, ct);
+        public Task SetRfGainAsync(int value, CancellationToken ct = default) => WriteLevel14Async(CivProtocol.SubRfGain, value, "RF gain", ct);
+        public Task<int> GetSquelchAsync(CancellationToken ct = default) => ReadLevel14Async(CivProtocol.SubSquelch, ct);
+        public Task SetSquelchAsync(int value, CancellationToken ct = default) => WriteLevel14Async(CivProtocol.SubSquelch, value, "squelch", ct);
+        public Task<int> GetNrLevelAsync(CancellationToken ct = default) => ReadLevel14Async(CivProtocol.SubNrLevel, ct);
+        public Task SetNrLevelAsync(int value, CancellationToken ct = default) => WriteLevel14Async(CivProtocol.SubNrLevel, value, "NR level", ct);
+        public Task<int> GetNbLevelAsync(CancellationToken ct = default) => ReadLevel14Async(CivProtocol.SubNbLevel, ct);
+        public Task SetNbLevelAsync(int value, CancellationToken ct = default) => WriteLevel14Async(CivProtocol.SubNbLevel, value, "NB level", ct);
+        public Task<int> GetNotchPositionAsync(CancellationToken ct = default) => ReadLevel14Async(CivProtocol.SubNotchPos, ct);
+        public Task SetNotchPositionAsync(int value, CancellationToken ct = default) => WriteLevel14Async(CivProtocol.SubNotchPos, value, "notch position", ct);
+
+        public Task<int> GetPreampAsync(CancellationToken ct = default) => ReadFunc16Async(CivProtocol.SubPreamp, ct);
+        public Task SetPreampAsync(int value, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubPreamp, Math.Clamp(value, 0, 2), "preamp", ct);
+        public Task<int> GetAgcAsync(CancellationToken ct = default) => ReadFunc16Async(CivProtocol.SubAgc, ct);
+        public Task SetAgcAsync(int value, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubAgc, Math.Clamp(value, 1, 3), "AGC", ct);
+
+        public async Task<bool> GetNoiseBlankerAsync(CancellationToken ct = default) => await ReadFunc16Async(CivProtocol.SubNoiseBlanker, ct) == 1;
+        public Task SetNoiseBlankerAsync(bool on, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubNoiseBlanker, on ? 1 : 0, "noise blanker", ct);
+        public async Task<bool> GetNoiseReductionAsync(CancellationToken ct = default) => await ReadFunc16Async(CivProtocol.SubNoiseReduction, ct) == 1;
+        public Task SetNoiseReductionAsync(bool on, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubNoiseReduction, on ? 1 : 0, "noise reduction", ct);
+        public async Task<bool> GetAutoNotchAsync(CancellationToken ct = default) => await ReadFunc16Async(CivProtocol.SubAutoNotch, ct) == 1;
+        public Task SetAutoNotchAsync(bool on, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubAutoNotch, on ? 1 : 0, "auto notch", ct);
+        public async Task<bool> GetManualNotchAsync(CancellationToken ct = default) => await ReadFunc16Async(CivProtocol.SubManualNotch, ct) == 1;
+        public Task SetManualNotchAsync(bool on, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubManualNotch, on ? 1 : 0, "manual notch", ct);
+        public Task<int> GetManualNotchWidthAsync(CancellationToken ct = default) => ReadFunc16Async(CivProtocol.SubManualNotchWidth, ct);
+        public Task SetManualNotchWidthAsync(int value, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubManualNotchWidth, Math.Clamp(value, 0, 2), "manual notch width", ct);
+        public Task<int> GetIfFilterShapeAsync(CancellationToken ct = default) => ReadFunc16Async(CivProtocol.SubIfFilterShape, ct);
+        public Task SetIfFilterShapeAsync(int value, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubIfFilterShape, Math.Clamp(value, 0, 1), "IF filter shape", ct);
+
+        /// <summary>Read a 16-family function (16 &lt;sub&gt;). Reply is 16 &lt;sub&gt; &lt;val&gt;. -1 on a miss.</summary>
+        private async Task<int> ReadFunc16Async(byte sub, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSetFunc, sub);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdSetFunc, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.CmdSetFunc
+                || reply.Data.Length < 2 || reply.Data[0] != sub)
+                return -1;
+            return reply.Data[1];
+        }
+
+        /// <summary>Write a 16-family function (16 &lt;sub&gt; &lt;val&gt;) and expect an ack.</summary>
+        private async Task WriteFunc16Async(byte sub, int value, string what, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSetFunc, sub, (byte)value);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set {What} to {Value} was not acknowledged", what, value);
+        }
+
+        public async Task<bool> GetAttenuatorAsync(CancellationToken ct = default)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdAttenuator);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdAttenuator, cancellationToken: ct);
+            // Reply body: 11 <val> → Data = [val]; 0x20 = 20 dB on.
+            if (reply == null || reply.Cmd != CivProtocol.CmdAttenuator || reply.Data.Length < 1)
+                return false;
+            return reply.Data[0] == CivProtocol.AttOn20dB;
+        }
+
+        public async Task SetAttenuatorAsync(bool on, CancellationToken ct = default)
+        {
+            byte val = on ? CivProtocol.AttOn20dB : CivProtocol.AttOff;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdAttenuator, val);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set attenuator {State} was not acknowledged", on ? "20 dB" : "off");
+        }
+
         // -- VFO select / exchange / split (Phase 3 block 5) -------------------
 
         public async Task SelectVfoAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
@@ -696,6 +841,23 @@ namespace Icom_Web_Control.Services
                         else _state.SplitMode = 0;
                         _state.TxVfo = VfoIndex(split ? other : active);
                     }
+
+                    // AF (volume) level (14 01) — mirror front-panel AF-knob
+                    // turns back to the app slider. Receiver-wide and slow, so
+                    // ride a spare split-poll phase (~1.5 Hz). A miss leaves the
+                    // last value; the state setter only broadcasts on change, so
+                    // this is quiet unless the knob actually moved.
+                    if (loop % SplitPollEveryNLoops == 3)
+                    {
+                        int af = await GetAfGainAsync(stoppingToken);
+                        if (af >= 0) { _state.AfGainA = af; _state.AfGainB = af; }
+                    }
+
+                    // A couple of RX controls per loop, cycling through AGC/
+                    // preamp/NB/NR/notch/att/levels so front-panel changes to any
+                    // of them make it back to the app within about a second.
+                    for (int i = 0; i < RxControlsPerLoop; i++)
+                        await PollNextRxControlAsync(stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {

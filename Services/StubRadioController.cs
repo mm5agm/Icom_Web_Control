@@ -164,6 +164,44 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- RX controls (receiver-wide, canned) -------------------------------
+
+        private int _rfGain = 255, _squelch = 0, _nrLevel = 128, _nbLevel = 128, _notchPos = 128;
+        private int _preamp = 0, _agc = 2, _manualNotchWidth = 1, _ifShape = 0; // 2 = MID; width 1 = MID; shape 0 = SHARP
+        private bool _nb, _nr, _autoNotch, _manualNotch, _att;
+
+        public Task<int> GetRfGainAsync(CancellationToken ct = default) => Task.FromResult(_rfGain);
+        public Task SetRfGainAsync(int value, CancellationToken ct = default) { _rfGain = Math.Clamp(value, 0, 255); _state.RfGainA = _rfGain; _state.RfGainB = _rfGain; return Task.CompletedTask; }
+        public Task<int> GetSquelchAsync(CancellationToken ct = default) => Task.FromResult(_squelch);
+        public Task SetSquelchAsync(int value, CancellationToken ct = default) { _squelch = Math.Clamp(value, 0, 255); _state.SquelchA = _squelch; _state.SquelchB = _squelch; return Task.CompletedTask; }
+        public Task<int> GetNrLevelAsync(CancellationToken ct = default) => Task.FromResult(_nrLevel);
+        public Task SetNrLevelAsync(int value, CancellationToken ct = default) { _nrLevel = Math.Clamp(value, 0, 255); _state.NrLevelA = _nrLevel; _state.NrLevelB = _nrLevel; return Task.CompletedTask; }
+        public Task<int> GetNbLevelAsync(CancellationToken ct = default) => Task.FromResult(_nbLevel);
+        public Task SetNbLevelAsync(int value, CancellationToken ct = default) { _nbLevel = Math.Clamp(value, 0, 255); _state.NbLevelA = _nbLevel; _state.NbLevelB = _nbLevel; return Task.CompletedTask; }
+        public Task<int> GetNotchPositionAsync(CancellationToken ct = default) => Task.FromResult(_notchPos);
+        public Task SetNotchPositionAsync(int value, CancellationToken ct = default) { _notchPos = Math.Clamp(value, 0, 255); _state.ManualNotchFreqA = _notchPos; _state.ManualNotchFreqB = _notchPos; return Task.CompletedTask; }
+
+        public Task<int> GetPreampAsync(CancellationToken ct = default) => Task.FromResult(_preamp);
+        public Task SetPreampAsync(int value, CancellationToken ct = default) { _preamp = Math.Clamp(value, 0, 2); _state.IpoA = _preamp.ToString(); _state.IpoB = _state.IpoA; return Task.CompletedTask; }
+        public Task<int> GetAgcAsync(CancellationToken ct = default) => Task.FromResult(_agc);
+        public Task SetAgcAsync(int value, CancellationToken ct = default) { _agc = Math.Clamp(value, 1, 3); _state.AgcA = _agc.ToString(); _state.AgcB = _state.AgcA; return Task.CompletedTask; }
+
+        public Task<bool> GetNoiseBlankerAsync(CancellationToken ct = default) => Task.FromResult(_nb);
+        public Task SetNoiseBlankerAsync(bool on, CancellationToken ct = default) { _nb = on; _state.NbA = on ? "1" : "0"; _state.NbB = _state.NbA; return Task.CompletedTask; }
+        public Task<bool> GetNoiseReductionAsync(CancellationToken ct = default) => Task.FromResult(_nr);
+        public Task SetNoiseReductionAsync(bool on, CancellationToken ct = default) { _nr = on; _state.NrA = on ? "1" : "0"; _state.NrB = _state.NrA; return Task.CompletedTask; }
+        public Task<bool> GetAutoNotchAsync(CancellationToken ct = default) => Task.FromResult(_autoNotch);
+        public Task SetAutoNotchAsync(bool on, CancellationToken ct = default) { _autoNotch = on; _state.AutoNotchA = on ? "1" : "0"; _state.AutoNotchB = _state.AutoNotchA; return Task.CompletedTask; }
+        public Task<bool> GetManualNotchAsync(CancellationToken ct = default) => Task.FromResult(_manualNotch);
+        public Task SetManualNotchAsync(bool on, CancellationToken ct = default) { _manualNotch = on; _state.ManualNotchA = on ? "1" : "0"; _state.ManualNotchB = _state.ManualNotchA; return Task.CompletedTask; }
+        public Task<int> GetManualNotchWidthAsync(CancellationToken ct = default) => Task.FromResult(_manualNotchWidth);
+        public Task SetManualNotchWidthAsync(int value, CancellationToken ct = default) { _manualNotchWidth = Math.Clamp(value, 0, 2); _state.ManualNotchWidthA = _manualNotchWidth.ToString(); _state.ManualNotchWidthB = _state.ManualNotchWidthA; return Task.CompletedTask; }
+        public Task<int> GetIfFilterShapeAsync(CancellationToken ct = default) => Task.FromResult(_ifShape);
+        public Task SetIfFilterShapeAsync(int value, CancellationToken ct = default) { _ifShape = Math.Clamp(value, 0, 1); _state.IfShapeA = _ifShape.ToString(); _state.IfShapeB = _state.IfShapeA; return Task.CompletedTask; }
+
+        public Task<bool> GetAttenuatorAsync(CancellationToken ct = default) => Task.FromResult(_att);
+        public Task SetAttenuatorAsync(bool on, CancellationToken ct = default) { _att = on; _state.AttA = on ? "20" : "00"; _state.AttB = _state.AttA; return Task.CompletedTask; }
+
         // -- Twin PBT (CI-V 14 07 / 14 08, canned) -----------------------------
 
         private int _pbtInner = 128; // 128 = passband centre / no shift
