@@ -65,6 +65,19 @@ namespace Icom_Web_Control.Services.Civ
         public const byte CmdReadMeter = 0x15;
         public const byte SubSMeter = 0x02;
 
+        // Phase 3 block 4 — PTT / TX status and the two TX meters. Command 1C 00
+        // both reads and sets the transmit state (data byte present = set); the
+        // Po and SWR meters share the 15-family big-endian BCD format of the
+        // S-meter (0–255).
+        //   TX status : send 1C 00        → reply 1C 00 <00=RX | 01=TX>
+        //   Set PTT   : send 1C 00 <v>    → reply FB / FA   (v: 00=RX, 01=TX)
+        //   Po meter  : send 15 11        → reply 15 11 <d1> <d2>  (00 00=0%, 01 43=50%, 02 13=100%)
+        //   SWR meter : send 15 12        → reply 15 12 <d1> <d2>  (00 00=SWR1.0 … 02 55=SWR∞)
+        public const byte CmdTransmit = 0x1C;
+        public const byte SubTxStatus = 0x00;
+        public const byte SubPoMeter = 0x11;
+        public const byte SubSwrMeter = 0x12;
+
         /// <summary>Decode one packed-BCD byte (two decimal digits) to 0–99.</summary>
         public static int BcdByte(byte b) => ((b >> 4) & 0x0F) * 10 + (b & 0x0F);
 

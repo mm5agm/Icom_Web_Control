@@ -397,16 +397,14 @@ namespace Icom_Web_Control.Services.Voice
 
         private async Task<DispatchResult> TxOnAsync(CancellationToken ct)
         {
-            await SendCommand("TX0;", ct);
-            _state.IsTransmitting = true;
+            await SetRadioTransmit(true, ct);
             _logger.LogInformation("[Voice] TxOn");
             return new DispatchResult(true, "Transmitting");
         }
 
         private async Task<DispatchResult> TxOffAsync(CancellationToken ct)
         {
-            await SendCommand("RX;", ct);
-            _state.IsTransmitting = false;
+            await SetRadioTransmit(false, ct);
             _logger.LogInformation("[Voice] TxOff");
             return new DispatchResult(true, "Receive");
         }
@@ -583,6 +581,23 @@ namespace Icom_Web_Control.Services.Voice
                 return;
             }
             await _radio.SetModeAsync(vfo, mode, ct);
+        }
+
+        /// <summary>
+        /// Key/unkey the radio through the CI-V seam (software PTT), honouring the
+        /// §6.5 dry-run flag. As with the frequency/mode helpers, dry-run sets
+        /// state optimistically so the spoken confirmation still reflects it —
+        /// and, importantly, dry-run never actually transmits.
+        /// </summary>
+        private async Task SetRadioTransmit(bool transmit, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set PTT {State}", transmit ? "TX" : "RX");
+                _state.IsTransmitting = transmit;
+                return;
+            }
+            await _radio.SetTransmitAsync(transmit, ct);
         }
 
         // -- helpers -------------------------------------------------------

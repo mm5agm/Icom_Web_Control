@@ -237,22 +237,19 @@ namespace Icom_Web_Control.Controllers
             _logger.LogInformation("[API] ToggleTransmit called: transmit={Transmit}", request.Transmit);
             try
             {
-                if (request.Transmit)
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+
+                // Software PTT via the CI-V seam (command 1C 00). SetTransmitAsync
+                // commits _radioStateService.IsTransmitting only on the radio's
+                // ACK, so we don't set it optimistically here.
+                await _radio.SetTransmitAsync(request.Transmit, CancellationToken.None);
+                _logger.LogInformation("[API] ToggleTransmit completed: transmitting={Transmit}", request.Transmit);
+                return Ok(new
                 {
-                    _logger.LogInformation("Turning TX ON...");
-                    await _catClient.SendCommandAsync("TX1;", "WebUI", CancellationToken.None);
-                    _radioStateService.IsTransmitting = true;
-                    _logger.LogInformation("[API] ToggleTransmit completed: transmitting=true");
-                    return Ok(new { message = "TX ON", transmitting = true });
-                }
-                else
-                {
-                    _logger.LogInformation("Turning TX OFF...");
-                    await _catClient.SendCommandAsync("TX0;", "WebUI", CancellationToken.None);
-                    _radioStateService.IsTransmitting = false;
-                    _logger.LogInformation("[API] ToggleTransmit completed: transmitting=false");
-                    return Ok(new { message = "TX OFF", transmitting = false });
-                }
+                    message = request.Transmit ? "TX ON" : "TX OFF",
+                    transmitting = _radioStateService.IsTransmitting
+                });
             }
             catch (Exception ex)
             {

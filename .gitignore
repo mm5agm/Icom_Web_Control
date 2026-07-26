@@ -164,8 +164,9 @@ run.log
 # Local scratch / temp files (test plans, draft notes, etc.)
 .tmp_*
 
-# Local backup scripts
+# Local backup scripts (e.g. IWC_Backup.ps1 — copies the project to Colin's NAS)
 Backup*.ps1
+*Backup*.ps1
 
 # Local Claude Code settings
 .claude/settings.local.json

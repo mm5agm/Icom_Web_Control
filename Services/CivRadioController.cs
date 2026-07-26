@@ -226,31 +226,74 @@ namespace Icom_Web_Control.Services
                 ["DATA-FM"] = (0x05, true),
             };
 
-        // -- S-meter (Phase 3 block 3) -----------------------------------------
+        // -- Meters (Phase 3 blocks 3–4) ---------------------------------------
 
         public async Task<int> ReadSMeterAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
         {
-            // Command 15 02 → 15 02 <d1> <d2>, level 0–255 as two big-endian
-            // BCD bytes (00 00=S0, 01 20=S9, 02 41=S9+60 dB).
-            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
-                CivProtocol.CmdReadMeter, CivProtocol.SubSMeter);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadMeter, cancellationToken: cancellationToken);
-            // Reply body is 15 02 <d1> <d2>: Data = [02, d1, d2].
-            if (reply == null || reply.Cmd != CivProtocol.CmdReadMeter
-                || reply.Data.Length < 3 || reply.Data[0] != CivProtocol.SubSMeter)
+            // Command 15 02, level 0–255 as two big-endian BCD bytes
+            // (00 00=S0, 01 20=S9, 02 41=S9+60 dB).
+            int level = await ReadMeterAsync(CivProtocol.SubSMeter, cancellationToken);
+            if (level < 0)
                 return vfo == RadioVfo.A ? (_state.SMeterA ?? 0) : (_state.SMeterB ?? 0);
+            return level;
+        }
 
+        /// <summary>
+        /// Read one meter from the 15 family (S-meter 02, Po 11, SWR 12). All
+        /// share the same reply shape — 15 &lt;sub&gt; &lt;d1&gt; &lt;d2&gt; with a
+        /// 0–255 big-endian BCD level. Returns -1 on any miss (wrong sub, short
+        /// frame, no reply) so callers can decide the fallback.
+        /// </summary>
+        private async Task<int> ReadMeterAsync(byte sub, CancellationToken cancellationToken)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdReadMeter, sub);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadMeter, cancellationToken: cancellationToken);
+            // Reply body is 15 <sub> <d1> <d2>: Data = [sub, d1, d2].
+            if (reply == null || reply.Cmd != CivProtocol.CmdReadMeter
+                || reply.Data.Length < 3 || reply.Data[0] != sub)
+                return -1;
             return CivProtocol.BcdByte(reply.Data[1]) * 100 + CivProtocol.BcdByte(reply.Data[2]);
         }
 
-        // Not yet implemented behind CI-V (later Phase 3 blocks). Safe
-        // placeholders so the seam's other callers never throw.
+        // -- PTT / TX status + TX meters (Phase 3 block 4) ---------------------
 
+        // The poll loop keeps _state.IsTransmitting live (via ReadTransmitAsync),
+        // so on-demand callers (rigctld, voice) get the cached value cheaply
+        // rather than firing another bus transaction at ~7 Hz.
         public Task<bool> GetTransmitAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_state.IsTransmitting);
 
-        public Task SetTransmitAsync(bool transmit, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+        public async Task SetTransmitAsync(bool transmit, CancellationToken cancellationToken = default)
+        {
+            // Software PTT: command 1C 00 with a data byte (01=TX, 00=RX).
+            byte v = transmit ? (byte)0x01 : (byte)0x00;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdTransmit, CivProtocol.SubTxStatus, v);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+                _state.IsTransmitting = transmit;
+            else
+                _logger.LogWarning("[CivRadioController] Set PTT {State} was not acknowledged",
+                    transmit ? "TX" : "RX");
+        }
+
+        /// <summary>
+        /// Read the transmit state (command 1C 00, no data byte). Returns the
+        /// last known state on a miss so a dropped frame never spuriously
+        /// flips TX/RX.
+        /// </summary>
+        private async Task<bool> ReadTransmitAsync(CancellationToken cancellationToken)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdTransmit, CivProtocol.SubTxStatus);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdTransmit, cancellationToken: cancellationToken);
+            // Reply body is 1C 00 <status>: Data = [00, status].
+            if (reply != null && reply.Cmd == CivProtocol.CmdTransmit
+                && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubTxStatus)
+                return reply.Data[1] != 0;
+            return _state.IsTransmitting;
+        }
 
         // -- Connect / identify -------------------------------------------------
 
@@ -326,10 +369,31 @@ namespace Icom_Web_Control.Services
                         continue; // link is down — don't chase further reads
                     }
 
-                    // S-meter (command 15 02) every loop — the fast-moving meter.
-                    // Best-effort: a miss returns the last value and never drops
-                    // the link.
-                    _state.SMeterA = await ReadSMeterAsync(RadioVfo.A, stoppingToken);
+                    // TX/RX status (command 1C 00) every loop — cheap, and it
+                    // decides which meters are worth reading. Best-effort: a miss
+                    // keeps the last state and never drops the link.
+                    bool transmitting = await ReadTransmitAsync(stoppingToken);
+                    _state.IsTransmitting = transmitting; // broadcasts on change
+
+                    if (transmitting)
+                    {
+                        // Transmitting: the S-meter is meaningless; Po (15 11) and
+                        // SWR (15 12) are the live needles. A -1 miss leaves the
+                        // last value in place.
+                        int po = await ReadMeterAsync(CivProtocol.SubPoMeter, stoppingToken);
+                        if (po >= 0) _state.PowerMeter = po;
+                        int swr = await ReadMeterAsync(CivProtocol.SubSwrMeter, stoppingToken);
+                        if (swr >= 0) _state.SWRMeter = swr;
+                    }
+                    else
+                    {
+                        // Receiving: S-meter (command 15 02) is the fast-moving
+                        // meter. Zero the TX needles once so they don't hang at
+                        // their last transmit reading after unkey.
+                        _state.SMeterA = await ReadSMeterAsync(RadioVfo.A, stoppingToken);
+                        if (_state.PowerMeter is not (null or 0)) _state.PowerMeter = 0;
+                        if (_state.SWRMeter is not (null or 0)) _state.SWRMeter = 0;
+                    }
 
                     // Mode (command 04, plus 1A 06 on SSB/AM/FM) is slower to
                     // change, so poll it less often to keep the bus free for the
