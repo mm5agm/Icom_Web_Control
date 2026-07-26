@@ -789,12 +789,6 @@
                                  style="font-size:1.1rem; font-weight:700; color:#000; margin-top:0.3rem; max-width:320px; overflow-wrap:break-word;"
                                  aria-live="polite"></div>
                         </div>
-                        <!-- Filter scope display VFO A — sits between band buttons and AGC column -->
-                        <div class="flex-shrink-0" id="filterScopeContainerA" style="width:160px;">
-                            <canvas id="filterScopeCanvasA" role="img" aria-hidden="true"
-                                    aria-label="VFO A filter display" data-a11y-key="filter.scopeA"
-                                    style="display:block; height:80px; border-radius:4px;"></canvas>
-                        </div>
                         <!-- Right: Controls column (2-column grid) -->
                         <div class="vfo-controls-column">
                             <div class="vfo-control-item">
@@ -929,7 +923,7 @@
                         </div>
                     </div>
 
-                    <!-- Segment selector + Contour/APF controls on one row -->
+                    <!-- Segment selector + APF controls on one row -->
                     <div class="d-flex align-items-center gap-1 mb-1 flex-wrap" style="margin-top: 2px;">
                         <span class="fw-bold" style="font-size: 0.8rem; white-space: nowrap;">Segment</span>
                         <select class="form-select form-select-sm segment-select" id="segmentSelectA"
@@ -938,19 +932,6 @@
                                 onchange="window.onSegmentChange && window.onSegmentChange('A', this.value)">
                             <option value="">--</option>
                         </select>
-                        <button type="button" id="contourBtnA"
-                                class="btn btn-sm @(Model.RadioState.ContourOnA ? "btn-success" : "btn-outline-secondary") flex-shrink-0"
-                                style="color: black; font-weight: bold;"
-                                aria-label="VFO A Contour filter" title="Toggle Contour audio peak filter"
-                                onclick="toggleContour('A')">@(Model.RadioState.ContourOnA ? "Contour On" : "Contour Off")</button>
-                        <input type="range" id="contourFreqSliderA"
-                               min="100" max="@contourMaxFreq" step="@contourStep"
-                               value="@Model.RadioState.ContourFreqA"
-                               style="width: clamp(60px, 8vw, 110px); height: 16px;"
-                               oninput="document.getElementById('contourFreqValueA').textContent = this.value + ' Hz'"
-                               onchange="setContourFreq('A', parseInt(this.value))"
-                               aria-label="VFO A Contour frequency">
-                        <span id="contourFreqValueA" style="font-size: 0.8rem; white-space: nowrap; min-width: 46px;">@(Model.RadioState.ContourFreqA) Hz</span>
                         <button type="button" id="apfBtnA"
                                 class="btn btn-sm @(Model.RadioState.ApfOnA ? "btn-success" : "btn-outline-secondary") flex-shrink-0"
                                 style="color: black; font-weight: bold;"
@@ -966,7 +947,7 @@
                         <span id="apfFreqValueA" style="font-size: 0.8rem; white-space: nowrap; min-width: 46px;">@(Model.RadioState.ApfFreqA) Hz</span>
                     </div>
 
-                    <!-- Frequency + Roofing + AF Gain on one row -->
+                    <!-- Frequency + AF Gain on one row -->
                     <div class="vfo-freq-row d-flex align-items-center flex-wrap gap-2 mb-1" style="margin-top: -2px;">
                         <span id="freqA" class="fw-bold frequency-display digit-display" role="spinbutton" aria-label="VFO A frequency" title="VFO A frequency" data-a11y-key="vfo.a.frequency" tabindex="0" aria-valuemin="0.03" aria-valuemax="75" aria-valuenow="0"></span>
                         <span class="frequency-display digit-display">MHz</span>
@@ -981,37 +962,6 @@
                                 title="Keyboard — enter VFO A frequency">
                             <strong>123</strong>
                         </button>
-                        @if (!isFt710)
-                        {
-                        <label class="mb-0 text-nowrap ms-1 fw-bold">Roofing:</label>
-                        <select class="form-select form-select-sm fw-bold flex-shrink-0" id="roofingFilterSelectA"
-                                aria-label="VFO A roofing filter"
-                                title="VFO A roofing filter"
-                                style="width: auto;"
-                                onchange="window.radioControl.setRoofingFilter('A', this.value)">
-                            @if (isFtdx10)
-                            {
-                                @foreach (var opt in roofingOptionsFtdx10)
-                                {
-                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterA==opt.Value ? "selected" : null)">@opt.Label</option>
-                                }
-                            }
-                            else if (isFtdx3000)
-                            {
-                                @foreach (var opt in roofingOptions3000)
-                                {
-                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterA==opt.Value ? "selected" : null)">@opt.Label</option>
-                                }
-                            }
-                            else
-                            {
-                                @foreach (var opt in roofingOptions)
-                                {
-                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterA==opt.Value ? "selected" : null)">@opt.Label</option>
-                                }
-                            }
-                        </select>
-                        }
                         <label class="mb-0 text-nowrap ms-1 fw-bold">AF Gain: <span id="afGainValueA" class="fw-bold">@Model.AfGainA</span></label>
                         <input type="range" class="flex-shrink-0"
                                id="afGainSliderA"
@@ -1022,37 +972,15 @@
                                oninput="document.getElementById('afGainValueA').innerText = this.value">
                     </div>
 
-                    <!-- IF Width and IF Shift -->
+                    <!-- Audio Filter (LCUT/HCUT) -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
-                        <label class="mb-0 text-nowrap fw-bold">IF Width:</label>
-                        <select class="form-select form-select-sm fw-bold flex-shrink-0" id="ifWidthSelectA"
-                                aria-label="VFO A IF width"
-                                title="VFO A IF width"
-                                style="width: auto;"
-                                onchange="window.radioControl.setIfWidth('A', this.value)">
-                            @foreach (var opt in ifWidthOptions)
-                            {
-                                bool isDefault = string.IsNullOrEmpty(Model.RadioState.IfWidthA) && opt.Value == ifWidthDefaultA;
-                                <option value="@opt.Value" selected="@(Model.RadioState.IfWidthA==opt.Value||isDefault ? "selected" : null)">@opt.Label</option>
-                            }
-                        </select>
-                        <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0 ms-2"
+                        <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
                                 id="audioFilterBtnA"
                                 aria-label="VFO A Audio Filter"
                                 title="Open the Audio Filter dialog for VFO A's current mode (LCUT FREQ, LCUT SLOPE, HCUT FREQ, HCUT SLOPE)"
                                 onclick="window.audioFilter && window.audioFilter.open('A')">
                             Audio Filter
                         </button>
-                        <label class="mb-0 text-nowrap ms-1 fw-bold">IF Shift: <span id="ifShiftValueA" class="fw-bold">@Model.RadioState.IfShiftA</span></label>
-                        <input type="range" class="form-range ifshift-slider flex-shrink-0"
-                               id="ifShiftSliderA"
-                               aria-label="VFO A IF shift"
-                               title="VFO A IF shift"
-                               min="-1000" max="1000" step="20" value="@Model.RadioState.IfShiftA"
-                               style="width: clamp(70px, 8vw, 120px); height: 18px;"
-                               oninput="document.getElementById('ifShiftValueA').textContent = this.value; if(window.filterScopePanelA) window.filterScopePanelA.setState({ifShiftHz: parseInt(this.value)||0})">
-                        <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
-                                onclick="resetIfShift('A')" title="Zero IF Shift">Zero</button>
                     </div>
 
                     <!-- VFO A status line — live band/mode/freq/power summary, banner-coloured -->
@@ -1201,12 +1129,6 @@
                                      aria-live="polite"></div>
                             </div>
                         }
-                        <!-- Filter scope display VFO B — sits between band buttons and AGC column -->
-                        <div class="flex-shrink-0" id="filterScopeContainerB" style="width:160px;">
-                            <canvas id="filterScopeCanvasB" role="img" aria-hidden="true"
-                                    aria-label="VFO B filter display" data-a11y-key="filter.scopeB"
-                                    style="display:block; height:80px; border-radius:4px;"></canvas>
-                        </div>
                         <!-- Right: Controls column (2-column grid) -->
                         <div class="vfo-controls-column">
                             <div class="vfo-control-item">
@@ -1341,7 +1263,7 @@
                         </div>
                     </div>
 
-                    <!-- Segment selector + Contour/APF controls on one row -->
+                    <!-- Segment selector + APF controls on one row -->
                     <div class="d-flex align-items-center gap-1 mb-1 flex-wrap" style="margin-top: 2px;">
                         <span class="fw-bold" style="font-size: 0.8rem; white-space: nowrap;">Segment</span>
                         <select class="form-select form-select-sm segment-select" id="segmentSelectB"
@@ -1350,19 +1272,6 @@
                                 onchange="window.onSegmentChange && window.onSegmentChange('B', this.value)">
                             <option value="">--</option>
                         </select>
-                        <button type="button" id="contourBtnB"
-                                class="btn btn-sm @(Model.RadioState.ContourOnB ? "btn-success" : "btn-outline-secondary") flex-shrink-0"
-                                style="color: black; font-weight: bold;"
-                                aria-label="VFO B Contour filter" title="Toggle Contour audio peak filter"
-                                onclick="toggleContour('B')">@(Model.RadioState.ContourOnB ? "Contour On" : "Contour Off")</button>
-                        <input type="range" id="contourFreqSliderB"
-                               min="100" max="@contourMaxFreq" step="@contourStep"
-                               value="@Model.RadioState.ContourFreqB"
-                               style="width: clamp(60px, 8vw, 110px); height: 16px;"
-                               oninput="document.getElementById('contourFreqValueB').textContent = this.value + ' Hz'"
-                               onchange="setContourFreq('B', parseInt(this.value))"
-                               aria-label="VFO B Contour frequency">
-                        <span id="contourFreqValueB" style="font-size: 0.8rem; white-space: nowrap; min-width: 46px;">@(Model.RadioState.ContourFreqB) Hz</span>
                         <button type="button" id="apfBtnB"
                                 class="btn btn-sm @(Model.RadioState.ApfOnB ? "btn-success" : "btn-outline-secondary") flex-shrink-0"
                                 style="color: black; font-weight: bold;"
@@ -1378,7 +1287,7 @@
                         <span id="apfFreqValueB" style="font-size: 0.8rem; white-space: nowrap; min-width: 46px;">@(Model.RadioState.ApfFreqB) Hz</span>
                     </div>
 
-                    <!-- Frequency + Roofing + AF Gain on one row -->
+                    <!-- Frequency + AF Gain on one row -->
                     <div class="vfo-freq-row d-flex align-items-center flex-wrap gap-2 mb-1" style="margin-top: -2px;">
                         <span id="freqB" class="fw-bold frequency-display digit-display" role="spinbutton" aria-label="VFO B frequency" title="VFO B frequency" data-a11y-key="vfo.b.frequency" tabindex="0" aria-valuemin="0.03" aria-valuemax="75" aria-valuenow="0"></span>
                         <span class="frequency-display digit-display">MHz</span>
@@ -1393,37 +1302,6 @@
                                 title="Keyboard — enter VFO B frequency">
                             <strong>123</strong>
                         </button>
-                        @if (!isFt710)
-                        {
-                        <label class="mb-0 text-nowrap ms-1 fw-bold">Roofing:</label>
-                        <select class="form-select form-select-sm fw-bold flex-shrink-0" id="roofingFilterSelectB"
-                                aria-label="VFO B roofing filter"
-                                title="VFO B roofing filter"
-                                style="width: auto;"
-                                onchange="window.radioControl.setRoofingFilter('B', this.value)">
-                            @if (isFtdx10)
-                            {
-                                @foreach (var opt in roofingOptionsFtdx10)
-                                {
-                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterB==opt.Value ? "selected" : null)">@opt.Label</option>
-                                }
-                            }
-                            else if (isFtdx3000)
-                            {
-                                @foreach (var opt in roofingOptions3000)
-                                {
-                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterB==opt.Value ? "selected" : null)">@opt.Label</option>
-                                }
-                            }
-                            else
-                            {
-                                @foreach (var opt in roofingOptions)
-                                {
-                                    <option value="@opt.Value" selected="@(Model.RadioState.RoofingFilterB==opt.Value ? "selected" : null)">@opt.Label</option>
-                                }
-                            }
-                        </select>
-                        }
                         <label class="mb-0 text-nowrap ms-1 fw-bold">AF Gain: <span id="afGainValueB" class="fw-bold">@Model.AfGainB</span></label>
                         <input type="range" class="flex-shrink-0"
                                id="afGainSliderB"
@@ -1434,37 +1312,15 @@
                                oninput="document.getElementById('afGainValueB').innerText = this.value">
                     </div>
 
-                    <!-- IF Width and IF Shift -->
+                    <!-- Audio Filter (LCUT/HCUT) -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
-                        <label class="mb-0 text-nowrap fw-bold">IF Width:</label>
-                        <select class="form-select form-select-sm fw-bold flex-shrink-0" id="ifWidthSelectB"
-                                aria-label="VFO B IF width"
-                                title="VFO B IF width"
-                                style="width: auto;"
-                                onchange="window.radioControl.setIfWidth('B', this.value)">
-                            @foreach (var opt in ifWidthOptions)
-                            {
-                                bool isDefault = string.IsNullOrEmpty(Model.RadioState.IfWidthB) && opt.Value == ifWidthDefaultB;
-                                <option value="@opt.Value" selected="@(Model.RadioState.IfWidthB==opt.Value||isDefault ? "selected" : null)">@opt.Label</option>
-                            }
-                        </select>
-                        <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0 ms-2"
+                        <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
                                 id="audioFilterBtnB"
                                 aria-label="VFO B Audio Filter"
                                 title="Open the Audio Filter dialog for VFO B's current mode (LCUT FREQ, LCUT SLOPE, HCUT FREQ, HCUT SLOPE)"
                                 onclick="window.audioFilter && window.audioFilter.open('B')">
                             Audio Filter
                         </button>
-                        <label class="mb-0 text-nowrap ms-1 fw-bold">IF Shift: <span id="ifShiftValueB" class="fw-bold">@Model.RadioState.IfShiftB</span></label>
-                        <input type="range" class="form-range ifshift-slider flex-shrink-0"
-                               id="ifShiftSliderB"
-                               aria-label="VFO B IF shift"
-                               title="VFO B IF shift"
-                               min="-1000" max="1000" step="20" value="@Model.RadioState.IfShiftB"
-                               style="width: clamp(70px, 8vw, 120px); height: 18px;"
-                               oninput="document.getElementById('ifShiftValueB').textContent = this.value; if(window.filterScopePanelB) window.filterScopePanelB.setState({ifShiftHz: parseInt(this.value)||0})">
-                        <button type="button" class="btn btn-secondary btn-sm flex-shrink-0"
-                                onclick="resetIfShift('B')" title="Zero IF Shift">Zero</button>
                     </div>
 
                     <!-- VFO B status line — live band/mode/freq summary, banner-coloured -->
@@ -2039,8 +1895,6 @@
         import { FTdx101Meters }        from "/js/orchestrators/FTdx101Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
-        import { FilterScopePanel }    from "/js/ui/filter-scope-panel.js?v=2";
-        import "/js/ui/if-width-tables.js?v=3";
         import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=5";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
@@ -2364,57 +2218,10 @@
             window.spectrumPanelB = spectrumPanelB;
             window.spectrumPanel  = spectrumPanelA;
 
-            // ── Filter scope panels ──────────────────────────────────────────
-            window.filterScopePanelA = new FilterScopePanel('filterScopeCanvasA', '@Model.RadioModel', {
-                ifWidthCode:       '@Model.RadioState.IfWidthA',
-                ifShiftHz:          @Model.RadioState.IfShiftA,
-                roofingCode:       '@Model.RadioState.RoofingFilterA',
-                manualNotchOn:      @(Model.RadioState.ManualNotchA == "1" ? "true" : "false"),
-                manualNotchFreqHz:  800,
-                contourOn:          @(Model.RadioState.ContourOnA ? "true" : "false"),
-                contourFreqHz:      @Model.RadioState.ContourFreqA,
-                apfOn:              @(Model.RadioState.ApfOnA ? "true" : "false"),
-                apfFreqHz:          @Model.RadioState.ApfFreqA,
-                mode:              '@Model.RadioState.ModeA'
-            });
-            window.filterScopePanelB = new FilterScopePanel('filterScopeCanvasB', '@Model.RadioModel', {
-                ifWidthCode:       '@Model.RadioState.IfWidthB',
-                ifShiftHz:          @Model.RadioState.IfShiftB,
-                roofingCode:       '@Model.RadioState.RoofingFilterB',
-                manualNotchOn:      @(Model.RadioState.ManualNotchB == "1" ? "true" : "false"),
-                manualNotchFreqHz:  800,
-                contourOn:          @(Model.RadioState.ContourOnB ? "true" : "false"),
-                contourFreqHz:      @Model.RadioState.ContourFreqB,
-                apfOn:              @(Model.RadioState.ApfOnB ? "true" : "false"),
-                apfFreqHz:          @Model.RadioState.ApfFreqB,
-                mode:              '@Model.RadioState.ModeB'
-            });
-
-            // Tighten the contour sliders' ranges to the current passband
-            // now that the panels (which compute the passband) are ready.
-            // Subsequent recomputes happen on mode / IF Width / roofing changes.
-            if (typeof window.updateContourSliderBounds === 'function') {
-                window.updateContourSliderBounds('A');
-                window.updateContourSliderBounds('B');
-            }
-
-            // ── Mode-aware IF Width dropdown ─────────────────────────────────
-            // Populate the IF Width dropdowns based on the current mode. The
-            // SH command codes are mode-dependent: same code = different Hz
-            // in CW vs SSB. The dropdown labels must reflect the current mode.
+            // Filter-scope panels, Contour and IF-Width/Shift controls were
+            // removed for the IC-7300 (direct-sampling SDR — no roofing filters,
+            // no Yaesu-style IF width/shift, no Contour). See the clone-split plan.
             window._radioModel = '@Model.RadioModel';
-            if (window.IfWidth) {
-                window.IfWidth.rebuildIfWidthSelect(
-                    document.getElementById('ifWidthSelectA'),
-                    window._radioModel,
-                    '@Model.RadioState.ModeA'
-                );
-                window.IfWidth.rebuildIfWidthSelect(
-                    document.getElementById('ifWidthSelectB'),
-                    window._radioModel,
-                    '@Model.RadioState.ModeB'
-                );
-            }
 
             // Hold button — toggles whether the panel updates from incoming
             // SDR frames. While held the spectrum + waterfall freeze at the
