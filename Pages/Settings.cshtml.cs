@@ -78,29 +78,12 @@ namespace Icom_Web_Control.Pages
             Settings = await _settingsService.GetSettingsAsync();
             Settings.BandPlan = Settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             Settings.TxToggleKey = NormalizeTxToggleKey(Settings.TxToggleKey);
-            // The Settings page binds a single Sample Rate dropdown that
-            // represents 'reset both VFOs to this rate'. Show the current
-            // A-side rate as the pre-selected option so the dropdown reflects
-            // a sensible value rather than the legacy zero placeholder.
-            Settings.SdrSampleRateHz = Settings.SdrSampleRateHzA;
             NetworkAddresses = GetLocalIPAddresses();
             return Page();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
-            // SdrDeviceKeyA / SdrDeviceKeyB are intentionally allowed to be empty
-            // (empty = no SDR configured for that VFO). Must be removed BEFORE
-            // ModelState.IsValid is checked, because the implicit [Required] from
-            // <Nullable>enable</Nullable> would otherwise reject empty strings
-            // and silently prevent the save.
-            // SdrDeviceKey is the legacy v2.2.x field, still on the model so the
-            // migration in SettingsService can carry over old saved values.
-            ModelState.Remove("Settings.SdrDeviceKey");
-            ModelState.Remove("Settings.SdrDeviceKeyA");
-            ModelState.Remove("Settings.SdrDeviceKeyB");
-            // SdrplayInstallPath is intentionally optional — blank = auto-detect.
-            ModelState.Remove("Settings.SdrplayInstallPath");
             // DX cluster host/callsign also allowed empty (empty = feature disabled).
             ModelState.Remove("Settings.DxClusterHost");
             ModelState.Remove("Settings.DxClusterLoginCallsign");
@@ -156,17 +139,6 @@ namespace Icom_Web_Control.Pages
                 var oldSerialPort = current.SerialPort;
                 var oldBaudRate   = current.BaudRate;
 
-                // Capture pre-change SDR values so we can ask SdrManager to
-                // restart its worker(s) when any SDR-related setting changes.
-                // This makes adding/removing a VFO B SDR take effect immediately
-                // instead of needing a full app restart.
-                var oldSdrA       = current.SdrDeviceKeyA ?? string.Empty;
-                var oldSdrB       = current.SdrDeviceKeyB ?? string.Empty;
-                var oldSdrIfHz    = current.SdrIfFrequencyHz;
-                var oldSdrSrHzA   = current.SdrSampleRateHzA;
-                var oldSdrSrHzB   = current.SdrSampleRateHzB;
-                var oldSdrFft     = current.SdrFftSize;
-
                 current.RadioModel        = Settings.RadioModel;
                 // HttpPort is bound from a number input; clamp to a sane range.
                 // 1024+ avoids privileged-port territory; we'd reach the upper
@@ -177,56 +149,17 @@ namespace Icom_Web_Control.Pages
                 current.SerialPort        = Settings.SerialPort;
                 current.BaudRate          = Settings.BaudRate;
                 current.WebAddress        = Settings.WebAddress;
-                current.SdrDeviceKeyA     = Settings.SdrDeviceKeyA ?? string.Empty;
-                current.SdrDeviceKeyB     = Settings.SdrDeviceKeyB ?? string.Empty;
-                current.SdrDeviceKey      = string.Empty;  // legacy field — kept blank in v2.3.0+ files
-                current.SdrplayInstallPath = Settings.SdrplayInstallPath ?? string.Empty;
-                current.SdrIfFrequencyHz  = Settings.SdrIfFrequencyHz;
-                // Settings page binds a single Sample Rate dropdown — treat that
-                // as a "reset both VFOs to this rate" control. Per-VFO divergence
-                // happens at runtime via the span buttons on the main page.
-                if (Settings.SdrSampleRateHz > 0)
-                {
-                    current.SdrSampleRateHzA = Settings.SdrSampleRateHz;
-                    current.SdrSampleRateHzB = Settings.SdrSampleRateHz;
-                }
-                current.SdrSampleRateHz   = 0;             // legacy field — kept zero in v2.3.0+ files
-                current.SdrFftSize        = Settings.SdrFftSize;
+                // External-SDR spectrum config was removed from the Settings page
+                // (the IC-7300's scope comes over CI-V, not an IF-tapped SDR).
+                // The Sdr* fields are left untouched here so their persisted
+                // values survive the read-modify-write; the CI-V scope work
+                // (Phase 3 block 6) will decide their ultimate fate.
                 current.BandPlan          = Settings.BandPlan;
-                // MP comes fully loaded; D has 600Hz standard plus 1.2kHz/300Hz optional.
-                if (Settings.RadioModel == "FTdx101MP")
-                {
-                    current.InstalledRoofingFilters = new List<string> { "6", "7", "8", "9", "A" };
-                }
-                else if (Settings.RadioModel == "FTdx101D")
-                {
-                    var optionalSelected = Settings.InstalledRoofingFilters ?? new List<string>();
-                    current.InstalledRoofingFilters = new List<string> { "6", "7", "9" }
-                        .Concat(optionalSelected.Where(f => f is "8" or "A"))
-                        .Distinct().ToList();
-                }
-                else if (Settings.RadioModel == "FTdx10")
-                {
-                    // Standard filters (1=15kHz, 2=6kHz, 3=3kHz) are always available.
-                    // Optional: 4=1.2kHz (YF-130CN), 5=300Hz (YF-130CW).
-                    var optionalSelected = Settings.InstalledRoofingFilters ?? new List<string>();
-                    current.InstalledRoofingFilters = new List<string> { "1", "2", "3" }
-                        .Concat(optionalSelected.Where(f => f is "4" or "5"))
-                        .Distinct().ToList();
-                }
-                else if (Settings.RadioModel == "FT-710")
-                {
-                    current.InstalledRoofingFilters = new List<string>();
-                }
-                else if (Settings.RadioModel == "FTDX3000")
-                {
-                    // Standard: 0=Auto, 1=15kHz, 2=6kHz, 3=3kHz always present.
-                    // Optional: 4=600Hz (YH-77SDE), 5=300Hz (YH-77SDE narrow).
-                    var optionalSelected = Settings.InstalledRoofingFilters ?? new List<string>();
-                    current.InstalledRoofingFilters = new List<string> { "0", "1", "2", "3" }
-                        .Concat(optionalSelected.Where(f => f is "4" or "5"))
-                        .Distinct().ToList();
-                }
+                // Icom IC-7300 / MkII is a direct-sampling SDR with no roofing
+                // filters and no CAT filter-selection command, so there is nothing
+                // to configure. Keep the list empty. (Field retained on the model
+                // as a migration anchor from the inherited Yaesu code.)
+                current.InstalledRoofingFilters = new List<string>();
                 if (Settings.CwMessages != null && Settings.CwMessages.Count == 5)
                     current.CwMessages = Settings.CwMessages;
 

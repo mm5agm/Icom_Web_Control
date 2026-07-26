@@ -138,14 +138,7 @@
                         <dt class="col-sm-4">Radio Model:</dt>
                         <dd class="col-sm-8">
                             <code>@Model.Settings.RadioModel</code>
-                            @if (Model.Settings.RadioModel == "FTdx101MP")
-                            {
-                                <span class="badge bg-primary">200W</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-info">100W</span>
-                            }
+                            <span class="badge bg-info">100W</span>
                         </dd>
                         <dt class="col-sm-4">Serial Port:</dt>
                         <dd class="col-sm-8"><code>@Model.Settings.SerialPort</code></dd>
@@ -169,22 +162,6 @@
                             @if (Model.CurrentRunningPort != Model.Settings.HttpPort)
                             {
                                 <span class="badge bg-warning text-dark ms-1" title="Configured port differs — restart for it to take effect">configured: @Model.Settings.HttpPort</span>
-                            }
-                        </dd>
-                        <dt class="col-sm-4">SDR Device:</dt>
-                        <dd class="col-sm-8">
-                            @{
-                                var sdrA = Model.Settings.SdrDeviceKeyA;
-                                var sdrB = Model.Settings.SdrDeviceKeyB;
-                            }
-                            @if (string.IsNullOrEmpty(sdrA) && string.IsNullOrEmpty(sdrB))
-                            {
-                                <span class="text-muted">None</span>
-                            }
-                            else
-                            {
-                                @if (!string.IsNullOrEmpty(sdrA)) { <div><strong>VFO A:</strong> <code>@sdrA</code></div> }
-                                @if (!string.IsNullOrEmpty(sdrB)) { <div><strong>VFO B:</strong> <code>@sdrB</code></div> }
                             }
                         </dd>
                     </dl>
@@ -246,7 +223,7 @@
                 </div>
                 <div class="form-text" id="txToggleKeyHelp">
                     Optional browser shortcut for toggling transmit. Disabled when blank. For safety,
-                    YWC ignores this shortcut while you are typing in an input or text box.
+                    IWC ignores this shortcut while you are typing in an input or text box.
                 </div>
                 <div class="form-text text-warning">
                     Warning: this directly keys the transmitter. Choose a key you will not press by accident.
@@ -261,7 +238,7 @@
         <summary><i class="bi bi-mic-fill" aria-hidden="true"></i>&nbsp;Voice Control</summary>
         <div class="section-body">
             <p class="text-muted small mb-3">
-                Hands-free control of YWC via a PC microphone. Uses Windows' built-in speech recognition
+                Hands-free control of IWC via a PC microphone. Uses Windows' built-in speech recognition
                 (SAPI 5), so audio never leaves your computer.
                 A small mic button appears in the top navbar when enabled — press and hold it, speak a
                 command, release. The recognised text is interpreted as a CAT action (set frequency,
@@ -274,7 +251,7 @@
                     Enable voice control
                 </label>
                 <div class="form-text">
-                    Off by default. When enabled, YWC loads the Windows speech recogniser at startup
+                    Off by default. When enabled, IWC loads the Windows speech recogniser at startup
                     and shows the mic button in the navbar. Disable to hide the button and free the
                     recogniser. Requires the active language's speech pack (below) to be installed in
                     Windows (Settings → Time &amp; Language → Speech).
@@ -300,7 +277,7 @@
                     Speak confirmation after each voice command
                 </label>
                 <div class="form-text">
-                    When on, YWC speaks a short confirmation through the PC's default audio output after
+                    When on, IWC speaks a short confirmation through the PC's default audio output after
                     every recognised voice command — e.g. <em>"Move to fourteen point zero seven four megahertz, successful"</em>.
                     Key accessibility feature for operators who can't see the screen to verify whether a
                     command landed. Default on; turn off here if you find it chatty.
@@ -1549,84 +1526,14 @@
                         <div class="mb-3">
                             <label asp-for="Settings.RadioModel" class="form-label">Radio Model</label>
                             <select asp-for="Settings.RadioModel" class="form-select">
-                                <option value="FTdx101MP">FTdx101MP</option>
-                                <option value="FTdx101D">FTdx101D</option>
-                                <option value="FTdx10">FTdx10</option>
-                                <option value="FT-710">FT-710</option>
-                                <option value="FTDX3000">FTDX3000</option>
+                                <option value="IC-7300MK2">IC-7300 MkII</option>
+                                <option value="IC-7300">IC-7300</option>
                             </select>
                             <div class="form-text">
-                                <strong>FTdx101MP:</strong> 200W output, dual receivers (VFO A + VFO B shown by default)<br />
-                                <strong>FTdx101D:</strong> 100W output, dual receivers (VFO A + VFO B shown by default)<br />
-                                <strong>FTdx10:</strong> 100W output, single receiver (VFO B for split/memory)<br />
-                                <strong>FT-710:</strong> 100W output, single receiver (VFO B for split/memory)<br />
-                                <strong>FTDX3000:</strong> 100W output, single receiver, SDR IF output available (9 MHz)
+                                <strong>IC-7300 MkII:</strong> 100W output, single receiver, HF + 6m + 4m (EU), built-in real-time scope over CI-V<br />
+                                <strong>IC-7300:</strong> 100W output, single receiver, HF + 6m, built-in real-time scope over CI-V
                             </div>
                             <span asp-validation-for="Settings.RadioModel" class="text-danger"></span>
-                        </div>
-                        <div class="mb-3" id="optionalFiltersSection">
-                            <!-- Forces the form to always post this key, even with every filter unchecked — otherwise the binder leaves the list at its default instead of empty. -->
-                            <input type="hidden" name="Settings.InstalledRoofingFilters" value="" />
-                            <label class="form-label fw-bold">Roofing Filters Installed</label>
-                            <div id="filtersMpNote" style="display:@(Model.Settings.RadioModel == "FTdx101MP" ? "block" : "none")">
-                                <div class="alert alert-info py-2 mb-0">
-                                    The FTdx101MP comes with all roofing filters fitted as standard: 12 kHz, 3 kHz, 1.2 kHz, 600 Hz, and 300 Hz. No configuration is needed.
-                                </div>
-                            </div>
-                            <div id="filtersDSection" style="display:@(Model.Settings.RadioModel == "FTdx101D" ? "block" : "none")">
-                                <div class="form-text mb-2">
-                                    The FTdx101D comes with 12 kHz, 3 kHz, and 600 Hz fitted as standard.
-                                    Tick any optional filters you have installed so the app only shows filters that are actually available.
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter8" name="Settings.InstalledRoofingFilters" value="8"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("8") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter8">1.2 kHz (optional)</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filterA" name="Settings.InstalledRoofingFilters" value="A"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("A") ? "checked" : "") />
-                                    <label class="form-check-label" for="filterA">300 Hz (optional)</label>
-                                </div>
-                                <div class="form-text text-muted mt-1">
-                                    12 kHz, 3 kHz, and 600 Hz are always shown (standard on FTdx101D).
-                                </div>
-                            </div>
-                            <div id="filtersFtdx10Section" style="display:@(Model.Settings.RadioModel == "FTdx10" ? "block" : "none")">
-                                <div class="form-text mb-2">
-                                    The FTdx10 roofing filter is selectable via CAT. 12 kHz, 3 kHz, and 500 Hz
-                                    are fitted as standard. Tick the optional filter if you have it installed.
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filterFtdx10A" name="Settings.InstalledRoofingFilters" value="A"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("A") ? "checked" : "") />
-                                    <label class="form-check-label" for="filterFtdx10A">300 Hz (optional — YF-130CW)</label>
-                                </div>
-                                <div class="form-text text-muted mt-1">12 kHz, 3 kHz, and 500 Hz are always shown.</div>
-                            </div>
-                            <div id="filtersFt710Section" style="display:@(Model.Settings.RadioModel == "FT-710" ? "block" : "none")">
-                                <div class="alert alert-info py-2 mb-0">
-                                    The FT-710 has no roofing filter CAT command — the radio selects its filter
-                                    automatically based on DSP bandwidth and mode. No configuration is needed.
-                                </div>
-                            </div>
-                            <div id="filtersFtdx3000Section" style="display:@(Model.Settings.RadioModel == "FTDX3000" ? "block" : "none")">
-                                <div class="form-text mb-2">
-                                    The FTDX3000 roofing filters are selectable via CAT. AUTO, 15 kHz, 6 kHz, and 3 kHz
-                                    are fitted as standard. Tick any optional filters you have installed.
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter3k4" name="Settings.InstalledRoofingFilters" value="4"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("4") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter3k4">600 Hz (optional — YH-77SDE)</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter3k5" name="Settings.InstalledRoofingFilters" value="5"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("5") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter3k5">300 Hz (optional — YH-77SDE narrow)</label>
-                                </div>
-                                <div class="form-text text-muted mt-1">AUTO, 15 kHz, 6 kHz, and 3 kHz are always shown.</div>
-                            </div>
                         </div>
                         <div class="mb-3">
                             <label asp-for="Settings.SerialPort" class="form-label">Serial Port</label>
@@ -1642,14 +1549,14 @@
                             <select asp-for="Settings.BaudRate" class="form-select">
                                 <option value="4800">4800</option>
                                 <option value="9600">9600</option>
-                                <option value="19200">19200</option>
-                                <option value="38400" selected>38400 (Default)</option>
+                                <option value="19200">19200 (Default)</option>
+                                <option value="38400">38400</option>
                                 <option value="57600">57600</option>
                                 <option value="115200">115200</option>
                             </select>
                             <div class="form-text">
-                                Select the baud rate configured in your radio.
-                                <br /><strong>Default:</strong> 38400 for FT-dx101 Series
+                                Select the CI-V baud rate configured in the radio's menu (Set &gt; Connectors &gt; CI-V &gt; CI-V Baud Rate).
+                                <br /><strong>IC-7300 / MkII:</strong> default is 19200; supports up to 115200. Match whatever the radio's CI-V menu is set to (Auto works, but a fixed rate is more reliable).
                             </div>
                             <span asp-validation-for="Settings.BaudRate" class="text-danger"></span>
                         </div>
@@ -1716,207 +1623,6 @@
                             <strong>External Applications:</strong> Configure WSJT-X, JTAlert, and Log4OM on the
                             <a asp-page="/ApplicationSetup" class="alert-link">Application Setup</a> page.
                         </div>
-        </div>
-    </details>
-
-    <!-- SDR Spectrum Display -->
-    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
-        <summary>
-            <i class="bi bi-broadcast-pin" aria-hidden="true"></i>&nbsp;SDR Spectrum Display
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
-                    data-bs-toggle="modal" data-bs-target="#sdrHelpModal"
-                    onclick="event.stopPropagation();">
-                <i class="bi bi-question-circle"></i> Help
-            </button>
-        </summary>
-        <div class="section-body">
-            <p class="text-muted mb-3">
-                Connect your radio's <strong>IF output (RCA)</strong> to an SDR receiver. The spectrum
-                display shows the band around your current VFO frequency in real time.
-            </p>
-            @if (Model.Settings.RadioModel == "FTdx10" || Model.Settings.RadioModel == "FT-710")
-            {
-                <div class="alert alert-danger border-3" role="alert">
-                    <i class="bi bi-exclamation-octagon-fill me-2"></i>
-                    <strong>⚠️ Risk of destroying your SDR — @Model.Settings.RadioModel has no IF tap.</strong>
-                    Because this radio has no rear-panel IF output, an SDR has to be connected to an antenna port.
-                    <strong>Transmitting on that antenna (or any antenna nearby) will deliver enough RF energy
-                    into the SDR's front end to damage or destroy it.</strong> Either use a dedicated receive-only
-                    antenna for the SDR, fit a coax switch that disconnects the SDR during TX, or fit a
-                    transmit/receive RF relay or PIN-diode T/R switch. Do not transmit with the SDR's coax
-                    plugged into your TX antenna without one of these protections in place.
-                </div>
-                <div class="alert alert-warning" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <strong>@Model.Settings.RadioModel:</strong> This radio does not have a rear-panel IF output.
-                    SDR spectrum display will show absolute RF frequencies from the connected antenna
-                    rather than a VFO-centred view. The IF Frequency setting has no effect.
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-warning" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <strong>Safety note:</strong> The SDR is connected to your radio's <strong>IF output</strong>,
-                    which is an internal low-level signal — safe during TX. <strong>Never connect the SDR
-                    directly to a TX antenna</strong> (or use an antenna very close to one you're transmitting on):
-                    the RF energy can destroy the SDR's front end.
-                </div>
-            }
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-end mb-2">
-                            <label class="form-label fw-bold mb-0">SDR Devices</label>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="sdrScanBtn"
-                                    onclick="scanSdrDevices()">
-                                <i class="bi bi-search"></i> Scan
-                            </button>
-                        </div>
-                        <div class="form-text mb-2">
-                            Plug in your SDR(s) before scanning. Each VFO can have its own SDR — the user
-                            tells YWC which physical SDR is wired to which VFO's IF output. Leave a slot
-                            blank if that VFO has no SDR.
-                        </div>
-
-                        <label for="sdrDeviceDropdownA" class="form-label small fw-semibold mb-1">VFO A SDR</label>
-                        <select class="form-select form-select-sm mb-1" id="sdrDeviceDropdownA">
-                            <option value="">— (none) —</option>
-                        </select>
-                        <input type="hidden" asp-for="Settings.SdrDeviceKeyA" id="sdrDeviceKeyInput" />
-                        <div id="sdrDeviceKeyDisplay" class="font-monospace small text-muted mb-3"></div>
-
-                        <label for="sdrDeviceDropdownB" class="form-label small fw-semibold mb-1">VFO B SDR</label>
-                        <select class="form-select form-select-sm mb-1" id="sdrDeviceDropdownB">
-                            <option value="">— (none) —</option>
-                        </select>
-                        <input type="hidden" asp-for="Settings.SdrDeviceKeyB" id="sdrDeviceKeyInputB" />
-                        <div id="sdrDeviceKeyDisplayB" class="font-monospace small text-muted"></div>
-
-                        <div id="sdrScanNotes" class="mt-2"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Settings.SdrIfFrequencyHz" class="form-label fw-bold">IF Frequency (Hz)</label>
-                        <input asp-for="Settings.SdrIfFrequencyHz" class="form-control" type="number"
-                               min="1000000" max="100000000" step="1000" />
-                        <div class="form-text">
-                            The radio's IF output frequency. <strong>FTdx101 series: 9,000,000 Hz.</strong>
-                            ELAD FDM-DUO via USB: set to match the device's IQ centre frequency.
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Settings.SdrplayInstallPath" class="form-label fw-bold">SDRplay install path (advanced)</label>
-                        <div class="input-group">
-                            <input asp-for="Settings.SdrplayInstallPath" class="form-control" type="text"
-                                   id="sdrplayInstallPathInput"
-                                   placeholder="@(Model.DetectedSdrplayInstallPath ?? "e.g. C:\\Program Files\\SDRplay\\API")" />
-                            <button type="button" class="btn btn-outline-secondary" id="sdrplayBrowseBtn"
-                                    title="Open a folder browser to select the SDRplay install folder">
-                                Browse…
-                            </button>
-                        </div>
-                        <div class="form-text">
-                            @if (!string.IsNullOrEmpty(Model.DetectedSdrplayInstallPath))
-                            {
-                                <span class="text-success">
-                                    <strong>Auto-detected:</strong> <code>@Model.DetectedSdrplayInstallPath</code>
-                                </span>
-                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="sdrplayUseDetectedBtn">
-                                    Use this path
-                                </button>
-                                <br />
-                            }
-                            else
-                            {
-                                <span class="text-warning"><strong>No SDRplay install auto-detected.</strong></span><br />
-                            }
-                            Leave blank for auto-detect. Only needed if the SDRplay API was installed
-                            to a non-default location and its <code>x64</code> folder isn't on the
-                            Windows PATH. Point this at the SDRplay API folder containing the
-                            <code>x64\sdrplay_api.dll</code> subfolder. If your SDR shows in
-                            other apps but not here, try setting this.
-                        </div>
-                    </div>
-                    <script>
-                        (function () {
-                            const input    = document.getElementById('sdrplayInstallPathInput');
-                            const browseBn = document.getElementById('sdrplayBrowseBtn');
-                            const useDetBn = document.getElementById('sdrplayUseDetectedBtn');
-                            const detected = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DetectedSdrplayInstallPath ?? ""));
-
-                            if (useDetBn) {
-                                useDetBn.addEventListener('click', () => {
-                                    if (detected) input.value = detected;
-                                });
-                            }
-                            if (browseBn) {
-                                browseBn.addEventListener('click', async () => {
-                                    const start = (input.value || detected || '').trim();
-                                    browseBn.disabled = true;
-                                    const original  = browseBn.textContent;
-                                    browseBn.textContent = 'Opening…';
-                                    try {
-                                        const resp = await fetch('/api/sdr/sdrplay/pick-installdir', {
-                                            method:  'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body:    JSON.stringify({ startPath: start })
-                                        });
-                                        if (resp.ok) {
-                                            const data = await resp.json();
-                                            if (data.picked) input.value = data.picked;
-                                        } else {
-                                            const data = await resp.json().catch(() => ({}));
-                                            alert('Folder picker failed: ' + (data.error || resp.statusText));
-                                        }
-                                    } catch (e) {
-                                        alert('Folder picker error: ' + e.message);
-                                    } finally {
-                                        browseBn.disabled    = false;
-                                        browseBn.textContent = original;
-                                    }
-                                });
-                            }
-                        })();
-                    </script>
-                </div>
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label asp-for="Settings.SdrSampleRateHz" class="form-label fw-bold">Sample Rate (Hz) — both VFOs</label>
-                        <select asp-for="Settings.SdrSampleRateHz" class="form-select">
-                            <option value="62500">62,500 — 62.5 kHz span (narrowest, single-QSO zoom)</option>
-                            <option value="125000">125,000 — 125 kHz span (best for 30m / 60m)</option>
-                            <option value="250000">250,000 — 250 kHz span</option>
-                            <option value="500000">500,000 — 500 kHz span</option>
-                            <option value="1024000">1,024,000 — 1 MHz span</option>
-                            <option value="2048000">2,048,000 — 2 MHz span (recommended)</option>
-                            <option value="2500000">2,500,000 — 2.5 MHz span</option>
-                            <option value="3200000">3,200,000 — 3.2 MHz span</option>
-                        </select>
-                        <div class="form-text">
-                            Higher rates give a wider visible span but require more CPU.
-                            Not all devices support all rates.
-                            <strong>Saving this resets both VFOs</strong> to the chosen rate;
-                            use the span buttons above each spectrum on the main page
-                            to set each VFO independently afterwards.
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Settings.SdrFftSize" class="form-label fw-bold">FFT Size</label>
-                        <select asp-for="Settings.SdrFftSize" class="form-select">
-                            <option value="512">512 — faster, less frequency resolution</option>
-                            <option value="1024">1024 — recommended</option>
-                            <option value="2048">2048 — higher resolution, more CPU</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <button type="button" class="btn btn-outline-danger btn-sm"
-                                onclick="clearSdrDevice()">
-                            <i class="bi bi-x-circle"></i> Disable SDR / Clear Device
-                        </button>
-                        <div class="form-text">Removes the saved device; the spectrum panel will be hidden.</div>
-                    </div>
-                </div>
-            </div>
         </div>
     </details>
 
@@ -2151,7 +1857,7 @@
         <summary><i class="bi bi-box-arrow-up" aria-hidden="true"></i>&nbsp;Backup &amp; Restore</summary>
         <div class="section-body">
             <p class="text-muted">
-                Download a single zip file containing everything you've customised in YWC — settings, memories, memory banks, calibration, and accessible-label overrides.
+                Download a single zip file containing everything you've customised in IWC — settings, memories, memory banks, calibration, and accessible-label overrides.
                 Use it to safeguard your configuration, move to a new PC, or share a setup with another operator.
             </p>
             <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -2166,7 +1872,7 @@
             </div>
             <p class="text-muted small mt-2 mb-0">
                 Import overwrites the matching files in your user-data folder. Each replaced file is kept as a <code>.bak</code> so you can recover.
-                After importing, <strong>restart the app</strong> so the radio-connection, DX-cluster, SDR and rigctld services pick up the new values.
+                After importing, <strong>restart the app</strong> so the radio-connection, DX-cluster and rigctld services pick up the new values.
                 Radio state (live frequency, mode etc.) is not included in the backup — it resets to whatever the radio reports on next connect.
             </p>
         </div>
@@ -2181,7 +1887,7 @@
         fileInput.addEventListener('change', async () => {
             if (!fileInput.files || fileInput.files.length === 0) return;
             const file = fileInput.files[0];
-            if (!confirm(`Replace YWC's user data with the contents of "${file.name}"?\n\nMatching files in your user-data folder will be overwritten. Each replaced file is kept as a .bak.`)) {
+            if (!confirm(`Replace IWC's user data with the contents of "${file.name}"?\n\nMatching files in your user-data folder will be overwritten. Each replaced file is kept as a .bak.`)) {
                 fileInput.value = '';
                 return;
             }
@@ -2210,87 +1916,31 @@
     })();
 </script>
 
-<!-- SDR Help Modal -->
-<div class="modal fade" id="sdrHelpModal" tabindex="-1" aria-labelledby="sdrHelpModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title" id="sdrHelpModalLabel">
-                    <i class="bi bi-broadcast-pin me-2"></i>SDR Spectrum Display — Help
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-
-                <h6 class="fw-bold">How it works</h6>
-                <p>
-                    Connect the <strong>IF output (rear-panel RCA socket)</strong> of your FTdx101 to the
-                    antenna input of your SDR receiver using a coax cable with an RCA-to-SMA adapter.
-                    The app tunes the SDR to the radio's IF frequency (9 MHz for the FTdx101 series) and
-                    displays the surrounding band as a live spectrum waterfall.
-                </p>
-
-                <h6 class="fw-bold mt-3">Supported SDR hardware</h6>
-                <p>Support for the following devices is built in — no additional software installation required:</p>
-                <table class="table table-sm table-bordered">
-                    <thead class="table-dark">
-                        <tr><th>Device</th><th>Notes</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>RTL-SDR</strong></td>
-                            <td>Any RTL2832U-based dongle (RTL-SDR Blog v3/v4, Nooelec, etc.). Plug in and scan.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Airspy</strong></td>
-                            <td>Airspy Mini, Airspy R2. Plug in and scan.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>HackRF One</strong></td>
-                            <td>Plug in and scan.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>SDRplay RSP1 / RSP1A / RSP1B / RSP2 / RSPduo / RSPdx</strong></td>
-                            <td>Requires the SDRplay API — see below.</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <h6 class="fw-bold mt-3"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>SDRplay — additional step required</h6>
-                <p>
-                    SDRplay devices use a background Windows service provided by SDRplay Ltd.
-                    You must install the <strong>SDRplay API</strong> before the device will be detected:
-                </p>
-                <ol>
-                    <li>
-                        Go to <a href="https://www.sdrplay.com/downloads/" target="_blank" rel="noopener">www.sdrplay.com/downloads/</a>
-                        and download the latest <strong>SDRplay API/Hardware Driver</strong> for Windows.
-                    </li>
-                    <li>Run the installer. It installs the USB driver and starts the <em>SDRplay API Service</em>.</li>
-                    <li>Plug in your RSP device, then click <strong>Scan</strong> on this page.</li>
-                </ol>
-                <p class="text-muted small">
-                    Only one application can use the SDRplay API at a time.
-                    If SDR Console or another SDR app is open, close it before scanning.
-                </p>
-
-                <h6 class="fw-bold mt-3">Troubleshooting</h6>
-                <ul>
-                    <li><strong>No devices found after scan</strong> — check the device is plugged in and that Windows Device Manager shows it without a yellow warning icon.</li>
-                    <li><strong>SDRplay not detected</strong> — open <em>services.msc</em> and confirm <em>SDRplay API Service</em> is running.</li>
-                    <li><strong>Spectrum looks wrong / distorted</strong> — check your IF frequency setting matches the radio (FTdx101: 9,000,000 Hz).</li>
-                </ul>
-
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Per-section "Save Settings" buttons. Colin: scrolling to the single
+        // Save button at the bottom of a long page is tedious, so give every
+        // section its own. They are plain type=submit buttons inside
+        // #settingsForm, so they post the whole form exactly like the main
+        // button and go through the same jQuery-validate submit handler below.
+        // Injected in JS to stay DRY — one button definition, appended to each
+        // section body — rather than repeating markup in every <details>.
+        (function () {
+            var form = document.getElementById('settingsForm');
+            if (!form) return;
+            form.querySelectorAll('.section-body').forEach(function (body) {
+                var row = document.createElement('div');
+                row.className = 'section-save-row mt-3 pt-3 border-top text-end';
+                var btn = document.createElement('button');
+                btn.type = 'submit';
+                btn.className = 'btn btn-primary btn-sm';
+                btn.innerHTML = '<i class="bi bi-save"></i> Save Settings';
+                row.appendChild(btn);
+                body.appendChild(row);
+            });
+        })();
+    </script>
     <script>
         // Must run AFTER _ValidationScriptsPartial so jQuery Validate is present.
         // "Saving…" only when the form will actually POST. Previously the spinner
@@ -2361,216 +2011,6 @@
         })();
     </script>
     <script type="module">
-        // hwVer (per SDRplay API header) → friendly model name. Kept in sync
-        // with the C# HwVerToModel in Services/Sdr/SdrplayDevice.cs.
-        const SDRPLAY_HW_VER_NAMES = {
-            1: 'RSP1', 2: 'RSP2', 3: 'RSPduo', 4: 'RSPdx', 5: 'RSPdx-R2',
-            6: 'RSP1B', 7: 'RSPdxR2', 255: 'RSP1A'
-        };
-
-        // Extract serial (and hwVer if present) from an sdrplay:... key.
-        // New: "sdrplay:hw6-2405242660" → { hwVer: 6, serial: "2405242660" }
-        // Old: "sdrplay:2405242660"      → { hwVer: null, serial: "2405242660" }
-        function parseSdrplayKey(key) {
-            const body = key.slice('sdrplay:'.length);
-            const m = /^hw(\d+)-(.+)$/i.exec(body);
-            if (m) return { hwVer: parseInt(m[1], 10), serial: m[2] };
-            return { hwVer: null, serial: body };
-        }
-
-        // Returns true if either key refers to the same physical device.
-        // Handles "old serial-only saved key matches new hwVer-prefixed scan key".
-        function sdrplayKeysMatch(a, b) {
-            if (!a || !b || !a.startsWith('sdrplay:') || !b.startsWith('sdrplay:')) return false;
-            if (a === b) return true;
-            const ka = parseSdrplayKey(a), kb = parseSdrplayKey(b);
-            return ka.serial === kb.serial;
-        }
-
-        // Derives a human-readable label from a saved device key without needing a scan.
-        // sdrplay:hw6-2405242660   →  "SDRplay RSP1B (2405242660) [sdrplay]"
-        // sdrplay:0000000001       →  "SDRplay (0000000001) [sdrplay]"   (legacy key, no model)
-        // driver=rtlsdr,label=Generic RTL2832U,...  →  "Generic RTL2832U [rtlsdr]"
-        function keyToLabel(key) {
-            if (!key) return '';
-            if (key.startsWith('sdrplay:')) {
-                const { hwVer, serial } = parseSdrplayKey(key);
-                const model = hwVer != null ? (SDRPLAY_HW_VER_NAMES[hwVer] || `hw${hwVer}`) : null;
-                return model
-                    ? `SDRplay ${model} (${serial}) [sdrplay]`
-                    : `SDRplay (${serial}) [sdrplay]`;
-            }
-            let label = '', driver = '';
-            for (const pair of key.split(',')) {
-                const eq = pair.indexOf('=');
-                if (eq < 1) continue;
-                const k = pair.slice(0, eq).trim().toLowerCase();
-                const v = pair.slice(eq + 1).trim();
-                if (k === 'label')  label  = v;
-                if (k === 'driver') driver = v;
-            }
-            return label ? `${label}${driver ? ' [' + driver + ']' : ''}` : key;
-        }
-
-        // ── Dual-SDR device selector (VFO A + VFO B) ─────────────────────────
-        //
-        // Two dropdowns, each with its own hidden input bound to
-        // Settings.SdrDeviceKeyA / SdrDeviceKeyB. One Scan button populates
-        // both dropdowns from the same /api/sdr/devices result. Each VFO can
-        // independently be set to a device or left as (none) — typical
-        // operator has SDR-A wired to the radio's MAIN IF output and may or
-        // may not have a second SDR on the SUB IF output.
-
-        // Slot config keyed by VFO label.
-        const sdrSlots = {
-            A: { dropdownId: 'sdrDeviceDropdownA', inputId: 'sdrDeviceKeyInput',  displayId: 'sdrDeviceKeyDisplay'  },
-            B: { dropdownId: 'sdrDeviceDropdownB', inputId: 'sdrDeviceKeyInputB', displayId: 'sdrDeviceKeyDisplayB' },
-        };
-
-        function updateDeviceKeyDisplay(slot) {
-            const cfg = sdrSlots[slot];
-            const key = document.getElementById(cfg.inputId).value;
-            const el  = document.getElementById(cfg.displayId);
-            el.textContent = key ? `Saved key: ${key}` : '';
-        }
-
-        // Initialise both dropdowns from saved keys on page load, then
-        // auto-scan so the dropdown for the unconfigured side picks up any
-        // available hardware without making the user click Scan again.
-        document.addEventListener('DOMContentLoaded', () => {
-            for (const slot of ['A', 'B']) {
-                const cfg = sdrSlots[slot];
-                const savedKey = document.getElementById(cfg.inputId).value;
-                if (savedKey) {
-                    const dropdown = document.getElementById(cfg.dropdownId);
-                    dropdown.innerHTML = '';
-                    const noneOpt = document.createElement('option');
-                    noneOpt.value = '';
-                    noneOpt.textContent = '— (none) —';
-                    dropdown.appendChild(noneOpt);
-                    const opt = document.createElement('option');
-                    opt.value = savedKey;
-                    opt.textContent = keyToLabel(savedKey);
-                    opt.selected = true;
-                    dropdown.appendChild(opt);
-                }
-                updateDeviceKeyDisplay(slot);
-
-                // Selection change → mirror to the hidden input.
-                document.getElementById(cfg.dropdownId).addEventListener('change', function () {
-                    document.getElementById(cfg.inputId).value = this.value;
-                    updateDeviceKeyDisplay(slot);
-                });
-            }
-
-            // Kick off an automatic scan so both dropdowns show what's
-            // available without the user having to click Scan first. Cheap
-            // for SDRplay (sub-second) and surfaces in-use devices via the
-            // SdrManager merge in the controller.
-            window.scanSdrDevices();
-        });
-
-        // Populate BOTH SDR dropdowns from one /api/sdr/devices call. Each
-        // dropdown preserves its own selection across re-scans (matched by
-        // exact key, or by sdrplayKeysMatch for the legacy→new format jump).
-        window.scanSdrDevices = async function () {
-            const btn      = document.getElementById('sdrScanBtn');
-            const notesDiv = document.getElementById('sdrScanNotes');
-
-            btn.disabled       = true;
-            btn.innerHTML      = '<span class="spinner-border spinner-border-sm me-1"></span>Scanning…';
-            notesDiv.innerHTML = '';
-
-            try {
-                const resp               = await fetch('/api/sdr/devices');
-                const { devices, notes } = await resp.json();
-
-                for (const slot of ['A', 'B']) {
-                    const cfg      = sdrSlots[slot];
-                    const dropdown = document.getElementById(cfg.dropdownId);
-                    const savedKey = document.getElementById(cfg.inputId).value;
-
-                    dropdown.innerHTML = '';
-                    const noneOpt = document.createElement('option');
-                    noneOpt.value       = '';
-                    noneOpt.textContent = '— (none) —';
-                    dropdown.appendChild(noneOpt);
-
-                    let matched = false;
-                    devices.forEach(d => {
-                        const opt = document.createElement('option');
-                        opt.value       = d.key;
-                        // Devices currently held by a running worker get an
-                        // "(in use)" suffix so the user understands why we
-                        // know about them even though they'd be invisible to
-                        // a fresh sdrplay_api_GetDevices call.
-                        const suffix = d.inUse ? ' (in use)' : '';
-                        opt.textContent = `${d.label} [${d.driver}]${suffix}`;
-                        const sameDevice =
-                            d.key === savedKey ||
-                            sdrplayKeysMatch(d.key, savedKey);
-                        if (sameDevice) {
-                            opt.selected = true;
-                            matched = true;
-                            if (d.key !== savedKey) {
-                                document.getElementById(cfg.inputId).value = d.key;
-                                updateDeviceKeyDisplay(slot);
-                            }
-                        }
-                        dropdown.appendChild(opt);
-                    });
-
-                    // Saved key not in scan results AND not surfaced by SdrManager
-                    // either — the device is genuinely absent. Append a placeholder
-                    // so the user doesn't lose their saved choice silently.
-                    if (savedKey && !matched) {
-                        const opt = document.createElement('option');
-                        opt.value       = savedKey;
-                        opt.textContent = `${keyToLabel(savedKey)} (not plugged in)`;
-                        opt.selected    = true;
-                        dropdown.appendChild(opt);
-                    }
-                }
-
-                // Show any installation notes returned by the server.
-                if (notes && notes.length > 0) {
-                    const ul = document.createElement('ul');
-                    ul.className = 'mb-0 ps-3';
-                    notes.forEach(msg => {
-                        const li = document.createElement('li');
-                        li.textContent = msg;
-                        ul.appendChild(li);
-                    });
-                    const wrapper = document.createElement('div');
-                    wrapper.className = devices.length === 0
-                        ? 'alert alert-warning py-2 small'
-                        : 'alert alert-info py-2 small';
-                    wrapper.appendChild(ul);
-                    notesDiv.appendChild(wrapper);
-                }
-
-            } catch (e) {
-                for (const slot of ['A', 'B']) {
-                    document.getElementById(sdrSlots[slot].dropdownId).innerHTML =
-                        '<option value="">Error contacting scan API</option>';
-                }
-            } finally {
-                btn.disabled  = false;
-                btn.innerHTML = '<i class="bi bi-search"></i> Scan';
-            }
-        };
-
-        window.clearSdrDevice = function () {
-            for (const slot of ['A', 'B']) {
-                const cfg = sdrSlots[slot];
-                document.getElementById(cfg.inputId).value = '';
-                document.getElementById(cfg.dropdownId).innerHTML =
-                    '<option value="" selected>— (none) —</option>';
-                updateDeviceKeyDisplay(slot);
-            }
-            document.getElementById('sdrScanNotes').innerHTML = '';
-        };
-
         // DX cluster connection test — POSTs the current Settings-page values
         // (host, port, callsign) to /api/dxcluster/test, which opens a TCP
         // connection, sends the callsign, reads ~10 s of output, and returns
@@ -2697,25 +2137,6 @@
             }
         }
 
-    </script>
-    <script>
-        (function () {
-            const modelSelect     = document.getElementById('Settings_RadioModel');
-            const mpNote          = document.getElementById('filtersMpNote');
-            const dSection        = document.getElementById('filtersDSection');
-            const ftdx10Section   = document.getElementById('filtersFtdx10Section');
-            const ft710Section    = document.getElementById('filtersFt710Section');
-            const ftdx3000Section = document.getElementById('filtersFtdx3000Section');
-            if (!modelSelect) return;
-            modelSelect.addEventListener('change', function () {
-                const v = this.value;
-                if (mpNote)          mpNote.style.display          = v === 'FTdx101MP' ? 'block' : 'none';
-                if (dSection)        dSection.style.display        = v === 'FTdx101D'  ? 'block' : 'none';
-                if (ftdx10Section)   ftdx10Section.style.display   = v === 'FTdx10'    ? 'block' : 'none';
-                if (ft710Section)    ft710Section.style.display    = v === 'FT-710'    ? 'block' : 'none';
-                if (ftdx3000Section) ftdx3000Section.style.display = v === 'FTDX3000'  ? 'block' : 'none';
-            });
-        })();
     </script>
     <script>
         (function () {
