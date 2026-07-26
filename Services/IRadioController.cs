@@ -69,6 +69,16 @@ namespace Icom_Web_Control.Services
         /// <summary>Set RF output power as a 0–100 % level (CI-V 14 0A set, scaled to 0–255).</summary>
         Task SetRfPowerPercentAsync(int percent, CancellationToken cancellationToken = default);
 
+        // -- AF (volume) level (CI-V 14 01) -------------------------------------
+        // Receiver-wide 0–255 audio level (the IC-7300 has one receiver, so no
+        // per-VFO addressing). Same 14-family form as RF power.
+
+        /// <summary>Read AF (volume) level as a raw 0–255 value (CI-V 14 01 read). -1 on a miss.</summary>
+        Task<int> GetAfGainAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set AF (volume) level as a raw 0–255 value (CI-V 14 01 set).</summary>
+        Task SetAfGainAsync(int value, CancellationToken cancellationToken = default);
+
         // -- VFO / split (Phase 3 block 5) --------------------------------------
         // GetFrequencyHzAsync / SetFrequencyHzAsync / GetModeAsync / SetModeAsync
         // above already take a RadioVfo and, from block 5, address each VFO
@@ -89,5 +99,25 @@ namespace Icom_Web_Control.Services
 
         /// <summary>Turn split on or off (CI-V 0F 01/00).</summary>
         Task SetSplitAsync(bool on, CancellationToken cancellationToken = default);
+
+        // -- Twin PBT (Digital Passband Tuning, CI-V 14 07 / 14 08) -------------
+        // A single receiver-wide passband adjustment (the IC-7300 has one
+        // receiver, so no per-VFO addressing). Each edge is a 0–255 shift with
+        // 128 as centre (no shift): the inner shift (PBT1) and the outer shift
+        // (PBT2). Narrowing both toward opposite ends tightens the passband,
+        // giving independent control of the low and high edges — the IC-7300's
+        // equivalent of the Yaesu LCUT/HCUT audio filter.
+
+        /// <summary>Read the PBT inner (PBT1) shift as a 0–255 value, 128=centre. -1 on a miss.</summary>
+        Task<int> GetPbtInnerAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the PBT inner (PBT1) shift (0–255, 128=centre).</summary>
+        Task SetPbtInnerAsync(int value, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the PBT outer (PBT2) shift as a 0–255 value, 128=centre. -1 on a miss.</summary>
+        Task<int> GetPbtOuterAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the PBT outer (PBT2) shift (0–255, 128=centre).</summary>
+        Task SetPbtOuterAsync(int value, CancellationToken cancellationToken = default);
     }
 }

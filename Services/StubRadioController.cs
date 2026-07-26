@@ -149,6 +149,44 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- AF (volume) level (CI-V 14 01, canned) ----------------------------
+
+        private int _afGain = 128; // mid volume
+
+        public Task<int> GetAfGainAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(_afGain);
+
+        public Task SetAfGainAsync(int value, CancellationToken cancellationToken = default)
+        {
+            _afGain = Math.Clamp(value, 0, 255);
+            _state.AfGainA = _afGain;
+            _state.AfGainB = _afGain;
+            return Task.CompletedTask;
+        }
+
+        // -- Twin PBT (CI-V 14 07 / 14 08, canned) -----------------------------
+
+        private int _pbtInner = 128; // 128 = passband centre / no shift
+        private int _pbtOuter = 128;
+
+        public Task<int> GetPbtInnerAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(_pbtInner);
+
+        public Task SetPbtInnerAsync(int value, CancellationToken cancellationToken = default)
+        {
+            _pbtInner = Math.Clamp(value, 0, 255);
+            return Task.CompletedTask;
+        }
+
+        public Task<int> GetPbtOuterAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(_pbtOuter);
+
+        public Task SetPbtOuterAsync(int value, CancellationToken cancellationToken = default)
+        {
+            _pbtOuter = Math.Clamp(value, 0, 255);
+            return Task.CompletedTask;
+        }
+
         // -- Hosted canned-data feeder -----------------------------------------
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

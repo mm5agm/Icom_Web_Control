@@ -101,6 +101,18 @@ namespace Icom_Web_Control.Services.Civ
         public const byte CmdSetLevel = 0x14;
         public const byte SubRfPower = 0x0A;
 
+        // AF (volume) level — 14 01, same 14-family form: two big-endian BCD
+        // bytes 00 00–02 55 (value 0–255). Receiver-wide on the IC-7300.
+        public const byte SubAfGain = 0x01;
+
+        // Twin PBT (Digital Passband Tuning) — same 14-family form as RF power,
+        // two big-endian BCD bytes 00 00–02 55 where 01 28 (=128) is the centre
+        // (no shift), 00 00 narrows the upper edge, 02 55 narrows the lower edge.
+        //   14 07 = PBT1 (inner shift),  14 08 = PBT2 (outer shift)
+        public const byte SubPbtInner = 0x07;
+        public const byte SubPbtOuter = 0x08;
+        public const int  PbtCentre   = 128;   // 01 28 = passband centre / no shift
+
         // Phase 3 block 5 — VFO select, split, and true per-VFO frequency/mode.
         //
         // VFO select (command 07) — set-only, no read of the active VFO exists:

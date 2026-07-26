@@ -972,14 +972,14 @@
                                oninput="document.getElementById('afGainValueA').innerText = this.value">
                     </div>
 
-                    <!-- Audio Filter (LCUT/HCUT) -->
+                    <!-- Twin PBT (Digital Passband Tuning) -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
                         <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
                                 id="audioFilterBtnA"
-                                aria-label="VFO A Audio Filter"
-                                title="Open the Audio Filter dialog for VFO A's current mode (LCUT FREQ, LCUT SLOPE, HCUT FREQ, HCUT SLOPE)"
+                                aria-label="VFO A Twin PBT"
+                                title="Open the Twin PBT (passband tuning) dialog — narrow the receive passband's low and high edges"
                                 onclick="window.audioFilter && window.audioFilter.open('A')">
-                            Audio Filter
+                            Twin PBT
                         </button>
                     </div>
 
@@ -1312,14 +1312,14 @@
                                oninput="document.getElementById('afGainValueB').innerText = this.value">
                     </div>
 
-                    <!-- Audio Filter (LCUT/HCUT) -->
+                    <!-- Twin PBT (Digital Passband Tuning) -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
                         <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
                                 id="audioFilterBtnB"
-                                aria-label="VFO B Audio Filter"
-                                title="Open the Audio Filter dialog for VFO B's current mode (LCUT FREQ, LCUT SLOPE, HCUT FREQ, HCUT SLOPE)"
+                                aria-label="VFO B Twin PBT"
+                                title="Open the Twin PBT (passband tuning) dialog — narrow the receive passband's low and high edges"
                                 onclick="window.audioFilter && window.audioFilter.open('B')">
-                            Audio Filter
+                            Twin PBT
                         </button>
                     </div>
 
@@ -1656,60 +1656,47 @@
     </div>
 </dialog>
 
-<!-- Audio Filter Dialogs — LCUT FREQ / LCUT SLOPE / HCUT FREQ / HCUT SLOPE
-     for the current mode of each VFO. One dialog per VFO so the user can
-     view/adjust both at once on FTdx101-family dual-receiver radios.
-     Uses EX menu commands per AudioFilterMapService; replaces the broken
-     SL-based "IF Low Cut" dropdown. -->
+<!-- Twin PBT (Digital Passband Tuning) Dialogs — PBT1 (inner) and PBT2
+     (outer) shift values for the IC-7300's single receiver. Each edge is a
+     0–255 shift with 128 at centre (no shift). One dialog per VFO button so
+     either panel can open it; on the single-receiver IC-7300 both drive the
+     same passband. Replaces the Yaesu LCUT/HCUT audio-filter dialog.
+     The dialog id stays audioFilterDialog{vfo} so drag-position persistence
+     and the close-on-load list keep working. -->
 @foreach (var vfo in new[] { "A", "B" })
 {
     <dialog id="audioFilterDialog@(vfo)" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:380px; max-width:520px; position:fixed; margin:0;" aria-labelledby="audioFilterDialogTitle@(vfo)">
         <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
-            <strong id="audioFilterDialogTitle@(vfo)">Audio Filter — VFO @vfo <span id="audioFilterModeLabel@(vfo)" class="text-info ms-1"></span></strong>
-            <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('audioFilterDialog@(vfo)').close()" aria-label="Close VFO @vfo Audio Filter dialog">✕</button>
+            <strong id="audioFilterDialogTitle@(vfo)">Twin PBT — VFO @vfo</strong>
+            <button class="btn btn-sm" style="background:#c0392b; color:#fff; border:1px solid #e74c3c; font-weight:bold; font-size:1rem; line-height:1; padding:2px 11px;" onclick="document.getElementById('audioFilterDialog@(vfo)').close()" title="Close" aria-label="Close VFO @vfo Twin PBT dialog">✕</button>
         </div>
         <div class="p-3 d-flex flex-column gap-3">
             <div id="audioFilterStatus@(vfo)" class="small text-warning" style="min-height:1.2em;"></div>
-            <div id="audioFilterUnsupported@(vfo)" class="alert alert-secondary mb-0" style="display:none;">
-                Audio Filter is not available for this mode on this radio model.
-            </div>
+            <p class="small text-muted mb-0" style="color:#bbb !important;">
+                Shift the two passband edges to narrow the receive filter.
+                Centre = no shift; drag toward the ends to cut the low or high side.
+            </p>
             <div id="audioFilterControls@(vfo)">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                    <label class="mb-0 fw-bold" style="min-width:90px;">LCUT FREQ:</label>
-                    <input type="checkbox" id="audioFilterLcutFreqOff@(vfo)" class="form-check-input"
-                           title="Disable low-cut filter (OFF)" aria-label="LCUT FREQ off">
-                    <label class="mb-0 small" for="audioFilterLcutFreqOff@(vfo)">Off</label>
-                    <input type="range" id="audioFilterLcutFreqSlider@(vfo)"
-                           min="100" max="1000" step="50" value="100"
+                    <label class="mb-0 fw-bold" style="min-width:64px;">PBT1:</label>
+                    <input type="range" id="pbtInnerSlider@(vfo)"
+                           min="0" max="255" step="1" value="128"
                            style="flex:1; height:18px;"
-                           aria-label="LCUT FREQ Hz">
-                    <span id="audioFilterLcutFreqLabel@(vfo)" class="text-end" style="min-width:64px;">—</span>
+                           aria-label="PBT1 inner shift">
+                    <span id="pbtInnerLabel@(vfo)" class="text-end" style="min-width:64px;">Centre</span>
                 </div>
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <label class="mb-0 fw-bold" style="min-width:90px;">LCUT SLOPE:</label>
-                    <button type="button" class="btn btn-sm btn-outline-light audio-filter-slope-btn"
-                            id="audioFilterLcutSlopeBtn@(vfo)" data-slope-code="0"
-                            title="Toggle LCUT slope between 6 dB/oct and 18 dB/oct"
-                            aria-label="LCUT slope">— dB/oct</button>
-                </div>
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <label class="mb-0 fw-bold" style="min-width:90px;">HCUT FREQ:</label>
-                    <input type="checkbox" id="audioFilterHcutFreqOff@(vfo)" class="form-check-input"
-                           title="Disable high-cut filter (OFF)" aria-label="HCUT FREQ off">
-                    <label class="mb-0 small" for="audioFilterHcutFreqOff@(vfo)">Off</label>
-                    <input type="range" id="audioFilterHcutFreqSlider@(vfo)"
-                           min="700" max="4000" step="50" value="3000"
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <label class="mb-0 fw-bold" style="min-width:64px;">PBT2:</label>
+                    <input type="range" id="pbtOuterSlider@(vfo)"
+                           min="0" max="255" step="1" value="128"
                            style="flex:1; height:18px;"
-                           aria-label="HCUT FREQ Hz">
-                    <span id="audioFilterHcutFreqLabel@(vfo)" class="text-end" style="min-width:64px;">—</span>
+                           aria-label="PBT2 outer shift">
+                    <span id="pbtOuterLabel@(vfo)" class="text-end" style="min-width:64px;">Centre</span>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <label class="mb-0 fw-bold" style="min-width:90px;">HCUT SLOPE:</label>
-                    <button type="button" class="btn btn-sm btn-outline-light audio-filter-slope-btn"
-                            id="audioFilterHcutSlopeBtn@(vfo)" data-slope-code="0"
-                            title="Toggle HCUT slope between 6 dB/oct and 18 dB/oct"
-                            aria-label="HCUT slope">— dB/oct</button>
-                </div>
+                <button type="button" class="btn btn-sm btn-outline-light"
+                        id="pbtClearBtn@(vfo)"
+                        title="Reset both PBT shifts to centre (no passband tuning)"
+                        aria-label="Clear Twin PBT">Clear PBT</button>
             </div>
         </div>
     </dialog>
@@ -3793,32 +3780,40 @@
             } catch (e) { console.error('saveCwMessages error:', e); }
         }
 
-        // --- AUDIO FILTER POPOUT ---
-        // One independent dialog per VFO so the user can view/adjust both at
-        // once on FTdx101-family dual-receiver radios. Each instance reads/
-        // writes the four EX-menu values for *its* VFO's current mode class,
-        // backed by /api/cat/audiofilter/{vfo}. The dialog is a thin read/
-        // write proxy — the radio holds all state.
+        // --- TWIN PBT POPOUT ---
+        // The IC-7300's Twin PBT (Digital Passband Tuning): two receiver-wide
+        // shift values — PBT1 (inner) = CI-V 14 07, PBT2 (outer) = CI-V 14 08.
+        // Each is 0–255 with 128 as centre (no shift). One dialog per VFO
+        // button (either panel can open it); on the single-receiver IC-7300
+        // both drive the same passband. The dialog id stays audioFilterDialog
+        // {vfo} so drag-position persistence and the close-on-load list keep
+        // working. Thin read/write proxy — the radio holds all state.
         window.audioFilter = (function () {
             const $ = (id) => document.getElementById(id);
+            const PBT_CENTRE = 128;
+
+            // 128 → "Centre"; otherwise a signed offset from centre.
+            function fmtPbt(v) {
+                if (v === PBT_CENTRE) return 'Centre';
+                const off = v - PBT_CENTRE;
+                return (off > 0 ? '+' : '') + off;
+            }
 
             function makeInstance(vfo) {
                 const dialogId = 'audioFilterDialog' + vfo;
                 const dlg = () => $(dialogId);
-                const id = (suffix) => `audioFilter${suffix}${vfo}`;
-                const el = (suffix) => $(id(suffix));
-                // Remember the slider's last non-OFF Hz so toggling OFF→ON
-                // returns to the same value rather than the slider's min.
-                let _lastLcutHz = 300;
-                let _lastHcutHz = 3000;
+                const el = (suffix) => $('audioFilter' + suffix + vfo);
+                const inner = () => $('pbtInnerSlider' + vfo);
+                const outer = () => $('pbtOuterSlider' + vfo);
+                const innerLbl = () => $('pbtInnerLabel' + vfo);
+                const outerLbl = () => $('pbtOuterLabel' + vfo);
                 let _busy = false;
 
                 async function open() {
                     const d = dlg();
                     if (d && typeof d.show === 'function' && !d.open) {
                         // On first open (no saved drag position), anchor the
-                        // dialog just below the Audio Filter button that
-                        // opened it.
+                        // dialog just below the Twin PBT button that opened it.
                         const hasSaved = !!localStorage.getItem('dlgPos_' + dialogId);
                         if (!hasSaved) {
                             const btn = $('audioFilterBtn' + vfo);
@@ -3834,121 +3829,61 @@
                     await refresh();
                 }
 
+                function setSlider(slider, label, value) {
+                    if (!slider) return;
+                    slider.value = value;
+                    if (label) label.textContent = fmtPbt(value);
+                }
+
                 async function refresh() {
                     if (_busy) return;
                     _busy = true;
                     try {
-                        const resp = await fetch(`/api/cat/audiofilter/${vfo.toLowerCase()}`);
+                        const resp = await fetch('/api/cat/pbt');
                         if (!resp.ok) {
-                            el('Status').textContent = 'Failed to read audio filter.';
+                            el('Status').textContent = 'Failed to read Twin PBT.';
                             return;
                         }
                         const data = await resp.json();
-                        el('ModeLabel').textContent = data.modeClass ? `(${data.modeClass})` : '';
-
-                        const otherVfo = vfo === 'A' ? 'B' : 'A';
-                        el('Status').textContent = data.otherVfoShares
-                            ? `VFO ${otherVfo} is also in ${data.modeClass} — these settings affect both VFOs.`
-                            : '';
-
-                        const anySupported = (data.lcutFreq && data.lcutFreq.supported)
-                                          || (data.lcutSlope && data.lcutSlope.supported)
-                                          || (data.hcutFreq && data.hcutFreq.supported)
-                                          || (data.hcutSlope && data.hcutSlope.supported);
-                        el('Unsupported').style.display = anySupported ? 'none' : '';
-                        el('Controls').style.display    = anySupported ? '' : 'none';
-                        if (!anySupported) return;
-
-                        renderFreqRow('Lcut', data.lcutFreq);
-                        renderSlopeBtn('Lcut', data.lcutSlope);
-                        renderFreqRow('Hcut', data.hcutFreq);
-                        renderSlopeBtn('Hcut', data.hcutSlope);
+                        el('Status').textContent = '';
+                        setSlider(inner(), innerLbl(),
+                            typeof data.inner === 'number' ? data.inner : PBT_CENTRE);
+                        setSlider(outer(), outerLbl(),
+                            typeof data.outer === 'number' ? data.outer : PBT_CENTRE);
                     } catch (e) {
-                        console.error(`audioFilter[${vfo}].refresh error:`, e);
+                        console.error(`twinPbt[${vfo}].refresh error:`, e);
                     } finally {
                         _busy = false;
                     }
                 }
 
-                function renderFreqRow(prefix, v) {
-                    const slider = el(prefix + 'FreqSlider');
-                    const off    = el(prefix + 'FreqOff');
-                    const label  = el(prefix + 'FreqLabel');
-                    if (!v || !v.supported) {
-                        slider.disabled = true; off.disabled = true; label.textContent = '—';
-                        return;
-                    }
-                    off.disabled = false;
-                    if (v.label === 'OFF') {
-                        off.checked = true; slider.disabled = true;
-                        label.textContent = 'OFF';
-                    } else {
-                        off.checked = false; slider.disabled = false;
-                        if (typeof v.hz === 'number') {
-                            slider.value = v.hz;
-                            if (prefix === 'Lcut') _lastLcutHz = v.hz; else _lastHcutHz = v.hz;
-                        }
-                        label.textContent = v.label || (slider.value + ' Hz');
-                    }
-                }
-
-                function renderSlopeBtn(prefix, v) {
-                    const btn = el(prefix + 'SlopeBtn');
-                    if (!v || !v.supported) {
-                        btn.disabled = true; btn.textContent = '—';
-                        btn.classList.remove('btn-warning'); btn.classList.add('btn-outline-light');
-                        return;
-                    }
-                    btn.disabled = false;
-                    btn.dataset.slopeCode = v.code || '0';
-                    btn.textContent = v.label || (v.code === '1' ? '18 dB/oct' : '6 dB/oct');
-                    btn.classList.toggle('btn-warning',      v.code === '1');
-                    btn.classList.toggle('btn-outline-light', v.code !== '1');
-                }
-
-                function hzToFreqCode(hz, isLcut) {
-                    const base = isLcut ? 100 : 700;
-                    const n = Math.round((hz - base) / 50) + 1;
-                    return String(n).padStart(2, '0');
-                }
-
-                async function writeOne(setting, code) {
+                async function writeEdge(edge, value) {
                     try {
-                        const resp = await fetch(`/api/cat/audiofilter/${vfo.toLowerCase()}/${setting}`, {
+                        const resp = await fetch('/api/cat/pbt/' + edge, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ code })
+                            body: JSON.stringify({ value })
                         });
-                        if (!resp.ok) return;
-                        const data = await resp.json();
-                        const v = data.result;
-                        if (setting === 'lcutFreq') renderFreqRow('Lcut', v);
-                        else if (setting === 'hcutFreq') renderFreqRow('Hcut', v);
-                        else if (setting === 'lcutSlope') renderSlopeBtn('Lcut', v);
-                        else if (setting === 'hcutSlope') renderSlopeBtn('Hcut', v);
-                    } catch (e) { console.error(`audioFilter[${vfo}].writeOne error:`, e); }
+                        if (!resp.ok) el('Status').textContent = `Failed to set PBT ${edge}.`;
+                    } catch (e) { console.error(`twinPbt[${vfo}].writeEdge error:`, e); }
                 }
 
                 function wireDom() {
-                    el('LcutFreqSlider').addEventListener('input',  (e) => el('LcutFreqLabel').textContent = e.target.value + ' Hz');
-                    el('LcutFreqSlider').addEventListener('change', (e) => writeOne('lcutFreq', hzToFreqCode(parseInt(e.target.value), true)));
-                    el('LcutFreqOff').addEventListener('change', (e) => {
-                        if (e.target.checked) writeOne('lcutFreq', '00');
-                        else                  writeOne('lcutFreq', hzToFreqCode(_lastLcutHz, true));
-                    });
-                    el('LcutSlopeBtn').addEventListener('click', () => {
-                        const cur = el('LcutSlopeBtn').dataset.slopeCode || '0';
-                        writeOne('lcutSlope', cur === '0' ? '1' : '0');
-                    });
-                    el('HcutFreqSlider').addEventListener('input',  (e) => el('HcutFreqLabel').textContent = e.target.value + ' Hz');
-                    el('HcutFreqSlider').addEventListener('change', (e) => writeOne('hcutFreq', hzToFreqCode(parseInt(e.target.value), false)));
-                    el('HcutFreqOff').addEventListener('change', (e) => {
-                        if (e.target.checked) writeOne('hcutFreq', '00');
-                        else                  writeOne('hcutFreq', hzToFreqCode(_lastHcutHz, false));
-                    });
-                    el('HcutSlopeBtn').addEventListener('click', () => {
-                        const cur = el('HcutSlopeBtn').dataset.slopeCode || '0';
-                        writeOne('hcutSlope', cur === '0' ? '1' : '0');
+                    const i = inner(), o = outer();
+                    if (i) {
+                        i.addEventListener('input',  (e) => innerLbl().textContent = fmtPbt(parseInt(e.target.value, 10)));
+                        i.addEventListener('change', (e) => writeEdge('inner', parseInt(e.target.value, 10)));
+                    }
+                    if (o) {
+                        o.addEventListener('input',  (e) => outerLbl().textContent = fmtPbt(parseInt(e.target.value, 10)));
+                        o.addEventListener('change', (e) => writeEdge('outer', parseInt(e.target.value, 10)));
+                    }
+                    const clr = $('pbtClearBtn' + vfo);
+                    if (clr) clr.addEventListener('click', async () => {
+                        setSlider(inner(), innerLbl(), PBT_CENTRE);
+                        setSlider(outer(), outerLbl(), PBT_CENTRE);
+                        await writeEdge('inner', PBT_CENTRE);
+                        await writeEdge('outer', PBT_CENTRE);
                     });
                 }
 

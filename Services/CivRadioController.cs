@@ -77,6 +77,13 @@ namespace Icom_Web_Control.Services
                 return false;
 
             await IdentifyAsync(cancellationToken);
+
+            // Seed the AF (volume) level so the slider shows the radio's real
+            // position on first paint rather than a default. Receiver-wide, so
+            // both panels mirror the one value. Best-effort — a miss leaves 0.
+            var af = await GetAfGainAsync(cancellationToken);
+            if (af >= 0) { _state.AfGainA = af; _state.AfGainB = af; }
+
             return true;
         }
 
@@ -387,6 +394,64 @@ namespace Icom_Web_Control.Services
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set RF power {Percent}% (level {Level}) was not acknowledged",
                     percent, level);
+        }
+
+        // -- AF (volume) level (CI-V 14 01) ------------------------------------
+        // Receiver-wide 0–255 audio level; same 14-family form as RF power/PBT.
+
+        public Task<int> GetAfGainAsync(CancellationToken cancellationToken = default)
+            => ReadLevel14Async(CivProtocol.SubAfGain, cancellationToken);
+
+        public Task SetAfGainAsync(int value, CancellationToken cancellationToken = default)
+            => WriteLevel14Async(CivProtocol.SubAfGain, value, "AF gain", cancellationToken);
+
+        // -- Twin PBT (CI-V 14 07 / 14 08) -------------------------------------
+        // Same wire form as RF power (14 0A): two big-endian BCD bytes 00 00–02 55
+        // where 01 28 (=128) is centre. Read and write share one helper each.
+
+        public Task<int> GetPbtInnerAsync(CancellationToken cancellationToken = default)
+            => ReadLevel14Async(CivProtocol.SubPbtInner, cancellationToken);
+
+        public Task SetPbtInnerAsync(int value, CancellationToken cancellationToken = default)
+            => WriteLevel14Async(CivProtocol.SubPbtInner, value, "PBT inner", cancellationToken);
+
+        public Task<int> GetPbtOuterAsync(CancellationToken cancellationToken = default)
+            => ReadLevel14Async(CivProtocol.SubPbtOuter, cancellationToken);
+
+        public Task SetPbtOuterAsync(int value, CancellationToken cancellationToken = default)
+            => WriteLevel14Async(CivProtocol.SubPbtOuter, value, "PBT outer", cancellationToken);
+
+        /// <summary>
+        /// Read a 14-family level (command 14 &lt;sub&gt;). The reply carries a
+        /// 0–255 value as two big-endian BCD bytes. Returns -1 on any miss.
+        /// </summary>
+        private async Task<int> ReadLevel14Async(byte sub, CancellationToken cancellationToken)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSetLevel, sub);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdSetLevel, cancellationToken: cancellationToken);
+            // Reply body is 14 <sub> <d1> <d2>: Data = [sub, d1, d2].
+            if (reply == null || reply.Cmd != CivProtocol.CmdSetLevel
+                || reply.Data.Length < 3 || reply.Data[0] != sub)
+                return -1;
+            return CivProtocol.BcdByte(reply.Data[1]) * 100 + CivProtocol.BcdByte(reply.Data[2]);
+        }
+
+        /// <summary>
+        /// Write a 14-family level (command 14 &lt;sub&gt;) as two big-endian BCD
+        /// bytes. The value is clamped to 0–255.
+        /// </summary>
+        private async Task WriteLevel14Async(byte sub, int value, string what, CancellationToken cancellationToken)
+        {
+            int level = Math.Clamp(value, 0, 255);
+            byte d1 = (byte)(level / 100);                    // 0–2: a single BCD digit is its own value
+            int rem = level % 100;
+            byte d2 = (byte)(((rem / 10) << 4) | (rem % 10)); // packed BCD of the low two digits
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSetLevel, sub, d1, d2);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set {What} to {Level} was not acknowledged", what, level);
         }
 
         // -- VFO select / exchange / split (Phase 3 block 5) -------------------

@@ -56,31 +56,26 @@ namespace Icom_Web_Control.Controllers
         private bool VfoIsB(string receiver) =>
             RadioCapabilities.VfoIsB(_radioStateService.IsSingleReceiver, _radioStateService.ActiveVfo, receiver);
 
+        // AF (volume) level is receiver-wide on the IC-7300 (CI-V 14 01), so
+        // both the A and B sliders drive the one level via the _radio seam.
+        // Both state fields are mirrored so either panel reflects the change.
         [HttpPost("afgain/a")]
-        public async Task<IActionResult> SetAfGainA([FromBody] int value)
-        {
-            if (value < 0 || value > 255)
-                return BadRequest(new { error = "AF Gain value out of range (0-255)" });
-            await EnsureConnectedAsync();
-            // VfoP1Outgoing("A") = "0" on both single and dual receivers
-            await _catClient.SendCommandAsync($"AG{VfoP1Outgoing("A")}{value:D3};", "WebUI", CancellationToken.None);
-            if (VfoIsB("A")) _radioStateService.AfGainB = value;
-            else             _radioStateService.AfGainA = value;
-            return Ok(new { message = $"AF Gain {value} set for Receiver A" });
-        }
+        public Task<IActionResult> SetAfGainA([FromBody] int value) => SetAfGainCore(value, "A");
 
         [HttpPost("afgain/b")]
-        public async Task<IActionResult> SetAfGainB([FromBody] int value)
+        public Task<IActionResult> SetAfGainB([FromBody] int value) => SetAfGainCore(value, "B");
+
+        private async Task<IActionResult> SetAfGainCore(int value, string receiver)
         {
             if (value < 0 || value > 255)
                 return BadRequest(new { error = "AF Gain value out of range (0-255)" });
-            await EnsureConnectedAsync();
-            // VfoP1Outgoing("B") = "0" on single-receiver (radio rejects AG1...),
-            // "1" on dual-receiver (FTdx101 has independent SUB AF gain).
-            await _catClient.SendCommandAsync($"AG{VfoP1Outgoing("B")}{value:D3};", "WebUI", CancellationToken.None);
-            if (VfoIsB("B")) _radioStateService.AfGainB = value;
-            else             _radioStateService.AfGainA = value;
-            return Ok(new { message = $"AF Gain {value} set for Receiver B" });
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio not connected" });
+
+            await _radio.SetAfGainAsync(value, CancellationToken.None);
+            _radioStateService.AfGainA = value;
+            _radioStateService.AfGainB = value;
+            return Ok(new { message = $"AF Gain {value} set for Receiver {receiver}" });
         }
 
         [HttpPost("micgain")]
@@ -2430,6 +2425,78 @@ namespace Icom_Web_Control.Controllers
             settings.CwMessages = messages.Select(m => m ?? "").Take(5).ToList();
             await _settingsService.SaveSettingsAsync(settings);
             return Ok(new { saved = true });
+        }
+
+        // -- TWIN PBT (Digital Passband Tuning, CI-V 14 07 / 14 08) ----------
+        //
+        // The IC-7300's equivalent of an audio bandpass filter. Two 0–255 shift
+        // values (128 = centre / no shift): the inner (PBT1) and outer (PBT2)
+        // edges. Single receiver-wide on the IC-7300, so there is no per-VFO
+        // addressing — this replaces the Yaesu LCUT/HCUT audio-filter path,
+        // which drove the (now inert) EX-menu multiplexer.
+
+        public class PbtReadResponse
+        {
+            public int Inner  { get; set; } = 128;
+            public int Outer  { get; set; } = 128;
+            public int Centre { get; set; } = 128;
+        }
+
+        public class PbtSetRequest
+        {
+            public int Value { get; set; }
+        }
+
+        [HttpGet("pbt")]
+        public async Task<IActionResult> ReadPbt()
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                var inner = await _radio.GetPbtInnerAsync(CancellationToken.None);
+                var outer = await _radio.GetPbtOuterAsync(CancellationToken.None);
+                return Ok(new PbtReadResponse
+                {
+                    Inner = inner < 0 ? 128 : inner,
+                    Outer = outer < 0 ? 128 : outer
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading Twin PBT");
+                return StatusCode(500, new { error = "Failed to read Twin PBT" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("pbt/{edge}")]
+        public async Task<IActionResult> SetPbt(string edge, [FromBody] PbtSetRequest request)
+        {
+            var e = (edge ?? "").Trim().ToLowerInvariant();
+            if (e != "inner" && e != "outer")
+                return BadRequest(new { error = "Invalid edge (must be 'inner' or 'outer')" });
+            if (request == null || request.Value < 0 || request.Value > 255)
+                return BadRequest(new { error = "Value must be 0–255" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                if (e == "inner") await _radio.SetPbtInnerAsync(request.Value, CancellationToken.None);
+                else              await _radio.SetPbtOuterAsync(request.Value, CancellationToken.None);
+                return Ok(new { edge = e, value = request.Value });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting Twin PBT {Edge}", e);
+                return StatusCode(500, new { error = "Failed to set Twin PBT" });
+            }
+            finally { _requestSemaphore.Release(); }
         }
 
         // -- AUDIO FILTER (LCUT/HCUT FREQ + SLOPE per mode class) ------------
