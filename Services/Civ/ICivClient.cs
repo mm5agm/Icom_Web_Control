@@ -29,6 +29,15 @@ namespace Icom_Web_Control.Services.Civ
         Task<CivFrame?> TransactAsync(byte[] frame, byte expectedCmd, int timeoutMs = 500, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Write raw bytes to the port with no reply matching. Exists for the
+        /// power-ON wake-up burst (a run of 0xFE bytes plus the 18 01 frame),
+        /// which the asleep radio may not acknowledge in the normal way.
+        /// Serialised against <see cref="TransactAsync"/> so it can never
+        /// interleave with a pending request. No-op if the port is closed.
+        /// </summary>
+        Task SendRawAsync(byte[] bytes, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Frames addressed to us that did not match a pending transaction
         /// (radio-initiated transceive pushes, spontaneous state reports). Not
         /// used in Phase 2 but exposed so Phase 3's transceive handling has a

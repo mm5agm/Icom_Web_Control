@@ -176,5 +176,16 @@ namespace Icom_Web_Control.Services
         /// 250000 or 500000. The displayed full width is twice this.
         /// </summary>
         Task SetScopeSpanAsync(int spanHz, CancellationToken cancellationToken = default);
+
+        // -- Power on/off (Phase 3 block 7, CI-V command 18) -------------------
+
+        /// <summary>
+        /// Turn the transceiver on or off (CI-V 18 01 / 18 00). Power-ON prepends
+        /// the baud-dependent 0xFE wake-up preamble the asleep CI-V circuit needs.
+        /// Caveat: over the IC-7300's USB CI-V the serial port is powered by the
+        /// radio, so a full power-OFF drops the port entirely and remote power-ON
+        /// only works over a separately-powered CI-V remote-jack link.
+        /// </summary>
+        Task SetPowerAsync(bool on, CancellationToken cancellationToken = default);
     }
 }

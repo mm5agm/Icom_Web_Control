@@ -201,9 +201,47 @@ namespace Icom_Web_Control.Services.Civ
             {
                 return null;
             }
+            catch (Exception ex)
+            {
+                // The serial device can be pulled out from under us — powering
+                // the radio off drops the USB CDC port, so a write/read here
+                // throws IOException / InvalidOperationException / Unauthorized
+                // AccessException. Treat any such failure as a transaction miss
+                // (null), never let it escape: an unhandled throw from the poll
+                // loop's BackgroundService would stop the whole host.
+                _logger.LogDebug(ex, "CI-V transaction failed (port error?)");
+                return null;
+            }
             finally
             {
                 _pending = null;
+                _txLock.Release();
+            }
+        }
+
+        public async Task SendRawAsync(byte[] bytes, CancellationToken cancellationToken = default)
+        {
+            if (!IsOpen) return;
+
+            await _txLock.WaitAsync(cancellationToken);
+            try
+            {
+                lock (_portLock)
+                {
+                    if (_port?.IsOpen != true) return;
+                    _port.Write(bytes, 0, bytes.Length);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // shutting down
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Error writing raw CI-V bytes");
+            }
+            finally
+            {
                 _txLock.Release();
             }
         }

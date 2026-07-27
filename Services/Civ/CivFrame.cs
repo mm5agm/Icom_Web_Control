@@ -215,6 +215,27 @@ namespace Icom_Web_Control.Services.Civ
         // waveform-info span field reads back the same value.
         public const byte SubScopeSpan     = 0x15;  // 27 15
 
+        // Phase 3 block 7 — transceiver power on/off (command 18).
+        //   18 00 = power OFF, 18 01 = power ON. The radio ACKs FB.
+        // Power OFF is a plain frame (the radio is awake and listening).
+        // Power ON must wake the asleep CI-V circuit first with a burst of
+        // 0xFE bytes sent immediately before the 18 01 frame — see
+        // PowerOnWakePreambleCount and the IC-7300 MkII CI-V manual p.16.
+        public const byte CmdPower = 0x18;
+        public const byte PowerOff = 0x00;
+        public const byte PowerOn  = 0x01;
+
+        /// <summary>
+        /// The number of leading 0xFE wake-up bytes to prepend to an 18 01
+        /// power-ON frame. The asleep CI-V circuit needs a burst of FEs to wake
+        /// before it will read the frame, and the required count scales with the
+        /// baud rate — the IC-7300 MkII CI-V manual (p.16) lists 25 @ 19200,
+        /// 13 @ 9600, 7 @ 4800. Generalised as ⌈baud/768⌉ (which reproduces all
+        /// three listed values exactly) with a floor of 7.
+        /// </summary>
+        public static int PowerOnWakePreambleCount(int baudRate)
+            => Math.Max(7, (int)Math.Ceiling(baudRate / 768.0));
+
         /// <summary>Decode one packed-BCD byte (two decimal digits) to 0–99.</summary>
         public static int BcdByte(byte b) => ((b >> 4) & 0x0F) * 10 + (b & 0x0F);
 

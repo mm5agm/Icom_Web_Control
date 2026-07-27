@@ -193,6 +193,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<HostOptions>(opts =>
 {
     opts.ShutdownTimeout = TimeSpan.FromSeconds(2);
+
+    // Never let one background service's unhandled exception stop the whole
+    // host. The default (StopHost) means a single throw from e.g. the CI-V
+    // poll loop while the radio's USB port is yanked would kill the app,
+    // leaving the web page up with no comms. Individual services already log
+    // and recover; this is the backstop so a missed case degrades one service
+    // instead of taking everything (SignalR, voice, rigctld) down with it.
+    opts.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
 
 builder.Services.AddSingleton<CalibrationStorage>();

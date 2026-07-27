@@ -206,30 +206,25 @@ namespace Icom_Web_Control.Controllers
             _logger.LogInformation("[API] SetRadioPower called: powerOn={PowerOn}", request.PowerOn);
             try
             {
-                if (request.PowerOn)
-                {
-                    _logger.LogInformation("Turning radio ON...");
-                    await _catClient.SendCommandAsync("PS1;", "WebUI", CancellationToken.None);
-                    await Task.Delay(1500);
-                    await _catClient.SendCommandAsync("PS1;", "WebUI", CancellationToken.None);
-                    _radioStateService.RadioPowerOn = true;
-                    _logger.LogInformation("Radio power ON command sent");
-                    await Task.Delay(3000);
-                    _logger.LogInformation("Re-initializing radio after power on...");
-                    await _radioInitService.InitializeRadioAsync();
-                    _logger.LogInformation("[API] SetRadioPower completed: powerOn=true");
-                    return Ok(new { message = "Radio powered ON and initialized", powerOn = true });
-                }
-                else
-                {
-                    _logger.LogInformation("Turning radio OFF...");
-                    await _catClient.SendCommandAsync("PS0;", "WebUI", CancellationToken.None);
-                    _radioStateService.RadioPowerOn = false;
+                // Power via the CI-V seam (command 18). Power-OFF needs a live
+                // link (the radio must be listening to receive 18 00); power-ON
+                // wakes the bus with the FE preamble and, over USB, only succeeds
+                // if the port is still powered. After power-ON the CI-V poll loop
+                // reconnects and re-identifies on its own — no explicit re-init.
+                if (!request.PowerOn && !_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+
+                await _radio.SetPowerAsync(request.PowerOn, CancellationToken.None);
+                _radioStateService.RadioPowerOn = request.PowerOn;
+                if (!request.PowerOn)
                     AppStatus.InitializationStatus = "radio_off";
-                    _logger.LogInformation("Radio power OFF command sent");
-                    _logger.LogInformation("[API] SetRadioPower completed: powerOn=false");
-                    return Ok(new { message = "Radio powered OFF", powerOn = false });
-                }
+
+                _logger.LogInformation("[API] SetRadioPower completed: powerOn={PowerOn}", request.PowerOn);
+                return Ok(new
+                {
+                    message = request.PowerOn ? "Radio powered ON" : "Radio powered OFF",
+                    powerOn = request.PowerOn
+                });
             }
             catch (Exception ex)
             {

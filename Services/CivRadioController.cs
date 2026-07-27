@@ -87,7 +87,21 @@ namespace Icom_Web_Control.Services
             if (!await _bus.OpenAsync(port, baud))
                 return false;
 
-            await IdentifyAsync(cancellationToken);
+            // A port that opens is NOT proof the radio is usable: over USB the
+            // COM port can stay enumerated while the radio is off, and the
+            // IC-7300's CI-V circuit still answers 19 00 in soft-off/standby
+            // (display dark). So neither "port open" nor "ID answered" means the
+            // radio is operational. Gate the connection on the operating-frequency
+            // read (03) — the same liveness signal the poll loop uses to hold the
+            // link — so a powered-off radio reads as disconnected (steady red)
+            // instead of flashing the power button green↔red as each reconnect
+            // flags "connected" only to drop on the very next read miss.
+            await IdentifyAsync(cancellationToken); // learn address/model if it answers; best-effort
+            if (await ReadOperatingFrequencyAsync(cancellationToken) <= 0)
+            {
+                await _bus.CloseAsync();
+                return false;
+            }
 
             // Seed the RX controls so every slider/dropdown shows the radio's
             // real position on first paint rather than a default. All are
@@ -776,29 +790,89 @@ namespace Icom_Web_Control.Services
             }
         }
 
+        // -- Power on/off (Phase 3 block 7, command 18) ------------------------
+
+        public Task SetPowerAsync(bool on, CancellationToken cancellationToken = default)
+            => on ? PowerOnAsync(cancellationToken) : PowerOffAsync(cancellationToken);
+
+        /// <summary>
+        /// Power the radio down (18 00). The radio ACKs FB then powers off, so
+        /// the ack is best-effort — a null reply here is expected, not an error.
+        /// We flag RadioPowerOn false immediately; the poll loop's own
+        /// miss-detection then drops the link naturally once the radio stops
+        /// answering (no forced close from this thread, which would race the
+        /// poll's in-flight transaction).
+        /// </summary>
+        private async Task PowerOffAsync(CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdPower, CivProtocol.PowerOff);
+            await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            _state.RadioPowerOn = false;
+            _logger.LogInformation("[CivRadioController] Power OFF (18 00) sent");
+        }
+
+        /// <summary>
+        /// Power the radio up (18 01). The asleep CI-V circuit is woken with a
+        /// burst of 0xFE bytes sized to the baud rate, sent in one write with the
+        /// frame appended so no inter-byte gap lets it doze off again. Over USB
+        /// the port is unpowered while the radio is off, so this can only succeed
+        /// over a separately-powered CI-V remote-jack link; on USB the front-panel
+        /// switch is the only way up. On success the poll loop reconnects and
+        /// re-identifies once the radio's bus starts answering.
+        /// </summary>
+        private async Task PowerOnAsync(CancellationToken ct)
+        {
+            var settings = await _settings.GetSettingsAsync();
+
+            if (!_bus.IsOpen && !await _bus.OpenAsync(settings.SerialPort, settings.BaudRate))
+            {
+                _logger.LogWarning("[CivRadioController] Power ON: CI-V port unavailable — the USB port is unpowered while the radio is off");
+                return;
+            }
+
+            int wake = CivProtocol.PowerOnWakePreambleCount(settings.BaudRate);
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdPower, CivProtocol.PowerOn);
+            var burst = new byte[wake + frame.Length];
+            for (int i = 0; i < wake; i++) burst[i] = CivProtocol.Preamble; // 0xFE
+            Array.Copy(frame, 0, burst, wake, frame.Length);
+
+            await _bus.SendRawAsync(burst, ct);
+            _state.RadioPowerOn = true;
+            _logger.LogInformation("[CivRadioController] Power ON (18 01) sent with {Wake}× FE wake preamble", wake);
+        }
+
         // -- Connect / identify -------------------------------------------------
 
-        private async Task IdentifyAsync(CancellationToken cancellationToken)
+        /// <summary>
+        /// Read the transceiver ID (19 00). The reply's From byte is the radio's
+        /// real CI-V address; its data byte is the model's default address, which
+        /// distinguishes IC-7300 MkII (B6) from the classic IC-7300 (94) and other
+        /// Icoms — hence "read the ID, don't hard-code." Returns false when the
+        /// radio doesn't answer at all: the port opened but nothing is on the bus
+        /// (radio powered off or asleep), which is not a real connection.
+        /// </summary>
+        private async Task<bool> IdentifyAsync(CancellationToken cancellationToken)
         {
-            // Read the transceiver ID (19 00). The reply's From byte is the
-            // radio's real CI-V address; its data byte is the model's default
-            // address, which distinguishes IC-7300 MkII (B6) from the classic
-            // IC-7300 (94) and other Icoms — hence "read the ID, don't hard-code."
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdReadId, CivProtocol.SubReadId);
             var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadId, cancellationToken: cancellationToken);
+            if (reply == null)
+                return false;
 
-            if (reply != null && reply.From != 0x00)
+            if (reply.From != 0x00)
                 _radioAddress = reply.From;
 
             byte idByte = _radioAddress;
-            if (reply != null && reply.Data.Length >= 2)
+            if (reply.Data.Length >= 2)
                 idByte = reply.Data[^1]; // 19 00 <id>
 
             ModelId = MapModel(idByte);
             _state.RadioModel = ModelId;
             _logger.LogInformation("[CivRadioController] Radio identified: {Model} (CI-V address {Addr:X2})",
                 ModelId, _radioAddress);
+            return true;
         }
 
         private static string MapModel(byte idByte) => idByte switch
@@ -820,7 +894,27 @@ namespace Icom_Web_Control.Services
             {
                 if (!_bus.IsOpen)
                 {
-                    var ok = await ConnectAsync(stoppingToken);
+                    bool ok;
+                    try
+                    {
+                        ok = await ConnectAsync(stoppingToken);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Connect touches the serial port (open, ID, freq read,
+                        // close), any of which can throw while the radio is being
+                        // powered off and its USB port vanishes. Swallow it here —
+                        // this call sits outside the poll try/catch below, so an
+                        // escape would fault the BackgroundService and take the
+                        // whole host down. Treat it as a failed connect and retry.
+                        _logger.LogWarning(ex, "[CivRadioController] Connect attempt threw — retrying");
+                        ok = false;
+                    }
+
                     if (!ok)
                     {
                         await SetConnectedAsync(false);

@@ -235,6 +235,14 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- Power on/off (Phase 3 block 7, canned) ----------------------------
+
+        public Task SetPowerAsync(bool on, CancellationToken cancellationToken = default)
+        {
+            _state.RadioPowerOn = on;
+            return Task.CompletedTask;
+        }
+
         // -- Hosted canned-data feeder -----------------------------------------
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
