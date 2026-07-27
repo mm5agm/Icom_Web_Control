@@ -940,6 +940,15 @@ namespace Icom_Web_Control.Services
                     if (hz > 0)
                     {
                         misses = 0;
+                        // The operating-freq read is the liveness signal, so a good
+                        // read means we're connected — regardless of how the port
+                        // got opened. It can be opened out-of-band by PowerOnAsync
+                        // (IWC's power button sends 18 01 on a port it opens itself),
+                        // which skips the reconnect block above and its
+                        // SetConnectedAsync(true); without this the init spinner
+                        // would spin forever even though control works.
+                        if (!_state.IsConnected)
+                            await SetConnectedAsync(true);
                         SetVfoFrequency(active, hz); // broadcasts on change
                     }
                     else if (++misses >= MaxConsecutiveReadMisses)
