@@ -1964,6 +1964,12 @@ The radio remembers this across power cycles, so it's a once-only change. **Why 
 
 If you can't find these menu items, your operating manual's index under "DATA MOD SOURCE" or "REAR SELECT" is the authoritative reference for your firmware version.
 
+**Icom IC-7300 (CI-V / USB):** the equivalent radio-side settings are `MENU → SET → Connectors → MOD Input → DATA MOD = USB` and `USB MOD Level` set to roughly 30–50%. With DATA MOD on MIC or ACC (the factory default is often MIC), the radio keys but ignores the USB audio, so you get no RF.
+
+**Windows gotcha — WSJT-X pointed at the wrong "Speakers" endpoint.** Even with the radio set correctly, TX can still produce zero power if WSJT-X is sending audio to the wrong playback device. The IC-7300's USB codec can appear **twice** in Windows' Playback list (`Win+R → mmsys.cpl → Playback`) as two identically-named entries — e.g. two **"Speakers (2- USB Audio Device)"** rows, one flagged *Default Device* and one just *Ready*. Only one of them is actually wired to the radio's modulator. If WSJT-X's **Output** (Settings → Audio → Output) is set to the wrong one, its Tune tone drives that endpoint to full scale (you'll see the green bar move in `mmsys.cpl`) yet the radio makes no power — the audio is going nowhere useful.
+
+The tell-tale sign: the radio makes power when its own voice synth speaks (internal audio) but never from WSJT-X's tone. To fix, switch WSJT-X → Settings → Audio → **Output** to the *other* identically-named entry. If you can't tell the two apart in the WSJT-X dropdown, right-click the wrong one (the one that goes full-scale but gives no RF) in `mmsys.cpl → Playback` and **Disable** it, leaving only the working endpoint to choose. While you're there, open the working endpoint's **Properties → Levels** tab and confirm it isn't muted and the slider is well up.
+
 ---
 
 ### 15.2 My RSP1 shows serial number `0000000001` — is it broken?
