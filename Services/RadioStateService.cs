@@ -136,10 +136,6 @@ namespace Icom_Web_Control.Services
         private void BroadcastUpdate(string property, object value)
         {
             _logger.LogDebug("[BroadcastUpdate] Broadcasting {Property} = {Value}", property, value);
-            if (property == "PowerMeter")
-            {
-                _logger.LogWarning("[DEBUG][PowerMeter] Broadcasting PowerMeter value: {@Value}", value);
-            }
             // Special case: PowerMeter should include isTransmitting for frontend sync
             if (property == "PowerMeter")
             {
