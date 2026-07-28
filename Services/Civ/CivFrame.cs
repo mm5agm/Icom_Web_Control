@@ -78,6 +78,20 @@ namespace Icom_Web_Control.Services.Civ
         public const byte SubPoMeter = 0x11;
         public const byte SubSwrMeter = 0x12;
 
+        // Antenna tuner (command 1C 01). Unlike the Yaesu AC command — which
+        // cannot report a tuning cycle in progress — the IC-7300 reports and
+        // sets all three states here:
+        //   Read : send 1C 01        → reply 1C 01 <00=OFF | 01=ON | 02=TUNING>
+        //   Set  : send 1C 01 <v>    → reply FB / FA
+        //     v: 00 = tuner OFF (through), 01 = tuner ON (in line),
+        //        02 = start a tuning cycle (radio ACKs, then reports 02 while
+        //             tuning and drops back to 01 when done).
+        // See the IC-7300 MkII CI-V manual p.13.
+        public const byte SubTuner = 0x01;
+        public const byte TunerOff  = 0x00;
+        public const byte TunerOn   = 0x01;
+        public const byte TunerTune = 0x02;
+
         // The remaining 15-family meters (same 0–255 big-endian BCD form as
         // above). ALC/COMP read 00 00 while receiving; Id is ~0 on RX and rises
         // on TX; Vd (PA supply) reads the idle rail on RX (~13.8 V) and sags

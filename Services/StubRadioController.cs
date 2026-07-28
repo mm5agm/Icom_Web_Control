@@ -97,6 +97,22 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- Antenna tuner (CI-V 1C 01, canned) --------------------------------
+
+        private int _tuner; // 0=OFF, 1=ON, 2=TUNING
+
+        public Task<int> GetTunerAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(_tuner);
+
+        public Task SetTunerAsync(int state, CancellationToken cancellationToken = default)
+        {
+            if (state < 0 || state > 2) return Task.CompletedTask;
+            _tuner = state;
+            _state.AtuEnabled = state != 0;
+            _state.AtuTuning = state == 2;
+            return Task.CompletedTask;
+        }
+
         // -- RF output power set (CI-V 14 0A, canned) --------------------------
 
         private int _rfPowerPercent = 100; // stub starts at full power

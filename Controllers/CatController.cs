@@ -1919,10 +1919,10 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                // AC P1 P2 P3 ;  — P3=1 ATU ON, P3=0 ATU OFF (P1/P2 always 0)
-                string cmd = request.Enabled ? "AC001;" : "AC000;";
-                await _catClient.SendCommandAsync(cmd, "WebUI", CancellationToken.None);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                // CI-V 1C 01: 01=tuner ON (in line), 00=tuner OFF (through).
+                await _radio.SetTunerAsync(request.Enabled ? 1 : 0, CancellationToken.None);
                 _radioStateService.AtuEnabled = request.Enabled;
                 return Ok(new { atuEnabled = request.Enabled });
             }
@@ -1934,16 +1934,15 @@ namespace Icom_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
-        // Auto-tune trigger. Sending AC002; toggles the radio's auto-tune
-        // cycle — once to start, once to stop. The UI binds this to a
-        // long-press of the ATU button.
+        // Auto-tune trigger. The UI binds this to a long-press of the ATU
+        // button; it toggles the tuning cycle — start if idle, stop if a
+        // cycle is already running.
         //
-        // The Yaesu CAT manuals (FTdx10 and FTdx101MP both, page 6) say
-        // P2 of AC is "Fixed at 0" — so the radio does NOT report tuning-
-        // in-progress over CAT. The "Tuning…" UI state therefore has to be
-        // managed client-side: the frontend assumes tuning is active for a
-        // safe upper-bound window after pressing, then triggers a state
-        // refresh via the GET endpoint below to capture the settled on/off.
+        // Unlike the Yaesu AC command, CI-V 1C 01 *does* report a tuning
+        // cycle in progress (status 02), so the frontend "Tuning…" state is
+        // driven by real radio status broadcast from the poll loop rather
+        // than a client-side timer. Sending 1C 01 02 starts a cycle; sending
+        // 1C 01 01 (ON) mid-cycle stops it and leaves the tuner in line.
         [HttpPost("atu/tune")]
         public async Task<IActionResult> StartAtuTune()
         {
@@ -1951,9 +1950,13 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync("AC002;", "WebUI", CancellationToken.None);
-                _logger.LogInformation("ATU auto-tune toggled (AC002;)");
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                // Toggle: if a cycle is already running, stop it (→ ON); else start one.
+                bool tuning = _radioStateService.AtuTuning;
+                await _radio.SetTunerAsync(tuning ? 1 : 2, CancellationToken.None);
+                _logger.LogInformation("ATU auto-tune {Action} (CI-V 1C 01 {Sub:X2})",
+                    tuning ? "stopped" : "started", tuning ? 1 : 2);
                 return Ok(new { message = "ATU tune toggled" });
             }
             catch (Exception ex)
@@ -1964,19 +1967,9 @@ namespace Icom_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
-        // Refresh the ATU on/off state by querying AC; from the radio.
-        // Called by the frontend after a tune cycle in case the radio
-        // didn't auto-report the settled state.
-        //
-        // Important: CatMultiplexerService.OnMessageReceived consumes
-        // direct command replies into _pendingResponses BEFORE they reach
-        // CatMessageDispatcher (only unsolicited auto-info messages flow
-        // through the dispatcher). So we have to parse the AC reply
-        // ourselves and update RadioStateService directly here.
-        //
-        // Reply format after the multiplexer strips the trailing ';':
-        //   "AC" P1 P2 P3   — 5 characters, P3 at index 4.
-        //   P3: 0=Tuner OFF, 1=Tuner ON, 2=Tuning Start/Stop
+        // Refresh the ATU state by reading CI-V 1C 01 from the radio. Called
+        // by the frontend after a tune cycle to capture the settled on/off.
+        //   status: 0=OFF, 1=ON, 2=TUNING.
         [HttpGet("atu")]
         public async Task<IActionResult> RefreshAtuState()
         {
@@ -1984,17 +1977,19 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                var reply = await _catClient.SendCommandAsync("AC;", "WebUI", CancellationToken.None);
-                if (!string.IsNullOrEmpty(reply) && reply.StartsWith("AC") && reply.Length >= 5)
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                int status = await _radio.GetTunerAsync(CancellationToken.None);
+                if (status >= 0)
                 {
-                    _radioStateService.AtuEnabled = reply[4] == '1';
-                    _logger.LogDebug("ATU refresh: parsed AtuEnabled={State} from reply '{Reply}'",
-                        _radioStateService.AtuEnabled, reply);
+                    _radioStateService.AtuEnabled = status != 0;
+                    _radioStateService.AtuTuning = status == 2;
+                    _logger.LogDebug("ATU refresh: status={Status} → enabled={Enabled} tuning={Tuning}",
+                        status, _radioStateService.AtuEnabled, _radioStateService.AtuTuning);
                 }
                 else
                 {
-                    _logger.LogWarning("ATU refresh: unexpected AC; reply '{Reply}' (not parsed)", reply ?? "(null)");
+                    _logger.LogWarning("ATU refresh: 1C 01 read missed (no status)");
                 }
                 return Ok(new { atuEnabled = _radioStateService.AtuEnabled });
             }

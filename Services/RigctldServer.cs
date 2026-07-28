@@ -231,6 +231,8 @@ namespace Icom_Web_Control.Services
                     "T" => parts.Length > 1 ? await SetPttAsync(parts[1], clientId) : "RPRT -1",
                     "l" => parts.Length > 1 ? await GetLevelAsync(parts[1]) : "RPRT -1",
                     "L" => parts.Length > 2 ? await SetLevelAsync(parts[1], parts[2], clientId) : "RPRT -1",
+                    "u" => parts.Length > 1 ? await GetFuncAsync(parts[1]) : "RPRT -1",
+                    "U" => parts.Length > 2 ? await SetFuncAsync(parts[1], parts[2], clientId) : "RPRT -1",
                     "x" => GetSplit(),
                     "X" => parts.Length > 1 ? await SetSplitAsync(parts[1], clientId) : "RPRT -1",
                     "z" => GetSplitFrequency(),
@@ -270,8 +272,8 @@ namespace Icom_Web_Control.Services
                 "get_powerstat" => _radioStateService.RadioPowerOn ? "1" : "0",
                 "chk_vfo"       => "CHKVFO 0",
                 "dump_state"    => GetDumpState(),
-                "get_func"      => "RPRT -1", // ATU (CI-V 1C 01) not yet on the seam
-                "set_func"      => "RPRT -1",
+                "get_func"      => parts.Length > 1 ? await GetFuncAsync(parts[1]) : "RPRT -1",
+                "set_func"      => parts.Length > 2 ? await SetFuncAsync(parts[1], parts[2], clientId) : "RPRT -1",
                 "get_mem"       => "RPRT -1",
                 "set_mem"       => "RPRT -1",
                 "get_band"      => "RPRT -1",
@@ -367,6 +369,33 @@ namespace Icom_Web_Control.Services
             else
                 DisarmTxWatchdog();
 
+            return "RPRT 0";
+        }
+
+        // --- Functions (get_func / set_func) ---
+        // Only RIG_FUNC_TUNER is advertised (see the func masks in GetDumpState).
+        // Hamlib passes the function name uppercase, e.g. "get_func TUNER".
+
+        private async Task<string> GetFuncAsync(string func)
+        {
+            if (!func.Equals("TUNER", StringComparison.OrdinalIgnoreCase))
+                return "RPRT -1";
+            // Cache reflects the poll loop's 1C 01 read; "on" covers ON and TUNING.
+            var on = _radioStateService.AtuEnabled;
+            await Task.CompletedTask;
+            return on ? "1" : "0";
+        }
+
+        private async Task<string> SetFuncAsync(string func, string value, string clientId)
+        {
+            if (!func.Equals("TUNER", StringComparison.OrdinalIgnoreCase))
+                return "RPRT -1";
+            // Hamlib sends 0 (off) or 1 (on). CI-V 1C 01: 0=OFF, 1=ON (in line).
+            // A tuning cycle (02) is triggered by the web long-press, not exposed here.
+            var on = value != "0";
+            _logger.LogInformation("Rigctld set_func TUNER: {Value} (client: {ClientId})", value, clientId);
+            await _radio.SetTunerAsync(on ? 1 : 0, CancellationToken.None);
+            _radioStateService.AtuEnabled = on;
             return "RPRT 0";
         }
 
@@ -588,8 +617,8 @@ namespace Icom_Web_Control.Services
                 "0",            // announces
                 "0",            // preamp list
                 "0",            // attenuator list
-                "0x00000000",   // has_get_func
-                "0x00000000",   // has_set_func
+                "0x00100000",   // has_get_func — RIG_FUNC_TUNER (ATU, CI-V 1C 01)
+                "0x00100000",   // has_set_func — RIG_FUNC_TUNER
                 "0x000fffff",   // has_get_level
                 "0x000fffff",   // has_set_level
                 "0",            // has_get_parm

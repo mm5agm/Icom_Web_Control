@@ -231,8 +231,8 @@ namespace Icom_Web_Control.Services
         // control to OFF. The state setters broadcast only on change, so a
         // steady radio produces no SignalR traffic here.
         private int _rxPollIndex;
-        private const int RxControlCount = 14;
-        private const int RxControlsPerLoop = 2;   // ~1.1 s to sweep all 14
+        private const int RxControlCount = 15;
+        private const int RxControlsPerLoop = 2;   // ~1.2 s to sweep all 15
 
         private async Task PollNextRxControlAsync(CancellationToken ct)
         {
@@ -252,6 +252,7 @@ namespace Icom_Web_Control.Services
                 case 11: { int v = await GetNotchPositionAsync(ct); if (v >= 0) { _state.ManualNotchFreqA = v; _state.ManualNotchFreqB = v; } break; }
                 case 12: { int v = await ReadFunc16Async(CivProtocol.SubManualNotchWidth, ct); if (v >= 0) { _state.ManualNotchWidthA = v.ToString(); _state.ManualNotchWidthB = _state.ManualNotchWidthA; } break; }
                 case 13: { int v = await ReadFunc16Async(CivProtocol.SubIfFilterShape, ct);    if (v >= 0) { _state.IfShapeA = v.ToString(); _state.IfShapeB = _state.IfShapeA; } break; }
+                case 14: { int v = await GetTunerAsync(ct); if (v >= 0) { _state.AtuEnabled = v != CivProtocol.TunerOff; _state.AtuTuning = v == CivProtocol.TunerTune; } break; }
             }
             _rxPollIndex++;
         }
@@ -535,6 +536,45 @@ namespace Icom_Web_Control.Services
                 && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubTxStatus)
                 return reply.Data[1] != 0;
             return _state.IsTransmitting;
+        }
+
+        // -- Antenna tuner (CI-V 1C 01) ----------------------------------------
+
+        /// <summary>
+        /// Read the antenna-tuner state (command 1C 01, no data byte):
+        /// 0=OFF, 1=ON, 2=TUNING. -1 on any miss. The poll loop keeps
+        /// _state.AtuEnabled / _state.AtuTuning live from this.
+        /// </summary>
+        public async Task<int> GetTunerAsync(CancellationToken cancellationToken = default)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdTransmit, CivProtocol.SubTuner);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdTransmit, cancellationToken: cancellationToken);
+            // Reply body is 1C 01 <status>: Data = [01, status].
+            if (reply != null && reply.Cmd == CivProtocol.CmdTransmit
+                && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubTuner)
+                return reply.Data[1];
+            return -1;
+        }
+
+        public async Task SetTunerAsync(int state, CancellationToken cancellationToken = default)
+        {
+            if (state < 0 || state > 2) return;
+            byte v = (byte)state;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdTransmit, CivProtocol.SubTuner, v);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+            {
+                // 00=OFF, 01=ON, 02=start tuning. A tuning cycle leaves the tuner
+                // ON when it finishes; reflect "enabled" for both 01 and 02.
+                _state.AtuEnabled = state != CivProtocol.TunerOff;
+                _state.AtuTuning = state == CivProtocol.TunerTune;
+            }
+            else
+            {
+                _logger.LogWarning("[CivRadioController] Set tuner {State} was not acknowledged", state);
+            }
         }
 
         // -- RF output power set (CI-V 14 0A) ----------------------------------

@@ -58,6 +58,20 @@ namespace Icom_Web_Control.Services
         Task<bool> GetTransmitAsync(CancellationToken cancellationToken = default);
         Task SetTransmitAsync(bool transmit, CancellationToken cancellationToken = default);
 
+        // -- Antenna tuner (CI-V 1C 01) -----------------------------------------
+        // The IC-7300's internal ATU. Unlike the Yaesu AC command, CI-V reports a
+        // tuning cycle in progress, so state is a small integer, not a bool:
+        //   0 = OFF (through), 1 = ON (in line), 2 = tuning cycle in progress.
+
+        /// <summary>Read the antenna-tuner state: 0=OFF, 1=ON, 2=TUNING (CI-V 1C 01 read). -1 on a miss.</summary>
+        Task<int> GetTunerAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Set the antenna tuner: 0=OFF, 1=ON, 2=start a tuning cycle
+        /// (CI-V 1C 01 set). Values outside 0–2 are ignored.
+        /// </summary>
+        Task SetTunerAsync(int state, CancellationToken cancellationToken = default);
+
         // -- RF output power set (CI-V 14 0A) -----------------------------------
         // Power is expressed to the app as a 0–100 % level (the radio's native
         // form for CI-V 14 0A). The 100 W IC-7300 family maps watts 1:1 to
