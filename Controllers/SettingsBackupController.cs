@@ -7,7 +7,7 @@ namespace Icom_Web_Control.Controllers
 {
     /// <summary>
     /// Export and import the entire user settings file. Designed for moving
-    /// a complete YWC configuration (band profiles, memories, CW messages,
+    /// a complete IWC configuration (band profiles, memories, CW messages,
     /// DX watch list, calibration, external app paths, etc.) between PCs or
     /// preserving it across a Windows rebuild.
     /// </summary>

@@ -1,4 +1,4 @@
-// Yaesu Web Control – Meter Formatters
+// Icom Web Control – Meter Formatters
 // Pure UI formatting helpers. No calibration, no DOM, no gauge logic, no side effects.
 //
 // Method naming convention:

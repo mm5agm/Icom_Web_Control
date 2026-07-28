@@ -58,7 +58,7 @@ public class CalibrationStorage
     // Both Load and Save target the user APPDATA file regardless of whether
     // ASPNETCORE_ENVIRONMENT is Development. The earlier behaviour pointed
     // dev-mode at wwwroot/calibration.default.<model>.json, which meant
-    // anyone running YWC via `dotnet run` from source would silently overwrite
+    // anyone running IWC via `dotnet run` from source would silently overwrite
     // the SHIPPED defaults with their own calibration edits. Colin caught this
     // on 2026-06-12 after a few rounds of bench-testing for Jacek's #29 — the
     // FTdx101MP shipped defaults were full of his test mutations. Developers

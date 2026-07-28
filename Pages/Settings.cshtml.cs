@@ -21,7 +21,7 @@ namespace Icom_Web_Control.Pages
         private readonly HttpPortInfo _portInfo;
 
         /// <summary>
-        /// The port YWC is actually listening on right now. This is the port
+        /// The port IWC is actually listening on right now. This is the port
         /// the displayed network URLs on the Settings page use — so the
         /// Local-Access / Network-Access boxes always show something that
         /// actually works, even when the configured Settings.HttpPort has been
@@ -249,13 +249,13 @@ namespace Icom_Web_Control.Pages
         /// <summary>
         /// Restart Now action — invoked from the restart-required banner on the
         /// Settings page. Spawns a small detached helper that waits two seconds
-        /// then relaunches the YWC executable, broadcasts ServerShutdown so any
+        /// then relaunches the IWC executable, broadcasts ServerShutdown so any
         /// open browser tab shows the existing "Icom Web Control has stopped"
         /// overlay, and stops the host. The user reloads the browser once the
         /// app is back up.
         ///
         /// Restart only works when running as the published `Icom_Web_Control.exe`
-        /// — if YWC was launched via `dotnet run` the auto-relaunch path is
+        /// — if IWC was launched via `dotnet run` the auto-relaunch path is
         /// skipped, but the host still stops cleanly. Dev users can rerun
         /// `dotnet run` manually.
         /// </summary>
@@ -278,7 +278,7 @@ namespace Icom_Web_Control.Pages
             // Schedule a relaunch of the same exe. We use a detached cmd helper
             // that waits 2 s (long enough for the current host to fully stop and
             // release its HTTP port) and then `start`s the exe — `start` returns
-            // immediately so cmd exits cleanly, leaving the new YWC running.
+            // immediately so cmd exits cleanly, leaving the new IWC running.
             try
             {
                 var exePath = Process.GetCurrentProcess().MainModule?.FileName;
@@ -293,7 +293,7 @@ namespace Icom_Web_Control.Pages
                         UseShellExecute = false,
                         CreateNoWindow  = true,
                     });
-                    _logger.LogInformation("Scheduled YWC relaunch via detached cmd helper: {Exe}", exePath);
+                    _logger.LogInformation("Scheduled IWC relaunch via detached cmd helper: {Exe}", exePath);
                 }
                 else
                 {
@@ -302,7 +302,7 @@ namespace Icom_Web_Control.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to schedule YWC relaunch — user will need to relaunch manually");
+                _logger.LogError(ex, "Failed to schedule IWC relaunch — user will need to relaunch manually");
             }
 
             // Stop the host. Hosted services (MeterPollingService, the tray icon,

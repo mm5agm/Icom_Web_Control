@@ -416,7 +416,7 @@ namespace Icom_Web_Control.Controllers
             }
         }
 
-        // ── YWC starter bank (bundled with the app) ──────────────────────────
+        // ── IWC starter bank (bundled with the app) ──────────────────────────
         //
         // The starter bank is a region-specific set of watering-hole memories
         // (FT8/FT4/SSB/CW/RTTY/beacons) shipped in wwwroot/data/starter-bank-*.json.
@@ -659,7 +659,7 @@ namespace Icom_Web_Control.Controllers
         // ── ADIF memory import ─────────────────────────────────────────────
         //
         // Read an ADIF file and turn each unique (frequency, mode) pair into
-        // a YWC memory. Many operators already have their favourite
+        // a IWC memory. Many operators already have their favourite
         // frequencies in Log4OM or another logger — this saves them retyping.
         //
         // Strategy:

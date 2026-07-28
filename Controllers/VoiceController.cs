@@ -146,7 +146,7 @@ namespace Icom_Web_Control.Controllers
         }
 
         /// <summary>
-        /// Extracts voice-related log lines from today's YWC log file. Used by
+        /// Extracts voice-related log lines from today's IWC log file. Used by
         /// the "Voice Control Log" panel on the Diagnostics page. A bug
         /// reporter clicks the panel, copies the output, pastes it into a
         /// GitHub issue -- without ever having to know the log file lives at

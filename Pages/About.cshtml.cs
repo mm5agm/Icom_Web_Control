@@ -66,7 +66,7 @@ namespace Icom_Web_Control.Pages
                 DxClusterCallsign = s.DxClusterLoginCallsign;
         }
 
-        // ── Host hardware probes (Windows-only — fine since YWC is WinExe) ──
+        // ── Host hardware probes (Windows-only — fine since IWC is WinExe) ──
         //
         // Added 2026-06-15 so bug reports show whether the user's shack PC
         // can realistically drive two SDRs + radio polling + spectrum render

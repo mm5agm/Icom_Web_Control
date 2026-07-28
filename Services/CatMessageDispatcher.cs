@@ -512,7 +512,7 @@
                         //
                         // Note: pre-2026-06-14 code read message[2] (P1) for
                         // on/off, which is always '0 Fixed'. That bug silently
-                        // dropped every front-panel ATU toggle — only YWC-
+                        // dropped every front-panel ATU toggle — only IWC-
                         // initiated toggles showed in the UI because SetAtu
                         // sets state directly without going through this parser.
                         if (message.Length >= 5)

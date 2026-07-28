@@ -75,7 +75,7 @@ static string? GetPortOwner(int port)
     return null;
 }
 
-// Probe a TCP port to see if YWC can bind to it. Uses Socket.Bind on
+// Probe a TCP port to see if IWC can bind to it. Uses Socket.Bind on
 // IPAddress.Any so we catch the full set of "port unavailable" cases:
 //   - port already in use by another listener
 //   - port in a Windows excluded range (WSL / Hyper-V / Docker)
@@ -129,7 +129,7 @@ static int LoadConfiguredHttpPort()
 }
 
 // ── Serilog file logging ────────────────────────────────────────────────────
-// YWC is a WinExe (no console window) so stdout-based loggers are invisible.
+// IWC is a WinExe (no console window) so stdout-based loggers are invisible.
 // Wire up Serilog with a rolling-daily file sink under %APPDATA% so we have a
 // readable record of what the app did — essential for diagnosing shutdown
 // hangs, CAT timeouts, SDR init failures and anything else the user can't see.
@@ -158,7 +158,7 @@ Log.Logger = new LoggerConfiguration()
     // continuations — to roughly 1 Hz, so the init sequence never reached the
     // DT0 step and the app hung at "Initializing". Intermittent because it
     // depends on disk / AV / file-lock timing (issue #73, wa6auf). Dropped
-    // shared:true as well — YWC is the only writer of this file.
+    // shared:true as well — IWC is the only writer of this file.
     .WriteTo.Async(a => a.File(
         Path.Combine(logDir, "iwc-.log"),
         rollingInterval: RollingInterval.Day,
@@ -315,7 +315,7 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{chosenPort}");
 builder.Services.AddSingleton(new HttpPortInfo(chosenPort));
 
 builder.Services.AddSingleton<BrowserLauncher>();
-// System tray icon — gives operators a visible "YWC is running" indicator
+// System tray icon — gives operators a visible "IWC is running" indicator
 // and a clean Exit menu. Implemented as an STA-threaded hosted service.
 builder.Services.AddHostedService<SystemTrayService>();
 

@@ -28,7 +28,7 @@ namespace Icom_Web_Control.Services
         // Antenna sync: the radio doesn't broadcast AN auto-information messages when the
         // operator changes the antenna on the front panel, so we have to poll. Polling on
         // every meter-cycle (2 Hz) would be wasteful for a near-static value, so we poll
-        // every Nth cycle (~2 seconds at the current loop cadence). Keeps the YWC antenna
+        // every Nth cycle (~2 seconds at the current loop cadence). Keeps the IWC antenna
         // selector in sync with the radio without saturating the serial bus.
         private int _antennaPollCounter = 0;
         private const int AntennaPollEvery = 4;

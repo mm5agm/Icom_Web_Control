@@ -1,4 +1,4 @@
-// Yaesu Web Control – On-screen Frequency Keyboard
+// Icom Web Control – On-screen Frequency Keyboard
 // Floating, draggable, resizable <dialog> for entering VFO frequencies.
 // Position and size persist to localStorage across sessions.
 

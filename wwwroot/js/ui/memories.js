@@ -183,13 +183,13 @@ async function _loadAndRender() {
         _renderTiles(container);
     } catch (e) {
         const msg = e instanceof TypeError
-            ? 'Server not responding — is Yaesu Web Control still running?'
+            ? 'Server not responding — is Icom Web Control still running?'
             : `Failed to load memories: ${e.message}`;
         container.innerHTML = `<div class="text-danger small p-2">${msg}</div>`;
     }
 }
 
-// Sentinel value used for the always-present built-in YWC starter bank entry.
+// Sentinel value used for the always-present built-in IWC starter bank entry.
 // Must match the Memories editor page constant of the same name.
 const STARTER_BANK_VALUE = '__iwc_starter__';
 // Sentinel for the "split the starter bank into per-mode banks" action.
@@ -206,11 +206,11 @@ async function _loadBanks() {
         _banks = await resp.json();
         sel.innerHTML = '<option value="">Banks…</option>';
         // Always-available built-in starter bank entry. Sits at the top of
-        // the dropdown so users can find the YWC factory memories without
+        // the dropdown so users can find the IWC factory memories without
         // visiting the Memories editor page.
         const starterOpt = document.createElement('option');
         starterOpt.value       = STARTER_BANK_VALUE;
-        starterOpt.textContent = '📥 YWC Starter Bank (built-in)';
+        starterOpt.textContent = '📥 IWC Starter Bank (built-in)';
         sel.appendChild(starterOpt);
         // Action entry: split the starter bank into themed banks (FT8, CW,
         // SSB, RTTY, FM) the user can load individually.
@@ -272,7 +272,7 @@ async function _switchBank(name) {
 async function _createThemedBanks() {
     const statusEl = document.getElementById('memToolbarStatus');
     if (!await _memConfirm(
-        'Create themed banks from the YWC starter bank?\n\n' +
+        'Create themed banks from the IWC starter bank?\n\n' +
         'This will create banks named FT8, FT4, CW, SSB, RTTY and FM\n' +
         '(skipping any that are empty for your region).\n\n' +
         'Existing banks with the same name are left untouched —\n' +

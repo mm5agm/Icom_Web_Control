@@ -1,4 +1,4 @@
-// Yaesu Web Control – WebSocket Connection Manager
+// Icom Web Control – WebSocket Connection Manager
 // Handles connection, reconnection, message routing, and error handling.
 // No UI, no DOM, no gauge logic. Pure networking only.
 

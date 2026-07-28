@@ -9,7 +9,7 @@
 # A pre-release differs in three ways:
 #   1. develop is NOT merged into main (pre-releases live on the develop line only).
 #   2. The tag is created on develop, not main.
-#   3. The GitHub release is created with --prerelease (not --latest), so YWC's
+#   3. The GitHub release is created with --prerelease (not --latest), so IWC's
 #      auto-updater -- which polls /releases/latest -- ignores it. Only users
 #      who follow the direct link see the build.
 
@@ -70,7 +70,7 @@ if ($PreRelease) {
     $notesBody = @"
 **Pre-release for testing -- not a public build.**
 
-Do not install unless you're prepared for bugs and will report them on GitHub. YWC's in-app auto-updater ignores pre-releases, so existing users will not be prompted to upgrade to this build.
+Do not install unless you're prepared for bugs and will report them on GitHub. IWC's in-app auto-updater ignores pre-releases, so existing users will not be prompted to upgrade to this build.
 
 Please send feedback via GitHub Issues (or mm5agm@outlook.com). Mention the ``$Version`` tag when reporting.
 "@

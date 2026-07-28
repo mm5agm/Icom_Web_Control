@@ -1,4 +1,4 @@
-// Yaesu Web Control – Gauge Factory
+// Icom Web Control – Gauge Factory
 // Creates gauge instances based on a type string.
 // No layout logic, no DOM queries, no calibration logic.
 

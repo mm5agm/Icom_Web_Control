@@ -37,7 +37,7 @@ namespace Icom_Web_Control.Services
         }
 
         /// <summary>
-        /// Maps YWC's friendly mode-name string (as stored in RadioStateService.ModeA/B)
+        /// Maps IWC's friendly mode-name string (as stored in RadioStateService.ModeA/B)
         /// to one of the six mode-class keys used in the JSON map.
         /// Covers the modes reported by every supported radio's MD command.
         /// Returns null if the mode isn't recognised.
@@ -65,7 +65,7 @@ namespace Icom_Web_Control.Services
         }
 
         /// <summary>
-        /// Whether YWC has an EX address map for the given radio model.
+        /// Whether IWC has an EX address map for the given radio model.
         /// </summary>
         public bool IsRadioSupported(string radioModel)
             => !string.IsNullOrEmpty(radioModel) && _map.Radios.ContainsKey(radioModel);

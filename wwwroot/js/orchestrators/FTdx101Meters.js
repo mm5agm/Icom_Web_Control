@@ -1,4 +1,4 @@
-// Yaesu Web Control – Meter Orchestrator
+// Icom Web Control – Meter Orchestrator
 // Connects calibration-engine → MeterPanel.
 // No DOM queries, no SignalR, no string formatting.
 // Owns TX state, smoothing, noise filtering, calibration, and gauge updates.

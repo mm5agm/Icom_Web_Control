@@ -68,7 +68,7 @@
         // legacy "sdrplay:<serial>" (still accepted; auto-migrated on save).
         // SoapySDR-format keys: "driver=rtlsdr,serial=00000001" etc.
         //
-        // The SDRplay API enforces one device per process, so YWC spawns a
+        // The SDRplay API enforces one device per process, so IWC spawns a
         // dedicated Yaesu_Sdr_Worker.exe process per SDR — see
         // docs/decisions/0001-dual-sdr-architecture.md.
         //
@@ -104,7 +104,7 @@
 
         // Per-VFO spectrum DSP knobs (see SpectrumProcessor). Live-controlled
         // from the three sliders on each spectrum panel; persisted here so
-        // settings survive YWC restarts and re-apply to a new worker session.
+        // settings survive IWC restarts and re-apply to a new worker session.
         //
         //   Gain    — pre-dB linear gain G (design doc §4.1). 1.0 = no boost.
         //   LowDb   — display clamp lower bound (SDR Console "Low"). Bins below

@@ -19,7 +19,7 @@ namespace Icom_Web_Control.Services.Voice
     /// <item><c>StartAsync</c> (hosted service): attempts to construct the
     /// SAPI recogniser for <c>Settings.VoiceActiveLocale</c> (default
     /// en-GB) and load its installed pack. Failures are logged but
-    /// non-fatal — the rest of YWC still runs.</item>
+    /// non-fatal — the rest of IWC still runs.</item>
     /// <item><c>SwitchLocaleAsync</c> (called by VoiceController when the
     /// user changes the language switcher in Settings): disposes the
     /// current engine and reconstructs it for the new culture — see §4.2.</item>
@@ -105,7 +105,7 @@ namespace Icom_Web_Control.Services.Voice
             // Honour the Settings toggle. If voice control is disabled the
             // engine is never constructed -- no SAPI load, no mic permission
             // grab, no holding the recogniser in memory. The user can flip
-            // the toggle in Settings and restart YWC to enable.
+            // the toggle in Settings and restart IWC to enable.
             var settings = await _settings.GetSettingsAsync();
             if (settings.VoiceControlEnabled)
             {
@@ -162,7 +162,7 @@ namespace Icom_Web_Control.Services.Voice
                 {
                     if (!_audioWired)
                     {
-                        // Deferred until first start so YWC boots fine on
+                        // Deferred until first start so IWC boots fine on
                         // machines without a microphone.
                         _engine.SetInputToDefaultAudioDevice();
                         _audioWired = true;

@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Comprehensive API test suite for Yaesu Web Control.
+    Comprehensive API test suite for Icom Web Control.
     Tests all endpoints: Memory CRUD, CAT controls, validation errors.
     Detects whether radio is connected; skips radio-dependent tests if not.
 
@@ -132,7 +132,7 @@ Section "Server connectivity"
 $pingResp = Invoke-Api -Path "/api/cat/status/init"
 if (-not $pingResp.Ok) {
     Write-Host ""
-    Write-Host "ERROR: Cannot reach $BaseUrl -- is Yaesu Web Control running?" -ForegroundColor Red
+    Write-Host "ERROR: Cannot reach $BaseUrl -- is Icom Web Control running?" -ForegroundColor Red
     Write-Host "Start the application then re-run this script." -ForegroundColor Red
     exit 1
 }

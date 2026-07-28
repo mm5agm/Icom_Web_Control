@@ -298,7 +298,7 @@ BAND_PLANS.USA = BAND_PLANS.Region2;
 // advice.
 //
 // Externalising this data to a JSON file in the install folder is on the
-// roadmap for the next release so corrections can ship without a YWC update.
+// roadmap for the next release so corrections can ship without a IWC update.
 export const BAND_EDGES = {
     Region1: [
         { name: '160m', lo:   1810000, hi:   2000000 },
@@ -373,7 +373,7 @@ BAND_EDGES.USA = BAND_EDGES.Region2;
 // At startup, Index.cshtml calls loadBandPlanFromServer() to overlay updates
 // from /bandplan.default.json (sitting in the install folder). Operators who
 // notice the RSGB / FCC / JARL has tweaked a band plan can drop in an updated
-// JSON file without waiting for a YWC release — restart the app and the new
+// JSON file without waiting for a IWC release — restart the app and the new
 // data takes effect. The format is documented in the file's _comment field.
 //
 // We mutate BAND_PLANS / BAND_EDGES in place rather than re-exporting so

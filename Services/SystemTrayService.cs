@@ -10,7 +10,7 @@ namespace Icom_Web_Control.Services
     /// <summary>
     /// Adds a small Icom Web Control icon to the Windows system tray so the
     /// operator can:
-    ///   - tell at a glance that YWC is running, and
+    ///   - tell at a glance that IWC is running, and
     ///   - shut it down cleanly without resorting to Task Manager.
     ///
     /// The web server has no native UI of its own. Without this service the
@@ -56,7 +56,7 @@ namespace Icom_Web_Control.Services
             _uiThread = new Thread(UiThreadProc)
             {
                 IsBackground = true,
-                Name = "YWC Tray UI"
+                Name = "IWC Tray UI"
             };
             _uiThread.SetApartmentState(ApartmentState.STA);
             _uiThread.Start();
@@ -204,7 +204,7 @@ namespace Icom_Web_Control.Services
         {
             var ok = MessageBox.Show(
                 "Stop Icom Web Control?\n\nWSJT-X / Log4OM / JTAlert / GridTracker / Fldigi " +
-                "will lose their CAT connection until YWC is restarted.",
+                "will lose their CAT connection until IWC is restarted.",
                 "Exit Icom Web Control",
                 MessageBoxButtons.OKCancel,
                 MessageBoxIcon.Question);

@@ -648,7 +648,7 @@ namespace Icom_Web_Control.Services.Voice
         // installed voices -- one voice says "fourteen point oh seven four",
         // another says "fourteen point seventy-four". We spell the value out
         // digit-by-digit so the spoken confirmation matches what the user
-        // said (digit-by-digit fractional MHz is the YWC v1 grammar).
+        // said (digit-by-digit fractional MHz is the IWC v1 grammar).
 
         private static string FormatFrequencyForSpeech(long hz)
         {

@@ -1,7 +1,7 @@
 namespace Icom_Web_Control.Services
 {
     /// <summary>
-    /// Single source of truth for the HTTP port YWC is actually listening on.
+    /// Single source of truth for the HTTP port IWC is actually listening on.
     /// Resolved once at startup in <c>Program.cs</c> by probing the user's
     /// configured port and (if necessary) the nine fallbacks above it, then
     /// registered as a singleton so every consumer — Kestrel, the browser

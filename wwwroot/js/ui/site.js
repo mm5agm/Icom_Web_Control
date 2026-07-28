@@ -10,7 +10,7 @@ function showServerStoppedOverlay() {
     overlay.id = 'iwcServerStoppedOverlay';
     overlay.setAttribute('role', 'alertdialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Yaesu Web Control has been closed');
+    overlay.setAttribute('aria-label', 'Icom Web Control has been closed');
     overlay.style.cssText = [
         'position:fixed', 'inset:0', 'z-index:99999',
         // Fully opaque, not rgba(...,0.96) — at 4% transparency, any canvas
@@ -24,10 +24,10 @@ function showServerStoppedOverlay() {
         'padding:24px', 'font-family:system-ui,sans-serif'
     ].join(';');
     overlay.innerHTML =
-        '<div style="font-size:2rem;margin-bottom:0.5rem">Yaesu Web Control has stopped</div>' +
+        '<div style="font-size:2rem;margin-bottom:0.5rem">Icom Web Control has stopped</div>' +
         '<div style="font-size:1rem;max-width:520px;line-height:1.5;margin-bottom:1.5rem;color:#aab">' +
             'The app has been closed from the system-tray icon. The radio is no longer being controlled from this browser tab.' +
-            '<br><br>Once you restart Yaesu Web Control, click <strong>Reload page</strong> below to continue. Or just close this browser tab using its X button.' +
+            '<br><br>Once you restart Icom Web Control, click <strong>Reload page</strong> below to continue. Or just close this browser tab using its X button.' +
         '</div>' +
         '<button type="button" id="iwcServerStoppedReloadBtn" ' +
             'style="padding:8px 22px;border-radius:6px;border:1px solid #4a8abf;background:#2a4860;color:#e0e0ff;cursor:pointer;font-size:0.95rem">' +
@@ -36,7 +36,7 @@ function showServerStoppedOverlay() {
     document.body.appendChild(overlay);
     document.getElementById('iwcServerStoppedReloadBtn')?.addEventListener('click', () => {
         // location.reload() works for any tab regardless of how it was opened.
-        // If YWC isn't back up yet, the reload will fail and the browser shows
+        // If IWC isn't back up yet, the reload will fail and the browser shows
         // its own "can't connect" page — which is still a clearer outcome than
         // a tab stuck on the overlay.
         location.reload();
@@ -75,7 +75,7 @@ document.addEventListener('keydown', function (e) {
     // Ignore if typing in an input, textarea, or contenteditable
     if (isTypingIntoEditable()) return;
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Bare F only — guarding against modifiers stops YWC from stealing
+        // Bare F only — guarding against modifiers stops IWC from stealing
         // Ctrl+F (browser find-in-page) and Cmd+F on Mac.
         const body = document.body;
         if (body && !document.fullscreenElement) {
@@ -690,7 +690,7 @@ function applyVfoActiveStyling() {
     activeCol.classList.remove('vfo-inactive', 'vfo-tx-editable');
     inactiveCol.classList.add('vfo-inactive');
     // R10/R11: in split mode the inactive panel IS the TX VFO — operators
-    // must still be able to set the TX frequency from YWC without
+    // must still be able to set the TX frequency from IWC without
     // un-splitting. .vfo-tx-editable re-enables the frequency field while
     // leaving every other card-body control read-only.
     inactiveCol.classList.toggle('vfo-tx-editable', splitOn);
@@ -704,7 +704,7 @@ function applyVfoActiveStyling() {
 
 // Apply the styling at page-load time too, before any SignalR update has
 // arrived. This handles the case where the radio is already on a stable
-// VFO and YWC's TxVfo state is correct by the time the DOM is ready.
+// VFO and IWC's TxVfo state is correct by the time the DOM is ready.
 document.addEventListener('DOMContentLoaded', () => {
     // Defer to next tick so other DOMContentLoaded handlers run first
     // (the VFO panels need to be in the DOM, which they always are at
@@ -3549,7 +3549,7 @@ document.addEventListener('DOMContentLoaded', function () {
         banner.innerHTML =
             `<div style="display:flex;align-items:flex-start;gap:8px">` +
             `<div style="flex:1"><strong>Update available — v${_escHtml(version)}</strong><br>` +
-            `<span style="color:#aab;font-size:0.78rem">A newer version of Yaesu Web Control is available.</span></div>` +
+            `<span style="color:#aab;font-size:0.78rem">A newer version of Icom Web Control is available.</span></div>` +
             `<button id="updateBannerDismissX" ` +
             `style="background:none;border:none;color:#aaa;cursor:pointer;font-size:1rem;line-height:1;padding:0" aria-label="Dismiss">✕</button>` +
             `</div>` +

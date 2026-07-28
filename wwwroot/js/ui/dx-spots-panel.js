@@ -1,4 +1,4 @@
-// Yaesu Web Control – DX Spots List Panel
+// Icom Web Control – DX Spots List Panel
 //
 // Popup list of DX cluster spots. Sortable columns, click-to-QSY, filtered
 // to the operator's current band (with an "All bands" override). Works

@@ -1,4 +1,4 @@
-// Yaesu Web Control – Default Calibration Tables
+// Icom Web Control – Default Calibration Tables
 // Pure data only. No functions, no DOM, no side effects.
 //
 // Keys match the meterName strings passed to calibrateNumeric() in calibration-engine.js.

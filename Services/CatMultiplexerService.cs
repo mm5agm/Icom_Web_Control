@@ -268,7 +268,7 @@ namespace Icom_Web_Control.Services
         // app state" queries. Without this helper the readQueries loop in
         // RadioInitializationService silently failed for every property it
         // queried (PC, MG, PR, PL, GT0/1, PA0/1, ...). Reported by SP3L-Jacek
-        // as #35: YWC's slider stayed at the persisted Power instead of
+        // as #35: IWC's slider stayed at the persisted Power instead of
         // reflecting the radio's actual setting on startup.
         public async Task SendCommandAndDispatchAsync(string command, string clientId, CancellationToken cancellationToken = default)
         {
@@ -352,7 +352,7 @@ namespace Icom_Web_Control.Services
                 // discarding them. This used to call DiscardInBuffer() here,
                 // which silently ate unsolicited FA/FB auto-info pushes that
                 // happened to land in the OS receive buffer just before the
-                // next queued command started — the only way YWC ever learns
+                // next queued command started — the only way IWC ever learns
                 // about a frequency change, since nothing polls for FA/FB.
                 // On real hardware DataReceived usually wins that race, but
                 // over a slower virtual serial port (e.g. VSPE) it doesn't,

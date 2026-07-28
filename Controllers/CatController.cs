@@ -29,7 +29,7 @@ namespace Icom_Web_Control.Controllers
         // every P1=0-Fixed receive-control CAT command (GT, PA, RA, NR, NB,
         // NL, BC, BP, CO, SH, IS, SL, RL, AG, RG, SQ) must use P1=0 -- the
         // radio's firmware hard-codes that position to 0, and silently
-        // rejects commands sent with P1=1 (which is what YWC was doing when
+        // rejects commands sent with P1=1 (which is what IWC was doing when
         // the user clicked a control on panel B). On dual-receiver (FTdx101)
         // P1 genuinely addresses MAIN vs SUB.
         //
@@ -1821,7 +1821,7 @@ namespace Icom_Web_Control.Controllers
             // heavyweight startup sequence the app runs at launch (multiplexer
             // connect + ~30 read queries + state restoration, takes 5+ seconds).
             // That worked the first time the user clicked it (cold install) but
-            // CRASHED YWC entirely when clicked while everything was running:
+            // CRASHED IWC entirely when clicked while everything was running:
             // the deep init races with MeterPollingService at 10 Hz, the SDR
             // workers, in-flight WebUI commands, etc. Reported by Colin on
             // v2.3.3 — first click reported a false "radio not responding"

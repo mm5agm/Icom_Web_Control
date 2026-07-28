@@ -135,7 +135,7 @@ namespace Icom_Web_Control.Services
 
                 // Safety: force the radio into RX before doing anything else.
                 // Yaesu HF rigs preserve MOX/TX state across power cycles in
-                // some firmwares, so a radio powered off mid-transmit (by YWC,
+                // some firmwares, so a radio powered off mid-transmit (by IWC,
                 // WSJT-X via rigctld, or a stuck PTT) can come back up still
                 // transmitting. If we don't clear it here, the next operation
                 // happens on a live carrier.
@@ -182,10 +182,10 @@ namespace Icom_Web_Control.Services
                 // Mode (MD) is deliberately NOT restored from persisted state on
                 // connect (Issue #38, SP3L-Jacek 2026-06-18). The radio is the
                 // source of truth: if the operator changed mode on the front
-                // panel while YWC was closed, restoring YWC's last-saved value
+                // panel while IWC was closed, restoring IWC's last-saved value
                 // would silently overwrite their setting.
                 // The MD0;/MD1; queries (sent during InitializeRadioAsync's
-                // fast burst, and again in readQueries below) populate YWC's UI
+                // fast burst, and again in readQueries below) populate IWC's UI
                 // with whatever the radio currently has. Same anti-pattern as
                 // RF Power (#35), MIC GAIN / Speech Processor / PROC LEVEL (#16).
                 if (!string.IsNullOrEmpty(persistedState.AntennaA))
@@ -219,20 +219,20 @@ namespace Icom_Web_Control.Services
                 // deliberately NOT restored from persisted state on connect
                 // (Issue #16, SP3L-Jacek 2026-06-04). These three values
                 // directly affect TX audio quality and are normally tuned
-                // physically on the radio for optimal sound — a fresh YWC
+                // physically on the radio for optimal sound — a fresh IWC
                 // install was writing its default `50` / `50` / off back to
                 // the radio, blowing away the operator's carefully-set
                 // MIC GAIN=33 / PROC LEVEL=100. The radio is the source of
                 // truth: the `MG;`, `PR;`, `PL;` queries in `readQueries`
-                // below will populate YWC's UI with whatever the radio
-                // actually has. If the user changes a value via the YWC
+                // below will populate IWC's UI with whatever the radio
+                // actually has. If the user changes a value via the IWC
                 // slider afterwards, that sends the command to the radio
                 // and the radio's state changes accordingly.
                 // IF Width is read from the radio on connect (SH queries below) — not written here.
                 // IF Shift is also deliberately NOT restored from persisted state
                 // on connect (Issue #41, SP3L-Jacek 2026-06-18). Same anti-pattern
                 // as Mode / RF Power / MIC Gain. The IS0;/IS1; queries below
-                // populate YWC's UI with the radio's actual current values.
+                // populate IWC's UI with the radio's actual current values.
                 await Task.WhenAll(stateTasks);
 
                 // 4. Read actual radio state (frequencies, band, etc.) before marking initialized
@@ -383,7 +383,7 @@ namespace Icom_Web_Control.Services
                     await multiplexer.SendCommandAndDispatchAsync(q, "Initialization", stoppingToken);
 
                 // 4b. Single-receiver "ping-pong" -- read the OTHER VFO's
-                // P1=0-Fixed receive controls so YWC has both *A and *B
+                // P1=0-Fixed receive controls so IWC has both *A and *B
                 // populated. Without this, the inactive panel shows defaults
                 // (Jacek SP3L #34 pre5 — his proposed fix). Skipped on
                 // dual-receiver since FTdx101 reports per-VFO via P1.
@@ -561,7 +561,7 @@ namespace Icom_Web_Control.Services
             var logger = scopeForLogger.ServiceProvider.GetService<ILogger<RadioInitializationService>>();
             logger?.LogInformation("[RadioInit] StopAsync entered");
 
-            // Safety: send TX0; before disconnecting so YWC never leaves the
+            // Safety: send TX0; before disconnecting so IWC never leaves the
             // radio in transmit. Some Yaesu firmwares preserve MOX/TX state
             // across power cycles, so a shutdown mid-transmit could otherwise
             // result in the radio coming back up still keying. Best-effort
@@ -581,7 +581,7 @@ namespace Icom_Web_Control.Services
             // FTdx101 power-meter restore (discussion #6, F1ubw). During normal
             // operation MeterPollingService sets the radio's front-panel meter
             // to MS13 (Comp + SWR) as the RM0 read workaround; without this
-            // restore, quitting YWC leaves the FTdx101's Power needle hidden
+            // restore, quitting IWC leaves the FTdx101's Power needle hidden
             // until the operator power-cycles the radio or hits the METER button.
             //
             // Best-effort with a 1 s timeout so a hung send (e.g. radio
