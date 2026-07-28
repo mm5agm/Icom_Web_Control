@@ -234,9 +234,28 @@ builder.Services.AddSingleton<ICatClient, MultiplexedCatClient>();
 // retained in the tree (unregistered) as a no-hardware fallback for reference.
 // See docs/design/iwc-clone-split-plan.md.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Civ.ICivClient, Icom_Web_Control.Services.Civ.CivBusService>();
+
+// No-hardware preview mode: set IWC_USE_STUB_RADIO=1 to back the seam with the
+// canned StubRadioController instead of the real CI-V link. Lets the pseudo-dual
+// two-panel spectrum UI (and gauges) be demoed/developed without a radio plugged
+// in. The real CivRadioController is still registered as a plain singleton so
+// anything resolving it directly keeps working; it just isn't hosted (won't open
+// the serial port) in stub mode.
+var useStubRadio = string.Equals(
+    Environment.GetEnvironmentVariable("IWC_USE_STUB_RADIO"), "1", StringComparison.Ordinal);
+
 builder.Services.AddSingleton<CivRadioController>();
-builder.Services.AddSingleton<IRadioController>(sp => sp.GetRequiredService<CivRadioController>());
-builder.Services.AddHostedService(sp => sp.GetRequiredService<CivRadioController>());
+if (useStubRadio)
+{
+    builder.Services.AddSingleton<StubRadioController>();
+    builder.Services.AddSingleton<IRadioController>(sp => sp.GetRequiredService<StubRadioController>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<StubRadioController>());
+}
+else
+{
+    builder.Services.AddSingleton<IRadioController>(sp => sp.GetRequiredService<CivRadioController>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<CivRadioController>());
+}
 
 // Register the rigctld server as a background service
 builder.Services.AddHostedService<RigctldServer>();

@@ -259,6 +259,41 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- Canned spectrum (Phase 5 dual-panel demo) -------------------------
+        //
+        // The real CivRadioController reassembles CI-V 27 00 scope frames and
+        // broadcasts SpectrumUpdate {sdrId, bins, centreHz, spanHz}. Here we
+        // fake the same envelope for BOTH VFOs so the pseudo-dual two-panel UI
+        // can be developed/demoed without a radio. bins are dBFS values matching
+        // CivScopeAssembler's contract (~-120..0). The frontend gates panel B on
+        // the pseudo-dual setting, so emitting B here is harmless when it's off.
+        private const int ScopeBinCount = 475;
+        private readonly Random _rng = new();
+        private readonly float[] _binsA = new float[ScopeBinCount];
+        private readonly float[] _binsB = new float[ScopeBinCount];
+        private int _scopeFrame;
+
+        /// <summary>
+        /// Fill <paramref name="bins"/> with a canned noise floor plus a couple of
+        /// slowly-drifting Gaussian "signal" humps, so the trace and waterfall
+        /// actually move. <paramref name="phase"/> drives the drift.
+        /// </summary>
+        private void FillCannedSpectrum(float[] bins, double phase)
+        {
+            const float floorDb = -102f;
+            // Two drifting signals at different rates so the two panels look alive
+            // and distinct. Centres wander across the middle of the span.
+            double c1 = ScopeBinCount * (0.50 + 0.18 * Math.Sin(phase * 0.7));
+            double c2 = ScopeBinCount * (0.35 + 0.10 * Math.Sin(phase * 1.3 + 1.0));
+            for (int i = 0; i < bins.Length; i++)
+            {
+                float noise = floorDb + (float)(_rng.NextDouble() * 4.0);
+                float s1 = 55f * (float)Math.Exp(-Math.Pow(i - c1, 2) / (2 * 6.0 * 6.0));
+                float s2 = 38f * (float)Math.Exp(-Math.Pow(i - c2, 2) / (2 * 4.0 * 4.0));
+                bins[i] = Math.Min(0f, noise + s1 + s2);
+            }
+        }
+
         // -- Hosted canned-data feeder -----------------------------------------
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -306,6 +341,26 @@ namespace Icom_Web_Control.Services
                 // near 13.8 V (raw ≈ 157 on the Vd scale: raw 13=10 V, 241=16 V).
                 _state.VDDMeter = 157;
                 _state.IDDMeter = 0;
+
+                // Canned dual-panel spectrum (Phase 5). Feed A always and B too
+                // (frontend hides B unless pseudo-dual is on). Re-assert streaming
+                // status periodically so late-connecting clients pick it up.
+                FillCannedSpectrum(_binsA, phase);
+                FillCannedSpectrum(_binsB, phase * 1.1 + 0.5);
+                try
+                {
+                    await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
+                        new { sdrId = "A", bins = _binsA, centreHz = _freqA, spanHz = _scopeSpanHz * 2 }, stoppingToken);
+                    await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
+                        new { sdrId = "B", bins = _binsB, centreHz = _freqB, spanHz = _scopeSpanHz * 2 }, stoppingToken);
+                    if (_scopeFrame++ % 6 == 0)
+                    {
+                        await _hubContext.Clients.All.SendAsync("SdrStatus", new { sdrId = "A", status = "streaming" }, stoppingToken);
+                        await _hubContext.Clients.All.SendAsync("SdrStatus", new { sdrId = "B", status = "streaming" }, stoppingToken);
+                    }
+                }
+                catch (OperationCanceledException) { break; }
+                catch { /* no clients / hub busy — ignore in the stub */ }
 
                 try { await Task.Delay(500, stoppingToken); }
                 catch (OperationCanceledException) { break; }

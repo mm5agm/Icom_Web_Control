@@ -118,6 +118,34 @@
         public float SdrSpectrumHighDbA { get; set; } = 0f;
         public float SdrSpectrumHighDbB { get; set; } = 0f;
 
+        // ── Pseudo-dual receiver (Phase 5) ────────────────────────────────
+        // The IC-7300 MkII has ONE receiver. This feature *presents* a second
+        // VFO's spectrum ("watch" panel) alongside the primary you actually
+        // listen to, by time-sharing the single scope. See
+        // docs/design/iwc-clone-split-plan.md Phase 5.
+        //
+        // Master switch. When true, the index page shows two spectrum panels
+        // (primary + watch) instead of one. Default OFF — opt-in flagship
+        // feature; a single-panel layout is the plain default.
+        public bool PseudoDualReceiverEnabled { get; set; } = false;
+
+        // Whether the watch panel may show a DIFFERENT band from the primary.
+        //
+        // Same-band watch is glitch-free (the single scope covers both VFOs at
+        // once, audio never moves). Cross-band watch is physically impossible
+        // on one receiver WITHOUT briefly retuning the RX — so enabling this
+        // lets the app "peek" at the watch band every few seconds, which dips
+        // the primary audio for ~0.4 s per peek. OFF = same-band only, the
+        // zero-glitch fallback: the watch panel shows "out of range" when the
+        // two VFOs are on different bands. Default OFF.
+        public bool PseudoDualCrossBandEnabled { get; set; } = false;
+
+        // How often (seconds) the cross-band peek borrows the receiver to
+        // refresh the watch band. Only used when PseudoDualCrossBandEnabled.
+        // Bigger = fewer/rarer audio dips but a staler watch trace. Default 15
+        // (≈4 brief dips/min). Clamped to 5–60 in the UI.
+        public int PseudoDualPeekIntervalSeconds { get; set; } = 15;
+
         // Optional user override for the SDRplay API install directory
         // (the folder that contains the x64\sdrplay_api.dll subfolder).
         // Leave blank for auto-detect: SdrplayDllResolver tries the app

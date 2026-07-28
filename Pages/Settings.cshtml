@@ -172,6 +172,60 @@
 
     <form method="post" id="settingsForm">
 
+    <!-- Spectrum Display section -->
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-bar-chart-steps" aria-hidden="true"></i>&nbsp;Spectrum Display</summary>
+        <div class="section-body">
+            <p class="text-muted small mb-3">
+                The IC-7300 has a single receiver. <strong>Pseudo-dual receiver</strong> presents a
+                second "watch" spectrum panel alongside the one you're listening to, by time-sharing
+                the radio's scope. On the <em>same band</em> both panels update live and your audio is
+                never touched. Watching a <em>different</em> band is only possible by briefly borrowing
+                the receiver, which dips your listening audio for a fraction of a second each time.
+            </p>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="pseudoDualReceiverEnabled" asp-for="Settings.PseudoDualReceiverEnabled" />
+                <label class="form-check-label" for="pseudoDualReceiverEnabled">
+                    Enable pseudo-dual receiver (two spectrum panels)
+                </label>
+                <div class="form-text">
+                    Off by default — a single spectrum panel is the plain layout. When on, IWC shows a
+                    primary panel (the VFO you hear) and a watch panel (the other VFO), with a
+                    <em>Listen</em> button on each to swap which one you hear.
+                </div>
+            </div>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="pseudoDualCrossBandEnabled" asp-for="Settings.PseudoDualCrossBandEnabled" />
+                <label class="form-check-label" for="pseudoDualCrossBandEnabled">
+                    Allow cross-band watch (dips audio to peek at the other band)
+                </label>
+                <div class="form-text">
+                    Off = same-band only, and your audio is never interrupted; the watch panel shows
+                    <em>"out of range"</em> when the two VFOs are on different bands. On = IWC briefly
+                    retunes the receiver every few seconds to refresh a different watch band, dipping
+                    your listening audio for ~0.4&nbsp;s per peek. Useful for e.g. working 20&nbsp;m
+                    while watching 6&nbsp;m for an opening.
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="pseudoDualPeekIntervalSeconds">
+                    Cross-band peek interval (seconds)
+                </label>
+                <input type="number" min="5" max="60" step="1"
+                       class="form-control" style="max-width: 140px;"
+                       id="pseudoDualPeekIntervalSeconds"
+                       asp-for="Settings.PseudoDualPeekIntervalSeconds" />
+                <div class="form-text">
+                    How often the cross-band watch borrows the receiver (5–60&nbsp;s). Larger = fewer,
+                    rarer audio dips but a staler watch trace. Default 15&nbsp;s (≈4 brief dips/min).
+                    Ignored unless cross-band watch is on.
+                </div>
+            </div>
+        </div>
+    </details>
+
     <!-- Accessibility section -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
         <summary><i class="bi bi-universal-access" aria-hidden="true"></i>&nbsp;Accessibility</summary>

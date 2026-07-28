@@ -107,6 +107,11 @@ namespace Icom_Web_Control.Pages
         public long VoiceNudgeStepHzA { get; set; } = 10_000;
         public long VoiceNudgeStepHzB { get; set; } = 10_000;
 
+        // Pseudo-dual receiver (Phase 5). When true the index page shows a
+        // second "watch" spectrum panel even on the single-receiver IC-7300 —
+        // this flag is what un-gates panel B despite data-single-receiver.
+        public bool PseudoDualReceiverEnabled { get; set; } = false;
+
         public RadioStateService RadioState => _radioStateService;
 
         public RadioStateViewModel State { get; set; } = new RadioStateViewModel();
@@ -150,6 +155,7 @@ namespace Icom_Web_Control.Pages
             SdrSpectrumHighDbB = settings.SdrSpectrumHighDbB;
             VoiceNudgeStepHzA = settings.VoiceNudgeStepHzA;
             VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
+            PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;

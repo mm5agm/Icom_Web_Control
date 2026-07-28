@@ -53,6 +53,16 @@ namespace Icom_Web_Control.Services
         private readonly CivScopeAssembler _scope = new();
         private int _scopeBroadcasts;
 
+        // Pseudo-dual receiver (Phase 5, same-band). Cached copy of the setting,
+        // refreshed on a slow poll phase so the serial-reader thread (which raises
+        // OnUnsolicitedFrame) never has to await the settings store. When on, the
+        // single Center-mode sweep — which is wide enough to include a nearby watch
+        // VFO — is cropped around the watch VFO and re-broadcast as the other panel.
+        // _watchInRange tracks whether the watch VFO currently falls inside the
+        // sweep so we only emit an "out of range" status on transitions.
+        private volatile bool _pseudoDual;
+        private bool _watchInRange = true;
+
         public CivRadioController(
             RadioStateService state,
             ICivClient bus,
@@ -181,15 +191,97 @@ namespace Icom_Web_Control.Services
 
             // Re-assert "streaming" on the first sweep and every ~30 thereafter
             // so a client that loads mid-stream un-hides its spectrum panel.
-            if (_scopeBroadcasts++ % 30 == 0)
-                SendHub("SdrStatus", new { sdrId = "A", status = "streaming" });
+            bool announce = _scopeBroadcasts++ % 30 == 0;
 
+            if (!_pseudoDual)
+            {
+                if (announce)
+                    SendHub("SdrStatus", new { sdrId = "A", status = "streaming" });
+                SendHub("SpectrumUpdate", new
+                {
+                    sdrId = "A",
+                    bins = sweep.BinsDb,
+                    centreHz = sweep.CentreHz,
+                    spanHz = sweep.SpanHz,
+                });
+                return;
+            }
+
+            // Pseudo-dual receiver (Phase 5, same-band): the Center-mode sweep is
+            // centred on the operating VFO, so it feeds the primary panel; a window
+            // cropped around the watch VFO feeds the other panel. No extra CI-V, no
+            // scope-mode churn — the audio VFO never moves. When the watch VFO is
+            // outside the sweep (cross-band, or the span is too narrow) the watch
+            // panel reports "out of range"; the optional peek layer fills that gap
+            // later.
+            RadioVfo active = ActiveVfo;
+            string primaryId = active == RadioVfo.A ? "A" : "B";
+            string watchId   = active == RadioVfo.A ? "B" : "A";
+            long watchHz     = active == RadioVfo.A ? _state.FrequencyB : _state.FrequencyA;
+
+            if (announce)
+                SendHub("SdrStatus", new { sdrId = primaryId, status = "streaming" });
             SendHub("SpectrumUpdate", new
             {
-                sdrId = "A",
+                sdrId = primaryId,
                 bins = sweep.BinsDb,
                 centreHz = sweep.CentreHz,
                 spanHz = sweep.SpanHz,
+            });
+
+            BroadcastWatchCrop(sweep, watchId, watchHz, announce);
+        }
+
+        /// <summary>
+        /// Phase 5 same-band watch panel: crop the widest window centred on the
+        /// watch VFO that still fits inside the primary sweep and broadcast it as
+        /// <paramref name="watchId"/>. The frontend panel centres on its own VFO
+        /// frequency, so a slice tagged with <c>centreHz = watchHz</c> lands
+        /// correctly with no frontend change. Out-of-range (cross-band) emits an
+        /// "outofrange" status on transitions, and streaming is re-asserted on the
+        /// <paramref name="announce"/> heartbeat for late-loading clients.
+        /// </summary>
+        private void BroadcastWatchCrop(ScopeSweep sweep, string watchId, long watchHz, bool announce)
+        {
+            int n = sweep.BinsDb.Length;
+            long lo = sweep.CentreHz - sweep.SpanHz / 2;
+            long hi = sweep.CentreHz + sweep.SpanHz / 2;
+
+            // Need the watch VFO comfortably inside the sweep (a little margin each
+            // side) and enough bins to be worth drawing.
+            long margin = sweep.SpanHz / 20;
+            bool inRange = n >= 16 && sweep.SpanHz > 0 && watchHz > 0
+                           && watchHz > lo + margin && watchHz < hi - margin;
+
+            long halfB = 0, wLo = 0, wHi = 0;
+            int iLo = 0, iHi = 0;
+            if (inRange)
+            {
+                halfB = Math.Min(watchHz - lo, hi - watchHz);
+                wLo = watchHz - halfB;
+                wHi = watchHz + halfB;
+                double binsPerHz = (double)(n - 1) / sweep.SpanHz;
+                iLo = Math.Clamp((int)Math.Round((wLo - lo) * binsPerHz), 0, n - 1);
+                iHi = Math.Clamp((int)Math.Round((wHi - lo) * binsPerHz), 0, n - 1);
+                if (iHi - iLo < 8)
+                    inRange = false;
+            }
+
+            if (announce || inRange != _watchInRange)
+                SendHub("SdrStatus", new { sdrId = watchId, status = inRange ? "streaming" : "outofrange" });
+            _watchInRange = inRange;
+
+            if (!inRange)
+                return;
+
+            var slice = new float[iHi - iLo + 1];
+            Array.Copy(sweep.BinsDb, iLo, slice, 0, slice.Length);
+            SendHub("SpectrumUpdate", new
+            {
+                sdrId = watchId,
+                bins = slice,
+                centreHz = watchHz,
+                spanHz = wHi - wLo,
             });
         }
 
@@ -1090,6 +1182,12 @@ namespace Icom_Web_Control.Services
                         int af = await GetAfGainAsync(stoppingToken);
                         if (af >= 0) { _state.AfGainA = af; _state.AfGainB = af; }
                     }
+
+                    // Refresh the cached pseudo-dual flag occasionally so the
+                    // scope-broadcast path (on the serial-reader thread) never has
+                    // to await the settings store. Cheap and slow-moving.
+                    if (loop % SplitPollEveryNLoops == 1)
+                        _pseudoDual = (await _settings.GetSettingsAsync()).PseudoDualReceiverEnabled;
 
                     // A couple of RX controls per loop, cycling through AGC/
                     // preamp/NB/NR/notch/att/levels so front-panel changes to any

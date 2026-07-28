@@ -602,6 +602,8 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="500000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span plus or minus 500 kHz" title="VFO A scope span ±500 kHz — widest">±500k</button>
                             </div>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="A" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
+                            <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="A" title="Listen to VFO A — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
+                            <span class="badge bg-success small spectrum-audio-badge" data-vfo="A" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
                             <span id="spectrumStatusBadgeA" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
@@ -642,6 +644,8 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="500000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span plus or minus 500 kHz" title="VFO B scope span ±500 kHz — widest">±500k</button>
                             </div>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
+                            <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="B" title="Listen to VFO B — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
+                            <span class="badge bg-success small spectrum-audio-badge" data-vfo="B" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
@@ -1847,7 +1851,7 @@
         import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";
         import { FTdx101Meters }        from "/js/orchestrators/FTdx101Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
-        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=1";
+        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=3";
         import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=5";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
@@ -1998,11 +2002,17 @@
                     streaming:    ['success',   'Live'],
                     disconnected: ['danger',    'Disconnected'],
                     nodll:        ['danger',    'No SoapySDR'],
+                    outofrange:   ['warning',   'Off-screen'],
                 };
                 const [colour, text] = labels[status] ?? ['secondary', status];
                 badge.className = `badge bg-${colour} small`;
                 badge.textContent = text;
             }
+            // Pseudo-dual receiver (Phase 5): when on, the "watch" panel B is
+            // meaningful even on the single-receiver IC-7300 (the scope is
+            // time-shared to feed it). Server-rendered from settings.
+            const _pseudoDual = @(Model.PseudoDualReceiverEnabled ? "true" : "false");
+
             // Track per-VFO configured/streaming state so we can show or hide the
             // outer spectrumContainer and the Mono/Multi toggle as appropriate.
             const sdrState = { A: 'unconfigured', B: 'unconfigured' };
@@ -2017,8 +2027,12 @@
                 // spectrum-B panel are both hidden, leaving just one
                 // spectrum + a show/hide control (#34 follow-up,
                 // 2026-06-13).
+                // On single-receiver radios the second panel is normally
+                // meaningless — force it off. EXCEPT when pseudo-dual receiver
+                // is enabled: then the IC-7300's single scope is time-shared to
+                // feed a watch panel, so B stays gated on its own stream state.
                 const vfoRow = document.getElementById('vfoRow');
-                if (vfoRow?.dataset.singleReceiver === 'true') {
+                if (vfoRow?.dataset.singleReceiver === 'true' && !_pseudoDual) {
                     bConfigured = false;
                 }
 
@@ -2216,6 +2230,50 @@
                     }
                 });
             });
+
+            // ── Pseudo-dual "Listen" button + "Listening" badge (Phase 5) ────
+            // Each panel gets a Listen button (route audio to that VFO) and a
+            // "Listening" badge (this VFO currently has the audio). Only active
+            // when pseudo-dual is on — otherwise both stay hidden and this is a
+            // plain single-panel layout. The badge follows the authoritative
+            // ActiveVfo state pushed from the radio via site.js's hook.
+            (function wirePseudoDualAudio() {
+                if (!_pseudoDual) return; // buttons/badges stay display:none
+                const listenBtns = Array.from(document.querySelectorAll('.spectrum-listen-btn'));
+                const audioBadges = Array.from(document.querySelectorAll('.spectrum-audio-badge'));
+                const idxOf = el => (el.dataset.vfo === 'B' ? 1 : 0);
+
+                // 0 = A, 1 = B. Seed from the server-rendered active VFO.
+                let audioVfo = @Model.RadioState.ActiveVfo;
+
+                function refresh() {
+                    // Show the Listen button on the panel you are NOT hearing;
+                    // show the "Listening" badge on the one you are.
+                    listenBtns.forEach(btn => {
+                        btn.style.display = (idxOf(btn) === audioVfo) ? 'none' : '';
+                    });
+                    audioBadges.forEach(b => {
+                        b.style.display = (idxOf(b) === audioVfo) ? '' : 'none';
+                    });
+                }
+
+                listenBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const vfo = (idxOf(btn) === 1) ? 'b' : 'a';
+                        // Optimistic move; the ActiveVfo SignalR echo corrects it
+                        // if the radio disagrees. Self-contained fetch so this
+                        // doesn't depend on site.js internals.
+                        audioVfo = idxOf(btn);
+                        refresh();
+                        fetch(`/api/cat/active-vfo/${vfo}`, { method: 'POST' }).catch(() => {});
+                    });
+                });
+
+                // Authoritative updates from the radio (see site.js ActiveVfo).
+                window.onActiveVfoChanged = idx => { audioVfo = idx; refresh(); };
+
+                refresh();
+            })();
 
             // Spectrum DSP sliders — Low (dB floor) / High (dB ceiling). On the
             // CI-V scope these are purely client-side: the radio streams a fixed

@@ -1201,6 +1201,9 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ActiveVfo") {
         activeVfo = update.value;
         applyVfoActiveStyling();
+        // Pseudo-dual receiver (Phase 5): let the spectrum panels move their
+        // "Listening" badge / Listen button to the VFO that now has the audio.
+        if (typeof window.onActiveVfoChanged === 'function') window.onActiveVfoChanged(activeVfo);
         // In normal mode on a single-receiver radio, the TX button position
         // follows activeVfo (the TX VFO IS the active VFO; FT doesn't move).
         updateTxButton();

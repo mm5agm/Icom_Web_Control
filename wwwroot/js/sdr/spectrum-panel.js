@@ -579,6 +579,16 @@ export class SpectrumPanel {
         const canvas = document.getElementById(this._canvasId);
         if (!canvas || !this._lastBins) return;
 
+        // Out of range (Phase 5 pseudo-dual: the watch VFO has moved outside the
+        // shared sweep) — the last frame is stale and meaningless, so keep the
+        // "off-screen" overlay instead of repainting it. Without this, any
+        // mouse-driven re-render (crosshair tracking on hover) would paint the
+        // stale trace over the overlay and the message would vanish.
+        if (this._status === 'outofrange') {
+            this._drawStatusOverlay('outofrange');
+            return;
+        }
+
         const ctx         = canvas.getContext('2d');
         const W           = canvas.width;
         const H           = canvas.height;
@@ -1173,6 +1183,7 @@ export class SpectrumPanel {
             connecting:   'Connecting to SDR device…',
             disconnected: 'SDR device unavailable — retrying every 5 s',
             nodll:        'SoapySDR.dll not found — install SoapySDR + device driver',
+            outofrange:   'Watch VFO is off-screen — widen the scope span, or turn on cross-band peek in Settings',
         };
 
         const line1 = messages[status] ?? `SDR status: ${status}`;

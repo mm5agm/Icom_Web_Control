@@ -181,6 +181,16 @@ namespace Icom_Web_Control.Pages
                 current.VoiceControlEnabled = Settings.VoiceControlEnabled;
                 current.VoiceSpokenConfirmationEnabled = Settings.VoiceSpokenConfirmationEnabled;
 
+                // Pseudo-dual receiver (Phase 5)
+                current.PseudoDualReceiverEnabled = Settings.PseudoDualReceiverEnabled;
+                current.PseudoDualCrossBandEnabled = Settings.PseudoDualCrossBandEnabled;
+                // Clamp peek interval to the 5–60 s the UI offers; fall back to
+                // the 15 s default if an out-of-range value is posted.
+                current.PseudoDualPeekIntervalSeconds =
+                    (Settings.PseudoDualPeekIntervalSeconds >= 5 && Settings.PseudoDualPeekIntervalSeconds <= 60)
+                        ? Settings.PseudoDualPeekIntervalSeconds
+                        : 15;
+
                 await _settingsService.SaveSettingsAsync(current);
 
                 // Only reconnect the radio if something that actually affects the
