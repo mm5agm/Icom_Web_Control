@@ -402,10 +402,11 @@ try
 
     app.MapGet("/api/status/init", () => new { status = Icom_Web_Control.Services.AppStatus.InitializationStatus });
 
-    app.MapGet("/api/ports", () =>
+    app.MapGet("/api/ports", async (Icom_Web_Control.Services.ISettingsService settingsService) =>
     {
         var ports = System.IO.Ports.SerialPort.GetPortNames();
-        return new { ports, com6Present = ports.Contains("COM6") };
+        var configured = (await settingsService.GetSettingsAsync()).SerialPort;
+        return new { ports, configuredPort = configured, configuredPresent = ports.Contains(configured) };
     });
 
     // Serve accessible labels from AppData — copy default on first run so users can find and edit it.

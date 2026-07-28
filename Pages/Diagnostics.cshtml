@@ -49,7 +49,7 @@
             </div>
         </div>
         <div class="small text-muted mb-1">
-            Recent <code>[Voice]</code> and <code>[IntentDispatcher]</code> entries from today's YWC log,
+            Recent <code>[Voice]</code> and <code>[IntentDispatcher]</code> entries from today's IWC log,
             filtered server-side. Use the <strong>Copy to clipboard</strong> button if you want to paste
             these into a GitHub issue.
         </div>
@@ -73,7 +73,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>Meter</th>
-                            <th>CAT</th>
+                            <th>CI-V</th>
                             <th class="text-end">Raw value</th>
                             <th class="text-end">Updated</th>
                         </tr>
@@ -104,12 +104,10 @@
                             <option value="SWRMeter">SWRMeter</option>
                             <option value="PowerMeter">PowerMeter</option>
                             <option value="SMeterA">SMeterA</option>
-                            <option value="SMeterB">SMeterB</option>
                             <option value="ALCMeter">ALCMeter</option>
                             <option value="CompressionMeter">CompressionMeter</option>
                             <option value="IDDMeter">IDDMeter</option>
                             <option value="VDDMeter">VDDMeter</option>
-                            <option value="Temperature">Temperature</option>
                         </optgroup>
                         <optgroup label="VFO state">
                             <option value="SplitMode">SplitMode</option>
@@ -118,14 +116,6 @@
                             <option value="FrequencyB">FrequencyB</option>
                             <option value="ModeA">ModeA</option>
                             <option value="ModeB">ModeB</option>
-                            <option value="BandA">BandA</option>
-                            <option value="BandB">BandB</option>
-                            <option value="AntennaA">AntennaA</option>
-                            <option value="AntennaB">AntennaB</option>
-                            <option value="AtuEnabled">AtuEnabled</option>
-                            <option value="AtuTuning">AtuTuning</option>
-                            <option value="RxClarOn">RxClarOn</option>
-                            <option value="TxClarOn">TxClarOn</option>
                         </optgroup>
                     </select>
                     <input id="diag-textfilter" type="text" class="form-control form-control-sm"
@@ -152,18 +142,16 @@
 
     // ── Meter definitions ─────────────────────────────────────────────────────
     const METERS = [
-        { property: 'IsTransmitting',   label: 'TX State',       cat: 'TX;'  },
-        { property: 'SWRMeter',         label: 'SWR',            cat: 'RM6;' },
-        { property: 'PowerMeter',       label: 'Power',          cat: 'RM5;' },
-        { property: 'SMeterA',          label: 'S-Meter A',      cat: 'SM0;' },
-        { property: 'SMeterB',          label: 'S-Meter B',      cat: 'SM1;' },
-        { property: 'ALCMeter',         label: 'ALC',            cat: 'RM4;' },
-        { property: 'CompressionMeter', label: 'Compression',    cat: 'RM3;' },
-        { property: 'IDDMeter',         label: 'IDD',            cat: 'RM7;' },
-        { property: 'VDDMeter',         label: 'VDD',            cat: 'RM8;' },
-        { property: 'Temperature',      label: 'Temp (PA)',      cat: 'RM9;' },
-        { property: 'FrequencyA',       label: 'Freq A (Hz)',    cat: 'FA;'  },
-        { property: 'FrequencyB',       label: 'Freq B (Hz)',    cat: 'FB;'  },
+        { property: 'IsTransmitting',   label: 'TX State',       civ: '1C 00' },
+        { property: 'SWRMeter',         label: 'SWR',            civ: '15 12' },
+        { property: 'PowerMeter',       label: 'Power',          civ: '15 11' },
+        { property: 'SMeterA',          label: 'S-Meter',        civ: '15 02' },
+        { property: 'ALCMeter',         label: 'ALC',            civ: '15 13' },
+        { property: 'CompressionMeter', label: 'Compression',    civ: '15 14' },
+        { property: 'IDDMeter',         label: 'Id (PA)',        civ: '15 16' },
+        { property: 'VDDMeter',         label: 'Vd (PA)',        civ: '15 15' },
+        { property: 'FrequencyA',       label: 'Freq A (Hz)',    civ: '03'    },
+        { property: 'FrequencyB',       label: 'Freq B (Hz)',    civ: '25'    },
     ];
 
     // ── Build meter table ─────────────────────────────────────────────────────
@@ -174,7 +162,7 @@
         const tr = document.createElement('tr');
         tr.innerHTML =
             `<td>${m.label}</td>` +
-            `<td><code>${m.cat}</code></td>` +
+            `<td><code>${m.civ}</code></td>` +
             `<td class="text-end fw-bold" id="dv-${m.property}" style="min-width:80px">—</td>` +
             `<td class="text-end text-muted small" id="dt-${m.property}" style="min-width:72px">—</td>`;
         tbody.appendChild(tr);
@@ -429,10 +417,11 @@
             const list = (j.ports && j.ports.length)
                 ? j.ports.map(p => `<code class="me-2">${p}</code>`).join('')
                 : '<em>No COM ports detected.</em>';
-            const com6 = j.com6Present
-                ? '<span class="badge bg-success ms-2">COM6 present</span>'
-                : '<span class="badge bg-danger ms-2">COM6 not present</span>';
-            portsBody.innerHTML = list + com6;
+            const port = j.configuredPort || '(none set)';
+            const configured = j.configuredPresent
+                ? `<span class="badge bg-success ms-2">${port} present</span>`
+                : `<span class="badge bg-danger ms-2">${port} not present</span>`;
+            portsBody.innerHTML = list + configured;
             portsLoaded = true;
         } catch (e) {
             portsBody.innerHTML = '<span class="text-danger">Failed to load: ' + e.message + '</span>';
