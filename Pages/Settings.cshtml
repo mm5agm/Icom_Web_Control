@@ -309,13 +309,13 @@
                     <em class="text-muted small">Loading…</em>
                 </div>
                 <div class="mt-2 d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-sm btn-primary" id="savePhrasesBtn" onclick="ywcSavePhrases()">
+                    <button type="button" class="btn btn-sm btn-primary" id="savePhrasesBtn" onclick="iwcSavePhrases()">
                         <i class="bi bi-floppy" aria-hidden="true"></i>&nbsp;Save phrases
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="validatePhrasesBtn" onclick="ywcValidatePhrases()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="validatePhrasesBtn" onclick="iwcValidatePhrases()">
                         <i class="bi bi-check2-circle" aria-hidden="true"></i>&nbsp;Validate
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="ywcResetPhrases()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="iwcResetPhrases()">
                         Reset to defaults
                     </button>
                 </div>
@@ -334,7 +334,7 @@
             </div>
             <div class="mb-3">
                 <button type="button" id="openGrammarsFolderBtn" class="btn btn-sm btn-outline-secondary"
-                        onclick="ywcOpenGrammarsFolder()">
+                        onclick="iwcOpenGrammarsFolder()">
                     <i class="bi bi-folder2-open" aria-hidden="true"></i>&nbsp;Open user grammars folder
                 </button>
                 <button type="button" id="testPackBtn" class="btn btn-sm btn-outline-secondary"
@@ -361,7 +361,7 @@
                     </div>
                 </div>
                 <div class="mt-2 d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="exportPackBtn" onclick="ywcExportPhrases()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="exportPackBtn" onclick="iwcExportPhrases()">
                         <i class="bi bi-download" aria-hidden="true"></i>&nbsp;Export language pack
                     </button>
                 </div>
@@ -375,7 +375,7 @@
             <div class="mb-3">
                 <label class="form-label">Version history</label>
                 <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="loadHistoryBtn" onclick="ywcLoadHistory()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="loadHistoryBtn" onclick="iwcLoadHistory()">
                         <i class="bi bi-clock-history" aria-hidden="true"></i>&nbsp;Show version history
                     </button>
                 </div>
@@ -390,7 +390,7 @@
                 <label class="form-label">Import language pack</label>
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <input type="file" class="form-control form-control-sm w-auto" id="importPackFile" accept=".zip">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="previewImportBtn" onclick="ywcPreviewImport()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="previewImportBtn" onclick="iwcPreviewImport()">
                         <i class="bi bi-upload" aria-hidden="true"></i>&nbsp;Preview import
                     </button>
                 </div>
@@ -405,7 +405,7 @@
             // Pull /api/voice/status to (re)populate diagnostics -- on Settings
             // load, and again after a locale switch since the engine state
             // (and possibly the error message) changes with it.
-            async function ywcRefreshVoiceDiagnostics() {
+            async function iwcRefreshVoiceDiagnostics() {
                 const el = document.getElementById('voiceDiagnostics');
                 if (!el) return;
                 try {
@@ -434,7 +434,7 @@
                     el.innerHTML = '<span class="text-danger">Could not query voice diagnostics: ' + escapeHtml(String(e)) + '</span>';
                 }
             }
-            ywcRefreshVoiceDiagnostics();
+            iwcRefreshVoiceDiagnostics();
             function escapeHtml(s) {
                 return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             }
@@ -451,7 +451,7 @@
                     '<a href="ms-settings:speech" target="_blank" rel="noopener">Settings → Time &amp; Language → Speech</a>.</div>';
             }
 
-            async function ywcLoadLocales() {
+            async function iwcLoadLocales() {
                 const select = document.getElementById('voiceActiveLocale');
                 if (!select) return;
                 try {
@@ -485,14 +485,14 @@
                         const data = await r.json();
                         if (!r.ok) {
                             alert('Could not switch language: ' + (data.error || ('HTTP ' + r.status)));
-                            await ywcLoadLocales();
+                            await iwcLoadLocales();
                             return;
                         }
                         renderLocaleMismatchBanner(culture, displayName, data.hasWindowsRecognizer);
                         // The Voice Phrases editor below still only edits the
                         // en-GB pack (per-locale editing is a later phase) --
                         // only the engine state actually changes here.
-                        ywcRefreshVoiceDiagnostics();
+                        iwcRefreshVoiceDiagnostics();
                     } catch (e) {
                         alert('Could not switch language: ' + e);
                     } finally {
@@ -500,9 +500,9 @@
                     }
                 });
             })();
-            ywcLoadLocales();
+            iwcLoadLocales();
 
-            async function ywcOpenGrammarsFolder() {
+            async function iwcOpenGrammarsFolder() {
                 try {
                     const r = await fetch('/api/voice/open-grammars-folder', { method: 'POST' });
                     if (!r.ok) alert('Could not open grammars folder (status ' + r.status + ')');
@@ -532,7 +532,7 @@
 
             // ── Language Pack metadata + export ───────────────────────────
 
-            async function ywcLoadPackMetadata() {
+            async function iwcLoadPackMetadata() {
                 try {
                     const r = await fetch('/api/voice/phrases/metadata');
                     if (!r.ok) return;
@@ -543,9 +543,9 @@
                     // Non-critical — the fields just stay blank.
                 }
             }
-            ywcLoadPackMetadata();
+            iwcLoadPackMetadata();
 
-            async function ywcExportPhrases() {
+            async function iwcExportPhrases() {
                 const status = document.getElementById('packExportStatus');
                 const btn = document.getElementById('exportPackBtn');
                 btn.disabled = true;
@@ -575,7 +575,7 @@
             // the source instead of an upload), so failures/warnings render
             // the same way an import's would.
 
-            async function ywcLoadHistory() {
+            async function iwcLoadHistory() {
                 const el = document.getElementById('voiceHistoryResults');
                 el.innerHTML = '<em class="text-muted small">Loading…</em>';
                 try {
@@ -594,7 +594,7 @@
                             '<td>v' + escapeHtml(String(s.version ?? '?')) + '</td>' +
                             '<td>' + escapeHtml(s.author || '—') + '</td>' +
                             '<td>' + escapeHtml(s.description || '—') + '</td>' +
-                            '<td><button type="button" class="btn btn-sm btn-outline-warning" onclick="ywcRestoreHistory(' +
+                            '<td><button type="button" class="btn btn-sm btn-outline-warning" onclick="iwcRestoreHistory(' +
                                 JSON.stringify(s.snapshotId) + ')">Restore</button></td></tr>';
                     }
                     html += '</tbody></table></div>';
@@ -604,7 +604,7 @@
                 }
             }
 
-            async function ywcRestoreHistory(snapshotId) {
+            async function iwcRestoreHistory(snapshotId) {
                 if (!confirm('Restore this version? The current phrases will be saved to history first, so this can be undone.'))
                     return;
                 try {
@@ -619,9 +619,9 @@
                         return;
                     }
                     alert('Restored.' + (data.warnings && data.warnings.length ? ' ' + data.warnings.length + ' warning(s) — check the phrases editor.' : ''));
-                    ywcLoadPhrases();
-                    ywcLoadPackMetadata();
-                    ywcLoadHistory();
+                    iwcLoadPhrases();
+                    iwcLoadPackMetadata();
+                    iwcLoadHistory();
                 } catch (e) {
                     alert('Restore failed: ' + e);
                 }
@@ -630,13 +630,13 @@
             // ── Language Pack import (§3.2) ───────────────────────────────
             // Two-step, mirroring the server: preview (upload + validate,
             // nothing written) then install (re-validated server-side,
-            // actually writes the pack). ywcImportPreview holds the parsed
+            // actually writes the pack). iwcImportPreview holds the parsed
             // config/meta from the preview step so install can post them
             // straight back without re-uploading the ZIP.
 
-            let ywcImportPreview = null;
+            let iwcImportPreview = null;
 
-            async function ywcPreviewImport() {
+            async function iwcPreviewImport() {
                 const fileInput = document.getElementById('importPackFile');
                 const resultsEl = document.getElementById('importPreviewResults');
                 const btn = document.getElementById('previewImportBtn');
@@ -644,7 +644,7 @@
                     resultsEl.innerHTML = '<span class="text-danger">Choose a .zip file first.</span>';
                     return;
                 }
-                ywcImportPreview = null;
+                iwcImportPreview = null;
                 btn.disabled = true;
                 resultsEl.innerHTML = '<em class="text-muted">Validating…</em>';
                 try {
@@ -656,7 +656,7 @@
                         resultsEl.innerHTML = '<span class="text-danger">' + escapeHtml(data.error || ('HTTP ' + r.status)) + '</span>';
                         return;
                     }
-                    ywcImportPreview = data;
+                    iwcImportPreview = data;
                     renderImportPreview(data);
                 } catch (e) {
                     resultsEl.innerHTML = '<span class="text-danger">Preview failed: ' + escapeHtml(String(e)) + '</span>';
@@ -704,14 +704,14 @@
                 if (canInstall) {
                     html += '<div class="d-flex gap-2 align-items-center flex-wrap mt-1">';
                     if (data.alreadyInstalled) {
-                        html += '<select class="form-select form-select-sm w-auto" id="importMergeStrategy" onchange="ywcToggleCollisionsPicker()">' +
+                        html += '<select class="form-select form-select-sm w-auto" id="importMergeStrategy" onchange="iwcToggleCollisionsPicker()">' +
                             '<option value="replace">Replace existing pack</option>' +
                             '<option value="merge">Merge — keep existing Custom Commands, add new ones</option>' +
                             '</select>';
                     }
                     const warnCount = (data.warnings || []).length;
                     const label = warnCount ? ('Install with ' + warnCount + ' warning' + (warnCount === 1 ? '' : 's')) : 'Install';
-                    html += '<button type="button" class="btn btn-sm btn-primary" id="installImportBtn" onclick="ywcInstallImport()">' +
+                    html += '<button type="button" class="btn btn-sm btn-primary" id="installImportBtn" onclick="iwcInstallImport()">' +
                         escapeHtml(label) + '</button>';
                     html += '</div>';
                 }
@@ -745,18 +745,18 @@
 
                 html += '</div>';
                 resultsEl.innerHTML = html;
-                ywcToggleCollisionsPicker();
+                iwcToggleCollisionsPicker();
             }
 
-            function ywcToggleCollisionsPicker() {
+            function iwcToggleCollisionsPicker() {
                 const picker = document.getElementById('importCollisionsPicker');
                 if (!picker) return;
                 const mergeSelect = document.getElementById('importMergeStrategy');
                 picker.style.display = (mergeSelect && mergeSelect.value === 'merge') ? '' : 'none';
             }
 
-            async function ywcInstallImport() {
-                if (!ywcImportPreview) return;
+            async function iwcInstallImport() {
+                if (!iwcImportPreview) return;
                 const resultsEl = document.getElementById('importPreviewResults');
                 const btn = document.getElementById('installImportBtn');
                 const mergeSelect = document.getElementById('importMergeStrategy');
@@ -774,9 +774,9 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            culture: ywcImportPreview.culture,
-                            config: ywcImportPreview.config,
-                            meta: ywcImportPreview.meta,
+                            culture: iwcImportPreview.culture,
+                            config: iwcImportPreview.config,
+                            meta: iwcImportPreview.meta,
                             mergeStrategy: mergeStrategy,
                             collisionResolutions: collisionResolutions,
                         }),
@@ -787,7 +787,7 @@
                             renderValidationResults(data.errors || [], []);
                         return;
                     }
-                    const culture = ywcImportPreview.culture;
+                    const culture = iwcImportPreview.culture;
                     let msg = '<span class="text-success">Installed ' + escapeHtml(culture) + '.</span>';
                     if (data.collisionsResolved && data.collisionsResolved.length) {
                         const kept = data.collisionsResolved.filter(c => c.kept === 'mine').map(c => c.name);
@@ -796,14 +796,14 @@
                         if (took.length) msg += ' Took the imported versions of: ' + took.map(escapeHtml).join(', ') + '.';
                     }
                     resultsEl.innerHTML = msg;
-                    ywcImportPreview = null;
+                    iwcImportPreview = null;
                     document.getElementById('importPackFile').value = '';
                     // The editor and metadata panel show the active (en-GB)
                     // pack — refresh them so an en-GB import is visible
                     // immediately instead of only after a page reload.
                     if (culture.toLowerCase() === 'en-gb') {
-                        ywcLoadPhrases();
-                        ywcLoadPackMetadata();
+                        iwcLoadPhrases();
+                        iwcLoadPackMetadata();
                     }
                 } catch (e) {
                     resultsEl.innerHTML = '<span class="text-danger">Install failed: ' + escapeHtml(String(e)) + '</span>';
@@ -1080,7 +1080,7 @@
                 }
 
                 const tryBtn = e.target.closest('[data-action="try-it"]');
-                if (tryBtn) { ywcTryItPhrase(tryBtn); return; }
+                if (tryBtn) { iwcTryItPhrase(tryBtn); return; }
 
                 const delBtn = e.target.closest('[data-action="delete-macro"]');
                 if (delBtn) { delBtn.closest('tr').remove(); return; }
@@ -1166,7 +1166,7 @@
             // §2.5 per-row "Try it": tests just the phrases in this row's
             // input against a scoped 3-second recognition, without saving
             // anything or touching the live grammar's own state afterwards.
-            async function ywcTryItPhrase(btn) {
+            async function iwcTryItPhrase(btn) {
                 const tr = btn.closest('tr');
                 const input = tr.querySelector('input[data-path], .macro-phrases');
                 const resultEl = tr.querySelector('.try-it-result');
@@ -1221,7 +1221,7 @@
             // in the editor and flags any phrase that appears more than once
             // (e.g. the same trigger word accidentally added to two
             // different commands, which SAPI would then match ambiguously).
-            function ywcCheckDuplicatePhrases() {
+            function iwcCheckDuplicatePhrases() {
                 const seen = new Map(); // lowercased phrase -> count
                 document.querySelectorAll('#voicePhrasesEditor input[data-path], #voicePhrasesEditor .macro-phrases').forEach(input => {
                     input.classList.remove('is-invalid');
@@ -1247,7 +1247,7 @@
             // §2.5 autosave: debounced draft POST on every editor keystroke,
             // so a browser refresh mid-edit doesn't lose unsaved work.
             let _draftSaveTimer = null;
-            function ywcScheduleDraftSave() {
+            function iwcScheduleDraftSave() {
                 if (_draftSaveTimer) clearTimeout(_draftSaveTimer);
                 _draftSaveTimer = setTimeout(async () => {
                     if (!_phrasesConfig) return;
@@ -1264,11 +1264,11 @@
             document.addEventListener('input', function (e) {
                 const editorRoot = document.getElementById('voicePhrasesEditor');
                 if (!editorRoot || !editorRoot.contains(e.target)) return;
-                ywcCheckDuplicatePhrases();
-                ywcScheduleDraftSave();
+                iwcCheckDuplicatePhrases();
+                iwcScheduleDraftSave();
             });
 
-            async function ywcLoadPhrases(url) {
+            async function iwcLoadPhrases(url) {
                 const el = document.getElementById('voicePhrasesEditor');
                 try {
                     const r = await fetch(url || '/api/voice/phrases');
@@ -1277,18 +1277,18 @@
                     el.innerHTML = '<div id="phrasesDuplicateWarning"></div><div id="phrasesDraftBanner"></div>' + buildPhrasesEditor(_phrasesConfig);
                     const resultsEl = document.getElementById('phrasesValidationResults');
                     if (resultsEl) resultsEl.innerHTML = '';
-                    ywcCheckDuplicatePhrases();
+                    iwcCheckDuplicatePhrases();
                     // §2.5: offer to restore an autosaved draft left over from
                     // an interrupted edit (browser refresh/crash), but only
                     // when loading the real installed pack -- not after a
                     // Reset-to-defaults preview.
-                    if (!url) await ywcCheckForDraft();
+                    if (!url) await iwcCheckForDraft();
                 } catch (e) {
                     el.innerHTML = '<span class="text-danger">Error loading phrases: ' + escapeHtml(String(e)) + '</span>';
                 }
             }
 
-            async function ywcCheckForDraft() {
+            async function iwcCheckForDraft() {
                 const bannerEl = document.getElementById('phrasesDraftBanner');
                 if (!bannerEl) return;
                 try {
@@ -1298,24 +1298,24 @@
                     bannerEl.innerHTML =
                         '<div class="alert alert-info py-1 px-2 small mb-2 d-flex justify-content-between align-items-center">' +
                         '<span>You have unsaved changes from a previous editing session.</span>' +
-                        '<span><button type="button" class="btn btn-sm btn-primary me-1" onclick="ywcRestoreDraft()">Restore</button>' +
-                        '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="ywcDiscardDraft()">Discard</button></span>' +
+                        '<span><button type="button" class="btn btn-sm btn-primary me-1" onclick="iwcRestoreDraft()">Restore</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="iwcDiscardDraft()">Discard</button></span>' +
                         '</div>';
-                    window._ywcPendingDraft = data.config;
+                    window._iwcPendingDraft = data.config;
                 } catch { /* best-effort */ }
             }
 
-            function ywcRestoreDraft() {
-                if (!window._ywcPendingDraft) return;
-                _phrasesConfig = window._ywcPendingDraft;
-                window._ywcPendingDraft = null;
+            function iwcRestoreDraft() {
+                if (!window._iwcPendingDraft) return;
+                _phrasesConfig = window._iwcPendingDraft;
+                window._iwcPendingDraft = null;
                 const el = document.getElementById('voicePhrasesEditor');
                 el.innerHTML = '<div id="phrasesDuplicateWarning"></div><div id="phrasesDraftBanner"></div>' + buildPhrasesEditor(_phrasesConfig);
-                ywcCheckDuplicatePhrases();
+                iwcCheckDuplicatePhrases();
             }
 
-            async function ywcDiscardDraft() {
-                window._ywcPendingDraft = null;
+            async function iwcDiscardDraft() {
+                window._iwcPendingDraft = null;
                 const bannerEl = document.getElementById('phrasesDraftBanner');
                 if (bannerEl) bannerEl.innerHTML = '';
                 try { await fetch('/api/voice/phrases/draft/discard', { method: 'POST' }); } catch { /* best-effort */ }
@@ -1333,7 +1333,7 @@
                 return html;
             }
 
-            async function ywcValidatePhrases() {
+            async function iwcValidatePhrases() {
                 if (!_phrasesConfig) return;
                 const resultsEl = document.getElementById('phrasesValidationResults');
                 const btn = document.getElementById('validatePhrasesBtn');
@@ -1355,7 +1355,7 @@
                 }
             }
 
-            async function ywcSavePhrases() {
+            async function iwcSavePhrases() {
                 if (!_phrasesConfig) return;
                 const status = document.getElementById('phrasesSaveStatus');
                 const resultsEl = document.getElementById('phrasesValidationResults');
@@ -1390,9 +1390,9 @@
                 }
             }
 
-            async function ywcResetPhrases() {
+            async function iwcResetPhrases() {
                 if (!confirm('Reset all phrases to the built-in English (UK) defaults?')) return;
-                await ywcLoadPhrases('/api/voice/phrases/defaults');
+                await iwcLoadPhrases('/api/voice/phrases/defaults');
                 document.getElementById('phrasesSaveStatus').innerHTML = '<span class="text-warning">Defaults loaded — click Save phrases to apply.</span>';
             }
 
@@ -1405,10 +1405,10 @@
                 const details = document.querySelector('details.settings-section:has(#voicePhrasesEditor)');
                 if (details) {
                     details.addEventListener('toggle', function onToggle() {
-                        if (details.open && !_phrasesConfig) ywcLoadPhrases();
+                        if (details.open && !_phrasesConfig) iwcLoadPhrases();
                     });
                     // Also load immediately if the section starts open.
-                    if (details.open) ywcLoadPhrases();
+                    if (details.open) iwcLoadPhrases();
                 }
             })();
 

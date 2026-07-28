@@ -110,18 +110,18 @@
         // (Settings page > Voice Control section). Default off. Per-VFO nudge
         // step defaults (VoiceNudgeStepHzA/B) are rendered directly on
         // Index.cshtml next to each VFO's mic button, not here.
-        var _ywcSettingsService = (Icom_Web_Control.Services.ISettingsService)Context.RequestServices
+        var _iwcSettingsService = (Icom_Web_Control.Services.ISettingsService)Context.RequestServices
             .GetService(typeof(Icom_Web_Control.Services.ISettingsService))!;
-        var _ywcVoiceEnabled = false;
+        var _iwcVoiceEnabled = false;
         try
         {
-            var _ywcSettings = await _ywcSettingsService.GetSettingsAsync();
-            _ywcVoiceEnabled = _ywcSettings.VoiceControlEnabled;
+            var _iwcSettings = await _iwcSettingsService.GetSettingsAsync();
+            _iwcVoiceEnabled = _iwcSettings.VoiceControlEnabled;
         }
         catch { /* settings unavailable -> defaults */ }
     }
     <script>
-        window.ywcVoiceEnabled = @(_ywcVoiceEnabled ? "true" : "false");
+        window.iwcVoiceEnabled = @(_iwcVoiceEnabled ? "true" : "false");
     </script>
     <script src="~/js/ui/voice-control.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />

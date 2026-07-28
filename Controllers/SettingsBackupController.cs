@@ -121,7 +121,7 @@ namespace Icom_Web_Control.Controllers
             var date = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             return new FileContentResult(bytes, "application/json")
             {
-                FileDownloadName = $"ywc-settings-{date}.json"
+                FileDownloadName = $"iwc-settings-{date}.json"
             };
         }
     }

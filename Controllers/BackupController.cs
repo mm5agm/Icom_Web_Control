@@ -90,7 +90,7 @@ namespace Icom_Web_Control.Controllers
             var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             return new FileContentResult(ms.ToArray(), "application/zip")
             {
-                FileDownloadName = $"ywc-backup-{stamp}.zip"
+                FileDownloadName = $"iwc-backup-{stamp}.zip"
             };
         }
 

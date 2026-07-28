@@ -12,14 +12,14 @@
 // is being reported; a button ignores updates that aren't its own so the
 // other button doesn't flicker.
 //
-// window.ywcVoiceEnabled (server-rendered in _Layout.cshtml) gates whether
+// window.iwcVoiceEnabled (server-rendered in _Layout.cshtml) gates whether
 // any mic button is shown at all. VFO B's button is additionally hidden on
 // single-receiver radios via #vfoRow's data-single-receiver attribute.
 
 (function () {
     'use strict';
 
-    if (!window.ywcVoiceEnabled) return;
+    if (!window.iwcVoiceEnabled) return;
 
     function createVfoVoiceControl(vfo, defaultStepHz) {
         const suffix    = vfo; // 'A' | 'B'
@@ -139,8 +139,8 @@
     }
 
     const controls = [
-        createVfoVoiceControl('A', window.ywcVoiceNudgeStepHzA),
-        createVfoVoiceControl('B', window.ywcVoiceNudgeStepHzB),
+        createVfoVoiceControl('A', window.iwcVoiceNudgeStepHzA),
+        createVfoVoiceControl('B', window.iwcVoiceNudgeStepHzB),
     ].filter(Boolean);
 
     // VFO B's mic button exists in the DOM even on single-receiver radios

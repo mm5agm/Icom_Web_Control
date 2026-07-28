@@ -191,11 +191,11 @@ async function _loadAndRender() {
 
 // Sentinel value used for the always-present built-in YWC starter bank entry.
 // Must match the Memories editor page constant of the same name.
-const STARTER_BANK_VALUE = '__ywc_starter__';
+const STARTER_BANK_VALUE = '__iwc_starter__';
 // Sentinel for the "split the starter bank into per-mode banks" action.
 // Selecting this from the dropdown triggers the themed-create flow rather
 // than a bank load.
-const CREATE_THEMED_VALUE = '__ywc_create_themed__';
+const CREATE_THEMED_VALUE = '__iwc_create_themed__';
 
 async function _loadBanks() {
     const sel = document.getElementById('memBankSelect');

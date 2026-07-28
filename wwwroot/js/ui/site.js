@@ -5,9 +5,9 @@
 // the page itself opened) — we try it as a courtesy and otherwise leave a
 // clear visual cue.
 function showServerStoppedOverlay() {
-    if (document.getElementById('ywcServerStoppedOverlay')) return;
+    if (document.getElementById('iwcServerStoppedOverlay')) return;
     const overlay = document.createElement('div');
-    overlay.id = 'ywcServerStoppedOverlay';
+    overlay.id = 'iwcServerStoppedOverlay';
     overlay.setAttribute('role', 'alertdialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Yaesu Web Control has been closed');
@@ -29,12 +29,12 @@ function showServerStoppedOverlay() {
             'The app has been closed from the system-tray icon. The radio is no longer being controlled from this browser tab.' +
             '<br><br>Once you restart Yaesu Web Control, click <strong>Reload page</strong> below to continue. Or just close this browser tab using its X button.' +
         '</div>' +
-        '<button type="button" id="ywcServerStoppedReloadBtn" ' +
+        '<button type="button" id="iwcServerStoppedReloadBtn" ' +
             'style="padding:8px 22px;border-radius:6px;border:1px solid #4a8abf;background:#2a4860;color:#e0e0ff;cursor:pointer;font-size:0.95rem">' +
             '↻ Reload page' +
         '</button>';
     document.body.appendChild(overlay);
-    document.getElementById('ywcServerStoppedReloadBtn')?.addEventListener('click', () => {
+    document.getElementById('iwcServerStoppedReloadBtn')?.addEventListener('click', () => {
         // location.reload() works for any tab regardless of how it was opened.
         // If YWC isn't back up yet, the reload will fail and the browser shows
         // its own "can't connect" page — which is still a clearer outcome than
@@ -94,7 +94,7 @@ document.addEventListener('keydown', function (e) {
 // Optional browser TX shortcut. Disabled by default; when configured, it
 // toggles transmit using the same /api/cat/tx flow as the on-screen button.
 document.addEventListener('keydown', function (e) {
-    const configuredKey = window.ywcTxToggleKey;
+    const configuredKey = window.iwcTxToggleKey;
     // Empty string only — do not use falsy check; a legacy " " must still match.
     if (configuredKey == null || configuredKey === '' || isTypingIntoEditable()) return;
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;

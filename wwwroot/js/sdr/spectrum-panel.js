@@ -103,7 +103,7 @@ export class SpectrumPanel {
         // The server now owns this via /api/sdr/dsp/{vfo}; the old key would
         // just sit forever in users' browsers otherwise. Safe to remove
         // unconditionally — removeItem on a missing key is a no-op.
-        try { localStorage.removeItem('ywc.spectrumDbRange.' + this._vfo); }
+        try { localStorage.removeItem('iwc.spectrumDbRange.' + this._vfo); }
         catch (e) { /* localStorage may be unavailable */ }
 
         this._init();
@@ -113,7 +113,7 @@ export class SpectrumPanel {
     // so a corrupt value can't make either zone vanish entirely.
     _loadSplitRatio() {
         try {
-            const raw = localStorage.getItem('ywc.spectrumSplit.' + this._vfo);
+            const raw = localStorage.getItem('iwc.spectrumSplit.' + this._vfo);
             const v = parseFloat(raw);
             if (isFinite(v) && v >= 0.15 && v <= 0.85) return v;
         } catch (e) { /* localStorage may be unavailable */ }
@@ -122,7 +122,7 @@ export class SpectrumPanel {
 
     _saveSplitRatio() {
         try {
-            localStorage.setItem('ywc.spectrumSplit.' + this._vfo, this._splitRatio.toFixed(3));
+            localStorage.setItem('iwc.spectrumSplit.' + this._vfo, this._splitRatio.toFixed(3));
         } catch (e) { /* localStorage may be unavailable */ }
     }
 
@@ -134,7 +134,7 @@ export class SpectrumPanel {
 
     _loadWaterfallSpeed() {
         try {
-            const v = parseInt(localStorage.getItem('ywc.waterfallSpeed.' + this._vfo), 10);
+            const v = parseInt(localStorage.getItem('iwc.waterfallSpeed.' + this._vfo), 10);
             if (SpectrumPanel.WATERFALL_SPEEDS.includes(v)) return v;
         } catch (e) { /* localStorage may be unavailable */ }
         return 1;
@@ -142,7 +142,7 @@ export class SpectrumPanel {
 
     _saveWaterfallSpeed() {
         try {
-            localStorage.setItem('ywc.waterfallSpeed.' + this._vfo, String(this._waterfallSpeed));
+            localStorage.setItem('iwc.waterfallSpeed.' + this._vfo, String(this._waterfallSpeed));
         } catch (e) { /* localStorage may be unavailable */ }
     }
 
@@ -170,7 +170,7 @@ export class SpectrumPanel {
 
     _loadWaterfallBrightness() {
         try {
-            const v = parseInt(localStorage.getItem('ywc.waterfallBright.' + this._vfo), 10);
+            const v = parseInt(localStorage.getItem('iwc.waterfallBright.' + this._vfo), 10);
             if (isFinite(v) && v >= 0 && v <= SpectrumPanel.WATERFALL_BRIGHT_MAX) return v;
         } catch (e) { /* localStorage may be unavailable */ }
         return 0;
@@ -178,7 +178,7 @@ export class SpectrumPanel {
 
     _saveWaterfallBrightness() {
         try {
-            localStorage.setItem('ywc.waterfallBright.' + this._vfo, String(this._wfBrightDb));
+            localStorage.setItem('iwc.waterfallBright.' + this._vfo, String(this._wfBrightDb));
         } catch (e) { /* localStorage may be unavailable */ }
     }
 

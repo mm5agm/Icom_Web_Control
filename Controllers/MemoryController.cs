@@ -664,7 +664,7 @@ namespace Icom_Web_Control.Controllers
         //
         // Strategy:
         //  - Parse all QSO records
-        //  - Bucket by (frequency-in-Hz, ywc-mode-string) so duplicates from
+        //  - Bucket by (frequency-in-Hz, iwc-mode-string) so duplicates from
         //    multiple QSOs on the same frequency collapse into one memory
         //  - Skip entries whose label already exists in the current memory
         //    list (collision-safe; users can re-import without doubling up)
@@ -695,7 +695,7 @@ namespace Icom_Web_Control.Controllers
             if (records.Count == 0)
                 return BadRequest(new { error = "No ADIF records found in the file." });
 
-            // Deduplicate by (Hz, ywc-mode) so the same frequency appearing in
+            // Deduplicate by (Hz, iwc-mode) so the same frequency appearing in
             // hundreds of QSOs only produces one new memory.
             var seen = new HashSet<(long, string)>();
             var newMemories = new List<AppMemory>();

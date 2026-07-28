@@ -1838,9 +1838,9 @@
     <!-- Cache-busted JS reference, placed BEFORE your inline script if you use window.radioControl, etc. -->
     <script>window.bandPlan = '@Model.BandPlan';</script>
     <script>
-        window.ywcTxToggleKey = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TxToggleKey));
-        window.ywcVoiceNudgeStepHzA = @Model.VoiceNudgeStepHzA;
-        window.ywcVoiceNudgeStepHzB = @Model.VoiceNudgeStepHzB;
+        window.iwcTxToggleKey = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TxToggleKey));
+        window.iwcVoiceNudgeStepHzA = @Model.VoiceNudgeStepHzA;
+        window.iwcVoiceNudgeStepHzB = @Model.VoiceNudgeStepHzB;
     </script>
     <script type="module">
         import { MeterPanel }           from "/js/guages/meter-panel.js?v=1";
@@ -1907,7 +1907,7 @@
                 const conB = document.getElementById('sMeterHistoryContainerB');
                 if (!btn || !con) return;
 
-                const KEY = 'ywc.sMeterHistoryVisible';
+                const KEY = 'iwc.sMeterHistoryVisible';
                 const apply = (visible) => {
                     con.style.display = visible ? '' : 'none';
                     if (conB) conB.style.display = visible ? '' : 'none';
@@ -1942,10 +1942,10 @@
             );
 
             // Region-specific band plan for FT8/CW/SSB markers on both panels.
-            const _ywcRegion = '@Model.BandPlan';
-            if (BAND_PLANS[_ywcRegion]) {
-                spectrumPanelA.setBandPlan(BAND_PLANS[_ywcRegion]);
-                spectrumPanelB.setBandPlan(BAND_PLANS[_ywcRegion]);
+            const _iwcRegion = '@Model.BandPlan';
+            if (BAND_PLANS[_iwcRegion]) {
+                spectrumPanelA.setBandPlan(BAND_PLANS[_iwcRegion]);
+                spectrumPanelB.setBandPlan(BAND_PLANS[_iwcRegion]);
             }
             // Region-specific band edges (red dashed guard rails). Falls back
             // to the class-static worldwide envelope inside SpectrumPanel if
@@ -1957,18 +1957,18 @@
             // we re-apply once the fetch resolves. Net effect: hardcoded
             // defaults always work; updated JSON applies as soon as it loads.
             loadBandPlanFromServer().then(loaded => {
-                if (loaded && BAND_PLANS[_ywcRegion]) {
-                    spectrumPanelA.setBandPlan(BAND_PLANS[_ywcRegion]);
-                    spectrumPanelB.setBandPlan(BAND_PLANS[_ywcRegion]);
+                if (loaded && BAND_PLANS[_iwcRegion]) {
+                    spectrumPanelA.setBandPlan(BAND_PLANS[_iwcRegion]);
+                    spectrumPanelB.setBandPlan(BAND_PLANS[_iwcRegion]);
                 }
-                if (loaded && BAND_EDGES[_ywcRegion]) {
-                    spectrumPanelA.setBandEdges(BAND_EDGES[_ywcRegion]);
-                    spectrumPanelB.setBandEdges(BAND_EDGES[_ywcRegion]);
+                if (loaded && BAND_EDGES[_iwcRegion]) {
+                    spectrumPanelA.setBandEdges(BAND_EDGES[_iwcRegion]);
+                    spectrumPanelB.setBandEdges(BAND_EDGES[_iwcRegion]);
                 }
             });
-            if (BAND_EDGES[_ywcRegion]) {
-                spectrumPanelA.setBandEdges(BAND_EDGES[_ywcRegion]);
-                spectrumPanelB.setBandEdges(BAND_EDGES[_ywcRegion]);
+            if (BAND_EDGES[_iwcRegion]) {
+                spectrumPanelA.setBandEdges(BAND_EDGES[_iwcRegion]);
+                spectrumPanelB.setBandEdges(BAND_EDGES[_iwcRegion]);
             }
 
             const spectrumPipeline = new SdrSpectrumPipeline();
@@ -2057,7 +2057,7 @@
 
             // Mono/Multi toggle — persisted in localStorage so the user's
             // last-used layout sticks across page reloads. Default Multi (both).
-            const MODE_STORAGE_KEY = 'ywc.spectrumMode';
+            const MODE_STORAGE_KEY = 'iwc.spectrumMode';
             let currentMode = localStorage.getItem(MODE_STORAGE_KEY) || 'Multi';
             function applyMode(mode) {
                 currentMode = mode;
@@ -2079,7 +2079,7 @@
             // Stacked / Side-by-side layout toggle — persisted in localStorage
             // so the user's preference sticks across reloads. Default stacked
             // (matches the v2.3.0 initial layout).
-            const LAYOUT_STORAGE_KEY = 'ywc.spectrumLayout';
+            const LAYOUT_STORAGE_KEY = 'iwc.spectrumLayout';
             let currentLayout = localStorage.getItem(LAYOUT_STORAGE_KEY) || 'stacked';
             function applyLayout(layout) {
                 currentLayout = layout;
