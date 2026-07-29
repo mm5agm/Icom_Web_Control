@@ -88,6 +88,10 @@ namespace Icom_Web_Control.Pages
         public float SdrSpectrumLowDbB  { get; set; } = -120f;
         public float SdrSpectrumHighDbA { get; set; } = 0f;
         public float SdrSpectrumHighDbB { get; set; } = 0f;
+        public int SdrWaterfallSpeedA   { get; set; } = 1;
+        public int SdrWaterfallSpeedB   { get; set; } = 1;
+        public int SdrWaterfallBrightDbA { get; set; } = 0;
+        public int SdrWaterfallBrightDbB { get; set; } = 0;
 
         public string BandPlan { get; set; } = "Region1";
         public string RadioModel { get; set; } = "FTdx101MP";
@@ -111,6 +115,11 @@ namespace Icom_Web_Control.Pages
         // second "watch" spectrum panel even on the single-receiver IC-7300 —
         // this flag is what un-gates panel B despite data-single-receiver.
         public bool PseudoDualReceiverEnabled { get; set; } = false;
+
+        // How the watch panel's (VFO B) span buttons behave: "ZoomIn" (software
+        // crop, B independent), "Shared" (both drive the one physical span), or
+        // "Hidden" (no B span buttons). See ApplicationSettings.PseudoDualWatchSpanMode.
+        public string PseudoDualWatchSpanMode { get; set; } = "ZoomIn";
 
         public RadioStateService RadioState => _radioStateService;
 
@@ -153,9 +162,14 @@ namespace Icom_Web_Control.Pages
             SdrSpectrumLowDbB  = settings.SdrSpectrumLowDbB;
             SdrSpectrumHighDbA = settings.SdrSpectrumHighDbA;
             SdrSpectrumHighDbB = settings.SdrSpectrumHighDbB;
+            SdrWaterfallSpeedA   = settings.SdrWaterfallSpeedA;
+            SdrWaterfallSpeedB   = settings.SdrWaterfallSpeedB;
+            SdrWaterfallBrightDbA = settings.SdrWaterfallBrightDbA;
+            SdrWaterfallBrightDbB = settings.SdrWaterfallBrightDbB;
             VoiceNudgeStepHzA = settings.VoiceNudgeStepHzA;
             VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
             PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
+            PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;

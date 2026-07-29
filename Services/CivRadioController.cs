@@ -36,6 +36,7 @@ namespace Icom_Web_Control.Services
         private const int SplitPollEveryNLoops = 4;    // split rarely toggles; ~1.5 Hz is plenty
         private const int ReconnectDelayMs = 3000;
         private const int MaxConsecutiveReadMisses = 5;
+        private const int PeekWindowMs = 450;          // scope-borrow window per cross-band peek (~1 sweep)
 
         private readonly RadioStateService _state;
         private readonly ICivClient _bus;
@@ -61,7 +62,40 @@ namespace Icom_Web_Control.Services
         // _watchInRange tracks whether the watch VFO currently falls inside the
         // sweep so we only emit an "out of range" status on transitions.
         private volatile bool _pseudoDual;
-        private bool _watchInRange = true;
+        private volatile bool _watchInRange = true;
+
+        // Cross-band peek supervisor (Phase 5, optional additive layer). When the
+        // two VFOs are on different bands the same-band crop can't reach the watch
+        // VFO, so — if the operator opts in — the poll loop periodically borrows the
+        // receiver: it selects the watch VFO for one Center sweep (tagged to the
+        // watch panel via _peekWatchId), then hands it straight back. Costs a brief
+        // audio dip on the listen VFO, so it's off by default and rate-limited.
+        // _crossBandPeek / _peekIntervalMs are cached copies of the settings,
+        // refreshed on the same slow poll phase as _pseudoDual. _peekWatchId is
+        // non-null only while a borrow is in flight (read by the reader thread).
+        private volatile bool _crossBandPeek;
+        private volatile int _peekIntervalMs = 15000;
+        private volatile string? _peekWatchId;
+        private long _peekLastTicks;
+
+        // Watch-panel span (Phase 5). The single scope has one span, so the watch
+        // panel is a crop of that sweep; "ZoomIn" mode lets the operator narrow the
+        // crop around the watch VFO in software without touching the physical scope.
+        // _watchZoomIn caches whether that mode is active (refreshed with the other
+        // pseudo-dual settings); _watchCropHalfHz is the requested crop ± half-width
+        // (0 = auto/widest). When not in ZoomIn mode the crop reverts to auto.
+        private volatile bool _watchZoomIn = true;
+        private volatile int _watchCropHalfHz;
+
+        // When the operator manually selects Fixed mode via the panel's scope-mode
+        // badge, remember it so a reconnect's EnableScopeAsync doesn't yank the
+        // scope back to Center under them. Selecting Center again clears it.
+        private volatile bool _operatorFixedMode;
+
+        // When the operator turns the scope off (via the panel toggle), remember it
+        // so a reconnect's EnableScopeAsync leaves it off rather than switching it
+        // back on. Turning it on again clears it.
+        private volatile bool _operatorScopeOff;
 
         public CivRadioController(
             RadioStateService state,
@@ -130,16 +164,85 @@ namespace Icom_Web_Control.Services
         // -- Spectrum scope (Phase 3 block 6) ----------------------------------
 
         /// <summary>
-        /// Enable the spectrum scope in Center mode and switch on the waveform
-        /// output to the controller. Center mode keeps the sweep centred on the
-        /// operating frequency, which is the assumption the web SpectrumPanel's
-        /// axis is built on. Sent once per connect; best-effort.
+        /// Enable the spectrum scope and switch on the waveform output to the
+        /// controller. Normally forces Center mode (the assumption the web
+        /// SpectrumPanel's axis is built on), but respects a manual Fixed choice
+        /// the operator made via the badge so a reconnect doesn't override it.
+        /// Sent once per connect; best-effort.
         /// </summary>
         private async Task EnableScopeAsync(CancellationToken ct)
         {
-            await SendScopeSetAsync(CivProtocol.SubScopeMode, CivProtocol.ScopeModeCenter, "scope center mode", ct);
+            // Respect a manual scope-off from an earlier session — don't switch the
+            // scope back on under the operator on reconnect.
+            if (_operatorScopeOff)
+                return;
+
+            // Switch the scope on and start waveform output first, then assert the
+            // mode — the radio can power up (or be left) in Fixed mode. Force
+            // Center unless the operator deliberately chose Fixed this session.
             await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on", ct);
             await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", ct);
+            bool center = !_operatorFixedMode;
+            await SetScopeModeAsync(center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed,
+                center ? "scope center mode" : "scope fixed mode", ct);
+        }
+
+        /// <summary>
+        /// Turn the scope + waveform output on or off (CI-V 27 10 / 27 11). On
+        /// re-asserts the scope mode too; off stops the 27 00 stream. Remembers a
+        /// manual off across reconnects via <see cref="_operatorScopeOff"/>.
+        /// </summary>
+        public async Task SetScopeEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            _operatorScopeOff = !enabled;
+            if (enabled)
+            {
+                await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on", cancellationToken);
+                await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", cancellationToken);
+                bool center = !_operatorFixedMode;
+                await SetScopeModeAsync(center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed,
+                    center ? "scope center mode" : "scope fixed mode", cancellationToken);
+            }
+            else
+            {
+                // Stop the PC waveform stream first, then power the scope down.
+                await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x00, "scope waveform output off", cancellationToken);
+                await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x00, "scope off", cancellationToken);
+            }
+        }
+
+        /// <summary>
+        /// Set the scope mode (CI-V 27 14) to Center or Fixed. Public entry point
+        /// for the click-the-badge control; delegates to the retrying setter.
+        /// </summary>
+        public Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default)
+        {
+            // Remember a manual Fixed choice so a later reconnect respects it
+            // instead of forcing Center (see EnableScopeAsync).
+            _operatorFixedMode = !center;
+            byte mode = center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed;
+            return SetScopeModeAsync(mode, center ? "scope center mode" : "scope fixed mode", cancellationToken);
+        }
+
+        /// <summary>
+        /// Set the scope mode (27 14). The payload is two bytes — the Main-scope
+        /// selector (00) then the mode — see <see cref="CivProtocol.ScopeMain"/>.
+        /// Retried a few times because a front-panel/reconnect can leave the
+        /// scope in Fixed mode, which misaligns the (Center-assuming) web panel.
+        /// </summary>
+        private async Task SetScopeModeAsync(byte mode, string what, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdScope, CivProtocol.SubScopeMode, CivProtocol.ScopeMain, mode);
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+                if (reply != null && reply.Cmd == CivProtocol.AckOk)
+                    return;
+                if (attempt < 3)
+                    await Task.Delay(150, ct);
+            }
+            _logger.LogWarning("[CivRadioController] {What} was not acknowledged", what);
         }
 
         /// <summary>Send a 27-family scope set (27 &lt;sub&gt; &lt;val&gt;) and expect an ack.</summary>
@@ -177,6 +280,18 @@ namespace Icom_Web_Control.Services
         }
 
         /// <summary>
+        /// Set the watch panel's crop ± half-width (Phase 5 "ZoomIn" span mode).
+        /// Display-only: it stores the requested half-width that
+        /// <see cref="BroadcastWatchCrop"/> applies on the next sweep — no CI-V is
+        /// sent, so the physical scope and the primary panel are untouched.
+        /// </summary>
+        public Task SetWatchCropSpanAsync(int halfHz, CancellationToken cancellationToken = default)
+        {
+            _watchCropHalfHz = Math.Max(0, halfHz);
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
         /// Feed unsolicited frames to the scope assembler. Runs on the serial
         /// reader thread; the assembler is single-threaded by that contract, and
         /// the SignalR broadcast is fire-and-forget so we never block the reader.
@@ -188,6 +303,10 @@ namespace Icom_Web_Control.Services
             var sweep = _scope.Add(frame);
             if (sweep == null)
                 return;
+
+            // The radio's live scope mode (tracks front-panel changes), carried on
+            // every SpectrumUpdate so the panel can label CENT / FIX etc.
+            string mode = ScopeModeName(sweep.Mode);
 
             // Re-assert "streaming" on the first sweep and every ~30 thereafter
             // so a client that loads mid-stream un-hides its spectrum panel.
@@ -203,6 +322,26 @@ namespace Icom_Web_Control.Services
                     bins = sweep.BinsDb,
                     centreHz = sweep.CentreHz,
                     spanHz = sweep.SpanHz,
+                    mode,
+                });
+                return;
+            }
+
+            // A cross-band peek is in progress: the receiver is momentarily tuned
+            // to the watch band, so this whole sweep belongs to the watch panel —
+            // route it there and leave the primary panel frozen for the ~0.4 s dip.
+            string? peek = _peekWatchId;
+            if (peek != null)
+            {
+                if (announce)
+                    SendHub("SdrStatus", new { sdrId = peek, status = "streaming" });
+                SendHub("SpectrumUpdate", new
+                {
+                    sdrId = peek,
+                    bins = sweep.BinsDb,
+                    centreHz = sweep.CentreHz,
+                    spanHz = sweep.SpanHz,
+                    mode,
                 });
                 return;
             }
@@ -227,9 +366,10 @@ namespace Icom_Web_Control.Services
                 bins = sweep.BinsDb,
                 centreHz = sweep.CentreHz,
                 spanHz = sweep.SpanHz,
+                mode,
             });
 
-            BroadcastWatchCrop(sweep, watchId, watchHz, announce);
+            BroadcastWatchCrop(sweep, watchId, watchHz, announce, mode);
         }
 
         /// <summary>
@@ -241,7 +381,7 @@ namespace Icom_Web_Control.Services
         /// "outofrange" status on transitions, and streaming is re-asserted on the
         /// <paramref name="announce"/> heartbeat for late-loading clients.
         /// </summary>
-        private void BroadcastWatchCrop(ScopeSweep sweep, string watchId, long watchHz, bool announce)
+        private void BroadcastWatchCrop(ScopeSweep sweep, string watchId, long watchHz, bool announce, string mode)
         {
             int n = sweep.BinsDb.Length;
             long lo = sweep.CentreHz - sweep.SpanHz / 2;
@@ -257,7 +397,13 @@ namespace Icom_Web_Control.Services
             int iLo = 0, iHi = 0;
             if (inRange)
             {
-                halfB = Math.Min(watchHz - lo, hi - watchHz);
+                // Widest symmetric crop that fits inside the sweep. In "ZoomIn"
+                // mode a requested narrower half-width tightens it around the watch
+                // VFO (display-only, no CI-V, no effect on the primary); a request
+                // wider than what fits just clamps to this geometric max.
+                long geoMax = Math.Min(watchHz - lo, hi - watchHz);
+                int req = _watchZoomIn ? _watchCropHalfHz : 0;
+                halfB = req > 0 ? Math.Min(geoMax, req) : geoMax;
                 wLo = watchHz - halfB;
                 wHi = watchHz + halfB;
                 double binsPerHz = (double)(n - 1) / sweep.SpanHz;
@@ -267,12 +413,21 @@ namespace Icom_Web_Control.Services
                     inRange = false;
             }
 
-            if (announce || inRange != _watchInRange)
-                SendHub("SdrStatus", new { sdrId = watchId, status = inRange ? "streaming" : "outofrange" });
-            _watchInRange = inRange;
-
             if (!inRange)
+            {
+                // Cross-band peek fills this panel by borrowing the receiver every
+                // few seconds; between borrows keep the last peeked trace frozen
+                // rather than wiping it with an "off-screen" overlay. Only when
+                // peek is off do we tell the panel the watch VFO is unreachable.
+                if (!_crossBandPeek && (announce || _watchInRange))
+                    SendHub("SdrStatus", new { sdrId = watchId, status = "outofrange" });
+                _watchInRange = false;
                 return;
+            }
+
+            if (announce || !_watchInRange)
+                SendHub("SdrStatus", new { sdrId = watchId, status = "streaming" });
+            _watchInRange = true;
 
             var slice = new float[iHi - iLo + 1];
             Array.Copy(sweep.BinsDb, iLo, slice, 0, slice.Length);
@@ -282,7 +437,90 @@ namespace Icom_Web_Control.Services
                 bins = slice,
                 centreHz = watchHz,
                 spanHz = wHi - wLo,
+                mode,
             });
+        }
+
+        /// <summary>
+        /// Map the waveform header's scope-mode byte (field ④) to the short label
+        /// the radio's own screen uses. Center is the mode IWC forces and the web
+        /// panel assumes; the others mean the panel's axis may not line up.
+        /// </summary>
+        private static string ScopeModeName(byte mode) => mode switch
+        {
+            0x00 => "CENT",
+            0x01 => "FIX",
+            0x02 => "SCROLL-C",
+            0x03 => "SCROLL-F",
+            _    => "?",
+        };
+
+        /// <summary>
+        /// Cross-band peek (Phase 5): when the two VFOs are on different bands the
+        /// same-band crop can't reach the watch VFO, so momentarily borrow the
+        /// receiver — select the watch VFO, let a Center sweep arrive (tagged as the
+        /// watch panel via <see cref="_peekWatchId"/>), then hand it straight back.
+        /// Costs a brief (~0.4 s) audio dip on the listen VFO, which is why it's
+        /// opt-in and rate-limited. Called every poll loop but a no-op unless the
+        /// operator enabled it, the interval has elapsed, and the watch VFO isn't
+        /// already visible in the same-band crop. Runs on the poll thread, so the
+        /// borrow blocks meter reads for its window — acceptable, audio is dipping
+        /// anyway. The caller guards on connected + !transmitting.
+        /// </summary>
+        private async Task MaybePeekWatchBandAsync(CancellationToken ct)
+        {
+            if (!_crossBandPeek)
+                return;
+            long now = Environment.TickCount64;
+            if (now - _peekLastTicks < _peekIntervalMs)
+                return;
+
+            // Same-band crop already covers the watch VFO — no borrow needed. Reset
+            // the clock so a later cross-band retune waits a full interval rather
+            // than dipping the instant the VFOs part.
+            if (_watchInRange)
+            {
+                _peekLastTicks = now;
+                return;
+            }
+
+            RadioVfo active = ActiveVfo;
+            RadioVfo watch = active == RadioVfo.A ? RadioVfo.B : RadioVfo.A;
+            string watchId = active == RadioVfo.A ? "B" : "A";
+
+            // Borrow the receiver. Route arriving sweeps to the watch panel via
+            // _peekWatchId; send the selects over the bus directly so the persistent
+            // ActiveVfo / "listening" badge never flips.
+            _peekWatchId = watchId;
+            try
+            {
+                await RawSelectVfoAsync(watch, ct);
+                await DelayQuiet(PeekWindowMs, ct);
+            }
+            finally
+            {
+                // Always hand the receiver back — leaving it on the watch VFO would
+                // strand the audio there — and retry, since a dropped select is far
+                // worse here than elsewhere. Clear the peek tag only once restored.
+                for (int i = 0; i < 3 && !await RawSelectVfoAsync(active, ct); i++)
+                    await DelayQuiet(30, ct);
+                _peekWatchId = null;
+                _peekLastTicks = Environment.TickCount64;
+            }
+        }
+
+        /// <summary>
+        /// Select a VFO (command 07) over the bus WITHOUT mutating
+        /// <see cref="RadioStateService.ActiveVfo"/> — used by the peek supervisor to
+        /// borrow the receiver transiently. Returns whether the radio acknowledged.
+        /// </summary>
+        private async Task<bool> RawSelectVfoAsync(RadioVfo vfo, CancellationToken ct)
+        {
+            byte v = vfo == RadioVfo.B ? CivProtocol.VfoSelectB : CivProtocol.VfoSelectA;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSelectVfo, v);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            return reply != null && reply.Cmd == CivProtocol.AckOk;
         }
 
         private void SendHub(string property, object value)
@@ -1187,13 +1425,25 @@ namespace Icom_Web_Control.Services
                     // scope-broadcast path (on the serial-reader thread) never has
                     // to await the settings store. Cheap and slow-moving.
                     if (loop % SplitPollEveryNLoops == 1)
-                        _pseudoDual = (await _settings.GetSettingsAsync()).PseudoDualReceiverEnabled;
+                    {
+                        var s = await _settings.GetSettingsAsync();
+                        _pseudoDual = s.PseudoDualReceiverEnabled;
+                        _crossBandPeek = s.PseudoDualReceiverEnabled && s.PseudoDualCrossBandEnabled;
+                        _peekIntervalMs = Math.Clamp(s.PseudoDualPeekIntervalSeconds, 5, 60) * 1000;
+                        _watchZoomIn = string.Equals(s.PseudoDualWatchSpanMode, "ZoomIn", StringComparison.OrdinalIgnoreCase);
+                    }
 
                     // A couple of RX controls per loop, cycling through AGC/
                     // preamp/NB/NR/notch/att/levels so front-panel changes to any
                     // of them make it back to the app within about a second.
                     for (int i = 0; i < RxControlsPerLoop; i++)
                         await PollNextRxControlAsync(stoppingToken);
+
+                    // Cross-band peek: briefly borrow the receiver to refresh a
+                    // watch VFO on a different band. Internally rate-limited and a
+                    // no-op unless the operator enabled it; never during TX.
+                    if (!transmitting)
+                        await MaybePeekWatchBandAsync(stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {

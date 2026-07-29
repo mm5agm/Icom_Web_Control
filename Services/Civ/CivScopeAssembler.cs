@@ -16,6 +16,13 @@ namespace Icom_Web_Control.Services.Civ
         public long CentreHz { get; init; }
         public long SpanHz { get; init; }
         public bool OutOfRange { get; init; }
+
+        /// <summary>
+        /// The scope mode reported in the waveform header (field ④): 0=Center,
+        /// 1=Fixed, 2=SCROLL-C, 3=SCROLL-F. This is the radio's live mode — it
+        /// tracks front-panel changes — so the display can surface it.
+        /// </summary>
+        public byte Mode { get; init; }
     }
 
     /// <summary>
@@ -169,6 +176,7 @@ namespace Icom_Web_Control.Services.Civ
                 CentreHz   = _centreHz,
                 SpanHz     = _spanHz,
                 OutOfRange = _outOfRange,
+                Mode       = _mode,
             };
         }
     }

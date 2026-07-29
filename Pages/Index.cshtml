@@ -564,6 +564,17 @@
          SDR is configured for either VFO. -->
     <div id="spectrumContainer" class="row mt-3" style="display:none;">
         <div class="col-12">
+            <!-- Scope on/off — always available while the spectrum is shown.
+                 Turning it off stops the radio streaming waveform data (CI-V
+                 27 10 / 27 11): the trace goes quiet. Also the operator's
+                 control for testing whether the scope stream causes RX noise. -->
+            <div class="d-flex justify-content-end align-items-center mb-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="scopeEnableSwitch" checked
+                           title="Turn the radio's spectrum scope on or off">
+                    <label class="form-check-label small" for="scopeEnableSwitch">Scope</label>
+                </div>
+            </div>
             <!-- Toggles row: VFO selector + layout (stacked vs side-by-side).
                  Both hidden when only one side is configured. -->
             <div id="spectrumModeToggle" class="d-flex justify-content-end align-items-center gap-2 mb-2" style="display:none;">
@@ -615,10 +626,10 @@
                         <input type="range" class="form-range spectrum-high-slider" data-vfo="A" min="-100" max="0" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbA))" aria-label="VFO A spectrum High (dB ceiling)" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-high-label" data-vfo="A" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbA))</span>
                         <label class="text-nowrap mb-0 ms-2" title="How fast the waterfall scrolls, from full speed down to 1/128. Does not affect the spectrum trace above it.">Speed</label>
-                        <input type="range" class="form-range spectrum-speed-slider" data-vfo="A" min="0" max="7" step="1" value="0" aria-label="VFO A waterfall scroll speed" style="flex:0 0 70px; width:70px;">
+                        <input type="range" class="form-range spectrum-speed-slider" data-vfo="A" data-server-speed="@Model.SdrWaterfallSpeedA" min="0" max="7" step="1" value="0" aria-label="VFO A waterfall scroll speed" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-speed-label" data-vfo="A" style="min-width:3.5em; text-align:right;">Full</span>
                         <label class="text-nowrap mb-0 ms-2" title="Brighten the waterfall — lifts weak signals up the colour scale. Does not affect the spectrum trace above it.">Bright</label>
-                        <input type="range" class="form-range spectrum-bright-slider" data-vfo="A" min="0" max="60" step="1" value="0" aria-label="VFO A waterfall brightness" style="flex:0 0 70px; width:70px;">
+                        <input type="range" class="form-range spectrum-bright-slider" data-vfo="A" data-server-bright="@Model.SdrWaterfallBrightDbA" min="0" max="60" step="1" value="0" aria-label="VFO A waterfall brightness" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-bright-label" data-vfo="A" style="min-width:3.5em; text-align:right;">Off</span>
                     </div>
                     <div class="card-body p-0">
@@ -657,10 +668,10 @@
                         <input type="range" class="form-range spectrum-high-slider" data-vfo="B" min="-100" max="0" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbB))" aria-label="VFO B spectrum High (dB ceiling)" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-high-label" data-vfo="B" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbB))</span>
                         <label class="text-nowrap mb-0 ms-2" title="How fast the waterfall scrolls, from full speed down to 1/128. Does not affect the spectrum trace above it.">Speed</label>
-                        <input type="range" class="form-range spectrum-speed-slider" data-vfo="B" min="0" max="7" step="1" value="0" aria-label="VFO B waterfall scroll speed" style="flex:0 0 70px; width:70px;">
+                        <input type="range" class="form-range spectrum-speed-slider" data-vfo="B" data-server-speed="@Model.SdrWaterfallSpeedB" min="0" max="7" step="1" value="0" aria-label="VFO B waterfall scroll speed" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-speed-label" data-vfo="B" style="min-width:3.5em; text-align:right;">Full</span>
                         <label class="text-nowrap mb-0 ms-2" title="Brighten the waterfall — lifts weak signals up the colour scale. Does not affect the spectrum trace above it.">Bright</label>
-                        <input type="range" class="form-range spectrum-bright-slider" data-vfo="B" min="0" max="60" step="1" value="0" aria-label="VFO B waterfall brightness" style="flex:0 0 70px; width:70px;">
+                        <input type="range" class="form-range spectrum-bright-slider" data-vfo="B" data-server-bright="@Model.SdrWaterfallBrightDbB" min="0" max="60" step="1" value="0" aria-label="VFO B waterfall brightness" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-bright-label" data-vfo="B" style="min-width:3.5em; text-align:right;">Off</span>
                     </div>
                     <div class="card-body p-0">
@@ -1851,7 +1862,7 @@
         import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";
         import { FTdx101Meters }        from "/js/orchestrators/FTdx101Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
-        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=3";
+        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=6";
         import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=5";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
@@ -1991,6 +2002,17 @@
             }
             spectrumPipeline.onSpectrumUpdate('A', data => { spectrumPanelA.update(data); syncSpanButtons('A', data); });
             spectrumPipeline.onSpectrumUpdate('B', data => { spectrumPanelB.update(data); syncSpanButtons('B', data); });
+
+            // Scope on/off switch — turns the radio's spectrum scope + waveform
+            // output on or off (CI-V 27 10 / 27 11). Off stops the trace streaming.
+            const scopeSwitch = document.getElementById('scopeEnableSwitch');
+            if (scopeSwitch) {
+                scopeSwitch.addEventListener('change', () => {
+                    const state = scopeSwitch.checked ? 'on' : 'off';
+                    fetch(`/api/cat/scope/${state}`, { method: 'POST' })
+                        .catch(() => { /* ignore network errors */ });
+                });
+            }
 
             // Per-VFO status routing — drives the panel state + small badge in the header.
             function setStatusBadge(vfo, status) {
@@ -2281,6 +2303,30 @@
             // colour window via panel.setDbRange(high, low). (The old pre-dB
             // "Gain" slider is gone — it drove the SDR worker, which the CI-V
             // scope path doesn't use.) Initial values come from Razor settings.
+            // Debounced server-side persistence of the four spectrum display
+            // sliders (Low/High/Speed/Bright). Merges pending fields per VFO and
+            // POSTs to /api/cat/spectrumdisplay/{vfo} after a quiet period, so
+            // dragging a slider doesn't spam the settings file. This is what makes
+            // the values survive across sessions AND browsers (superseding the old
+            // localStorage-only Speed/Bright); the panel's localStorage cache is
+            // still updated so a same-browser reload is instant before the server
+            // round-trip.
+            const _specSaveTimers  = {};
+            const _specSavePending = { A: {}, B: {} };
+            function persistSpectrumDisplay(vfo, fields) {
+                Object.assign(_specSavePending[vfo], fields);
+                clearTimeout(_specSaveTimers[vfo]);
+                _specSaveTimers[vfo] = setTimeout(() => {
+                    const body = _specSavePending[vfo];
+                    _specSavePending[vfo] = {};
+                    fetch(`/api/cat/spectrumdisplay/${vfo}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    }).catch(() => {});
+                }, 500);
+            }
+
             (function wireDspSliders() {
                 function applyToPanel(vfo, low, high) {
                     const panel = vfo === 'B' ? spectrumPanelB : spectrumPanelA;
@@ -2305,6 +2351,10 @@
                         }
                         lowLabel.textContent = lowSlider.value;
                         applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
+                        persistSpectrumDisplay(vfo, {
+                            low:  parseFloat(lowSlider.value),
+                            high: parseFloat(highSlider.value)
+                        });
                     });
                     highSlider.addEventListener('input', () => {
                         if (parseFloat(highSlider.value) <= parseFloat(lowSlider.value)) {
@@ -2313,17 +2363,22 @@
                         }
                         highLabel.textContent = highSlider.value;
                         applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
+                        persistSpectrumDisplay(vfo, {
+                            low:  parseFloat(lowSlider.value),
+                            high: parseFloat(highSlider.value)
+                        });
                     });
                 });
             })();
 
-            // Waterfall scroll speed — purely client-side (no backend/worker
-            // involvement, unlike the DSP sliders above): it only changes how
-            // often SpectrumPanel advances the waterfall by one row per
-            // incoming FFT frame. Persisted in localStorage by the panel
-            // itself. The slider drags across an *index* into
-            // SpectrumPanel.WATERFALL_SPEEDS (1,2,4,...,128) rather than the
-            // divisor itself, since the divisors aren't evenly spaced.
+            // Waterfall scroll speed — changes how often SpectrumPanel advances
+            // the waterfall by one row per incoming FFT frame. The initial value
+            // is server-rendered (data-server-speed = divisor) so it survives
+            // across browsers/devices; it's also written back to the panel's
+            // localStorage cache so a same-browser reload is instant. The slider
+            // drags across an *index* into SpectrumPanel.WATERFALL_SPEEDS
+            // (1,2,4,...,128) rather than the divisor itself, since the divisors
+            // aren't evenly spaced.
             ['A', 'B'].forEach(vfo => {
                 const slider = document.querySelector(`.spectrum-speed-slider[data-vfo="${vfo}"]`);
                 const label  = document.querySelector(`.spectrum-speed-label[data-vfo="${vfo}"]`);
@@ -2333,20 +2388,25 @@
                 const speeds = SpectrumPanel.WATERFALL_SPEEDS;
                 const formatSpeed = (d) => d === 1 ? 'Full' : `1/${d}`;
 
-                const initialIndex = Math.max(0, speeds.indexOf(panel.getWaterfallSpeed()));
+                const serverDivisor = parseInt(slider.dataset.serverSpeed, 10);
+                const initialIndex  = Math.max(0, speeds.indexOf(
+                    Number.isFinite(serverDivisor) ? serverDivisor : panel.getWaterfallSpeed()));
                 slider.value = String(initialIndex);
                 label.textContent = formatSpeed(speeds[initialIndex]);
+                panel.setWaterfallSpeed(speeds[initialIndex]);   // sync panel + localStorage to server value
 
                 slider.addEventListener('input', () => {
                     const divisor = speeds[parseInt(slider.value, 10)];
                     label.textContent = formatSpeed(divisor);
                     panel.setWaterfallSpeed(divisor);
+                    persistSpectrumDisplay(vfo, { speed: divisor });
                 });
             });
 
-            // Waterfall brightness — also purely client-side. Adds a dB lift to
-            // the waterfall's colour mapping only (the spectrum trace is left
-            // alone). 0 = "Off"; the panel persists the value in localStorage.
+            // Waterfall brightness — adds a dB lift to the waterfall's colour
+            // mapping only (the spectrum trace is left alone). 0 = "Off". Initial
+            // value is server-rendered (data-server-bright) so it survives across
+            // browsers/devices; also mirrored into the panel's localStorage cache.
             ['A', 'B'].forEach(vfo => {
                 const slider = document.querySelector(`.spectrum-bright-slider[data-vfo="${vfo}"]`);
                 const label  = document.querySelector(`.spectrum-bright-label[data-vfo="${vfo}"]`);
@@ -2355,14 +2415,17 @@
 
                 const formatBright = (db) => db <= 0 ? 'Off' : `+${db}`;
 
-                const initial = panel.getWaterfallBrightness();
+                const serverBright = parseInt(slider.dataset.serverBright, 10);
+                const initial = Number.isFinite(serverBright) ? serverBright : panel.getWaterfallBrightness();
                 slider.value = String(initial);
                 label.textContent = formatBright(initial);
+                panel.setWaterfallBrightness(initial);   // sync panel + localStorage to server value
 
                 slider.addEventListener('input', () => {
                     const db = parseInt(slider.value, 10);
                     label.textContent = formatBright(db);
                     panel.setWaterfallBrightness(db);
+                    persistSpectrumDisplay(vfo, { bright: db });
                 });
             });
 
@@ -2376,20 +2439,53 @@
                     b.classList.toggle('active', parseInt(b.dataset.hz, 10) === hz);
                 });
             }
+            // How the watch panel's (VFO B) span buttons behave — the radio has
+            // ONE scope, so B is a crop of A's single sweep:
+            //   ZoomIn — B narrows its crop in software (POST watchspan); A untouched.
+            //   Shared — B drives the one physical span like A (POST scopespan);
+            //            both panels' highlights follow it.
+            //   Hidden — B's span buttons are removed (below); only A controls span.
+            const _watchSpanMode = '@Model.PseudoDualWatchSpanMode';
+
+            async function postSpan(url, hz) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(hz)
+                    });
+                    return res.ok;
+                } catch { return false; /* network error — ignore */ }
+            }
+
             document.querySelectorAll('.span-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const hz  = parseInt(btn.dataset.hz, 10);
                     const vfo = btn.dataset.vfo || 'A';
-                    try {
-                        const res = await fetch(`/api/cat/scopespan/${vfo}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(hz)
-                        });
-                        if (res.ok) markActiveSpan(vfo, hz);
-                    } catch { /* network error — ignore */ }
+
+                    // VFO B in ZoomIn mode: crop-only, never touches the scope or A.
+                    if (vfo === 'B' && _watchSpanMode === 'ZoomIn') {
+                        if (await postSpan('/api/cat/watchspan/B', hz)) markActiveSpan('B', hz);
+                        return;
+                    }
+
+                    // A, or B in Shared mode: drive the one physical span. In Shared
+                    // mode light both panels' buttons so the single scope is obvious.
+                    if (await postSpan(`/api/cat/scopespan/${vfo}`, hz)) {
+                        markActiveSpan(vfo, hz);
+                        if (vfo === 'B' && _watchSpanMode === 'Shared') markActiveSpan('A', hz);
+                        if (vfo === 'A' && _watchSpanMode === 'Shared') markActiveSpan('B', hz);
+                    }
                 });
             });
+
+            // Hidden mode: drop VFO B's span selector entirely.
+            if (_watchSpanMode === 'Hidden') {
+                document.querySelectorAll('.span-btn[data-vfo="B"]').forEach(b => {
+                    const group = b.closest('.btn-group');
+                    if (group) group.style.display = 'none';
+                });
+            }
             window.__markActiveSpan = markActiveSpan;
         });
         async function launchWsjtx() {

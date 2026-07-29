@@ -223,6 +223,27 @@
                     Ignored unless cross-band watch is on.
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="pseudoDualWatchSpanMode">
+                    Watch panel (VFO&nbsp;B) span buttons
+                </label>
+                <select class="form-select" style="max-width: 320px;"
+                        id="pseudoDualWatchSpanMode"
+                        asp-for="Settings.PseudoDualWatchSpanMode">
+                    <option value="ZoomIn">Zoom in independently (recommended)</option>
+                    <option value="Shared">Share one span with VFO A</option>
+                    <option value="Hidden">Hide VFO B's span buttons</option>
+                </select>
+                <div class="form-text">
+                    The radio has one scope with one span, so the watch panel is a crop of the same
+                    sweep — VFO&nbsp;B can never be <em>wider</em> than VFO&nbsp;A.
+                    <strong>Zoom in independently</strong> lets B's buttons tighten its view around the
+                    watch signal in software without changing A.
+                    <strong>Share one span</strong> makes B's buttons set the single physical span like
+                    A's (both panels follow it). <strong>Hide</strong> removes B's span buttons so only
+                    A controls the shared span.
+                </div>
+            </div>
         </div>
     </details>
 

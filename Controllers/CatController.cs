@@ -96,6 +96,92 @@ namespace Icom_Web_Control.Controllers
             return Ok(new { message = $"Scope span ±{hz} Hz set (Receiver {receiver})" });
         }
 
+        // Set the physical scope mode (CI-V 27 14) from the click-the-badge
+        // control on the spectrum panel. {mode} = "center" or "fixed". The
+        // IC-7300 has one Main scope, so the receiver isn't relevant — both
+        // panels reflect the same physical mode.
+        [HttpPost("scopemode/{mode}")]
+        public async Task<IActionResult> SetScopeMode(string mode)
+        {
+            bool center = string.Equals(mode, "center", StringComparison.OrdinalIgnoreCase);
+            bool fixedMode = string.Equals(mode, "fixed", StringComparison.OrdinalIgnoreCase);
+            if (!center && !fixedMode)
+                return BadRequest(new { error = $"Scope mode '{mode}' must be 'center' or 'fixed'" });
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio not connected" });
+
+            await _radio.SetScopeModeAsync(center, CancellationToken.None);
+            return Ok(new { message = $"Scope mode {(center ? "Center" : "Fixed")} set" });
+        }
+
+        // Turn the spectrum scope on or off (CI-V 27 10 / 27 11). {state} = "on"
+        // or "off". Off stops the radio streaming 27 00 frames — the web spectrum
+        // goes quiet — and doubles as a way to test whether the scope stream is
+        // the source of receiver noise.
+        [HttpPost("scope/{state}")]
+        public async Task<IActionResult> SetScopeEnabled(string state)
+        {
+            bool on = string.Equals(state, "on", StringComparison.OrdinalIgnoreCase);
+            bool off = string.Equals(state, "off", StringComparison.OrdinalIgnoreCase);
+            if (!on && !off)
+                return BadRequest(new { error = $"Scope state '{state}' must be 'on' or 'off'" });
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio not connected" });
+
+            await _radio.SetScopeEnabledAsync(on, CancellationToken.None);
+            return Ok(new { message = $"Scope {(on ? "on" : "off")}" });
+        }
+
+        // Pseudo-dual "ZoomIn" span mode: narrow the watch panel's crop of the
+        // single sweep around the watch VFO. Display-only — no CI-V, no effect on
+        // the primary panel or the physical scope; the controller just crops fewer
+        // bins on the next sweep. 0 = auto (widest crop that fits).
+        [HttpPost("watchspan/{receiver}")]
+        public async Task<IActionResult> SetWatchSpan(string receiver, [FromBody] int hz)
+        {
+            if (hz != 0 && Array.IndexOf(AllowedScopeSpansHz, hz) < 0)
+                return BadRequest(new { error = $"Watch span {hz} Hz not one of ±2.5k…±500k (or 0 for auto)" });
+
+            await _radio.SetWatchCropSpanAsync(hz, CancellationToken.None);
+            return Ok(new { message = $"Watch crop ±{hz} Hz set (Receiver {receiver})" });
+        }
+
+        // Persist the four per-panel spectrum display sliders (Low/High dB range,
+        // waterfall Speed, waterfall Brightness) so they survive across sessions
+        // AND browsers/devices. Display-only — no CI-V. Read-modify-write into
+        // appsettings.user.json via ISettingsService. Any field may be omitted;
+        // only the supplied fields are updated. receiver = "A" or "B".
+        [HttpPost("spectrumdisplay/{receiver}")]
+        public async Task<IActionResult> SetSpectrumDisplay(string receiver, [FromBody] SpectrumDisplayRequest req)
+        {
+            bool isB = string.Equals(receiver, "B", StringComparison.OrdinalIgnoreCase);
+            var s = await _settingsService.GetSettingsAsync();
+
+            if (req.Low is float low)
+            {
+                low = Math.Clamp(low, -160f, -20f);
+                if (isB) s.SdrSpectrumLowDbB = low; else s.SdrSpectrumLowDbA = low;
+            }
+            if (req.High is float high)
+            {
+                high = Math.Clamp(high, -100f, 20f);
+                if (isB) s.SdrSpectrumHighDbB = high; else s.SdrSpectrumHighDbA = high;
+            }
+            if (req.Speed is int speed)
+            {
+                speed = Math.Clamp(speed, 1, 128);
+                if (isB) s.SdrWaterfallSpeedB = speed; else s.SdrWaterfallSpeedA = speed;
+            }
+            if (req.Bright is int bright)
+            {
+                bright = Math.Clamp(bright, 0, 60);
+                if (isB) s.SdrWaterfallBrightDbB = bright; else s.SdrWaterfallBrightDbA = bright;
+            }
+
+            await _settingsService.SaveSettingsAsync(s);
+            return Ok(new { message = $"Spectrum display persisted (Receiver {receiver})" });
+        }
+
         [HttpPost("micgain")]
         public async Task<IActionResult> SetMicGain([FromBody] MicGainRequest request)
         {
@@ -1033,6 +1119,16 @@ namespace Icom_Web_Control.Controllers
         public class MicGainRequest
         {
             public int Value { get; set; }
+        }
+
+        // Body for POST spectrumdisplay/{receiver}. All nullable so the client
+        // can PATCH just the slider that moved; omitted fields are left as-is.
+        public class SpectrumDisplayRequest
+        {
+            public float? Low { get; set; }
+            public float? High { get; set; }
+            public int? Speed { get; set; }
+            public int? Bright { get; set; }
         }
 
         public class ProcRequest

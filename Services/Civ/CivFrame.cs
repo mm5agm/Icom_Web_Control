@@ -222,7 +222,14 @@ namespace Icom_Web_Control.Services.Civ
         public const byte SubScopeOnOff    = 0x10;  // 27 10 — scope on/off
         public const byte SubScopeOutput   = 0x11;  // 27 11 — waveform output to controller
         public const byte SubScopeMode     = 0x14;  // 27 14 — center/fixed/scroll
-        public const byte ScopeModeCenter  = 0x00;  // 27 14 00
+        // 27 14 takes TWO data bytes: a leading scope-number selector then the
+        // mode (CI-V manual p.25 shows the format as "00 XX"). The IC-7300 MkII
+        // has a single (Main) scope, so the selector is always 00. Sending only
+        // one byte (27 14 00) is a short frame the radio NG-rejects — that was
+        // why "scope center mode was not acknowledged" appeared in the log.
+        public const byte ScopeMain        = 0x00;  // 27 14 <this> XX — Main scope selector
+        public const byte ScopeModeCenter  = 0x00;  // 27 14 00 00
+        public const byte ScopeModeFixed   = 0x01;  // 27 14 00 01
         // 27 15 — span (Center / SCROLL-C mode), sent as a 5-byte BCD frequency.
         // The value is the ± half-width in Hz: 2500, 5000, 10000, 25000, 50000,
         // 100000, 250000 or 500000 (radio SPAN ±2.5k … ±500k). The reported

@@ -217,7 +217,7 @@ export class SpectrumPanel {
     // ── Public API ───────────────────────────────────────────────────────────
 
     /** Update the spectrum/waterfall with a new frame of FFT data. */
-    update({ bins, centreHz, spanHz }) {
+    update({ bins, centreHz, spanHz, mode }) {
         // Hold mode (set via setHold(true)) freezes the display at the
         // last received frame so the operator can inspect a fleeting signal
         // without it scrolling off the waterfall. Incoming frames are
@@ -227,6 +227,10 @@ export class SpectrumPanel {
         this._lastBins    = bins;
         this._lastCentreHz = centreHz;
         this._lastSpanHz   = spanHz;
+        // Radio scope mode (CENT / FIX / SCROLL-C / SCROLL-F) for the corner
+        // badge. Only the CI-V scope path sends it; SDR frames leave it
+        // undefined, which the badge treats as "nothing to show".
+        if (mode !== undefined) this._scopeMode = mode;
 
         // Only scroll the waterfall every Nth frame per _waterfallSpeed;
         // the spectrum trace above it still redraws every frame regardless.
@@ -412,11 +416,12 @@ export class SpectrumPanel {
             this._crosshairX = (e.clientX - rect.left) * (canvas.width  / rect.width);
             this._crosshairY = (e.clientY - rect.top)  * (canvas.height / rect.height);
 
-            // Swap cursor to row-resize when over the splitter so the
-            // affordance is obvious before the user tries to drag.
+            // Swap cursor to row-resize over the splitter and to a pointer over
+            // the clickable scope-mode badge, so each affordance is obvious
+            // before the user tries to interact.
             canvas.style.cursor = this._isOnSplitter(this._crosshairY, canvas.height)
                 ? 'row-resize'
-                : 'crosshair';
+                : (this._isOnScopeModeBadge(this._crosshairX, this._crosshairY) ? 'pointer' : 'crosshair');
 
             if (this._lastBins) this._render();
             // Announce cursor frequency to screen readers via a live region (debounced to 1 s).
@@ -457,6 +462,15 @@ export class SpectrumPanel {
         return Math.abs(canvasY - splitY) <= 6;
     }
 
+    // Hit test for the scope-mode badge (canvas-internal pixels). Null-safe:
+    // the badge only exists while a CI-V scope mode is known.
+    _isOnScopeModeBadge(canvasX, canvasY) {
+        const b = this._scopeModeBadgeRect;
+        if (!b || canvasX == null || canvasY == null) return false;
+        return canvasX >= b.x && canvasX <= b.x + b.w &&
+               canvasY >= b.y && canvasY <= b.y + b.h;
+    }
+
     _onCanvasClick(e) {
         if (!this._lastBins || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
 
@@ -467,6 +481,17 @@ export class SpectrumPanel {
         const rect   = canvas.getBoundingClientRect();
         const x      = e.clientX - rect.left;
         const W      = canvas.width;
+
+        // Clicks on the scope-mode badge toggle the radio between Center and
+        // Fixed rather than tuning. CENT is the mode the panel's axis assumes;
+        // clicking a green CENT badge flips to Fixed, an amber FIX badge back to
+        // Center. The badge only appears on the CI-V scope path (not SDR).
+        if (this._isOnScopeModeBadge(x * (W / rect.width), this._canvasYFromEvent(e, canvas))) {
+            const target = (this._scopeMode === 'CENT') ? 'fixed' : 'center';
+            fetch(`/api/cat/scopemode/${target}`, { method: 'POST' })
+                .catch(() => { /* ignore network errors */ });
+            return;
+        }
 
         // Click-to-tune is active across the whole panel — both the live
         // spectrum (top ~45%) and the waterfall (bottom ~55%). Clicking a
@@ -599,11 +624,13 @@ export class SpectrumPanel {
         const spanHz      = this._lastSpanHz;
 
         this._drawSpectrum(ctx, bins, W, specH);
+        this._drawOutOfBandShade(ctx, W, specH);
         this._drawFrequencyAxis(ctx, bins, W, specH, centreHz, spanHz);
         this._drawBandEdges(ctx, W, specH);
         this._drawBandMarkers(ctx, W, specH);
         this._drawSpots(ctx, W, specH);
         this._drawDxBadge(ctx, W);
+        this._drawScopeModeBadge(ctx);
         if (scrollWaterfall || !this._waterfallData) this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawPinnedCursor(ctx, W, specH);
         this._drawCrosshair(ctx, W, specH, spanHz);
@@ -699,6 +726,53 @@ export class SpectrumPanel {
         ctx.fillRect(4, 4, textWidth + padX * 2, 20);
         ctx.fillStyle = '#000000';
         ctx.fillText(label, 4 + padX, 4 + padY);
+        ctx.restore();
+    }
+
+    // ── Out-of-band dimming ──────────────────────────────────────────────────
+    // The IC-7300's scope is a fixed ± window centred on the VFO, so on most
+    // bands it spills past the amateur allocation (e.g. on 20 m the sweep runs
+    // below 14.000 and above 14.350). Rather than crop — which would change the
+    // horizontal scale per band and break every overlay's hz→x maths — we lay a
+    // translucent dark veil over the out-of-band columns so the in-band section
+    // clearly stands out while adjacent activity stays visible (just greyed).
+    // Drawn between the trace and the axis/edge lines so those render crisp on
+    // top. Same edge data as _drawBandEdges.
+    _drawOutOfBandShade(ctx, W, specH) {
+        if (this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        const edges = this._bandEdges ?? SpectrumPanel.BAND_EDGES;
+        if (!edges || !edges.length) return;
+
+        // In-band intervals overlapping the visible window, clipped to it.
+        const inBand = [];
+        for (const edge of edges) {
+            const lo = Math.max(edge.lo, leftHz);
+            const hi = Math.min(edge.hi, rightHz);
+            if (hi > lo) inBand.push([lo, hi]);
+        }
+        inBand.sort((a, b) => a[0] - b[0]);
+
+        const hzToX = (hz) => ((hz - leftHz) / this._lastSpanHz) * W;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';   // dim veil over out-of-band
+
+        // Shade every gap: window-start → first band, between bands, last band →
+        // window-end. If no band overlaps the window the whole thing is shaded.
+        let cursor = leftHz;
+        for (const [lo, hi] of inBand) {
+            if (lo > cursor) {
+                const x0 = hzToX(cursor);
+                ctx.fillRect(x0, 0, hzToX(lo) - x0, specH);
+            }
+            if (hi > cursor) cursor = hi;
+        }
+        if (cursor < rightHz) {
+            const x0 = hzToX(cursor);
+            ctx.fillRect(x0, 0, hzToX(rightHz) - x0, specH);
+        }
         ctx.restore();
     }
 
@@ -839,6 +913,41 @@ export class SpectrumPanel {
         ctx.textAlign = 'left';
         ctx.fillText(label, x + padX, y + padY);
         ctx.restore();
+    }
+
+    // Small badge in the top-left showing the radio's live scope mode
+    // (CENT / FIX / SCROLL-C / SCROLL-F), read from the 27 00 waveform header.
+    // Only the CI-V scope path sets _scopeMode; SDR frames leave it undefined,
+    // so the badge is drawn only when a mode is actually known. CENT is the
+    // mode this panel's axis assumes, so it reads neutral/green; any other mode
+    // is amber to warn that the trace may not line up with the frequency axis.
+    _drawScopeModeBadge(ctx) {
+        const mode = this._scopeMode;
+        if (!mode) { this._scopeModeBadgeRect = null; return; }
+
+        const aligned = (mode === 'CENT');
+        const bg = aligned ? '#1e7e34' : '#b58900';
+        const fg = aligned ? '#ffffff' : '#000000';
+
+        ctx.save();
+        ctx.font         = 'bold 14px sans-serif';
+        ctx.textBaseline = 'top';
+        const padX = 8;
+        const padY = 5;
+        const w = ctx.measureText(mode).width + padX * 2;
+        const h = 24;
+        const x = 4;
+        const y = 4;
+        ctx.fillStyle = bg;
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = fg;
+        ctx.textAlign = 'left';
+        ctx.fillText(mode, x + padX, y + padY);
+        ctx.restore();
+
+        // Remember the hit rect (canvas-internal pixels) so a click here toggles
+        // the radio's scope mode instead of tuning.
+        this._scopeModeBadgeRect = { x, y, w, h };
     }
 
     // ── DX cluster spot overlay ──────────────────────────────────────────────

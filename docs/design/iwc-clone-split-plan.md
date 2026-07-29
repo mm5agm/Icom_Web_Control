@@ -204,3 +204,27 @@ After Phase 1 there's a running app with a hole where the protocol goes. Every p
 **UI:** a "ZIN" (or "Zero-beat") on-screen button next to the CW-decode toggle; one-shot action (measure → single QSY), not a continuous servo. Works for remote operators too — which the radio's own front-panel AUTOTUNE never could.
 
 **⚠️ Open item before building:** confirm the **exact CI-V read for the CW pitch** so the target tone `f_pitch` is precise rather than assumed (the IC-7300 MkII CW pitch is a SET-menu value in the `1A 05 nn nn` family — nail down the sub-address and its Hz encoding from `docs/manuals/IC-7300MK2_ENG_CI-V_0.pdf` at implementation time). Until confirmed, ZIN could fall back to a user-entered pitch, but reading it from the radio is the correct source of truth.
+
+---
+
+## Phase 7 (future) — Skins: switchable full-layout screens (MM5AGM request, 2026-07-29)
+
+**Idea:** let the operator pick between several complete **skins**, where a skin is not just a colour theme but a whole screen — its own **layout** (which panels sit where, and their sizes), its own **control set** (which controls are shown or hidden), *and* its own **colours/typography**, bundled together as one selectable look. **One selector, not a skin × theme matrix** (MM5AGM decision 2026-07-29: "full bundle… simpler mental model, less flexible" — chosen deliberately over keeping layout and colour as independent axes).
+
+**Relationship to the theme-system goal (reconciled — read this before building):** the earlier frontend plan (see the UI-theme memory) framed theming as a *separate* colour/font axis driven by CSS custom properties, shipping a list of themes (**IC-7300 / Classic Yaesu-style / Dark / Light**) chosen independently of layout. That token infrastructure is still the **implementation foundation** — nothing hardcodes a colour, everything reads a CSS custom property — but the *user-facing* unit is now the **skin**, which packages { token set + layout + control-visibility } together. The old theme list **folds into** skins: e.g. the "IC-7300" theme becomes the look-half of the Front-Panel-Replica skin; "Light" is the default skin's palette. Users pick a skin, not a theme-then-layout pair. This supersedes the "theme switcher in header + Settings" framing only at the UI level — the persistence mechanism and token approach carry over unchanged.
+
+**Planned skins, in MM5AGM's priority order:**
+1. **Front-Panel Replica** *(first deliverable)* — arranged to resemble the physical IC-7300 face: scope-dominant, bold blocky frequency readout, controls placed where the radio has them, black/blue Icom palette. The "feels like my radio" skin.
+2. **Large-print** *(second)* — big frequency readout, large hit-targets, high contrast, minimal clutter, essentials only. Directly serves IWC's core **partially-sighted-operator + voice-control** goal. Must honour the accessibility-first layout constraints already called out in the Phase 4 layout pass (don't shrink hit targets, keep segmented-button/slider affordances legible).
+3. **Others to follow** — not fixed; candidates include Minimalist/clean (casual listening: freq + mode + S-meter + one spectrum) and Contest/DX operating (surfaces split, the Phase-5 dual-VFO watch, memories, DX spots; de-emphasises rarely-touched DSP). Add as wanted.
+
+**Architecture sketch (decide specifics at build time):**
+- A **skin descriptor** selects three things: (a) a **layout** — the panel arrangement, realistically a CSS-grid `grid-template` and/or a per-skin Razor partial for the home page; (b) a **token set** — the existing CSS-custom-property values; (c) a **control manifest** — which control groups render vs collapse. The current single hardcoded `Index.cshtml` arrangement becomes the *default* skin.
+- **Selector** in the header + Settings; persisted to `localStorage` for instant no-reload apply and mirrored to `appsettings.user.json` so it survives restart — the same pattern the theme switcher was already going to use.
+- Keep all the live plumbing **skin-agnostic**: the SignalR value flow, gauges, spectrum panels, and voice hooks must not fork per skin — a skin only *re-arranges and re-styles existing components*, never duplicates the data path. This is the constraint that keeps N skins maintainable.
+
+**Effort note:** the token/colour half is incremental; the **layout** half is the real work. The home page is currently one fixed arrangement, so making layout swappable (a grid template each skin sets, or a partial-per-skin) is the foundational task the *first* skin pays for — later skins are then cheap. **Fold this together with the Phase 4 "control layout / whitespace pass"** rather than doing two separate layout reworks. Pure frontend/CSS/Razor work — no CI-V changes.
+
+**Sequencing:** capture-only for now (MM5AGM 2026-07-29, "decide later"). Lands after the Phase 5 cross-band peek, on top of the CSS-token theming foundation; Front-Panel-Replica is deliverable #1, Large-print #2.
+
+**Open decisions before building:** layout mechanism (one responsive grid whose template each skin sets, vs a Razor partial per skin); whether control-hiding is per-skin only or also allows a user override on top; how a skin interacts with the existing per-VFO waterfall/spectrum `localStorage` prefs; whether skins stay a fixed built-in set or become user-authored/JSON-defined later.

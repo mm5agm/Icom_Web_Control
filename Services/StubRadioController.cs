@@ -251,6 +251,33 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // Scope mode (CI-V 27 14, canned) — the fake sweep is always "Center",
+        // so just remember the request; the emitted frames stay centred.
+        private bool _scopeCenter = true;
+        private volatile bool _scopeEnabled = true;
+
+        public Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default)
+        {
+            _scopeCenter = center;
+            return Task.CompletedTask;
+        }
+
+        public Task SetScopeEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+        {
+            _scopeEnabled = enabled;
+            return Task.CompletedTask;
+        }
+
+        // Watch-panel crop span (Phase 5 "ZoomIn" mode) — display-only; the stub
+        // has no real crop path, so just remember the value.
+        private int _watchCropHalfHz;
+
+        public Task SetWatchCropSpanAsync(int halfHz, CancellationToken cancellationToken = default)
+        {
+            _watchCropHalfHz = System.Math.Max(0, halfHz);
+            return Task.CompletedTask;
+        }
+
         // -- Power on/off (Phase 3 block 7, canned) ----------------------------
 
         public Task SetPowerAsync(bool on, CancellationToken cancellationToken = default)
@@ -345,22 +372,26 @@ namespace Icom_Web_Control.Services
                 // Canned dual-panel spectrum (Phase 5). Feed A always and B too
                 // (frontend hides B unless pseudo-dual is on). Re-assert streaming
                 // status periodically so late-connecting clients pick it up.
-                FillCannedSpectrum(_binsA, phase);
-                FillCannedSpectrum(_binsB, phase * 1.1 + 0.5);
-                try
+                if (_scopeEnabled)
                 {
-                    await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
-                        new { sdrId = "A", bins = _binsA, centreHz = _freqA, spanHz = _scopeSpanHz * 2 }, stoppingToken);
-                    await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
-                        new { sdrId = "B", bins = _binsB, centreHz = _freqB, spanHz = _scopeSpanHz * 2 }, stoppingToken);
-                    if (_scopeFrame++ % 6 == 0)
+                    FillCannedSpectrum(_binsA, phase);
+                    FillCannedSpectrum(_binsB, phase * 1.1 + 0.5);
+                    string mode = _scopeCenter ? "CENT" : "FIX";
+                    try
                     {
-                        await _hubContext.Clients.All.SendAsync("SdrStatus", new { sdrId = "A", status = "streaming" }, stoppingToken);
-                        await _hubContext.Clients.All.SendAsync("SdrStatus", new { sdrId = "B", status = "streaming" }, stoppingToken);
+                        await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
+                            new { sdrId = "A", bins = _binsA, centreHz = _freqA, spanHz = _scopeSpanHz * 2, mode }, stoppingToken);
+                        await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
+                            new { sdrId = "B", bins = _binsB, centreHz = _freqB, spanHz = _scopeSpanHz * 2, mode }, stoppingToken);
+                        if (_scopeFrame++ % 6 == 0)
+                        {
+                            await _hubContext.Clients.All.SendAsync("SdrStatus", new { sdrId = "A", status = "streaming" }, stoppingToken);
+                            await _hubContext.Clients.All.SendAsync("SdrStatus", new { sdrId = "B", status = "streaming" }, stoppingToken);
+                        }
                     }
+                    catch (OperationCanceledException) { break; }
+                    catch { /* no clients / hub busy — ignore in the stub */ }
                 }
-                catch (OperationCanceledException) { break; }
-                catch { /* no clients / hub busy — ignore in the stub */ }
 
                 try { await Task.Delay(500, stoppingToken); }
                 catch (OperationCanceledException) { break; }

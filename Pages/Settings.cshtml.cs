@@ -190,6 +190,12 @@ namespace Icom_Web_Control.Pages
                     (Settings.PseudoDualPeekIntervalSeconds >= 5 && Settings.PseudoDualPeekIntervalSeconds <= 60)
                         ? Settings.PseudoDualPeekIntervalSeconds
                         : 15;
+                // Watch-panel (VFO B) span-button behaviour; fall back to the
+                // ZoomIn default for any unrecognised value.
+                current.PseudoDualWatchSpanMode =
+                    Settings.PseudoDualWatchSpanMode is "ZoomIn" or "Shared" or "Hidden"
+                        ? Settings.PseudoDualWatchSpanMode
+                        : "ZoomIn";
 
                 await _settingsService.SaveSettingsAsync(current);
 

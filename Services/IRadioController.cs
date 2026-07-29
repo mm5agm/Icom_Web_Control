@@ -191,6 +191,33 @@ namespace Icom_Web_Control.Services
         /// </summary>
         Task SetScopeSpanAsync(int spanHz, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Set the scope mode (CI-V 27 14): Center or Fixed. Center keeps the
+        /// sweep centred on the operating frequency — the assumption the web
+        /// SpectrumPanel's axis is built on — so <paramref name="center"/> = true
+        /// is the aligned mode; false selects Fixed. Retried until acknowledged.
+        /// </summary>
+        Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Turn the spectrum scope and its waveform-to-controller output on or off
+        /// (CI-V 27 10 / 27 11). Off stops the radio streaming 27 00 frames, so the
+        /// web spectrum goes quiet. A manual off is remembered so a reconnect
+        /// doesn't switch the scope back on. Also the operator's control for
+        /// testing whether the scope stream is the source of receiver noise.
+        /// </summary>
+        Task SetScopeEnabledAsync(bool enabled, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Set the pseudo-dual watch panel's crop half-width in Hz (Phase 5,
+        /// "ZoomIn" span mode). This is a display-only crop of the single physical
+        /// sweep around the watch VFO — it emits no CI-V and never affects the
+        /// primary panel or the real scope. <paramref name="halfHz"/> uses the same
+        /// ± half-width values as <see cref="SetScopeSpanAsync"/>; 0 (or a value
+        /// wider than the available sweep) means "auto" — the widest crop that fits.
+        /// </summary>
+        Task SetWatchCropSpanAsync(int halfHz, CancellationToken cancellationToken = default);
+
         // -- Power on/off (Phase 3 block 7, CI-V command 18) -------------------
 
         /// <summary>

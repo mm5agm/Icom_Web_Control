@@ -118,6 +118,17 @@
         public float SdrSpectrumHighDbA { get; set; } = 0f;
         public float SdrSpectrumHighDbB { get; set; } = 0f;
 
+        //   WaterfallSpeed — divisor into SpectrumPanel.WATERFALL_SPEEDS
+        //             [1,2,4,8,16,32,64,128]; 1 = fastest scroll. Default 1.
+        //   WaterfallBrightDb — additive dB brightness lift for the waterfall,
+        //             0..60. Default 0. Both mirror the index panel sliders and
+        //             persist across sessions/devices (superseding the old
+        //             localStorage-only iwc.waterfall* keys).
+        public int SdrWaterfallSpeedA   { get; set; } = 1;
+        public int SdrWaterfallSpeedB   { get; set; } = 1;
+        public int SdrWaterfallBrightDbA { get; set; } = 0;
+        public int SdrWaterfallBrightDbB { get; set; } = 0;
+
         // ── Pseudo-dual receiver (Phase 5) ────────────────────────────────
         // The IC-7300 MkII has ONE receiver. This feature *presents* a second
         // VFO's spectrum ("watch" panel) alongside the primary you actually
@@ -145,6 +156,21 @@
         // Bigger = fewer/rarer audio dips but a staler watch trace. Default 15
         // (≈4 brief dips/min). Clamped to 5–60 in the UI.
         public int PseudoDualPeekIntervalSeconds { get; set; } = 15;
+
+        // How the watch panel's (VFO B) span buttons behave. The radio has ONE
+        // scope with ONE span (CI-V 27 15), and the watch panel is a crop of that
+        // single sweep — so B can never be WIDER than A. Three modes:
+        //   "ZoomIn" (default) — B's buttons narrow B's crop around the watch VFO
+        //             in software only; they never touch the physical scope, so
+        //             changing B no longer changes A. B can go narrower than A
+        //             (zoom into the watch signal); asking for wider than the
+        //             available sweep just clamps to the max crop.
+        //   "Shared" — B's buttons set the one physical span like A's; both panels'
+        //             active span highlights follow it, making the single scope
+        //             obvious. B always matches A.
+        //   "Hidden" — B shows no span buttons; only A controls the shared span.
+        // Default "ZoomIn" so the panels feel independent out of the box.
+        public string PseudoDualWatchSpanMode { get; set; } = "ZoomIn";
 
         // Optional user override for the SDRplay API install directory
         // (the folder that contains the x64\sdrplay_api.dll subfolder).
