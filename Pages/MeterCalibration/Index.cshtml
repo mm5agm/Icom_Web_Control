@@ -15,6 +15,11 @@
             <button id="txBtn" class="btn-tx">TX</button>
             <button id="helpBtn" class="btn-help">? Help</button>
             <button type="button" onclick="window.open(window.location.origin + '/Diagnostics', 'diagnostics', 'width=1400,height=900,resizable=yes')" class="btn-help">Diagnostics</button>
+            <button id="emailCalBtn" class="btn-secondary" title="Send your calibration to the developer so it can be folded into a future release">✉ Email calibration to developer</button>
+            @if (Model.IsDevelopmentMode)
+            {
+                <button id="importDefaultBtn" class="btn-help" title="Read an emailed calibration from the clipboard and fold it into the shipped default file (developer only)">⬇ Import emailed cal → default (dev)</button>
+            }
             <span id="saveStatus" class="save-status"></span>
         </div>
     </div>
@@ -364,6 +369,82 @@
                 alert('Reset failed: ' + e.message);
             }
         });
+
+        // ── Email calibration to the developer ─────────────────────────────
+        // Users can't edit the shipped defaults, but they CAN send Colin their
+        // tuned tables so he can fold them into a future release. This opens
+        // their mail client with the JSON pre-filled (and copies it to the
+        // clipboard as a fallback for webmail users who ignore mailto:).
+        document.getElementById("emailCalBtn").addEventListener("click", async () => {
+            const status = document.getElementById("saveStatus");
+            try {
+                const r = await fetch("/api/calibration/file");
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const data = await r.json();
+
+                const model = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RadioModel));
+                const cal = JSON.stringify(data.calibration, null, 2);
+                const subject = "IWC calibration data — " + (model || "radio");
+                const body =
+                    "Hi Colin,\n\n" +
+                    "Here is my Icom Web Control meter calibration for my " + (model || "radio") + ".\n\n" +
+                    "(If the JSON below is missing, it has been copied to your clipboard — just paste it here.)\n\n" +
+                    cal + "\n";
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(cal).catch(() => { });
+                }
+
+                window.location.href =
+                    "mailto:mm5agm@@outlook.com?subject=" + encodeURIComponent(subject) +
+                    "&body=" + encodeURIComponent(body);
+
+                status.textContent = "Opening your email app… (also copied to clipboard)";
+                setTimeout(() => { status.textContent = ""; }, 4000);
+            } catch (err) {
+                status.textContent = "Could not read calibration: " + err.message;
+                setTimeout(() => { status.textContent = ""; }, 4000);
+            }
+        });
+
+        // ── Developer-only: import an emailed calibration into the default ──
+        // Colin copies a user's emailed JSON to the clipboard, then clicks this.
+        // The server edits only the changed "raw" values in the shipped default
+        // file for that radio, so the git diff stays tiny and reviewable.
+        const importBtn = document.getElementById("importDefaultBtn");
+        if (importBtn) {
+            importBtn.addEventListener("click", async () => {
+                const status = document.getElementById("saveStatus");
+                if (!navigator.clipboard || !navigator.clipboard.readText) {
+                    status.textContent = "Clipboard read not available in this browser.";
+                    return;
+                }
+                try {
+                    const text = await navigator.clipboard.readText();
+                    const resp = await fetch("/api/calibration/import-default", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text })
+                    });
+                    const r = await resp.json();
+                    if (resp.ok && r.ok) {
+                        if (r.changed) {
+                            status.textContent =
+                                "Imported into " + r.fileName + " (" + r.model + "): updated " +
+                                (r.updated && r.updated.length ? r.updated.join(", ") : "—") +
+                                (r.structural ? "  ⚠ " + r.structural : "");
+                        } else {
+                            status.textContent = (r.message || "No changes — default already matches.") +
+                                " (" + (r.model || "") + ")";
+                        }
+                    } else {
+                        status.textContent = "Import failed: " + (r.message || ("HTTP " + resp.status));
+                    }
+                } catch (err) {
+                    status.textContent = "Import failed: " + err.message;
+                }
+            });
+        }
 
         // Help modal
         const helpModal = document.getElementById("helpModal");

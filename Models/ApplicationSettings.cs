@@ -291,6 +291,16 @@
         // sighted operators never have to change the Windows default device
         // (which would disturb whatever else -- WSJT-X etc. -- relies on it).
         public string VoiceInputDeviceName { get; set; } = "";
+
+        // Which speaker/output device the spoken confirmations play through.
+        // Empty = the Windows default playback device (SetOutputToDefaultAudioDevice).
+        // A non-empty value is a WaveOut/MME product name (see AudioOutput);
+        // VoiceTtsService renders the phrase to a WAV and plays it to that device
+        // itself, because System.Speech can't target an output device by name.
+        // Chosen from the picker in Settings → Voice Control so a partially-
+        // sighted operator can send confirmations to their own speakers/headset
+        // while the Windows default stays pointed at WSJT-X, rig audio, etc.
+        public string VoiceOutputDeviceName { get; set; } = "";
     }
 
     public class RadioState

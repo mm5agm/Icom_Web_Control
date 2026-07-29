@@ -36,6 +36,17 @@ namespace Icom_Web_Control.Services.Voice
     /// </summary>
     internal static class VoiceGrammar
     {
+        /// <summary>
+        /// Decomposed commands whose trigger prefix is made optional in the
+        /// grammar (see BuildDecomposed). Their vocabulary carries its own unit
+        /// word ("...metres", "...hertz"), so a bare value is unambiguous and
+        /// the user can skip the lead-in ("forty metres" == "go to forty
+        /// metres"). Single source of truth: consumed by Build() below and by
+        /// VoiceHelpBuilder so the on-screen help matches what actually works.
+        /// </summary>
+        public static readonly IReadOnlySet<string> TriggerOptionalCommands =
+            new HashSet<string>(StringComparer.Ordinal) { "SetBand", "SetNudgeStep" };
+
         public static Grammar Build(VoicePhrasesConfig cfg, string culture = "en-GB")
         {
             // GrammarBuilder.Culture defaults to the current thread's culture,
@@ -78,8 +89,8 @@ namespace Icom_Web_Control.Services.Voice
             // (mode/att/preamp/agc/af gain) have bare vocabulary ("data",
             // "fifty", "fast") that would collide across branches without a
             // mandatory trigger, so they stay trigger-required.
-            Try("SetBand",                () => BuildDecomposed("SetBand",        cfg.SetBand,      triggerOptional: true));
-            Try("SetNudgeStep",           () => BuildDecomposed("SetNudgeStep",   cfg.SetNudgeStep, triggerOptional: true));
+            Try("SetBand",                () => BuildDecomposed("SetBand",        cfg.SetBand,      triggerOptional: TriggerOptionalCommands.Contains("SetBand")));
+            Try("SetNudgeStep",           () => BuildDecomposed("SetNudgeStep",   cfg.SetNudgeStep, triggerOptional: TriggerOptionalCommands.Contains("SetNudgeStep")));
             Try("SetAttenuator",          () => BuildDecomposed("SetAttenuator",  cfg.SetAttenuator));
             Try("SetPreamp",              () => BuildDecomposed("SetPreamp",      cfg.SetPreamp));
             Try("SetAgc",                 () => BuildDecomposed("SetAgc",         cfg.SetAgc));

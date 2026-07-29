@@ -359,6 +359,26 @@
                 </div>
                 <div id="voiceInputDeviceNote" class="mt-2"></div>
             </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="voiceOutputDevice">Announcement speaker</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <select class="form-select w-auto" id="voiceOutputDevice">
+                        <option value="">Loading…</option>
+                    </select>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="voiceOutputTestBtn">
+                        <i class="bi bi-volume-up" aria-hidden="true"></i>&nbsp;Test
+                    </button>
+                </div>
+                <div class="form-text">
+                    Which speaker or headset the spoken confirmations play through. Leave on
+                    <em>Windows default playback device</em> to follow your system setting — but if
+                    your default is used by something else (WSJT-X, rig audio) you may never hear
+                    the announcements, so pick your own speakers here. Picking one does
+                    <strong>not</strong> change your Windows default. Press <em>Test</em> to check
+                    you can hear it.
+                </div>
+                <div id="voiceOutputDeviceNote" class="mt-2"></div>
+            </div>
             <div class="mb-3 form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch"
                        id="voiceSpokenConfirmationEnabled" asp-for="Settings.VoiceSpokenConfirmationEnabled" />
@@ -385,6 +405,10 @@
                     the source of any language pack you import, or you're hand-authoring your own commands.
                 </div>
             </div>
+            <!-- Save button injected here (see .section-save-anchor handler) so
+                 changing the mic/speaker/toggles above doesn't require scrolling
+                 past the whole Voice Phrases editor to reach a Save button. -->
+            <div class="section-save-anchor"></div>
             <!-- Voice Phrases editor -->
             <div class="mb-3">
                 <label class="form-label fw-semibold">Voice Phrases</label>
@@ -659,6 +683,88 @@
                 });
             })();
             iwcLoadMicrophones();
+
+            // ── Speaker (announcement) picker ──────────────────────────────
+            // System.Speech can't target an output device by name, so the chosen
+            // speaker is rendered-and-played server-side. Lists devices, POSTs the
+            // pick (applied live, no restart), and offers a Test button.
+
+            function renderSpeakerNote(msg) {
+                const note = document.getElementById('voiceOutputDeviceNote');
+                if (!note) return;
+                note.innerHTML = msg
+                    ? '<div class="alert alert-warning py-1 px-2 small mb-0">' + escapeHtml(msg) + '</div>'
+                    : '';
+            }
+
+            async function iwcLoadSpeakers() {
+                const select = document.getElementById('voiceOutputDevice');
+                if (!select) return;
+                try {
+                    const r = await fetch('/api/voice/speakers');
+                    if (!r.ok) { select.innerHTML = '<option value="">Failed to load</option>'; return; }
+                    const data = await r.json();
+                    let html = '<option value=""' + (data.usingDefault ? ' selected' : '') +
+                        '>Windows default playback device</option>';
+                    html += data.devices.map(d =>
+                        '<option value="' + escapeHtml(d.name) + '"' + (d.isSelected ? ' selected' : '') + '>' +
+                        escapeHtml(d.name) + '</option>').join('');
+                    if (!data.usingDefault && !data.selectedPresent && data.selected) {
+                        html += '<option value="' + escapeHtml(data.selected) + '" selected>' +
+                            escapeHtml(data.selected) + ' (not connected)</option>';
+                    }
+                    select.innerHTML = html;
+                    renderSpeakerNote((!data.usingDefault && !data.selectedPresent)
+                        ? 'The saved speaker isn’t connected right now. Reconnect it, or pick another.'
+                        : '');
+                } catch (e) {
+                    select.innerHTML = '<option value="">Failed to load</option>';
+                }
+            }
+
+            (function () {
+                const select = document.getElementById('voiceOutputDevice');
+                if (select) {
+                    select.addEventListener('change', async function () {
+                        const name = select.value;
+                        select.disabled = true;
+                        try {
+                            const r = await fetch('/api/voice/speaker', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name }),
+                            });
+                            if (!r.ok) {
+                                const data = await r.json().catch(() => ({}));
+                                alert('Could not switch speaker: ' + (data.error || ('HTTP ' + r.status)));
+                                await iwcLoadSpeakers();
+                                return;
+                            }
+                            renderSpeakerNote('');
+                        } catch (e) {
+                            alert('Could not switch speaker: ' + e);
+                        } finally {
+                            select.disabled = false;
+                        }
+                    });
+                }
+                const testBtn = document.getElementById('voiceOutputTestBtn');
+                if (testBtn) {
+                    testBtn.addEventListener('click', async function () {
+                        testBtn.disabled = true;
+                        try {
+                            await fetch('/api/voice/speaker-test', { method: 'POST' });
+                        } catch (e) {
+                            alert('Could not play test announcement: ' + e);
+                        } finally {
+                            // Re-enable after a moment so it can't be spammed while
+                            // the phrase is still playing.
+                            setTimeout(() => { testBtn.disabled = false; }, 1500);
+                        }
+                    });
+                }
+            })();
+            iwcLoadSpeakers();
 
             async function iwcOpenGrammarsFolder() {
                 try {
@@ -2082,20 +2188,35 @@
         // section its own. They are plain type=submit buttons inside
         // #settingsForm, so they post the whole form exactly like the main
         // button and go through the same jQuery-validate submit handler below.
-        // Injected in JS to stay DRY — one button definition, appended to each
-        // section body — rather than repeating markup in every <details>.
+        // Injected in JS to stay DRY — one button definition — rather than
+        // repeating markup in every <details>.
+        //
+        // Left-aligned (Colin's preference — easier to find at the margin than
+        // hunting the right edge). A section can also mark an extra insertion
+        // point with a .section-save-anchor element so a very long section (e.g.
+        // Voice Control, whose Voice Phrases editor keeps growing) gets a Save
+        // button partway down — a user who changed a control up top needn't
+        // scroll past everything below it to save.
         (function () {
             var form = document.getElementById('settingsForm');
             if (!form) return;
-            form.querySelectorAll('.section-body').forEach(function (body) {
+            function makeSaveRow() {
                 var row = document.createElement('div');
-                row.className = 'section-save-row mt-3 pt-3 border-top text-end';
+                row.className = 'section-save-row mt-3 pt-3 border-top text-start';
                 var btn = document.createElement('button');
                 btn.type = 'submit';
                 btn.className = 'btn btn-primary btn-sm';
                 btn.innerHTML = '<i class="bi bi-save"></i> Save Settings';
                 row.appendChild(btn);
-                body.appendChild(row);
+                return row;
+            }
+            // Mid-section anchors first (a Save button before the anchored element).
+            form.querySelectorAll('.section-save-anchor').forEach(function (anchor) {
+                anchor.parentNode.insertBefore(makeSaveRow(), anchor);
+            });
+            // Then one at the end of every section body.
+            form.querySelectorAll('.section-body').forEach(function (body) {
+                body.appendChild(makeSaveRow());
             });
         })();
     </script>

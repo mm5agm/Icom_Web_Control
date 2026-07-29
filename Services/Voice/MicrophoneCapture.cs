@@ -57,7 +57,7 @@ namespace Icom_Web_Control.Services.Voice
                 {
                     var caps = WaveInEvent.GetCapabilities(i);
                     if (!string.IsNullOrWhiteSpace(caps.ProductName))
-                        list.Add(new InputDevice(i, caps.ProductName));
+                        list.Add(new InputDevice(i, Normalize(caps.ProductName)));
                 }
                 catch
                 {
@@ -79,12 +79,13 @@ namespace Icom_Web_Control.Services.Voice
         public static int FindDeviceIndex(string? name)
         {
             if (string.IsNullOrWhiteSpace(name)) return -1;
+            var target = Normalize(name);
             int count = WaveInEvent.DeviceCount;
             for (int i = 0; i < count; i++)
             {
                 try
                 {
-                    if (string.Equals(WaveInEvent.GetCapabilities(i).ProductName, name, StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(Normalize(WaveInEvent.GetCapabilities(i).ProductName), target, StringComparison.OrdinalIgnoreCase))
                         return i;
                 }
                 catch
@@ -94,6 +95,13 @@ namespace Icom_Web_Control.Services.Voice
             }
             return -1;
         }
+
+        // MME product names come from a fixed 32-char buffer, so long names
+        // arrive truncated at 31 chars and can end on a space. That trailing
+        // space survives enumeration but is stripped somewhere in the
+        // browser → JSON → settings round-trip, breaking a later exact match.
+        // Trimming trailing whitespace on both sides keeps the key stable.
+        private static string Normalize(string name) => name.TrimEnd();
     }
 
     /// <summary>

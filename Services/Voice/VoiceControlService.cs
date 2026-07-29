@@ -120,6 +120,7 @@ namespace Icom_Web_Control.Services.Voice
             // the toggle in Settings and restart IWC to enable.
             var settings = await _settings.GetSettingsAsync();
             _configuredMicName = settings.VoiceInputDeviceName;
+            _tts.ApplyOutputDevice(settings.VoiceOutputDeviceName);
             if (settings.VoiceControlEnabled)
             {
                 TryInitialiseEngine(string.IsNullOrWhiteSpace(settings.VoiceActiveLocale)
@@ -345,6 +346,18 @@ namespace Icom_Web_Control.Services.Voice
             _logger.LogInformation("[Voice] Input device set to '{Device}'",
                 string.IsNullOrWhiteSpace(deviceName) ? "(Windows default)" : deviceName);
         }
+
+        /// <summary>
+        /// Apply a newly-chosen playback device for spoken confirmations (from
+        /// the Settings picker). Delegates to the TTS service; persistence is the
+        /// caller's job. Pass null/empty for the Windows default device.
+        /// </summary>
+        public void ApplyOutputDevice(string? deviceName) => _tts.ApplyOutputDevice(deviceName);
+
+        /// <summary>Speak a phrase now — used by the Settings "Test" button so
+        /// the operator can confirm the chosen speaker actually makes sound
+        /// without having to issue a live voice command.</summary>
+        public void TestSpeak(string text) => _tts.Speak(text);
 
         /// <summary>
         /// Reloads the grammar for the active culture without restarting the
