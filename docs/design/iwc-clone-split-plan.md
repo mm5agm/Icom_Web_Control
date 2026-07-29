@@ -228,3 +228,24 @@ After Phase 1 there's a running app with a hole where the protocol goes. Every p
 **Sequencing:** capture-only for now (MM5AGM 2026-07-29, "decide later"). Lands after the Phase 5 cross-band peek, on top of the CSS-token theming foundation; Front-Panel-Replica is deliverable #1, Large-print #2.
 
 **Open decisions before building:** layout mechanism (one responsive grid whose template each skin sets, vs a Razor partial per skin); whether control-hiding is per-skin only or also allows a user override on top; how a skin interacts with the existing per-VFO waterfall/spectrum `localStorage` prefs; whether skins stay a fixed built-in set or become user-authored/JSON-defined later.
+
+## Phase 8 (future) — Radio Settings Backup / Restore over CI-V (MM5AGM request, 2026-07-29)
+
+**Idea:** let the operator **save the radio's user settings to a file and restore them later**, entirely over CI-V — no SD card. This is a direct answer to a limitation MM5AGM hit on Yaesu Web Control, where the only way to back up radio settings was the physical SD-card save/restore; the Yaesu CAT set gave no read access to menu items. **The IC-7300 MkII is different** — verified against `docs/manuals/IC-7300MK2_ENG_CI-V_0.pdf`, nearly every user-set parameter is *both readable and writable* over CI-V, so a full software backup/restore is genuinely achievable.
+
+**What CI-V exposes (the raw material):**
+- **`1A 05 00 xx`** — the SET-menu table, **~100+ items**, each documented "Sets or reads the …": RTTY, SPEECH, beep levels, screen-capture, filters, and the CI-V settings themselves (Transceive `00 89`, Output `00 91`, USB Echo `00 92/93`), etc. This table *is* the enumeration list for a backup walk.
+- **`14 xx`** — level settings (AF, RF, squelch, notch, NR, power, beep level…), read/write.
+- **`16 xx`** — function on/off states (AGC, NB, NR, preamp…).
+- **`1A 06`, `03/04/06`** — data mode, mode/filter per band.
+
+**The one deliberate exception — CI-V baud rate.** It is **not** a CI-V-readable/writable item: the manual mentions baud only in its intro and a preamble-timing note, never in the `1A 05` table. That's by design (reading/writing the link speed over the link itself is a chicken-and-egg problem, and it's often "Auto"). So **baud stays a front-panel/manual setting** and must be *excluded* from any restore. The CI-V **address** is exposed, but arguably exclude it from restore too, for the same "don't break the link you're using" reason.
+
+**Approach sketch (decide specifics at build time):**
+- **No single "dump everything" command** — enumerate the manual's item table and read each (many round-trips, but reliable). Store as a versioned JSON file (radio model + firmware note + timestamp).
+- **Some items are band/mode-scoped** — a *full* backup means capturing per-band state, not just the current band. Decide backup granularity (current state vs full per-band sweep) at build time.
+- **Restore = write the saved items back**, skipping the exclusion list (baud, and probably CI-V address). Offer a dry-run/diff ("these 6 settings differ from the file") before committing writes.
+- **Use *this* manual as the source of truth** — MkII item numbers differ from the original IC-7300; pin the item table to `docs/manuals/IC-7300MK2_ENG_CI-V_0.pdf`.
+- Ties naturally into IWC's **voice-control** goal ("save my settings" / "restore my settings") and is a clean marketing differentiator over YWC.
+
+**Sequencing:** capture-only for now (MM5AGM 2026-07-29). Lower priority than the on-air features (Phases 5–7); it's a fair bit of table-enumeration work with no live-operating payoff, so it lands once the core control/UX phases are settled.
