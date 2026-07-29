@@ -18,15 +18,15 @@
 
     <h5>About this project</h5>
     <p>
-        A web-based control panel for Yaesu HF transceivers. Written because I couldn't see the
-        FTdx101MP front-panel controls without a magnifying glass. Designed for partially sighted
+        A web-based control panel for Icom CI-V transceivers. Written because I couldn't see the
+        IC-7300 MkII front-panel controls without a magnifying glass. Designed for partially sighted
         operators (NVDA / Windows Narrator compatible) and for anyone who wants a clean,
         tablet-friendly interface alongside their logger.
     </p>
     <p class="text-muted small mb-4">
         <strong>Supported radios:</strong>
-        FTdx101MP · FTdx101D · FTdx10 · FT-710 · FTDX3000.
-        <strong>Windows only.</strong>
+        IC-7300 MkII (v1 target). <strong>Windows only.</strong>
+        <em>Pre-alpha — early preview.</em>
     </p>
 
     <hr/>
@@ -57,15 +57,13 @@
     <h5>Developer's tested radio firmware</h5>
     <p class="text-muted small">
         IWC is developed and tested against my own bench radio. Some IWC behaviours
-        depend on the radio's firmware version &mdash; for example, the FTdx101's IF Width
-        dropdown gained 3.5 kHz and 4.0 kHz options only in firmware released after the
-        2023 CAT manual was published. If you hit a CAT-related bug, comparing your
-        firmware versions against the ones below helps work out whether a Yaesu firmware
-        difference is involved before raising a bug report.
+        can depend on the radio's firmware version. If you hit a CI-V-related bug,
+        comparing your firmware version against the one below helps work out whether
+        a firmware difference is involved before raising a bug report.
     </p>
     <p class="text-muted small mb-2">
-        <strong>Where to find your firmware versions:</strong>
-        on the FTdx101MP / FTdx101D, press <strong>Func &rarr; Extension Settings &rarr; Soft Version</strong>
+        <strong>Where to find your firmware version:</strong>
+        on the IC-7300 MkII, go to <strong>MENU &rarr; SET &rarr; Others &rarr; Version Information</strong>
         on the radio's front panel.
     </p>
     @foreach (var radio in Model.TestedFirmware)

@@ -71,8 +71,15 @@ namespace Icom_Web_Control.Services.Voice
             }
 
             Try("SetMode",                () => BuildDecomposed("SetMode",        cfg.SetMode));
-            Try("SetBand",                () => BuildDecomposed("SetBand",        cfg.SetBand));
-            Try("SetNudgeStep",           () => BuildDecomposed("SetNudgeStep",   cfg.SetNudgeStep));
+            // SetBand/SetNudgeStep vocabulary words carry their own unit
+            // ("...metres", "...hertz"), so they're self-identifying and the
+            // trigger can be optional — the user can say a bare "forty metres"
+            // as well as "go to forty metres". The other decomposed commands
+            // (mode/att/preamp/agc/af gain) have bare vocabulary ("data",
+            // "fifty", "fast") that would collide across branches without a
+            // mandatory trigger, so they stay trigger-required.
+            Try("SetBand",                () => BuildDecomposed("SetBand",        cfg.SetBand,      triggerOptional: true));
+            Try("SetNudgeStep",           () => BuildDecomposed("SetNudgeStep",   cfg.SetNudgeStep, triggerOptional: true));
             Try("SetAttenuator",          () => BuildDecomposed("SetAttenuator",  cfg.SetAttenuator));
             Try("SetPreamp",              () => BuildDecomposed("SetPreamp",      cfg.SetPreamp));
             Try("SetAgc",                 () => BuildDecomposed("SetAgc",         cfg.SetAgc));
@@ -298,7 +305,7 @@ namespace Icom_Web_Control.Services.Voice
         // NormaliseIntent in VoiceControlService splits on ':' to recover
         // the intent name and parameter value.
 
-        private static GrammarBuilder? BuildDecomposed(string intentPrefix, DecomposedCommand cmd)
+        private static GrammarBuilder? BuildDecomposed(string intentPrefix, DecomposedCommand cmd, bool triggerOptional = false)
         {
             if (cmd.Triggers.Count == 0 || cmd.Vocabulary.Count == 0) return null;
 
@@ -315,7 +322,14 @@ namespace Icom_Web_Control.Services.Voice
             if (!any) return null;
 
             var gb = new GrammarBuilder();
-            gb.Append(new Choices(cmd.Triggers.ToArray()));          // non-semantic trigger
+            // Non-semantic trigger prefix. When triggerOptional, wrap it in a
+            // 0-1 repeat (same idiom as the optional "megahertz" suffix below)
+            // so a bare vocabulary word ("forty metres") matches too — only safe
+            // where the vocabulary is self-identifying.
+            if (triggerOptional)
+                gb.Append(new GrammarBuilder(new Choices(cmd.Triggers.ToArray())), 0, 1);
+            else
+                gb.Append(new Choices(cmd.Triggers.ToArray()));
             gb.Append(new SemanticResultKey("intent", valueChoices)); // value encodes intent
             return gb;
         }

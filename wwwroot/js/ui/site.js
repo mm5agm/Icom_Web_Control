@@ -1029,6 +1029,24 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window._applyConnectBtnState === 'function') window._applyConnectBtnState(connected);
     }
 
+    // --- CONNECTION PROBLEM BANNER ---
+    // ConnectionStatusText carries a human-readable reason the CI-V link isn't
+    // up (empty when connected/OK). Show it prominently on the home screen so a
+    // wrong/missing serial port is obvious rather than a silent retry loop.
+    if (update.property === "ConnectionStatusText") {
+        const banner = document.getElementById('connectionProblemBanner');
+        const textEl = document.getElementById('connectionProblemText');
+        const msg = (update.value == null) ? '' : String(update.value).trim();
+        if (banner) {
+            if (msg) {
+                if (textEl) textEl.textContent = msg;
+                banner.style.display = '';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+    }
+
     // --- MODE CHANGE (THE BUG FIX) ---
     if (update.property === "ModeA") {
         updateModeSelect('A', update.value);
@@ -1645,6 +1663,20 @@ async function pollInitStatus() {
             overlay.style.display = "block";
             // Don't auto-redirect - let user choose
         } else {
+            // Still trying to connect. If the backend knows *why* the link isn't
+            // up (e.g. the configured serial port isn't present), show that reason
+            // with a Settings link rather than an indefinite bare spinner — a wrong
+            // COM number otherwise just looks like a hang ("stuck at
+            // initialization"). Polling continues below, so the overlay clears
+            // itself the moment the radio actually connects.
+            const detail = data.detail ? String(data.detail).trim() : "";
+            if (detail) {
+                const safe = detail.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                statusText.innerHTML = safe +
+                    " <a href='/Settings' class='text-white text-decoration-underline'>Open Settings</a>";
+            } else {
+                statusText.innerText = "Initializing radio, please wait...";
+            }
             overlay.style.display = "block";
         }
 

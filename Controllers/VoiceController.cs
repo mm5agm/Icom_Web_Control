@@ -266,6 +266,61 @@ namespace Icom_Web_Control.Controllers
             return Ok(new { ok = true, culture = request.Culture, hasWindowsRecognizer = hasRecognizer, status = _voice.CurrentStatus });
         }
 
+        /// <summary>
+        /// Recording-device discovery for the Settings microphone picker. Lists
+        /// the WaveIn devices Windows exposes right now plus which one is
+        /// currently selected (empty = Windows default). System.Speech can't
+        /// target a device by name, so IWC captures the chosen one itself — see
+        /// MicrophoneCapture / VoiceControlService.ApplyInputDevice.
+        /// </summary>
+        [HttpGet("microphones")]
+        public async Task<IActionResult> GetMicrophones()
+        {
+            var selected = (await _settings.GetSettingsAsync()).VoiceInputDeviceName ?? "";
+            var devices = MicrophoneCapture.ListInputDevices()
+                .Select(d => new
+                {
+                    name = d.Name,
+                    isSelected = string.Equals(d.Name, selected, StringComparison.OrdinalIgnoreCase),
+                    present = true,
+                })
+                .ToArray();
+
+            // If the saved device isn't in the live list (unplugged), still
+            // report it so the picker can show it selected-but-missing rather
+            // than silently reverting to the default in the UI.
+            bool selectedPresent = string.IsNullOrEmpty(selected) ||
+                devices.Any(d => d.isSelected);
+
+            return Ok(new
+            {
+                devices,
+                selected,
+                selectedPresent,
+                usingDefault = string.IsNullOrEmpty(selected),
+            });
+        }
+
+        public record SetMicrophoneRequest(string? Name);
+
+        /// <summary>
+        /// Persists the chosen recording device and rebinds the live SAPI
+        /// engine to it — no restart needed. An empty/blank name selects the
+        /// Windows default device.
+        /// </summary>
+        [HttpPost("microphone")]
+        public async Task<IActionResult> SetMicrophone([FromBody] SetMicrophoneRequest request)
+        {
+            var name = request?.Name?.Trim() ?? "";
+            var settings = await _settings.GetSettingsAsync();
+            settings.VoiceInputDeviceName = name;
+            await _settings.SaveSettingsAsync(settings);
+
+            _voice.ApplyInputDevice(string.IsNullOrEmpty(name) ? null : name);
+            _logger.LogInformation("[Voice] Microphone set to {Name}", string.IsNullOrEmpty(name) ? "(Windows default)" : name);
+            return Ok(new { ok = true, name });
+        }
+
         /// <summary>Returns the current voice phrases configuration (user file or built-in defaults).</summary>
         [HttpGet("phrases")]
         public IActionResult GetPhrases()

@@ -345,6 +345,20 @@
                 </div>
                 <div id="voiceLocaleMismatchBanner" class="mt-2"></div>
             </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="voiceInputDevice">Microphone</label>
+                <select class="form-select w-auto" id="voiceInputDevice">
+                    <option value="">Loading…</option>
+                </select>
+                <div class="form-text">
+                    Which microphone the speech recogniser listens to. Choose the mic you'll speak
+                    into — the change takes effect immediately, no restart. Leave on
+                    <em>Windows default recording device</em> to follow your system setting.
+                    Picking one here does <strong>not</strong> change your Windows default, so it
+                    won't disturb other apps (WSJT-X, etc.).
+                </div>
+                <div id="voiceInputDeviceNote" class="mt-2"></div>
+            </div>
             <div class="mb-3 form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch"
                        id="voiceSpokenConfirmationEnabled" asp-for="Settings.VoiceSpokenConfirmationEnabled" />
@@ -576,6 +590,75 @@
                 });
             })();
             iwcLoadLocales();
+
+            // ── Microphone picker ──────────────────────────────────────────
+            // System.Speech can't target a device by name, so the chosen mic is
+            // captured server-side and fed to SAPI. This just lists devices and
+            // POSTs the pick; VoiceControlService rebinds live (no restart).
+
+            function renderMicNote(msg) {
+                const note = document.getElementById('voiceInputDeviceNote');
+                if (!note) return;
+                note.innerHTML = msg
+                    ? '<div class="alert alert-warning py-1 px-2 small mb-0">' + escapeHtml(msg) + '</div>'
+                    : '';
+            }
+
+            async function iwcLoadMicrophones() {
+                const select = document.getElementById('voiceInputDevice');
+                if (!select) return;
+                try {
+                    const r = await fetch('/api/voice/microphones');
+                    if (!r.ok) { select.innerHTML = '<option value="">Failed to load</option>'; return; }
+                    const data = await r.json();
+                    let html = '<option value=""' + (data.usingDefault ? ' selected' : '') +
+                        '>Windows default recording device</option>';
+                    html += data.devices.map(d =>
+                        '<option value="' + escapeHtml(d.name) + '"' + (d.isSelected ? ' selected' : '') + '>' +
+                        escapeHtml(d.name) + '</option>').join('');
+                    // A saved device that's no longer plugged in: show it so the
+                    // user sees what's selected rather than a silent revert.
+                    if (!data.usingDefault && !data.selectedPresent && data.selected) {
+                        html += '<option value="' + escapeHtml(data.selected) + '" selected>' +
+                            escapeHtml(data.selected) + ' (not connected)</option>';
+                    }
+                    select.innerHTML = html;
+                    renderMicNote((!data.usingDefault && !data.selectedPresent)
+                        ? 'The saved microphone isn’t connected right now. Reconnect it, or pick another.'
+                        : '');
+                } catch (e) {
+                    select.innerHTML = '<option value="">Failed to load</option>';
+                }
+            }
+
+            (function () {
+                const select = document.getElementById('voiceInputDevice');
+                if (!select) return;
+                select.addEventListener('change', async function () {
+                    const name = select.value;
+                    select.disabled = true;
+                    try {
+                        const r = await fetch('/api/voice/microphone', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name }),
+                        });
+                        if (!r.ok) {
+                            const data = await r.json().catch(() => ({}));
+                            alert('Could not switch microphone: ' + (data.error || ('HTTP ' + r.status)));
+                            await iwcLoadMicrophones();
+                            return;
+                        }
+                        renderMicNote('');
+                        iwcRefreshVoiceDiagnostics();
+                    } catch (e) {
+                        alert('Could not switch microphone: ' + e);
+                    } finally {
+                        select.disabled = false;
+                    }
+                });
+            })();
+            iwcLoadMicrophones();
 
             async function iwcOpenGrammarsFolder() {
                 try {

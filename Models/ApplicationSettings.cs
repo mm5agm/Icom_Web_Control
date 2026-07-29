@@ -281,6 +281,16 @@
         // an app restart. Defaults to en-GB since that's the only pack that
         // ships today. docs/VoiceControl/language-pack-manager-design.md §4.4.
         public string VoiceActiveLocale { get; set; } = "en-GB";
+
+        // Which microphone the speech recogniser listens to. Empty = the
+        // Windows default recording device (SetInputToDefaultAudioDevice).
+        // A non-empty value is a WaveIn/MME product name (see
+        // MicrophoneCapture): IWC captures that device itself and feeds SAPI a
+        // MicrophoneStream, because System.Speech can't target a device by name.
+        // Chosen from the picker in Settings → Voice Control so partially-
+        // sighted operators never have to change the Windows default device
+        // (which would disturb whatever else -- WSJT-X etc. -- relies on it).
+        public string VoiceInputDeviceName { get; set; } = "";
     }
 
     public class RadioState

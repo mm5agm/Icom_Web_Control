@@ -49,11 +49,16 @@
 
         // ---- Visual state --------------------------------------------
 
+        // Only the colour variant is swapped; the button's layout classes
+        // (d-flex/centering) and its fixed size stay put. Rebuilding className
+        // wholesale used to drop those and reflow the icon.
+        const COLOUR_CLASSES = ['btn-outline-danger', 'btn-danger', 'btn-success', 'btn-warning'];
         function setButtonClass(styleSuffix) {
-            btn.className = 'btn btn-' + styleSuffix + ' btn-sm';
+            btn.classList.remove(...COLOUR_CLASSES);
+            btn.classList.add('btn-' + styleSuffix);
         }
-        function setIdleVisual()        { setButtonClass('outline-danger'); }
-        function setListeningVisual()   { setButtonClass('danger'); }
+        function setIdleVisual()        { btn.classList.remove('voice-mic-listening'); setButtonClass('outline-danger'); }
+        function setListeningVisual()   { setButtonClass('danger'); btn.classList.add('voice-mic-listening'); }
         function setHeardVisual()       { setButtonClass('success'); }
         function setExecutingVisual()   { setButtonClass('success'); }
         function setErrorVisual()       { setButtonClass('danger'); }

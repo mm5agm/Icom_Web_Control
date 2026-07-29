@@ -21,9 +21,17 @@ namespace Icom_Web_Control.Services.Voice
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hub;
-        // Phase 3: the semantic seam. Frequency-set voice intents are repointed
-        // here (real CI-V) while the remaining intents still use the inert
-        // Yaesu _catClient until each is migrated in turn.
+        // Phase 3: the semantic seam. Most voice intents are now repointed here
+        // (real CI-V): frequency, band, mode, TX, split, VFO-swap, AF gain,
+        // preamp. The few still on the inert Yaesu _catClient below need an
+        // Icom-specific control-model rework, not just a repoint (the IC-7300's
+        // attenuator/AGC/IF-width vocabulary differs from Yaesu's), so they are
+        // deliberately left broken-on-Icom and marked TODO(voice-civ):
+        //   SetAttenuator  — IC-7300 has one on/off pad, not off/6/12/18 dB.
+        //   SetAgc         — IC-7300 is fast/mid/slow only, no off/auto.
+        //   NudgeIfWidth   — no clean seam equivalent yet (PBT/filter model differs).
+        //   BandUp/Down    — no seam band-step; would need band-stacking logic.
+        //   Macro          — sends arbitrary Yaesu CAT strings; Icom needs CI-V hex.
         private readonly IRadioController _radio;
 
         public IntentDispatcher(
@@ -189,9 +197,10 @@ namespace Icom_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] SetBand: no default frequency for {Metres}m", metres);
                 return new DispatchResult(false, phrase);
             }
-            var command = $"{(VfoIsB ? "FB" : "FA")}{hz:D9};";
-            await SendCommand(command, ct);
-            if (VfoIsB) _state.FrequencyB = hz; else _state.FrequencyA = hz;
+            // Icom: set the band-default frequency through the CI-V seam, exactly
+            // like SetFrequency. On the single-receiver IC-7300 a VFO-B set uses
+            // CI-V 25 01 (unselected) so it never swaps the operating VFO.
+            await SetRadioFrequency(VfoIsB ? RadioVfo.B : RadioVfo.A, hz, ct);
             _logger.LogInformation("[Voice] SetBand -> {Metres}m -> {Hz} Hz (VFO {Vfo})", metres, hz, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
@@ -218,40 +227,13 @@ namespace Icom_Web_Control.Services.Voice
 
         private async Task<DispatchResult> SwapVfoAsync(CancellationToken ct)
         {
-            var settings = await _settings.GetSettingsAsync();
-            var isSingleReceiver = RadioCapabilities.IsSingleReceiver(settings.RadioModel);
             const string phrase = "Swap V F O";
-
-            if (isSingleReceiver)
-            {
-                // Single-receiver radios (FTdx10/FT-710): no atomic SV;
-                // command. Fake the swap by reading both stored frequencies
-                // and writing them back swapped. Simpler than toggling VS,
-                // and matches what the radio actually does when the user
-                // presses A/B on the front panel.
-                var faRaw = await SendCommand("FA;", ct);
-                var fbRaw = await SendCommand("FB;", ct);
-                if (!TryParseFreqResponse(faRaw, "FA", out var fa) ||
-                    !TryParseFreqResponse(fbRaw, "FB", out var fb))
-                {
-                    _logger.LogWarning("[Voice] SwapVFO: couldn't parse FA/FB readback");
-                    return new DispatchResult(false, phrase);
-                }
-                await SendCommand($"FA{fb:D9};", ct);
-                await SendCommand($"FB{fa:D9};", ct);
-                _state.FrequencyA = fb;
-                _state.FrequencyB = fa;
-                _logger.LogInformation("[Voice] SwapVFO (fake) -> A={A}, B={B}", fb, fa);
-                return new DispatchResult(true, phrase);
-            }
-            else
-            {
-                // Dual-receiver (FTdx101): atomic SV; — the radio handles the
-                // swap and broadcasts new FA/FB via auto-info.
-                await SendCommand("SV;", ct);
-                _logger.LogInformation("[Voice] SwapVFO (SV;)");
-                return new DispatchResult(true, phrase);
-            }
+            // Icom: CI-V 07 B0 atomically exchanges A↔B on the radio (the seam
+            // swaps the cached freq/mode and the poll re-reads both). No need for
+            // the Yaesu single-vs-dual FA/FB read-write-back dance.
+            await ExchangeRadioVfos(ct);
+            _logger.LogInformation("[Voice] SwapVFO (07 B0 exchange)");
+            return new DispatchResult(true, phrase);
         }
 
         // -- SetNudgeStep --------------------------------------------------
@@ -320,6 +302,9 @@ namespace Icom_Web_Control.Services.Voice
             // BU/BD require a P1 band selector (0=MAIN, 1=SUB) per the
             // FTdx101MP CAT manual -- a bare "BU;"/"BD;" is malformed and
             // the radio silently ignores it.
+            // TODO(voice-civ): no CI-V seam band-step yet. Could map onto the
+            // band-stacking registers (like the HTTP band buttons) later. Inert
+            // on Icom until then.
             var command = (up ? "BU" : "BD") + VfoP1 + ";";
             await SendCommand(command, ct);
             _logger.LogInformation("[Voice] {Phrase} (VFO {Vfo})", phrase, CurrentVfo);
@@ -411,8 +396,7 @@ namespace Icom_Web_Control.Services.Voice
 
         private async Task<DispatchResult> SplitAsync(bool on, CancellationToken ct)
         {
-            await SendCommand(on ? "FT1;" : "FT0;", ct);
-            _state.SplitMode = on ? 1 : 0;
+            await SetRadioSplit(on, ct);
             _logger.LogInformation("[Voice] Split {State}", on ? "on" : "off");
             return new DispatchResult(true, on ? "Split on" : "Split off");
         }
@@ -425,6 +409,9 @@ namespace Icom_Web_Control.Services.Voice
             if (!TryGetLong(args, "direction", out var direction) || (direction != 1 && direction != -1))
                 return new DispatchResult(false, "Filter width");
 
+            // TODO(voice-civ): Yaesu SH filter-width nudge has no clean IC-7300
+            // seam equivalent yet (the Icom passband/filter model differs). Inert
+            // on Icom until a CI-V filter-width path is designed.
             var p1 = VfoP1;
             var raw = await SendCommand($"SH{p1};", ct);
             if (!TryParseIntResponse(raw, "SH", out var current))
@@ -446,7 +433,7 @@ namespace Icom_Web_Control.Services.Voice
 
             pct = Math.Clamp(pct, 0, 100);
             var catValue = (int)Math.Round(pct * 255.0 / 100.0);
-            await SendCommand($"AG{VfoP1}{catValue:D3};", ct);
+            await SetRadioAfGain(catValue, ct);
             if (VfoIsB) _state.AfGainB = catValue; else _state.AfGainA = catValue;
             _logger.LogInformation("[Voice] SetAfGain {Pct}% -> CAT {CatValue} (VFO {Vfo})", pct, catValue, CurrentVfo);
             return new DispatchResult(true, $"Audio gain {pct}");
@@ -470,6 +457,9 @@ namespace Icom_Web_Control.Services.Voice
             };
             if (code == null) return new DispatchResult(false, "Attenuator");
 
+            // TODO(voice-civ): IC-7300 attenuator is a single on/off ~20 dB pad
+            // (CI-V 11), not Yaesu's off/6/12/18. Repoint to _radio.SetAttenuatorAsync
+            // once the vocabulary is reduced to on/off. Inert on Icom until then.
             await SendCommand($"RA{VfoP1}{code};", ct);
             var attValue = level switch { "off" => "00", "6" => "06", "12" => "12", "18" => "18", _ => (string?)null };
             if (VfoIsB) _state.AttB = attValue ?? _state.AttB; else _state.AttA = attValue ?? _state.AttA;
@@ -493,7 +483,8 @@ namespace Icom_Web_Control.Services.Voice
             };
             if (code == null) return new DispatchResult(false, "Preamp");
 
-            await SendCommand($"PA{VfoP1}{code};", ct);
+            // code is "0"/"1"/"2" — IC-7300 preamp off / amp 1 / amp 2 (CI-V 16 02).
+            await SetRadioPreamp(int.Parse(code), ct);
             if (VfoIsB) _state.IpoB = code; else _state.IpoA = code;
             var phrase = level switch
             {
@@ -523,6 +514,9 @@ namespace Icom_Web_Control.Services.Voice
             };
             if (code == null) return new DispatchResult(false, "A G C");
 
+            // TODO(voice-civ): IC-7300 AGC is fast/mid/slow (16 12 → 1/2/3) only;
+            // no off/auto. Trim the vocabulary and repoint to _radio.SetAgcAsync.
+            // Inert on Icom until then.
             await SendCommand($"GT{VfoP1}{code};", ct);
             if (VfoIsB) _state.AgcB = code; else _state.AgcA = code;
             _logger.LogInformation("[Voice] SetAgc -> {Speed} (VFO {Vfo})", speed, CurrentVfo);
@@ -600,6 +594,53 @@ namespace Icom_Web_Control.Services.Voice
             await _radio.SetTransmitAsync(transmit, ct);
         }
 
+        /// <summary>Exchange VFO A↔B through the CI-V seam (07 B0), dry-run-aware.</summary>
+        private async Task ExchangeRadioVfos(CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would exchange VFO A<->B");
+                (_state.FrequencyA, _state.FrequencyB) = (_state.FrequencyB, _state.FrequencyA);
+                (_state.ModeA, _state.ModeB) = (_state.ModeB, _state.ModeA);
+                return;
+            }
+            await _radio.ExchangeVfosAsync(ct);
+        }
+
+        /// <summary>Set split on/off through the CI-V seam (0F), dry-run-aware.</summary>
+        private async Task SetRadioSplit(bool on, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set split {State}", on ? "on" : "off");
+                _state.SplitMode = on ? 1 : 0;
+                return;
+            }
+            await _radio.SetSplitAsync(on, ct);
+        }
+
+        /// <summary>Set AF gain (0–255) through the CI-V seam (14 01), dry-run-aware.</summary>
+        private async Task SetRadioAfGain(int value, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set AF gain {Value}", value);
+                return;
+            }
+            await _radio.SetAfGainAsync(value, ct);
+        }
+
+        /// <summary>Set preamp (0/1/2) through the CI-V seam (16 02), dry-run-aware.</summary>
+        private async Task SetRadioPreamp(int value, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set preamp {Value}", value);
+                return;
+            }
+            await _radio.SetPreampAsync(value, ct);
+        }
+
         // -- helpers -------------------------------------------------------
 
         /// <summary>
@@ -630,16 +671,6 @@ namespace Icom_Web_Control.Services.Voice
             var trimmed = raw.Trim().TrimEnd(';');
             if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
             return int.TryParse(trimmed.AsSpan(prefix.Length), out value);
-        }
-
-        /// <summary>Parses "FA01407400000;" or "FA01407400000" into a long Hz value.</summary>
-        private static bool TryParseFreqResponse(string? raw, string prefix, out long hz)
-        {
-            hz = 0;
-            if (string.IsNullOrWhiteSpace(raw)) return false;
-            var trimmed = raw.Trim().TrimEnd(';');
-            if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
-            return long.TryParse(trimmed.AsSpan(prefix.Length), out hz);
         }
 
         // ── Speech-formatting helpers for the spoken confirmation ─────────

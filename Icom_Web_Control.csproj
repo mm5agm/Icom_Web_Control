@@ -63,6 +63,13 @@
          docs/VoiceControl/v1-plan.md. Windows-only — the surrounding
          project is already net10.0-windows so no portability change. -->
     <PackageReference Include="System.Speech" Version="10.0.1" />
+    <!-- NAudio.WinMM: WaveIn (MME) device enumeration + capture only. Lets the
+         user pick a specific microphone in Settings — System.Speech can bind
+         only to the Windows *default* recording device or to a raw audio
+         Stream, so we capture the chosen device ourselves at 16 kHz/16-bit/mono
+         and feed SAPI via SetInputToAudioStream. See Services/Voice/
+         MicrophoneCapture.cs. WinMM subset keeps WASAPI/MediaFoundation out. -->
+    <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
   </ItemGroup>
 
   <!-- Voice control grammar files shipped alongside the exe so

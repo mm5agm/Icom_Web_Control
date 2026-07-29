@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.Speech.Recognition;
+using System.Speech.AudioFormat;
 using Icom_Web_Control.Hubs;
 using Icom_Web_Control.Services;
 
@@ -60,6 +61,17 @@ namespace Icom_Web_Control.Services.Voice
         private bool _audioWired;
         private string _activeCulture = VoicePhraseStore.DefaultCulture;
 
+        // Microphone selection (Settings → Voice Control). _configuredMicName is
+        // the WaveIn product name the user picked, or null/empty for the Windows
+        // default device. When a specific device is chosen we capture it via
+        // _micStream and feed SAPI SetInputToAudioStream, because System.Speech
+        // can't target a device by name. _boundMicIndex is the WaveIn index
+        // currently bound (-1 = the default device is bound). See
+        // MicrophoneCapture / EnsureAudioInput. All guarded by _engineLock.
+        private volatile string? _configuredMicName;
+        private MicrophoneStream? _micStream;
+        private int _boundMicIndex = -1;
+
         // §6.5 "Test this pack" dry run -- set for the duration of a
         // StartListeningAsync(dryRun: true) session; OnSpeechRecognized reads
         // it to skip actually sending the matched CAT command.
@@ -107,6 +119,7 @@ namespace Icom_Web_Control.Services.Voice
             // grab, no holding the recogniser in memory. The user can flip
             // the toggle in Settings and restart IWC to enable.
             var settings = await _settings.GetSettingsAsync();
+            _configuredMicName = settings.VoiceInputDeviceName;
             if (settings.VoiceControlEnabled)
             {
                 TryInitialiseEngine(string.IsNullOrWhiteSpace(settings.VoiceActiveLocale)
@@ -160,14 +173,14 @@ namespace Icom_Web_Control.Services.Voice
                 _targetVfo = vfo;
                 try
                 {
-                    if (!_audioWired)
-                    {
-                        // Deferred until first start so IWC boots fine on
-                        // machines without a microphone.
-                        _engine.SetInputToDefaultAudioDevice();
-                        _audioWired = true;
-                    }
+                    // Bind the configured input (chosen mic or Windows default).
+                    // Deferred until first start so IWC boots fine on machines
+                    // without a microphone. For a chosen device we then drop any
+                    // audio captured while idle so recognition starts clean.
+                    EnsureAudioInput();
+                    _micStream?.DiscardBuffered();
                     _engine.RecognizeAsync(RecognizeMode.Multiple);
+                    _logger.LogInformation("[Voice] PTT start (vfo={Vfo}, dryRun={DryRun}) — recognition active", vfo, dryRun);
                     UpdateStatus(VoiceState.Listening);
                     return true;
                 }
@@ -197,6 +210,7 @@ namespace Icom_Web_Control.Services.Voice
                 try
                 {
                     _engine?.RecognizeAsyncStop();
+                    _logger.LogInformation("[Voice] PTT stop — recognition stopped");
                 }
                 catch (Exception ex)
                 {
@@ -206,6 +220,130 @@ namespace Icom_Web_Control.Services.Voice
                 UpdateStatus(VoiceState.Idle);
             }
             return Task.CompletedTask;
+        }
+
+        // ── Audio input binding ────────────────────────────────────────────
+        // System.Speech can bind only to the Windows default device or to a raw
+        // PCM stream. When the user picks a specific mic in Settings we capture
+        // it ourselves (MicrophoneStream, 48 kHz/16-bit/mono) and feed SAPI via
+        // SetInputToAudioStream; otherwise we use SetInputToDefaultAudioDevice.
+        // All three methods below must be called with _engineLock held.
+
+        private static SpeechAudioFormatInfo MicFormat() =>
+            new(MicrophoneCapture.SampleRate, AudioBitsPerSample.Sixteen, AudioChannel.Mono);
+
+        /// <summary>
+        /// Idempotently bind the configured input. Latches like the original
+        /// default-device behaviour: once the correct device is bound, repeated
+        /// PTT starts don't re-open it. A configured mic that's since been
+        /// unplugged (index -1) falls back to the Windows default.
+        /// </summary>
+        private void EnsureAudioInput()
+        {
+            if (_engine == null) return;
+
+            int index = MicrophoneCapture.FindDeviceIndex(_configuredMicName);
+            if (index < 0)
+            {
+                if (!_audioWired || _micStream != null)
+                {
+                    DisposeMicStream();
+                    _engine.SetInputToDefaultAudioDevice();
+                    _boundMicIndex = -1;
+                    _audioWired = true;
+                }
+                return;
+            }
+
+            if (_micStream == null || _boundMicIndex != index)
+            {
+                DisposeMicStream();
+                var stream = new MicrophoneStream(index, _logger);
+                _engine.SetInputToAudioStream(stream, MicFormat());
+                _micStream = stream;
+                _boundMicIndex = index;
+                _audioWired = true;
+                _logger.LogInformation("[Voice] Listening on microphone '{Name}' (WaveIn #{Index})", _configuredMicName, index);
+            }
+        }
+
+        /// <summary>
+        /// Ensure the configured input is bound and discard any audio queued
+        /// since the last recognition, so ambient noise / a previous utterance
+        /// isn't replayed as the first match. For the default device that means
+        /// SetInputToNull()+SetInputToDefaultAudioDevice(); for a chosen mic it
+        /// clears the capture queue (or binds fresh, which is inherently clean).
+        /// </summary>
+        private void FlushAudioInput()
+        {
+            if (_engine == null) return;
+
+            int index = MicrophoneCapture.FindDeviceIndex(_configuredMicName);
+            if (index < 0)
+            {
+                DisposeMicStream();
+                _engine.SetInputToNull();
+                _engine.SetInputToDefaultAudioDevice();
+                _boundMicIndex = -1;
+                _audioWired = true;
+                return;
+            }
+
+            if (_micStream == null || _boundMicIndex != index)
+                EnsureAudioInput();          // fresh bind -> already clean
+            else
+                _micStream.DiscardBuffered();
+        }
+
+        private void DisposeMicStream()
+        {
+            if (_micStream == null) return;
+            try { _engine?.SetInputToNull(); } catch { /* best-effort */ }
+            try { _micStream.Dispose(); } catch { /* best-effort */ }
+            _micStream = null;
+            _boundMicIndex = -1;
+        }
+
+        /// <summary>
+        /// Apply a newly-chosen input device (from the Settings picker) without
+        /// an app restart. Persistence is the caller's job; this only updates
+        /// the live engine. If currently listening, recognition is rebound to
+        /// the new device immediately; otherwise the change takes effect on the
+        /// next PTT press. Pass null/empty for the Windows default device.
+        /// </summary>
+        public void ApplyInputDevice(string? deviceName)
+        {
+            lock (_engineLock)
+            {
+                _configuredMicName = deviceName;
+                bool wasListening = _status.State == VoiceState.Listening;
+                if (_engine != null && wasListening)
+                {
+                    try { _engine.RecognizeAsyncCancel(); } catch { /* best-effort */ }
+                }
+
+                // Drop the current binding so the next EnsureAudioInput rebinds
+                // to the new device.
+                DisposeMicStream();
+                _audioWired = false;
+
+                if (_engine != null && wasListening)
+                {
+                    try
+                    {
+                        EnsureAudioInput();
+                        _micStream?.DiscardBuffered();
+                        _engine.RecognizeAsync(RecognizeMode.Multiple);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "[Voice] Failed to rebind input device '{Device}'", deviceName);
+                        UpdateStatus(VoiceState.Error, error: ex.Message);
+                    }
+                }
+            }
+            _logger.LogInformation("[Voice] Input device set to '{Device}'",
+                string.IsNullOrWhiteSpace(deviceName) ? "(Windows default)" : deviceName);
         }
 
         /// <summary>
@@ -278,15 +416,13 @@ namespace Icom_Web_Control.Services.Voice
                         // continuously once an input device is wired, even
                         // between explicit Recognize() calls -- so ambient
                         // noise, or the tail of what was said for a *previous*
-                        // Try It test, sits queued in the engine's audio buffer
-                        // and gets consumed as the start of the next
-                        // Recognize() call, matching against a phrase the user
-                        // never said this time. SetInputToNull() followed by
-                        // SetInputToDefaultAudioDevice() discards that queue so
-                        // each test only hears audio spoken after it starts.
-                        engine.SetInputToNull();
-                        engine.SetInputToDefaultAudioDevice();
-                        _audioWired = true;
+                        // Try It test, sits queued in the audio buffer and gets
+                        // consumed as the start of the next Recognize() call,
+                        // matching against a phrase the user never said this
+                        // time. FlushAudioInput() discards that queue (whether
+                        // the input is the Windows default device or a chosen
+                        // mic) so each test only hears audio spoken after it starts.
+                        FlushAudioInput();
 
                         engine.UnloadAllGrammars();
                         var builder = new System.Speech.Recognition.GrammarBuilder(
@@ -365,8 +501,7 @@ namespace Icom_Web_Control.Services.Voice
                     // Flush before resuming live listening too, so nothing
                     // spoken during the Try It test (or the silence after it)
                     // gets replayed into the live grammar as its first match.
-                    engine.SetInputToNull();
-                    engine.SetInputToDefaultAudioDevice();
+                    FlushAudioInput();
                     engine.RecognizeAsync(RecognizeMode.Multiple);
                 }
             }
@@ -432,6 +567,19 @@ namespace Icom_Web_Control.Services.Voice
                 engine.SpeechRecognitionRejected += OnSpeechRejected;
                 engine.RecognizeCompleted += OnRecognizeCompleted;
 
+                // Audio-path diagnostics. When recognition produces nothing
+                // these tell us whether SAPI is actually receiving audio from
+                // the wired input: SpeechDetected fires when it hears speech
+                // onset, AudioSignalProblemOccurred flags too-quiet/too-loud/
+                // no-signal, AudioStateChanged tracks Silence<->Speech.
+                engine.SpeechDetected += (_, e) =>
+                    _logger.LogInformation("[Voice] SpeechDetected @ {Pos}", e.AudioPosition);
+                engine.AudioSignalProblemOccurred += (_, e) =>
+                    _logger.LogWarning("[Voice] Audio signal problem: {Problem} (level={Level}, secondsSinceStart={Secs})",
+                        e.AudioSignalProblem, e.AudioLevel, e.RecognizerAudioPosition.TotalSeconds);
+                engine.AudioStateChanged += (_, e) =>
+                    _logger.LogInformation("[Voice] AudioState -> {State}", e.AudioState);
+
                 // Grammar is built programmatically via VoiceGrammar.Build().
                 // We can't load Commands.<culture>.srgs at runtime because
                 // System.Speech on .NET 6+ throws PlatformNotSupportedException
@@ -462,6 +610,7 @@ namespace Icom_Web_Control.Services.Voice
                 try
                 {
                     _engine?.RecognizeAsyncCancel();
+                    DisposeMicStream();          // stop/release any captured mic
                     _engine?.Dispose();
                 }
                 catch (Exception ex)
@@ -483,7 +632,12 @@ namespace Icom_Web_Control.Services.Voice
         // good match typically sits at 0.85+). Tune downward if too many
         // legitimate phrases get rejected, upward if more misfits slip
         // through.
-        private const float MinConfidence = 0.6f;
+        // Lowered from 0.6 -> 0.5: with a quiet mic SAPI reports low confidence
+        // even for correctly-heard commands (measured 0.3-0.56 for phrases it
+        // transcribed perfectly). Capture-side AGC (MicrophoneStream) lifts the
+        // signal to raise these legitimately; this relaxed gate catches the rest
+        // while the constrained command grammar keeps false accepts unlikely.
+        private const float MinConfidence = 0.5f;
 
         private async void OnSpeechRecognized(object? sender, SpeechRecognizedEventArgs e)
         {
@@ -528,6 +682,7 @@ namespace Icom_Web_Control.Services.Voice
             //     with args["direction"] = ±1
             (intent, args) = NormaliseIntent(intent, args, heard);
 
+            _logger.LogInformation("[Voice] Recognised '{Heard}' (conf={Conf:F2}) -> intent={Intent}", heard, confidence, intent);
             UpdateStatus(VoiceState.Heard, heard: heard, intent: intent, confidence: confidence);
             UpdateStatus(VoiceState.Executing, heard: heard, intent: intent, confidence: confidence);
             try

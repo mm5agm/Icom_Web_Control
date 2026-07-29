@@ -148,6 +148,49 @@
 <style>
     #saveMemBtnA, #saveMemBtnB { font-weight: 700 !important; font-size: 0.85rem !important; color: #212529 !important; }
 
+    /* Voice PTT button — three visually distinct states so the operator can
+       always tell whether it's listening:
+         1. Rest / hover (armed, NOT listening) -> amber outline. Bootstrap
+            normally fills btn-outline-danger solid RED on hover, which was
+            indistinguishable from the pressed/listening red; we override that
+            to amber so "hovering" never looks like "listening".
+         2. Pressed / listening -> solid red, pressed *in* (scaled down), with a
+            bright pulsing ring and a breathing icon. Impossible to mistake.
+         3. Release (pointer still on the button) -> snaps back to the amber
+            hover look, so the red->amber change is proof the release registered.
+       The pressed-in scale means the shape changes too, not just colour, which
+       helps a partially-sighted operator. */
+
+    /* Armed hover — amber, deliberately not red. :not(.voice-mic-listening)
+       so it never fights the pressed state. */
+    .voice-mic-btn.btn-outline-danger:hover:not(.voice-mic-listening) {
+        background-color: #ffe69c;
+        border-color: #ffc107;
+        color: #664d03;
+    }
+
+    /* Pressed / listening — wins over every other state. */
+    .voice-mic-btn.voice-mic-listening,
+    .voice-mic-btn.voice-mic-listening:hover {
+        background-color: #dc3545 !important;
+        border-color: #b02a37 !important;
+        color: #fff !important;
+        transform: scale(0.94);
+        animation: voiceMicPulse 1s ease-in-out infinite;
+    }
+    .voice-mic-btn.voice-mic-listening > i {
+        animation: voiceMicIcon 1s ease-in-out infinite;
+    }
+    @@keyframes voiceMicPulse {
+        0%   { box-shadow: 0 0 0 0    rgba(220, 53, 69, 0.75); }
+        70%  { box-shadow: 0 0 0 18px rgba(220, 53, 69, 0);    }
+        100% { box-shadow: 0 0 0 0    rgba(220, 53, 69, 0);    }
+    }
+    @@keyframes voiceMicIcon {
+        0%, 100% { transform: scale(1);    opacity: 1;   }
+        50%      { transform: scale(1.12); opacity: 0.85; }
+    }
+
     /* Dual-receiver (FTdx101) active-band highlight: a subtle amber ring on
        the VFO panel the main tuning knob currently controls (MAIN or SUB).
        box-shadow so it never shifts layout; both receivers stay full-colour. */
@@ -156,49 +199,19 @@
         transition: box-shadow 0.2s ease;
     }
 
-    /* Single-receiver radios (FTdx10, FT-710, FTDX3000): the inactive VFO
-       card BODY is greyed and made non-interactive. The card HEADER stays
-       normal so TX / ZIN / badges remain full-colour and clickable — dimming
-       the whole column (including the header) made the TX button look
-       disabled in split mode even though it was still active (CSS cannot
-       undo a parent's opacity/filter on a child).
-       Editing body controls on the inactive section via CAT would silently
-       swap the radio's active VFO; better to disable visually and require
-       an explicit A/B swap on the rig first.
-       See docs/decisions/0003-single-vs-dual-receiver-ui.md
-       Reported by Jacek SP3L on #34. */
-    .vfo-inactive > .card > .card-body {
-        pointer-events: none;
-    }
-    .vfo-inactive > .card > .card-body > * {
-        opacity: 0.55;
-        filter: grayscale(0.5);
-        transition: opacity 0.25s ease, filter 0.25s ease;
-    }
-    /* R10/R11 (Jacek SP3L #34): in split mode the inactive panel IS the TX
-       VFO and its frequency must remain interactive so operators can set
-       the TX frequency from IWC without un-splitting first. .vfo-tx-editable
-       is added by applyVfoActiveStyling() only when splitMode>0. The freq
-       row is undimmed as a unit (parent opacity cannot be undone on nested
-       children), then non-frequency siblings in that row (roofing, AF gain)
-       are re-dimmed. */
-    .vfo-inactive.vfo-tx-editable > .card > .card-body > .vfo-freq-row {
-        opacity: 1;
-        filter: none;
-    }
-    .vfo-inactive.vfo-tx-editable > .card > .card-body > .vfo-freq-row > *:not(.frequency-display):not(.freq-step-controls):not(.fkb-open-btn) {
-        opacity: 0.55;
-        filter: grayscale(0.5);
-        pointer-events: none;
-    }
-    .vfo-inactive.vfo-tx-editable .frequency-display,
-    .vfo-inactive.vfo-tx-editable .freq-step-controls,
-    .vfo-inactive.vfo-tx-editable .fkb-open-btn {
-        /* pointer-events:auto on a child overrides pointer-events:none on
-           an ancestor — that is the CSS exception that makes the carve-out
-           work. !important is needed on <button> (fkb-open / ▲▼). */
-        pointer-events: auto !important;
-    }
+    /* IWC single-receiver (IC-7300 MkII): the non-active VFO panel is NOT
+       greyed or disabled. YWC greyed the inactive VFO's whole card-body
+       because editing it over CAT would silently swap the radio's operating
+       VFO (Jacek SP3L #34, ADR-0003). That doesn't apply to IWC: the pseudo-
+       dual model treats VFO B as an independently-tunable *watch* VFO, and
+       CivRadioController sets the non-active VFO's frequency/mode via CI-V
+       25/26 (unselected-VFO) WITHOUT switching the operating VFO — so its
+       band/mode/frequency controls are safe to drive directly. Both panels
+       therefore stay full-colour and interactive (MM5AGM 2026-07-29). The
+       live S-meter/history on the non-active panel is still hidden below
+       (there is no second receiver, so a moving needle would mislead).
+       The former .vfo-tx-editable split-mode carve-out is now moot — every
+       control is interactive regardless of split — so those rules are gone. */
 
     /* Hide live receive indicators on the inactive VFO panel — on a real
        single-receiver radio there is no signal data for the inactive VFO,
@@ -246,6 +259,17 @@
     Check <strong>Windows Display Settings</strong>: ensure resolution is set to native and scaling is correct for your monitor
     (recommended: <strong>150%</strong> for 4K, <strong>125%</strong> for 1440p, <strong>100%</strong> for 1080p).
     <button type="button" class="btn-close btn-sm py-2" onclick="dismissViewportWarning()" aria-label="Dismiss"></button>
+</div>
+
+<!-- Connection-problem banner. Driven by the ConnectionStatusText SignalR
+     property (see site.js): shown when the CI-V link can't come up (e.g. the
+     configured serial port isn't present), hidden the moment the radio
+     connects. Not user-dismissible — it clears itself when the problem does. -->
+<div id="connectionProblemBanner" class="alert alert-warning mb-1 py-1 px-3" role="alert"
+     aria-live="polite" style="display:none; font-size:0.85rem;">
+    <i class="bi bi-plug-fill" aria-hidden="true"></i>
+    <strong>Radio not connected.</strong>
+    <span id="connectionProblemText"></span>
 </div>
 
 <div class="row mb-1" style="padding-top: 2px; padding-bottom: 2px;">
@@ -809,7 +833,7 @@
                                     <option value="100000">100 kHz</option>
                                 </select>
                                 <button id="voiceMicBtnA" type="button"
-                                        class="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                                        class="btn btn-outline-danger voice-mic-btn d-flex align-items-center justify-content-center"
                                         style="width:140px; height:120px; padding:0;"
                                         title="Hold to give a VFO A voice command"
                                         aria-label="Voice command VFO A — hold to speak">
@@ -1123,7 +1147,7 @@
                                         <option value="100000">100 kHz</option>
                                     </select>
                                     <button id="voiceMicBtnB" type="button"
-                                            class="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                                            class="btn btn-outline-danger voice-mic-btn d-flex align-items-center justify-content-center"
                                             style="width:140px; height:120px; padding:0;"
                                             title="Hold to give a VFO B voice command"
                                             aria-label="Voice command VFO B — hold to speak">

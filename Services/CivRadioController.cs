@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
@@ -129,7 +130,29 @@ namespace Icom_Web_Control.Services
 
             _logger.LogInformation("[CivRadioController] Connecting to {Port} @ {Baud} 8N1…", port, baud);
             if (!await _bus.OpenAsync(port, baud))
+            {
+                // Tell the operator *why* the port didn't open. The common
+                // pre-alpha case is a wrong/re-enumerated COM number (radio off,
+                // cable in a different USB socket, driver not loaded) — surface
+                // the configured port and the list actually present so the fix
+                // is obvious without digging through logs or Device Manager.
+                var available = System.IO.Ports.SerialPort.GetPortNames();
+                if (Array.IndexOf(available, port) < 0)
+                {
+                    var list = available.Length > 0
+                        ? string.Join(", ", available.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+                        : "none";
+                    _state.ConnectionStatusText =
+                        $"Serial port {port} not found. Ports available now: {list}. " +
+                        "Check the radio is on and the USB cable is connected, then set the correct port in Settings.";
+                }
+                else
+                {
+                    _state.ConnectionStatusText =
+                        $"Serial port {port} is present but could not be opened — it may be in use by another program (e.g. WSJT-X or another CAT app).";
+                }
                 return false;
+            }
 
             // A port that opens is NOT proof the radio is usable: over USB the
             // COM port can stay enumerated while the radio is off, and the
@@ -144,8 +167,13 @@ namespace Icom_Web_Control.Services
             if (await ReadOperatingFrequencyAsync(cancellationToken) <= 0)
             {
                 await _bus.CloseAsync();
+                _state.ConnectionStatusText =
+                    $"Serial port {port} opened, but the radio isn't responding — is it powered on?";
                 return false;
             }
+
+            // Link is genuinely up — clear any earlier problem banner.
+            _state.ConnectionStatusText = "";
 
             // Seed the RX controls so every slider/dropdown shows the radio's
             // real position on first paint rather than a default. All are

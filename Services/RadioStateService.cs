@@ -328,6 +328,14 @@ namespace Icom_Web_Control.Services
         private bool _isConnected = false;
         public bool IsConnected { get => _isConnected; set => SetField(ref _isConnected, value); }
 
+        // Human-readable reason the link isn't up, shown as a banner on the home
+        // screen (empty string = nothing to show). Set by CivRadioController's
+        // connect attempt to distinguish "configured serial port not found" (a
+        // config/cabling problem the user can act on) from "port present but
+        // radio silent" (radio off). Broadcasts like any other property.
+        private string _connectionStatusText = "";
+        public string ConnectionStatusText { get => _connectionStatusText; set => SetField(ref _connectionStatusText, value ?? ""); }
+
         private string _bandA = "20m";
         public string BandA { get => _bandA; set => SetField(ref _bandA, value); }
 
@@ -593,6 +601,7 @@ namespace Icom_Web_Control.Services
             return new List<KeyValuePair<string, object>>
             {
                 new("IsConnected", IsConnected),
+                new("ConnectionStatusText", ConnectionStatusText ?? ""),
                 new("RadioPowerOn", RadioPowerOn),
                 new("FrequencyA", FrequencyA),
                 new("FrequencyB", FrequencyB),

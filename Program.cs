@@ -419,7 +419,11 @@ try
     // MAP SIGNALR HUB:
     app.MapHub<Icom_Web_Control.Hubs.RadioHub>("/radioHub");
 
-    app.MapGet("/api/status/init", () => new { status = Icom_Web_Control.Services.AppStatus.InitializationStatus });
+    // `detail` carries a human-readable reason the link isn't up (e.g. the
+    // configured serial port isn't present) so the init overlay can show the
+    // cause instead of an indefinite "Initializing…" spinner. Empty when OK.
+    app.MapGet("/api/status/init", (Icom_Web_Control.Services.RadioStateService state) =>
+        new { status = Icom_Web_Control.Services.AppStatus.InitializationStatus, detail = state.ConnectionStatusText ?? "" });
 
     app.MapGet("/api/ports", async (Icom_Web_Control.Services.ISettingsService settingsService) =>
     {
