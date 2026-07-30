@@ -73,7 +73,7 @@
 17. [Voice Control](#17-voice-control)
     - 17.1 [What you can say](#171-what-you-can-say)
     - 17.2 [Enabling voice control](#172-enabling-voice-control)
-    - 17.3 [Using the mic buttons](#173-using-the-mic-buttons)
+    - 17.3 [Using the mic button](#173-using-the-mic-button)
     - 17.4 [Troubleshooting](#174-troubleshooting)
     - 17.5 [Privacy](#175-privacy)
     - 17.6 [Adding your own commands](#176-adding-your-own-commands)
@@ -2077,42 +2077,53 @@ Originally requested by Yuri W4YSW. Shipped in v2.3.9.
 
 > **Not the same as Voice Announcements (§5.16).** Voice *control* (this section) is **you speaking to the app** — a press-and-hold mic button that lets you issue spoken commands. Voice *announcements* (§5.16) is **the app speaking to you** — automatic spoken cues for band, mode, TX state, DX alerts, etc., useful as an accessibility feature. They are independent features with separate on/off switches. If you're looking for the toggle to silence IWC's automatic speech, you want §5.16.
 
-IWC includes hands-free voice control of common operating actions. **Each VFO has its own mic button**, on the main Index page next to that VFO's band/mode controls — press and hold VFO A's button to control VFO A, VFO B's button to control VFO B. On single-receiver radios (FTdx10, FT-710, FTDX3000) only VFO A's button appears, since there's no independent VFO B to target. Recognition happens entirely on your PC via Windows' built-in speech engine — your audio never leaves your computer. See [§15.8](#158-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method) for the reasoning behind this approach and the Alexa method that was considered and dropped.
+IWC includes hands-free voice control of common operating actions. Hold the **mic button** on the main Index page — next to the VFO's band/mode controls — and speak a command. The IC-7300 has a **single receiver**, so there's one mic button; commands act on the operating VFO. Recognition happens entirely on your PC via Windows' built-in speech engine — your audio never leaves your computer. See [§15.3](#153-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method) for the reasoning behind this approach and the Alexa method that was considered and dropped.
 
-Voice control is **off by default** — it has to be turned on in Settings before the mic buttons appear (see [§17.2](#172-enabling-voice-control)).
+Voice control is **off by default** — it has to be turned on in Settings before the mic button appears (see [§17.2](#172-enabling-voice-control)).
 
 ### 17.1 What you can say
 
-Every command below targets whichever VFO's mic button you're holding down — a command spoken into VFO B's button only ever touches VFO B, and vice versa. The phrases are the built-in English (UK) defaults; they're editable (see [§17.6](#176-adding-your-own-commands)), so if your installation has custom phrases, "Settings → Voice Control → Voice Phrases" is the definitive list, not this table.
+Every command below acts on the operating VFO. The phrases are the built-in English (UK) defaults; they're editable (see [§17.6](#176-adding-your-own-commands)), so if your installation has custom phrases, "Settings → Voice Control → Voice Phrases" is the definitive list, not this table.
+
+The commands are split into two groups. The **first table** is fully wired to the IC-7300 over CI-V and works today. The **second table** lists commands the speech engine still *recognises* — they're in the grammar and you can say them — but which aren't yet connected to the IC-7300, so they don't change anything on the radio (see the warning under that table).
+
+**Working now (wired to the IC-7300):**
 
 | Command family | Say | What happens |
 | --- | --- | --- |
-| Set frequency | "tune to fourteen point zero seven four megahertz", "set frequency to fourteen megahertz" | Held VFO tunes to that frequency. Whole MHz, one decimal, or three decimals; "megahertz" is optional |
-| Change band | "go to twenty metres", "switch to forty metres" | Held VFO jumps to that band's default (usually FT8) frequency. Bands: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres |
-| Step up / down | "tune up" / "step up" / "nudge up"; "tune down" / "step down" / "nudge down" | Held VFO moves by that VFO's configured step size (see below; default 10 kHz) |
-| Set step size | "set step to ten kilohertz", "step size one kilohertz" | Changes the held VFO's step size: 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. Same value as the dropdown next to that VFO's mic button — either one updates the other |
-| Band up / down | "band up" / "band down" | Held VFO jumps to the next/previous ham band |
-| Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Held VFO switches to that mode |
-| Swap VFOs | "swap V F O", "swap A and B" | VFO A and B contents swap (radio-wide, not VFO-specific) |
-| Set attenuator | "set attenuator off", "attenuator six d b" (also twelve, eighteen dB) | Held VFO's attenuator changes |
-| Set preamp | "set preamp off" / "i p o", "preamp one" (also two) | Held VFO's preamp changes |
-| Set AGC | "set a g c fast" (also mid, slow, auto, off) | Held VFO's AGC speed changes |
-| Set AF gain | "set a f gain fifty" (0–100 in the steps listed in the phrase editor, or "mute"/"maximum") | Held VFO's volume changes |
-| IF filter width | "filter wider" / "filter narrower" | Held VFO's IF passband width nudges one step |
+| Set frequency | "tune to fourteen point zero seven four megahertz", "set frequency to fourteen megahertz" | Tunes to that frequency. Whole MHz, one decimal, or three decimals; "megahertz" is optional |
+| Change band | "go to twenty metres", "switch to forty metres" | Jumps to that band's default (usually FT8) frequency. Bands: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The band name alone works too — a bare "forty metres" is the same as "go to forty metres" |
+| Step up / down | "tune up" / "step up" / "nudge up"; "tune down" / "step down" / "nudge down" | Moves by the configured step size (see Set step size; default 10 kHz) |
+| Set step size | "set step ten kilohertz", "step size one kilohertz" | Sets the step size: 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. The step word alone works too ("ten kilohertz"). Same value as the step dropdown by the mic button — either one updates the other |
+| Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Switches mode |
+| Swap VFOs | "swap V F O", "swap A and B" | Exchanges VFO A and B contents |
+| Set preamp | "set preamp off", "preamp one" (also two) | Preamp off / amp 1 / amp 2 (IC-7300 has two preamp stages) |
+| Set AF gain | "set a f gain fifty" / "audio gain fifty" (0–100 in the steps listed in the phrase editor, or "mute" / "maximum") | Sets the AF (volume) level |
 | Transmit | "key transmitter" / "start transmitting"; "stop transmitting" / "go to receive" | Radio keys up / drops back to receive |
 | Split | "split on" / "enable split"; "split off" / "simplex" | Split operation toggles |
-| Status read-back | "what frequency", "what mode", "what band" | IWC speaks the held VFO's current value out loud — no CAT command is sent to the radio |
+| Status read-back | "what frequency", "what mode", "what band" | IWC speaks the current value out loud — nothing is sent to the radio |
 | Help | "help", "what can I say" | IWC speaks a short list of the available command categories |
-| Macros | "noise reduction on/off", "noise blanker on/off", "copy a to b" / "copy b to a", "fine step up/down" | Runs the matching one-shot command. See the Macros group in the phrase editor for the full list and their exact command strings |
+
+**Recognised but not yet active on the IC-7300:**
+
+| Command family | Say | Status |
+| --- | --- | --- |
+| Set attenuator | "set attenuator off", "attenuator six d b" (also twelve, eighteen dB) | Not yet wired to CI-V. The IC-7300's attenuator is a single on/off pad, not the off/6/12/18 dB set these phrases assume — the command is being reworked for the Icom control model |
+| Set AGC | "set a g c fast" (also mid, slow, auto, off) | Not yet wired to CI-V. The IC-7300 has fast/mid/slow only (no off/auto); the command is being reworked |
+| Band up / down | "band up" / "band down" | Not yet wired to CI-V. Use "go to \<band\> metres" instead, which works |
+| IF filter width | "filter wider" / "filter narrower" | Not yet wired to CI-V — use the on-screen IF Width control instead |
+| Macros | "noise reduction on/off", "noise blanker on/off", "copy a to b" / "copy b to a", "fine step up/down" | The default macros still hold Yaesu CAT strings and don't reach the IC-7300 yet |
+
+> ℹ️ **These commands tell you they're not available.** Say one and IWC speaks a short "…isn't available on the IC-7300 yet" message instead of a false "successful" — so you're never misled into thinking the radio changed when it didn't. They'll be wired up in a later build.
 
 A few notes on phrasing:
 
 - **Spell out mode letters.** Say "U S B" (three letters), not "USB" as a word — the speech engine handles letter-by-letter spelling much more reliably for short acronyms.
 - **Fractional frequencies are spoken digit-by-digit** after "point". "Fourteen point zero seven four" parses as 14.074, not "fourteen point seventy-four". "Oh" is accepted as an alternative to "zero".
 - **"megahertz" is optional.** Both "set frequency to fourteen point zero seven four megahertz" and "tune to fourteen point zero seven four" work — say it or skip it.
-- **MHz only — no kHz.** The grammar recognises frequencies in whole-or-decimal **megahertz**, from 1 MHz up to 71 MHz (covering HF + 6 m + 4 m). It does **not** recognise kilohertz input. If you say something the grammar can't parse — e.g. "tune to thirty kilohertz" — the engine will fuzzy-match to the nearest valid in-range phrase ("tune to thirty point eight") and act on that instead. **Listen to the spoken confirmation** that follows every command: it tells you exactly what got recognised, which is the safety net against misrecognition. For sub-MHz tuning (LF, MF, the 30 kHz lower limit on the FTdx101), use the mouse or the keyboard-driven frequency display instead — see §16.7.
+- **MHz only — no kHz.** The grammar recognises frequencies in whole-or-decimal **megahertz**, from 1 MHz up to 71 MHz (covering HF + 6 m + 4 m). It does **not** recognise kilohertz input. If you say something the grammar can't parse — e.g. "tune to thirty kilohertz" — the engine will fuzzy-match to the nearest valid in-range phrase ("tune to thirty point eight") and act on that instead. **Listen to the spoken confirmation** that follows every command: it tells you exactly what got recognised, which is the safety net against misrecognition. For sub-MHz tuning (LF, MF, down to the IC-7300's 30 kHz lower limit), use the mouse or the keyboard-driven frequency display instead — see §16.7.
 - **Bands supported:** 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The default frequency picked for each band is roughly the FT8 / digital hangout — adjust with a follow-up "set frequency to …" or "tune up" / "tune down".
-- **Scots variants** are accepted: "go tae forty metres" works the same as "go to forty metres".
+- **Scots variants** are accepted where they're in the default phrase list — e.g. "tune tae fourteen point zero seven four" works the same as "tune to …". Add your own in the phrase editor (§17.6) for any command you like.
 
 **After every command, IWC speaks a short confirmation** through the PC's default audio output:
 
@@ -2123,7 +2134,7 @@ A few notes on phrasing:
 - *"Tune up, successful"* / *"Tune down, successful"* — for nudge.
 - If the command was rejected (e.g. frequency out of range), the suffix is *"unsuccessful"* instead.
 
-This is a primary accessibility feature: a partially-sighted operator can drive the radio without watching the screen and hear exactly what happened to each command. The confirmation also doubles as the safety net for misrecognition — if you said "tune to fourteen" but heard *"Move to forty megahertz, successful"*, the spoken readback tells you the engine misheard and you can issue the command again. Confirmations don't name the VFO — you already know which one from which mic button you were holding. Disable in **Settings → Voice Control → Speak confirmation after each voice command** if you find it chatty.
+This is a primary accessibility feature: a partially-sighted operator can drive the radio without watching the screen and hear exactly what happened to each command. The confirmation also doubles as the safety net for misrecognition — if you said "tune to fourteen" but heard *"Move to forty megahertz, successful"*, the spoken readback tells you the engine misheard and you can issue the command again. Disable in **Settings → Voice Control → Speak confirmation after each voice command** if you find it chatty.
 
 ### 17.2 Enabling voice control
 
@@ -2133,16 +2144,16 @@ This is a primary accessibility feature: a partially-sighted operator can drive 
 4. **Restart IWC.** The speech engine is loaded once at startup; the toggle takes effect on the next launch.
 5. Confirm the **Windows speech recognition pack for your active language** is installed. Open Windows → Settings → Time &amp; Language → Speech and check the installed-languages list. The active language defaults to English (United Kingdom) — if it isn't listed, install it from there (most UK Windows installs already have it). The **Active language** dropdown in the Voice Control section lets you switch to any other installed language pack (see [§17.7](#177-more-languages)).
 
-After restart, you should see a **mic button on the Index page beside the VFO A panel**, next to VFO A's band/mode controls. If you don't see it, jump to [§17.4 Troubleshooting](#174-troubleshooting).
+After restart, you should see a **mic button on the Index page beside the VFO panel**, next to the band/mode controls. If you don't see it, jump to [§17.4 Troubleshooting](#174-troubleshooting).
 
-### 17.3 Using the mic buttons
+### 17.3 Using the mic button
 
-Each mic button is a **press-and-hold** control — it doesn't latch. The two VFOs' buttons are independent, but only one can be listening at a time (there's a single speech engine underneath); holding one button while the other is already listening simply has no effect until you release the first.
+The mic button is a **press-and-hold** control — it doesn't latch. Hold it to listen, release to process.
 
-1. **Press and hold** a VFO's mic button. The button colour changes to indicate the speech engine is listening.
+1. **Press and hold** the mic button. The button colour changes to indicate the speech engine is listening.
 2. **Speak the command clearly** at a normal volume.
 3. **Release** the button. The engine processes what it heard.
-4. If the phrase matched the grammar, that VFO responds within a fraction of a second. The button returns to its idle colour.
+4. If the phrase matched the grammar, the radio responds within a fraction of a second. The button returns to its idle colour.
 5. Bold text under the button shows the **last phrase recognised** and which command it matched — useful for spotting misrecognitions ("set frequency to forty metres" instead of "go to forty metres", say).
 
 If you change your mind mid-phrase, just release the button without speaking. Nothing is sent to the radio unless a full grammar match is found.
@@ -2153,9 +2164,9 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 
 ### 17.4 Troubleshooting
 
-**No mic buttons on the Index page.**
+**No mic button on the Index page.**
 - Did you tick "Enable voice control" in Settings *and* restart IWC? The toggle only takes effect on next launch.
-- Only one mic button (VFO A's)? That's expected — the IC-7300 is a single-receiver radio, so VFO B is a frequency/mode slot rather than an independent receiver to target by voice.
+- The IC-7300 is a single-receiver radio, so there's one mic button beside the VFO panel — that's expected, not a fault.
 - Open the Settings page → Voice Control → Diagnostics. If the **State** is anything other than `Idle`, there's an engine error — read the **Last error** line.
 - If Diagnostics shows the active language's Windows speech pack isn't installed, install it (Windows → Settings → Time &amp; Language → Speech → Add a language) — see [§17.2](#172-enabling-voice-control).
 
@@ -2166,8 +2177,7 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 - The raw log file lives at `%APPDATA%\MM5AGM\Icom Web Control\logs\iwc-YYYYMMDD.log` if you ever need the unfiltered version (e.g. CAT command traffic, SDR worker status, etc.), but the Diagnostics page is the right tool for voice-specific issues.
 
 **"Tune up" doesn't seem to do much.**
-- Check you're watching the VFO panel whose mic button you actually pressed — each VFO steps independently, so "tune up" spoken into VFO B's button moves VFO B, not VFO A.
-- Each VFO's step size is shown (and changeable) in the dropdown next to that VFO's mic button, default **10 kHz**. If it's set small (e.g. 10 Hz) the movement can be easy to miss. Change it with the dropdown or by voice: "set step to ten kilohertz".
+- The step size is shown (and changeable) in the dropdown next to the mic button, default **10 kHz**. If it's set small (e.g. 10 Hz) the movement can be easy to miss. Change it with the dropdown or by voice: "set step ten kilohertz".
 - If you need bigger jumps use "set frequency to …" or "go to … metres" instead.
 
 **Speech engine works for a while then stops responding.**
