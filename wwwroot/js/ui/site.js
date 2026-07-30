@@ -1128,6 +1128,10 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
         try { state.lastBackendFreq.A = update.value; } catch (_) { /* state lives in IIFE scope only */ }
         try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
+        // Feed the DX Spots panel's band filter from the main update stream —
+        // the SDR-era spectrum pipeline that used to do this is dormant on the
+        // IC-7300 build (no SDR), which left _vfoHz=0 and the band filter inert.
+        try { if (window.dxSpotsPanel) window.dxSpotsPanel.setVfoFrequency(update.value); } catch (_) { /* panel may not exist yet */ }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
         try { if (window.syncSegmentSelectToFrequency) window.syncSegmentSelectToFrequency('A', update.value); }

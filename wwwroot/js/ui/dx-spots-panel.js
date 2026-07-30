@@ -125,6 +125,11 @@ export class DxSpotsPanel {
         else                   this.show();
     }
 
+    close() {
+        if (!this._dialog) return;
+        if (this._dialog.open) this._dialog.close();
+    }
+
     // ── Band / mode helpers ─────────────────────────────────────────────────
 
     _currentBand() {
@@ -344,7 +349,12 @@ export class DxSpotsPanel {
         const header = this._dialog.querySelector('.dxs-header');
         if (!header) return;
         header.addEventListener('mousedown', (e) => {
-            if (e.target.closest('button, input, label')) return;
+            // Don't start a drag when the mousedown lands on an interactive
+            // control OR its Bootstrap wrapper — the .form-check/.form-switch
+            // div has padding around the "All bands" switch, and clicking that
+            // padding (target = the div, not the input) was starting a drag and
+            // preventDefault-ing the toggle, so the checkbox could never change.
+            if (e.target.closest('button, input, label, select, .form-check, .form-switch')) return;
             const rect  = this._dialog.getBoundingClientRect();
             const origX = e.clientX, origY = e.clientY;
             const baseL = rect.left,  baseT = rect.top;
