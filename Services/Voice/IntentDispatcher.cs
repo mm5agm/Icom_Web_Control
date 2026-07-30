@@ -293,37 +293,35 @@ namespace Icom_Web_Control.Services.Voice
 
         // -- BandUp / BandDown ---------------------------------------------
 
-        private async Task<DispatchResult> BandStepAsync(bool up, CancellationToken ct)
+        private Task<DispatchResult> BandStepAsync(bool up, CancellationToken ct)
         {
-            var phrase = up ? "Band up" : "Band down";
-            // BU/BD require a P1 band selector (0=MAIN, 1=SUB) per the
-            // FTdx101MP CAT manual -- a bare "BU;"/"BD;" is malformed and
-            // the radio silently ignores it.
             // TODO(voice-civ): no CI-V seam band-step yet. Could map onto the
-            // band-stacking registers (like the HTTP band buttons) later. Inert
-            // on Icom until then.
-            var command = (up ? "BU" : "BD") + VfoP1 + ";";
-            await SendCommand(command, ct);
-            _logger.LogInformation("[Voice] {Phrase} (VFO {Vfo})", phrase, CurrentVfo);
-            return new DispatchResult(true, phrase);
+            // band-stacking registers (like the HTTP band buttons) later. Until
+            // then this intent is inert on Icom, so report it honestly rather
+            // than falsely confirming. "Go to <band> metres" (SetBand) works today.
+            _logger.LogInformation("[Voice] Band {Dir} recognised but not yet wired to CI-V (VFO {Vfo})", up ? "up" : "down", CurrentVfo);
+            return Task.FromResult(new DispatchResult(false,
+                "Band up and down aren't available yet — say go to, then a band", IsReadBack: true));
         }
 
         // -- Macro ---------------------------------------------------------
 
-        private async Task<DispatchResult> MacroAsync(
+        private Task<DispatchResult> MacroAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             var name = args.TryGetValue("macroName", out var n) ? n?.ToString() ?? "Macro" : "Macro";
             if (!args.TryGetValue("macroCat", out var c) || c is not string cat || string.IsNullOrWhiteSpace(cat))
             {
                 _logger.LogWarning("[Voice] Macro '{Name}' has no CAT string", name);
-                return new DispatchResult(false, name);
+                return Task.FromResult(new DispatchResult(false, name));
             }
-            // Split on ';' to support multi-command macros like "NR01;NB01;"
-            foreach (var seg in cat.Split(';', StringSplitOptions.RemoveEmptyEntries))
-                await SendCommand(seg + ";", ct);
-            _logger.LogInformation("[Voice] Macro '{Name}' -> {Cat}", name, cat);
-            return new DispatchResult(true, name);
+            // TODO(voice-civ): the default macros still hold Yaesu ASCII CAT
+            // strings (AB;, NR01;, …). They need CI-V hex equivalents before they
+            // can reach the IC-7300, so macros are inert on Icom. Report it
+            // honestly (IsReadBack, plain spoken message) rather than falsely
+            // confirming a command that never left the app.
+            _logger.LogInformation("[Voice] Macro '{Name}' ({Cat}) recognised but not yet wired to CI-V", name, cat);
+            return Task.FromResult(new DispatchResult(false, $"The {name} macro isn't available on the IC-7300 yet", IsReadBack: true));
         }
 
         // -- Status read-back (IsReadBack=true → no ", successful" appended) -----
@@ -438,11 +436,11 @@ namespace Icom_Web_Control.Services.Voice
 
         // -- Attenuator / Preamp / AGC -------------------------------------
 
-        private async Task<DispatchResult> SetAttenuatorAsync(
+        private Task<DispatchResult> SetAttenuatorAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!args.TryGetValue("level", out var lvlObj) || lvlObj is not string level)
-                return new DispatchResult(false, "Attenuator");
+                return Task.FromResult(new DispatchResult(false, "Attenuator"));
 
             var code = level switch
             {
@@ -452,17 +450,16 @@ namespace Icom_Web_Control.Services.Voice
                 "18"  => "3",
                 _     => null,
             };
-            if (code == null) return new DispatchResult(false, "Attenuator");
+            if (code == null) return Task.FromResult(new DispatchResult(false, "Attenuator"));
 
-            // TODO(voice-civ): IC-7300 attenuator is a single on/off ~20 dB pad
-            // (CI-V 11), not Yaesu's off/6/12/18. Repoint to _radio.SetAttenuatorAsync
-            // once the vocabulary is reduced to on/off. Inert on Icom until then.
-            await SendCommand($"RA{VfoP1}{code};", ct);
-            var attValue = level switch { "off" => "00", "6" => "06", "12" => "12", "18" => "18", _ => (string?)null };
-            if (VfoIsB) _state.AttB = attValue ?? _state.AttB; else _state.AttA = attValue ?? _state.AttA;
-            var phrase = level == "off" ? "Attenuator off" : $"Attenuator {level} decibels";
-            _logger.LogInformation("[Voice] SetAttenuator -> {Level} (VFO {Vfo})", level, CurrentVfo);
-            return new DispatchResult(true, phrase);
+            // TODO(voice-civ): the IC-7300 attenuator is a single on/off ~20 dB
+            // pad (CI-V 11), not Yaesu's off/6/12/18 dB set. Until the vocabulary
+            // is reduced to on/off and repointed to _radio, this intent is inert
+            // on Icom. Report that honestly (IsReadBack speaks the message plainly
+            // and always, with no false ", successful") rather than confirming a
+            // change that never reached the radio.
+            _logger.LogInformation("[Voice] SetAttenuator '{Level}' recognised but not yet wired to CI-V (VFO {Vfo})", level, CurrentVfo);
+            return Task.FromResult(new DispatchResult(false, "Attenuator control isn't available on the IC-7300 yet", IsReadBack: true));
         }
 
         private async Task<DispatchResult> SetPreampAsync(
@@ -494,11 +491,11 @@ namespace Icom_Web_Control.Services.Voice
             return new DispatchResult(true, phrase);
         }
 
-        private async Task<DispatchResult> SetAgcAsync(
+        private Task<DispatchResult> SetAgcAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!args.TryGetValue("speed", out var spObj) || spObj is not string speed)
-                return new DispatchResult(false, "A G C");
+                return Task.FromResult(new DispatchResult(false, "A G C"));
 
             var code = speed switch
             {
@@ -509,15 +506,14 @@ namespace Icom_Web_Control.Services.Voice
                 "auto" => "4",
                 _      => null,
             };
-            if (code == null) return new DispatchResult(false, "A G C");
+            if (code == null) return Task.FromResult(new DispatchResult(false, "A G C"));
 
-            // TODO(voice-civ): IC-7300 AGC is fast/mid/slow (16 12 → 1/2/3) only;
-            // no off/auto. Trim the vocabulary and repoint to _radio.SetAgcAsync.
-            // Inert on Icom until then.
-            await SendCommand($"GT{VfoP1}{code};", ct);
-            if (VfoIsB) _state.AgcB = code; else _state.AgcA = code;
-            _logger.LogInformation("[Voice] SetAgc -> {Speed} (VFO {Vfo})", speed, CurrentVfo);
-            return new DispatchResult(true, $"A G C {speed}");
+            // TODO(voice-civ): IC-7300 AGC is fast/mid/slow (16 12 → 1/2/3) only,
+            // no off/auto. Until the vocabulary is trimmed and repointed to
+            // _radio.SetAgcAsync, this intent is inert on Icom. Report it honestly
+            // (IsReadBack, plain spoken message) rather than falsely confirming.
+            _logger.LogInformation("[Voice] SetAgc '{Speed}' recognised but not yet wired to CI-V (VFO {Vfo})", speed, CurrentVfo);
+            return Task.FromResult(new DispatchResult(false, "A G C control isn't available on the IC-7300 yet", IsReadBack: true));
         }
 
         // -- CAT send, dry-run-aware ----------------------------------------
