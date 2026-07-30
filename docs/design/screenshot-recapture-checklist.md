@@ -17,8 +17,11 @@ IWC's own screens, which have changed for the IC-7300 build:
 - [ ] `DevelopScreen.png`
 
 **Spectrum**
-- [ ] `Spectrum_Side_By_Side.png`
-- [ ] `Spectrum_Stacked.png`
+- The old dual-SDR spectrum shots (`Spectrum_Side_By_Side.png`, `Spectrum_Stacked.png`)
+  are **no longer referenced** by the manual — the SDR sections were replaced with
+  the IC-7300's built-in CI-V scope prose. Listed under 🗑 Orphans below.
+- [ ] _(new)_ If the IWC build renders a CI-V scope panel worth showing, shoot a
+      fresh single-scope screenshot and add it to §5.4 of the manual.
 
 **Operating panels**
 - [ ] `CW-Keyer.png`
@@ -43,13 +46,12 @@ IWC's own screens, which have changed for the IC-7300 build:
 - [ ] `Memories_Starter_Bank_Loaded`
 - [ ] `Memories_Tile_Closeup`
 
-**Settings (4)**
+**Settings (3)**
 - [ ] `Settings_Network_Config`
 - [ ] `Settings_Restart_Required`
-- [ ] `Settings_SDR_Warning` — ⚠ **check first:** IC-7300 uses CI-V scope, not an
-      SDR, so this Settings section may no longer exist. Don't shoot it until
-      confirmed it's still in the UI.
 - [ ] `Settings_Test_Cluster`
+- `Settings_SDR_Warning` — **no longer referenced** by the manual (the SDR Settings
+  content was removed for the CI-V-scope IC-7300 build). Listed under 🗑 Orphans below.
 
 ## 🟠 Yaesu-specific — must be *replaced*, not just re-shot (4)
 
@@ -69,4 +71,7 @@ Other apps' own screens; no IWC branding to change:
 ## 🗑 Orphans to delete (in `pictures/`, not referenced by the manual)
 
 - [ ] `Spectrum_New.png` — superseded by Side_By_Side / Stacked
+- [ ] `Spectrum_Side_By_Side.png` — dual-SDR era; manual no longer references it
+- [ ] `Spectrum_Stacked.png` — dual-SDR era; manual no longer references it
+- [ ] `Settings_SDR_Warning.png` — SDR Settings section removed for the IC-7300 build
 - [ ] `Log4OM_UDP_Proxy.png`
