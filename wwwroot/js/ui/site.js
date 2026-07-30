@@ -1332,6 +1332,14 @@ connection.on("RadioStateUpdate", function (update) {
         if (window.dspSetActive) window.dspSetActive('ifShapeGroupB', update.value);
     }
 
+    // --- SELECTED IF FILTER SLOT (FIL1/2/3, CI-V 26) ---
+    if (update.property === "SelectedFilterA") {
+        if (window.dspSetActive) window.dspSetActive('filGroupA', update.value);
+    }
+    if (update.property === "SelectedFilterB") {
+        if (window.dspSetActive) window.dspSetActive('filGroupB', update.value);
+    }
+
     // --- NOISE BLANKER ---
     if (update.property === "NbA") {
         if (window.dspSetActive) window.dspSetActive('nbGroupA', update.value);

@@ -135,11 +135,19 @@
         public string IfShapeB { get; set; } = "0";
 
         /// <summary>
-        /// IF Width per VFO: "0"=200Hz "1"=400Hz "2"=600Hz "3"=850Hz "4"=1200Hz
-        ///                   "5"=1400Hz "6"=1800Hz "7"=2400Hz "8"=3000Hz
+        /// IF passband filter width per VFO, in Hz as a string (e.g. "2400").
+        /// "" when unknown or when the current mode (FM) has no adjustable width.
+        /// Driven by CI-V 1A 03 via CivRadioController's FilterWidthCodec.
         /// </summary>
-        public string IfWidthA { get; set; } = "8";
-        public string IfWidthB { get; set; } = "8";
+        public string IfWidthA { get; set; } = "";
+        public string IfWidthB { get; set; } = "";
+
+        /// <summary>
+        /// Selected IF filter slot per VFO: "1"=FIL1 "2"=FIL2 "3"=FIL3.
+        /// "" when unknown. Sourced from the command 26 mode reply's filter byte.
+        /// </summary>
+        public string SelectedFilterA { get; set; } = "";
+        public string SelectedFilterB { get; set; } = "";
 
         /// <summary>
         /// IF Shift per VFO in Hz (-1000 to +1000)

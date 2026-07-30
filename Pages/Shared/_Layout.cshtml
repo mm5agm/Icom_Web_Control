@@ -103,6 +103,8 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <script src="~/js/ui/site.js" asp-append-version="true"></script>
+    <!-- IC-7300 IF passband width + FIL slot — must load after site.js (defines window.IfWidth / setIfWidth / setFilterSlot). -->
+    <script src="~/js/ui/ic7300-if-width.js" asp-append-version="true"></script>
     @{
         // Voice Control: server-render the enable flag so voice-control.js
         // can decide whether to show the per-VFO mic buttons before any user

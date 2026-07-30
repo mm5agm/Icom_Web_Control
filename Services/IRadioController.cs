@@ -137,6 +137,25 @@ namespace Icom_Web_Control.Services
         Task<int> GetIfFilterShapeAsync(CancellationToken cancellationToken = default);
         Task SetIfFilterShapeAsync(int value, CancellationToken cancellationToken = default);
 
+        // -- IF passband filter width + FIL slot (CI-V 1A 03 / 26) --------------
+        // The width of the currently-selected FIL slot for the VFO's current
+        // mode, in Hz. Valid Hz values depend on the mode group (SSB/CW, RTTY,
+        // AM); FM has no adjustable width. The controller snaps any requested Hz
+        // to the nearest value the radio supports. FIL1/2/3 is the preset slot
+        // the width applies to, carried in the command 26 mode frame.
+
+        /// <summary>Read the IF passband width in Hz for the current mode (CI-V 1A 03). -1 on a miss or when the mode has no width (FM).</summary>
+        Task<int> GetIfFilterWidthHzAsync(RadioVfo vfo, CancellationToken cancellationToken = default);
+
+        /// <summary>Set the IF passband width, snapping <paramref name="hz"/> to the nearest value the current mode supports (CI-V 1A 03).</summary>
+        Task SetIfFilterWidthHzAsync(RadioVfo vfo, int hz, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the selected filter slot: 1=FIL1, 2=FIL2, 3=FIL3 (from the CI-V 26 mode reply). -1 on a miss.</summary>
+        Task<int> GetSelectedFilterAsync(RadioVfo vfo, CancellationToken cancellationToken = default);
+
+        /// <summary>Select filter slot 1/2/3 for the VFO, preserving its mode (CI-V 26).</summary>
+        Task SetSelectedFilterAsync(RadioVfo vfo, int fil, CancellationToken cancellationToken = default);
+
         /// <summary>Attenuator: the IC-7300's single 20 dB pad, on/off (CI-V 11).</summary>
         Task<bool> GetAttenuatorAsync(CancellationToken cancellationToken = default);
         Task SetAttenuatorAsync(bool on, CancellationToken cancellationToken = default);

@@ -57,6 +57,14 @@ namespace Icom_Web_Control.Services.Civ
         public const byte CmdMenu = 0x1A;
         public const byte SubDataMode = 0x06;
 
+        // IF passband filter width (command 1A 03) — the width of the currently
+        // selected FIL slot for the current mode. One BCD data byte whose code
+        // range and Hz meaning depend on the mode group (SSB/CW, RTTY, AM); FM
+        // has no adjustable width. See FilterWidthCodec in CivRadioController.
+        //   Read : send 1A 03            → reply 1A 03 <code(BCD)>
+        //   Set  : send 1A 03 <code(BCD)> → reply FB / FA
+        public const byte SubIfWidth = 0x03;
+
         // Phase 3 block 3 — meters (command 15 family). Sub 02 = S-meter.
         //   Read : send 15 02   → reply 15 02 <d1> <d2>
         // The level is a 0–255 value as two big-endian BCD bytes (unlike the

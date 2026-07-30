@@ -61,8 +61,10 @@ namespace Icom_Web_Control.Services
             MicGain = _initialState.MicGain;
             ProcEnabled = _initialState.ProcEnabled;
             ProcLevel = _initialState.ProcLevel;
-            IfWidthA = _initialState.IfWidthA ?? "8";
-            IfWidthB = _initialState.IfWidthB ?? "8";
+            IfWidthA = _initialState.IfWidthA ?? "";
+            IfWidthB = _initialState.IfWidthB ?? "";
+            SelectedFilterA = _initialState.SelectedFilterA ?? "";
+            SelectedFilterB = _initialState.SelectedFilterB ?? "";
             IfShiftA = _initialState.IfShiftA;
             IfShiftB = _initialState.IfShiftB;
             AfGainA = _initialState.AfGainA;
@@ -286,12 +288,18 @@ namespace Icom_Web_Control.Services
         private string _nbB = "0";
         public string NbB { get => _nbB; set => SetField(ref _nbB, value); }
 
-        // SH command IF Width: "0"=200Hz "1"=400Hz "2"=600Hz "3"=850Hz "4"=1200Hz
-        //                      "5"=1400Hz "6"=1800Hz "7"=2400Hz "8"=3000Hz
-        private string _ifWidthA = "8";
+        // IC-7300 IF passband filter width, in Hz as a string (CI-V 1A 03).
+        // "" = unknown / mode has no adjustable width (FM).
+        private string _ifWidthA = "";
         public string IfWidthA { get => _ifWidthA; set => SetField(ref _ifWidthA, value); }
-        private string _ifWidthB = "8";
+        private string _ifWidthB = "";
         public string IfWidthB { get => _ifWidthB; set => SetField(ref _ifWidthB, value); }
+
+        // Selected IF filter slot: "1"=FIL1 "2"=FIL2 "3"=FIL3, "" = unknown.
+        private string _selectedFilterA = "";
+        public string SelectedFilterA { get => _selectedFilterA; set => SetField(ref _selectedFilterA, value); }
+        private string _selectedFilterB = "";
+        public string SelectedFilterB { get => _selectedFilterB; set => SetField(ref _selectedFilterB, value); }
 
         // IS command IF Shift: stored in Hz, -1000 to +1000. CAT encodes as 0000-9999 (center=5000=0Hz).
         private int _ifShiftA = 0;
@@ -644,6 +652,8 @@ namespace Icom_Web_Control.Services
                 new("IfShapeB", IfShapeB),
                 new("IfWidthA", IfWidthA),
                 new("IfWidthB", IfWidthB),
+                new("SelectedFilterA", SelectedFilterA),
+                new("SelectedFilterB", SelectedFilterB),
                 new("IfShiftA", IfShiftA),
                 new("IfShiftB", IfShiftB),
                 new("RxClarOn", RxClarOn),
@@ -780,6 +790,8 @@ namespace Icom_Web_Control.Services
                 IfShapeB = IfShapeB,
                 IfWidthA = IfWidthA,
                 IfWidthB = IfWidthB,
+                SelectedFilterA = SelectedFilterA,
+                SelectedFilterB = SelectedFilterB,
                 IfShiftA = IfShiftA,
                 IfShiftB = IfShiftB,
                 ClarifierOffsetA = ClarifierOffsetA,

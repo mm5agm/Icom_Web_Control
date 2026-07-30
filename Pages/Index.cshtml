@@ -888,6 +888,24 @@
                                     @Html.Raw(SegBtn("ifShapeGroupA", "1", "SOFT",  ifShapeA, "window.setIfShape('A','1')"))
                                 </div>
                             </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">Filter</label>
+                                @{ var filA = Model.RadioState.SelectedFilterA; }
+                                <div class="dsp-seg-group" role="group" aria-label="VFO A IF filter slot" id="filGroupA">
+                                    @Html.Raw(SegBtn("filGroupA", "1", "FIL1", filA, "window.setFilterSlot('A','1')"))
+                                    @Html.Raw(SegBtn("filGroupA", "2", "FIL2", filA, "window.setFilterSlot('A','2')"))
+                                    @Html.Raw(SegBtn("filGroupA", "3", "FIL3", filA, "window.setFilterSlot('A','3')"))
+                                </div>
+                            </div>
+                            <div class="vfo-control-item" id="ifWidthRowA">
+                                <label class="vfo-control-label" for="ifWidthSelectA">IF Width</label>
+                                <select class="form-select form-select-sm vfo-mode-select" id="ifWidthSelectA"
+                                        aria-label="VFO A IF passband width"
+                                        title="VFO A IF passband filter width — options follow the current mode"
+                                        data-vfo="A" data-current="@Model.RadioState.IfWidthA"
+                                        onchange="window.setIfWidth('A', this.value)">
+                                </select>
+                            </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">Notch Pos</label>
                                 <input type="range" id="manualNotchFreqA" aria-label="VFO A manual notch position" title="VFO A manual notch position (0=low, 128=centre, 255=high)" min="0" max="255" step="1" value="@Model.RadioState.ManualNotchFreqA"
@@ -1202,6 +1220,24 @@
                                     @Html.Raw(SegBtn("ifShapeGroupB", "0", "SHARP", ifShapeB, "window.setIfShape('B','0')"))
                                     @Html.Raw(SegBtn("ifShapeGroupB", "1", "SOFT",  ifShapeB, "window.setIfShape('B','1')"))
                                 </div>
+                            </div>
+                            <div class="vfo-control-item">
+                                <label class="vfo-control-label">Filter</label>
+                                @{ var filB = Model.RadioState.SelectedFilterB; }
+                                <div class="dsp-seg-group" role="group" aria-label="VFO B IF filter slot" id="filGroupB">
+                                    @Html.Raw(SegBtn("filGroupB", "1", "FIL1", filB, "window.setFilterSlot('B','1')"))
+                                    @Html.Raw(SegBtn("filGroupB", "2", "FIL2", filB, "window.setFilterSlot('B','2')"))
+                                    @Html.Raw(SegBtn("filGroupB", "3", "FIL3", filB, "window.setFilterSlot('B','3')"))
+                                </div>
+                            </div>
+                            <div class="vfo-control-item" id="ifWidthRowB">
+                                <label class="vfo-control-label" for="ifWidthSelectB">IF Width</label>
+                                <select class="form-select form-select-sm vfo-mode-select" id="ifWidthSelectB"
+                                        aria-label="VFO B IF passband width"
+                                        title="VFO B IF passband filter width — options follow the current mode"
+                                        data-vfo="B" data-current="@Model.RadioState.IfWidthB"
+                                        onchange="window.setIfWidth('B', this.value)">
+                                </select>
                             </div>
                             <div class="vfo-control-item" style="grid-column: 1 / -1;">
                                 <label class="vfo-control-label">Notch Pos</label>

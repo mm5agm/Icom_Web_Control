@@ -589,8 +589,8 @@ namespace Icom_Web_Control.Services
         // control to OFF. The state setters broadcast only on change, so a
         // steady radio produces no SignalR traffic here.
         private int _rxPollIndex;
-        private const int RxControlCount = 15;
-        private const int RxControlsPerLoop = 2;   // ~1.2 s to sweep all 15
+        private const int RxControlCount = 16;
+        private const int RxControlsPerLoop = 2;   // ~1.3 s to sweep all 16
 
         private async Task PollNextRxControlAsync(CancellationToken ct)
         {
@@ -611,8 +611,42 @@ namespace Icom_Web_Control.Services
                 case 12: { int v = await ReadFunc16Async(CivProtocol.SubManualNotchWidth, ct); if (v >= 0) { _state.ManualNotchWidthA = v.ToString(); _state.ManualNotchWidthB = _state.ManualNotchWidthA; } break; }
                 case 13: { int v = await ReadFunc16Async(CivProtocol.SubIfFilterShape, ct);    if (v >= 0) { _state.IfShapeA = v.ToString(); _state.IfShapeB = _state.IfShapeA; } break; }
                 case 14: { int v = await GetTunerAsync(ct); if (v >= 0) { _state.AtuEnabled = v != CivProtocol.TunerOff; _state.AtuTuning = v == CivProtocol.TunerTune; } break; }
+                case 15: await PollIfWidthAndFilterAsync(ct); break;
             }
             _rxPollIndex++;
+        }
+
+        /// <summary>
+        /// Poll the operating VFO's selected filter slot and IF passband width
+        /// in one pass. The 1A 03 width command is receiver-wide, so it only
+        /// reflects the operating VFO; the mode read (26) also yields the FIL
+        /// slot, so both come from a single extra transaction plus (for modes
+        /// that have a width) the 1A 03 read. FM clears the width to "".
+        /// </summary>
+        private async Task PollIfWidthAndFilterAsync(CancellationToken ct)
+        {
+            var vfo = ActiveVfo;
+            var m = await ReadVfoModeRawAsync(SelectorFor(vfo), ct);
+            if (!m.ok) return;
+
+            if (m.filter is >= 0x01 and <= 0x03)
+            {
+                string f = m.filter.ToString();
+                if (vfo == RadioVfo.A) _state.SelectedFilterA = f; else _state.SelectedFilterB = f;
+            }
+
+            var group = FilterWidthCodec.GroupForModeByte(m.mode);
+            if (group == FilterWidthCodec.Group.None)
+            {
+                if (vfo == RadioVfo.A) _state.IfWidthA = ""; else _state.IfWidthB = "";
+                return;
+            }
+
+            int code = await ReadMenuByteAsync(CivProtocol.SubIfWidth, ct);
+            if (code < 0) return;
+            int hz = FilterWidthCodec.CodeToHz(group, code);
+            if (hz < 0) return;
+            if (vfo == RadioVfo.A) _state.IfWidthA = hz.ToString(); else _state.IfWidthB = hz.ToString();
         }
 
         /// <summary>Read the attenuator (command 11) as its raw byte. -1 on a miss; 0x20 = 20 dB.</summary>
@@ -1063,6 +1097,172 @@ namespace Icom_Web_Control.Services
         public Task SetManualNotchWidthAsync(int value, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubManualNotchWidth, Math.Clamp(value, 0, 2), "manual notch width", ct);
         public Task<int> GetIfFilterShapeAsync(CancellationToken ct = default) => ReadFunc16Async(CivProtocol.SubIfFilterShape, ct);
         public Task SetIfFilterShapeAsync(int value, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubIfFilterShape, Math.Clamp(value, 0, 1), "IF filter shape", ct);
+
+        // -- IF passband filter width + FIL slot (CI-V 1A 03 / 26) -------------
+        //
+        // Width (1A 03) is a single BCD code whose Hz meaning depends on the
+        // current mode group — FilterWidthCodec is the one place that mapping
+        // lives (mirrored in wwwroot/js/ui/ic7300-if-width.js for the dropdown).
+        // The command is receiver-wide, so it reflects the operating VFO's mode;
+        // we interpret the code using the requested VFO's own mode group.
+        //
+        // The FIL slot (1/2/3) rides in the command 26 mode frame, so selecting
+        // a slot is a re-send of the current mode/data with the filter byte
+        // changed — the mirror of SetModeAsync, which preserves the filter.
+
+        public async Task<int> GetIfFilterWidthHzAsync(RadioVfo vfo, CancellationToken ct = default)
+        {
+            var group = await ReadModeGroupAsync(vfo, ct);
+            if (group == FilterWidthCodec.Group.None)
+                return -1;                                   // FM / unknown — no adjustable width
+            int code = await ReadMenuByteAsync(CivProtocol.SubIfWidth, ct);
+            if (code < 0) return -1;
+            int hz = FilterWidthCodec.CodeToHz(group, code);
+            if (hz < 0) return -1;
+            if (vfo == RadioVfo.A) _state.IfWidthA = hz.ToString(); else _state.IfWidthB = hz.ToString();
+            return hz;
+        }
+
+        public async Task SetIfFilterWidthHzAsync(RadioVfo vfo, int hz, CancellationToken ct = default)
+        {
+            var group = await ReadModeGroupAsync(vfo, ct);
+            if (group == FilterWidthCodec.Group.None)
+            {
+                _logger.LogWarning("[CivRadioController] IF width not adjustable in the current mode — ignored");
+                return;
+            }
+            int code = FilterWidthCodec.HzToCode(group, hz);
+            byte bcd = (byte)(((code / 10) << 4) | (code % 10));   // one BCD digit-pair; code ≤ 49
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubIfWidth, bcd);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+            {
+                _logger.LogWarning("[CivRadioController] Set IF width {Hz} Hz (code {Code}) was not acknowledged", hz, code);
+                return;
+            }
+            int snapped = FilterWidthCodec.CodeToHz(group, code);
+            if (vfo == RadioVfo.A) _state.IfWidthA = snapped.ToString(); else _state.IfWidthB = snapped.ToString();
+        }
+
+        public async Task<int> GetSelectedFilterAsync(RadioVfo vfo, CancellationToken ct = default)
+        {
+            var m = await ReadVfoModeRawAsync(SelectorFor(vfo), ct);
+            if (!m.ok || m.filter is < 0x01 or > 0x03) return -1;
+            if (vfo == RadioVfo.A) _state.SelectedFilterA = m.filter.ToString(); else _state.SelectedFilterB = m.filter.ToString();
+            return m.filter;
+        }
+
+        public async Task SetSelectedFilterAsync(RadioVfo vfo, int fil, CancellationToken ct = default)
+        {
+            if (fil is < 1 or > 3)
+            {
+                _logger.LogWarning("[CivRadioController] Invalid filter slot {Fil} — ignored", fil);
+                return;
+            }
+            byte sel = SelectorFor(vfo);
+            var cur = await ReadVfoModeRawAsync(sel, ct);
+            if (!cur.ok)
+            {
+                _logger.LogWarning("[CivRadioController] Could not read current mode to change filter — ignored");
+                return;
+            }
+            // Re-send command 26 with mode/data preserved, only the filter byte changed.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdVfoMode, sel, cur.mode, cur.data, (byte)fil);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+            {
+                _logger.LogWarning("[CivRadioController] Select filter FIL{Fil} (26) was not acknowledged", fil);
+                return;
+            }
+            if (vfo == RadioVfo.A) _state.SelectedFilterA = fil.ToString(); else _state.SelectedFilterB = fil.ToString();
+        }
+
+        /// <summary>Read the given VFO's mode and map it to its filter-width group. None on a miss.</summary>
+        private async Task<FilterWidthCodec.Group> ReadModeGroupAsync(RadioVfo vfo, CancellationToken ct)
+        {
+            var m = await ReadVfoModeRawAsync(SelectorFor(vfo), ct);
+            return m.ok ? FilterWidthCodec.GroupForModeByte(m.mode) : FilterWidthCodec.Group.None;
+        }
+
+        /// <summary>Read a one-byte menu value (1A &lt;sub&gt;) as BCD. Reply is 1A &lt;sub&gt; &lt;byte&gt;. -1 on a miss.</summary>
+        private async Task<int> ReadMenuByteAsync(byte sub, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, sub);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.CmdMenu
+                || reply.Data.Length < 2 || reply.Data[0] != sub)
+                return -1;
+            return CivProtocol.BcdByte(reply.Data[1]);
+        }
+
+        // Single source of truth for the CI-V 1A 03 width code ↔ Hz mapping,
+        // per mode group. The IC-7300 packs the width into one BCD byte whose
+        // meaning depends on the mode: SSB/CW and RTTY share a 50 Hz-stepped low
+        // range (codes 0–9 → 50–500 Hz) then a 100 Hz-stepped high range from
+        // code 10 (RTTY stops at 2700 Hz, SSB/CW at 3600 Hz); AM is a flat
+        // 200 Hz step (codes 0–49 → 200 Hz–10 kHz). FM has no adjustable width.
+        private static class FilterWidthCodec
+        {
+            public enum Group { None, SsbCw, Rtty, Am }
+
+            private static readonly int[] SsbCwHz = BuildStepped(41);  // codes 0..40 → 50..3600
+            private static readonly int[] RttyHz  = BuildStepped(32);  // codes 0..31 → 50..2700
+            private static readonly int[] AmHz    = BuildAm();          // codes 0..49 → 200..10000
+
+            // Shared SSB/CW/RTTY curve: 0–9 → (c+1)*50, else 600+(c-10)*100.
+            private static int[] BuildStepped(int count)
+            {
+                var a = new int[count];
+                for (int c = 0; c < count; c++) a[c] = c <= 9 ? (c + 1) * 50 : 600 + (c - 10) * 100;
+                return a;
+            }
+            private static int[] BuildAm()
+            {
+                var a = new int[50];
+                for (int c = 0; c < 50; c++) a[c] = 200 + c * 200;
+                return a;
+            }
+
+            private static int[]? Table(Group g) => g switch
+            {
+                Group.SsbCw => SsbCwHz,
+                Group.Rtty  => RttyHz,
+                Group.Am    => AmHz,
+                _ => null,
+            };
+
+            public static Group GroupForModeByte(byte mode) => mode switch
+            {
+                0x00 or 0x01 or 0x03 or 0x07 => Group.SsbCw,   // LSB/USB/CW/CW-R (+DATA)
+                0x04 or 0x08 => Group.Rtty,                    // RTTY/RTTY-R
+                0x02 => Group.Am,                              // AM
+                _ => Group.None,                               // FM (0x05) / unknown
+            };
+
+            /// <summary>Code → Hz for the group; -1 if the code is out of range or the group has no width.</summary>
+            public static int CodeToHz(Group g, int code)
+            {
+                var t = Table(g);
+                return (t == null || code < 0 || code >= t.Length) ? -1 : t[code];
+            }
+
+            /// <summary>Nearest valid code for the requested Hz within the group (0 if the group has no width).</summary>
+            public static int HzToCode(Group g, int hz)
+            {
+                var t = Table(g);
+                if (t == null) return 0;
+                int best = 0, bestErr = int.MaxValue;
+                for (int c = 0; c < t.Length; c++)
+                {
+                    int err = Math.Abs(t[c] - hz);
+                    if (err < bestErr) { bestErr = err; best = c; }
+                }
+                return best;
+            }
+        }
 
         /// <summary>Read a 16-family function (16 &lt;sub&gt;). Reply is 16 &lt;sub&gt; &lt;val&gt;. -1 on a miss.</summary>
         private async Task<int> ReadFunc16Async(byte sub, CancellationToken ct)

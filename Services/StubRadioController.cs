@@ -215,6 +215,22 @@ namespace Icom_Web_Control.Services
         public Task<int> GetIfFilterShapeAsync(CancellationToken ct = default) => Task.FromResult(_ifShape);
         public Task SetIfFilterShapeAsync(int value, CancellationToken ct = default) { _ifShape = Math.Clamp(value, 0, 1); _state.IfShapeA = _ifShape.ToString(); _state.IfShapeB = _state.IfShapeA; return Task.CompletedTask; }
 
+        private int _ifWidthHz = 2400, _selectedFilter = 1;   // canned SSB-ish defaults
+        public Task<int> GetIfFilterWidthHzAsync(RadioVfo vfo, CancellationToken ct = default) => Task.FromResult(_ifWidthHz);
+        public Task SetIfFilterWidthHzAsync(RadioVfo vfo, int hz, CancellationToken ct = default)
+        {
+            _ifWidthHz = Math.Clamp(hz, 50, 10000);
+            if (vfo == RadioVfo.A) _state.IfWidthA = _ifWidthHz.ToString(); else _state.IfWidthB = _ifWidthHz.ToString();
+            return Task.CompletedTask;
+        }
+        public Task<int> GetSelectedFilterAsync(RadioVfo vfo, CancellationToken ct = default) => Task.FromResult(_selectedFilter);
+        public Task SetSelectedFilterAsync(RadioVfo vfo, int fil, CancellationToken ct = default)
+        {
+            _selectedFilter = Math.Clamp(fil, 1, 3);
+            if (vfo == RadioVfo.A) _state.SelectedFilterA = _selectedFilter.ToString(); else _state.SelectedFilterB = _selectedFilter.ToString();
+            return Task.CompletedTask;
+        }
+
         public Task<bool> GetAttenuatorAsync(CancellationToken ct = default) => Task.FromResult(_att);
         public Task SetAttenuatorAsync(bool on, CancellationToken ct = default) { _att = on; _state.AttA = on ? "20" : "00"; _state.AttB = _state.AttA; return Task.CompletedTask; }
 
