@@ -42,77 +42,13 @@
         _             => "off"
     };
 
-    int contourMaxFreq = isFtdx3000 ? 4000 : 3200;
-    int contourStep    = isFtdx3000 ? 100  : 10;
+    // APF (Audio Peak Filter) shift step — the IC-7300 exposes APF in CW mode.
     int apfStep        = isFtdx3000 ? 25   : 10;
 
-    // IF Width options differ by model. Values match the SH command code sent to the radio.
-    var ifWidthOptions = isFtdx10
-        ? new (string Value, string Label)[]
-        {
-            // FTdx10 SH codes: code 0 is the wide 3 kHz default; codes 1-22 run narrow→wide.
-            ("0","3.0 kHz"),
-            ("1","300 Hz"), ("2","400 Hz"), ("3","600 Hz"), ("4","850 Hz"),
-            ("5","1.1 kHz"), ("6","1.2 kHz"), ("7","1.5 kHz"), ("8","1.65 kHz"),
-            ("9","1.8 kHz"), ("10","1.95 kHz"), ("11","2.1 kHz"), ("12","2.25 kHz"),
-            ("13","2.4 kHz"), ("14","2.45 kHz"), ("15","2.5 kHz"), ("16","2.6 kHz"),
-            ("17","2.7 kHz"), ("18","2.8 kHz"), ("19","2.9 kHz"), ("20","3.2 kHz"),
-            ("21","3.5 kHz"), ("22","4.0 kHz")
-        }
-        : isFt710
-        ? new (string Value, string Label)[]
-        {
-            ("0","300 Hz"), ("2","600 Hz"), ("3","850 Hz"), ("5","1.2 kHz"),
-            ("7","1.65 kHz"), ("9","1.95 kHz"), ("12","2.4 kHz"), ("16","2.7 kHz"),
-            ("19","3.0 kHz"), ("20","3.2 kHz"), ("21","3.5 kHz"), ("22","4.0 kHz")
-        }
-        : isFtdx3000
-        ? new (string Value, string Label)[]
-        {
-            ("1","200 Hz"), ("2","400 Hz"), ("3","600 Hz"), ("4","850 Hz"),
-            ("6","1.35 kHz"), ("7","1.5 kHz"), ("9","1.8 kHz"), ("12","2.2 kHz"),
-            ("14","2.4 kHz"), ("16","2.6 kHz"), ("18","2.8 kHz"), ("20","3.0 kHz"),
-            ("22","3.4 kHz"), ("25","4.0 kHz")
-        }
-        : new (string Value, string Label)[]
-        {
-            // FTdx101MP/D SH codes. The 2308-L CAT manual documents 0-21; current
-            // firmware (verified empirically by Colin on the FTdx101MP, #50)
-            // extends to code 23 = 4.0 kHz, with code 22 = 3.5 kHz between them.
-            // Code 0 is the radio's mode-dependent default (3 kHz with a 3 kHz
-            // roofing filter in SSB); codes 1-21 run narrow→wide as per the
-            // manual, then 22/23 add the wider SSB filters.
-            ("0","3.0 kHz"),
-            ("1","300 Hz"), ("2","400 Hz"), ("3","600 Hz"), ("4","850 Hz"),
-            ("5","1.1 kHz"), ("6","1.2 kHz"), ("7","1.5 kHz"), ("8","1.65 kHz"),
-            ("9","1.8 kHz"), ("10","1.95 kHz"), ("11","2.1 kHz"), ("12","2.2 kHz"),
-            ("13","2.3 kHz"), ("14","2.4 kHz"), ("15","2.5 kHz"), ("16","2.6 kHz"),
-            ("17","2.7 kHz"), ("18","2.8 kHz"), ("19","2.9 kHz"), ("20","3.0 kHz"),
-            ("21","3.2 kHz"), ("22","3.5 kHz"), ("23","4.0 kHz")
-        };
-    string ifWidthDefaultA = isFtdx10 ? "0" : isFt710 ? "12" : isFtdx3000 ? "14" : "0";
-    string ifWidthDefaultB = isFtdx10 ? "0" : isFt710 ? "12" : isFtdx3000 ? "14" : "0";
-
-    // Roofing filter options: FTdx101MP/D only (FT-710 has no CAT roofing filter control).
-    // RF command codes 6-A, filtered to only fitted filters per Settings.
-    var roofingOptions = new (string Value, string Label)[]
-            { ("A","300 Hz"), ("9","600 Hz"), ("8","1.2 kHz"), ("7","3 kHz"), ("6","12 kHz") }
-            .Where(o => Model.InstalledRoofingFilters.Contains(o.Value))
-            .ToArray();
-
-    // FTdx10 roofing filter options (RF read codes 6/7/9 standard, A optional).
-    var roofingOptionsFtdx10 = new (string Value, string Label)[]
-            { ("6","12 kHz"), ("7","3 kHz"), ("9","500 Hz"), ("A","300 Hz") }
-            .Where(o => o.Value == "6" || o.Value == "7" || o.Value == "9"
-                     || Model.InstalledRoofingFilters.Contains(o.Value))
-            .ToArray();
-
-    // FTDX3000 roofing filter options (codes 0-5; always show standard 0-3, optional 4-5 if fitted).
-    var roofingOptions3000 = new (string Value, string Label)[]
-            { ("0","Auto"), ("1","15 kHz"), ("2","6 kHz"), ("3","3 kHz"), ("4","600 Hz"), ("5","300 Hz") }
-            .Where(o => o.Value == "0" || o.Value == "1" || o.Value == "2" || o.Value == "3"
-                     || Model.InstalledRoofingFilters.Contains(o.Value))
-            .ToArray();
+    // NOTE: The Yaesu IF-Width (SH-command) tables, roofing-filter options, and
+    // Contour range vars were removed here during the IWC carve — the IC-7300 is
+    // a direct-sampling SDR with no roofing filters and a different (CI-V) filter
+    // model. A native IC-7300 IF-width control is a separate feature block.
 
     // Standard CTCSS tones
     var ctcssTones = new (string Code, string Label)[]

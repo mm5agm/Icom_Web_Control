@@ -1,6 +1,7 @@
 // Band segment data for IARU Region 1, Region 2, Region 3, and Japan.
 // Frequencies in Hz. Each entry gives the representative dial frequency and
-// the mode string used by this app (matches CatMessageDispatcher mode names).
+// the mode string used by this app (the vocabulary CivRadioController accepts,
+// e.g. 'CW-U', 'DATA-U', 'RTTY-L', 'LSB', 'USB' — mapped to IC-7300 CI-V bytes).
 //
 // Region 1 = Europe, Africa, Middle East, Northern Asia (IARU R1 band plan)
 // Region 2 = Americas (IARU R2; USA FCC Part 97 used as primary reference)
