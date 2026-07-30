@@ -1,9 +1,9 @@
-// FTdx101Calibration.js
+// Ic7300Calibration.js
 // DEPRECATED — superseded by calibration-engine.js + calibration-tables.js.
 // This file is no longer loaded or called. Kept for reference only.
 // Do not add new code here.
 
-class FTdx101Calibration {
+class Ic7300Calibration {
     static _calibrationData = null;
     static _cache = {};
 
@@ -74,4 +74,4 @@ class FTdx101Calibration {
     }
 }
 
-window.FTdx101Calibration = FTdx101Calibration;
+window.Ic7300Calibration = Ic7300Calibration;

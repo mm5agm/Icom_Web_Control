@@ -383,8 +383,8 @@ function updateTxIndicators(isTransmitting) {
     if (window.radioControl && window.radioControl._state) {
         window.radioControl._state.isTransmitting = isTransmitting;
     }
-    if (window.ftdx101Meters) {
-        window.ftdx101Meters.setTransmitting(isTransmitting);
+    if (window.ic7300Meters) {
+        window.ic7300Meters.setTransmitting(isTransmitting);
     }
     if (!isTransmitting) {
         // Force gauges to zero immediately when TX stops
@@ -397,7 +397,7 @@ function updateTxIndicators(isTransmitting) {
     }
 }
 
-// Update DOM labels for a single meter using the result from ftdx101Meters.handleMeterUpdate().
+// Update DOM labels for a single meter using the result from ic7300Meters.handleMeterUpdate().
 // Formatting is done here (UI layer) — the orchestrator returns plain numeric values.
 function updateMeterDomLabel(property, result) {
     if (!result || result.skip) return;
@@ -430,7 +430,7 @@ function updateMeterDomLabel(property, result) {
             break;
         }
         case 'ALCMeter': {
-            // IC-7300 ALC is a 0–100 % scale (see FTdx101Meters._processALC).
+            // IC-7300 ALC is a 0–100 % scale (see Ic7300Meters._processALC).
             const el  = document.getElementById('alcValue');
             const bar = document.getElementById('alcBar');
             const meterEl = document.getElementById('alcMeterValue');
@@ -1247,16 +1247,16 @@ connection.on("RadioStateUpdate", function (update) {
     }
 
     // --- METER UPDATES ---
-    if (window.ftdx101Meters) {
+    if (window.ic7300Meters) {
         // PowerMeter is sent as { value, isTransmitting } — unpack it and sync TX state.
         let meterValue = update.value;
         if (update.property === "PowerMeter" &&
             typeof update.value === 'object' && update.value !== null &&
             'value' in update.value && 'isTransmitting' in update.value) {
             meterValue = update.value.value;
-            window.ftdx101Meters.setTransmitting(update.value.isTransmitting);
+            window.ic7300Meters.setTransmitting(update.value.isTransmitting);
         }
-        const result = window.ftdx101Meters.handleMeterUpdate(update.property, meterValue);
+        const result = window.ic7300Meters.handleMeterUpdate(update.property, meterValue);
         if (result) updateMeterDomLabel(update.property, result);
     }
 
@@ -2923,7 +2923,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateSMeter('A', data.vfoA.sMeter);
             updateSMeter('B', data.vfoB.sMeter);
 
-            if (window.ftdx101Meters) {
+            if (window.ic7300Meters) {
                 const metersFromState = {
                     PowerMeter:       data.powerMeter,
                     SWRMeter:         data.swrMeter,
@@ -2937,7 +2937,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 for (const [prop, value] of Object.entries(metersFromState)) {
                     if (value !== undefined) {
-                        const result = window.ftdx101Meters.handleMeterUpdate(prop, value);
+                        const result = window.ic7300Meters.handleMeterUpdate(prop, value);
                         updateMeterDomLabel(prop, result);
                     }
                 }

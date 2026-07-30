@@ -60,7 +60,7 @@ The app draws a straight line between adjacent points (linear interpolation). Th
 
 The S-Meter works differently — Radio Values are labels (S1, S2, ... S9, +10, +20, +40) rather than numbers.
 
-The easiest way to calibrate the S-Meter is to use the **RF/SQL control** — the outer ring on the knob next to the Multi knob on the FTdx101MP. By rotating this ring you can smoothly reduce the S-meter reading and stop the needle at any point to read the raw value.
+The easiest way to calibrate the S-Meter is to use your radio's **RF gain / squelch control** to smoothly reduce the S-meter reading, stopping the needle at any point so you can read the raw value.
 
 First, reduce background noise as much as possible:
 
@@ -106,7 +106,7 @@ The process is the same for all numeric meters:
 
 ## Where Calibration Data Is Saved
 
-- **Installed app:** `%APPDATA%\MM5AGM\Yaesu Web Control\calibration.user.json`
+- **Installed app:** `%APPDATA%\MM5AGM\Icom Web Control\calibration.user.json`
 - **Development:** `wwwroot/calibration.default.json`
 
 The save path is shown at the top of the Meter Calibration page.

@@ -22,10 +22,6 @@
     <Content Remove="oldFiles/Backup/**" />
     <EmbeddedResource Remove="oldFiles/Backup/**" />
     <None Remove="oldFiles/Backup/**" />
-    <Compile Remove="YaesuCatNew\**" />
-    <Content Remove="YaesuCatNew\**" />
-    <EmbeddedResource Remove="YaesuCatNew\**" />
-    <None Remove="YaesuCatNew\**" />
     <Compile Remove="BenchmarkSuite1\**" />
     <Content Remove="BenchmarkSuite1\**" />
     <EmbeddedResource Remove="BenchmarkSuite1\**" />
@@ -83,9 +79,11 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <Version>1.5.6</Version>
-    <FileVersion>1.5.6.0</FileVersion>
-    <AssemblyVersion>1.5.6.0</AssemblyVersion>
+    <!-- Fresh IWC 0.x line; keep in step with Models/AppVersion.cs. AssemblyVersion/
+         FileVersion must stay numeric (no -alpha suffix); Version carries the label. -->
+    <Version>0.1.0-alpha</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <AssemblyTitle>Icom Web Control</AssemblyTitle>
     <Product>Icom Web Control</Product>
     <Description>Browser-based CI-V controller for Icom HF transceivers</Description>

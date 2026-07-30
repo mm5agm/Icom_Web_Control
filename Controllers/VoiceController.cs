@@ -540,7 +540,7 @@ namespace Icom_Web_Control.Controllers
 
         /// <summary>
         /// Bundles the current phrases, a freshly-regenerated SRGS reference
-        /// copy, and metadata into a YWC-VoicePack-&lt;culture&gt;-v&lt;version&gt;.zip
+        /// copy, and metadata into a IWC-VoicePack-&lt;culture&gt;-v&lt;version&gt;.zip
         /// for the user to share or attach to a GitHub Discussion post — see
         /// docs/VoiceControl/language-pack-manager-design.md §3.1. Exporting
         /// increments the stored pack version and re-saves the installed
@@ -574,7 +574,7 @@ namespace Icom_Web_Control.Controllers
                 }
 
                 _logger.LogInformation("[Voice] Exported language pack {Culture} v{Version}", culture, meta.Version);
-                return File(ms.ToArray(), "application/zip", $"YWC-VoicePack-{culture}-v{meta.Version}.zip");
+                return File(ms.ToArray(), "application/zip", $"IWC-VoicePack-{culture}-v{meta.Version}.zip");
             }
             catch (Exception ex)
             {

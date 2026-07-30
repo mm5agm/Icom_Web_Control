@@ -4,7 +4,7 @@
 // Owns TX state, smoothing, noise filtering, calibration, and gauge updates.
 // Returns plain numeric displayValue objects so the caller can format and update DOM labels.
 
-export class FTdx101Meters {
+export class Ic7300Meters {
     /**
      * @param {object} meterPanel        An initialised MeterPanel instance
      * @param {object} calibrationEngine An object exposing calibrateNumeric(key, raw)

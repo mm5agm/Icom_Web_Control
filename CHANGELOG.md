@@ -1,8 +1,13 @@
 # Changelog
 
-## [0.7.0](https://github.com/mm5agm/Yaesu_Web_Control/compare/v0.6.0...v0.7.0) (2026-04-04)
+Icom Web Control (IWC) starts a fresh `0.x` version line — it is **not** a
+continuation of the Yaesu Web Control (YWC) changelog, even though IWC was
+carved from the YWC codebase. For the shared history prior to the split, see
+the [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) repository.
 
+## [Unreleased]
 
-### Features
-
-* Introduce new meter components, migrate UI, remove legacy gauge code, add calibration editor, and clean up obsolete assets.\n\n- Add &lt;meter-gauge&gt;, &lt;meter-panel&gt;, and &lt;calibration-editor&gt; Web Components\n- Migrate all meter UI to new components in .cshtml files\n- Remove legacy JS gauge logic and obsolete CSS\n- Integrate calibration editor into Meter Calibration page\n- Final cleanup for modern, maintainable gauge system ([4688af0](https://github.com/mm5agm/Yaesu_Web_Control/commit/4688af03aded8a3e334281d5862ac6a0f248f8e5))
+Pre-alpha. Nothing has been released yet — the first tagged build will appear
+here once the IC-7300 MkII CI-V path is functional end-to-end. See
+[docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md) for
+the phased roadmap.
