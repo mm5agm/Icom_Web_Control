@@ -518,7 +518,7 @@
                         <button class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="CW keyer controls"
                                 title="Open CW keyer controls panel"
-                                onclick="document.getElementById('cwDialog').show()">CW</button>
+                                onclick="openCwDialog()">CW</button>
                         <button class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="FM repeater controls"
                                 title="Open FM repeater controls panel"
@@ -678,10 +678,6 @@
                         </h5>
                         <div class="d-flex align-items-center gap-1 flex-wrap">
                             <span id="splitTxBadgeA" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
-                            <button type="button" id="zinBtnA" class="btn btn-outline-light btn-sm"
-                                    onclick="cwZeroIn('A')"
-                                    aria-label="VFO A CW Auto Zero In"
-                                    title="CW Auto Zero In on VFO A — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
                             @if (hasVcTune) {
                             <button type="button" id="vcTuneToggleBtnA" class="btn btn-outline-light btn-sm"
                                     onclick="vcTuneToggle('a')"
@@ -981,7 +977,7 @@
                                oninput="document.getElementById('afGainValueA').innerText = this.value">
                     </div>
 
-                    <!-- Twin PBT (Digital Passband Tuning) -->
+                    <!-- Twin PBT (Digital Passband Tuning) + RX Tone Control -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
                         <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
                                 id="audioFilterBtnA"
@@ -989,6 +985,13 @@
                                 title="Open the Twin PBT (passband tuning) dialog — narrow the receive passband's low and high edges"
                                 onclick="window.audioFilter && window.audioFilter.open('A')">
                             Twin PBT
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
+                                id="rxFilterBtnA"
+                                aria-label="VFO A RX Tone Control filter"
+                                title="Open the RX Tone Control (HPF/LPF audio filter) dialog — cut the low and high edges of the receive audio for the current mode"
+                                onclick="window.rxFilter && window.rxFilter.open('A')">
+                            RX Filter
                         </button>
                     </div>
 
@@ -1010,10 +1013,6 @@
                         </h5>
                         <div class="d-flex align-items-center gap-1 flex-wrap">
                             <span id="splitTxBadgeB" class="badge bg-danger" style="display:none;" aria-live="polite">SPLIT TX</span>
-                            <button type="button" id="zinBtnB" class="btn btn-outline-light btn-sm"
-                                    onclick="cwZeroIn('B')"
-                                    aria-label="VFO B CW Auto Zero In"
-                                    title="CW Auto Zero In on VFO B — nudges the VFO so the received CW signal sits at your configured CW pitch">ZIN</button>
                             @if (hasVcTuneSub) {
                             <button type="button" id="vcTuneToggleBtnB" class="btn btn-outline-light btn-sm"
                                     style="display:none"
@@ -1314,7 +1313,7 @@
                                oninput="document.getElementById('afGainValueB').innerText = this.value">
                     </div>
 
-                    <!-- Twin PBT (Digital Passband Tuning) -->
+                    <!-- Twin PBT (Digital Passband Tuning) + RX Tone Control -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
                         <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
                                 id="audioFilterBtnB"
@@ -1322,6 +1321,13 @@
                                 title="Open the Twin PBT (passband tuning) dialog — narrow the receive passband's low and high edges"
                                 onclick="window.audioFilter && window.audioFilter.open('B')">
                             Twin PBT
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
+                                id="rxFilterBtnB"
+                                aria-label="VFO B RX Tone Control filter"
+                                title="Open the RX Tone Control (HPF/LPF audio filter) dialog — cut the low and high edges of the receive audio for the current mode"
+                                onclick="window.rxFilter && window.rxFilter.open('B')">
+                            RX Filter
                         </button>
                     </div>
 
@@ -1530,15 +1536,11 @@
     <div class="p-3 d-flex flex-column gap-2">
         <div class="d-flex align-items-center gap-2">
             <label class="mb-0 text-nowrap" style="min-width:100px;">Speed WPM: <span id="cwSpeedValue">@Model.CwSpeed</span></label>
-            <input type="range" id="cwSpeedSlider" min="4" max="60" step="1" value="@Model.CwSpeed"
+            <input type="range" id="cwSpeedSlider" min="6" max="48" step="1" value="@Model.CwSpeed"
                    style="flex:1; height:18px;"
                    oninput="document.getElementById('cwSpeedValue').textContent = this.value"
                    onchange="setCwSpeed(this.value)"
-                   aria-label="CW keyer speed" title="CW keyer speed in WPM">
-            <button type="button" class="btn btn-sm btn-outline-light flex-shrink-0"
-                    onclick="cwZeroIn()"
-                    title="CW Auto Zero In — nudges the active VFO so the received CW signal sits at your preferred pitch"
-                    aria-label="CW Auto Zero In">ZIN</button>
+                   aria-label="CW keyer speed" title="CW keyer speed in WPM (6–48)">
         </div>
         <div class="d-flex align-items-center gap-2">
             <label class="mb-0 text-nowrap" style="min-width:100px;">Break-in:</label>
@@ -1551,20 +1553,20 @@
             </select>
         </div>
         <div class="d-flex align-items-center gap-2">
-            <label class="mb-0 text-nowrap" style="min-width:100px;">BK-IN Delay: <span id="cwDelayValue">@Model.CwBreakInDelay</span> ms</label>
-            <input type="range" id="cwDelaySlider" min="0" max="2500" step="50" value="@Model.CwBreakInDelay"
+            <label class="mb-0 text-nowrap" style="min-width:100px;">BK-IN Delay: <span id="cwDelayValue">@(((decimal)Model.CwBreakInDelay/10).ToString("0.0"))</span> dots</label>
+            <input type="range" id="cwDelaySlider" min="2" max="13" step="0.1" value="@(((decimal)Model.CwBreakInDelay/10).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
                    style="flex:1; height:18px;"
-                   oninput="document.getElementById('cwDelayValue').textContent = this.value"
+                   oninput="document.getElementById('cwDelayValue').textContent = parseFloat(this.value).toFixed(1)"
                    onchange="setCwBreakInDelay(this.value)"
-                   aria-label="CW break-in delay" title="Semi break-in delay in ms">
+                   aria-label="CW break-in delay" title="Semi break-in delay in dots (2.0–13.0)">
         </div>
         <div class="d-flex align-items-center gap-2">
-            <label class="mb-0 text-nowrap" style="min-width:100px;">Pitch: <span id="cwPitchHz">@(300 + Model.CwPitch * 10)</span> Hz</label>
-            <input type="range" id="cwPitchSlider" min="0" max="75" step="1" value="@Model.CwPitch"
+            <label class="mb-0 text-nowrap" style="min-width:100px;">Pitch: <span id="cwPitchHz">@Model.CwPitch</span> Hz</label>
+            <input type="range" id="cwPitchSlider" min="300" max="900" step="10" value="@Model.CwPitch"
                    style="flex:1; height:18px;"
-                   oninput="document.getElementById('cwPitchHz').textContent = (300 + parseInt(this.value) * 10) + ' Hz'"
+                   oninput="document.getElementById('cwPitchHz').textContent = this.value"
                    onchange="setCwPitch(this.value)"
-                   aria-label="CW pitch frequency" title="CW sidetone pitch (300–1050 Hz)">
+                   aria-label="CW pitch frequency" title="CW sidetone pitch (300–900 Hz)">
         </div>
         <hr style="border-color:#444; margin:4px 0;">
         <div class="fw-bold small" style="color:#aaa;">Memory Keyer</div>
@@ -1580,7 +1582,10 @@
                    aria-label="CW message @(mi+1)" title="CW memory @(mi+1) text">
         </div>
         }
-        <button class="btn btn-sm btn-primary mt-1" onclick="saveCwMessages()" title="Save CW message memories" aria-label="Save CW memory messages to settings">Save Messages</button>
+        <div class="d-flex gap-2 mt-1">
+            <button class="btn btn-sm btn-primary flex-grow-1" onclick="saveCwMessages()" title="Save CW message memories" aria-label="Save CW memory messages to settings">Save Messages</button>
+            <button class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="stopCw()" title="Stop keying the current CW message (CI-V 17 FF)" aria-label="Stop CW keying">Stop</button>
+        </div>
     </div>
 </dialog>
 
@@ -1699,6 +1704,47 @@
                         id="pbtClearBtn@(vfo)"
                         title="Reset both PBT shifts to centre (no passband tuning)"
                         aria-label="Clear Twin PBT">Clear PBT</button>
+            </div>
+        </div>
+    </dialog>
+}
+
+<!-- RX Tone Control (HPF/LPF audio filter) Dialogs — CI-V 1A 05. Per-mode
+     receive-audio high-pass (low-cut) and low-pass (high-cut) edges; the
+     IC-7300's native equivalent of the Yaesu Audio Filter. One dialog per VFO
+     button; the values shown are for that VFO's *current mode* (the radio
+     stores them per mode, not per VFO). Both edges: HPF Through/100–2000 Hz,
+     LPF 500–2400 Hz/Through. Unavailable in SSB-DATA. -->
+@foreach (var vfo in new[] { "A", "B" })
+{
+    <dialog id="rxFilterDialog@(vfo)" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:380px; max-width:520px; position:fixed; margin:0;" aria-labelledby="rxFilterDialogTitle@(vfo)">
+        <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
+            <strong id="rxFilterDialogTitle@(vfo)">RX Filter — VFO @vfo</strong>
+            <button class="btn btn-sm" style="background:#c0392b; color:#fff; border:1px solid #e74c3c; font-weight:bold; font-size:1rem; line-height:1; padding:2px 11px;" onclick="document.getElementById('rxFilterDialog@(vfo)').close()" title="Close" aria-label="Close VFO @vfo RX Filter dialog">✕</button>
+        </div>
+        <div class="p-3 d-flex flex-column gap-3">
+            <div id="rxFilterStatus@(vfo)" class="small text-warning" style="min-height:1.2em;"></div>
+            <p class="small text-muted mb-0" style="color:#bbb !important;">
+                RX Tone Control for the current mode. HPF cuts the low audio edge;
+                LPF cuts the high edge. "Through" = no cut on that edge.
+            </p>
+            <div id="rxFilterControls@(vfo)">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="mb-0 fw-bold" for="rxHpfSelect@(vfo)" style="min-width:64px;">HPF:</label>
+                    <select id="rxHpfSelect@(vfo)" class="form-select form-select-sm" style="flex:1;" aria-label="RX high-pass (low-cut) edge">
+                        <option value="0">Through</option>
+                    </select>
+                </div>
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <label class="mb-0 fw-bold" for="rxLpfSelect@(vfo)" style="min-width:64px;">LPF:</label>
+                    <select id="rxLpfSelect@(vfo)" class="form-select form-select-sm" style="flex:1;" aria-label="RX low-pass (high-cut) edge">
+                        <option value="0">Through</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-light"
+                        id="rxFilterDefaultBtn@(vfo)"
+                        title="Reset to the widest filter (HPF Through, LPF Through)"
+                        aria-label="Clear RX Filter">Widest</button>
             </div>
         </div>
     </dialog>
@@ -3208,7 +3254,7 @@
             }, { passive: true });
         }
 
-        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'voiceHelpDialog', 'audioFilterDialogA', 'audioFilterDialogB', 'utcClockInfoDialog'].forEach(id => {
+        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'voiceHelpDialog', 'audioFilterDialogA', 'audioFilterDialogB', 'rxFilterDialogA', 'rxFilterDialogB', 'utcClockInfoDialog'].forEach(id => {
             const dlg = document.getElementById(id);
             if (!dlg) return;
             makeDraggable(dlg, dlg.querySelector('div'));
@@ -3967,29 +4013,20 @@
         }
 
         // --- CW KEYER ---
-        async function setCwPitch(code) {
-            try { await fetch('/api/cat/cwpitch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: parseInt(code) }) }); }
+        async function setCwPitch(hz) {
+            try { await fetch('/api/cat/cwpitch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hz: parseInt(hz) }) }); }
             catch (e) { console.error('setCwPitch error:', e); }
         }
         async function setCwSpeed(v) {
             try { await fetch('/api/cat/cw/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed: parseInt(v) }) }); }
             catch (e) { console.error('setCwSpeed error:', e); }
         }
-        // vfo argument: 'a', 'b', or 'active'. Fire-and-forget. The CW Keyer
-        // popup button passes 'active' so it follows whichever VFO is in
-        // focus; the per-VFO buttons on each VFO panel pass their own letter
-        // so they always target that specific receiver.
-        async function cwZeroIn(vfo) {
-            const target = (vfo === 'A' || vfo === 'B') ? vfo.toLowerCase() : 'active';
-            try { await fetch(`/api/cat/cw/zin/${target}`, { method: 'POST' }); }
-            catch (e) { console.error('cwZeroIn error:', e); }
-        }
         async function setCwBreakIn(v) {
             try { await fetch('/api/cat/cw/breakin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: v }) }); }
             catch (e) { console.error('setCwBreakIn error:', e); }
         }
         async function setCwBreakInDelay(v) {
-            try { await fetch('/api/cat/cw/breakindelay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delayMs: parseInt(v) }) }); }
+            try { await fetch('/api/cat/cw/breakindelay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dots: parseFloat(v) }) }); }
             catch (e) { console.error('setCwBreakInDelay error:', e); }
         }
         async function sendCwMessage(index) {
@@ -3997,6 +4034,31 @@
             if (!input || !input.value.trim()) return;
             try { await fetch('/api/cat/cw/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: input.value }) }); }
             catch (e) { console.error('sendCwMessage error:', e); }
+        }
+        async function stopCw() {
+            try { await fetch('/api/cat/cw/stop', { method: 'POST' }); }
+            catch (e) { console.error('stopCw error:', e); }
+        }
+        // Open the CW keyer dialog and pull the radio's live settings so the
+        // sliders reflect the rig, not stale defaults (CI-V GET /cw/state).
+        async function openCwDialog() {
+            const d = document.getElementById('cwDialog');
+            if (d && typeof d.show === 'function' && !d.open) d.show();
+            try {
+                const resp = await fetch('/api/cat/cw/state');
+                if (!resp.ok) return;
+                const s = await resp.json();
+                const setSlider = (id, lblId, val, fmt) => {
+                    const sl = document.getElementById(id), lb = document.getElementById(lblId);
+                    if (sl) sl.value = val;
+                    if (lb) lb.textContent = fmt ? fmt(val) : val;
+                };
+                if (typeof s.speedWpm === 'number')  setSlider('cwSpeedSlider', 'cwSpeedValue', s.speedWpm);
+                if (typeof s.pitchHz === 'number')   setSlider('cwPitchSlider', 'cwPitchHz', s.pitchHz);
+                if (typeof s.delayDots === 'number') setSlider('cwDelaySlider', 'cwDelayValue', s.delayDots, (v) => parseFloat(v).toFixed(1));
+                const bk = document.getElementById('cwBreakInSelect');
+                if (bk && typeof s.breakIn === 'number') bk.value = String(s.breakIn);
+            } catch (e) { console.error('openCwDialog state error:', e); }
         }
         async function saveCwMessages() {
             const msgs = [];
@@ -4142,6 +4204,145 @@
             };
         })();
 
+        // --- RX TONE CONTROL (HPF/LPF audio filter) POPOUT ---
+        // The IC-7300's per-mode RX Tone Control: a high-pass (low-cut) and a
+        // low-pass (high-cut) audio edge = CI-V 1A 05 <item> HH LL. The item is
+        // chosen server-side from the VFO's current mode; both edges are Hz with
+        // 0 = "Through" (no cut). Unavailable in SSB-DATA — the server reports
+        // that and we grey the controls. Thin read/write proxy; the radio holds
+        // all state. One dialog per VFO button (either panel can open it).
+        window.rxFilter = (function () {
+            const $ = (id) => document.getElementById(id);
+            // HPF: Through, then 100–2000 Hz. LPF: 500–2400 Hz, then Through.
+            const HPF_HZ = [0]; for (let h = 100; h <= 2000; h += 100) HPF_HZ.push(h);
+            const LPF_HZ = []; for (let h = 500; h <= 2400; h += 100) LPF_HZ.push(h); LPF_HZ.push(0);
+
+            function fillSelect(sel, values) {
+                if (!sel) return;
+                sel.innerHTML = '';
+                for (const hz of values) {
+                    const o = document.createElement('option');
+                    o.value = String(hz);
+                    o.textContent = hz === 0 ? 'Through' : (hz + ' Hz');
+                    sel.appendChild(o);
+                }
+            }
+
+            function makeInstance(vfo) {
+                const dialogId = 'rxFilterDialog' + vfo;
+                const dlg = () => $(dialogId);
+                const status = () => $('rxFilterStatus' + vfo);
+                const controls = () => $('rxFilterControls' + vfo);
+                const hpf = () => $('rxHpfSelect' + vfo);
+                const lpf = () => $('rxLpfSelect' + vfo);
+                let _busy = false;
+
+                async function open() {
+                    const d = dlg();
+                    if (d && typeof d.show === 'function' && !d.open) {
+                        const hasSaved = !!localStorage.getItem('dlgPos_' + dialogId);
+                        if (!hasSaved) {
+                            const btn = $('rxFilterBtn' + vfo);
+                            if (btn) {
+                                const r = btn.getBoundingClientRect();
+                                d.style.left = Math.round(r.left) + 'px';
+                                d.style.top  = Math.round(r.bottom + 6) + 'px';
+                                d.style.transform = 'none';
+                            }
+                        }
+                        d.show();
+                    }
+                    await refresh();
+                }
+
+                function setEnabled(on) {
+                    const c = controls();
+                    if (c) c.style.opacity = on ? '1' : '0.45';
+                    if (hpf()) hpf().disabled = !on;
+                    if (lpf()) lpf().disabled = !on;
+                    const btn = $('rxFilterDefaultBtn' + vfo);
+                    if (btn) btn.disabled = !on;
+                }
+
+                async function refresh() {
+                    if (_busy) return;
+                    _busy = true;
+                    try {
+                        const resp = await fetch('/api/cat/rxfilter/' + vfo.toLowerCase());
+                        if (!resp.ok) {
+                            status().textContent = 'Failed to read RX filter.';
+                            setEnabled(false);
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (!data.available) {
+                            status().textContent = 'RX Tone Control not available in this mode (e.g. SSB-DATA).';
+                            setEnabled(false);
+                            return;
+                        }
+                        status().textContent = '';
+                        setEnabled(true);
+                        if (hpf()) hpf().value = String(data.hpfHz | 0);
+                        if (lpf()) lpf().value = String(data.lpfHz | 0);
+                    } catch (e) {
+                        console.error(`rxFilter[${vfo}].refresh error:`, e);
+                    } finally {
+                        _busy = false;
+                    }
+                }
+
+                async function writeBoth() {
+                    const hpfHz = parseInt(hpf() ? hpf().value : '0', 10) || 0;
+                    const lpfHz = parseInt(lpf() ? lpf().value : '0', 10) || 0;
+                    try {
+                        const resp = await fetch('/api/cat/rxfilter/' + vfo.toLowerCase(), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ hpfHz, lpfHz })
+                        });
+                        if (!resp.ok) status().textContent = 'Failed to set RX filter.';
+                    } catch (e) { console.error(`rxFilter[${vfo}].writeBoth error:`, e); }
+                }
+
+                function wireDom() {
+                    fillSelect(hpf(), HPF_HZ);
+                    fillSelect(lpf(), LPF_HZ);
+                    if (hpf()) hpf().addEventListener('change', writeBoth);
+                    if (lpf()) lpf().addEventListener('change', writeBoth);
+                    const btn = $('rxFilterDefaultBtn' + vfo);
+                    if (btn) btn.addEventListener('click', async () => {
+                        if (hpf()) hpf().value = '0';   // HPF Through
+                        if (lpf()) lpf().value = '0';   // LPF Through
+                        await writeBoth();
+                    });
+                }
+
+                function onModeChanged(changedVfo) {
+                    if (changedVfo !== vfo) return;
+                    const d = dlg();
+                    if (!d || !d.open) return;
+                    refresh();
+                }
+
+                return { open, refresh, onModeChanged, wireDom };
+            }
+
+            const instances = { A: makeInstance('A'), B: makeInstance('B') };
+
+            document.addEventListener('DOMContentLoaded', () => {
+                instances.A.wireDom();
+                instances.B.wireDom();
+            });
+
+            return {
+                open: (vfo) => instances[(vfo === 'B') ? 'B' : 'A'].open(),
+                onModeChanged: (vfo, mode) => {
+                    instances.A.onModeChanged(vfo, mode);
+                    instances.B.onModeChanged(vfo, mode);
+                }
+            };
+        })();
+
         // Expose functions called from HTML onclick/onchange attributes
         window.launchWsjtx  = launchWsjtx;
         window.launchJtalert = launchJtalert;
@@ -4179,7 +4380,8 @@
         window.saveFmRepeater  = saveFmRepeater;
         window.setCwPitch      = setCwPitch;
         window.setCwSpeed      = setCwSpeed;
-        window.cwZeroIn        = cwZeroIn;
+        window.openCwDialog    = openCwDialog;
+        window.stopCw          = stopCw;
         window.setCwBreakIn    = setCwBreakIn;
         window.setCwBreakInDelay = setCwBreakInDelay;
         window.sendCwMessage   = sendCwMessage;

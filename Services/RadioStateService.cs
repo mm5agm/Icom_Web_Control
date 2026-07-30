@@ -523,8 +523,8 @@ namespace Icom_Web_Control.Services
         private int _nrLevelB = 1;
         public int NrLevelB { get => _nrLevelB; set => SetField(ref _nrLevelB, value); }
 
-        // CW Pitch: code 0–75 = 300–1050 Hz in 10 Hz steps (KP command)
-        private int _cwPitch = 30; // default code 30 = 600 Hz
+        // CW Pitch: IC-7300 sidetone/pitch in Hz, 300–900 (CI-V 14 09)
+        private int _cwPitch = 600; // default 600 Hz
         public int CwPitch { get => _cwPitch; set => SetField(ref _cwPitch, value); }
 
         // RF Gain per VFO: 0–255 (RG command)
@@ -567,12 +567,13 @@ namespace Icom_Web_Control.Services
         private string _ctcssTone = "01";
         public string CtcssTone { get => _ctcssTone; set => SetField(ref _ctcssTone, value); }
 
-        // CW Keyer
+        // CW Keyer. Speed in WPM (6–48); break-in mode "0"/"1"/"2"; break-in
+        // delay stored as dots×10 (IC-7300 unit is dots, 2.0–13.0 → 20–130).
         private int _cwSpeed = 20;
         public int CwSpeed { get => _cwSpeed; set => SetField(ref _cwSpeed, value); }
         private string _cwBreakIn = "0";
         public string CwBreakIn { get => _cwBreakIn; set => SetField(ref _cwBreakIn, value); }
-        private int _cwBreakInDelay = 200;
+        private int _cwBreakInDelay = 30; // dots×10 → 3.0 dots
         public int CwBreakInDelay { get => _cwBreakInDelay; set => SetField(ref _cwBreakInDelay, value); }
 
         private bool _radioPowerOn = true; // Assume on when app starts

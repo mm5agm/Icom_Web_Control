@@ -65,6 +65,19 @@ namespace Icom_Web_Control.Services.Civ
         //   Set  : send 1A 03 <code(BCD)> → reply FB / FA
         public const byte SubIfWidth = 0x03;
 
+        // RX Tone Control — HPF/LPF audio filter (command 1A 05, menu family).
+        // The RX high-pass (low-cut) and low-pass (high-cut) audio edges live in
+        // the menu tree, reached over CI-V as 1A 05 with a TWO-byte item selector
+        // (high byte always 00). Each mode owns its own item: SSB=01, AM=04,
+        // FM=07, CW=10, RTTY=11 (the low byte is the literal BCD menu number).
+        //   Read : send 1A 05 00 <item>            → reply 1A 05 00 <item> HH LL
+        //   Set  : send 1A 05 00 <item> HH LL      → reply FB / FA
+        // Data is two BCD bytes HH (HPF code) LL (LPF code):
+        //   HPF: 00 = Through, 01–20 = 100–2000 Hz (×100, low-cut)
+        //   LPF: 05–24 = 500–2400 Hz (×100, high-cut), 25 = Through
+        // The IC-7300's RX Tone Control is unavailable in SSB-DATA mode.
+        public const byte SubRxTone = 0x05;
+
         // Phase 3 block 3 — meters (command 15 family). Sub 02 = S-meter.
         //   Read : send 15 02   → reply 15 02 <d1> <d2>
         // The level is a 0–255 value as two big-endian BCD bytes (unlike the
@@ -173,6 +186,25 @@ namespace Icom_Web_Control.Services.Civ
         public const byte CmdAttenuator = 0x11;
         public const byte AttOff        = 0x00;
         public const byte AttOn20dB     = 0x20;
+
+        // CW keyer — memory keyer send (command 17) plus the keyer settings that
+        // ride the 14 (level) and 16 (function) families.
+        //   Send : 17 <ASCII bytes…>   → keys the message (≤30 chars). The byte
+        //          for each character IS its ASCII code (0-9=30–39, A-Z=41–5A,
+        //          space=20, / . , ? etc. = their ASCII value); 0x5E ('^') is a
+        //          no-inter-character-space marker, not a keyed glyph.
+        //   Stop : 17 FF               → abort a message in progress.
+        // Settings:
+        //   14 0C = keyer speed   (0–255 = 6–48 WPM)
+        //   14 09 = CW pitch      (0–255 = 300–900 Hz)
+        //   14 0F = break-in delay(0–255 = 2.0–13.0 dots)   ← dots, not ms
+        //   16 47 = break-in mode (00=OFF, 01=SEMI, 02=FULL)
+        public const byte CmdCwSend       = 0x17;
+        public const byte CwStop          = 0xFF; // 17 FF — stop keying
+        public const byte SubCwSpeed      = 0x0C; // 14 0C
+        public const byte SubCwPitch      = 0x09; // 14 09
+        public const byte SubCwBreakInDelay = 0x0F; // 14 0F
+        public const byte SubCwBreakIn    = 0x47; // 16 47
 
         // Phase 3 block 5 — VFO select, split, and true per-VFO frequency/mode.
         //

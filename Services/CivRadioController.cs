@@ -1198,6 +1198,97 @@ namespace Icom_Web_Control.Services
             return CivProtocol.BcdByte(reply.Data[1]);
         }
 
+        // -- RX Tone Control: HPF/LPF audio filter (CI-V 1A 05 <item>) ---------
+        //
+        // The RX high-pass (low-cut) and low-pass (high-cut) audio filter edges
+        // are per-mode menu items in the 1A 05 family. Which item applies is
+        // decided by the requested VFO's current mode (SSB/AM/FM/CW/RTTY each own
+        // one); SSB-DATA has no Tone Control on the radio, so we report it as
+        // unavailable rather than writing a menu item that would be ignored.
+        // The wire data is two BCD bytes HH LL; RxToneCodec is the one place the
+        // code↔Hz mapping and Through sentinel (0 Hz) live.
+
+        public async Task<(int hpfHz, int lpfHz)> GetRxFilterAsync(RadioVfo vfo, CancellationToken ct = default)
+        {
+            byte item = await RxToneItemForVfoAsync(vfo, ct);
+            if (item == RxToneUnavailable) return (-1, -1);
+
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubRxTone, 0x00, item);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
+            // Reply body: 1A 05 00 <item> HH LL → Data = [05, 00, item, HH, LL].
+            if (reply == null || reply.Cmd != CivProtocol.CmdMenu
+                || reply.Data.Length < 5 || reply.Data[0] != CivProtocol.SubRxTone
+                || reply.Data[2] != item)
+                return (-1, -1);
+            int hpf = RxToneCodec.HpfCodeToHz(CivProtocol.BcdByte(reply.Data[3]));
+            int lpf = RxToneCodec.LpfCodeToHz(CivProtocol.BcdByte(reply.Data[4]));
+            return (hpf, lpf);
+        }
+
+        public async Task SetRxFilterAsync(RadioVfo vfo, int hpfHz, int lpfHz, CancellationToken ct = default)
+        {
+            byte item = await RxToneItemForVfoAsync(vfo, ct);
+            if (item == RxToneUnavailable)
+            {
+                _logger.LogWarning("[CivRadioController] RX Tone Control not available in the current mode — ignored");
+                return;
+            }
+
+            int hpfCode = RxToneCodec.HpfHzToCode(hpfHz);
+            int lpfCode = RxToneCodec.LpfHzToCode(lpfHz);
+            byte hh = (byte)(((hpfCode / 10) << 4) | (hpfCode % 10));   // BCD, code ≤ 20
+            byte ll = (byte)(((lpfCode / 10) << 4) | (lpfCode % 10));   // BCD, code ≤ 25
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubRxTone, 0x00, item, hh, ll);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set RX filter HPF {Hpf} / LPF {Lpf} Hz was not acknowledged", hpfHz, lpfHz);
+        }
+
+        /// <summary>Sentinel item byte meaning "no RX Tone Control in this mode".</summary>
+        private const byte RxToneUnavailable = 0xFF;
+
+        /// <summary>
+        /// Map the requested VFO's current mode to its 1A 05 Tone-Control item
+        /// byte (the literal BCD menu number). SSB-DATA and any unreadable/unknown
+        /// mode yield <see cref="RxToneUnavailable"/>.
+        /// </summary>
+        private async Task<byte> RxToneItemForVfoAsync(RadioVfo vfo, CancellationToken ct)
+        {
+            var m = await ReadVfoModeRawAsync(SelectorFor(vfo), ct);
+            if (!m.ok) return RxToneUnavailable;
+            return m.mode switch
+            {
+                0x00 or 0x01 => m.data != 0 ? RxToneUnavailable : (byte)0x01, // LSB/USB → SSB (not DATA)
+                0x02 => 0x04,                                                  // AM
+                0x05 => 0x07,                                                  // FM
+                0x03 or 0x07 => 0x10,                                          // CW / CW-R
+                0x04 or 0x08 => 0x11,                                          // RTTY / RTTY-R
+                _ => RxToneUnavailable,
+            };
+        }
+
+        // Single source of truth for the 1A 05 HPF/LPF code ↔ Hz mapping. The
+        // radio codes each edge in one BCD byte; we surface Hz with 0 = Through
+        // (no filtering) as the natural sentinel for both edges.
+        //   HPF: code 0 = Through, 1–20 = 100–2000 Hz  (×100, low-cut)
+        //   LPF: code 25 = Through, 5–24 = 500–2400 Hz (×100, high-cut)
+        private static class RxToneCodec
+        {
+            public static int HpfCodeToHz(int code)
+                => code <= 0 ? 0 : Math.Clamp(code, 1, 20) * 100;
+
+            public static int HpfHzToCode(int hz)
+                => hz <= 0 ? 0 : Math.Clamp((int)Math.Round(hz / 100.0), 1, 20);
+
+            public static int LpfCodeToHz(int code)
+                => code >= 25 ? 0 : (code < 5 ? 0 : Math.Clamp(code, 5, 24) * 100);
+
+            public static int LpfHzToCode(int hz)
+                => hz <= 0 ? 25 : Math.Clamp((int)Math.Round(hz / 100.0), 5, 24);
+        }
+
         // Single source of truth for the CI-V 1A 03 width code ↔ Hz mapping,
         // per mode group. The IC-7300 packs the width into one BCD byte whose
         // meaning depends on the mode: SSB/CW and RTTY share a 50 Hz-stepped low
@@ -1304,6 +1395,107 @@ namespace Icom_Web_Control.Services
             var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set attenuator {State} was not acknowledged", on ? "20 dB" : "off");
+        }
+
+        // -- CW keyer (CI-V 17 / 14 0C / 14 09 / 14 0F / 16 47) ----------------
+        //
+        // The memory-keyer send (17) transmits ASCII characters as Morse; the
+        // settings ride the shared 14 (level) and 16 (function) helpers. Speed,
+        // pitch and break-in delay convert between the operator's natural units
+        // (WPM / Hz / dots) and the radio's 0–255 code — CwKeyerCodec owns those
+        // linear mappings. These are the IC-7300 equivalents of the Yaesu
+        // KY/KS/KP/BI/SD commands the inherited panel used to drive.
+
+        // Characters the IC-7300 memory keyer accepts (17 <ASCII…>). Each keyed
+        // byte IS the character's ASCII code; 0x5E ('^') marks "no inter-char
+        // space" and is passed through verbatim if the caller includes it.
+        private static bool IsCwSendable(char c) =>
+            (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+            c == ' ' || c == '/' || c == '?' || c == '.' || c == '-' || c == ',' ||
+            c == ':' || c == '\'' || c == '(' || c == ')' || c == '=' || c == '+' ||
+            c == '"' || c == '@' || c == '^';
+
+        public async Task<string> SendCwMessageAsync(string message, CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(message)) return "";
+            // Keep only sendable characters, cap at the radio's 30-char limit.
+            var clean = new string((message ?? "").Where(IsCwSendable).Take(30).ToArray());
+            if (clean.Length == 0) return "";
+
+            // Body = 17 followed by one ASCII byte per character.
+            var body = new byte[1 + clean.Length];
+            body[0] = CivProtocol.CmdCwSend;
+            for (int i = 0; i < clean.Length; i++) body[i + 1] = (byte)clean[i];
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] CW send '{Msg}' was not acknowledged", clean);
+            return clean;
+        }
+
+        public async Task StopCwAsync(CancellationToken ct = default)
+        {
+            // 17 FF aborts a message already keying.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdCwSend, CivProtocol.CwStop);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] CW stop (17 FF) was not acknowledged");
+        }
+
+        public async Task<int> GetCwSpeedWpmAsync(CancellationToken ct = default)
+        {
+            int code = await ReadLevel14Async(CivProtocol.SubCwSpeed, ct);
+            return code < 0 ? -1 : CwKeyerCodec.CodeToWpm(code);
+        }
+
+        public Task SetCwSpeedWpmAsync(int wpm, CancellationToken ct = default)
+            => WriteLevel14Async(CivProtocol.SubCwSpeed, CwKeyerCodec.WpmToCode(wpm), "CW speed", ct);
+
+        public async Task<int> GetCwPitchHzAsync(CancellationToken ct = default)
+        {
+            int code = await ReadLevel14Async(CivProtocol.SubCwPitch, ct);
+            return code < 0 ? -1 : CwKeyerCodec.CodeToPitchHz(code);
+        }
+
+        public Task SetCwPitchHzAsync(int hz, CancellationToken ct = default)
+            => WriteLevel14Async(CivProtocol.SubCwPitch, CwKeyerCodec.PitchHzToCode(hz), "CW pitch", ct);
+
+        public async Task<double> GetCwBreakInDelayDotsAsync(CancellationToken ct = default)
+        {
+            int code = await ReadLevel14Async(CivProtocol.SubCwBreakInDelay, ct);
+            return code < 0 ? -1 : CwKeyerCodec.CodeToDots(code);
+        }
+
+        public Task SetCwBreakInDelayDotsAsync(double dots, CancellationToken ct = default)
+            => WriteLevel14Async(CivProtocol.SubCwBreakInDelay, CwKeyerCodec.DotsToCode(dots), "CW break-in delay", ct);
+
+        public Task<int> GetCwBreakInAsync(CancellationToken ct = default)
+            => ReadFunc16Async(CivProtocol.SubCwBreakIn, ct);
+
+        public Task SetCwBreakInAsync(int mode, CancellationToken ct = default)
+            => WriteFunc16Async(CivProtocol.SubCwBreakIn, Math.Clamp(mode, 0, 2), "CW break-in", ct);
+
+        // Linear code (0–255) ↔ operator-unit mappings for the three CW levels.
+        //   Speed : 0–255 = 6–48 WPM
+        //   Pitch : 0–255 = 300–900 Hz
+        //   Delay : 0–255 = 2.0–13.0 dots
+        private static class CwKeyerCodec
+        {
+            public static int WpmToCode(int wpm)
+                => (int)Math.Round((Math.Clamp(wpm, 6, 48) - 6) / 42.0 * 255.0);
+            public static int CodeToWpm(int code)
+                => (int)Math.Round(6 + Math.Clamp(code, 0, 255) / 255.0 * 42.0);
+
+            public static int PitchHzToCode(int hz)
+                => (int)Math.Round((Math.Clamp(hz, 300, 900) - 300) / 600.0 * 255.0);
+            public static int CodeToPitchHz(int code)
+                => (int)Math.Round(300 + Math.Clamp(code, 0, 255) / 255.0 * 600.0);
+
+            public static int DotsToCode(double dots)
+                => (int)Math.Round((Math.Clamp(dots, 2.0, 13.0) - 2.0) / 11.0 * 255.0);
+            public static double CodeToDots(int code)
+                => Math.Round((2.0 + Math.Clamp(code, 0, 255) / 255.0 * 11.0) * 10.0) / 10.0;
         }
 
         // -- VFO select / exchange / split (Phase 3 block 5) -------------------

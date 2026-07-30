@@ -156,9 +156,58 @@ namespace Icom_Web_Control.Services
         /// <summary>Select filter slot 1/2/3 for the VFO, preserving its mode (CI-V 26).</summary>
         Task SetSelectedFilterAsync(RadioVfo vfo, int fil, CancellationToken cancellationToken = default);
 
+        // -- RX Tone Control: HPF/LPF audio filter (CI-V 1A 05) ----------------
+        // Per-mode receive audio high-pass (low-cut) and low-pass (high-cut)
+        // edges — the IC-7300's equivalent of the Yaesu Audio Filter. Both edges
+        // are reported/set in Hz with 0 = Through (no filtering). The controller
+        // picks the menu item from the VFO's current mode; SSB-DATA and modes
+        // without Tone Control report (-1, -1) / ignore the set.
+
+        /// <summary>Read the RX HPF (low-cut) and LPF (high-cut) edges in Hz for the current mode; 0 = Through. (-1, -1) when unavailable (CI-V 1A 05).</summary>
+        Task<(int hpfHz, int lpfHz)> GetRxFilterAsync(RadioVfo vfo, CancellationToken cancellationToken = default);
+
+        /// <summary>Set the RX HPF (low-cut) and LPF (high-cut) edges in Hz for the current mode; 0 = Through. Snaps to the radio's 100 Hz steps (CI-V 1A 05).</summary>
+        Task SetRxFilterAsync(RadioVfo vfo, int hpfHz, int lpfHz, CancellationToken cancellationToken = default);
+
         /// <summary>Attenuator: the IC-7300's single 20 dB pad, on/off (CI-V 11).</summary>
         Task<bool> GetAttenuatorAsync(CancellationToken cancellationToken = default);
         Task SetAttenuatorAsync(bool on, CancellationToken cancellationToken = default);
+
+        // -- CW keyer (CI-V 17 / 14 0C / 14 09 / 14 0F / 16 47) ----------------
+        // Memory-keyer send plus the keyer settings, in the operator's natural
+        // units (WPM / Hz / dots / 0–1–2 break-in mode). The controller converts
+        // to/from the radio's 0–255 code. Note break-in delay is in DOTS on the
+        // IC-7300, not milliseconds.
+
+        /// <summary>Key a memory message as Morse (CI-V 17). Non-sendable chars are dropped and the text capped at 30 chars; returns the cleaned text actually sent.</summary>
+        Task<string> SendCwMessageAsync(string message, CancellationToken cancellationToken = default);
+
+        /// <summary>Abort a CW message currently being keyed (CI-V 17 FF).</summary>
+        Task StopCwAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Read the keyer speed in WPM (6–48). -1 on a miss (CI-V 14 0C).</summary>
+        Task<int> GetCwSpeedWpmAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the keyer speed in WPM (clamped 6–48; CI-V 14 0C).</summary>
+        Task SetCwSpeedWpmAsync(int wpm, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the CW pitch/sidetone in Hz (300–900). -1 on a miss (CI-V 14 09).</summary>
+        Task<int> GetCwPitchHzAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the CW pitch/sidetone in Hz (clamped 300–900; CI-V 14 09).</summary>
+        Task SetCwPitchHzAsync(int hz, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the break-in delay in dots (2.0–13.0). -1 on a miss (CI-V 14 0F).</summary>
+        Task<double> GetCwBreakInDelayDotsAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the break-in delay in dots (clamped 2.0–13.0; CI-V 14 0F).</summary>
+        Task SetCwBreakInDelayDotsAsync(double dots, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the break-in mode: 0=OFF, 1=SEMI, 2=FULL. -1 on a miss (CI-V 16 47).</summary>
+        Task<int> GetCwBreakInAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the break-in mode (0=OFF, 1=SEMI, 2=FULL; CI-V 16 47).</summary>
+        Task SetCwBreakInAsync(int mode, CancellationToken cancellationToken = default);
 
         // -- VFO / split (Phase 3 block 5) --------------------------------------
         // GetFrequencyHzAsync / SetFrequencyHzAsync / GetModeAsync / SetModeAsync

@@ -1852,20 +1852,22 @@ namespace Icom_Web_Control.Controllers
         }
 
         // --- CW PITCH ---
-        public class CwPitchRequest { public int Code { get; set; } = 30; }
+        // IC-7300 CW pitch is 300–900 Hz (CI-V 14 09), set directly in Hz.
+        public class CwPitchRequest { public int Hz { get; set; } = 600; }
 
         [HttpPost("cwpitch")]
         public async Task<IActionResult> SetCwPitch([FromBody] CwPitchRequest request)
         {
-            if (request.Code < 0 || request.Code > 75)
-                return BadRequest(new { error = "CW pitch code must be 0–75 (300–1050 Hz)" });
+            if (request.Hz < 300 || request.Hz > 900)
+                return BadRequest(new { error = "CW pitch must be 300–900 Hz" });
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"KP{request.Code:D2};", "WebUI", CancellationToken.None);
-                _radioStateService.CwPitch = request.Code;
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetCwPitchHzAsync(request.Hz, CancellationToken.None);
+                _radioStateService.CwPitch = request.Hz;
                 return Ok();
             }
             catch (Exception ex)
@@ -2138,19 +2140,21 @@ namespace Icom_Web_Control.Controllers
         // --- CW KEYER ---
         public class CwSpeedRequest { public int Speed { get; set; } = 20; }
         public class CwBreakInRequest { public string Mode { get; set; } = "0"; }
-        public class CwBreakInDelayRequest { public int DelayMs { get; set; } = 200; }
+        public class CwBreakInDelayRequest { public double Dots { get; set; } = 3.0; }
 
         [HttpPost("cw/speed")]
         public async Task<IActionResult> SetCwSpeed([FromBody] CwSpeedRequest request)
         {
-            if (request.Speed < 4 || request.Speed > 60)
-                return BadRequest(new { error = "CW speed 4–60 WPM" });
+            // IC-7300 keyer range is 6–48 WPM (CI-V 14 0C).
+            if (request.Speed < 6 || request.Speed > 48)
+                return BadRequest(new { error = "CW speed 6–48 WPM" });
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"KS{request.Speed:D3};", "WebUI", CancellationToken.None);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetCwSpeedWpmAsync(request.Speed, CancellationToken.None);
                 _radioStateService.CwSpeed = request.Speed;
                 return Ok();
             }
@@ -2158,55 +2162,56 @@ namespace Icom_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
-        // CW Auto Zero In — fire-and-forget trigger. Radio nudges the VFO so
-        // the received CW signal sits exactly at the operator's preferred CW
-        // pitch (the value set via KP). Requested by IK2XRW Alessandro (#55).
-        //
-        // Yaesu format: ZI{P1};
-        //   P1 = 0  MAIN band (= VFO A on dual-receiver, the only receiver
-        //           on single-receiver radios)
-        //   P1 = 1  SUB band (FTdx101 only; rejected on single-receiver)
-        //
-        // {vfo} URL segment selects which VFO:
-        //   "a"      → P1=0 explicitly                    (VFO A button)
-        //   "b"      → P1=1 on dual-receiver, P1=0 forced on single-receiver
-        //              (which silently rejects P1=1 on P1=0-Fixed commands)
-        //   "active" → follow VS / single-receiver fall-back. Used by the
-        //              CW Keyer popup button so one click does the right
-        //              thing without needing to know which side is in focus.
-        [HttpPost("cw/zin/{vfo}")]
-        public async Task<IActionResult> CwZeroIn(string vfo)
+        // --- CW KEYER STATE (read current settings from the radio) ---
+        // Lets the CW popup show the radio's live speed/pitch/delay/break-in
+        // when it opens, rather than stale server-rendered defaults.
+        public class CwStateResponse
         {
-            string v = (vfo ?? "").Trim().ToLowerInvariant();
-            if (v != "a" && v != "b" && v != "active")
-                return BadRequest(new { error = "VFO must be 'a', 'b', or 'active'" });
+            public int SpeedWpm { get; set; }
+            public int PitchHz { get; set; }
+            public double DelayDots { get; set; }
+            public int BreakIn { get; set; }
+        }
 
+        [HttpGet("cw/state")]
+        public async Task<IActionResult> GetCwState()
+        {
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                string p1;
-                if (v == "active")
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                var speed  = await _radio.GetCwSpeedWpmAsync(CancellationToken.None);
+                var pitch  = await _radio.GetCwPitchHzAsync(CancellationToken.None);
+                var delay  = await _radio.GetCwBreakInDelayDotsAsync(CancellationToken.None);
+                var breakIn = await _radio.GetCwBreakInAsync(CancellationToken.None);
+                return Ok(new CwStateResponse
                 {
-                    p1 = _radioStateService.IsSingleReceiver
-                        ? "0"
-                        : (_radioStateService.ActiveVfo == 1 ? "1" : "0");
-                }
-                else
-                {
-                    // Explicit per-VFO targeting. On single-receiver radios
-                    // P1=1 is silently ignored by the radio firmware, so the
-                    // VFO B button is functionally a no-op there — that's
-                    // accurate to how the hardware behaves.
-                    p1 = _radioStateService.IsSingleReceiver
-                        ? "0"
-                        : (v == "b" ? "1" : "0");
-                }
-                await _catClient.SendCommandAsync($"ZI{p1};", "WebUI", CancellationToken.None);
+                    SpeedWpm  = speed  < 0 ? _radioStateService.CwSpeed : speed,
+                    PitchHz   = pitch  < 0 ? 600 : pitch,
+                    DelayDots = delay  < 0 ? 3.0 : delay,
+                    BreakIn   = breakIn < 0 ? 0 : breakIn
+                });
+            }
+            catch (Exception ex) { _logger.LogError(ex, "Error reading CW state"); return StatusCode(500, new { error = "Failed" }); }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // Abort a CW memory message that is currently keying (CI-V 17 FF).
+        [HttpPost("cw/stop")]
+        public async Task<IActionResult> StopCw()
+        {
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.StopCwAsync(CancellationToken.None);
                 return Ok();
             }
-            catch (Exception ex) { _logger.LogError(ex, "Error sending CW Zero In"); return StatusCode(500, new { error = "Failed" }); }
+            catch (Exception ex) { _logger.LogError(ex, "Error stopping CW"); return StatusCode(500, new { error = "Failed" }); }
             finally { _requestSemaphore.Release(); }
         }
 
@@ -2219,8 +2224,9 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"BI{request.Mode};", "WebUI", CancellationToken.None);
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetCwBreakInAsync(int.Parse(request.Mode), CancellationToken.None);
                 _radioStateService.CwBreakIn = request.Mode;
                 return Ok();
             }
@@ -2231,15 +2237,17 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("cw/breakindelay")]
         public async Task<IActionResult> SetCwBreakInDelay([FromBody] CwBreakInDelayRequest request)
         {
-            if (request.DelayMs < 0 || request.DelayMs > 2500)
-                return BadRequest(new { error = "Delay 0–2500 ms" });
+            // IC-7300 break-in delay is in DOTS (2.0–13.0), not milliseconds.
+            if (request.Dots < 2.0 || request.Dots > 13.0)
+                return BadRequest(new { error = "Delay 2.0–13.0 dots" });
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"SD{request.DelayMs:D4};", "WebUI", CancellationToken.None);
-                _radioStateService.CwBreakInDelay = request.DelayMs;
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetCwBreakInDelayDotsAsync(request.Dots, CancellationToken.None);
+                _radioStateService.CwBreakInDelay = (int)Math.Round(request.Dots * 10);
                 return Ok();
             }
             catch (Exception ex) { _logger.LogError(ex, "Error setting CW break-in delay"); return StatusCode(500, new { error = "Failed" }); }
@@ -2253,19 +2261,18 @@ namespace Icom_Web_Control.Controllers
         {
             if (string.IsNullOrEmpty(request.Message))
                 return BadRequest(new { error = "Empty message" });
-            var clean = new string(request.Message.ToUpper().Where(c =>
-                (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-                c == ' ' || c == '?' || c == '/' || c == '.' || c == ','
-            ).Take(24).ToArray());
-            if (string.IsNullOrEmpty(clean))
-                return BadRequest(new { error = "No valid CW characters" });
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
             try
             {
-                await EnsureConnectedAsync();
-                await _catClient.SendCommandAsync($"KY {clean};", "WebUI", CancellationToken.None);
-                return Ok(new { sent = clean });
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                // The controller filters to the radio's sendable character set
+                // and caps at the 30-char limit, returning what was actually keyed.
+                var sent = await _radio.SendCwMessageAsync(request.Message, CancellationToken.None);
+                if (string.IsNullOrEmpty(sent))
+                    return BadRequest(new { error = "No valid CW characters" });
+                return Ok(new { sent });
             }
             catch (Exception ex) { _logger.LogError(ex, "Error sending CW message"); return StatusCode(500, new { error = "Failed" }); }
             finally { _requestSemaphore.Release(); }
@@ -2358,6 +2365,86 @@ namespace Icom_Web_Control.Controllers
             {
                 _logger.LogError(ex, "Error setting Twin PBT {Edge}", e);
                 return StatusCode(500, new { error = "Failed to set Twin PBT" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        // -- RX TONE CONTROL: HPF/LPF audio filter (CI-V 1A 05) -------------
+        //
+        // Per-mode receive audio high-pass (low-cut) / low-pass (high-cut)
+        // edges — the IC-7300's native equivalent of the (now inert) Yaesu
+        // Audio Filter. Both edges are Hz with 0 = Through. The {vfo} segment
+        // picks which VFO's *current mode* the menu item is read from; the
+        // radio stores values per mode, not per VFO. Available == false when
+        // the current mode has no Tone Control (SSB-DATA, etc.).
+
+        public class RxFilterReadResponse
+        {
+            public bool Available { get; set; }
+            public int HpfHz { get; set; }
+            public int LpfHz { get; set; }
+        }
+
+        public class RxFilterSetRequest
+        {
+            public int HpfHz { get; set; }
+            public int LpfHz { get; set; }
+        }
+
+        [HttpGet("rxfilter/{vfo}")]
+        public async Task<IActionResult> ReadRxFilter(string vfo)
+        {
+            var v = (vfo ?? "").Trim().ToLowerInvariant();
+            if (v != "a" && v != "b")
+                return BadRequest(new { error = "Invalid VFO (must be 'a' or 'b')" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                var (hpf, lpf) = await _radio.GetRxFilterAsync(
+                    v == "b" ? RadioVfo.B : RadioVfo.A, CancellationToken.None);
+                if (hpf < 0)
+                    return Ok(new RxFilterReadResponse { Available = false });
+                return Ok(new RxFilterReadResponse { Available = true, HpfHz = hpf, LpfHz = lpf });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading RX filter");
+                return StatusCode(500, new { error = "Failed to read RX filter" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("rxfilter/{vfo}")]
+        public async Task<IActionResult> SetRxFilter(string vfo, [FromBody] RxFilterSetRequest request)
+        {
+            var v = (vfo ?? "").Trim().ToLowerInvariant();
+            if (v != "a" && v != "b")
+                return BadRequest(new { error = "Invalid VFO (must be 'a' or 'b')" });
+            if (request == null)
+                return BadRequest(new { error = "Missing body" });
+            // 0 = Through; otherwise HPF 100–2000, LPF 500–2400 (the controller
+            // snaps to 100 Hz steps, but reject wildly out-of-range values).
+            if (request.HpfHz < 0 || request.HpfHz > 2000 || request.LpfHz < 0 || request.LpfHz > 2400)
+                return BadRequest(new { error = "HPF 0–2000 Hz, LPF 0–2400 Hz (0 = Through)" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetRxFilterAsync(
+                    v == "b" ? RadioVfo.B : RadioVfo.A, request.HpfHz, request.LpfHz, CancellationToken.None);
+                return Ok(new { vfo = v, hpfHz = request.HpfHz, lpfHz = request.LpfHz });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting RX filter");
+                return StatusCode(500, new { error = "Failed to set RX filter" });
             }
             finally { _requestSemaphore.Release(); }
         }

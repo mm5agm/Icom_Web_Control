@@ -1061,6 +1061,7 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeA', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('A', update.value);
         if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('A', update.value);
+        if (window.rxFilter && window.rxFilter.onModeChanged) window.rxFilter.onModeChanged('A', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
@@ -1074,6 +1075,7 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeB', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('B', update.value);
         if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('B', update.value);
+        if (window.rxFilter && window.rxFilter.onModeChanged) window.rxFilter.onModeChanged('B', update.value);
     }
 
     // --- S-METER (push) ---
@@ -1584,9 +1586,10 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- CW ---
     if (update.property === "CwPitch") {
+        // CwPitch is broadcast in Hz (300–900, CI-V 14 09) — display as-is.
         const s = document.getElementById('cwPitchSlider'); const l = document.getElementById('cwPitchHz');
         if (s) s.value = update.value;
-        if (l) l.textContent = (300 + parseInt(update.value) * 10) + ' Hz';
+        if (l) l.textContent = update.value;
     }
     if (update.property === "CwSpeed") {
         const s = document.getElementById('cwSpeedSlider'); const l = document.getElementById('cwSpeedValue');
@@ -1596,8 +1599,10 @@ connection.on("RadioStateUpdate", function (update) {
         const el = document.getElementById('cwBreakInSelect'); if (el) el.value = update.value;
     }
     if (update.property === "CwBreakInDelay") {
+        // CwBreakInDelay is broadcast as dots×10 (30 = 3.0 dots); slider is in dots (2.0–13.0).
+        const dots = parseInt(update.value) / 10;
         const s = document.getElementById('cwDelaySlider'); const l = document.getElementById('cwDelayValue');
-        if (s) s.value = update.value; if (l) l.textContent = update.value;
+        if (s) s.value = dots; if (l) l.textContent = dots.toFixed(1);
     }
 
     // --- FM REPEATER ---

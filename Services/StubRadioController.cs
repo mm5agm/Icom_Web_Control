@@ -234,6 +234,37 @@ namespace Icom_Web_Control.Services
         public Task<bool> GetAttenuatorAsync(CancellationToken ct = default) => Task.FromResult(_att);
         public Task SetAttenuatorAsync(bool on, CancellationToken ct = default) { _att = on; _state.AttA = on ? "20" : "00"; _state.AttB = _state.AttA; return Task.CompletedTask; }
 
+        // -- RX Tone Control HPF/LPF (CI-V 1A 05, canned) ----------------------
+
+        private int _rxHpfHz = 100;   // 0 = Through
+        private int _rxLpfHz = 2400;  // 0 = Through
+        public Task<(int hpfHz, int lpfHz)> GetRxFilterAsync(RadioVfo vfo, CancellationToken ct = default)
+            => Task.FromResult((_rxHpfHz, _rxLpfHz));
+        public Task SetRxFilterAsync(RadioVfo vfo, int hpfHz, int lpfHz, CancellationToken ct = default)
+        {
+            _rxHpfHz = hpfHz <= 0 ? 0 : Math.Clamp(hpfHz, 100, 2000);
+            _rxLpfHz = lpfHz <= 0 ? 0 : Math.Clamp(lpfHz, 500, 2400);
+            return Task.CompletedTask;
+        }
+
+        // -- CW keyer (CI-V 17 / 14 0C / 14 09 / 14 0F / 16 47, canned) --------
+
+        private int _cwSpeedWpm = 20;
+        private int _cwPitchHz = 600;
+        private double _cwDelayDots = 3.0;
+        private int _cwBreakIn = 0; // 0=OFF, 1=SEMI, 2=FULL
+        public Task<string> SendCwMessageAsync(string message, CancellationToken ct = default)
+            => Task.FromResult(message ?? "");
+        public Task StopCwAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task<int> GetCwSpeedWpmAsync(CancellationToken ct = default) => Task.FromResult(_cwSpeedWpm);
+        public Task SetCwSpeedWpmAsync(int wpm, CancellationToken ct = default) { _cwSpeedWpm = Math.Clamp(wpm, 6, 48); _state.CwSpeed = _cwSpeedWpm; return Task.CompletedTask; }
+        public Task<int> GetCwPitchHzAsync(CancellationToken ct = default) => Task.FromResult(_cwPitchHz);
+        public Task SetCwPitchHzAsync(int hz, CancellationToken ct = default) { _cwPitchHz = Math.Clamp(hz, 300, 900); return Task.CompletedTask; }
+        public Task<double> GetCwBreakInDelayDotsAsync(CancellationToken ct = default) => Task.FromResult(_cwDelayDots);
+        public Task SetCwBreakInDelayDotsAsync(double dots, CancellationToken ct = default) { _cwDelayDots = Math.Clamp(dots, 2.0, 13.0); return Task.CompletedTask; }
+        public Task<int> GetCwBreakInAsync(CancellationToken ct = default) => Task.FromResult(_cwBreakIn);
+        public Task SetCwBreakInAsync(int mode, CancellationToken ct = default) { _cwBreakIn = Math.Clamp(mode, 0, 2); _state.CwBreakIn = _cwBreakIn.ToString(); return Task.CompletedTask; }
+
         // -- Twin PBT (CI-V 14 07 / 14 08, canned) -----------------------------
 
         private int _pbtInner = 128; // 128 = passband centre / no shift
