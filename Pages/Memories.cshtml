@@ -123,7 +123,7 @@
                 <label class="form-check-label" for="showAdvanced">Show advanced fields</label>
             </div>
             <span class="text-muted small">
-                Antenna, IF Width/Shift, Roofing, NB, NR, AGC, Power, Notes —
+                IF Width, NB, NR, AGC, Power, Notes —
                 applied on recall only if set. Not exported to the radio's own memory channels.
             </span>
         </div>
@@ -138,10 +138,7 @@
                         <th style="min-width:100px">Clarifier (Hz)</th>
                         <th style="width:70px">RX Clar</th>
                         <th style="width:70px">TX Clar</th>
-                        <th class="advanced-col" style="min-width:70px; display:none">Ant</th>
                         <th class="advanced-col" style="min-width:90px; display:none">IF Width</th>
-                        <th class="advanced-col" style="min-width:90px; display:none">IF Shift</th>
-                        <th class="advanced-col" style="min-width:90px; display:none">Roofing</th>
                         <th class="advanced-col" style="width:60px; display:none">NB</th>
                         <th class="advanced-col" style="width:70px; display:none">NB Lvl</th>
                         <th class="advanced-col" style="min-width:80px; display:none">NR</th>
@@ -211,34 +208,11 @@
                                 <input type="hidden" name="Memories[@i].TxClarOn" value="false" />
                             </td>
                             <td class="advanced-col" style="display:none">
-                                <select class="form-select form-select-sm" name="Memories[@i].Antenna">
-                                    <option value="" selected="@(string.IsNullOrEmpty(m.Antenna) ? "selected" : null)">—</option>
-                                    <option value="1" selected="@(m.Antenna == "1" ? "selected" : null)">1</option>
-                                    <option value="2" selected="@(m.Antenna == "2" ? "selected" : null)">2</option>
-                                    <option value="3" selected="@(m.Antenna == "3" ? "selected" : null)">3</option>
-                                </select>
-                            </td>
-                            <td class="advanced-col" style="display:none">
                                 <input class="form-control form-control-sm"
                                        name="Memories[@i].IfWidthCode"
                                        value="@m.IfWidthCode"
                                        placeholder="—"
-                                       title="SH command code (raw integer, e.g. 8)" />
-                            </td>
-                            <td class="advanced-col" style="display:none">
-                                <input class="form-control form-control-sm"
-                                       name="Memories[@i].IfShiftHz"
-                                       type="number"
-                                       value="@(m.IfShiftHz?.ToString() ?? "")"
-                                       min="-1000" max="1000" step="20"
-                                       placeholder="—" />
-                            </td>
-                            <td class="advanced-col" style="display:none">
-                                <input class="form-control form-control-sm"
-                                       name="Memories[@i].RoofingCode"
-                                       value="@m.RoofingCode"
-                                       placeholder="—"
-                                       title="Roofing filter code (6=12kHz, 7=3kHz, 8=1.2kHz, 9=600Hz, A=300Hz)" />
+                                       title="IF passband width in Hz (applied on recall)" />
                             </td>
                             <td class="advanced-col text-center align-middle" style="display:none">
                                 <select class="form-select form-select-sm" name="Memories[@i].NbOn">

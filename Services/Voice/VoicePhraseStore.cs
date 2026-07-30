@@ -383,10 +383,9 @@ namespace Icom_Web_Control.Services.Voice
                 new() { Name = "NR off",          Phrases = ["noise reduction off", "n r off"],          Cat = "NR00;", Category = "Noise Reduction" },
                 new() { Name = "NB on",           Phrases = ["noise blanker on", "n b on"],              Cat = "NB01;", Category = "Noise Reduction" },
                 new() { Name = "NB off",          Phrases = ["noise blanker off", "n b off"],            Cat = "NB00;", Category = "Noise Reduction" },
-                // Roofing filter — CAT strings are FTdx101 specific; verify and adjust if needed.
-                new() { Name = "Roofing 3 kHz",   Phrases = ["roofing three kilohertz", "roofing three k"],   Cat = "RF03;", Category = "Macros" },
-                new() { Name = "Roofing 6 kHz",   Phrases = ["roofing six kilohertz", "roofing six k"],       Cat = "RF04;", Category = "Macros" },
-                new() { Name = "Roofing 12 kHz",  Phrases = ["roofing twelve kilohertz", "roofing twelve k"], Cat = "RF05;", Category = "Macros" },
+                // (The Yaesu roofing-filter macros were removed for IWC — the
+                //  IC-7300 is a DSP receiver with no switchable roofing filters;
+                //  its IF passband is set via the IF Width / FIL slot controls.)
             },
             SetAttenuator = new()
             {
