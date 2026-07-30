@@ -212,18 +212,17 @@ builder.Services.AddSignalR();
 // Register the persistence service (no hub dependency)
 builder.Services.AddSingleton<RadioStatePersistenceService>();
 
-// Register RadioStateService and CatMessageBuffer as singletons
+// Register RadioStateService as a singleton
 builder.Services.AddSingleton<RadioStateService>();
-builder.Services.AddSingleton<CatMessageBuffer>();
 
-// Register CatMessageDispatcher as singleton
-builder.Services.AddSingleton<CatMessageDispatcher>();
-
-// Register CatMultiplexerService as singleton
-builder.Services.AddSingleton<CatMultiplexerService>();
-
-// Register the main CAT client for the web app
-builder.Services.AddSingleton<ICatClient, MultiplexedCatClient>();
+// ICatClient is now a no-op stub. The Yaesu CAT transport it used to front
+// (CatMultiplexerService / CatMessageDispatcher / CatMessageBuffer /
+// MultiplexedCatClient / CatCommands) was deleted in the IWC carve — IWC drives
+// the IC-7300 through the IRadioController / CI-V seam below. NullCatClient keeps
+// the not-yet-ported vestigial call sites (some CatController controls, the
+// Memory radio-sync paths, one voice intent) compiling and inert until each is
+// re-implemented on the seam in its own block. See NullCatClient for detail.
+builder.Services.AddSingleton<ICatClient, NullCatClient>();
 
 // ── IRadioController seam (Phase 2) ─────────────────────────────────────────
 // The semantic, protocol-free seam IWC introduces. Phase 2 backs it with the
@@ -269,23 +268,17 @@ builder.Services.AddSingleton<ISettingsService, SettingsService>();
 builder.Services.AddSingleton<AudioFilterMapService>();
 
 
-// MeterPollingService — Yaesu CAT meter polling. Parked in Phase 1: it polls
-// the (unopened) serial multiplexer and would fight StubRadioController over
-// IsConnected/meter state. Phase 3 rebuilds meter reading over CI-V behind the
-// IRadioController seam and re-enables a hosted poller.
-// builder.Services.AddHostedService<MeterPollingService>();
+// Meter polling was the Yaesu CAT MeterPollingService — deleted in the carve.
+// Meter reads (S-meter, Po/SWR/ALC) now come through the CI-V seam
+// (CivRadioController), so there is no separate hosted poller to register.
 
 // Register the radio state service — reuse the same singleton instance as RadioStateService
 builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<RadioStateService>());
 
-// RadioInitializationService — still registered as a singleton (CatController
-// injects it for the radio-power re-init path), but NOT started as a hosted
-// service in Phase 1: there is no CI-V transport yet, so its Yaesu serial
-// connect would just time out. Phase 2 restores the hosted registration with a
-// CI-V-aware connect sequence. StubRadioController now supplies the "connected +
-// canned data" story at startup.
-builder.Services.AddSingleton<RadioInitializationService>();
-// builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioInitializationService>());
+// The Yaesu RadioInitializationService (serial connect + read-burst + state
+// restore) was deleted in the carve. Its job — connect the radio and restore
+// state at startup — is now owned by CivRadioController (hosted) over CI-V, and
+// the Connect / Test-Connection endpoints call IRadioController.ConnectAsync.
 
 // ADD THIS LINE for Razor Pages support:
 builder.Services.AddRazorPages();

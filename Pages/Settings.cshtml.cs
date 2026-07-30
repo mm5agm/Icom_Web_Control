@@ -15,7 +15,7 @@ namespace Icom_Web_Control.Pages
     {
         private readonly ISettingsService _settingsService;
         private readonly ILogger<SettingsModel> _logger;
-        private readonly RadioInitializationService _radioInitializationService;
+        private readonly IRadioController _radio;
         private readonly IHostApplicationLifetime _lifetime;
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly HttpPortInfo _portInfo;
@@ -60,14 +60,14 @@ namespace Icom_Web_Control.Pages
         public SettingsModel(
             ISettingsService settingsService,
             ILogger<SettingsModel> logger,
-            RadioInitializationService radioInitializationService,
+            IRadioController radio,
             IHostApplicationLifetime lifetime,
             IHubContext<RadioHub> hubContext,
             HttpPortInfo portInfo)
         {
             _settingsService = settingsService;
             _logger = logger;
-            _radioInitializationService = radioInitializationService;
+            _radio = radio;
             _lifetime = lifetime;
             _hubContext = hubContext;
             _portInfo = portInfo;
@@ -215,15 +215,14 @@ namespace Icom_Web_Control.Pages
                     // Reset initialization status so app will try again
                     Icom_Web_Control.Services.AppStatus.InitializationStatus = "initializing";
 
-                    // Automatic retry: trigger radio initialization in the background rather
-                    // than awaiting it here. The full sequence (CAT burst, DT0 wait up to 5s,
-                    // state restore, auto-info settle) can legitimately take several seconds,
-                    // which was blocking this POST response and making Save appear to hang
-                    // (wa6auf11, #73 follow-up). The existing initializing-overlay/polling on
-                    // the main page already handles showing progress once redirected there.
-                    // InitializeRadioAsync's own top-level catch means this never surfaces an
-                    // unobserved exception.
-                    _ = _radioInitializationService.InitializeRadioAsync();
+                    // The CI-V port changed, so ask the seam to reconnect on the new
+                    // port in the background rather than awaiting it here — a connect
+                    // can take a moment and awaiting it would make Save appear to hang
+                    // (wa6auf11, #73 follow-up). CivRadioController owns the link and
+                    // also auto-reconnects on its own loop; this just nudges it to pick
+                    // up the new setting immediately. Its own catch means this never
+                    // surfaces an unobserved exception.
+                    _ = _radio.ConnectAsync();
                 }
 
                 StatusMessage = "✓ Settings saved successfully.";

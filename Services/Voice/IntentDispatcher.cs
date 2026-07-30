@@ -17,7 +17,6 @@ namespace Icom_Web_Control.Services.Voice
     public sealed class IntentDispatcher
     {
         private readonly ILogger<IntentDispatcher> _logger;
-        private readonly ICatClient _catClient;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hub;
@@ -36,14 +35,12 @@ namespace Icom_Web_Control.Services.Voice
 
         public IntentDispatcher(
             ILogger<IntentDispatcher> logger,
-            ICatClient catClient,
             RadioStateService state,
             ISettingsService settings,
             IHubContext<RadioHub> hub,
             IRadioController radio)
         {
             _logger = logger;
-            _catClient = catClient;
             _state = state;
             _settings = settings;
             _hub = hub;
@@ -541,7 +538,13 @@ namespace Icom_Web_Control.Services.Voice
                 _logger.LogInformation("[Voice] DRY RUN -- would send {Command}", command);
                 return Task.FromResult(string.Empty);
             }
-            return _catClient.SendCommandAsync(command, "Voice", ct);
+            // The Yaesu CAT transport this used to reach was deleted in the IWC
+            // carve. The handful of voice intents still routed here (attenuator,
+            // AGC, IF-width nudge, band up/down, raw macros) need Icom-specific
+            // CI-V reworks, not a straight repoint — see the TODO(voice-civ) notes
+            // on the field declarations above. Until then they are inert no-ops.
+            _logger.LogInformation("[Voice] intent not yet on CI-V — dropped legacy CAT send: {Command}", command);
+            return Task.FromResult(string.Empty);
         }
 
         /// <summary>

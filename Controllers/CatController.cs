@@ -15,7 +15,6 @@ namespace Icom_Web_Control.Controllers
         private readonly ILogger<CatController> _logger;
         private readonly RadioStateService _radioStateService;
         private readonly RadioStatePersistenceService _statePersistence;
-        private readonly RadioInitializationService _radioInitService;
         private readonly AudioFilterMapService _audioFilterMap;
         // Phase 3: the semantic seam. Frequency set is repointed here (real CI-V
         // via CivRadioController) while the rest of this controller still speaks
@@ -395,7 +394,6 @@ namespace Icom_Web_Control.Controllers
             ILogger<CatController> logger,
             RadioStateService radioStateService,
             RadioStatePersistenceService statePersistence,
-            RadioInitializationService radioInitService,
             AudioFilterMapService audioFilterMap,
             IRadioController radio)
         {
@@ -404,7 +402,6 @@ namespace Icom_Web_Control.Controllers
             _logger = logger;
             _radioStateService = radioStateService;
             _statePersistence = statePersistence;
-            _radioInitService = radioInitService;
             _audioFilterMap = audioFilterMap;
             _radio = radio;
         }
@@ -1912,91 +1909,42 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("reinitialize")]
         public async Task<IActionResult> Reinitialize()
         {
-            // Test Connection ("Reinitialize") used to call the full
-            // RadioInitializationService.InitializeRadioAsync() — the same
-            // heavyweight startup sequence the app runs at launch (multiplexer
-            // connect + ~30 read queries + state restoration, takes 5+ seconds).
-            // That worked the first time the user clicked it (cold install) but
-            // CRASHED IWC entirely when clicked while everything was running:
-            // the deep init races with MeterPollingService at 10 Hz, the SDR
-            // workers, in-flight WebUI commands, etc. Reported by Colin on
-            // v2.3.3 — first click reported a false "radio not responding"
-            // (from the race), second click hard-crashed the process so the
-            // browser saw "Failed to fetch".
+            // "Test Connection" (Settings page). IWC drives the IC-7300 through
+            // the CI-V seam (IRadioController / CivRadioController), which owns
+            // the serial link and auto-reconnects on its own loop. So this
+            // button just reports the seam's live connection state, and asks it
+            // to (re)connect if it isn't currently up — e.g. the user changed
+            // the COM port in Settings, or plugged the radio in after launch.
             //
-            // Replacement logic: if the multiplexer is already connected (the
-            // overwhelmingly common case — Test Connection is normally pressed
-            // to verify a working setup), just send the ID; probe through the
-            // existing CAT client. The multiplexer handles command queuing
-            // correctly, so the probe coexists peacefully with meter polling.
-            //
-            // Only run the heavyweight init if the multiplexer is genuinely
-            // disconnected (user changed Settings, plugged in the radio, and
-            // wants Test Connection to attempt a fresh connection) — that's
-            // the original recover-from-broken-state use case.
+            // The old Yaesu path (RadioInitializationService full read-burst +
+            // an ID; CAT probe) was deleted in the carve; it also used to crash
+            // IWC when clicked mid-session by racing the meter poller. The seam
+            // serialises CI-V traffic, so a connect here coexists with polling.
             try
             {
-                _logger.LogInformation("Test Connection requested from Settings page (IsConnected={IsConnected})", _catClient.IsConnected);
+                _logger.LogInformation("Test Connection requested from Settings page (IsConnected={IsConnected})", _radio.IsConnected);
 
-                if (!_catClient.IsConnected)
+                if (!_radio.IsConnected)
                 {
-                    _logger.LogInformation("Test Connection: not currently connected — running full radio initialization");
-                    await _radioInitService.InitializeRadioAsync();
+                    _logger.LogInformation("Test Connection: not currently connected — asking the CI-V seam to connect");
+                    await _radio.ConnectAsync(CancellationToken.None);
                 }
 
-                // Verify the radio is actually responding. Standard Yaesu
-                // identification probe ID; — require a parseable reply that
-                // starts with 'ID' and includes a semicolon (e.g. 'ID0570;'
-                // from an FTdx101MP). 2s timeout gives the multiplexer's
-                // command queue plenty of room behind a busy meter poll.
-                //
-                // Without this check the button reported success whenever
-                // SerialPort.Open() succeeded, even when the radio was not
-                // actually responding to CAT (Juergen WB4EM, Disc #14: a
-                // virtual-port-sharer in the chain swallowed the chatter but
-                // Open() still succeeded, so the user was falsely reassured).
-                string? probe = null;
-                try
+                if (!_radio.IsConnected)
                 {
-                    probe = await _catClient.SendCommandAsync("ID;", "TestConnection", CancellationToken.None, timeoutMs: 2000);
-                }
-                catch (Exception probeEx)
-                {
-                    _logger.LogWarning(probeEx, "Test Connection: ID; probe threw");
-                }
-
-                // Probe must start with 'ID' and include at least the 4-character
-                // radio-identifier code (e.g. 'ID0682' for FTdx101MP, 'ID0570'
-                // for FTdx101D, etc). We do NOT require a trailing semicolon —
-                // the multiplexer strips the CAT terminator as part of response
-                // parsing, so what we see here is e.g. 'ID0682' even though the
-                // wire response was 'ID0682;'. v2.3.3/v2.3.4 had a Contains(';')
-                // check that always failed against the multiplexer's parsed
-                // output — producing the false-negative "Radio did not respond"
-                // even when CAT was working perfectly. Reported by Colin via
-                // the log at 18:16, after the v2.3.4 crash fix landed but the
-                // probe still reported failure.
-                bool probeOk = !string.IsNullOrEmpty(probe)
-                    && probe.StartsWith("ID", StringComparison.Ordinal)
-                    && probe.Length >= 6;
-                if (!probeOk)
-                {
-                    _logger.LogWarning(
-                        "Test Connection: ID; probe failed. Reply='{Probe}' (null/empty/garbled means CAT is not actually reaching the radio).",
-                        probe ?? "(null)");
+                    _logger.LogWarning("Test Connection: CI-V seam did not come up (radio off / wrong COM port / CI-V not enabled).");
                     return Ok(new
                     {
                         success = false,
-                        message = "Radio did not respond to a CAT probe. " +
-                                  "Check the radio is powered on, CAT is enabled in the radio's menu, " +
-                                  "and the COM port is connected directly to the radio (not via a " +
-                                  "virtual-port sharer like VSPE, OmniRig or com0com).",
+                        message = "Radio did not respond. Check the radio is powered on, " +
+                                  "CI-V is enabled in the radio's menu, and the correct USB / COM " +
+                                  "port is selected in Settings.",
                     });
                 }
 
-                var idCode = probe!.StartsWith("ID", StringComparison.Ordinal) ? probe.Substring(2).TrimEnd(';') : probe;
-                _logger.LogInformation("Test Connection: probe OK — radio replied '{Probe}'", probe);
-                return Ok(new { success = true, message = $"Connection succeeded — radio ID {idCode}" });
+                var idCode = string.IsNullOrEmpty(_radio.ModelId) ? "IC-7300" : _radio.ModelId;
+                _logger.LogInformation("Test Connection: CI-V seam connected — model {Model}", idCode);
+                return Ok(new { success = true, message = $"Connection succeeded — {idCode}" });
             }
             catch (Exception ex)
             {
@@ -2288,9 +2236,9 @@ namespace Icom_Web_Control.Controllers
         {
             try
             {
-                await _radioInitService.InitializeRadioAsync();
-                AppStatus.InitializationStatus = "complete";
-                return Ok(new { success = true });
+                await _radio.ConnectAsync(CancellationToken.None);
+                AppStatus.InitializationStatus = _radio.IsConnected ? "complete" : "error";
+                return Ok(new { success = _radio.IsConnected });
             }
             catch (Exception ex)
             {
@@ -2305,7 +2253,7 @@ namespace Icom_Web_Control.Controllers
         {
             try
             {
-                await _catClient.DisconnectAsync();
+                await _radio.DisconnectAsync();
                 AppStatus.InitializationStatus = "disconnected";
                 return Ok(new { success = true });
             }

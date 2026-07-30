@@ -2371,6 +2371,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Shared digit-step routine used by wheel, keyboard, and ▲/▼ buttons.
         // `step` is the signed amount to add to the digit at the selected
         // position; carries propagate left through more-significant digits.
+        //
+        // Live-tracking cadence: while you tune, the radio is retuned in real
+        // time (like turning the VFO knob) rather than only on release. Sends
+        // are throttled to LIVE_STEP_THROTTLE_MS so a fast wheel-spin or held
+        // arrow can't flood the CI-V link (~8 sets/sec max), and a trailing
+        // LIVE_STEP_SETTLE_MS timer guarantees the final value always lands.
+        const LIVE_STEP_THROTTLE_MS = 120;
+        const LIVE_STEP_SETTLE_MS = 200;
         function stepSelectedDigit(step) {
             const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
             const idx = state.selectedIdx[receiver];
@@ -2403,9 +2411,27 @@ document.addEventListener('DOMContentLoaded', function() {
             newDigits.forEach(d => d.classList.remove('selected'));
             if (newDigits[idx]) newDigits[idx].classList.add('selected');
             clearTimeout(display._debounceTimer);
-            display._debounceTimer = setTimeout(() => {
+
+            // Live send: retune the radio as you go so it tracks in real time.
+            // Throttled to LIVE_STEP_THROTTLE_MS so a held arrow or fast
+            // wheel-spin can't flood CI-V. The first step of a fresh gesture
+            // always sends (the window has long since elapsed).
+            const nowMs = Date.now();
+            if (display._lastLiveSend === undefined ||
+                (nowMs - display._lastLiveSend) >= LIVE_STEP_THROTTLE_MS) {
+                display._lastLiveSend = nowMs;
                 setFrequency(receiver, newFreq);
                 state.lastSentFreq[receiver] = newFreq;
+            }
+
+            // Trailing settle: guarantee the FINAL value reaches the radio even
+            // if the last step landed inside the throttle window, then release
+            // the local-edit override.
+            display._debounceTimer = setTimeout(() => {
+                if (state.lastSentFreq[receiver] !== newFreq) {
+                    setFrequency(receiver, newFreq);
+                    state.lastSentFreq[receiver] = newFreq;
+                }
                 state.localFreq[receiver] = null;
                 // IMPORTANT: keep state.editing=true here. The polling tick
                 // at ~500 ms will reset it to false once it sees the radio
@@ -2417,7 +2443,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // ~tens of ms ago and the radio hasn't echoed back yet.
                 // That race shows up as the digit "flipping back then
                 // settling on the new value" the user reported.
-            }, 600);
+            }, LIVE_STEP_SETTLE_MS);
         }
 
         // Auto-select the kHz position when the user hits an arrow / ▲ / ▼
