@@ -15,7 +15,6 @@ namespace Icom_Web_Control.Controllers
         private readonly ILogger<CatController> _logger;
         private readonly RadioStateService _radioStateService;
         private readonly RadioStatePersistenceService _statePersistence;
-        private readonly AudioFilterMapService _audioFilterMap;
         // Phase 3: the semantic seam. Frequency set is repointed here (real CI-V
         // via CivRadioController) while the rest of this controller still speaks
         // the inert Yaesu _catClient until each command is migrated in turn.
@@ -394,7 +393,6 @@ namespace Icom_Web_Control.Controllers
             ILogger<CatController> logger,
             RadioStateService radioStateService,
             RadioStatePersistenceService statePersistence,
-            AudioFilterMapService audioFilterMap,
             IRadioController radio)
         {
             _catClient = catClient;
@@ -402,7 +400,6 @@ namespace Icom_Web_Control.Controllers
             _logger = logger;
             _radioStateService = radioStateService;
             _statePersistence = statePersistence;
-            _audioFilterMap = audioFilterMap;
             _radio = radio;
         }
 
@@ -2449,232 +2446,5 @@ namespace Icom_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
-        // -- AUDIO FILTER (LCUT/HCUT FREQ + SLOPE per mode class) ------------
-        //
-        // Yaesu stores LCUT FREQ, LCUT SLOPE, HCUT FREQ, HCUT SLOPE as
-        // per-mode-class menu values (one set per SSB/AM/FM/DATA/RTTY/CW),
-        // accessed via the EX command. The address differs per radio model
-        // and is looked up from AudioFilterMapService (which reads the
-        // wwwroot/data/audio-filter-ex-map.json table sourced from each
-        // radio's CAT manual).
-        //
-        // The {vfo} URL segment ("a" or "b") tells the controller which VFO's
-        // *current mode* to look up. Since the radio stores values per
-        // mode class (not per VFO), the actual EX address depends only on
-        // the mode, not the VFO. When both VFOs share a mode they share the
-        // values — the response includes vfoBMode/vfoAMode so the UI can
-        // surface that to the user.
-
-        public class AudioFilterValueResult
-        {
-            public string? Code { get; set; }     // raw P4 code from the radio, e.g. "05" or "0"
-            public int?    Hz { get; set; }       // freq in Hz, or null for slopes / OFF / unsupported
-            public string? Label { get; set; }    // human label (slope: "6 dB/oct"; freq: "300 Hz" or "OFF")
-            public bool    Supported { get; set; }
-        }
-
-        public class AudioFilterReadResponse
-        {
-            public string  RadioModel       { get; set; } = "";
-            public string  Vfo              { get; set; } = "";
-            public string? VfoMode          { get; set; }   // friendly mode of the requested VFO
-            public string? OtherVfoMode     { get; set; }   // friendly mode of the *other* VFO
-            public string? ModeClass        { get; set; }   // SSB / AM / FM / DATA / RTTY / CW
-            public string? OtherModeClass   { get; set; }   // mode class of the *other* VFO
-            public bool    OtherVfoShares   { get; set; }   // true if other VFO is in same mode class
-            public AudioFilterValueResult LcutFreq  { get; set; } = new();
-            public AudioFilterValueResult LcutSlope { get; set; } = new();
-            public AudioFilterValueResult HcutFreq  { get; set; } = new();
-            public AudioFilterValueResult HcutSlope { get; set; } = new();
-        }
-
-        public class AudioFilterSetRequest
-        {
-            public string Code { get; set; } = "";   // raw P4 code, formatted to the right digit count
-        }
-
-        [HttpGet("audiofilter/{vfo}")]
-        public async Task<IActionResult> ReadAudioFilter(string vfo)
-        {
-            var v = (vfo ?? "").Trim().ToUpperInvariant();
-            if (v != "A" && v != "B") return BadRequest(new { error = "Invalid VFO (must be 'a' or 'b')" });
-
-            if (!await _requestSemaphore.WaitAsync(2000))
-                return StatusCode(503, new { error = "Radio busy" });
-            try
-            {
-                await EnsureConnectedAsync();
-                var settings = await _settingsService.GetSettingsAsync();
-                var radioModel = settings.RadioModel ?? "";
-
-                var resp = new AudioFilterReadResponse { RadioModel = radioModel, Vfo = v };
-
-                if (!_audioFilterMap.IsRadioSupported(radioModel))
-                {
-                    // Not in the map — return a response with everything unsupported
-                    // so the UI can grey out cleanly.
-                    return Ok(resp);
-                }
-
-                resp.VfoMode        = v == "B" ? _radioStateService.ModeB : _radioStateService.ModeA;
-                resp.OtherVfoMode   = v == "B" ? _radioStateService.ModeA : _radioStateService.ModeB;
-                resp.ModeClass      = AudioFilterMapService.ModeClassFor(resp.VfoMode);
-                resp.OtherModeClass = AudioFilterMapService.ModeClassFor(resp.OtherVfoMode);
-                resp.OtherVfoShares = resp.ModeClass != null && resp.ModeClass == resp.OtherModeClass;
-
-                if (resp.ModeClass == null)
-                {
-                    // Mode not yet known (radio still initialising) — return supported=false everywhere.
-                    return Ok(resp);
-                }
-
-                resp.LcutFreq  = await ReadOneAudioFilterValue(radioModel, resp.ModeClass, "lcutFreq");
-                resp.LcutSlope = await ReadOneAudioFilterValue(radioModel, resp.ModeClass, "lcutSlope");
-                resp.HcutFreq  = await ReadOneAudioFilterValue(radioModel, resp.ModeClass, "hcutFreq");
-                resp.HcutSlope = await ReadOneAudioFilterValue(radioModel, resp.ModeClass, "hcutSlope");
-
-                return Ok(resp);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error reading audio filter for VFO {Vfo}", v);
-                return StatusCode(500, new { error = "Failed to read audio filter values" });
-            }
-            finally { _requestSemaphore.Release(); }
-        }
-
-        private async Task<AudioFilterValueResult> ReadOneAudioFilterValue(
-            string radioModel, string modeClass, string setting)
-        {
-            var result = new AudioFilterValueResult { Supported = false };
-
-            var addr = _audioFilterMap.GetAddress(radioModel, modeClass, setting);
-            if (addr == null) return result;
-
-            var readCmd = _audioFilterMap.BuildReadCommand(radioModel, addr);
-            var response = await _catClient.SendCommandAsync(readCmd, "WebUI", CancellationToken.None);
-            var code = _audioFilterMap.ParseAnswerValueCode(radioModel, addr, response ?? "");
-            if (code == null) return result;
-
-            result.Supported = true;
-            result.Code      = code;
-            DecorateValueResult(result, setting, code);
-            return result;
-        }
-
-        // Adds Hz / Label fields based on the raw code and which setting it is.
-        private void DecorateValueResult(AudioFilterValueResult result, string setting, string code)
-        {
-            var ranges = _audioFilterMap.ValueRanges;
-            if (setting == "lcutFreq" || setting == "hcutFreq")
-            {
-                var r = setting == "lcutFreq" ? ranges.LcutFreq : ranges.HcutFreq;
-                if (code == r.Off)
-                {
-                    result.Label = "OFF";
-                    result.Hz = null;
-                }
-                else if (int.TryParse(code, out int n))
-                {
-                    var hz = r.Min.Hz + (n - int.Parse(r.Min.Code)) * r.StepHz;
-                    result.Hz = hz;
-                    result.Label = $"{hz} Hz";
-                }
-            }
-            else if (setting == "lcutSlope" || setting == "hcutSlope")
-            {
-                var opt = ranges.Slope.Options.FirstOrDefault(o => o.Code == code);
-                result.Label = opt?.Label ?? code;
-            }
-        }
-
-        [HttpPost("audiofilter/{vfo}/{setting}")]
-        public async Task<IActionResult> WriteAudioFilter(
-            string vfo, string setting, [FromBody] AudioFilterSetRequest request)
-        {
-            var v = (vfo ?? "").Trim().ToUpperInvariant();
-            if (v != "A" && v != "B") return BadRequest(new { error = "Invalid VFO (must be 'a' or 'b')" });
-
-            var allowedSettings = new[] { "lcutFreq", "lcutSlope", "hcutFreq", "hcutSlope" };
-            if (!allowedSettings.Contains(setting))
-                return BadRequest(new { error = $"Invalid setting (must be one of: {string.Join(", ", allowedSettings)})" });
-
-            if (request == null || string.IsNullOrWhiteSpace(request.Code))
-                return BadRequest(new { error = "Missing value code" });
-
-            if (!await _requestSemaphore.WaitAsync(2000))
-                return StatusCode(503, new { error = "Radio busy" });
-            try
-            {
-                await EnsureConnectedAsync();
-                var settings = await _settingsService.GetSettingsAsync();
-                var radioModel = settings.RadioModel ?? "";
-
-                if (!_audioFilterMap.IsRadioSupported(radioModel))
-                    return BadRequest(new { error = $"Audio filter not supported on radio model '{radioModel}'" });
-
-                var mode = v == "B" ? _radioStateService.ModeB : _radioStateService.ModeA;
-                var modeClass = AudioFilterMapService.ModeClassFor(mode);
-                if (modeClass == null)
-                    return StatusCode(503, new { error = "Radio mode not yet known; try again shortly" });
-
-                var addr = _audioFilterMap.GetAddress(radioModel, modeClass, setting);
-                if (addr == null)
-                    return BadRequest(new { error = $"{setting} is not exposed for {modeClass} mode on {radioModel}" });
-
-                if (!ValidateValueCode(setting, request.Code))
-                    return BadRequest(new { error = $"Invalid value code '{request.Code}' for {setting}" });
-
-                var cmd = _audioFilterMap.BuildSetCommand(radioModel, addr, request.Code);
-                await _catClient.SendCommandAsync(cmd, "WebUI", CancellationToken.None);
-
-                // Re-read to confirm the radio accepted the write — EX writes
-                // are documented as brittle, so we surface what the radio
-                // actually stored rather than just trusting our request.
-                var readCmd  = _audioFilterMap.BuildReadCommand(radioModel, addr);
-                var response = await _catClient.SendCommandAsync(readCmd, "WebUI", CancellationToken.None);
-                var actual   = _audioFilterMap.ParseAnswerValueCode(radioModel, addr, response ?? "");
-
-                var result = new AudioFilterValueResult { Supported = true };
-                if (actual != null)
-                {
-                    result.Code = actual;
-                    DecorateValueResult(result, setting, actual);
-                }
-                else
-                {
-                    result.Code = request.Code;
-                    DecorateValueResult(result, setting, request.Code);
-                }
-
-                return Ok(new { setting, modeClass, result });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error writing audio filter {Setting} for VFO {Vfo}", setting, v);
-                return StatusCode(500, new { error = "Failed to write audio filter value" });
-            }
-            finally { _requestSemaphore.Release(); }
-        }
-
-        // Sanity-check the value code against the relevant value range.
-        private bool ValidateValueCode(string setting, string code)
-        {
-            var ranges = _audioFilterMap.ValueRanges;
-            if (setting == "lcutFreq" || setting == "hcutFreq")
-            {
-                var r = setting == "lcutFreq" ? ranges.LcutFreq : ranges.HcutFreq;
-                if (code == r.Off) return true;
-                if (!int.TryParse(code, out int n)) return false;
-                if (!int.TryParse(r.Min.Code, out int min)) return false;
-                if (!int.TryParse(r.Max.Code, out int max)) return false;
-                return n >= min && n <= max && code.Length == r.Digits;
-            }
-            if (setting == "lcutSlope" || setting == "hcutSlope")
-            {
-                return ranges.Slope.Options.Any(o => o.Code == code);
-            }
-            return false;
-        }
     }
 }

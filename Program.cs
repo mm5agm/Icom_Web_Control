@@ -262,12 +262,6 @@ builder.Services.AddHostedService<RigctldServer>();
 // Register your settings service
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 
-// Audio filter EX address map — loaded once at startup from
-// wwwroot/data/audio-filter-ex-map.json; used by the Audio Filter popout
-// controller endpoints to translate per-radio menu addresses.
-builder.Services.AddSingleton<AudioFilterMapService>();
-
-
 // Meter polling was the Yaesu CAT MeterPollingService — deleted in the carve.
 // Meter reads (S-meter, Po/SWR/ALC) now come through the CI-V seam
 // (CivRadioController), so there is no separate hosted poller to register.
