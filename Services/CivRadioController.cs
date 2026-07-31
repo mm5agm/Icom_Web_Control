@@ -33,6 +33,14 @@ namespace Icom_Web_Control.Services
     public sealed class CivRadioController : BackgroundService, IRadioController
     {
         private const int PollIntervalMs = 150;      // ~6–7 Hz — snappy meters/dial
+        // When the scope is streaming, the CI-V bus (19200 baud ≈ 1920 B/s) is
+        // near-saturated by the ~550-byte sweeps; a solicited read that lands
+        // mid-sweep makes the radio skip a scope segment, and the assembler then
+        // discards the whole sweep — the "once-a-second" spectrum stutter. Pacing
+        // the poll loop slower while the scope runs hands that bus time back to
+        // the scope. Every read still happens; the S-meter just drops to ~3.5 Hz,
+        // imperceptible on a gauge, and the dial/meters stay responsive.
+        private const int ScopePollIntervalMs = 280; // ~3–4 Hz while scope streams
         private const int ModePollEveryNLoops = 3;    // mode changes rarely; ~2 Hz is plenty
         private const int SplitPollEveryNLoops = 4;    // split rarely toggles; ~1.5 Hz is plenty
         private const int ReconnectDelayMs = 3000;
@@ -54,6 +62,20 @@ namespace Icom_Web_Control.Services
         // heartbeat for clients that load after the stream is already flowing.
         private readonly CivScopeAssembler _scope = new();
         private int _scopeBroadcasts;
+
+        // TickCount64 of the last completed sweep, written on the serial-reader
+        // thread and read by the poll loop to decide whether the scope is live.
+        // While it is, the loop paces itself with ScopePollIntervalMs so solicited
+        // reads stop crowding the scope frames off the bus. long writes are atomic
+        // on this x64-only build; Volatile keeps the reader-thread store visible.
+        private long _lastSweepTicks;
+
+        // Diagnostics: log the scope frame-drop rate periodically while streaming
+        // so bus-contention stutter is a measured number. Snapshots of the
+        // assembler counters at the last log, plus when that log last fired.
+        private long _lastScopeLogTicks;
+        private long _lastLoggedSweeps;
+        private long _lastLoggedDiscards;
 
         // Pseudo-dual receiver (Phase 5, same-band). Cached copy of the setting,
         // refreshed on a slow poll phase so the serial-reader thread (which raises
@@ -331,6 +353,10 @@ namespace Icom_Web_Control.Services
             var sweep = _scope.Add(frame);
             if (sweep == null)
                 return;
+
+            // Mark the scope live so the poll loop backs off and lets the sweep
+            // frames have the bus (see ScopePollIntervalMs).
+            Volatile.Write(ref _lastSweepTicks, Environment.TickCount64);
 
             // The radio's live scope mode (tracks front-panel changes), carried on
             // every SpectrumUpdate so the panel can label CENT / FIX etc.
@@ -1875,7 +1901,7 @@ namespace Icom_Web_Control.Services
                 }
 
                 loop++;
-                await DelayQuiet(PollIntervalMs, stoppingToken);
+                await DelayQuiet(ScopeAwarePollIntervalMs(), stoppingToken);
             }
 
             await _bus.CloseAsync();
@@ -1898,6 +1924,47 @@ namespace Icom_Web_Control.Services
                 // No clients connected yet — the value is also polled via
                 // /api/cat/status/init.
             }
+        }
+
+        // Choose the inter-poll delay based on whether the scope is currently
+        // streaming, and — while it is — log the frame-drop rate every ~5 s so the
+        // effect is measurable. The scope counts as live if a sweep completed
+        // within the last second (a sweep arrives a few times a second when on).
+        private int ScopeAwarePollIntervalMs()
+        {
+            long now = Environment.TickCount64;
+            bool scopeStreaming = now - Volatile.Read(ref _lastSweepTicks) < 1000;
+            if (!scopeStreaming)
+                return PollIntervalMs;
+
+            // Seed the baseline the first time we see the scope live so the first
+            // logged window measures a real 5 s, not everything since startup.
+            if (_lastScopeLogTicks == 0)
+            {
+                _lastScopeLogTicks = now;
+                _lastLoggedSweeps = _scope.SweepsCompleted;
+                _lastLoggedDiscards = _scope.SweepsDiscarded;
+            }
+            else if (now - _lastScopeLogTicks >= 5000)
+            {
+                long sweeps = _scope.SweepsCompleted;
+                long discards = _scope.SweepsDiscarded;
+                long dSweeps = sweeps - _lastLoggedSweeps;
+                long dDiscards = discards - _lastLoggedDiscards;
+                long attempts = dSweeps + dDiscards;
+                if (attempts > 0)
+                {
+                    _logger.LogDebug(
+                        "[CivRadioController] Scope: {Sweeps} sweeps, {Discards} dropped ({Pct:0.0}%) in last {Secs:0.0}s",
+                        dSweeps, dDiscards, 100.0 * dDiscards / attempts,
+                        (now - _lastScopeLogTicks) / 1000.0);
+                }
+                _lastScopeLogTicks = now;
+                _lastLoggedSweeps = sweeps;
+                _lastLoggedDiscards = discards;
+            }
+
+            return ScopePollIntervalMs;
         }
 
         private static async Task DelayQuiet(int ms, CancellationToken ct)

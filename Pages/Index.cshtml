@@ -604,12 +604,9 @@
                         </div>
                     </div>
                     <div class="spectrum-dsp-bar d-flex align-items-center gap-2 px-2 py-1 small" data-vfo="A">
-                        <label class="text-nowrap mb-0" title="Display floor — bins below this dB level are clamped (SDR Console &quot;Low&quot;)">Low</label>
-                        <input type="range" class="form-range spectrum-low-slider" data-vfo="A" min="-160" max="-60" step="1" value="@((int)Math.Round(Model.SdrSpectrumLowDbA))" aria-label="VFO A spectrum Low (dB floor)" style="flex:0 0 70px; width:70px;">
-                        <span class="text-monospace spectrum-low-label" data-vfo="A" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumLowDbA))</span>
-                        <label class="text-nowrap mb-0 ms-2" title="Display ceiling — bins above this dB level are clamped (SDR Console &quot;High&quot;)">High</label>
-                        <input type="range" class="form-range spectrum-high-slider" data-vfo="A" min="-100" max="0" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbA))" aria-label="VFO A spectrum High (dB ceiling)" style="flex:0 0 70px; width:70px;">
-                        <span class="text-monospace spectrum-high-label" data-vfo="A" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbA))</span>
+                        <label class="text-nowrap mb-0" title="Vertical scale height in dB. Smaller = taller peaks (more gain); larger = flatter. The noise floor is tracked automatically and pinned near the bottom, so this never moves it.">Range</label>
+                        <input type="range" class="form-range spectrum-range-slider" data-vfo="A" min="5" max="140" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbA - Model.SdrSpectrumLowDbA))" aria-label="VFO A spectrum range (dB scale height); noise floor tracked automatically" style="flex:0 0 70px; width:70px;">
+                        <span class="text-monospace spectrum-range-label" data-vfo="A" style="min-width:4em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbA - Model.SdrSpectrumLowDbA)) dB</span>
                         <label class="text-nowrap mb-0 ms-2" title="How fast the waterfall scrolls, from full speed down to 1/128. Does not affect the spectrum trace above it.">Speed</label>
                         <input type="range" class="form-range spectrum-speed-slider" data-vfo="A" data-server-speed="@Model.SdrWaterfallSpeedA" min="0" max="7" step="1" value="0" aria-label="VFO A waterfall scroll speed" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-speed-label" data-vfo="A" style="min-width:3.5em; text-align:right;">Full</span>
@@ -646,12 +643,9 @@
                         </div>
                     </div>
                     <div class="spectrum-dsp-bar d-flex align-items-center gap-2 px-2 py-1 small" data-vfo="B">
-                        <label class="text-nowrap mb-0" title="Display floor — bins below this dB level are clamped (SDR Console &quot;Low&quot;)">Low</label>
-                        <input type="range" class="form-range spectrum-low-slider" data-vfo="B" min="-160" max="-60" step="1" value="@((int)Math.Round(Model.SdrSpectrumLowDbB))" aria-label="VFO B spectrum Low (dB floor)" style="flex:0 0 70px; width:70px;">
-                        <span class="text-monospace spectrum-low-label" data-vfo="B" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumLowDbB))</span>
-                        <label class="text-nowrap mb-0 ms-2" title="Display ceiling — bins above this dB level are clamped (SDR Console &quot;High&quot;)">High</label>
-                        <input type="range" class="form-range spectrum-high-slider" data-vfo="B" min="-100" max="0" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbB))" aria-label="VFO B spectrum High (dB ceiling)" style="flex:0 0 70px; width:70px;">
-                        <span class="text-monospace spectrum-high-label" data-vfo="B" style="min-width:3.5em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbB))</span>
+                        <label class="text-nowrap mb-0" title="Vertical scale height in dB. Smaller = taller peaks (more gain); larger = flatter. The noise floor is tracked automatically and pinned near the bottom, so this never moves it.">Range</label>
+                        <input type="range" class="form-range spectrum-range-slider" data-vfo="B" min="5" max="140" step="1" value="@((int)Math.Round(Model.SdrSpectrumHighDbB - Model.SdrSpectrumLowDbB))" aria-label="VFO B spectrum range (dB scale height); noise floor tracked automatically" style="flex:0 0 70px; width:70px;">
+                        <span class="text-monospace spectrum-range-label" data-vfo="B" style="min-width:4em; text-align:right;">@((int)Math.Round(Model.SdrSpectrumHighDbB - Model.SdrSpectrumLowDbB)) dB</span>
                         <label class="text-nowrap mb-0 ms-2" title="How fast the waterfall scrolls, from full speed down to 1/128. Does not affect the spectrum trace above it.">Speed</label>
                         <input type="range" class="form-range spectrum-speed-slider" data-vfo="B" data-server-speed="@Model.SdrWaterfallSpeedB" min="0" max="7" step="1" value="0" aria-label="VFO B waterfall scroll speed" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-speed-label" data-vfo="B" style="min-width:3.5em; text-align:right;">Full</span>
@@ -2410,47 +2404,36 @@
                 }, 500);
             }
 
+            // Vertical scale is a single "Range" control now — the panel tracks the
+            // noise floor automatically and pins it near the bottom of the scope, so
+            // the only thing left to choose is how much dB of headroom sits above it
+            // (smaller = taller peaks / more gain). This kills the old Floor/Range
+            // coupling where widening the span slid the noise off the bottom. Storage
+            // is still {low, high}; only (high − low) = Range is meaningful now, so we
+            // persist against a fixed nominal base and let Range round-trip.
             (function wireDspSliders() {
-                function applyToPanel(vfo, low, high) {
-                    const panel = vfo === 'B' ? spectrumPanelB : spectrumPanelA;
-                    if (panel && high > low) panel.setDbRange(high, low);
-                }
+                const PERSIST_BASE = -110;   // arbitrary; auto-floor ignores absolutes
 
                 ['A', 'B'].forEach(vfo => {
-                    const lowSlider  = document.querySelector(`.spectrum-low-slider[data-vfo="${vfo}"]`);
-                    const highSlider = document.querySelector(`.spectrum-high-slider[data-vfo="${vfo}"]`);
-                    const lowLabel   = document.querySelector(`.spectrum-low-label[data-vfo="${vfo}"]`);
-                    const highLabel  = document.querySelector(`.spectrum-high-label[data-vfo="${vfo}"]`);
-                    if (!lowSlider || !highSlider) return;   // VFO B hidden when no SDR
+                    const rangeSlider = document.querySelector(`.spectrum-range-slider[data-vfo="${vfo}"]`);
+                    const rangeLabel  = document.querySelector(`.spectrum-range-label[data-vfo="${vfo}"]`);
+                    if (!rangeSlider) return;   // VFO B hidden when no SDR
 
-                    // Sync canvas range to server-rendered initial slider values.
-                    applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
+                    const panel = () => (vfo === 'B' ? spectrumPanelB : spectrumPanelA);
 
-                    lowSlider.addEventListener('input', () => {
-                        // Prevent low rising above high: nudge high up to maintain the invariant.
-                        if (parseFloat(lowSlider.value) >= parseFloat(highSlider.value)) {
-                            highSlider.value = parseFloat(lowSlider.value) + 1;
-                            highLabel.textContent = highSlider.value;
-                        }
-                        lowLabel.textContent = lowSlider.value;
-                        applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
-                        persistSpectrumDisplay(vfo, {
-                            low:  parseFloat(lowSlider.value),
-                            high: parseFloat(highSlider.value)
-                        });
-                    });
-                    highSlider.addEventListener('input', () => {
-                        if (parseFloat(highSlider.value) <= parseFloat(lowSlider.value)) {
-                            lowSlider.value = parseFloat(highSlider.value) - 1;
-                            lowLabel.textContent = lowSlider.value;
-                        }
-                        highLabel.textContent = highSlider.value;
-                        applyToPanel(vfo, parseFloat(lowSlider.value), parseFloat(highSlider.value));
-                        persistSpectrumDisplay(vfo, {
-                            low:  parseFloat(lowSlider.value),
-                            high: parseFloat(highSlider.value)
-                        });
-                    });
+                    function apply() {
+                        const range = parseFloat(rangeSlider.value);
+                        if (rangeLabel) rangeLabel.textContent = `${range} dB`;
+                        const p = panel();
+                        if (p) p.setSpectrumRange(range);
+                        persistSpectrumDisplay(vfo, { low: PERSIST_BASE, high: PERSIST_BASE + range });
+                    }
+
+                    // Sync canvas to the server-rendered initial Range value.
+                    const p = panel();
+                    if (p) p.setSpectrumRange(parseFloat(rangeSlider.value));
+
+                    rangeSlider.addEventListener('input', apply);
                 });
             })();
 

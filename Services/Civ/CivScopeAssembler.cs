@@ -59,6 +59,22 @@ namespace Icom_Web_Control.Services.Civ
         private byte _mode;
 
         /// <summary>
+        /// Count of fully-assembled sweeps handed back since start. Paired with
+        /// <see cref="SweepsDiscarded"/> it gives the scope's frame-drop rate,
+        /// which the poll loop logs periodically so bus-contention stutter is a
+        /// measured number rather than an eyeballed one.
+        /// </summary>
+        public long SweepsCompleted { get; private set; }
+
+        /// <summary>
+        /// Count of in-flight sweeps thrown away because a segment arrived
+        /// dropped or out-of-order (a lost scope frame — almost always a
+        /// solicited transaction stealing bus time mid-sweep). Does not count
+        /// the benign "joined mid-stream, waiting for the next header" case.
+        /// </summary>
+        public long SweepsDiscarded { get; private set; }
+
+        /// <summary>
         /// Feed one <c>27 00</c> frame. Returns a completed <see cref="ScopeSweep"/>
         /// when the last segment of a sweep arrives, otherwise null.
         /// </summary>
@@ -83,6 +99,10 @@ namespace Icom_Web_Control.Services.Civ
             // dropped / out-of-order segment: resync and wait for the next header.
             if (_expectedOrder == 0 || order != _expectedOrder || div != _division)
             {
+                // Only a genuine mid-sweep loss counts as a discard; _expectedOrder
+                // == 0 just means we haven't seen a header yet (benign resync).
+                if (_expectedOrder != 0)
+                    SweepsDiscarded++;
                 _expectedOrder = 0;
                 _bins.Clear();
                 return null;
@@ -96,6 +116,7 @@ namespace Icom_Web_Control.Services.Civ
             {
                 var sweep = BuildSweep();
                 _expectedOrder = 0;
+                SweepsCompleted++;
                 return sweep;
             }
 
