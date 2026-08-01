@@ -1813,13 +1813,16 @@ namespace Icom_Web_Control.Services
         /// Read the transceiver ID (19 00). The reply's From byte is the radio's
         /// real CI-V address; its data byte is the model's default address, which
         /// distinguishes IC-7300 MkII (B6) from the classic IC-7300 (94) and other
-        /// Icoms — hence "read the ID, don't hard-code." Returns false when the
-        /// radio doesn't answer at all: the port opened but nothing is on the bus
-        /// (radio powered off or asleep), which is not a real connection.
+        /// Icoms — hence "read the ID, don't hard-code." The query is addressed to
+        /// the CI-V broadcast address (0x00) so any Icom answers regardless of its
+        /// address — otherwise a classic IC-7300 (94) would ignore a frame sent to
+        /// the B6 default and never connect. Returns false when the radio doesn't
+        /// answer at all: the port opened but nothing is on the bus (radio powered
+        /// off or asleep), which is not a real connection.
         /// </summary>
         private async Task<bool> IdentifyAsync(CancellationToken cancellationToken)
         {
-            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+            var frame = CivProtocol.BuildFrame(CivProtocol.BroadcastAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdReadId, CivProtocol.SubReadId);
             var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadId, cancellationToken: cancellationToken);
             if (reply == null)

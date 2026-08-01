@@ -23,6 +23,15 @@ namespace Icom_Web_Control.Services.Civ
         public const byte ControllerAddress = 0xE0;
 
         /// <summary>
+        /// CI-V broadcast ("to all") address. A frame addressed here is answered
+        /// by every transceiver on the bus, which is how we discover the radio's
+        /// real address at connect time without knowing the model in advance —
+        /// the reply's From byte carries the true address. Used only for the
+        /// first read-ID (19 00); all subsequent frames go to the learned address.
+        /// </summary>
+        public const byte BroadcastAddress = 0x00;
+
+        /// <summary>
         /// IC-7300 MkII factory default CI-V address. Used for the first frame
         /// only; the real address is then learned from the reply's From byte
         /// (and confirmed by the 19 00 transceiver-ID read) rather than trusted
