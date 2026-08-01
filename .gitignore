@@ -181,3 +181,7 @@ Backup*.ps1
 # Local planning notes
 plan.txt
 .tmp_*
+
+# Local radio product photos (IC-7300 / IC-7300 MkII) — reference only, not tracked
+pictures/ico-ic-7300_it_xl.jpg
+pictures/icom-ic-7300MK2-2.jpg
