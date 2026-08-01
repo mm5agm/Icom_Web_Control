@@ -1,5 +1,5 @@
 ﻿@page
-@model Yaesu_Web_Control.Pages.MemoriesModel
+@model Icom_Web_Control.Pages.MemoriesModel
 @{
     ViewData["Title"] = "Radio Memories";
 
@@ -59,7 +59,7 @@
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-info"
                         onclick="createThemedBanks()"
-                        title="Split the YWC starter bank into themed banks (FT8, CW, SSB, RTTY, FM) you can load individually">
+                        title="Split the IWC starter bank into themed banks (FT8, CW, SSB, RTTY, FM) you can load individually">
                     <i class="bi bi-collection" aria-hidden="true"></i> Create themed banks…
                 </button>
                 <span id="bankStatus" class="text-muted small ms-2"></span>
@@ -101,7 +101,7 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span class="fw-bold me-1">ADIF import:</span>
                 <label class="btn btn-sm btn-outline-info mb-0" for="adifImportFile"
-                       title="Read an ADIF log file and turn each unique frequency/mode pair into a YWC memory">
+                       title="Read an ADIF log file and turn each unique frequency/mode pair into a IWC memory">
                     <i class="bi bi-cloud-download" aria-hidden="true"></i> Import from ADIF…
                 </label>
                 <input type="file" id="adifImportFile" accept=".adi,.adif,.txt" hidden>
@@ -123,7 +123,7 @@
                 <label class="form-check-label" for="showAdvanced">Show advanced fields</label>
             </div>
             <span class="text-muted small">
-                Antenna, IF Width/Shift, Roofing, NB, NR, AGC, Power, Notes —
+                IF Width, NB, NR, AGC, Power, Notes —
                 applied on recall only if set. Not exported to the radio's own memory channels.
             </span>
         </div>
@@ -138,10 +138,7 @@
                         <th style="min-width:100px">Clarifier (Hz)</th>
                         <th style="width:70px">RX Clar</th>
                         <th style="width:70px">TX Clar</th>
-                        <th class="advanced-col" style="min-width:70px; display:none">Ant</th>
                         <th class="advanced-col" style="min-width:90px; display:none">IF Width</th>
-                        <th class="advanced-col" style="min-width:90px; display:none">IF Shift</th>
-                        <th class="advanced-col" style="min-width:90px; display:none">Roofing</th>
                         <th class="advanced-col" style="width:60px; display:none">NB</th>
                         <th class="advanced-col" style="width:70px; display:none">NB Lvl</th>
                         <th class="advanced-col" style="min-width:80px; display:none">NR</th>
@@ -211,34 +208,11 @@
                                 <input type="hidden" name="Memories[@i].TxClarOn" value="false" />
                             </td>
                             <td class="advanced-col" style="display:none">
-                                <select class="form-select form-select-sm" name="Memories[@i].Antenna">
-                                    <option value="" selected="@(string.IsNullOrEmpty(m.Antenna) ? "selected" : null)">—</option>
-                                    <option value="1" selected="@(m.Antenna == "1" ? "selected" : null)">1</option>
-                                    <option value="2" selected="@(m.Antenna == "2" ? "selected" : null)">2</option>
-                                    <option value="3" selected="@(m.Antenna == "3" ? "selected" : null)">3</option>
-                                </select>
-                            </td>
-                            <td class="advanced-col" style="display:none">
                                 <input class="form-control form-control-sm"
                                        name="Memories[@i].IfWidthCode"
                                        value="@m.IfWidthCode"
                                        placeholder="—"
-                                       title="SH command code (raw integer, e.g. 8)" />
-                            </td>
-                            <td class="advanced-col" style="display:none">
-                                <input class="form-control form-control-sm"
-                                       name="Memories[@i].IfShiftHz"
-                                       type="number"
-                                       value="@(m.IfShiftHz?.ToString() ?? "")"
-                                       min="-1000" max="1000" step="20"
-                                       placeholder="—" />
-                            </td>
-                            <td class="advanced-col" style="display:none">
-                                <input class="form-control form-control-sm"
-                                       name="Memories[@i].RoofingCode"
-                                       value="@m.RoofingCode"
-                                       placeholder="—"
-                                       title="Roofing filter code (6=12kHz, 7=3kHz, 8=1.2kHz, 9=600Hz, A=300Hz)" />
+                                       title="IF passband width in Hz (applied on recall)" />
                             </td>
                             <td class="advanced-col text-center align-middle" style="display:none">
                                 <select class="form-select form-select-sm" name="Memories[@i].NbOn">
@@ -408,10 +382,10 @@
         });
     }
 
-    // Sentinel value for the built-in YWC starter bank option in the Banks
+    // Sentinel value for the built-in IWC starter bank option in the Banks
     // dropdown. Real user-saved bank names can't collide because the bank
     // controller rejects names containing path-unsafe characters.
-    const STARTER_BANK_VALUE = '__ywc_starter__';
+    const STARTER_BANK_VALUE = '__iwc_starter__';
 
     function updateBankButtons() {
         const sel = document.getElementById('bankSelect');
@@ -432,7 +406,7 @@
             const names = await resp.json();
             const current = selectName !== undefined ? selectName : sel.value;
             // Always prepend the built-in starter bank option after the placeholder
-            const starterOption = `<option value="${STARTER_BANK_VALUE}"${current === STARTER_BANK_VALUE ? ' selected' : ''}>📥 YWC Starter Bank (built-in)</option>`;
+            const starterOption = `<option value="${STARTER_BANK_VALUE}"${current === STARTER_BANK_VALUE ? ' selected' : ''}>📥 IWC Starter Bank (built-in)</option>`;
             sel.innerHTML = '<option value="">-- Select bank --</option>' +
                 starterOption +
                 names.map(n => `<option value="${escHtml(n)}"${n === current ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
@@ -446,7 +420,7 @@
         if (!name) return;
 
         const isStarter = name === STARTER_BANK_VALUE;
-        const displayName = isStarter ? 'YWC Starter Bank' : name;
+        const displayName = isStarter ? 'IWC Starter Bank' : name;
         if (!await pageConfirm(
             `Load bank "${displayName}"?\n\nThis will replace your current app memories. Any unsaved changes will be lost.\n\nContinue?`)) return;
 
@@ -529,7 +503,7 @@
     // alone; user can opt in to overwriting any clashing names.
     async function createThemedBanks() {
         if (!await pageConfirm(
-            'Create themed banks from the YWC starter bank?\n\n' +
+            'Create themed banks from the IWC starter bank?\n\n' +
             'This will create banks named FT8, FT4, CW, SSB, RTTY and FM\n' +
             '(skipping any that are empty for your region).\n\n' +
             'Existing banks with the same name will be left untouched —\n' +
@@ -585,7 +559,7 @@
             const file = fileInput.files[0];
             const ok = await pageConfirm(
                 `Import memories from "${file.name}"?\n\n` +
-                `YWC will read every QSO record and create a memory for each unique frequency/mode pair. ` +
+                `IWC will read every QSO record and create a memory for each unique frequency/mode pair. ` +
                 `Memories with labels that already exist are skipped, so this is safe to run repeatedly.`);
             if (!ok) { fileInput.value = ''; return; }
 

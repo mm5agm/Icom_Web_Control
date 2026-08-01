@@ -9,7 +9,7 @@
 # A pre-release differs in three ways:
 #   1. develop is NOT merged into main (pre-releases live on the develop line only).
 #   2. The tag is created on develop, not main.
-#   3. The GitHub release is created with --prerelease (not --latest), so YWC's
+#   3. The GitHub release is created with --prerelease (not --latest), so IWC's
 #      auto-updater -- which polls /releases/latest -- ignores it. Only users
 #      who follow the direct link see the build.
 
@@ -38,7 +38,7 @@ if (-not $Version.StartsWith('v')) { $Version = "v$Version" }
 # 1. Commit any pending changes on develop.
 # Use `git add -u` (not `git add .`) so we only stage modifications to ALREADY
 # tracked files. This stops the script accidentally committing untracked
-# build artefacts like Yaesu_Web_Control_Setup.exe (which the .gitignore
+# build artefacts like Icom_Web_Control_Setup.exe (which the .gitignore
 # correctly excludes but `git add .` would override).
 # If you genuinely want new files in the release, stage them manually before
 # running this script.
@@ -70,7 +70,7 @@ if ($PreRelease) {
     $notesBody = @"
 **Pre-release for testing -- not a public build.**
 
-Do not install unless you're prepared for bugs and will report them on GitHub. YWC's in-app auto-updater ignores pre-releases, so existing users will not be prompted to upgrade to this build.
+Do not install unless you're prepared for bugs and will report them on GitHub. IWC's in-app auto-updater ignores pre-releases, so existing users will not be prompted to upgrade to this build.
 
 Please send feedback via GitHub Issues (or mm5agm@outlook.com). Mention the ``$Version`` tag when reporting.
 "@
@@ -81,8 +81,8 @@ Please send feedback via GitHub Issues (or mm5agm@outlook.com). Mention the ``$V
 
     Write-Host ""
     Write-Host "Pre-release $Version created successfully." -ForegroundColor Green
-    Write-Host "Build workflow: https://github.com/mm5agm/Yaesu_Web_Control/actions" -ForegroundColor Yellow
-    Write-Host "Releases:       https://github.com/mm5agm/Yaesu_Web_Control/releases" -ForegroundColor Yellow
+    Write-Host "Build workflow: https://github.com/mm5agm/Icom_Web_Control/actions" -ForegroundColor Yellow
+    Write-Host "Releases:       https://github.com/mm5agm/Icom_Web_Control/releases" -ForegroundColor Yellow
 }
 else {
     # Production release: merge develop into main, tag main.
@@ -107,6 +107,6 @@ else {
 
     Write-Host ""
     Write-Host "Release $Version created successfully." -ForegroundColor Green
-    Write-Host "Build workflow: https://github.com/mm5agm/Yaesu_Web_Control/actions" -ForegroundColor Yellow
-    Write-Host "Releases:       https://github.com/mm5agm/Yaesu_Web_Control/releases" -ForegroundColor Yellow
+    Write-Host "Build workflow: https://github.com/mm5agm/Icom_Web_Control/actions" -ForegroundColor Yellow
+    Write-Host "Releases:       https://github.com/mm5agm/Icom_Web_Control/releases" -ForegroundColor Yellow
 }

@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Listens for WSJT-X UDP status broadcasts and syncs frequency/TX state to the app.
@@ -19,7 +19,7 @@ namespace Yaesu_Web_Control.Services
         private const uint MessageTypeStatus = 1;
         private const uint MessageTypeClose = 6;
 
-        private readonly ICatClient _catClient;
+        private readonly IRadioController _radio;
         private readonly RadioStateService _radioStateService;
         private readonly ILogger<WsjtxUdpService> _logger;
         private readonly ISettingsService _settingsService;
@@ -36,12 +36,12 @@ namespace Yaesu_Web_Control.Services
         public string WsjtxId { get { lock (_lock) return _wsjtxId; } }
 
         public WsjtxUdpService(
-            ICatClient catClient,
+            IRadioController radio,
             RadioStateService radioStateService,
             ILogger<WsjtxUdpService> logger,
             ISettingsService settingsService)
         {
-            _catClient = catClient;
+            _radio = radio;
             _radioStateService = radioStateService;
             _logger = logger;
             _settingsService = settingsService;
@@ -182,14 +182,19 @@ namespace Yaesu_Web_Control.Services
 
                         if (diff > 100)
                         {
-                            _logger.LogInformation("[WSJT-X UDP] Frequency change detected: {OldFreq} Hz → {NewFreq} Hz (diff={Diff} Hz)", 
+                            _logger.LogInformation("[WSJT-X UDP] Frequency change detected: {OldFreq} Hz → {NewFreq} Hz (diff={Diff} Hz)",
                                 currentFreq, msg.DialFrequency, diff);
 
-                            // Send to radio
-                            await _catClient.SetFrequencyAAsync(msg.DialFrequency);
+                            // Send to radio via the IRadioController seam (CI-V 05).
+                            // Guard on IsConnected so a WSJT-X packet arriving while the
+                            // radio is absent/soft-off is a no-op rather than a throw.
+                            if (_radio.IsConnected)
+                            {
+                                await _radio.SetFrequencyHzAsync(RadioVfo.A, msg.DialFrequency, ct);
 
-                            // Update RadioStateService immediately so the UI updates via SignalR
-                            _radioStateService.FrequencyA = msg.DialFrequency;
+                                // Update RadioStateService immediately so the UI updates via SignalR
+                                _radioStateService.FrequencyA = msg.DialFrequency;
+                            }
                         }
                     }
                     break;

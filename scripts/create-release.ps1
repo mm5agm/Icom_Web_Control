@@ -160,5 +160,5 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Release $newTag created successfully." -ForegroundColor Green
 Write-Host "Build workflow running at:"            -ForegroundColor Cyan
-Write-Host "  https://github.com/mm5agm/Yaesu_Web_Control/actions"  -ForegroundColor Yellow
-Write-Host "  https://github.com/mm5agm/Yaesu_Web_Control/releases" -ForegroundColor Yellow
+Write-Host "  https://github.com/mm5agm/Icom_Web_Control/actions"  -ForegroundColor Yellow
+Write-Host "  https://github.com/mm5agm/Icom_Web_Control/releases" -ForegroundColor Yellow

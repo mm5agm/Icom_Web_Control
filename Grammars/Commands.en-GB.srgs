@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Yaesu Web Control voice command grammar — en-GB (v1).
+  Icom Web Control voice command grammar — en-GB (v1).
 
   Six intents (matches docs/VoiceControl/v1-plan.md):
 

@@ -4,7 +4,7 @@ using Markdig;
 using Markdig.Extensions.AutoIdentifiers;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace Yaesu_Web_Control.Pages
+namespace Icom_Web_Control.Pages
 {
     /// <summary>
     /// Renders the USER_MANUAL.md file from the project root as HTML on each

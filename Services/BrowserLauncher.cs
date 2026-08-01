@@ -1,7 +1,7 @@
 ﻿// BrowserLauncher.cs
 using System.Diagnostics;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class BrowserLauncher
     {

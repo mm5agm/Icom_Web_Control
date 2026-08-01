@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Win32;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Pages
+namespace Icom_Web_Control.Pages
 {
     public class AboutModel : PageModel
     {
@@ -66,7 +66,7 @@ namespace Yaesu_Web_Control.Pages
                 DxClusterCallsign = s.DxClusterLoginCallsign;
         }
 
-        // ── Host hardware probes (Windows-only — fine since YWC is WinExe) ──
+        // ── Host hardware probes (Windows-only — fine since IWC is WinExe) ──
         //
         // Added 2026-06-15 so bug reports show whether the user's shack PC
         // can realistically drive two SDRs + radio polling + spectrum render

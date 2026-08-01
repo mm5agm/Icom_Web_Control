@@ -207,14 +207,13 @@ class PowerGauge extends Gauge {
         const config = Object.assign({
             renderTo: canvasId,
             minValue: 0,
-            maxValue: 200,
-            majorTicks: ["0", "25", "50", "75", "100", "125", "150", "175", "200"],
+            maxValue: 100,
+            majorTicks: ["0", "25", "50", "75", "100"],
             highlights: [
-                { from: 0, to: 150, color: "rgba(0,255,0,.25)" },
-                { from: 150, to: 175, color: "rgba(255,255,0,.25)" },
-                { from: 175, to: 200, color: "rgba(255,0,0,.25)" }
+                { from: 0,  to: 90,  color: "rgba(0,255,0,.25)" },
+                { from: 90, to: 100, color: "rgba(255,255,0,.25)" }
             ],
-            labels: ["5", "25", "50", "75", "100", "125", "150", "175", "200"],
+            labels: ["0", "25", "50", "75", "100"],
             startAngle: 90,
             ticksAngle: 180,
             valueBox: false,
@@ -335,14 +334,14 @@ class ALCGauge extends Gauge {
         const config = Object.assign({
             renderTo: canvasId,
             minValue: 0,
-            maxValue: 255,
-            majorTicks: ["0", "32", "64", "96", "128", "160", "192", "224", "255"],
+            maxValue: 100,
+            majorTicks: ["0", "20", "40", "60", "80", "100"],
             highlights: [
-                { from: 0, to: 178, color: "rgba(0,255,0,.25)" },
-                { from: 178, to: 230, color: "rgba(255,255,0,.25)" },
-                { from: 230, to: 255, color: "rgba(255,0,0,.25)" }
+                { from: 0,  to: 80,  color: "rgba(0,255,0,.25)" },
+                { from: 80, to: 95,  color: "rgba(255,255,0,.25)" },
+                { from: 95, to: 100, color: "rgba(255,0,0,.25)" }
             ],
-            labels: ["0", "6", "12", "19", "25", "31", "37", "44", "50"],
+            labels: ["0", "20", "40", "60", "80", "100"],
             startAngle: 90,
             ticksAngle: 180,
             valueBox: false,
@@ -376,69 +375,10 @@ class ALCGauge extends Gauge {
             gaugeTitleShow: true,
             gaugeTitle: 'ALC',
             gaugeTitleId: 'alcMeterValue',
-            gaugeTitleDefault: '0V',
+            gaugeTitleDefault: '0',
+            gaugeTitleSuffix: '%',
             gaugeTitleBg: '#0dcaf0',
             gaugeTitleColor: '#000000'
-        }, options);
-
-        super(canvasId, config);
-    }
-}
-
-// ------------------------------------------------------------
-// PA TEMPERATURE METER
-// ------------------------------------------------------------
-
-class TempGauge extends Gauge {
-    constructor(canvasId, options = {}) {
-        const config = Object.assign({
-            renderTo: canvasId,
-            minValue: 0,
-            maxValue: 100,
-            majorTicks: ["0", "13", "25", "38", "50", "63", "75", "88", "100"],
-            highlights: [
-                { from: 0,  to: 40,  color: "rgba(0,255,0,.25)" },
-                { from: 40, to: 60,  color: "rgba(255,255,0,.25)" },
-                { from: 60, to: 100, color: "rgba(255,0,0,.25)" }
-            ],
-            labels: ["0", "13", "25", "38", "50", "63", "75", "88", "100"],
-            startAngle: 90,
-            ticksAngle: 180,
-            valueBox: false,
-            minorTicks: 0,
-            strokeTicks: false,
-            tickSide: "out",
-            needleSide: "center",
-            colorPlate: "transparent",
-            borders: false,
-            needleShadow: false,
-            colorMajorTicks: "#555555",
-            colorMinorTicks: "transparent",
-            colorNumbers: "transparent",
-            fontNumbersSize: 0,
-            colorBarProgress: "#198754",
-            colorBarProgressEnd: "#dc3545",
-            colorBar: "#dddddd",
-            barShadow: 0,
-            barWidth: 10,
-            barStrokeWidth: 0,
-            needleType: "arrow",
-            needleWidth: 3,
-            needleCircleSize: 7,
-            needleCircleOuter: false,
-            needleCircleInner: true,
-            colorNeedleCircleInner: "#dc3545",
-            colorNeedleCircleInnerEnd: "#dc3545",
-            animationDuration: 400,
-            animationRule: "linear",
-            value: 0,
-            gaugeTitleShow: true,
-            gaugeTitle: 'PA Temp',
-            gaugeTitleId: 'paTemperatureValue',
-            gaugeTitleDefault: '--',
-            gaugeTitleSuffix: '°C',
-            gaugeTitleBg: '#198754',
-            gaugeTitleColor: '#ffffff'
         }, options);
 
         super(canvasId, config);
@@ -454,14 +394,14 @@ class CompressionGauge extends Gauge {
         const config = Object.assign({
             renderTo: canvasId,
             minValue: 0,
-            maxValue: 20,
-            majorTicks: ["0", "2.5", "5", "7.5", "10", "12.5", "15", "17.5", "20"],
+            maxValue: 30,
+            majorTicks: ["0", "5", "10", "15", "20", "25", "30"],
             highlights: [
-                { from: 0,  to: 5,  color: "rgba(0,255,0,.25)" },
-                { from: 5,  to: 10, color: "rgba(255,255,0,.25)" },
-                { from: 10, to: 20, color: "rgba(255,0,0,.25)" }
+                { from: 0,  to: 10, color: "rgba(0,255,0,.25)" },
+                { from: 10, to: 20, color: "rgba(255,255,0,.25)" },
+                { from: 20, to: 30, color: "rgba(255,0,0,.25)" }
             ],
-            labels: ["0", "2.5", "5", "7.5", "10", "12.5", "15", "17.5", "20"],
+            labels: ["0", "5", "10", "15", "20", "25", "30"],
             startAngle: 90,
             ticksAngle: 180,
             valueBox: false,
@@ -573,15 +513,15 @@ class VDDGauge extends Gauge {
     constructor(canvasId, options = {}) {
         const config = Object.assign({
             renderTo: canvasId,
-            minValue: 40,
-            maxValue: 55,
-            majorTicks: ["40", "42", "44", "46", "48", "50", "52", "54", "55"],
+            minValue: 10,
+            maxValue: 16,
+            majorTicks: ["10", "11", "12", "13", "14", "15", "16"],
             highlights: [
-                { from: 40, to: 45, color: "rgba(255,255,0,.25)" },
-                { from: 45, to: 52, color: "rgba(0,255,0,.25)" },
-                { from: 52, to: 55, color: "rgba(255,0,0,.25)" }
+                { from: 10,   to: 12.5, color: "rgba(255,255,0,.25)" },
+                { from: 12.5, to: 15,   color: "rgba(0,255,0,.25)" },
+                { from: 15,   to: 16,   color: "rgba(255,0,0,.25)" }
             ],
-            labels: ["40", "42", "44", "46", "48", "50", "52", "54", "55"],
+            labels: ["10", "11", "12", "13", "14", "15", "16"],
             startAngle: 90,
             ticksAngle: 180,
             valueBox: false,
@@ -611,11 +551,11 @@ class VDDGauge extends Gauge {
             colorNeedleCircleInnerEnd: "#dc3545",
             animationDuration: 400,
             animationRule: "linear",
-            value: 48,
+            value: 13.8,
             gaugeTitleShow: true,
             gaugeTitle: 'VDD',
             gaugeTitleId: 'vddMeterValue',
-            gaugeTitleDefault: '48.0',
+            gaugeTitleDefault: '13.8',
             gaugeTitleSuffix: 'V',
             gaugeTitleBg: '#198754',
             gaugeTitleColor: '#ffffff'
@@ -626,4 +566,4 @@ class VDDGauge extends Gauge {
 }
 
 // Export classes as ES module
-export { Gauge, SMeterGauge, PowerGauge, SWRGauge, ALCGauge, TempGauge, CompressionGauge, IDDGauge, VDDGauge };
+export { Gauge, SMeterGauge, PowerGauge, SWRGauge, ALCGauge, CompressionGauge, IDDGauge, VDDGauge };

@@ -1,5 +1,24 @@
 # CLAUDE.md
 
+> ## ⭐ START HERE — read this first
+>
+> This is **Icom Web Control (IWC)**, a **pre-alpha** sibling of [Yaesu Web Control (YWC)](https://github.com/mm5agm/Yaesu_Web_Control). It was cloned from YWC and is being re-fitted for Icom CI-V radios. **Nothing here controls a radio yet.**
+>
+> **Before doing anything, read [`docs/design/iwc-clone-split-plan.md`](docs/design/iwc-clone-split-plan.md)** — the authoritative plan for how IWC is carved out of YWC (what's kept, what's rebuilt, the phased CI-V roadmap, and the `IRadioController` seam).
+>
+> **Key facts:**
+> - **Target radio (v1):** Icom **IC-7300 MkII** — CI-V over USB Type-C, address `B6`, single-receiver HF+6m(+4m EU), scope over CI-V (`27 00`, 475 bins). Manuals are in `docs/manuals/` (local, git-ignored).
+> - **Voice control is a required feature** (partially-sighted operators), not optional.
+> - This is a **separate repo** from YWC — its `origin` points at `mm5agm/Icom_Web_Control`. Keep YWC concerns out of here and vice-versa.
+>
+> **⛔ Work is GATED:** do **not** start the rebrand/carve or any coding until Colin (MM5AGM) has the IC-7300 MkII in hand **and** explicitly says go. Until then this repo is scaffolding only. When he says go, the design doc's **Phase 0 → Phase 1** checklist is the starting point.
+>
+> **🔔 SESSION-START REMINDER (do this in your first reply, every IWC session):** greet Colin with a one-line reminder that IWC is parked waiting on the **IC-7300 MkII**, and that all he has to do is say **"go"** once the radio is in hand to kick off Phase 1. Keep it brief; don't start any work until he actually says go.
+>
+> **Everything below this banner is inherited verbatim from YWC.** It accurately describes the parts IWC keeps (SignalR pipeline, gauges, spectrum frontend, settings, rigctld, voice), but the Yaesu-specific CAT sections will be replaced during the carve — treat them as reference, not current IWC truth, until this file is rewritten in Phase 1.
+
+---
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Architecture Rules
@@ -14,10 +33,10 @@ Before making any changes, read and follow all rules in `.claude/rules.md` and `
 
 ```bash
 # Build
-dotnet build Yaesu_Web_Control.csproj
+dotnet build Icom_Web_Control.csproj
 
 # Run (launches WinForms host + Kestrel on http://0.0.0.0:8080)
-dotnet run --project Yaesu_Web_Control.csproj
+dotnet run --project Icom_Web_Control.csproj
 
 # Publish self-contained
 dotnet publish -c Release -r win-x64 --self-contained

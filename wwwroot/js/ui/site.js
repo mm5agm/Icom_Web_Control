@@ -5,12 +5,12 @@
 // the page itself opened) — we try it as a courtesy and otherwise leave a
 // clear visual cue.
 function showServerStoppedOverlay() {
-    if (document.getElementById('ywcServerStoppedOverlay')) return;
+    if (document.getElementById('iwcServerStoppedOverlay')) return;
     const overlay = document.createElement('div');
-    overlay.id = 'ywcServerStoppedOverlay';
+    overlay.id = 'iwcServerStoppedOverlay';
     overlay.setAttribute('role', 'alertdialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Yaesu Web Control has been closed');
+    overlay.setAttribute('aria-label', 'Icom Web Control has been closed');
     overlay.style.cssText = [
         'position:fixed', 'inset:0', 'z-index:99999',
         // Fully opaque, not rgba(...,0.96) — at 4% transparency, any canvas
@@ -24,19 +24,19 @@ function showServerStoppedOverlay() {
         'padding:24px', 'font-family:system-ui,sans-serif'
     ].join(';');
     overlay.innerHTML =
-        '<div style="font-size:2rem;margin-bottom:0.5rem">Yaesu Web Control has stopped</div>' +
+        '<div style="font-size:2rem;margin-bottom:0.5rem">Icom Web Control has stopped</div>' +
         '<div style="font-size:1rem;max-width:520px;line-height:1.5;margin-bottom:1.5rem;color:#aab">' +
             'The app has been closed from the system-tray icon. The radio is no longer being controlled from this browser tab.' +
-            '<br><br>Once you restart Yaesu Web Control, click <strong>Reload page</strong> below to continue. Or just close this browser tab using its X button.' +
+            '<br><br>Once you restart Icom Web Control, click <strong>Reload page</strong> below to continue. Or just close this browser tab using its X button.' +
         '</div>' +
-        '<button type="button" id="ywcServerStoppedReloadBtn" ' +
+        '<button type="button" id="iwcServerStoppedReloadBtn" ' +
             'style="padding:8px 22px;border-radius:6px;border:1px solid #4a8abf;background:#2a4860;color:#e0e0ff;cursor:pointer;font-size:0.95rem">' +
             '↻ Reload page' +
         '</button>';
     document.body.appendChild(overlay);
-    document.getElementById('ywcServerStoppedReloadBtn')?.addEventListener('click', () => {
+    document.getElementById('iwcServerStoppedReloadBtn')?.addEventListener('click', () => {
         // location.reload() works for any tab regardless of how it was opened.
-        // If YWC isn't back up yet, the reload will fail and the browser shows
+        // If IWC isn't back up yet, the reload will fail and the browser shows
         // its own "can't connect" page — which is still a clearer outcome than
         // a tab stuck on the overlay.
         location.reload();
@@ -53,13 +53,29 @@ function showServerStoppedOverlay() {
     try { window.sMeterHistoryB?.stop?.();   } catch { /* ignore */ }
 }
 
+function isTypingIntoEditable() {
+    const active = document.activeElement;
+    if (active && (
+        active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' ||
+        active.isContentEditable
+    )) return true;
+    // The on-screen frequency keypad is a text-entry surface even though focus
+    // sits on its buttons (a <dialog>, not an <input>). Treat it as "typing" so
+    // global shortcuts (TX toggle, fullscreen) don't fire while a frequency is
+    // being entered — otherwise a non-digit shortcut key sails past the keypad's
+    // own keydown handler (which only swallows digits/Escape/nav) to the rig.
+    const freqKb = document.getElementById('freqKeyboardDialog');
+    if (freqKb && freqKb.open) return true;
+    return false;
+}
+
 // --- Fullscreen Toggle: 'f' or 'F' to enter, 'Esc' to exit ---
 document.addEventListener('keydown', function (e) {
     // Ignore if typing in an input, textarea, or contenteditable
-    const active = document.activeElement;
-    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+    if (isTypingIntoEditable()) return;
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Bare F only — guarding against modifiers stops YWC from stealing
+        // Bare F only — guarding against modifiers stops IWC from stealing
         // Ctrl+F (browser find-in-page) and Cmd+F on Mac.
         const body = document.body;
         if (body && !document.fullscreenElement) {
@@ -73,6 +89,28 @@ document.addEventListener('keydown', function (e) {
             e.preventDefault();
         }
     }
+});
+
+// Optional browser TX shortcut. Disabled by default; when configured, it
+// toggles transmit using the same /api/cat/tx flow as the on-screen button.
+document.addEventListener('keydown', function (e) {
+    const configuredKey = window.iwcTxToggleKey;
+    // Empty string only — do not use falsy check; a legacy " " must still match.
+    if (configuredKey == null || configuredKey === '' || isTypingIntoEditable()) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+
+    // Settings stores Space as the token "Space" (HTML cannot round-trip " ").
+    // Accept both the token and a legacy lone-space value.
+    const isSpaceShortcut = configuredKey === 'Space' || configuredKey === ' ';
+    const keyMatches = isSpaceShortcut
+        ? (e.key === ' ')
+        : (configuredKey.length === 1 && e.key.length === 1
+            ? e.key.toLowerCase() === configuredKey.toLowerCase()
+            : e.key === configuredKey);
+    if (!keyMatches) return;
+
+    e.preventDefault();
+    toggleTx();
 });
 
 // Add/remove fullscreen-mode class on body when entering/exiting fullscreen
@@ -304,21 +342,15 @@ window.setAntenna = async function (receiver, antenna) {
     }
 };
 
-// Centralised radio -> max-power mapping. Source of truth used by both
-// updatePowerSliderMax implementations. Without this, only the two FTdx101
-// variants were named explicitly and other 100 W radios (FTdx10, FT-710,
-// FTDX3000, FT-991A) fell through to a 200 W cap (#37, SP3L-Jacek 2026-06-16).
+// Centralised radio -> max-power mapping. IWC targets the Icom IC-7300 family
+// (IC-7300 and IC-7300 MkII), both 100 W radios, so this is 100 W across the
+// board — the switch is kept only so a future higher-power Icom can be added.
 function modelMaxPower(model) {
-    if (!model) return 200;
-    switch (model.toLowerCase()) {
-        case "ftdx101mp": return 200;
-        case "ftdx101d":
-        case "ftdx10":
-        case "ft-710":
-        case "ftdx3000":
-        case "ft-991a":
+    switch ((model || "").toLowerCase()) {
+        case "ic-7300mk2":
+        case "ic-7300":
+        default:
             return 100;
-        default: return 200;
     }
 }
 window.modelMaxPower = modelMaxPower;
@@ -330,7 +362,7 @@ function updatePowerSliderMax(maxPower) {
     const model = (window.state && window.state.radioModel) || null;
     const actualMax = model
         ? modelMaxPower(model)
-        : (typeof maxPower === "number" ? maxPower : 200);
+        : (typeof maxPower === "number" ? maxPower : 100);
 
     if (slider) {
         slider.max = actualMax;
@@ -351,8 +383,8 @@ function updateTxIndicators(isTransmitting) {
     if (window.radioControl && window.radioControl._state) {
         window.radioControl._state.isTransmitting = isTransmitting;
     }
-    if (window.ftdx101Meters) {
-        window.ftdx101Meters.setTransmitting(isTransmitting);
+    if (window.ic7300Meters) {
+        window.ic7300Meters.setTransmitting(isTransmitting);
     }
     if (!isTransmitting) {
         // Force gauges to zero immediately when TX stops
@@ -365,7 +397,7 @@ function updateTxIndicators(isTransmitting) {
     }
 }
 
-// Update DOM labels for a single meter using the result from ftdx101Meters.handleMeterUpdate().
+// Update DOM labels for a single meter using the result from ic7300Meters.handleMeterUpdate().
 // Formatting is done here (UI layer) — the orchestrator returns plain numeric values.
 function updateMeterDomLabel(property, result) {
     if (!result || result.skip) return;
@@ -398,22 +430,23 @@ function updateMeterDomLabel(property, result) {
             break;
         }
         case 'ALCMeter': {
+            // IC-7300 ALC is a 0–100 % scale (see Ic7300Meters._processALC).
             const el  = document.getElementById('alcValue');
             const bar = document.getElementById('alcBar');
             const meterEl = document.getElementById('alcMeterValue');
-            const alcFormatted = window.MeterFormatters.alcVolts(dv.alcVolts);
-            if (el) el.textContent = window.MeterFormatters.percent(dv.percent);
+            const pct = dv.percent;
+            if (el) el.textContent = window.MeterFormatters.percent(pct);
             if (bar) {
-                bar.style.width = `${dv.percent}%`;
-                bar.setAttribute('aria-valuenow', dv.percent);
+                bar.style.width = `${pct}%`;
+                bar.setAttribute('aria-valuenow', pct);
                 bar.className = 'progress-bar';
-                if (dv.percent < 70)      bar.classList.add('bg-success');
-                else if (dv.percent < 90) bar.classList.add('bg-warning');
-                else                      bar.classList.add('bg-danger');
+                if (pct < 70)      bar.classList.add('bg-success');
+                else if (pct < 90) bar.classList.add('bg-warning');
+                else               bar.classList.add('bg-danger');
             }
-            if (meterEl) meterEl.textContent = alcFormatted;
+            if (meterEl) meterEl.textContent = String(pct);
             const alcCanvas = document.getElementById('alcMeterCanvas');
-            if (alcCanvas) alcCanvas.dataset.reading = alcFormatted;
+            if (alcCanvas) alcCanvas.dataset.reading = String(pct);
             break;
         }
         case 'IDDMeter': {
@@ -429,14 +462,6 @@ function updateMeterDomLabel(property, result) {
             const el = document.getElementById('vddMeterValue');
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('vddMeterCanvas');
-            if (canvas) canvas.dataset.reading = formatted;
-            break;
-        }
-        case 'Temperature': {
-            const formatted = window.MeterFormatters.tempOverlay(dv.tempC);
-            const el = document.getElementById('paTemperatureValue');
-            if (el) el.textContent = formatted;
-            const canvas = document.getElementById('tempMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
             break;
         }
@@ -589,8 +614,9 @@ let txVfo = 0; // 0 = VFO A, 1 = VFO B (the TX VFO — only flips with split)
 let activeVfo = 0;
 
 // Apply the .vfo-inactive class to whichever VFO panel is NOT the active
-// (TX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
-// Dual-receiver radios (FTdx101MP/D) leave both panels active because each
+// (RX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
+// CSS greys only that panel's .card-body (header stays normal so TX looks
+// enabled). Dual-receiver radios leave both panels active because each
 // VFO is its own physical receiver chain. The data-single-receiver
 // attribute on #vfoRow is rendered server-side from RadioCapabilities.cs.
 // See docs/decisions/0003-single-vs-dual-receiver-ui.md.
@@ -610,13 +636,26 @@ function applyVfoActiveStyling() {
 
     const singleReceiver = vfoRow.dataset.singleReceiver === 'true';
     if (!singleReceiver) {
-        // Dual-receiver: both panels are real receivers, both stay active.
+        // Dual-receiver (FTdx101): both panels are real receivers, so neither
+        // is greyed. But still show WHICH band is active — the MAIN/SUB band
+        // the main tuning knob controls — with a subtle highlight, driven by
+        // activeVfo (VS: 0 = MAIN/A, 1 = SUB/B). The radio auto-broadcasts VS
+        // when you press MAIN⇄SUB-select on the front panel, so this follows
+        // live. (Restores an indicator dropped in the ADR-0003 rework — Pierre
+        // VK6IS #FTdx101.)
         aCol.classList.remove('vfo-inactive');
         bCol.classList.remove('vfo-inactive');
         aSpec?.classList.remove('vfo-inactive');
         bSpec?.classList.remove('vfo-inactive');
+        aCol.classList.toggle('vfo-active', activeVfo === 0);
+        bCol.classList.toggle('vfo-active', activeVfo === 1);
         return;
     }
+
+    // Single-receiver uses greying (below), not the active highlight — clear
+    // any stale highlight in case the RadioModel was switched mid-session.
+    aCol.classList.remove('vfo-active');
+    bCol.classList.remove('vfo-active');
 
     // Single-receiver: white = active VFO (the one currently RECEIVING),
     // grey = the other one. This is true in BOTH normal and split mode:
@@ -636,9 +675,10 @@ function applyVfoActiveStyling() {
     // (VS command) for both cases is deterministic and matches what the
     // radio is actually doing.
     //
-    // The TX button and SPLIT badge land on the grey panel in split mode
-    // (R8) automatically because updateTxButton / updateSplitButton derive
-    // the TX position as "opposite of active" on single-receiver radios.
+    // The TX button and SPLIT badge land on the inactive panel in split
+    // mode (R8) because updateTxButton / updateSplitButton derive the TX
+    // position as "opposite of active" on single-receiver radios. The
+    // card header is not greyed, so TX stays full-colour and clickable.
     //
     // The spectrum panel is NOT greyed — on single-receiver radios the
     // single spectrum always shows the live receive signal. The second
@@ -649,10 +689,10 @@ function applyVfoActiveStyling() {
 
     activeCol.classList.remove('vfo-inactive', 'vfo-tx-editable');
     inactiveCol.classList.add('vfo-inactive');
-    // R10/R11: in split mode the grey panel IS the TX VFO — operators must
-    // still be able to set the TX frequency from YWC without un-splitting.
-    // The .vfo-tx-editable class re-enables pointer-events on the frequency
-    // display while leaving every other control on the grey panel read-only.
+    // R10/R11: in split mode the inactive panel IS the TX VFO — operators
+    // must still be able to set the TX frequency from IWC without
+    // un-splitting. .vfo-tx-editable re-enables the frequency field while
+    // leaving every other card-body control read-only.
     inactiveCol.classList.toggle('vfo-tx-editable', splitOn);
 
     // Make sure neither spectrum carries a stale inactive class from a
@@ -664,7 +704,7 @@ function applyVfoActiveStyling() {
 
 // Apply the styling at page-load time too, before any SignalR update has
 // arrived. This handles the case where the radio is already on a stable
-// VFO and YWC's TxVfo state is correct by the time the DOM is ready.
+// VFO and IWC's TxVfo state is correct by the time the DOM is ready.
 document.addEventListener('DOMContentLoaded', () => {
     // Defer to next tick so other DOMContentLoaded handlers run first
     // (the VFO panels need to be in the DOM, which they always are at
@@ -698,7 +738,7 @@ async function toggleTx() {
             const data = await response.json();
             isTransmitting = data.transmitting;
             updateTxButton();
-
+            updateTxIndicators(isTransmitting);
         } else {
 
         }
@@ -772,10 +812,10 @@ function updateSplitButton() {
         btn.textContent = active ? 'Split ON' : 'Split';
     }
 
-    // R8: the SPLIT TX badge belongs on the TX VFO's header — the grey
-    // panel. On single-receiver radios the TX VFO is the OPPOSITE of the
-    // active VFO; on dual-receiver radios it's whichever VFO the FT
-    // command points to. Show one badge, hide the other.
+    // R8: the SPLIT TX badge belongs on the TX VFO's header. On
+    // single-receiver radios the TX VFO is the OPPOSITE of the active VFO;
+    // on dual-receiver radios it's whichever VFO the FT command points to.
+    // Show one badge, hide the other.
     let txVfoIdx;
     if (isSingleReceiver) {
         txVfoIdx = (activeVfo === 0) ? 1 : 0;   // opposite of RX
@@ -823,6 +863,15 @@ async function swapVfo() {
     try {
         await fetch('/api/cat/swap-vfo', { method: 'POST' });
         // FrequencyA/B updates arrive via SignalR; the endpoint also broadcasts immediately
+    } catch {}
+}
+
+// Dual-receiver only: make a VFO the active (MAIN/SUB) band by sending VS.
+// The ActiveVfo update arrives via SignalR and moves the highlight; setting
+// it server-side too avoids flicker.
+async function setActiveVfo(vfo) {
+    try {
+        await fetch(`/api/cat/active-vfo/${vfo}`, { method: 'POST' });
     } catch {}
 }
 
@@ -980,6 +1029,24 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window._applyConnectBtnState === 'function') window._applyConnectBtnState(connected);
     }
 
+    // --- CONNECTION PROBLEM BANNER ---
+    // ConnectionStatusText carries a human-readable reason the CI-V link isn't
+    // up (empty when connected/OK). Show it prominently on the home screen so a
+    // wrong/missing serial port is obvious rather than a silent retry loop.
+    if (update.property === "ConnectionStatusText") {
+        const banner = document.getElementById('connectionProblemBanner');
+        const textEl = document.getElementById('connectionProblemText');
+        const msg = (update.value == null) ? '' : String(update.value).trim();
+        if (banner) {
+            if (msg) {
+                if (textEl) textEl.textContent = msg;
+                banner.style.display = '';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+    }
+
     // --- MODE CHANGE (THE BUG FIX) ---
     if (update.property === "ModeA") {
         updateModeSelect('A', update.value);
@@ -994,6 +1061,7 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeA', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('A', update.value);
         if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('A', update.value);
+        if (window.rxFilter && window.rxFilter.onModeChanged) window.rxFilter.onModeChanged('A', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
@@ -1007,6 +1075,18 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('modeB', update.value);
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('B', update.value);
         if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('B', update.value);
+        if (window.rxFilter && window.rxFilter.onModeChanged) window.rxFilter.onModeChanged('B', update.value);
+    }
+
+    // --- S-METER (push) ---
+    // The backend polls command 15 02 at ~6–7 Hz and broadcasts SMeterA/B.
+    // Drive the gauge here so the needle tracks the radio smoothly; the 500 ms
+    // status poll still updates it as a fallback if a broadcast is missed.
+    if (update.property === "SMeterA" && typeof window.updateSMeter === 'function') {
+        window.updateSMeter('A', update.value);
+    }
+    if (update.property === "SMeterB" && typeof window.updateSMeter === 'function') {
+        window.updateSMeter('B', update.value);
     }
 
     // --- ANTENNA CHANGE ---
@@ -1048,6 +1128,10 @@ connection.on("RadioStateUpdate", function (update) {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
         try { state.lastBackendFreq.A = update.value; } catch (_) { /* state lives in IIFE scope only */ }
         try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
+        // Feed the DX Spots panel's band filter from the main update stream —
+        // the SDR-era spectrum pipeline that used to do this is dormant on the
+        // IC-7300 build (no SDR), which left _vfoHz=0 and the band filter inert.
+        try { if (window.dxSpotsPanel) window.dxSpotsPanel.setVfoFrequency(update.value); } catch (_) { /* panel may not exist yet */ }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'A', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
         try { if (window.syncSegmentSelectToFrequency) window.syncSegmentSelectToFrequency('A', update.value); }
@@ -1141,6 +1225,9 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ActiveVfo") {
         activeVfo = update.value;
         applyVfoActiveStyling();
+        // Pseudo-dual receiver (Phase 5): let the spectrum panels move their
+        // "Listening" badge / Listen button to the VFO that now has the audio.
+        if (typeof window.onActiveVfoChanged === 'function') window.onActiveVfoChanged(activeVfo);
         // In normal mode on a single-receiver radio, the TX button position
         // follows activeVfo (the TX VFO IS the active VFO; FT doesn't move).
         updateTxButton();
@@ -1166,16 +1253,16 @@ connection.on("RadioStateUpdate", function (update) {
     }
 
     // --- METER UPDATES ---
-    if (window.ftdx101Meters) {
+    if (window.ic7300Meters) {
         // PowerMeter is sent as { value, isTransmitting } — unpack it and sync TX state.
         let meterValue = update.value;
         if (update.property === "PowerMeter" &&
             typeof update.value === 'object' && update.value !== null &&
             'value' in update.value && 'isTransmitting' in update.value) {
             meterValue = update.value.value;
-            window.ftdx101Meters.setTransmitting(update.value.isTransmitting);
+            window.ic7300Meters.setTransmitting(update.value.isTransmitting);
         }
-        const result = window.ftdx101Meters.handleMeterUpdate(update.property, meterValue);
+        const result = window.ic7300Meters.handleMeterUpdate(update.property, meterValue);
         if (result) updateMeterDomLabel(update.property, result);
     }
 
@@ -1195,76 +1282,84 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- AGC ---
     if (update.property === "AgcA") {
-        const selectEl = document.getElementById('agcSelectA');
-        // Values 5/6 (AUTO-FAST/MID/SLOW) are normalised to 4 (AUTO) by the dispatcher,
-        // but guard here too in case of a race.
-        if (selectEl) selectEl.value = (update.value === "5" || update.value === "6") ? "4" : update.value;
+        if (window.dspSetActive) window.dspSetActive('agcGroupA', update.value);
     }
     if (update.property === "AgcB") {
-        const selectEl = document.getElementById('agcSelectB');
-        if (selectEl) selectEl.value = (update.value === "5" || update.value === "6") ? "4" : update.value;
+        if (window.dspSetActive) window.dspSetActive('agcGroupB', update.value);
     }
 
-    // --- IPO/AMP ---
+    // --- PREAMP ---
     if (update.property === "IpoA") {
-        const el = document.getElementById('ipoSelectA');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('ipoGroupA', update.value);
     }
     if (update.property === "IpoB") {
-        const el = document.getElementById('ipoSelectB');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('ipoGroupB', update.value);
     }
 
     // --- ATTENUATOR ---
     if (update.property === "AttA") {
-        const el = document.getElementById('attSelectA');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('attGroupA', update.value);
     }
     if (update.property === "AttB") {
-        const el = document.getElementById('attSelectB');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('attGroupB', update.value);
     }
 
     // --- NOISE REDUCTION ---
     if (update.property === "NrA") {
-        const el = document.getElementById('nrSelectA');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('nrGroupA', update.value);
     }
     if (update.property === "NrB") {
-        const el = document.getElementById('nrSelectB');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('nrGroupB', update.value);
     }
 
     // --- MANUAL NOTCH FREQUENCY ---
     if (update.property === "ManualNotchFreqA") {
         const el = document.getElementById('manualNotchFreqA');
-        if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueA').textContent = update.value + ' Hz'; }
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ manualNotchFreqHz: parseInt(update.value) || 800 });
+        if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueA').textContent = update.value; }
     }
     if (update.property === "ManualNotchFreqB") {
         const el = document.getElementById('manualNotchFreqB');
-        if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueB').textContent = update.value + ' Hz'; }
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ manualNotchFreqHz: parseInt(update.value) || 800 });
+        if (el) { el.value = update.value; document.getElementById('manualNotchFreqValueB').textContent = update.value; }
+    }
+
+    // --- MANUAL NOTCH WIDTH (WIDE/MID/NAR, CI-V 16 57) ---
+    if (update.property === "ManualNotchWidthA") {
+        if (window.dspSetActive) window.dspSetActive('mnWidthGroupA', update.value);
+    }
+    if (update.property === "ManualNotchWidthB") {
+        if (window.dspSetActive) window.dspSetActive('mnWidthGroupB', update.value);
+    }
+
+    // --- IF FILTER SHAPE (SHARP/SOFT, CI-V 16 56) ---
+    if (update.property === "IfShapeA") {
+        if (window.dspSetActive) window.dspSetActive('ifShapeGroupA', update.value);
+    }
+    if (update.property === "IfShapeB") {
+        if (window.dspSetActive) window.dspSetActive('ifShapeGroupB', update.value);
+    }
+
+    // --- SELECTED IF FILTER SLOT (FIL1/2/3, CI-V 26) ---
+    if (update.property === "SelectedFilterA") {
+        if (window.dspSetActive) window.dspSetActive('filGroupA', update.value);
+    }
+    if (update.property === "SelectedFilterB") {
+        if (window.dspSetActive) window.dspSetActive('filGroupB', update.value);
     }
 
     // --- NOISE BLANKER ---
     if (update.property === "NbA") {
-        const el = document.getElementById('nbSelectA');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('nbGroupA', update.value);
     }
     if (update.property === "NbB") {
-        const el = document.getElementById('nbSelectB');
-        if (el) el.value = update.value;
+        if (window.dspSetActive) window.dspSetActive('nbGroupB', update.value);
     }
 
-    // --- AUTO NOTCH ---
+    // --- AUTO NOTCH (folded into the single Notch group) ---
     if (update.property === "AutoNotchA") {
-        const el = document.getElementById('autoNotchSelectA');
-        if (el) el.value = update.value;
+        if (window.applyNotchState) window.applyNotchState('A', 'auto', update.value === '1');
     }
     if (update.property === "AutoNotchB") {
-        const el = document.getElementById('autoNotchSelectB');
-        if (el) el.value = update.value;
+        if (window.applyNotchState) window.applyNotchState('B', 'auto', update.value === '1');
     }
 
     // --- IF WIDTH ---
@@ -1389,15 +1484,13 @@ connection.on("RadioStateUpdate", function (update) {
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfFreqHz: apfState.B.freqHz });
     }
 
-    // --- MANUAL NOTCH ---
+    // --- MANUAL NOTCH (folded into the single Notch group) ---
     if (update.property === "ManualNotchA") {
-        const el = document.getElementById('manualNotchSelectA');
-        if (el) el.value = update.value;
+        if (window.applyNotchState) window.applyNotchState('A', 'manual', update.value === '1');
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ manualNotchOn: update.value === '1' });
     }
     if (update.property === "ManualNotchB") {
-        const el = document.getElementById('manualNotchSelectB');
-        if (el) el.value = update.value;
+        if (window.applyNotchState) window.applyNotchState('B', 'manual', update.value === '1');
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ manualNotchOn: update.value === '1' });
     }
 
@@ -1426,24 +1519,28 @@ connection.on("RadioStateUpdate", function (update) {
         if (window.updateAtuTuningState) window.updateAtuTuningState(tuning);
     }
 
-    // --- NB LEVEL ---
+    // --- NB LEVEL (radio shows 0–100%; CI-V carries 0–255, so scale down by 2.55) ---
     if (update.property === "NbLevelA") {
-        const el = document.getElementById('nbLevelSelectA');
-        if (el) el.value = update.value;
+        const s = document.getElementById('nbLevelSliderA'); const l = document.getElementById('nbLevelValueA');
+        const v = Math.round(parseInt(update.value) / 2.55);
+        if (s) s.value = v; if (l) l.textContent = v + '%';
     }
     if (update.property === "NbLevelB") {
-        const el = document.getElementById('nbLevelSelectB');
-        if (el) el.value = update.value;
+        const s = document.getElementById('nbLevelSliderB'); const l = document.getElementById('nbLevelValueB');
+        const v = Math.round(parseInt(update.value) / 2.55);
+        if (s) s.value = v; if (l) l.textContent = v + '%';
     }
 
-    // --- NR LEVEL (DNR algorithm on FTdx10) ---
+    // --- NR LEVEL (radio shows 0–15; CI-V carries 0–255, so scale down by 17) ---
     if (update.property === "NrLevelA") {
-        const el = document.getElementById('nrLevelSelectA');
-        if (el) el.value = update.value;
+        const s = document.getElementById('nrLevelSliderA'); const l = document.getElementById('nrLevelValueA');
+        const v = Math.round(parseInt(update.value) / 17);
+        if (s) s.value = v; if (l) l.textContent = v;
     }
     if (update.property === "NrLevelB") {
-        const el = document.getElementById('nrLevelSelectB');
-        if (el) el.value = update.value;
+        const s = document.getElementById('nrLevelSliderB'); const l = document.getElementById('nrLevelValueB');
+        const v = Math.round(parseInt(update.value) / 17);
+        if (s) s.value = v; if (l) l.textContent = v;
     }
 
     // --- RF GAIN ---
@@ -1493,9 +1590,10 @@ connection.on("RadioStateUpdate", function (update) {
 
     // --- CW ---
     if (update.property === "CwPitch") {
+        // CwPitch is broadcast in Hz (300–900, CI-V 14 09) — display as-is.
         const s = document.getElementById('cwPitchSlider'); const l = document.getElementById('cwPitchHz');
         if (s) s.value = update.value;
-        if (l) l.textContent = (300 + parseInt(update.value) * 10) + ' Hz';
+        if (l) l.textContent = update.value;
     }
     if (update.property === "CwSpeed") {
         const s = document.getElementById('cwSpeedSlider'); const l = document.getElementById('cwSpeedValue');
@@ -1505,8 +1603,10 @@ connection.on("RadioStateUpdate", function (update) {
         const el = document.getElementById('cwBreakInSelect'); if (el) el.value = update.value;
     }
     if (update.property === "CwBreakInDelay") {
+        // CwBreakInDelay is broadcast as dots×10 (30 = 3.0 dots); slider is in dots (2.0–13.0).
+        const dots = parseInt(update.value) / 10;
         const s = document.getElementById('cwDelaySlider'); const l = document.getElementById('cwDelayValue');
-        if (s) s.value = update.value; if (l) l.textContent = update.value;
+        if (s) s.value = dots; if (l) l.textContent = dots.toFixed(1);
     }
 
     // --- FM REPEATER ---
@@ -1580,6 +1680,20 @@ async function pollInitStatus() {
             overlay.style.display = "block";
             // Don't auto-redirect - let user choose
         } else {
+            // Still trying to connect. If the backend knows *why* the link isn't
+            // up (e.g. the configured serial port isn't present), show that reason
+            // with a Settings link rather than an indefinite bare spinner — a wrong
+            // COM number otherwise just looks like a hang ("stuck at
+            // initialization"). Polling continues below, so the overlay clears
+            // itself the moment the radio actually connects.
+            const detail = data.detail ? String(data.detail).trim() : "";
+            if (detail) {
+                const safe = detail.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                statusText.innerHTML = safe +
+                    " <a href='/Settings' class='text-white text-decoration-underline'>Open Settings</a>";
+            } else {
+                statusText.innerText = "Initializing radio, please wait...";
+            }
             overlay.style.display = "block";
         }
 
@@ -1642,7 +1756,7 @@ window.radioControl = {
     },
     setManualNotchFreq: async function (receiver, frequencyHz) {
         await fetch(`/api/cat/manualnotchfreq/${receiver.toLowerCase()}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frequencyHz }) });
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frequencyHz: parseInt(frequencyHz) }) });
     },
     setIfWidth: async function (receiver, code) {
         await fetch(`/api/cat/ifwidth/${receiver.toLowerCase()}`,
@@ -1740,6 +1854,26 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('swapVfoBtn')?.addEventListener('click', swapVfo);
     document.getElementById('copyBtoABtn')?.addEventListener('click', () => copyVfo('ba'));
     document.getElementById('copyAtoBBtn')?.addEventListener('click', () => copyVfo('ab'));
+
+    // Dual-receiver only: click a VFO panel's header to make it the active
+    // (MAIN/SUB) band. Ignored on single-receiver (greying already shows the
+    // active VFO) and when the click lands on a control inside the header.
+    (function wireVfoActiveSelect() {
+        const vfoRow = document.getElementById('vfoRow');
+        if (!vfoRow || vfoRow.dataset.singleReceiver === 'true') return;
+        const wire = (colId, vfo) => {
+            const header = document.querySelector(`#${colId} .card-header`);
+            if (!header) return;
+            header.style.cursor = 'pointer';
+            header.title = `Click to make VFO ${vfo} the active (MAIN/SUB) band`;
+            header.addEventListener('click', (e) => {
+                if (e.target.closest('button, input, select, a, [role="button"], .badge')) return;
+                setActiveVfo(vfo);
+            });
+        };
+        wire('vfoACol', 'A');
+        wire('vfoBCol', 'B');
+    })();
 
     // Clarifier: seed JS state from server-rendered HTML values
     const clarSlider = document.getElementById('clarOffsetSlider');
@@ -2147,8 +2281,8 @@ document.addEventListener('DOMContentLoaded', function() {
         lastMode: { A: null, B: null },
         lastAntenna: { A: null, B: null },
         lastPower: { A: 100, B: 100 },
-        maxPower: 200,
-        radioModel: 'FTdx101MP',
+        maxPower: 100,
+        radioModel: 'IC-7300MK2',
         pollingInterval: null,
         operationInProgress: false,
         isTransmitting: false  // Track TX state for meter display
@@ -2254,6 +2388,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Shared digit-step routine used by wheel, keyboard, and ▲/▼ buttons.
         // `step` is the signed amount to add to the digit at the selected
         // position; carries propagate left through more-significant digits.
+        //
+        // Live-tracking cadence: while you tune, the radio is retuned in real
+        // time (like turning the VFO knob) rather than only on release. Sends
+        // are throttled to LIVE_STEP_THROTTLE_MS so a fast wheel-spin or held
+        // arrow can't flood the CI-V link (~8 sets/sec max), and a trailing
+        // LIVE_STEP_SETTLE_MS timer guarantees the final value always lands.
+        const LIVE_STEP_THROTTLE_MS = 120;
+        const LIVE_STEP_SETTLE_MS = 200;
         function stepSelectedDigit(step) {
             const digits = Array.from(display.querySelectorAll('.digit')).filter(d => d.textContent !== '.');
             const idx = state.selectedIdx[receiver];
@@ -2286,9 +2428,27 @@ document.addEventListener('DOMContentLoaded', function() {
             newDigits.forEach(d => d.classList.remove('selected'));
             if (newDigits[idx]) newDigits[idx].classList.add('selected');
             clearTimeout(display._debounceTimer);
-            display._debounceTimer = setTimeout(() => {
+
+            // Live send: retune the radio as you go so it tracks in real time.
+            // Throttled to LIVE_STEP_THROTTLE_MS so a held arrow or fast
+            // wheel-spin can't flood CI-V. The first step of a fresh gesture
+            // always sends (the window has long since elapsed).
+            const nowMs = Date.now();
+            if (display._lastLiveSend === undefined ||
+                (nowMs - display._lastLiveSend) >= LIVE_STEP_THROTTLE_MS) {
+                display._lastLiveSend = nowMs;
                 setFrequency(receiver, newFreq);
                 state.lastSentFreq[receiver] = newFreq;
+            }
+
+            // Trailing settle: guarantee the FINAL value reaches the radio even
+            // if the last step landed inside the throttle window, then release
+            // the local-edit override.
+            display._debounceTimer = setTimeout(() => {
+                if (state.lastSentFreq[receiver] !== newFreq) {
+                    setFrequency(receiver, newFreq);
+                    state.lastSentFreq[receiver] = newFreq;
+                }
                 state.localFreq[receiver] = null;
                 // IMPORTANT: keep state.editing=true here. The polling tick
                 // at ~500 ms will reset it to false once it sees the radio
@@ -2300,7 +2460,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // ~tens of ms ago and the radio hasn't echoed back yet.
                 // That race shows up as the digit "flipping back then
                 // settling on the new value" the user reported.
-            }, 600);
+            }, LIVE_STEP_SETTLE_MS);
         }
 
         // Auto-select the kHz position when the user hits an arrow / ▲ / ▼
@@ -2752,21 +2912,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.radioModel !== undefined) {
                 state.radioModel = data.radioModel;
             }
-            // Always call updatePowerSliderMax to use latest radioModel
-            if (state.radioModel) {
-                const model = state.radioModel.toLowerCase();
-                if (model === "ftdx101d") {
-                    state.maxPower = 100;
-                } else if (model === "ftdx101mp") {
-                    state.maxPower = 200;
-                } else {
-                    const maxPower = (data.maxPower !== undefined) ? data.maxPower : 200;
-                    state.maxPower = maxPower;
-                }
-            } else {
-                const maxPower = (data.maxPower !== undefined) ? data.maxPower : 200;
-                state.maxPower = maxPower;
-            }
+            // IC-7300 family is 100 W; modelMaxPower is the single source of truth.
+            state.maxPower = window.modelMaxPower(state.radioModel);
             updatePowerSliderMax();
 
             state.lastMode.A = data.vfoA.mode;
@@ -2819,7 +2966,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateSMeter('A', data.vfoA.sMeter);
             updateSMeter('B', data.vfoB.sMeter);
 
-            if (window.ftdx101Meters) {
+            if (window.ic7300Meters) {
                 const metersFromState = {
                     PowerMeter:       data.powerMeter,
                     SWRMeter:         data.swrMeter,
@@ -2833,7 +2980,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 for (const [prop, value] of Object.entries(metersFromState)) {
                     if (value !== undefined) {
-                        const result = window.ftdx101Meters.handleMeterUpdate(prop, value);
+                        const result = window.ic7300Meters.handleMeterUpdate(prop, value);
                         updateMeterDomLabel(prop, result);
                     }
                 }
@@ -2914,7 +3061,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const labelMax = document.getElementById('powerMaxLabel');
         const actualMax = state.radioModel
             ? window.modelMaxPower(state.radioModel)
-            : (typeof maxPower === "number" ? maxPower : 200);
+            : (typeof maxPower === "number" ? maxPower : 100);
 
         if (slider) {
             slider.max = actualMax;
@@ -2968,6 +3115,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const sLabel = document.getElementById(labelId);
         if (sLabel) sLabel.textContent = sUnit;
     }
+    // Exposed so the outer SignalR RadioStateUpdate handler (different scope)
+    // can drive the needle at the backend poll rate instead of waiting for the
+    // 500 ms status poll — see the "SMeterA"/"SMeterB" cases there.
+    window.updateSMeter = updateSMeter;
 
     // Update MIC bar meter (0-255 raw value)
     function updateMICMeter(value) {
@@ -3336,7 +3487,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // TX-only meter canvases have no reading until the radio transmits.
     // Pre-fill with '—' so hover always announces something (name + dash rather than name only).
     document.addEventListener('DOMContentLoaded', function () {
-        ['vddMeterCanvas', 'iddMeterCanvas', 'tempMeterCanvas', 'compressionMeterCanvas'].forEach(id => {
+        ['vddMeterCanvas', 'iddMeterCanvas', 'compressionMeterCanvas'].forEach(id => {
             const c = document.getElementById(id);
             if (c && !c.dataset.reading) c.dataset.reading = '—';
         });
@@ -3476,7 +3627,7 @@ document.addEventListener('DOMContentLoaded', function () {
         banner.innerHTML =
             `<div style="display:flex;align-items:flex-start;gap:8px">` +
             `<div style="flex:1"><strong>Update available — v${_escHtml(version)}</strong><br>` +
-            `<span style="color:#aab;font-size:0.78rem">A newer version of Yaesu Web Control is available.</span></div>` +
+            `<span style="color:#aab;font-size:0.78rem">A newer version of Icom Web Control is available.</span></div>` +
             `<button id="updateBannerDismissX" ` +
             `style="background:none;border:none;color:#aaa;cursor:pointer;font-size:1rem;line-height:1;padding:0" aria-label="Dismiss">✕</button>` +
             `</div>` +
@@ -3496,14 +3647,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!meta) return;
         const current = meta.content.trim();
         try {
-            const resp = await fetch('https://api.github.com/repos/mm5agm/Yaesu_Web_Control/releases/latest', {
+            const resp = await fetch('https://api.github.com/repos/mm5agm/Icom_Web_Control/releases/latest', {
                 headers: { Accept: 'application/vnd.github+json' }
             });
             if (!resp.ok) return;
             const data = await resp.json();
             const latest = (data.tag_name || '').replace(/^v/i, '');
             if (latest && _isNewer(latest, current)) {
-                _showUpdateBanner(latest, data.html_url || 'https://github.com/mm5agm/Yaesu_Web_Control/releases');
+                _showUpdateBanner(latest, data.html_url || 'https://github.com/mm5agm/Icom_Web_Control/releases');
             }
         } catch { /* network unavailable or rate limited — silently skip */ }
     }

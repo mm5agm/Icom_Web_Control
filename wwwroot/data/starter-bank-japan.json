@@ -1,5 +1,5 @@
 {
-    "name": "YWC Starter Bank — JARL (Japan)",
+    "name": "IWC Starter Bank — JARL (Japan)",
     "description": "Watering-hole frequencies for FT8, FT4, SSB, CW, RTTY and beacons. JARL band plan — differs from IARU R3 in several segments, particularly on 80m and 40m where JARL band edges are narrower.",
     "entries": [
         { "label": "160m FT8",      "frequencyHz":   1840000, "mode": "DATA-U", "agcMode": "3", "nbOn": false, "nrLevel": "0", "powerWatts": 25,  "notes": "FT8 watering hole" },

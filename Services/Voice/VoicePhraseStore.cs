@@ -1,12 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Models;
 
-namespace Yaesu_Web_Control.Services.Voice
+namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>
     /// Reads and writes voice language packs. Storage is per-locale:
-    /// %APPDATA%\MM5AGM\Yaesu Web Control\Grammars\&lt;culture&gt;\Commands.&lt;culture&gt;.json
+    /// %APPDATA%\MM5AGM\Icom Web Control\Grammars\&lt;culture&gt;\Commands.&lt;culture&gt;.json
     /// (+ a sibling Commands.&lt;culture&gt;.meta.json), per
     /// docs/VoiceControl/language-pack-manager-design.md §1.6. Multiple
     /// cultures can be installed side by side; which one is actually loaded
@@ -24,7 +24,7 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private static readonly string AppDataRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control");
+            "MM5AGM", "Icom Web Control");
 
         private static readonly string LegacyFilePath = Path.Combine(AppDataRoot, "voice_phrases.json");
         private static readonly string GrammarsRoot = Path.Combine(AppDataRoot, "Grammars");
@@ -86,9 +86,10 @@ namespace Yaesu_Web_Control.Services.Voice
                 var json = File.ReadAllText(path);
                 var config = JsonSerializer.Deserialize<VoicePhrasesConfig>(json, _jsonOpts);
                 // Version 3 changed SetMode/SetBand to DecomposedCommand and merged
-                // Verbs+Connectors into Triggers for SetFrequency. Older files are
-                // reset to defaults rather than partially migrated.
-                if (config == null || config.Version < 6)
+                // Verbs+Connectors into Triggers for SetFrequency. Version 7 added
+                // the natural "status frequency" / "transmit on" trigger synonyms.
+                // Older files are reset to defaults rather than partially migrated.
+                if (config == null || config.Version < 7)
                     return BuildDefaults();
                 return config;
             }
@@ -320,7 +321,7 @@ namespace Yaesu_Web_Control.Services.Voice
 
         public static VoicePhrasesConfig BuildDefaults() => new()
         {
-            Version = 6,
+            Version = 7,
             SimpleCommands = new()
             {
                 ["SwapVFO"]          = ["swap v f o", "swap v f os", "swap a and b", "swap a b", "switch v f o", "switch a and b"],
@@ -328,10 +329,10 @@ namespace Yaesu_Web_Control.Services.Voice
                 ["NudgeDown"]        = ["tune down", "step down", "frequency down", "down one step", "tune lower", "nudge down", "nudge lower"],
                 ["BandUp"]           = ["band up", "next band", "up one band"],
                 ["BandDown"]         = ["band down", "previous band", "down one band"],
-                ["StatusFrequency"]  = ["what frequency", "what is my frequency", "read frequency", "current frequency"],
-                ["StatusMode"]       = ["what mode", "what is my mode", "read mode", "current mode"],
-                ["StatusBand"]       = ["what band", "what band am I on", "current band"],
-                ["TxOn"]             = ["key transmitter", "start transmitting", "transmit now"],
+                ["StatusFrequency"]  = ["what frequency", "what is my frequency", "read frequency", "current frequency", "status frequency"],
+                ["StatusMode"]       = ["what mode", "what is my mode", "read mode", "current mode", "status mode"],
+                ["StatusBand"]       = ["what band", "what band am I on", "current band", "status band"],
+                ["TxOn"]             = ["key transmitter", "start transmitting", "transmit now", "transmit on"],
                 ["TxOff"]            = ["stop transmitting", "go to receive", "transmit off"],
                 ["SplitOn"]          = ["split on", "enable split", "split transmit"],
                 ["SplitOff"]         = ["split off", "disable split", "simplex"],
@@ -383,10 +384,9 @@ namespace Yaesu_Web_Control.Services.Voice
                 new() { Name = "NR off",          Phrases = ["noise reduction off", "n r off"],          Cat = "NR00;", Category = "Noise Reduction" },
                 new() { Name = "NB on",           Phrases = ["noise blanker on", "n b on"],              Cat = "NB01;", Category = "Noise Reduction" },
                 new() { Name = "NB off",          Phrases = ["noise blanker off", "n b off"],            Cat = "NB00;", Category = "Noise Reduction" },
-                // Roofing filter — CAT strings are FTdx101 specific; verify and adjust if needed.
-                new() { Name = "Roofing 3 kHz",   Phrases = ["roofing three kilohertz", "roofing three k"],   Cat = "RF03;", Category = "Macros" },
-                new() { Name = "Roofing 6 kHz",   Phrases = ["roofing six kilohertz", "roofing six k"],       Cat = "RF04;", Category = "Macros" },
-                new() { Name = "Roofing 12 kHz",  Phrases = ["roofing twelve kilohertz", "roofing twelve k"], Cat = "RF05;", Category = "Macros" },
+                // (The Yaesu roofing-filter macros were removed for IWC — the
+                //  IC-7300 is a DSP receiver with no switchable roofing filters;
+                //  its IF passband is set via the IF Width / FIL slot controls.)
             },
             SetAttenuator = new()
             {

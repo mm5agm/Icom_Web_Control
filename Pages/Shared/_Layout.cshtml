@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Language" content="en">
     <meta name="language" content="en">
-    <meta name="x-app-version" content="@Yaesu_Web_Control.AppVersion.Current">
-    <title>@(ViewData["Title"]?.ToString() == "Yaesu Web Control" ? "Yaesu Web Control" : ViewData["Title"] + " - Yaesu Web Control")</title>
+    <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Current">
+    <title>@(ViewData["Title"]?.ToString() == "Icom Web Control" ? "Icom Web Control" : ViewData["Title"] + " - Icom Web Control")</title>
     <script type="importmap">{}</script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/Yaesu_Web_Control.styles.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/Icom_Web_Control.styles.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/gauge-debug.css" />
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
@@ -52,7 +52,7 @@
     <header class="sticky-top bg-white" @(((string?)ViewData["BodyRole"] == "application") ? Html.Raw("aria-hidden=\"true\"") : Html.Raw(""))>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow" style="padding-top: 0; padding-bottom: 0; margin-bottom: 2px; min-height: 0;">
             <div class="container-fluid px-3">
-                <a class="navbar-brand" asp-area="" asp-page="/Index" data-a11y-key="nav.brand" aria-label="Yaesu Web Control home">Yaesu Web Control <small class="text-muted fw-normal" style="font-size: 0.6em;">v@(AppVersion.Current) &copy; @DateTime.Now.Year</small></a>
+                <a class="navbar-brand" asp-area="" asp-page="/Index" data-a11y-key="nav.brand" aria-label="Icom Web Control home">Icom Web Control <small class="text-muted fw-normal" style="font-size: 0.6em;">v@(AppVersion.Current) &copy; @DateTime.Now.Year</small></a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -103,6 +103,8 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <script src="~/js/ui/site.js" asp-append-version="true"></script>
+    <!-- IC-7300 IF passband width + FIL slot — must load after site.js (defines window.IfWidth / setIfWidth / setFilterSlot). -->
+    <script src="~/js/ui/ic7300-if-width.js" asp-append-version="true"></script>
     @{
         // Voice Control: server-render the enable flag so voice-control.js
         // can decide whether to show the per-VFO mic buttons before any user
@@ -110,18 +112,18 @@
         // (Settings page > Voice Control section). Default off. Per-VFO nudge
         // step defaults (VoiceNudgeStepHzA/B) are rendered directly on
         // Index.cshtml next to each VFO's mic button, not here.
-        var _ywcSettingsService = (Yaesu_Web_Control.Services.ISettingsService)Context.RequestServices
-            .GetService(typeof(Yaesu_Web_Control.Services.ISettingsService))!;
-        var _ywcVoiceEnabled = false;
+        var _iwcSettingsService = (Icom_Web_Control.Services.ISettingsService)Context.RequestServices
+            .GetService(typeof(Icom_Web_Control.Services.ISettingsService))!;
+        var _iwcVoiceEnabled = false;
         try
         {
-            var _ywcSettings = await _ywcSettingsService.GetSettingsAsync();
-            _ywcVoiceEnabled = _ywcSettings.VoiceControlEnabled;
+            var _iwcSettings = await _iwcSettingsService.GetSettingsAsync();
+            _iwcVoiceEnabled = _iwcSettings.VoiceControlEnabled;
         }
         catch { /* settings unavailable -> defaults */ }
     }
     <script>
-        window.ywcVoiceEnabled = @(_ywcVoiceEnabled ? "true" : "false");
+        window.iwcVoiceEnabled = @(_iwcVoiceEnabled ? "true" : "false");
     </script>
     <script src="~/js/ui/voice-control.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />

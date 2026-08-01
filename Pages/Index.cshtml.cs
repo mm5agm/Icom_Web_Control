@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.Json;
 
-namespace Yaesu_Web_Control.Pages
+namespace Icom_Web_Control.Pages
 {
     // Add this at the top or in a suitable namespace
     public class RadioStateViewModel
@@ -88,6 +88,10 @@ namespace Yaesu_Web_Control.Pages
         public float SdrSpectrumLowDbB  { get; set; } = -120f;
         public float SdrSpectrumHighDbA { get; set; } = 0f;
         public float SdrSpectrumHighDbB { get; set; } = 0f;
+        public int SdrWaterfallSpeedA   { get; set; } = 1;
+        public int SdrWaterfallSpeedB   { get; set; } = 1;
+        public int SdrWaterfallBrightDbA { get; set; } = 0;
+        public int SdrWaterfallBrightDbB { get; set; } = 0;
 
         public string BandPlan { get; set; } = "Region1";
         public string RadioModel { get; set; } = "FTdx101MP";
@@ -98,11 +102,24 @@ namespace Yaesu_Web_Control.Pages
         // Default false; user enables via Settings > Accessibility.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
 
+        // Optional browser key that toggles TX. Empty = disabled.
+        public string TxToggleKey { get; set; } = string.Empty;
+
         // Voice control nudge step defaults for each VFO's mic button
         // dropdown, server-rendered so voice-control.js has a starting
         // value before it can fetch/receive anything.
         public long VoiceNudgeStepHzA { get; set; } = 10_000;
         public long VoiceNudgeStepHzB { get; set; } = 10_000;
+
+        // Pseudo-dual receiver (Phase 5). When true the index page shows a
+        // second "watch" spectrum panel even on the single-receiver IC-7300 —
+        // this flag is what un-gates panel B despite data-single-receiver.
+        public bool PseudoDualReceiverEnabled { get; set; } = false;
+
+        // How the watch panel's (VFO B) span buttons behave: "ZoomIn" (software
+        // crop, B independent), "Shared" (both drive the one physical span), or
+        // "Hidden" (no B span buttons). See ApplicationSettings.PseudoDualWatchSpanMode.
+        public string PseudoDualWatchSpanMode { get; set; } = "ZoomIn";
 
         public RadioStateService RadioState => _radioStateService;
 
@@ -130,6 +147,7 @@ namespace Yaesu_Web_Control.Pages
             ShowApp4Button = settings.ShowGridtrackerButton;
             ShowApp5Button = settings.ShowFldigiButton;
             ShowFrequencyArrowButtons = settings.ShowFrequencyArrowButtons;
+            TxToggleKey = settings.TxToggleKey == " " ? "Space" : (settings.TxToggleKey ?? string.Empty);
             App1Name = settings.App1Name;
             App2Name = settings.App2Name;
             App3Name = settings.App3Name;
@@ -144,8 +162,14 @@ namespace Yaesu_Web_Control.Pages
             SdrSpectrumLowDbB  = settings.SdrSpectrumLowDbB;
             SdrSpectrumHighDbA = settings.SdrSpectrumHighDbA;
             SdrSpectrumHighDbB = settings.SdrSpectrumHighDbB;
+            SdrWaterfallSpeedA   = settings.SdrWaterfallSpeedA;
+            SdrWaterfallSpeedB   = settings.SdrWaterfallSpeedB;
+            SdrWaterfallBrightDbA = settings.SdrWaterfallBrightDbA;
+            SdrWaterfallBrightDbB = settings.SdrWaterfallBrightDbB;
             VoiceNudgeStepHzA = settings.VoiceNudgeStepHzA;
             VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
+            PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
+            PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;

@@ -1,4 +1,4 @@
-namespace Yaesu_Web_Control.Models
+namespace Icom_Web_Control.Models
 {
     /// <summary>
     /// A single DX spot received from a cluster server.

@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -12,14 +12,14 @@ using System.Text.Json;
 using System.Windows.Forms;
 
 // ── Single-instance guard ────────────────────────────────────────────────────
-const string MutexName = "Global\\Yaesu_Web_Control_SingleInstance";
+const string MutexName = "Global\\Icom_Web_Control_SingleInstance";
 var mutex = new Mutex(initiallyOwned: true, name: MutexName, out bool createdNew);
 
 if (!createdNew)
 {
 #pragma warning disable CA1416
     MessageBox.Show(
-        "Yaesu Web Control is already running.",
+        "Icom Web Control is already running.",
         "Already Running",
         MessageBoxButtons.OK,
         MessageBoxIcon.Information);
@@ -75,7 +75,7 @@ static string? GetPortOwner(int port)
     return null;
 }
 
-// Probe a TCP port to see if YWC can bind to it. Uses Socket.Bind on
+// Probe a TCP port to see if IWC can bind to it. Uses Socket.Bind on
 // IPAddress.Any so we catch the full set of "port unavailable" cases:
 //   - port already in use by another listener
 //   - port in a Windows excluded range (WSL / Hyper-V / Docker)
@@ -116,7 +116,7 @@ static int LoadConfiguredHttpPort()
     {
         var path = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control", "appsettings.user.json");
+            "MM5AGM", "Icom Web Control", "appsettings.user.json");
         if (!File.Exists(path)) return 8080;
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
         if (doc.RootElement.TryGetProperty("HttpPort", out var p) && p.TryGetInt32(out int port))
@@ -128,65 +128,14 @@ static int LoadConfiguredHttpPort()
     return 8080;
 }
 
-// ── Suppress Windows critical-error dialogs during DLL load ─────────────────
-// When SoapySDR enumerates plugins (HackRF, RTL-SDR, Airspy, etc.), Windows
-// tries to resolve each plugin's import table. If a plugin's dependencies
-// conflict with whatever happens to be on the user's system — e.g.
-// system32 has a newer hackrf.dll that needs libusb 1.0.27+ functions while
-// YWC bundles an older libusb-1.0.dll, OR vice versa — Windows pops up a
-// modal "Entry Point Not Found" dialog and waits for the user to click OK.
-// That's startling and unhelpful since YWC handles plugin load failures
-// gracefully anyway (the affected SDR just doesn't appear in the device list).
-//
-// SEM_FAILCRITICALERRORS + SEM_NOOPENFILEERRORBOX suppress the dialog so the
-// process can fail the DLL load silently and carry on. Reported by the user
-// on v2.3.1 — the Settings-page auto-scan triggered the dialog because a
-// system32 hackrf.dll from some other SDR software conflicted with YWC's
-// bundled libusb.
-NativeWin32.SetErrorMode(NativeWin32.SEM_FAILCRITICALERRORS | NativeWin32.SEM_NOOPENFILEERRORBOX);
-
-// ── Native library resolver (SoapySDR + sdrplay_api) ────────────────────────
-// .NET P/Invoke on Windows does not search PATH directories by default, so
-// DLLs that aren't next to the app or in System32 silently fail to load.
-// One resolver lambda handles both DLLs — SetDllImportResolver can only be
-// called *once* per assembly, so anything we want to resolve has to share
-// this single registration.
-//
-// SDRplay history: observed on IK2XRW Alessandro's system (#53, 2026-06-26)
-// where the SDRplay install didn't add its bin folder to PATH, so the SDR
-// scan returned nothing. SdrplayDllResolver.TryResolve tries the user-
-// configured path, the app directory, then the standard Program Files
-// locations before falling back to default search.
-NativeLibrary.SetDllImportResolver(
-    System.Reflection.Assembly.GetExecutingAssembly(),
-    static (name, _, _) =>
-    {
-        if (name == "SoapySDR")
-        {
-            // Installed layout: <app>\SoapySDR\bin\SoapySDR.dll
-            var path = Path.Combine(AppContext.BaseDirectory, "SoapySDR", "bin", "SoapySDR.dll");
-            // Developer fallback: C:\SoapySDR\bin\SoapySDR.dll (build machine only)
-            if (!File.Exists(path))
-                path = @"C:\SoapySDR\bin\SoapySDR.dll";
-            if (File.Exists(path) && NativeLibrary.TryLoad(path, out IntPtr h))
-                return h;
-        }
-        else if (name == Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.DllName)
-        {
-            if (Yaesu_Web_Control.Services.Sdr.SdrplayDllResolver.TryResolve(out IntPtr h))
-                return h;
-        }
-        return IntPtr.Zero;   // fall back to default resolution for all other DLLs
-    });
-
 // ── Serilog file logging ────────────────────────────────────────────────────
-// YWC is a WinExe (no console window) so stdout-based loggers are invisible.
+// IWC is a WinExe (no console window) so stdout-based loggers are invisible.
 // Wire up Serilog with a rolling-daily file sink under %APPDATA% so we have a
 // readable record of what the app did — essential for diagnosing shutdown
 // hangs, CAT timeouts, SDR init failures and anything else the user can't see.
 var logDir = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-    "MM5AGM", "Yaesu Web Control", "logs");
+    "MM5AGM", "Icom Web Control", "logs");
 try { Directory.CreateDirectory(logDir); } catch { /* fall through, Serilog will surface the problem */ }
 
 Log.Logger = new LoggerConfiguration()
@@ -209,16 +158,16 @@ Log.Logger = new LoggerConfiguration()
     // continuations — to roughly 1 Hz, so the init sequence never reached the
     // DT0 step and the app hung at "Initializing". Intermittent because it
     // depends on disk / AV / file-lock timing (issue #73, wa6auf). Dropped
-    // shared:true as well — YWC is the only writer of this file.
+    // shared:true as well — IWC is the only writer of this file.
     .WriteTo.Async(a => a.File(
-        Path.Combine(logDir, "ywc-.log"),
+        Path.Combine(logDir, "iwc-.log"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 7,
         flushToDiskInterval: TimeSpan.FromSeconds(1),
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"))
     .CreateLogger();
 
-Log.Information("Yaesu Web Control starting (v{Version})", Yaesu_Web_Control.AppVersion.Current);
+Log.Information("Icom Web Control starting (v{Version})", Icom_Web_Control.AppVersion.Current);
 
 // Raise the thread-pool floor so cold start doesn't bottleneck on the pool's
 // ~1/sec starvation-recovery thread injection. Startup fires many concurrent
@@ -244,6 +193,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<HostOptions>(opts =>
 {
     opts.ShutdownTimeout = TimeSpan.FromSeconds(2);
+
+    // Never let one background service's unhandled exception stop the whole
+    // host. The default (StopHost) means a single throw from e.g. the CI-V
+    // poll loop while the radio's USB port is yanked would kill the app,
+    // leaving the web page up with no comms. Individual services already log
+    // and recover; this is the backstop so a missed case degrades one service
+    // instead of taking everything (SignalR, voice, rigctld) down with it.
+    opts.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
 
 builder.Services.AddSingleton<CalibrationStorage>();
@@ -255,18 +212,49 @@ builder.Services.AddSignalR();
 // Register the persistence service (no hub dependency)
 builder.Services.AddSingleton<RadioStatePersistenceService>();
 
-// Register RadioStateService and CatMessageBuffer as singletons
+// Register RadioStateService as a singleton
 builder.Services.AddSingleton<RadioStateService>();
-builder.Services.AddSingleton<CatMessageBuffer>();
 
-// Register CatMessageDispatcher as singleton
-builder.Services.AddSingleton<CatMessageDispatcher>();
+// ICatClient is now a no-op stub. The Yaesu CAT transport it used to front
+// (CatMultiplexerService / CatMessageDispatcher / CatMessageBuffer /
+// MultiplexedCatClient / CatCommands) was deleted in the IWC carve — IWC drives
+// the IC-7300 through the IRadioController / CI-V seam below. NullCatClient keeps
+// the not-yet-ported vestigial call sites (some CatController controls, the
+// Memory radio-sync paths, one voice intent) compiling and inert until each is
+// re-implemented on the seam in its own block. See NullCatClient for detail.
+builder.Services.AddSingleton<ICatClient, NullCatClient>();
 
-// Register CatMultiplexerService as singleton
-builder.Services.AddSingleton<CatMultiplexerService>();
+// ── IRadioController seam (Phase 2) ─────────────────────────────────────────
+// The semantic, protocol-free seam IWC introduces. Phase 2 backs it with the
+// real CI-V link: CivBusService owns the serial port and frames the bus;
+// CivRadioController is the single class below the seam that emits CI-V and,
+// as a hosted service, connects to the IC-7300 MkII and polls VFO-A frequency
+// into RadioStateService → SignalR. The Phase 1 canned StubRadioController is
+// retained in the tree (unregistered) as a no-hardware fallback for reference.
+// See docs/design/iwc-clone-split-plan.md.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Civ.ICivClient, Icom_Web_Control.Services.Civ.CivBusService>();
 
-// Register the main CAT client for the web app
-builder.Services.AddSingleton<ICatClient, MultiplexedCatClient>();
+// No-hardware preview mode: set IWC_USE_STUB_RADIO=1 to back the seam with the
+// canned StubRadioController instead of the real CI-V link. Lets the pseudo-dual
+// two-panel spectrum UI (and gauges) be demoed/developed without a radio plugged
+// in. The real CivRadioController is still registered as a plain singleton so
+// anything resolving it directly keeps working; it just isn't hosted (won't open
+// the serial port) in stub mode.
+var useStubRadio = string.Equals(
+    Environment.GetEnvironmentVariable("IWC_USE_STUB_RADIO"), "1", StringComparison.Ordinal);
+
+builder.Services.AddSingleton<CivRadioController>();
+if (useStubRadio)
+{
+    builder.Services.AddSingleton<StubRadioController>();
+    builder.Services.AddSingleton<IRadioController>(sp => sp.GetRequiredService<StubRadioController>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<StubRadioController>());
+}
+else
+{
+    builder.Services.AddSingleton<IRadioController>(sp => sp.GetRequiredService<CivRadioController>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<CivRadioController>());
+}
 
 // Register the rigctld server as a background service
 builder.Services.AddHostedService<RigctldServer>();
@@ -274,39 +262,17 @@ builder.Services.AddHostedService<RigctldServer>();
 // Register your settings service
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 
-// Audio filter EX address map — loaded once at startup from
-// wwwroot/data/audio-filter-ex-map.json; used by the Audio Filter popout
-// controller endpoints to translate per-radio menu addresses.
-builder.Services.AddSingleton<AudioFilterMapService>();
-
-
-// Add after existing service registrations
-builder.Services.AddHostedService<MeterPollingService>();
-
-// SDR spectrum display — reads IQ samples, computes FFT, broadcasts via SignalR
-// Registered as singleton so the span-change API endpoint can call RequestRestart().
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Sdr.SdrManager>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Sdr.SdrManager>());
+// Meter polling was the Yaesu CAT MeterPollingService — deleted in the carve.
+// Meter reads (S-meter, Po/SWR/ALC) now come through the CI-V seam
+// (CivRadioController), so there is no separate hosted poller to register.
 
 // Register the radio state service — reuse the same singleton instance as RadioStateService
 builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<RadioStateService>());
 
-// Register the radio initialization service
-builder.Services.AddSingleton<RadioInitializationService>();
-
-// VC Tune preselector control
-builder.Services.AddSingleton<CatRequestSemaphore>();
-builder.Services.AddSingleton<IVCTuneCommandBuilder, VCTuneCommandBuilder>();
-builder.Services.AddSingleton<IVCTuneResponseParser, VCTuneResponseParser>();
-builder.Services.AddSingleton<IVCTuneStateMachine, VCTuneStateMachine>();
-builder.Services.AddSingleton<IVCTuneConfigurationStore, VCTuneConfigurationStore>();
-builder.Services.AddSingleton<VCTuneDiagnostics>();
-builder.Services.AddSingleton<VCTuneHelpProvider>();
-builder.Services.AddSingleton<VCTuneModule>();
-builder.Services.AddSingleton<VCTuneIntegrationHarness>();
-builder.Services.AddSingleton<IVcTuneService, VcTuneService>();
-builder.Services.AddSingleton<VCTuneViewModel>();
-builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioInitializationService>());
+// The Yaesu RadioInitializationService (serial connect + read-burst + state
+// restore) was deleted in the carve. Its job — connect the radio and restore
+// state at startup — is now owned by CivRadioController (hosted) over CI-V, and
+// the Connect / Test-Connection endpoints call IRadioController.ConnectAsync.
 
 // ADD THIS LINE for Razor Pages support:
 builder.Services.AddRazorPages();
@@ -335,11 +301,11 @@ if (chosenPort < 0)
     var diag = string.Join("\n",
         triedPorts.Select(p => $"  {p,5} — {GetPortOwner(p) ?? "unknown / Windows-reserved"}"));
     MessageBox.Show(
-        $"Yaesu Web Control couldn't find a free TCP port to listen on.\n\n" +
+        $"Icom Web Control couldn't find a free TCP port to listen on.\n\n" +
         $"Tried ports {triedPorts.First()}–{triedPorts.Last()}:\n\n{diag}\n\n" +
-        $"Either close one of those programs, or open Yaesu Web Control's\n" +
+        $"Either close one of those programs, or open Icom Web Control's\n" +
         $"Settings page on a working installation and change the HttpPort\n" +
-        $"value in %APPDATA%\\MM5AGM\\Yaesu Web Control\\appsettings.user.json\n" +
+        $"value in %APPDATA%\\MM5AGM\\Icom Web Control\\appsettings.user.json\n" +
         $"to a free port (e.g. 9080), then restart.",
         "No free port available",
         MessageBoxButtons.OK,
@@ -355,7 +321,7 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{chosenPort}");
 builder.Services.AddSingleton(new HttpPortInfo(chosenPort));
 
 builder.Services.AddSingleton<BrowserLauncher>();
-// System tray icon — gives operators a visible "YWC is running" indicator
+// System tray icon — gives operators a visible "IWC is running" indicator
 // and a clean Exit menu. Implemented as an STA-threaded hosted service.
 builder.Services.AddHostedService<SystemTrayService>();
 
@@ -367,24 +333,23 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<WsjtxUdpService>()
 builder.Services.AddSingleton<ProcessStatusCacheService>();
 
 // Register radio memories service
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryService>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.MemoryBankService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.MemoryService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.MemoryBankService>();
 
 // Register DX cluster service — single instance shared between controllers and
 // the background hosted service so the API can read the spot buffer.
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.DxClusterService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.DxClusterService>());
+builder.Services.AddSingleton<Icom_Web_Control.Services.DxClusterService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.Services.DxClusterService>());
 
 // Voice control (in-process SAPI). VoiceControlService is the IHostedService
 // that owns the SpeechRecognitionEngine; IntentDispatcher maps recognised
 // intents to CAT actions; VoiceTtsService speaks confirmation phrases;
 // VoiceController exposes /api/voice/*. See docs/VoiceControl/v1-plan.md.
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.IntentDispatcher>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceTtsService>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VCTuneRecognizer>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoicePhraseStore>();
-builder.Services.AddSingleton<Yaesu_Web_Control.Services.Voice.VoiceControlService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Yaesu_Web_Control.Services.Voice.VoiceControlService>());
+builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.IntentDispatcher>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoiceTtsService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoicePhraseStore>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoiceControlService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.Services.Voice.VoiceControlService>());
 
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and
@@ -439,14 +404,19 @@ try
     app.MapControllers();
 
     // MAP SIGNALR HUB:
-    app.MapHub<Yaesu_Web_Control.Hubs.RadioHub>("/radioHub");
+    app.MapHub<Icom_Web_Control.Hubs.RadioHub>("/radioHub");
 
-    app.MapGet("/api/status/init", () => new { status = Yaesu_Web_Control.Services.AppStatus.InitializationStatus });
+    // `detail` carries a human-readable reason the link isn't up (e.g. the
+    // configured serial port isn't present) so the init overlay can show the
+    // cause instead of an indefinite "Initializing…" spinner. Empty when OK.
+    app.MapGet("/api/status/init", (Icom_Web_Control.Services.RadioStateService state) =>
+        new { status = Icom_Web_Control.Services.AppStatus.InitializationStatus, detail = state.ConnectionStatusText ?? "" });
 
-    app.MapGet("/api/ports", () =>
+    app.MapGet("/api/ports", async (Icom_Web_Control.Services.ISettingsService settingsService) =>
     {
         var ports = System.IO.Ports.SerialPort.GetPortNames();
-        return new { ports, com6Present = ports.Contains("COM6") };
+        var configured = (await settingsService.GetSettingsAsync()).SerialPort;
+        return new { ports, configuredPort = configured, configuredPresent = ports.Contains(configured) };
     });
 
     // Serve accessible labels from AppData — copy default on first run so users can find and edit it.
@@ -454,7 +424,7 @@ try
     {
         var userPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control", "labels.json");
+            "MM5AGM", "Icom Web Control", "labels.json");
 
         if (!File.Exists(userPath))
         {
@@ -464,30 +434,6 @@ try
         }
 
         return Results.File(userPath, "application/json");
-    });
-
-    app.MapPost("/api/sdr/span", async (
-        [Microsoft.AspNetCore.Mvc.FromQuery] double hz,
-        [Microsoft.AspNetCore.Mvc.FromQuery] string? sdrId,
-        Yaesu_Web_Control.Services.ISettingsService settings,
-        Yaesu_Web_Control.Services.Sdr.SdrManager sdr) =>
-    {
-        double[] valid = [62_500, 125_000, 250_000, 500_000, 1_024_000, 2_048_000, 2_500_000, 3_200_000];
-        if (Array.IndexOf(valid, hz) < 0) return Results.BadRequest("Invalid span value.");
-
-        // sdrId defaults to "A" for backward compatibility with any caller
-        // that doesn't supply it. v2.3.0+ frontend always sends an explicit
-        // "A" or "B"; older code paths (or third-party clients) get the
-        // single-SDR behaviour.
-        var target = (sdrId ?? "A").ToUpperInvariant();
-        if (target != "A" && target != "B") return Results.BadRequest("sdrId must be A or B.");
-
-        var s = await settings.GetSettingsAsync();
-        if (target == "A") s.SdrSampleRateHzA = hz;
-        else               s.SdrSampleRateHzB = hz;
-        await settings.SaveSettingsAsync(s);
-        sdr.RequestRestart();
-        return Results.Ok();
     });
 
     // Open browser automatically when app starts (but not when debugging in Visual Studio)
@@ -535,7 +481,7 @@ catch (Exception ex)
     else
     {
         MessageBox.Show(
-            $"Yaesu Web Control failed to start:\n\n{ex.Message}",
+            $"Icom Web Control failed to start:\n\n{ex.Message}",
             "Startup Error",
             MessageBoxButtons.OK,
             MessageBoxIcon.Error);
@@ -545,25 +491,4 @@ catch (Exception ex)
     throw;
 }
 
-// Win32 P/Invokes used during YWC startup. Kept at the end of Program.cs
-// rather than scattered through the top-level statements so the bootstrap
-// logic stays readable.
-internal static class NativeWin32
-{
-    /// <summary>
-    /// The system does not display the critical-error-handler message box.
-    /// Failing DLL loads return an error code to the caller instead of
-    /// showing the "Entry Point Not Found" / "DLL was not found" dialogs.
-    /// </summary>
-    public const uint SEM_FAILCRITICALERRORS = 0x0001;
-
-    /// <summary>
-    /// The OpenFile function does not display a message box when it fails
-    /// to find a file. Belt-and-braces alongside SEM_FAILCRITICALERRORS.
-    /// </summary>
-    public const uint SEM_NOOPENFILEERRORBOX = 0x8000;
-
-    [DllImport("kernel32.dll")]
-    public static extern uint SetErrorMode(uint uMode);
-}
 

@@ -1,10 +1,10 @@
-﻿using Yaesu_Web_Control.Hubs;
+﻿using Icom_Web_Control.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class RadioStateService : INotifyPropertyChanged, IRadioStateService
     {
@@ -21,6 +21,12 @@ namespace Yaesu_Web_Control.Services
         // whichever VFO is currently active (per VS), instead of always
         // writing to *A state — see #34 R2 controls-bleed-across-panels fix.
         public bool IsSingleReceiver { get; set; } = false;
+
+        // Configured radio model (e.g. "FTDX3000"). Set by RadioInitialization-
+        // Service at startup. The dispatcher uses this to normalise model-
+        // specific CAT read codes — notably the FTDX3000 roofing-filter answer,
+        // whose read code space differs from its set code space.
+        public string RadioModel { get; set; } = "";
 
         private RadioState _initialState;
 
@@ -55,10 +61,14 @@ namespace Yaesu_Web_Control.Services
             MicGain = _initialState.MicGain;
             ProcEnabled = _initialState.ProcEnabled;
             ProcLevel = _initialState.ProcLevel;
-            IfWidthA = _initialState.IfWidthA ?? "8";
-            IfWidthB = _initialState.IfWidthB ?? "8";
+            IfWidthA = _initialState.IfWidthA ?? "";
+            IfWidthB = _initialState.IfWidthB ?? "";
+            SelectedFilterA = _initialState.SelectedFilterA ?? "";
+            SelectedFilterB = _initialState.SelectedFilterB ?? "";
             IfShiftA = _initialState.IfShiftA;
             IfShiftB = _initialState.IfShiftB;
+            AfGainA = _initialState.AfGainA;
+            AfGainB = _initialState.AfGainB;
         }
 
         public RadioState InitialState => _initialState;
@@ -128,10 +138,6 @@ namespace Yaesu_Web_Control.Services
         private void BroadcastUpdate(string property, object value)
         {
             _logger.LogDebug("[BroadcastUpdate] Broadcasting {Property} = {Value}", property, value);
-            if (property == "PowerMeter")
-            {
-                _logger.LogWarning("[DEBUG][PowerMeter] Broadcasting PowerMeter value: {@Value}", value);
-            }
             // Special case: PowerMeter should include isTransmitting for frontend sync
             if (property == "PowerMeter")
             {
@@ -194,6 +200,16 @@ namespace Yaesu_Web_Control.Services
         public int ManualNotchFreqA { get => _manualNotchFreqA; set => SetField(ref _manualNotchFreqA, value); }
         private int _manualNotchFreqB = 1000;
         public int ManualNotchFreqB { get => _manualNotchFreqB; set => SetField(ref _manualNotchFreqB, value); }
+        // Manual-notch filter width (CI-V 16 57): "0"=WIDE "1"=MID "2"=NAR
+        private string _manualNotchWidthA = "1";
+        public string ManualNotchWidthA { get => _manualNotchWidthA; set => SetField(ref _manualNotchWidthA, value); }
+        private string _manualNotchWidthB = "1";
+        public string ManualNotchWidthB { get => _manualNotchWidthB; set => SetField(ref _manualNotchWidthB, value); }
+        // IF DSP filter shape (CI-V 16 56): "0"=SHARP "1"=SOFT
+        private string _ifShapeA = "0";
+        public string IfShapeA { get => _ifShapeA; set => SetField(ref _ifShapeA, value); }
+        private string _ifShapeB = "0";
+        public string IfShapeB { get => _ifShapeB; set => SetField(ref _ifShapeB, value); }
 
         private int? _rfMain;
         public int? RFMain { get => _rfMain; set => SetField(ref _rfMain, value); }
@@ -272,12 +288,18 @@ namespace Yaesu_Web_Control.Services
         private string _nbB = "0";
         public string NbB { get => _nbB; set => SetField(ref _nbB, value); }
 
-        // SH command IF Width: "0"=200Hz "1"=400Hz "2"=600Hz "3"=850Hz "4"=1200Hz
-        //                      "5"=1400Hz "6"=1800Hz "7"=2400Hz "8"=3000Hz
-        private string _ifWidthA = "8";
+        // IC-7300 IF passband filter width, in Hz as a string (CI-V 1A 03).
+        // "" = unknown / mode has no adjustable width (FM).
+        private string _ifWidthA = "";
         public string IfWidthA { get => _ifWidthA; set => SetField(ref _ifWidthA, value); }
-        private string _ifWidthB = "8";
+        private string _ifWidthB = "";
         public string IfWidthB { get => _ifWidthB; set => SetField(ref _ifWidthB, value); }
+
+        // Selected IF filter slot: "1"=FIL1 "2"=FIL2 "3"=FIL3, "" = unknown.
+        private string _selectedFilterA = "";
+        public string SelectedFilterA { get => _selectedFilterA; set => SetField(ref _selectedFilterA, value); }
+        private string _selectedFilterB = "";
+        public string SelectedFilterB { get => _selectedFilterB; set => SetField(ref _selectedFilterB, value); }
 
         // IS command IF Shift: stored in Hz, -1000 to +1000. CAT encodes as 0000-9999 (center=5000=0Hz).
         private int _ifShiftA = 0;
@@ -313,6 +335,14 @@ namespace Yaesu_Web_Control.Services
 
         private bool _isConnected = false;
         public bool IsConnected { get => _isConnected; set => SetField(ref _isConnected, value); }
+
+        // Human-readable reason the link isn't up, shown as a banner on the home
+        // screen (empty string = nothing to show). Set by CivRadioController's
+        // connect attempt to distinguish "configured serial port not found" (a
+        // config/cabling problem the user can act on) from "port present but
+        // radio silent" (radio off). Broadcasts like any other property.
+        private string _connectionStatusText = "";
+        public string ConnectionStatusText { get => _connectionStatusText; set => SetField(ref _connectionStatusText, value ?? ""); }
 
         private string _bandA = "20m";
         public string BandA { get => _bandA; set => SetField(ref _bandA, value); }
@@ -451,9 +481,9 @@ namespace Yaesu_Web_Control.Services
         private int? _temperature;
         public int? Temperature { get => _temperature; set => SetField(ref _temperature, value); }
 
-        private int _afGainA = 128;
+        private int _afGainA;
         public int AfGainA { get => _afGainA; set => SetField(ref _afGainA, value); }
-        private int _afGainB = 128;
+        private int _afGainB;
         public int AfGainB { get => _afGainB; set => SetField(ref _afGainB, value); }
 
         private int _micGain = 50;
@@ -493,8 +523,8 @@ namespace Yaesu_Web_Control.Services
         private int _nrLevelB = 1;
         public int NrLevelB { get => _nrLevelB; set => SetField(ref _nrLevelB, value); }
 
-        // CW Pitch: code 0–75 = 300–1050 Hz in 10 Hz steps (KP command)
-        private int _cwPitch = 30; // default code 30 = 600 Hz
+        // CW Pitch: IC-7300 sidetone/pitch in Hz, 300–900 (CI-V 14 09)
+        private int _cwPitch = 600; // default 600 Hz
         public int CwPitch { get => _cwPitch; set => SetField(ref _cwPitch, value); }
 
         // RF Gain per VFO: 0–255 (RG command)
@@ -537,12 +567,13 @@ namespace Yaesu_Web_Control.Services
         private string _ctcssTone = "01";
         public string CtcssTone { get => _ctcssTone; set => SetField(ref _ctcssTone, value); }
 
-        // CW Keyer
+        // CW Keyer. Speed in WPM (6–48); break-in mode "0"/"1"/"2"; break-in
+        // delay stored as dots×10 (IC-7300 unit is dots, 2.0–13.0 → 20–130).
         private int _cwSpeed = 20;
         public int CwSpeed { get => _cwSpeed; set => SetField(ref _cwSpeed, value); }
         private string _cwBreakIn = "0";
         public string CwBreakIn { get => _cwBreakIn; set => SetField(ref _cwBreakIn, value); }
-        private int _cwBreakInDelay = 200;
+        private int _cwBreakInDelay = 30; // dots×10 → 3.0 dots
         public int CwBreakInDelay { get => _cwBreakInDelay; set => SetField(ref _cwBreakInDelay, value); }
 
         private bool _radioPowerOn = true; // Assume on when app starts
@@ -564,6 +595,106 @@ namespace Yaesu_Web_Control.Services
         // Split mode: 0 = OFF, 1 = ON (VFO A = RX, VFO B = TX), 2 = ON + Quick Split (+5 kHz)
         private int _splitMode = 0;
         public int SplitMode { get => _splitMode; set => SetField(ref _splitMode, value); }
+
+        // Snapshot of every UI-relevant state property, replayed to each newly
+        // connected SignalR client by RadioHub.OnConnectedAsync through the
+        // normal RadioStateUpdate envelope. Broadcasts only fire on *change*,
+        // so a browser that connects after initialization (second tab, another
+        // computer) would otherwise keep the frontend's JS defaults for any
+        // property not server-rendered in Index.cshtml — most visibly
+        // ActiveVfo/TxVfo/SplitMode, which made VFO A always look active on
+        // late-joining clients. Property names must match the handlers in
+        // wwwroot/js/ui/site.js. Meters are excluded (they stream at ~10 Hz).
+        public IReadOnlyList<KeyValuePair<string, object>> GetClientStateSnapshot()
+        {
+            return new List<KeyValuePair<string, object>>
+            {
+                new("IsConnected", IsConnected),
+                new("ConnectionStatusText", ConnectionStatusText ?? ""),
+                new("RadioPowerOn", RadioPowerOn),
+                new("FrequencyA", FrequencyA),
+                new("FrequencyB", FrequencyB),
+                new("BandA", BandA),
+                new("BandB", BandB),
+                new("ModeA", ModeA ?? ""),
+                new("ModeB", ModeB ?? ""),
+                new("AntennaA", AntennaA ?? ""),
+                new("AntennaB", AntennaB ?? ""),
+                new("ActiveVfo", ActiveVfo),
+                new("TxVfo", TxVfo),
+                new("SplitMode", SplitMode),
+                new("IsTransmitting", IsTransmitting),
+                new("Power", Power),
+                new("RoofingFilterA", RoofingFilterA ?? ""),
+                new("RoofingFilterB", RoofingFilterB ?? ""),
+                new("AgcA", AgcA),
+                new("AgcB", AgcB),
+                new("IpoA", IpoA),
+                new("IpoB", IpoB),
+                new("AttA", AttA),
+                new("AttB", AttB),
+                new("NrA", NrA),
+                new("NrB", NrB),
+                new("NrLevelA", NrLevelA),
+                new("NrLevelB", NrLevelB),
+                new("NbA", NbA),
+                new("NbB", NbB),
+                new("NbLevelA", NbLevelA),
+                new("NbLevelB", NbLevelB),
+                new("AutoNotchA", AutoNotchA),
+                new("AutoNotchB", AutoNotchB),
+                new("ManualNotchA", ManualNotchA),
+                new("ManualNotchB", ManualNotchB),
+                new("ManualNotchFreqA", ManualNotchFreqA),
+                new("ManualNotchFreqB", ManualNotchFreqB),
+                new("ManualNotchWidthA", ManualNotchWidthA),
+                new("ManualNotchWidthB", ManualNotchWidthB),
+                new("IfShapeA", IfShapeA),
+                new("IfShapeB", IfShapeB),
+                new("IfWidthA", IfWidthA),
+                new("IfWidthB", IfWidthB),
+                new("SelectedFilterA", SelectedFilterA),
+                new("SelectedFilterB", SelectedFilterB),
+                new("IfShiftA", IfShiftA),
+                new("IfShiftB", IfShiftB),
+                new("RxClarOn", RxClarOn),
+                new("TxClarOn", TxClarOn),
+                new("ClarifierOffsetA", ClarifierOffsetA),
+                new("ClarifierOffsetB", ClarifierOffsetB),
+                new("ContourOnA", ContourOnA),
+                new("ContourOnB", ContourOnB),
+                new("ContourFreqA", ContourFreqA),
+                new("ContourFreqB", ContourFreqB),
+                new("ApfOnA", ApfOnA),
+                new("ApfOnB", ApfOnB),
+                new("ApfFreqA", ApfFreqA),
+                new("ApfFreqB", ApfFreqB),
+                new("AfGainA", AfGainA),
+                new("AfGainB", AfGainB),
+                new("RfGainA", RfGainA),
+                new("RfGainB", RfGainB),
+                new("SquelchA", SquelchA),
+                new("SquelchB", SquelchB),
+                new("ProcEnabled", ProcEnabled),
+                new("ProcLevel", ProcLevel),
+                new("AtuEnabled", AtuEnabled),
+                new("AtuTuning", AtuTuning),
+                new("MonitorOn", MonitorOn),
+                new("MonitorLevelA", MonitorLevelA),
+                new("MonitorLevelB", MonitorLevelB),
+                new("VoxOn", VoxOn),
+                new("VoxGain", VoxGain),
+                new("VoxDelay", VoxDelay),
+                new("CwPitch", CwPitch),
+                new("CwSpeed", CwSpeed),
+                new("CwBreakIn", CwBreakIn),
+                new("CwBreakInDelay", CwBreakInDelay),
+                new("FmShiftDir", FmShiftDir),
+                new("FmOffsetHz", FmOffsetHz),
+                new("CtcssMode", CtcssMode),
+                new("CtcssTone", CtcssTone),
+            };
+        }
 
         public RadioState GetState()
         {
@@ -654,8 +785,14 @@ namespace Yaesu_Web_Control.Services
                 AutoNotchB = AutoNotchB,
                 ManualNotchA = ManualNotchA,
                 ManualNotchB = ManualNotchB,
+                ManualNotchWidthA = ManualNotchWidthA,
+                ManualNotchWidthB = ManualNotchWidthB,
+                IfShapeA = IfShapeA,
+                IfShapeB = IfShapeB,
                 IfWidthA = IfWidthA,
                 IfWidthB = IfWidthB,
+                SelectedFilterA = SelectedFilterA,
+                SelectedFilterB = SelectedFilterB,
                 IfShiftA = IfShiftA,
                 IfShiftB = IfShiftB,
                 ClarifierOffsetA = ClarifierOffsetA,

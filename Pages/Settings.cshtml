@@ -1,5 +1,5 @@
 ﻿@page
-@model Yaesu_Web_Control.Pages.SettingsModel
+@model Icom_Web_Control.Pages.SettingsModel
 
 <style>
     /* Collapsible Settings sections — native <details>/<summary> for
@@ -56,7 +56,7 @@
     {
         <div class="alert alert-warning border-3 d-flex flex-wrap align-items-center gap-3" role="alert" aria-live="polite">
             <div class="flex-grow-1">
-                <h5 class="mb-1"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart Yaesu Web Control to apply your changes</h5>
+                <h5 class="mb-1"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart Icom Web Control to apply your changes</h5>
                 <div class="mb-0">
                     You changed the <strong>@Model.RestartRequiredReason</strong>.
                     Most settings take effect immediately, but this one needs a restart so every part of the app — and any open browser tabs from before the change — picks up the new value cleanly.
@@ -64,7 +64,7 @@
             </div>
             <form method="post" asp-page-handler="Restart" class="m-0">
                 <button type="submit" class="btn btn-warning fw-bold"
-                        title="Stop the app and relaunch it. Your browser will briefly show the 'Yaesu Web Control has stopped' overlay; reload this tab when the app is back.">
+                        title="Stop the app and relaunch it. Your browser will briefly show the 'Icom Web Control has stopped' overlay; reload this tab when the app is back.">
                     <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Restart Now
                 </button>
             </form>
@@ -138,14 +138,7 @@
                         <dt class="col-sm-4">Radio Model:</dt>
                         <dd class="col-sm-8">
                             <code>@Model.Settings.RadioModel</code>
-                            @if (Model.Settings.RadioModel == "FTdx101MP")
-                            {
-                                <span class="badge bg-primary">200W</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-info">100W</span>
-                            }
+                            <span class="badge bg-info">100W</span>
                         </dd>
                         <dt class="col-sm-4">Serial Port:</dt>
                         <dd class="col-sm-8"><code>@Model.Settings.SerialPort</code></dd>
@@ -171,22 +164,6 @@
                                 <span class="badge bg-warning text-dark ms-1" title="Configured port differs — restart for it to take effect">configured: @Model.Settings.HttpPort</span>
                             }
                         </dd>
-                        <dt class="col-sm-4">SDR Device:</dt>
-                        <dd class="col-sm-8">
-                            @{
-                                var sdrA = Model.Settings.SdrDeviceKeyA;
-                                var sdrB = Model.Settings.SdrDeviceKeyB;
-                            }
-                            @if (string.IsNullOrEmpty(sdrA) && string.IsNullOrEmpty(sdrB))
-                            {
-                                <span class="text-muted">None</span>
-                            }
-                            else
-                            {
-                                @if (!string.IsNullOrEmpty(sdrA)) { <div><strong>VFO A:</strong> <code>@sdrA</code></div> }
-                                @if (!string.IsNullOrEmpty(sdrB)) { <div><strong>VFO B:</strong> <code>@sdrB</code></div> }
-                            }
-                        </dd>
                     </dl>
                 </div>
             </div>
@@ -195,16 +172,91 @@
 
     <form method="post" id="settingsForm">
 
+    <!-- Spectrum Display section -->
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-bar-chart-steps" aria-hidden="true"></i>&nbsp;Spectrum Display</summary>
+        <div class="section-body">
+            <p class="text-muted small mb-3">
+                The IC-7300 has a single receiver. <strong>Pseudo-dual receiver</strong> presents a
+                second "watch" spectrum panel alongside the one you're listening to, by time-sharing
+                the radio's scope. On the <em>same band</em> both panels update live and your audio is
+                never touched. Watching a <em>different</em> band is only possible by briefly borrowing
+                the receiver, which dips your listening audio for a fraction of a second each time.
+            </p>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="pseudoDualReceiverEnabled" asp-for="Settings.PseudoDualReceiverEnabled" />
+                <label class="form-check-label" for="pseudoDualReceiverEnabled">
+                    Enable pseudo-dual receiver (two spectrum panels)
+                </label>
+                <div class="form-text">
+                    Off by default — a single spectrum panel is the plain layout. When on, IWC shows a
+                    primary panel (the VFO you hear) and a watch panel (the other VFO), with a
+                    <em>Listen</em> button on each to swap which one you hear.
+                </div>
+            </div>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="pseudoDualCrossBandEnabled" asp-for="Settings.PseudoDualCrossBandEnabled" />
+                <label class="form-check-label" for="pseudoDualCrossBandEnabled">
+                    Allow cross-band watch (dips audio to peek at the other band)
+                </label>
+                <div class="form-text">
+                    Off = same-band only, and your audio is never interrupted; the watch panel shows
+                    <em>"out of range"</em> when the two VFOs are on different bands. On = IWC briefly
+                    retunes the receiver every few seconds to refresh a different watch band, dipping
+                    your listening audio for ~0.4&nbsp;s per peek. Useful for e.g. working 20&nbsp;m
+                    while watching 6&nbsp;m for an opening.
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="pseudoDualPeekIntervalSeconds">
+                    Cross-band peek interval (seconds)
+                </label>
+                <input type="number" min="5" max="60" step="1"
+                       class="form-control" style="max-width: 140px;"
+                       id="pseudoDualPeekIntervalSeconds"
+                       asp-for="Settings.PseudoDualPeekIntervalSeconds" />
+                <div class="form-text">
+                    How often the cross-band watch borrows the receiver (5–60&nbsp;s). Larger = fewer,
+                    rarer audio dips but a staler watch trace. Default 15&nbsp;s (≈4 brief dips/min).
+                    Ignored unless cross-band watch is on.
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="pseudoDualWatchSpanMode">
+                    Watch panel (VFO&nbsp;B) span buttons
+                </label>
+                <select class="form-select" style="max-width: 320px;"
+                        id="pseudoDualWatchSpanMode"
+                        asp-for="Settings.PseudoDualWatchSpanMode">
+                    <option value="ZoomIn">Zoom in independently (recommended)</option>
+                    <option value="Shared">Share one span with VFO A</option>
+                    <option value="Hidden">Hide VFO B's span buttons</option>
+                </select>
+                <div class="form-text">
+                    The radio has one scope with one span, so the watch panel is a crop of the same
+                    sweep — VFO&nbsp;B can never be <em>wider</em> than VFO&nbsp;A.
+                    <strong>Zoom in independently</strong> lets B's buttons tighten its view around the
+                    watch signal in software without changing A.
+                    <strong>Share one span</strong> makes B's buttons set the single physical span like
+                    A's (both panels follow it). <strong>Hide</strong> removes B's span buttons so only
+                    A controls the shared span.
+                </div>
+            </div>
+        </div>
+    </details>
+
     <!-- Accessibility section -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
         <summary><i class="bi bi-universal-access" aria-hidden="true"></i>&nbsp;Accessibility</summary>
         <div class="section-body">
             <p class="text-muted small mb-3">
-                Settings to make Yaesu Web Control easier to use for operators with disabilities.
+                Settings to make Icom Web Control easier to use for operators with disabilities.
                 The frequency display is fully keyboard-driven: focus it with Tab, then use ↑/↓ to step
                 the selected digit, ←/→ to move the selection, PageUp/PageDown for 10× steps, and
                 Home/End to jump to the most/least significant digit. Got a suggestion?
-                <a href="https://github.com/mm5agm/Yaesu_Web_Control/discussions" target="_blank" rel="noopener">Open a GitHub discussion</a>.
+                <a href="https://github.com/mm5agm/Icom_Web_Control/discussions" target="_blank" rel="noopener">Open a GitHub discussion</a>.
             </p>
             <div class="mb-3 form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch"
@@ -220,6 +272,39 @@
                     the main screen uncluttered for users who don't need them.
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="Settings_TxToggleKey">TX toggle key</label>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    @* data-val="false": optional blank must never get client-side
+                       required (same silent-block class of bug as #65). Server
+                       already ModelState.Remove's this field. *@
+                    <input asp-for="Settings.TxToggleKey"
+                           class="form-control"
+                           id="Settings_TxToggleKey"
+                           style="max-width: 220px;"
+                           readonly
+                           autocomplete="off"
+                           data-val="false"
+                           aria-describedby="txToggleKeyHelp txToggleKeyDisplay" />
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="txToggleKeySetBtn">
+                        Set key
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="txToggleKeyClearBtn">
+                        Clear
+                    </button>
+                    <span class="badge text-bg-warning" id="txToggleKeyCaptureBadge" style="display:none;">
+                        Press a key now
+                    </span>
+                </div>
+                <div class="form-text" id="txToggleKeyHelp">
+                    Optional browser shortcut for toggling transmit. Disabled when blank. For safety,
+                    IWC ignores this shortcut while you are typing in an input or text box.
+                </div>
+                <div class="form-text text-warning">
+                    Warning: this directly keys the transmitter. Choose a key you will not press by accident.
+                </div>
+                <div class="form-text" id="txToggleKeyDisplay"></div>
+            </div>
         </div>
     </details>
 
@@ -228,7 +313,7 @@
         <summary><i class="bi bi-mic-fill" aria-hidden="true"></i>&nbsp;Voice Control</summary>
         <div class="section-body">
             <p class="text-muted small mb-3">
-                Hands-free control of YWC via a PC microphone. Uses Windows' built-in speech recognition
+                Hands-free control of IWC via a PC microphone. Uses Windows' built-in speech recognition
                 (SAPI 5), so audio never leaves your computer.
                 A small mic button appears in the top navbar when enabled — press and hold it, speak a
                 command, release. The recognised text is interpreted as a CAT action (set frequency,
@@ -241,7 +326,7 @@
                     Enable voice control
                 </label>
                 <div class="form-text">
-                    Off by default. When enabled, YWC loads the Windows speech recogniser at startup
+                    Off by default. When enabled, IWC loads the Windows speech recogniser at startup
                     and shows the mic button in the navbar. Disable to hide the button and free the
                     recogniser. Requires the active language's speech pack (below) to be installed in
                     Windows (Settings → Time &amp; Language → Speech).
@@ -260,6 +345,40 @@
                 </div>
                 <div id="voiceLocaleMismatchBanner" class="mt-2"></div>
             </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="voiceInputDevice">Microphone</label>
+                <select class="form-select w-auto" id="voiceInputDevice">
+                    <option value="">Loading…</option>
+                </select>
+                <div class="form-text">
+                    Which microphone the speech recogniser listens to. Choose the mic you'll speak
+                    into — the change takes effect immediately, no restart. Leave on
+                    <em>Windows default recording device</em> to follow your system setting.
+                    Picking one here does <strong>not</strong> change your Windows default, so it
+                    won't disturb other apps (WSJT-X, etc.).
+                </div>
+                <div id="voiceInputDeviceNote" class="mt-2"></div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="voiceOutputDevice">Announcement speaker</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <select class="form-select w-auto" id="voiceOutputDevice">
+                        <option value="">Loading…</option>
+                    </select>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="voiceOutputTestBtn">
+                        <i class="bi bi-volume-up" aria-hidden="true"></i>&nbsp;Test
+                    </button>
+                </div>
+                <div class="form-text">
+                    Which speaker or headset the spoken confirmations play through. Leave on
+                    <em>Windows default playback device</em> to follow your system setting — but if
+                    your default is used by something else (WSJT-X, rig audio) you may never hear
+                    the announcements, so pick your own speakers here. Picking one does
+                    <strong>not</strong> change your Windows default. Press <em>Test</em> to check
+                    you can hear it.
+                </div>
+                <div id="voiceOutputDeviceNote" class="mt-2"></div>
+            </div>
             <div class="mb-3 form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch"
                        id="voiceSpokenConfirmationEnabled" asp-for="Settings.VoiceSpokenConfirmationEnabled" />
@@ -267,7 +386,7 @@
                     Speak confirmation after each voice command
                 </label>
                 <div class="form-text">
-                    When on, YWC speaks a short confirmation through the PC's default audio output after
+                    When on, IWC speaks a short confirmation through the PC's default audio output after
                     every recognised voice command — e.g. <em>"Move to fourteen point zero seven four megahertz, successful"</em>.
                     Key accessibility feature for operators who can't see the screen to verify whether a
                     command landed. Default on; turn off here if you find it chatty.
@@ -286,6 +405,10 @@
                     the source of any language pack you import, or you're hand-authoring your own commands.
                 </div>
             </div>
+            <!-- Save button injected here (see .section-save-anchor handler) so
+                 changing the mic/speaker/toggles above doesn't require scrolling
+                 past the whole Voice Phrases editor to reach a Save button. -->
+            <div class="section-save-anchor"></div>
             <!-- Voice Phrases editor -->
             <div class="mb-3">
                 <label class="form-label fw-semibold">Voice Phrases</label>
@@ -299,13 +422,13 @@
                     <em class="text-muted small">Loading…</em>
                 </div>
                 <div class="mt-2 d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-sm btn-primary" id="savePhrasesBtn" onclick="ywcSavePhrases()">
+                    <button type="button" class="btn btn-sm btn-primary" id="savePhrasesBtn" onclick="iwcSavePhrases()">
                         <i class="bi bi-floppy" aria-hidden="true"></i>&nbsp;Save phrases
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="validatePhrasesBtn" onclick="ywcValidatePhrases()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="validatePhrasesBtn" onclick="iwcValidatePhrases()">
                         <i class="bi bi-check2-circle" aria-hidden="true"></i>&nbsp;Validate
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="ywcResetPhrases()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="iwcResetPhrases()">
                         Reset to defaults
                     </button>
                 </div>
@@ -324,7 +447,7 @@
             </div>
             <div class="mb-3">
                 <button type="button" id="openGrammarsFolderBtn" class="btn btn-sm btn-outline-secondary"
-                        onclick="ywcOpenGrammarsFolder()">
+                        onclick="iwcOpenGrammarsFolder()">
                     <i class="bi bi-folder2-open" aria-hidden="true"></i>&nbsp;Open user grammars folder
                 </button>
                 <button type="button" id="testPackBtn" class="btn btn-sm btn-outline-secondary"
@@ -332,7 +455,7 @@
                     <i class="bi bi-mic" aria-hidden="true"></i>&nbsp;Test this pack
                 </button>
                 <div class="form-text">
-                    Opens <code>%APPDATA%\MM5AGM\Yaesu Web Control\Grammars\</code> in Explorer.
+                    Opens <code>%APPDATA%\MM5AGM\Icom Web Control\Grammars\</code> in Explorer.
                     The <code>Commands.&lt;culture&gt;.json</code> file above is the live, editable
                     command set; the matching <code>.srgs</code> file is a generated, human-readable
                     copy for reference and sharing — it is not loaded live by the speech engine.
@@ -351,13 +474,13 @@
                     </div>
                 </div>
                 <div class="mt-2 d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="exportPackBtn" onclick="ywcExportPhrases()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="exportPackBtn" onclick="iwcExportPhrases()">
                         <i class="bi bi-download" aria-hidden="true"></i>&nbsp;Export language pack
                     </button>
                 </div>
                 <div class="form-text">
                     Bundles the current phrases, a freshly generated <code>.srgs</code> reference copy, and
-                    this metadata into a <code>YWC-VoicePack-en-GB-vN.zip</code> you can share or attach to
+                    this metadata into a <code>IWC-VoicePack-en-GB-vN.zip</code> you can share or attach to
                     a GitHub Discussion post. Exporting increments the pack version.
                 </div>
                 <div id="packExportStatus" class="form-text mt-1" aria-live="polite"></div>
@@ -365,7 +488,7 @@
             <div class="mb-3">
                 <label class="form-label">Version history</label>
                 <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="loadHistoryBtn" onclick="ywcLoadHistory()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="loadHistoryBtn" onclick="iwcLoadHistory()">
                         <i class="bi bi-clock-history" aria-hidden="true"></i>&nbsp;Show version history
                     </button>
                 </div>
@@ -378,14 +501,23 @@
             </div>
             <div class="mb-3">
                 <label class="form-label">Import language pack</label>
+                <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="setupUsVoiceBtn" onclick="iwcSetupUsEnglishVoice()">
+                        <i class="bi bi-translate" aria-hidden="true"></i>&nbsp;Install US English voice pack
+                    </button>
+                    <span class="form-text mb-0">
+                        One click for operators whose Windows is set to <strong>English (United States)</strong> —
+                        installs the bundled US pack and makes it the active language. The built-in default is en-GB.
+                    </span>
+                </div>
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <input type="file" class="form-control form-control-sm w-auto" id="importPackFile" accept=".zip">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="previewImportBtn" onclick="ywcPreviewImport()">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="previewImportBtn" onclick="iwcPreviewImport()">
                         <i class="bi bi-upload" aria-hidden="true"></i>&nbsp;Preview import
                     </button>
                 </div>
                 <div class="form-text">
-                    Pick a <code>YWC-VoicePack-&lt;culture&gt;-vN.zip</code> exported from this or another
+                    Or pick any <code>IWC-VoicePack-&lt;culture&gt;-vN.zip</code> exported from this or another
                     install. Nothing is written until you review the preview below and click Install.
                 </div>
                 <div id="importPreviewResults" class="mt-2"></div>
@@ -395,7 +527,7 @@
             // Pull /api/voice/status to (re)populate diagnostics -- on Settings
             // load, and again after a locale switch since the engine state
             // (and possibly the error message) changes with it.
-            async function ywcRefreshVoiceDiagnostics() {
+            async function iwcRefreshVoiceDiagnostics() {
                 const el = document.getElementById('voiceDiagnostics');
                 if (!el) return;
                 try {
@@ -424,7 +556,7 @@
                     el.innerHTML = '<span class="text-danger">Could not query voice diagnostics: ' + escapeHtml(String(e)) + '</span>';
                 }
             }
-            ywcRefreshVoiceDiagnostics();
+            iwcRefreshVoiceDiagnostics();
             function escapeHtml(s) {
                 return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             }
@@ -441,7 +573,7 @@
                     '<a href="ms-settings:speech" target="_blank" rel="noopener">Settings → Time &amp; Language → Speech</a>.</div>';
             }
 
-            async function ywcLoadLocales() {
+            async function iwcLoadLocales() {
                 const select = document.getElementById('voiceActiveLocale');
                 if (!select) return;
                 try {
@@ -475,14 +607,14 @@
                         const data = await r.json();
                         if (!r.ok) {
                             alert('Could not switch language: ' + (data.error || ('HTTP ' + r.status)));
-                            await ywcLoadLocales();
+                            await iwcLoadLocales();
                             return;
                         }
                         renderLocaleMismatchBanner(culture, displayName, data.hasWindowsRecognizer);
                         // The Voice Phrases editor below still only edits the
                         // en-GB pack (per-locale editing is a later phase) --
                         // only the engine state actually changes here.
-                        ywcRefreshVoiceDiagnostics();
+                        iwcRefreshVoiceDiagnostics();
                     } catch (e) {
                         alert('Could not switch language: ' + e);
                     } finally {
@@ -490,9 +622,160 @@
                     }
                 });
             })();
-            ywcLoadLocales();
+            iwcLoadLocales();
 
-            async function ywcOpenGrammarsFolder() {
+            // ── Microphone picker ──────────────────────────────────────────
+            // System.Speech can't target a device by name, so the chosen mic is
+            // captured server-side and fed to SAPI. This just lists devices and
+            // POSTs the pick; VoiceControlService rebinds live (no restart).
+
+            function renderMicNote(msg) {
+                const note = document.getElementById('voiceInputDeviceNote');
+                if (!note) return;
+                note.innerHTML = msg
+                    ? '<div class="alert alert-warning py-1 px-2 small mb-0">' + escapeHtml(msg) + '</div>'
+                    : '';
+            }
+
+            async function iwcLoadMicrophones() {
+                const select = document.getElementById('voiceInputDevice');
+                if (!select) return;
+                try {
+                    const r = await fetch('/api/voice/microphones');
+                    if (!r.ok) { select.innerHTML = '<option value="">Failed to load</option>'; return; }
+                    const data = await r.json();
+                    let html = '<option value=""' + (data.usingDefault ? ' selected' : '') +
+                        '>Windows default recording device</option>';
+                    html += data.devices.map(d =>
+                        '<option value="' + escapeHtml(d.name) + '"' + (d.isSelected ? ' selected' : '') + '>' +
+                        escapeHtml(d.name) + '</option>').join('');
+                    // A saved device that's no longer plugged in: show it so the
+                    // user sees what's selected rather than a silent revert.
+                    if (!data.usingDefault && !data.selectedPresent && data.selected) {
+                        html += '<option value="' + escapeHtml(data.selected) + '" selected>' +
+                            escapeHtml(data.selected) + ' (not connected)</option>';
+                    }
+                    select.innerHTML = html;
+                    renderMicNote((!data.usingDefault && !data.selectedPresent)
+                        ? 'The saved microphone isn’t connected right now. Reconnect it, or pick another.'
+                        : '');
+                } catch (e) {
+                    select.innerHTML = '<option value="">Failed to load</option>';
+                }
+            }
+
+            (function () {
+                const select = document.getElementById('voiceInputDevice');
+                if (!select) return;
+                select.addEventListener('change', async function () {
+                    const name = select.value;
+                    select.disabled = true;
+                    try {
+                        const r = await fetch('/api/voice/microphone', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name }),
+                        });
+                        if (!r.ok) {
+                            const data = await r.json().catch(() => ({}));
+                            alert('Could not switch microphone: ' + (data.error || ('HTTP ' + r.status)));
+                            await iwcLoadMicrophones();
+                            return;
+                        }
+                        renderMicNote('');
+                        iwcRefreshVoiceDiagnostics();
+                    } catch (e) {
+                        alert('Could not switch microphone: ' + e);
+                    } finally {
+                        select.disabled = false;
+                    }
+                });
+            })();
+            iwcLoadMicrophones();
+
+            // ── Speaker (announcement) picker ──────────────────────────────
+            // System.Speech can't target an output device by name, so the chosen
+            // speaker is rendered-and-played server-side. Lists devices, POSTs the
+            // pick (applied live, no restart), and offers a Test button.
+
+            function renderSpeakerNote(msg) {
+                const note = document.getElementById('voiceOutputDeviceNote');
+                if (!note) return;
+                note.innerHTML = msg
+                    ? '<div class="alert alert-warning py-1 px-2 small mb-0">' + escapeHtml(msg) + '</div>'
+                    : '';
+            }
+
+            async function iwcLoadSpeakers() {
+                const select = document.getElementById('voiceOutputDevice');
+                if (!select) return;
+                try {
+                    const r = await fetch('/api/voice/speakers');
+                    if (!r.ok) { select.innerHTML = '<option value="">Failed to load</option>'; return; }
+                    const data = await r.json();
+                    let html = '<option value=""' + (data.usingDefault ? ' selected' : '') +
+                        '>Windows default playback device</option>';
+                    html += data.devices.map(d =>
+                        '<option value="' + escapeHtml(d.name) + '"' + (d.isSelected ? ' selected' : '') + '>' +
+                        escapeHtml(d.name) + '</option>').join('');
+                    if (!data.usingDefault && !data.selectedPresent && data.selected) {
+                        html += '<option value="' + escapeHtml(data.selected) + '" selected>' +
+                            escapeHtml(data.selected) + ' (not connected)</option>';
+                    }
+                    select.innerHTML = html;
+                    renderSpeakerNote((!data.usingDefault && !data.selectedPresent)
+                        ? 'The saved speaker isn’t connected right now. Reconnect it, or pick another.'
+                        : '');
+                } catch (e) {
+                    select.innerHTML = '<option value="">Failed to load</option>';
+                }
+            }
+
+            (function () {
+                const select = document.getElementById('voiceOutputDevice');
+                if (select) {
+                    select.addEventListener('change', async function () {
+                        const name = select.value;
+                        select.disabled = true;
+                        try {
+                            const r = await fetch('/api/voice/speaker', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name }),
+                            });
+                            if (!r.ok) {
+                                const data = await r.json().catch(() => ({}));
+                                alert('Could not switch speaker: ' + (data.error || ('HTTP ' + r.status)));
+                                await iwcLoadSpeakers();
+                                return;
+                            }
+                            renderSpeakerNote('');
+                        } catch (e) {
+                            alert('Could not switch speaker: ' + e);
+                        } finally {
+                            select.disabled = false;
+                        }
+                    });
+                }
+                const testBtn = document.getElementById('voiceOutputTestBtn');
+                if (testBtn) {
+                    testBtn.addEventListener('click', async function () {
+                        testBtn.disabled = true;
+                        try {
+                            await fetch('/api/voice/speaker-test', { method: 'POST' });
+                        } catch (e) {
+                            alert('Could not play test announcement: ' + e);
+                        } finally {
+                            // Re-enable after a moment so it can't be spammed while
+                            // the phrase is still playing.
+                            setTimeout(() => { testBtn.disabled = false; }, 1500);
+                        }
+                    });
+                }
+            })();
+            iwcLoadSpeakers();
+
+            async function iwcOpenGrammarsFolder() {
                 try {
                     const r = await fetch('/api/voice/open-grammars-folder', { method: 'POST' });
                     if (!r.ok) alert('Could not open grammars folder (status ' + r.status + ')');
@@ -522,7 +805,7 @@
 
             // ── Language Pack metadata + export ───────────────────────────
 
-            async function ywcLoadPackMetadata() {
+            async function iwcLoadPackMetadata() {
                 try {
                     const r = await fetch('/api/voice/phrases/metadata');
                     if (!r.ok) return;
@@ -533,9 +816,9 @@
                     // Non-critical — the fields just stay blank.
                 }
             }
-            ywcLoadPackMetadata();
+            iwcLoadPackMetadata();
 
-            async function ywcExportPhrases() {
+            async function iwcExportPhrases() {
                 const status = document.getElementById('packExportStatus');
                 const btn = document.getElementById('exportPackBtn');
                 btn.disabled = true;
@@ -565,7 +848,7 @@
             // the source instead of an upload), so failures/warnings render
             // the same way an import's would.
 
-            async function ywcLoadHistory() {
+            async function iwcLoadHistory() {
                 const el = document.getElementById('voiceHistoryResults');
                 el.innerHTML = '<em class="text-muted small">Loading…</em>';
                 try {
@@ -584,7 +867,7 @@
                             '<td>v' + escapeHtml(String(s.version ?? '?')) + '</td>' +
                             '<td>' + escapeHtml(s.author || '—') + '</td>' +
                             '<td>' + escapeHtml(s.description || '—') + '</td>' +
-                            '<td><button type="button" class="btn btn-sm btn-outline-warning" onclick="ywcRestoreHistory(' +
+                            '<td><button type="button" class="btn btn-sm btn-outline-warning" onclick="iwcRestoreHistory(' +
                                 JSON.stringify(s.snapshotId) + ')">Restore</button></td></tr>';
                     }
                     html += '</tbody></table></div>';
@@ -594,7 +877,7 @@
                 }
             }
 
-            async function ywcRestoreHistory(snapshotId) {
+            async function iwcRestoreHistory(snapshotId) {
                 if (!confirm('Restore this version? The current phrases will be saved to history first, so this can be undone.'))
                     return;
                 try {
@@ -609,9 +892,9 @@
                         return;
                     }
                     alert('Restored.' + (data.warnings && data.warnings.length ? ' ' + data.warnings.length + ' warning(s) — check the phrases editor.' : ''));
-                    ywcLoadPhrases();
-                    ywcLoadPackMetadata();
-                    ywcLoadHistory();
+                    iwcLoadPhrases();
+                    iwcLoadPackMetadata();
+                    iwcLoadHistory();
                 } catch (e) {
                     alert('Restore failed: ' + e);
                 }
@@ -620,13 +903,13 @@
             // ── Language Pack import (§3.2) ───────────────────────────────
             // Two-step, mirroring the server: preview (upload + validate,
             // nothing written) then install (re-validated server-side,
-            // actually writes the pack). ywcImportPreview holds the parsed
+            // actually writes the pack). iwcImportPreview holds the parsed
             // config/meta from the preview step so install can post them
             // straight back without re-uploading the ZIP.
 
-            let ywcImportPreview = null;
+            let iwcImportPreview = null;
 
-            async function ywcPreviewImport() {
+            async function iwcPreviewImport() {
                 const fileInput = document.getElementById('importPackFile');
                 const resultsEl = document.getElementById('importPreviewResults');
                 const btn = document.getElementById('previewImportBtn');
@@ -634,7 +917,7 @@
                     resultsEl.innerHTML = '<span class="text-danger">Choose a .zip file first.</span>';
                     return;
                 }
-                ywcImportPreview = null;
+                iwcImportPreview = null;
                 btn.disabled = true;
                 resultsEl.innerHTML = '<em class="text-muted">Validating…</em>';
                 try {
@@ -646,7 +929,7 @@
                         resultsEl.innerHTML = '<span class="text-danger">' + escapeHtml(data.error || ('HTTP ' + r.status)) + '</span>';
                         return;
                     }
-                    ywcImportPreview = data;
+                    iwcImportPreview = data;
                     renderImportPreview(data);
                 } catch (e) {
                     resultsEl.innerHTML = '<span class="text-danger">Preview failed: ' + escapeHtml(String(e)) + '</span>';
@@ -694,14 +977,14 @@
                 if (canInstall) {
                     html += '<div class="d-flex gap-2 align-items-center flex-wrap mt-1">';
                     if (data.alreadyInstalled) {
-                        html += '<select class="form-select form-select-sm w-auto" id="importMergeStrategy" onchange="ywcToggleCollisionsPicker()">' +
+                        html += '<select class="form-select form-select-sm w-auto" id="importMergeStrategy" onchange="iwcToggleCollisionsPicker()">' +
                             '<option value="replace">Replace existing pack</option>' +
                             '<option value="merge">Merge — keep existing Custom Commands, add new ones</option>' +
                             '</select>';
                     }
                     const warnCount = (data.warnings || []).length;
                     const label = warnCount ? ('Install with ' + warnCount + ' warning' + (warnCount === 1 ? '' : 's')) : 'Install';
-                    html += '<button type="button" class="btn btn-sm btn-primary" id="installImportBtn" onclick="ywcInstallImport()">' +
+                    html += '<button type="button" class="btn btn-sm btn-primary" id="installImportBtn" onclick="iwcInstallImport()">' +
                         escapeHtml(label) + '</button>';
                     html += '</div>';
                 }
@@ -735,18 +1018,18 @@
 
                 html += '</div>';
                 resultsEl.innerHTML = html;
-                ywcToggleCollisionsPicker();
+                iwcToggleCollisionsPicker();
             }
 
-            function ywcToggleCollisionsPicker() {
+            function iwcToggleCollisionsPicker() {
                 const picker = document.getElementById('importCollisionsPicker');
                 if (!picker) return;
                 const mergeSelect = document.getElementById('importMergeStrategy');
                 picker.style.display = (mergeSelect && mergeSelect.value === 'merge') ? '' : 'none';
             }
 
-            async function ywcInstallImport() {
-                if (!ywcImportPreview) return;
+            async function iwcInstallImport() {
+                if (!iwcImportPreview) return;
                 const resultsEl = document.getElementById('importPreviewResults');
                 const btn = document.getElementById('installImportBtn');
                 const mergeSelect = document.getElementById('importMergeStrategy');
@@ -764,9 +1047,9 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            culture: ywcImportPreview.culture,
-                            config: ywcImportPreview.config,
-                            meta: ywcImportPreview.meta,
+                            culture: iwcImportPreview.culture,
+                            config: iwcImportPreview.config,
+                            meta: iwcImportPreview.meta,
                             mergeStrategy: mergeStrategy,
                             collisionResolutions: collisionResolutions,
                         }),
@@ -777,7 +1060,7 @@
                             renderValidationResults(data.errors || [], []);
                         return;
                     }
-                    const culture = ywcImportPreview.culture;
+                    const culture = iwcImportPreview.culture;
                     let msg = '<span class="text-success">Installed ' + escapeHtml(culture) + '.</span>';
                     if (data.collisionsResolved && data.collisionsResolved.length) {
                         const kept = data.collisionsResolved.filter(c => c.kept === 'mine').map(c => c.name);
@@ -786,17 +1069,102 @@
                         if (took.length) msg += ' Took the imported versions of: ' + took.map(escapeHtml).join(', ') + '.';
                     }
                     resultsEl.innerHTML = msg;
-                    ywcImportPreview = null;
+                    iwcImportPreview = null;
                     document.getElementById('importPackFile').value = '';
                     // The editor and metadata panel show the active (en-GB)
                     // pack — refresh them so an en-GB import is visible
                     // immediately instead of only after a page reload.
                     if (culture.toLowerCase() === 'en-gb') {
-                        ywcLoadPhrases();
-                        ywcLoadPackMetadata();
+                        iwcLoadPhrases();
+                        iwcLoadPackMetadata();
                     }
                 } catch (e) {
                     resultsEl.innerHTML = '<span class="text-danger">Install failed: ' + escapeHtml(String(e)) + '</span>';
+                } finally {
+                    if (btn) btn.disabled = false;
+                }
+            }
+
+            // One-click setup for US operators: load the bundled en-US pack,
+            // install it, and switch the active recognition locale to en-US —
+            // the default en-GB pack has no recogniser on a US Windows install,
+            // so an en-US machine needs both steps to get voice working.
+            async function iwcSetupUsEnglishVoice() {
+                const resultsEl = document.getElementById('importPreviewResults');
+                const btn = document.getElementById('setupUsVoiceBtn');
+                if (btn) btn.disabled = true;
+                resultsEl.innerHTML = '<em class="text-muted">Setting up US English voice…</em>';
+                try {
+                    // 1. Load the pack that ships inside the installer.
+                    const packResp = await fetch('/voice-packs/IWC-VoicePack-en-US-v1.zip');
+                    if (!packResp.ok) {
+                        resultsEl.innerHTML = '<span class="text-danger">Couldn\'t load the bundled US English pack (HTTP ' +
+                            packResp.status + ').</span>';
+                        return;
+                    }
+                    const blob = await packResp.blob();
+
+                    // 2. Preview — validates the pack and reports whether Windows
+                    //    has the matching speech recogniser installed.
+                    const fd = new FormData();
+                    fd.append('pack', blob, 'IWC-VoicePack-en-US-v1.zip');
+                    const pv = await fetch('/api/voice/phrases/import/preview', { method: 'POST', body: fd });
+                    const preview = await pv.json();
+                    if (!pv.ok) {
+                        resultsEl.innerHTML = '<span class="text-danger">' + escapeHtml(preview.error || ('HTTP ' + pv.status)) + '</span>';
+                        return;
+                    }
+                    if (preview.errors && preview.errors.length) {
+                        resultsEl.innerHTML = '<span class="text-danger">The bundled US pack failed validation.</span>' +
+                            renderValidationResults(preview.errors, preview.warnings || []);
+                        return;
+                    }
+
+                    // 3. Install (replace any existing en-US pack).
+                    const inst = await fetch('/api/voice/phrases/import/install', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            culture: preview.culture,
+                            config: preview.config,
+                            meta: preview.meta,
+                            mergeStrategy: 'replace',
+                            collisionResolutions: null,
+                        }),
+                    });
+                    const instData = await inst.json();
+                    if (!inst.ok) {
+                        resultsEl.innerHTML = '<span class="text-danger">' + escapeHtml(instData.error || ('HTTP ' + inst.status)) + '</span>';
+                        return;
+                    }
+
+                    // 4. Make en-US the active recognition locale.
+                    const loc = await fetch('/api/voice/locale', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ culture: preview.culture }),
+                    });
+                    const locData = await loc.json().catch(() => ({}));
+
+                    // 5. Report, flagging the one thing IWC can't do for them —
+                    //    installing the Windows en-US speech recogniser.
+                    let msg = '<div class="alert alert-success py-2 px-2 mb-0">US English voice pack installed and set as the active language.';
+                    if (!preview.hasWindowsRecognizer) {
+                        msg += ' <strong>Windows has no US English speech recogniser installed yet</strong> — add it in ' +
+                            '<a href="ms-settings:speech" target="_blank" rel="noopener">Settings → Time &amp; Language → Speech</a>, ' +
+                            'then restart IWC.';
+                    } else {
+                        msg += ' Make sure <em>Enable voice control</em> is ticked, then restart IWC if the mic button isn\'t already showing.';
+                    }
+                    msg += '</div>';
+                    resultsEl.innerHTML = msg;
+
+                    // Reflect the switch in the locale dropdown and diagnostics.
+                    iwcImportPreview = null;
+                    iwcLoadLocales();
+                    iwcRefreshVoiceDiagnostics();
+                } catch (e) {
+                    resultsEl.innerHTML = '<span class="text-danger">Setup failed: ' + escapeHtml(String(e)) + '</span>';
                 } finally {
                     if (btn) btn.disabled = false;
                 }
@@ -1070,7 +1438,7 @@
                 }
 
                 const tryBtn = e.target.closest('[data-action="try-it"]');
-                if (tryBtn) { ywcTryItPhrase(tryBtn); return; }
+                if (tryBtn) { iwcTryItPhrase(tryBtn); return; }
 
                 const delBtn = e.target.closest('[data-action="delete-macro"]');
                 if (delBtn) { delBtn.closest('tr').remove(); return; }
@@ -1156,7 +1524,7 @@
             // §2.5 per-row "Try it": tests just the phrases in this row's
             // input against a scoped 3-second recognition, without saving
             // anything or touching the live grammar's own state afterwards.
-            async function ywcTryItPhrase(btn) {
+            async function iwcTryItPhrase(btn) {
                 const tr = btn.closest('tr');
                 const input = tr.querySelector('input[data-path], .macro-phrases');
                 const resultEl = tr.querySelector('.try-it-result');
@@ -1211,7 +1579,7 @@
             // in the editor and flags any phrase that appears more than once
             // (e.g. the same trigger word accidentally added to two
             // different commands, which SAPI would then match ambiguously).
-            function ywcCheckDuplicatePhrases() {
+            function iwcCheckDuplicatePhrases() {
                 const seen = new Map(); // lowercased phrase -> count
                 document.querySelectorAll('#voicePhrasesEditor input[data-path], #voicePhrasesEditor .macro-phrases').forEach(input => {
                     input.classList.remove('is-invalid');
@@ -1237,7 +1605,7 @@
             // §2.5 autosave: debounced draft POST on every editor keystroke,
             // so a browser refresh mid-edit doesn't lose unsaved work.
             let _draftSaveTimer = null;
-            function ywcScheduleDraftSave() {
+            function iwcScheduleDraftSave() {
                 if (_draftSaveTimer) clearTimeout(_draftSaveTimer);
                 _draftSaveTimer = setTimeout(async () => {
                     if (!_phrasesConfig) return;
@@ -1254,11 +1622,11 @@
             document.addEventListener('input', function (e) {
                 const editorRoot = document.getElementById('voicePhrasesEditor');
                 if (!editorRoot || !editorRoot.contains(e.target)) return;
-                ywcCheckDuplicatePhrases();
-                ywcScheduleDraftSave();
+                iwcCheckDuplicatePhrases();
+                iwcScheduleDraftSave();
             });
 
-            async function ywcLoadPhrases(url) {
+            async function iwcLoadPhrases(url) {
                 const el = document.getElementById('voicePhrasesEditor');
                 try {
                     const r = await fetch(url || '/api/voice/phrases');
@@ -1267,18 +1635,18 @@
                     el.innerHTML = '<div id="phrasesDuplicateWarning"></div><div id="phrasesDraftBanner"></div>' + buildPhrasesEditor(_phrasesConfig);
                     const resultsEl = document.getElementById('phrasesValidationResults');
                     if (resultsEl) resultsEl.innerHTML = '';
-                    ywcCheckDuplicatePhrases();
+                    iwcCheckDuplicatePhrases();
                     // §2.5: offer to restore an autosaved draft left over from
                     // an interrupted edit (browser refresh/crash), but only
                     // when loading the real installed pack -- not after a
                     // Reset-to-defaults preview.
-                    if (!url) await ywcCheckForDraft();
+                    if (!url) await iwcCheckForDraft();
                 } catch (e) {
                     el.innerHTML = '<span class="text-danger">Error loading phrases: ' + escapeHtml(String(e)) + '</span>';
                 }
             }
 
-            async function ywcCheckForDraft() {
+            async function iwcCheckForDraft() {
                 const bannerEl = document.getElementById('phrasesDraftBanner');
                 if (!bannerEl) return;
                 try {
@@ -1288,24 +1656,24 @@
                     bannerEl.innerHTML =
                         '<div class="alert alert-info py-1 px-2 small mb-2 d-flex justify-content-between align-items-center">' +
                         '<span>You have unsaved changes from a previous editing session.</span>' +
-                        '<span><button type="button" class="btn btn-sm btn-primary me-1" onclick="ywcRestoreDraft()">Restore</button>' +
-                        '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="ywcDiscardDraft()">Discard</button></span>' +
+                        '<span><button type="button" class="btn btn-sm btn-primary me-1" onclick="iwcRestoreDraft()">Restore</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="iwcDiscardDraft()">Discard</button></span>' +
                         '</div>';
-                    window._ywcPendingDraft = data.config;
+                    window._iwcPendingDraft = data.config;
                 } catch { /* best-effort */ }
             }
 
-            function ywcRestoreDraft() {
-                if (!window._ywcPendingDraft) return;
-                _phrasesConfig = window._ywcPendingDraft;
-                window._ywcPendingDraft = null;
+            function iwcRestoreDraft() {
+                if (!window._iwcPendingDraft) return;
+                _phrasesConfig = window._iwcPendingDraft;
+                window._iwcPendingDraft = null;
                 const el = document.getElementById('voicePhrasesEditor');
                 el.innerHTML = '<div id="phrasesDuplicateWarning"></div><div id="phrasesDraftBanner"></div>' + buildPhrasesEditor(_phrasesConfig);
-                ywcCheckDuplicatePhrases();
+                iwcCheckDuplicatePhrases();
             }
 
-            async function ywcDiscardDraft() {
-                window._ywcPendingDraft = null;
+            async function iwcDiscardDraft() {
+                window._iwcPendingDraft = null;
                 const bannerEl = document.getElementById('phrasesDraftBanner');
                 if (bannerEl) bannerEl.innerHTML = '';
                 try { await fetch('/api/voice/phrases/draft/discard', { method: 'POST' }); } catch { /* best-effort */ }
@@ -1323,7 +1691,7 @@
                 return html;
             }
 
-            async function ywcValidatePhrases() {
+            async function iwcValidatePhrases() {
                 if (!_phrasesConfig) return;
                 const resultsEl = document.getElementById('phrasesValidationResults');
                 const btn = document.getElementById('validatePhrasesBtn');
@@ -1345,7 +1713,7 @@
                 }
             }
 
-            async function ywcSavePhrases() {
+            async function iwcSavePhrases() {
                 if (!_phrasesConfig) return;
                 const status = document.getElementById('phrasesSaveStatus');
                 const resultsEl = document.getElementById('phrasesValidationResults');
@@ -1380,9 +1748,9 @@
                 }
             }
 
-            async function ywcResetPhrases() {
+            async function iwcResetPhrases() {
                 if (!confirm('Reset all phrases to the built-in English (UK) defaults?')) return;
-                await ywcLoadPhrases('/api/voice/phrases/defaults');
+                await iwcLoadPhrases('/api/voice/phrases/defaults');
                 document.getElementById('phrasesSaveStatus').innerHTML = '<span class="text-warning">Defaults loaded — click Save phrases to apply.</span>';
             }
 
@@ -1395,10 +1763,10 @@
                 const details = document.querySelector('details.settings-section:has(#voicePhrasesEditor)');
                 if (details) {
                     details.addEventListener('toggle', function onToggle() {
-                        if (details.open && !_phrasesConfig) ywcLoadPhrases();
+                        if (details.open && !_phrasesConfig) iwcLoadPhrases();
                     });
                     // Also load immediately if the section starts open.
-                    if (details.open) ywcLoadPhrases();
+                    if (details.open) iwcLoadPhrases();
                 }
             })();
 
@@ -1516,89 +1884,14 @@
                         <div class="mb-3">
                             <label asp-for="Settings.RadioModel" class="form-label">Radio Model</label>
                             <select asp-for="Settings.RadioModel" class="form-select">
-                                <option value="FTdx101MP">FTdx101MP</option>
-                                <option value="FTdx101D">FTdx101D</option>
-                                <option value="FTdx10">FTdx10</option>
-                                <option value="FT-710">FT-710</option>
-                                <option value="FTDX3000">FTDX3000</option>
+                                <option value="IC-7300MK2">IC-7300 MkII</option>
+                                <option value="IC-7300">IC-7300</option>
                             </select>
                             <div class="form-text">
-                                <strong>FTdx101MP:</strong> 200W output, dual receivers (VFO A + VFO B shown by default)<br />
-                                <strong>FTdx101D:</strong> 100W output, dual receivers (VFO A + VFO B shown by default)<br />
-                                <strong>FTdx10:</strong> 100W output, single receiver (VFO B for split/memory)<br />
-                                <strong>FT-710:</strong> 100W output, single receiver (VFO B for split/memory)<br />
-                                <strong>FTDX3000:</strong> 100W output, single receiver, SDR IF output available (9 MHz)
+                                <strong>IC-7300 MkII:</strong> 100W output, single receiver, HF + 6m + 4m (EU), built-in real-time scope over CI-V<br />
+                                <strong>IC-7300:</strong> 100W output, single receiver, HF + 6m, built-in real-time scope over CI-V
                             </div>
                             <span asp-validation-for="Settings.RadioModel" class="text-danger"></span>
-                        </div>
-                        <div class="mb-3" id="optionalFiltersSection">
-                            <!-- Forces the form to always post this key, even with every filter unchecked — otherwise the binder leaves the list at its default instead of empty. -->
-                            <input type="hidden" name="Settings.InstalledRoofingFilters" value="" />
-                            <label class="form-label fw-bold">Roofing Filters Installed</label>
-                            <div id="filtersMpNote" style="display:@(Model.Settings.RadioModel == "FTdx101MP" ? "block" : "none")">
-                                <div class="alert alert-info py-2 mb-0">
-                                    The FTdx101MP comes with all roofing filters fitted as standard: 12 kHz, 3 kHz, 1.2 kHz, 600 Hz, and 300 Hz. No configuration is needed.
-                                </div>
-                            </div>
-                            <div id="filtersDSection" style="display:@(Model.Settings.RadioModel == "FTdx101D" ? "block" : "none")">
-                                <div class="form-text mb-2">
-                                    The FTdx101D comes with 12 kHz, 3 kHz, and 600 Hz fitted as standard.
-                                    Tick any optional filters you have installed so the app only shows filters that are actually available.
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter8" name="Settings.InstalledRoofingFilters" value="8"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("8") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter8">1.2 kHz (optional)</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filterA" name="Settings.InstalledRoofingFilters" value="A"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("A") ? "checked" : "") />
-                                    <label class="form-check-label" for="filterA">300 Hz (optional)</label>
-                                </div>
-                                <div class="form-text text-muted mt-1">
-                                    12 kHz, 3 kHz, and 600 Hz are always shown (standard on FTdx101D).
-                                </div>
-                            </div>
-                            <div id="filtersFtdx10Section" style="display:@(Model.Settings.RadioModel == "FTdx10" ? "block" : "none")">
-                                <div class="alert alert-info py-2 mb-2">
-                                    The FTdx10 selects its roofing filter automatically — there is no CAT command to control it.
-                                    The radio switches to the appropriate filter based on DSP bandwidth and mode.
-                                    Tick any optional filters you have installed for your own reference.
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter4" name="Settings.InstalledRoofingFilters" value="4"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("4") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter4">1.2 kHz installed (optional — YF-130CN)</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter5" name="Settings.InstalledRoofingFilters" value="5"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("5") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter5">300 Hz installed (optional — YF-130CW)</label>
-                                </div>
-                            </div>
-                            <div id="filtersFt710Section" style="display:@(Model.Settings.RadioModel == "FT-710" ? "block" : "none")">
-                                <div class="alert alert-info py-2 mb-0">
-                                    The FT-710 has no roofing filter CAT command — the radio selects its filter
-                                    automatically based on DSP bandwidth and mode. No configuration is needed.
-                                </div>
-                            </div>
-                            <div id="filtersFtdx3000Section" style="display:@(Model.Settings.RadioModel == "FTDX3000" ? "block" : "none")">
-                                <div class="form-text mb-2">
-                                    The FTDX3000 roofing filters are selectable via CAT. AUTO, 15 kHz, 6 kHz, and 3 kHz
-                                    are fitted as standard. Tick any optional filters you have installed.
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter3k4" name="Settings.InstalledRoofingFilters" value="4"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("4") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter3k4">600 Hz (optional — YH-77SDE)</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="filter3k5" name="Settings.InstalledRoofingFilters" value="5"
-                                           @(Model.Settings.InstalledRoofingFilters.Contains("5") ? "checked" : "") />
-                                    <label class="form-check-label" for="filter3k5">300 Hz (optional — YH-77SDE narrow)</label>
-                                </div>
-                                <div class="form-text text-muted mt-1">AUTO, 15 kHz, 6 kHz, and 3 kHz are always shown.</div>
-                            </div>
                         </div>
                         <div class="mb-3">
                             <label asp-for="Settings.SerialPort" class="form-label">Serial Port</label>
@@ -1614,14 +1907,14 @@
                             <select asp-for="Settings.BaudRate" class="form-select">
                                 <option value="4800">4800</option>
                                 <option value="9600">9600</option>
-                                <option value="19200">19200</option>
-                                <option value="38400" selected>38400 (Default)</option>
+                                <option value="19200">19200 (Default)</option>
+                                <option value="38400">38400</option>
                                 <option value="57600">57600</option>
                                 <option value="115200">115200</option>
                             </select>
                             <div class="form-text">
-                                Select the baud rate configured in your radio.
-                                <br /><strong>Default:</strong> 38400 for FT-dx101 Series
+                                Select the CI-V baud rate configured in the radio's menu (Set &gt; Connectors &gt; CI-V &gt; CI-V Baud Rate).
+                                <br /><strong>IC-7300 / MkII:</strong> default is 19200; supports up to 115200. Match whatever the radio's CI-V menu is set to (Auto works, but a fixed rate is more reliable).
                             </div>
                             <span asp-validation-for="Settings.BaudRate" class="text-danger"></span>
                         </div>
@@ -1673,7 +1966,7 @@
                             <input asp-for="Settings.HttpPort" type="number" min="1" max="65535" class="form-control" style="max-width: 12em;" />
                             <div class="form-text">
                                 Default <strong>8080</strong>. If that port is already used by another program on your PC
-                                (Plex, Jenkins, etc.), Yaesu Web Control automatically tries 8081–8089 at startup and uses the first free one.
+                                (Plex, Jenkins, etc.), Icom Web Control automatically tries 8081–8089 at startup and uses the first free one.
                                 The port actually in use right now is <strong>@Model.CurrentRunningPort</strong>.
                                 Pin a specific port here only if you need to override that behaviour (e.g. you always want 9080).
                             </div>
@@ -1688,207 +1981,6 @@
                             <strong>External Applications:</strong> Configure WSJT-X, JTAlert, and Log4OM on the
                             <a asp-page="/ApplicationSetup" class="alert-link">Application Setup</a> page.
                         </div>
-        </div>
-    </details>
-
-    <!-- SDR Spectrum Display -->
-    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
-        <summary>
-            <i class="bi bi-broadcast-pin" aria-hidden="true"></i>&nbsp;SDR Spectrum Display
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
-                    data-bs-toggle="modal" data-bs-target="#sdrHelpModal"
-                    onclick="event.stopPropagation();">
-                <i class="bi bi-question-circle"></i> Help
-            </button>
-        </summary>
-        <div class="section-body">
-            <p class="text-muted mb-3">
-                Connect your radio's <strong>IF output (RCA)</strong> to an SDR receiver. The spectrum
-                display shows the band around your current VFO frequency in real time.
-            </p>
-            @if (Model.Settings.RadioModel == "FTdx10" || Model.Settings.RadioModel == "FT-710")
-            {
-                <div class="alert alert-danger border-3" role="alert">
-                    <i class="bi bi-exclamation-octagon-fill me-2"></i>
-                    <strong>⚠️ Risk of destroying your SDR — @Model.Settings.RadioModel has no IF tap.</strong>
-                    Because this radio has no rear-panel IF output, an SDR has to be connected to an antenna port.
-                    <strong>Transmitting on that antenna (or any antenna nearby) will deliver enough RF energy
-                    into the SDR's front end to damage or destroy it.</strong> Either use a dedicated receive-only
-                    antenna for the SDR, fit a coax switch that disconnects the SDR during TX, or fit a
-                    transmit/receive RF relay or PIN-diode T/R switch. Do not transmit with the SDR's coax
-                    plugged into your TX antenna without one of these protections in place.
-                </div>
-                <div class="alert alert-warning" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <strong>@Model.Settings.RadioModel:</strong> This radio does not have a rear-panel IF output.
-                    SDR spectrum display will show absolute RF frequencies from the connected antenna
-                    rather than a VFO-centred view. The IF Frequency setting has no effect.
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-warning" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <strong>Safety note:</strong> The SDR is connected to your radio's <strong>IF output</strong>,
-                    which is an internal low-level signal — safe during TX. <strong>Never connect the SDR
-                    directly to a TX antenna</strong> (or use an antenna very close to one you're transmitting on):
-                    the RF energy can destroy the SDR's front end.
-                </div>
-            }
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-end mb-2">
-                            <label class="form-label fw-bold mb-0">SDR Devices</label>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="sdrScanBtn"
-                                    onclick="scanSdrDevices()">
-                                <i class="bi bi-search"></i> Scan
-                            </button>
-                        </div>
-                        <div class="form-text mb-2">
-                            Plug in your SDR(s) before scanning. Each VFO can have its own SDR — the user
-                            tells YWC which physical SDR is wired to which VFO's IF output. Leave a slot
-                            blank if that VFO has no SDR.
-                        </div>
-
-                        <label for="sdrDeviceDropdownA" class="form-label small fw-semibold mb-1">VFO A SDR</label>
-                        <select class="form-select form-select-sm mb-1" id="sdrDeviceDropdownA">
-                            <option value="">— (none) —</option>
-                        </select>
-                        <input type="hidden" asp-for="Settings.SdrDeviceKeyA" id="sdrDeviceKeyInput" />
-                        <div id="sdrDeviceKeyDisplay" class="font-monospace small text-muted mb-3"></div>
-
-                        <label for="sdrDeviceDropdownB" class="form-label small fw-semibold mb-1">VFO B SDR</label>
-                        <select class="form-select form-select-sm mb-1" id="sdrDeviceDropdownB">
-                            <option value="">— (none) —</option>
-                        </select>
-                        <input type="hidden" asp-for="Settings.SdrDeviceKeyB" id="sdrDeviceKeyInputB" />
-                        <div id="sdrDeviceKeyDisplayB" class="font-monospace small text-muted"></div>
-
-                        <div id="sdrScanNotes" class="mt-2"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Settings.SdrIfFrequencyHz" class="form-label fw-bold">IF Frequency (Hz)</label>
-                        <input asp-for="Settings.SdrIfFrequencyHz" class="form-control" type="number"
-                               min="1000000" max="100000000" step="1000" />
-                        <div class="form-text">
-                            The radio's IF output frequency. <strong>FTdx101 series: 9,000,000 Hz.</strong>
-                            ELAD FDM-DUO via USB: set to match the device's IQ centre frequency.
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Settings.SdrplayInstallPath" class="form-label fw-bold">SDRplay install path (advanced)</label>
-                        <div class="input-group">
-                            <input asp-for="Settings.SdrplayInstallPath" class="form-control" type="text"
-                                   id="sdrplayInstallPathInput"
-                                   placeholder="@(Model.DetectedSdrplayInstallPath ?? "e.g. C:\\Program Files\\SDRplay\\API")" />
-                            <button type="button" class="btn btn-outline-secondary" id="sdrplayBrowseBtn"
-                                    title="Open a folder browser to select the SDRplay install folder">
-                                Browse…
-                            </button>
-                        </div>
-                        <div class="form-text">
-                            @if (!string.IsNullOrEmpty(Model.DetectedSdrplayInstallPath))
-                            {
-                                <span class="text-success">
-                                    <strong>Auto-detected:</strong> <code>@Model.DetectedSdrplayInstallPath</code>
-                                </span>
-                                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="sdrplayUseDetectedBtn">
-                                    Use this path
-                                </button>
-                                <br />
-                            }
-                            else
-                            {
-                                <span class="text-warning"><strong>No SDRplay install auto-detected.</strong></span><br />
-                            }
-                            Leave blank for auto-detect. Only needed if the SDRplay API was installed
-                            to a non-default location and its <code>x64</code> folder isn't on the
-                            Windows PATH. Point this at the SDRplay API folder containing the
-                            <code>x64\sdrplay_api.dll</code> subfolder. If your SDR shows in
-                            other apps but not here, try setting this.
-                        </div>
-                    </div>
-                    <script>
-                        (function () {
-                            const input    = document.getElementById('sdrplayInstallPathInput');
-                            const browseBn = document.getElementById('sdrplayBrowseBtn');
-                            const useDetBn = document.getElementById('sdrplayUseDetectedBtn');
-                            const detected = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DetectedSdrplayInstallPath ?? ""));
-
-                            if (useDetBn) {
-                                useDetBn.addEventListener('click', () => {
-                                    if (detected) input.value = detected;
-                                });
-                            }
-                            if (browseBn) {
-                                browseBn.addEventListener('click', async () => {
-                                    const start = (input.value || detected || '').trim();
-                                    browseBn.disabled = true;
-                                    const original  = browseBn.textContent;
-                                    browseBn.textContent = 'Opening…';
-                                    try {
-                                        const resp = await fetch('/api/sdr/sdrplay/pick-installdir', {
-                                            method:  'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body:    JSON.stringify({ startPath: start })
-                                        });
-                                        if (resp.ok) {
-                                            const data = await resp.json();
-                                            if (data.picked) input.value = data.picked;
-                                        } else {
-                                            const data = await resp.json().catch(() => ({}));
-                                            alert('Folder picker failed: ' + (data.error || resp.statusText));
-                                        }
-                                    } catch (e) {
-                                        alert('Folder picker error: ' + e.message);
-                                    } finally {
-                                        browseBn.disabled    = false;
-                                        browseBn.textContent = original;
-                                    }
-                                });
-                            }
-                        })();
-                    </script>
-                </div>
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label asp-for="Settings.SdrSampleRateHz" class="form-label fw-bold">Sample Rate (Hz) — both VFOs</label>
-                        <select asp-for="Settings.SdrSampleRateHz" class="form-select">
-                            <option value="62500">62,500 — 62.5 kHz span (narrowest, single-QSO zoom)</option>
-                            <option value="125000">125,000 — 125 kHz span (best for 30m / 60m)</option>
-                            <option value="250000">250,000 — 250 kHz span</option>
-                            <option value="500000">500,000 — 500 kHz span</option>
-                            <option value="1024000">1,024,000 — 1 MHz span</option>
-                            <option value="2048000">2,048,000 — 2 MHz span (recommended)</option>
-                            <option value="2500000">2,500,000 — 2.5 MHz span</option>
-                            <option value="3200000">3,200,000 — 3.2 MHz span</option>
-                        </select>
-                        <div class="form-text">
-                            Higher rates give a wider visible span but require more CPU.
-                            Not all devices support all rates.
-                            <strong>Saving this resets both VFOs</strong> to the chosen rate;
-                            use the span buttons above each spectrum on the main page
-                            to set each VFO independently afterwards.
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="Settings.SdrFftSize" class="form-label fw-bold">FFT Size</label>
-                        <select asp-for="Settings.SdrFftSize" class="form-select">
-                            <option value="512">512 — faster, less frequency resolution</option>
-                            <option value="1024">1024 — recommended</option>
-                            <option value="2048">2048 — higher resolution, more CPU</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <button type="button" class="btn btn-outline-danger btn-sm"
-                                onclick="clearSdrDevice()">
-                            <i class="bi bi-x-circle"></i> Disable SDR / Clear Device
-                        </button>
-                        <div class="form-text">Removes the saved device; the spectrum panel will be hidden.</div>
-                    </div>
-                </div>
-            </div>
         </div>
     </details>
 
@@ -2118,40 +2210,12 @@
     </div>
     </form>
 
-    <script>
-        // Save button feedback: "Saving…" the instant the form is submitted
-        // (the POST → redirect → reload round trip takes a few seconds, and
-        // without this the button just sits there looking unresponsive),
-        // then "Saved ✓" on the reloaded page after a successful save,
-        // reverting back to normal after a few seconds. #65 follow-up.
-        (function () {
-            var form = document.getElementById('settingsForm');
-            var btn = document.getElementById('saveSettingsBtn');
-            var icon = document.getElementById('saveSettingsIcon');
-            var label = document.getElementById('saveSettingsLabel');
-            if (!form || !btn || !icon || !label) return;
-
-            form.addEventListener('submit', function () {
-                btn.disabled = true;
-                icon.className = 'spinner-border spinner-border-sm';
-                label.textContent = 'Saving…';
-            });
-
-            if (btn.dataset.saveSuccess === '1') {
-                setTimeout(function () {
-                    icon.className = 'bi bi-save';
-                    label.textContent = 'Save Settings';
-                }, 3000);
-            }
-        })();
-    </script>
-
     <!-- Backup / Restore — outside the main form so the import button doesn't trigger a save -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
         <summary><i class="bi bi-box-arrow-up" aria-hidden="true"></i>&nbsp;Backup &amp; Restore</summary>
         <div class="section-body">
             <p class="text-muted">
-                Download a single zip file containing everything you've customised in YWC — settings, memories, memory banks, calibration, and accessible-label overrides.
+                Download a single zip file containing everything you've customised in IWC — settings, memories, memory banks, calibration, and accessible-label overrides.
                 Use it to safeguard your configuration, move to a new PC, or share a setup with another operator.
             </p>
             <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -2166,7 +2230,7 @@
             </div>
             <p class="text-muted small mt-2 mb-0">
                 Import overwrites the matching files in your user-data folder. Each replaced file is kept as a <code>.bak</code> so you can recover.
-                After importing, <strong>restart the app</strong> so the radio-connection, DX-cluster, SDR and rigctld services pick up the new values.
+                After importing, <strong>restart the app</strong> so the radio-connection, DX-cluster and rigctld services pick up the new values.
                 Radio state (live frequency, mode etc.) is not included in the backup — it resets to whatever the radio reports on next connect.
             </p>
         </div>
@@ -2181,7 +2245,7 @@
         fileInput.addEventListener('change', async () => {
             if (!fileInput.files || fileInput.files.length === 0) return;
             const file = fileInput.files[0];
-            if (!confirm(`Replace YWC's user data with the contents of "${file.name}"?\n\nMatching files in your user-data folder will be overwritten. Each replaced file is kept as a .bak.`)) {
+            if (!confirm(`Replace IWC's user data with the contents of "${file.name}"?\n\nMatching files in your user-data folder will be overwritten. Each replaced file is kept as a .bak.`)) {
                 fileInput.value = '';
                 return;
             }
@@ -2210,298 +2274,116 @@
     })();
 </script>
 
-<!-- SDR Help Modal -->
-<div class="modal fade" id="sdrHelpModal" tabindex="-1" aria-labelledby="sdrHelpModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title" id="sdrHelpModalLabel">
-                    <i class="bi bi-broadcast-pin me-2"></i>SDR Spectrum Display — Help
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-
-                <h6 class="fw-bold">How it works</h6>
-                <p>
-                    Connect the <strong>IF output (rear-panel RCA socket)</strong> of your FTdx101 to the
-                    antenna input of your SDR receiver using a coax cable with an RCA-to-SMA adapter.
-                    The app tunes the SDR to the radio's IF frequency (9 MHz for the FTdx101 series) and
-                    displays the surrounding band as a live spectrum waterfall.
-                </p>
-
-                <h6 class="fw-bold mt-3">Supported SDR hardware</h6>
-                <p>Support for the following devices is built in — no additional software installation required:</p>
-                <table class="table table-sm table-bordered">
-                    <thead class="table-dark">
-                        <tr><th>Device</th><th>Notes</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>RTL-SDR</strong></td>
-                            <td>Any RTL2832U-based dongle (RTL-SDR Blog v3/v4, Nooelec, etc.). Plug in and scan.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Airspy</strong></td>
-                            <td>Airspy Mini, Airspy R2. Plug in and scan.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>HackRF One</strong></td>
-                            <td>Plug in and scan.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>SDRplay RSP1 / RSP1A / RSP1B / RSP2 / RSPduo / RSPdx</strong></td>
-                            <td>Requires the SDRplay API — see below.</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <h6 class="fw-bold mt-3"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>SDRplay — additional step required</h6>
-                <p>
-                    SDRplay devices use a background Windows service provided by SDRplay Ltd.
-                    You must install the <strong>SDRplay API</strong> before the device will be detected:
-                </p>
-                <ol>
-                    <li>
-                        Go to <a href="https://www.sdrplay.com/downloads/" target="_blank" rel="noopener">www.sdrplay.com/downloads/</a>
-                        and download the latest <strong>SDRplay API/Hardware Driver</strong> for Windows.
-                    </li>
-                    <li>Run the installer. It installs the USB driver and starts the <em>SDRplay API Service</em>.</li>
-                    <li>Plug in your RSP device, then click <strong>Scan</strong> on this page.</li>
-                </ol>
-                <p class="text-muted small">
-                    Only one application can use the SDRplay API at a time.
-                    If SDR Console or another SDR app is open, close it before scanning.
-                </p>
-
-                <h6 class="fw-bold mt-3">Troubleshooting</h6>
-                <ul>
-                    <li><strong>No devices found after scan</strong> — check the device is plugged in and that Windows Device Manager shows it without a yellow warning icon.</li>
-                    <li><strong>SDRplay not detected</strong> — open <em>services.msc</em> and confirm <em>SDRplay API Service</em> is running.</li>
-                    <li><strong>Spectrum looks wrong / distorted</strong> — check your IF frequency setting matches the radio (FTdx101: 9,000,000 Hz).</li>
-                </ul>
-
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script type="module">
-        // hwVer (per SDRplay API header) → friendly model name. Kept in sync
-        // with the C# HwVerToModel in Services/Sdr/SdrplayDevice.cs.
-        const SDRPLAY_HW_VER_NAMES = {
-            1: 'RSP1', 2: 'RSP2', 3: 'RSPduo', 4: 'RSPdx', 5: 'RSPdx-R2',
-            6: 'RSP1B', 7: 'RSPdxR2', 255: 'RSP1A'
-        };
-
-        // Extract serial (and hwVer if present) from an sdrplay:... key.
-        // New: "sdrplay:hw6-2405242660" → { hwVer: 6, serial: "2405242660" }
-        // Old: "sdrplay:2405242660"      → { hwVer: null, serial: "2405242660" }
-        function parseSdrplayKey(key) {
-            const body = key.slice('sdrplay:'.length);
-            const m = /^hw(\d+)-(.+)$/i.exec(body);
-            if (m) return { hwVer: parseInt(m[1], 10), serial: m[2] };
-            return { hwVer: null, serial: body };
-        }
-
-        // Returns true if either key refers to the same physical device.
-        // Handles "old serial-only saved key matches new hwVer-prefixed scan key".
-        function sdrplayKeysMatch(a, b) {
-            if (!a || !b || !a.startsWith('sdrplay:') || !b.startsWith('sdrplay:')) return false;
-            if (a === b) return true;
-            const ka = parseSdrplayKey(a), kb = parseSdrplayKey(b);
-            return ka.serial === kb.serial;
-        }
-
-        // Derives a human-readable label from a saved device key without needing a scan.
-        // sdrplay:hw6-2405242660   →  "SDRplay RSP1B (2405242660) [sdrplay]"
-        // sdrplay:0000000001       →  "SDRplay (0000000001) [sdrplay]"   (legacy key, no model)
-        // driver=rtlsdr,label=Generic RTL2832U,...  →  "Generic RTL2832U [rtlsdr]"
-        function keyToLabel(key) {
-            if (!key) return '';
-            if (key.startsWith('sdrplay:')) {
-                const { hwVer, serial } = parseSdrplayKey(key);
-                const model = hwVer != null ? (SDRPLAY_HW_VER_NAMES[hwVer] || `hw${hwVer}`) : null;
-                return model
-                    ? `SDRplay ${model} (${serial}) [sdrplay]`
-                    : `SDRplay (${serial}) [sdrplay]`;
-            }
-            let label = '', driver = '';
-            for (const pair of key.split(',')) {
-                const eq = pair.indexOf('=');
-                if (eq < 1) continue;
-                const k = pair.slice(0, eq).trim().toLowerCase();
-                const v = pair.slice(eq + 1).trim();
-                if (k === 'label')  label  = v;
-                if (k === 'driver') driver = v;
-            }
-            return label ? `${label}${driver ? ' [' + driver + ']' : ''}` : key;
-        }
-
-        // ── Dual-SDR device selector (VFO A + VFO B) ─────────────────────────
+    <script>
+        // Per-section "Save Settings" buttons. Colin: scrolling to the single
+        // Save button at the bottom of a long page is tedious, so give every
+        // section its own. They are plain type=submit buttons inside
+        // #settingsForm, so they post the whole form exactly like the main
+        // button and go through the same jQuery-validate submit handler below.
+        // Injected in JS to stay DRY — one button definition — rather than
+        // repeating markup in every <details>.
         //
-        // Two dropdowns, each with its own hidden input bound to
-        // Settings.SdrDeviceKeyA / SdrDeviceKeyB. One Scan button populates
-        // both dropdowns from the same /api/sdr/devices result. Each VFO can
-        // independently be set to a device or left as (none) — typical
-        // operator has SDR-A wired to the radio's MAIN IF output and may or
-        // may not have a second SDR on the SUB IF output.
+        // Left-aligned (Colin's preference — easier to find at the margin than
+        // hunting the right edge). A section can also mark an extra insertion
+        // point with a .section-save-anchor element so a very long section (e.g.
+        // Voice Control, whose Voice Phrases editor keeps growing) gets a Save
+        // button partway down — a user who changed a control up top needn't
+        // scroll past everything below it to save.
+        (function () {
+            var form = document.getElementById('settingsForm');
+            if (!form) return;
+            function makeSaveRow() {
+                var row = document.createElement('div');
+                row.className = 'section-save-row mt-3 pt-3 border-top text-start';
+                var btn = document.createElement('button');
+                btn.type = 'submit';
+                btn.className = 'btn btn-primary btn-sm';
+                btn.innerHTML = '<i class="bi bi-save"></i> Save Settings';
+                row.appendChild(btn);
+                return row;
+            }
+            // Mid-section anchors first (a Save button before the anchored element).
+            form.querySelectorAll('.section-save-anchor').forEach(function (anchor) {
+                anchor.parentNode.insertBefore(makeSaveRow(), anchor);
+            });
+            // Then one at the end of every section body.
+            form.querySelectorAll('.section-body').forEach(function (body) {
+                body.appendChild(makeSaveRow());
+            });
+        })();
+    </script>
+    <script>
+        // Must run AFTER _ValidationScriptsPartial so jQuery Validate is present.
+        // "Saving…" only when the form will actually POST. Previously the spinner
+        // ran even when unobtrusive validation cancelled the post (blank optional
+        // fields with implicit [Required]) — looked like a save that "didn't persist".
+        (function () {
+            var form = document.getElementById('settingsForm');
+            var btn = document.getElementById('saveSettingsBtn');
+            var icon = document.getElementById('saveSettingsIcon');
+            var label = document.getElementById('saveSettingsLabel');
+            if (!form || !btn || !icon || !label) return;
 
-        // Slot config keyed by VFO label.
-        const sdrSlots = {
-            A: { dropdownId: 'sdrDeviceDropdownA', inputId: 'sdrDeviceKeyInput',  displayId: 'sdrDeviceKeyDisplay'  },
-            B: { dropdownId: 'sdrDeviceDropdownB', inputId: 'sdrDeviceKeyInputB', displayId: 'sdrDeviceKeyDisplayB' },
-        };
+            function resetSaveButton() {
+                btn.disabled = false;
+                icon.className = 'bi bi-save';
+                label.textContent = 'Save Settings';
+            }
 
-        function updateDeviceKeyDisplay(slot) {
-            const cfg = sdrSlots[slot];
-            const key = document.getElementById(cfg.inputId).value;
-            const el  = document.getElementById(cfg.displayId);
-            el.textContent = key ? `Saved key: ${key}` : '';
-        }
+            function markSaving() {
+                btn.disabled = true;
+                icon.className = 'spinner-border spinner-border-sm';
+                label.textContent = 'Saving…';
+            }
 
-        // Initialise both dropdowns from saved keys on page load, then
-        // auto-scan so the dropdown for the unconfigured side picks up any
-        // available hardware without making the user click Scan again.
-        document.addEventListener('DOMContentLoaded', () => {
-            for (const slot of ['A', 'B']) {
-                const cfg = sdrSlots[slot];
-                const savedKey = document.getElementById(cfg.inputId).value;
-                if (savedKey) {
-                    const dropdown = document.getElementById(cfg.dropdownId);
-                    dropdown.innerHTML = '';
-                    const noneOpt = document.createElement('option');
-                    noneOpt.value = '';
-                    noneOpt.textContent = '— (none) —';
-                    dropdown.appendChild(noneOpt);
-                    const opt = document.createElement('option');
-                    opt.value = savedKey;
-                    opt.textContent = keyToLabel(savedKey);
-                    opt.selected = true;
-                    dropdown.appendChild(opt);
-                }
-                updateDeviceKeyDisplay(slot);
+            function revealFirstInvalid() {
+                var invalid = form.querySelector('.input-validation-error, :invalid');
+                if (!invalid) return;
+                var section = invalid.closest('details.settings-section');
+                if (section) section.open = true;
+                invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (typeof invalid.focus === 'function') invalid.focus();
+            }
 
-                // Selection change → mirror to the hidden input.
-                document.getElementById(cfg.dropdownId).addEventListener('change', function () {
-                    document.getElementById(cfg.inputId).value = this.value;
-                    updateDeviceKeyDisplay(slot);
+            if (window.jQuery) {
+                var $form = window.jQuery(form);
+                $form.on('invalid-form.validate', function () {
+                    resetSaveButton();
+                    revealFirstInvalid();
+                });
+                // Only flip the button to Saving… when Validate says the post may proceed.
+                $form.on('submit', function (e) {
+                    if ($form.data('validator') && !$form.valid()) {
+                        e.preventDefault();
+                        resetSaveButton();
+                        revealFirstInvalid();
+                        return;
+                    }
+                    markSaving();
+                });
+            } else {
+                form.addEventListener('submit', function (e) {
+                    if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                        e.preventDefault();
+                        resetSaveButton();
+                        revealFirstInvalid();
+                        return;
+                    }
+                    markSaving();
                 });
             }
 
-            // Kick off an automatic scan so both dropdowns show what's
-            // available without the user having to click Scan first. Cheap
-            // for SDRplay (sub-second) and surfaces in-use devices via the
-            // SdrManager merge in the controller.
-            window.scanSdrDevices();
-        });
-
-        // Populate BOTH SDR dropdowns from one /api/sdr/devices call. Each
-        // dropdown preserves its own selection across re-scans (matched by
-        // exact key, or by sdrplayKeysMatch for the legacy→new format jump).
-        window.scanSdrDevices = async function () {
-            const btn      = document.getElementById('sdrScanBtn');
-            const notesDiv = document.getElementById('sdrScanNotes');
-
-            btn.disabled       = true;
-            btn.innerHTML      = '<span class="spinner-border spinner-border-sm me-1"></span>Scanning…';
-            notesDiv.innerHTML = '';
-
-            try {
-                const resp               = await fetch('/api/sdr/devices');
-                const { devices, notes } = await resp.json();
-
-                for (const slot of ['A', 'B']) {
-                    const cfg      = sdrSlots[slot];
-                    const dropdown = document.getElementById(cfg.dropdownId);
-                    const savedKey = document.getElementById(cfg.inputId).value;
-
-                    dropdown.innerHTML = '';
-                    const noneOpt = document.createElement('option');
-                    noneOpt.value       = '';
-                    noneOpt.textContent = '— (none) —';
-                    dropdown.appendChild(noneOpt);
-
-                    let matched = false;
-                    devices.forEach(d => {
-                        const opt = document.createElement('option');
-                        opt.value       = d.key;
-                        // Devices currently held by a running worker get an
-                        // "(in use)" suffix so the user understands why we
-                        // know about them even though they'd be invisible to
-                        // a fresh sdrplay_api_GetDevices call.
-                        const suffix = d.inUse ? ' (in use)' : '';
-                        opt.textContent = `${d.label} [${d.driver}]${suffix}`;
-                        const sameDevice =
-                            d.key === savedKey ||
-                            sdrplayKeysMatch(d.key, savedKey);
-                        if (sameDevice) {
-                            opt.selected = true;
-                            matched = true;
-                            if (d.key !== savedKey) {
-                                document.getElementById(cfg.inputId).value = d.key;
-                                updateDeviceKeyDisplay(slot);
-                            }
-                        }
-                        dropdown.appendChild(opt);
-                    });
-
-                    // Saved key not in scan results AND not surfaced by SdrManager
-                    // either — the device is genuinely absent. Append a placeholder
-                    // so the user doesn't lose their saved choice silently.
-                    if (savedKey && !matched) {
-                        const opt = document.createElement('option');
-                        opt.value       = savedKey;
-                        opt.textContent = `${keyToLabel(savedKey)} (not plugged in)`;
-                        opt.selected    = true;
-                        dropdown.appendChild(opt);
-                    }
-                }
-
-                // Show any installation notes returned by the server.
-                if (notes && notes.length > 0) {
-                    const ul = document.createElement('ul');
-                    ul.className = 'mb-0 ps-3';
-                    notes.forEach(msg => {
-                        const li = document.createElement('li');
-                        li.textContent = msg;
-                        ul.appendChild(li);
-                    });
-                    const wrapper = document.createElement('div');
-                    wrapper.className = devices.length === 0
-                        ? 'alert alert-warning py-2 small'
-                        : 'alert alert-info py-2 small';
-                    wrapper.appendChild(ul);
-                    notesDiv.appendChild(wrapper);
-                }
-
-            } catch (e) {
-                for (const slot of ['A', 'B']) {
-                    document.getElementById(sdrSlots[slot].dropdownId).innerHTML =
-                        '<option value="">Error contacting scan API</option>';
-                }
-            } finally {
-                btn.disabled  = false;
-                btn.innerHTML = '<i class="bi bi-search"></i> Scan';
+            if (btn.dataset.saveSuccess === '1') {
+                setTimeout(function () {
+                    icon.className = 'bi bi-save';
+                    label.textContent = 'Save Settings';
+                }, 3000);
             }
-        };
-
-        window.clearSdrDevice = function () {
-            for (const slot of ['A', 'B']) {
-                const cfg = sdrSlots[slot];
-                document.getElementById(cfg.inputId).value = '';
-                document.getElementById(cfg.dropdownId).innerHTML =
-                    '<option value="" selected>— (none) —</option>';
-                updateDeviceKeyDisplay(slot);
-            }
-            document.getElementById('sdrScanNotes').innerHTML = '';
-        };
-
+        })();
+    </script>
+    <script type="module">
         // DX cluster connection test — POSTs the current Settings-page values
         // (host, port, callsign) to /api/dxcluster/test, which opens a TCP
         // connection, sends the callsign, reads ~10 s of output, and returns
@@ -2631,21 +2513,89 @@
     </script>
     <script>
         (function () {
-            const modelSelect     = document.getElementById('Settings_RadioModel');
-            const mpNote          = document.getElementById('filtersMpNote');
-            const dSection        = document.getElementById('filtersDSection');
-            const ftdx10Section   = document.getElementById('filtersFtdx10Section');
-            const ft710Section    = document.getElementById('filtersFt710Section');
-            const ftdx3000Section = document.getElementById('filtersFtdx3000Section');
-            if (!modelSelect) return;
-            modelSelect.addEventListener('change', function () {
-                const v = this.value;
-                if (mpNote)          mpNote.style.display          = v === 'FTdx101MP' ? 'block' : 'none';
-                if (dSection)        dSection.style.display        = v === 'FTdx101D'  ? 'block' : 'none';
-                if (ftdx10Section)   ftdx10Section.style.display   = v === 'FTdx10'    ? 'block' : 'none';
-                if (ft710Section)    ft710Section.style.display    = v === 'FT-710'    ? 'block' : 'none';
-                if (ftdx3000Section) ftdx3000Section.style.display = v === 'FTDX3000'  ? 'block' : 'none';
+            const input = document.getElementById('Settings_TxToggleKey');
+            const setBtn = document.getElementById('txToggleKeySetBtn');
+            const clearBtn = document.getElementById('txToggleKeyClearBtn');
+            const badge = document.getElementById('txToggleKeyCaptureBadge');
+            const display = document.getElementById('txToggleKeyDisplay');
+            if (!input || !setBtn || !clearBtn || !badge || !display) return;
+
+            // Seed from a JSON-encoded server value (not the asp-for attribute).
+            // A lone space character cannot round-trip through an HTML form /
+            // input value attribute — browsers and Tag Helpers treat
+            // whitespace-only as empty, so Space used to save as "" and show
+            // "Disabled". We store the KeyboardEvent.code token "Space"
+            // instead; migrate any legacy " " on load.
+            const serverKeyRaw = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Settings.TxToggleKey ?? string.Empty));
+            input.value = (serverKeyRaw === ' ') ? 'Space' : serverKeyRaw;
+
+            let captureActive = false;
+
+            function friendlyKeyLabel(key) {
+                if (!key) return 'Disabled';
+                if (key === ' ' || key === 'Space') return 'Space';
+                if (key === 'Escape') return 'Esc';
+                return key.length === 1 ? key.toUpperCase() : key;
+            }
+
+            function renderCurrentKey() {
+                display.textContent = input.value
+                    ? `Current shortcut: ${friendlyKeyLabel(input.value)}`
+                    : 'Current shortcut: Disabled';
+            }
+
+            function stopCapture() {
+                captureActive = false;
+                badge.style.display = 'none';
+                setBtn.classList.remove('btn-primary');
+                setBtn.classList.add('btn-outline-primary');
+            }
+
+            function startCapture() {
+                captureActive = true;
+                badge.style.display = 'inline-block';
+                setBtn.classList.remove('btn-outline-primary');
+                setBtn.classList.add('btn-primary');
+                // Drop focus from the button so pressing Space to choose the
+                // shortcut doesn't also re-activate the focused "Set key"
+                // button (Space/Enter fire a click on a focused button),
+                // which would immediately re-arm capture.
+                setBtn.blur();
+            }
+
+            setBtn.addEventListener('click', function () {
+                if (captureActive) {
+                    stopCapture();
+                    return;
+                }
+                startCapture();
             });
+
+            clearBtn.addEventListener('click', function () {
+                input.value = '';
+                stopCapture();
+                renderCurrentKey();
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (!captureActive) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (e.key === 'Tab') {
+                    stopCapture();
+                    renderCurrentKey();
+                    return;
+                }
+
+                // e.key for Space is " "; store "Space" so the value survives
+                // HTML form post / asp-for round-trips (whitespace-only does not).
+                input.value = (e.key === ' ') ? 'Space' : e.key;
+                stopCapture();
+                renderCurrentKey();
+            }, true);
+
+            renderCurrentKey();
         })();
     </script>
 }

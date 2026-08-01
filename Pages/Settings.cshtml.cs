@@ -3,27 +3,25 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
-using Yaesu_Web_Control.Hubs;
-using Yaesu_Web_Control.Models;
-using Yaesu_Web_Control.Services;
-using Yaesu_Web_Control.Services.Sdr;
+using Icom_Web_Control.Hubs;
+using Icom_Web_Control.Models;
+using Icom_Web_Control.Services;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
-namespace Yaesu_Web_Control.Pages
+namespace Icom_Web_Control.Pages
 {
     public class SettingsModel : PageModel
     {
         private readonly ISettingsService _settingsService;
         private readonly ILogger<SettingsModel> _logger;
-        private readonly RadioInitializationService _radioInitializationService;
+        private readonly IRadioController _radio;
         private readonly IHostApplicationLifetime _lifetime;
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly HttpPortInfo _portInfo;
-        private readonly SdrManager _sdrManager;
 
         /// <summary>
-        /// The port YWC is actually listening on right now. This is the port
+        /// The port IWC is actually listening on right now. This is the port
         /// the displayed network URLs on the Settings page use — so the
         /// Local-Access / Network-Access boxes always show something that
         /// actually works, even when the configured Settings.HttpPort has been
@@ -62,55 +60,36 @@ namespace Yaesu_Web_Control.Pages
         public SettingsModel(
             ISettingsService settingsService,
             ILogger<SettingsModel> logger,
-            RadioInitializationService radioInitializationService,
+            IRadioController radio,
             IHostApplicationLifetime lifetime,
             IHubContext<RadioHub> hubContext,
-            HttpPortInfo portInfo,
-            SdrManager sdrManager)
+            HttpPortInfo portInfo)
         {
             _settingsService = settingsService;
             _logger = logger;
-            _radioInitializationService = radioInitializationService;
+            _radio = radio;
             _lifetime = lifetime;
             _hubContext = hubContext;
             _portInfo = portInfo;
-            _sdrManager = sdrManager;
         }
 
         public async Task<IActionResult> OnGetAsync()
         {
             Settings = await _settingsService.GetSettingsAsync();
             Settings.BandPlan = Settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
-            // The Settings page binds a single Sample Rate dropdown that
-            // represents 'reset both VFOs to this rate'. Show the current
-            // A-side rate as the pre-selected option so the dropdown reflects
-            // a sensible value rather than the legacy zero placeholder.
-            Settings.SdrSampleRateHz = Settings.SdrSampleRateHzA;
-            // Auto-detect the SDRplay install dir so the page can show the
-            // user where the resolver is finding it (or that it's not).
-            DetectedSdrplayInstallPath = SdrplayDllResolver.DetectInstallDir();
+            Settings.TxToggleKey = NormalizeTxToggleKey(Settings.TxToggleKey);
             NetworkAddresses = GetLocalIPAddresses();
             return Page();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
-            // SdrDeviceKeyA / SdrDeviceKeyB are intentionally allowed to be empty
-            // (empty = no SDR configured for that VFO). Must be removed BEFORE
-            // ModelState.IsValid is checked, because the implicit [Required] from
-            // <Nullable>enable</Nullable> would otherwise reject empty strings
-            // and silently prevent the save.
-            // SdrDeviceKey is the legacy v2.2.x field, still on the model so the
-            // migration in SettingsService can carry over old saved values.
-            ModelState.Remove("Settings.SdrDeviceKey");
-            ModelState.Remove("Settings.SdrDeviceKeyA");
-            ModelState.Remove("Settings.SdrDeviceKeyB");
-            // SdrplayInstallPath is intentionally optional — blank = auto-detect.
-            ModelState.Remove("Settings.SdrplayInstallPath");
             // DX cluster host/callsign also allowed empty (empty = feature disabled).
             ModelState.Remove("Settings.DxClusterHost");
             ModelState.Remove("Settings.DxClusterLoginCallsign");
             ModelState.Remove("Settings.DxClusterPostLoginCommands");
+            // Accessibility TX shortcut is optional — empty = disabled.
+            ModelState.Remove("Settings.TxToggleKey");
 
             if (!ModelState.IsValid)
             {
@@ -160,17 +139,6 @@ namespace Yaesu_Web_Control.Pages
                 var oldSerialPort = current.SerialPort;
                 var oldBaudRate   = current.BaudRate;
 
-                // Capture pre-change SDR values so we can ask SdrManager to
-                // restart its worker(s) when any SDR-related setting changes.
-                // This makes adding/removing a VFO B SDR take effect immediately
-                // instead of needing a full app restart.
-                var oldSdrA       = current.SdrDeviceKeyA ?? string.Empty;
-                var oldSdrB       = current.SdrDeviceKeyB ?? string.Empty;
-                var oldSdrIfHz    = current.SdrIfFrequencyHz;
-                var oldSdrSrHzA   = current.SdrSampleRateHzA;
-                var oldSdrSrHzB   = current.SdrSampleRateHzB;
-                var oldSdrFft     = current.SdrFftSize;
-
                 current.RadioModel        = Settings.RadioModel;
                 // HttpPort is bound from a number input; clamp to a sane range.
                 // 1024+ avoids privileged-port territory; we'd reach the upper
@@ -181,56 +149,17 @@ namespace Yaesu_Web_Control.Pages
                 current.SerialPort        = Settings.SerialPort;
                 current.BaudRate          = Settings.BaudRate;
                 current.WebAddress        = Settings.WebAddress;
-                current.SdrDeviceKeyA     = Settings.SdrDeviceKeyA ?? string.Empty;
-                current.SdrDeviceKeyB     = Settings.SdrDeviceKeyB ?? string.Empty;
-                current.SdrDeviceKey      = string.Empty;  // legacy field — kept blank in v2.3.0+ files
-                current.SdrplayInstallPath = Settings.SdrplayInstallPath ?? string.Empty;
-                current.SdrIfFrequencyHz  = Settings.SdrIfFrequencyHz;
-                // Settings page binds a single Sample Rate dropdown — treat that
-                // as a "reset both VFOs to this rate" control. Per-VFO divergence
-                // happens at runtime via the span buttons on the main page.
-                if (Settings.SdrSampleRateHz > 0)
-                {
-                    current.SdrSampleRateHzA = Settings.SdrSampleRateHz;
-                    current.SdrSampleRateHzB = Settings.SdrSampleRateHz;
-                }
-                current.SdrSampleRateHz   = 0;             // legacy field — kept zero in v2.3.0+ files
-                current.SdrFftSize        = Settings.SdrFftSize;
+                // External-SDR spectrum config was removed from the Settings page
+                // (the IC-7300's scope comes over CI-V, not an IF-tapped SDR).
+                // The Sdr* fields are left untouched here so their persisted
+                // values survive the read-modify-write; the CI-V scope work
+                // (Phase 3 block 6) will decide their ultimate fate.
                 current.BandPlan          = Settings.BandPlan;
-                // MP comes fully loaded; D has 600Hz standard plus 1.2kHz/300Hz optional.
-                if (Settings.RadioModel == "FTdx101MP")
-                {
-                    current.InstalledRoofingFilters = new List<string> { "6", "7", "8", "9", "A" };
-                }
-                else if (Settings.RadioModel == "FTdx101D")
-                {
-                    var optionalSelected = Settings.InstalledRoofingFilters ?? new List<string>();
-                    current.InstalledRoofingFilters = new List<string> { "6", "7", "9" }
-                        .Concat(optionalSelected.Where(f => f is "8" or "A"))
-                        .Distinct().ToList();
-                }
-                else if (Settings.RadioModel == "FTdx10")
-                {
-                    // Standard filters (1=15kHz, 2=6kHz, 3=3kHz) are always available.
-                    // Optional: 4=1.2kHz (YF-130CN), 5=300Hz (YF-130CW).
-                    var optionalSelected = Settings.InstalledRoofingFilters ?? new List<string>();
-                    current.InstalledRoofingFilters = new List<string> { "1", "2", "3" }
-                        .Concat(optionalSelected.Where(f => f is "4" or "5"))
-                        .Distinct().ToList();
-                }
-                else if (Settings.RadioModel == "FT-710")
-                {
-                    current.InstalledRoofingFilters = new List<string>();
-                }
-                else if (Settings.RadioModel == "FTDX3000")
-                {
-                    // Standard: 0=Auto, 1=15kHz, 2=6kHz, 3=3kHz always present.
-                    // Optional: 4=600Hz (YH-77SDE), 5=300Hz (YH-77SDE narrow).
-                    var optionalSelected = Settings.InstalledRoofingFilters ?? new List<string>();
-                    current.InstalledRoofingFilters = new List<string> { "0", "1", "2", "3" }
-                        .Concat(optionalSelected.Where(f => f is "4" or "5"))
-                        .Distinct().ToList();
-                }
+                // Icom IC-7300 / MkII is a direct-sampling SDR with no roofing
+                // filters and no CAT filter-selection command, so there is nothing
+                // to configure. Keep the list empty. (Field retained on the model
+                // as a migration anchor from the inherited Yaesu code.)
+                current.InstalledRoofingFilters = new List<string>();
                 if (Settings.CwMessages != null && Settings.CwMessages.Count == 5)
                     current.CwMessages = Settings.CwMessages;
 
@@ -244,10 +173,29 @@ namespace Yaesu_Web_Control.Pages
 
                 // Accessibility
                 current.ShowFrequencyArrowButtons = Settings.ShowFrequencyArrowButtons;
+                // Space cannot round-trip as a lone " " through HTML form posts —
+                // store the KeyboardEvent.code token "Space" (and migrate legacy " ").
+                current.TxToggleKey = NormalizeTxToggleKey(Settings.TxToggleKey);
 
                 // Voice Control (v1)
                 current.VoiceControlEnabled = Settings.VoiceControlEnabled;
                 current.VoiceSpokenConfirmationEnabled = Settings.VoiceSpokenConfirmationEnabled;
+
+                // Pseudo-dual receiver (Phase 5)
+                current.PseudoDualReceiverEnabled = Settings.PseudoDualReceiverEnabled;
+                current.PseudoDualCrossBandEnabled = Settings.PseudoDualCrossBandEnabled;
+                // Clamp peek interval to the 5–60 s the UI offers; fall back to
+                // the 15 s default if an out-of-range value is posted.
+                current.PseudoDualPeekIntervalSeconds =
+                    (Settings.PseudoDualPeekIntervalSeconds >= 5 && Settings.PseudoDualPeekIntervalSeconds <= 60)
+                        ? Settings.PseudoDualPeekIntervalSeconds
+                        : 15;
+                // Watch-panel (VFO B) span-button behaviour; fall back to the
+                // ZoomIn default for any unrecognised value.
+                current.PseudoDualWatchSpanMode =
+                    Settings.PseudoDualWatchSpanMode is "ZoomIn" or "Shared" or "Hidden"
+                        ? Settings.PseudoDualWatchSpanMode
+                        : "ZoomIn";
 
                 await _settingsService.SaveSettingsAsync(current);
 
@@ -265,35 +213,16 @@ namespace Yaesu_Web_Control.Pages
                 if (catConnectionChanged)
                 {
                     // Reset initialization status so app will try again
-                    Yaesu_Web_Control.Services.AppStatus.InitializationStatus = "initializing";
+                    Icom_Web_Control.Services.AppStatus.InitializationStatus = "initializing";
 
-                    // Automatic retry: trigger radio initialization in the background rather
-                    // than awaiting it here. The full sequence (CAT burst, DT0 wait up to 5s,
-                    // state restore, auto-info settle) can legitimately take several seconds,
-                    // which was blocking this POST response and making Save appear to hang
-                    // (wa6auf11, #73 follow-up). The existing initializing-overlay/polling on
-                    // the main page already handles showing progress once redirected there.
-                    // InitializeRadioAsync's own top-level catch means this never surfaces an
-                    // unobserved exception.
-                    _ = _radioInitializationService.InitializeRadioAsync();
-                }
-
-                // If any SDR-related setting changed, ask SdrManager to restart its
-                // worker(s) so the new configuration takes effect immediately.
-                // Without this, adding/removing/changing an SDR would silently
-                // require a full app restart — the SdrManager loop only re-reads
-                // settings when its CancellationToken fires.
-                bool sdrChanged =
-                       !string.Equals(oldSdrA,  current.SdrDeviceKeyA ?? string.Empty, StringComparison.Ordinal)
-                    || !string.Equals(oldSdrB,  current.SdrDeviceKeyB ?? string.Empty, StringComparison.Ordinal)
-                    || oldSdrIfHz   != current.SdrIfFrequencyHz
-                    || oldSdrSrHzA  != current.SdrSampleRateHzA
-                    || oldSdrSrHzB  != current.SdrSampleRateHzB
-                    || oldSdrFft    != current.SdrFftSize;
-                if (sdrChanged)
-                {
-                    _logger.LogInformation("Settings: SDR settings changed — restarting SdrManager workers");
-                    _sdrManager.RequestRestart();
+                    // The CI-V port changed, so ask the seam to reconnect on the new
+                    // port in the background rather than awaiting it here — a connect
+                    // can take a moment and awaiting it would make Save appear to hang
+                    // (wa6auf11, #73 follow-up). CivRadioController owns the link and
+                    // also auto-reconnects on its own loop; this just nudges it to pick
+                    // up the new setting immediately. Its own catch means this never
+                    // surfaces an unobserved exception.
+                    _ = _radio.ConnectAsync();
                 }
 
                 StatusMessage = "✓ Settings saved successfully.";
@@ -335,13 +264,13 @@ namespace Yaesu_Web_Control.Pages
         /// <summary>
         /// Restart Now action — invoked from the restart-required banner on the
         /// Settings page. Spawns a small detached helper that waits two seconds
-        /// then relaunches the YWC executable, broadcasts ServerShutdown so any
-        /// open browser tab shows the existing "Yaesu Web Control has stopped"
+        /// then relaunches the IWC executable, broadcasts ServerShutdown so any
+        /// open browser tab shows the existing "Icom Web Control has stopped"
         /// overlay, and stops the host. The user reloads the browser once the
         /// app is back up.
         ///
-        /// Restart only works when running as the published `Yaesu_Web_Control.exe`
-        /// — if YWC was launched via `dotnet run` the auto-relaunch path is
+        /// Restart only works when running as the published `Icom_Web_Control.exe`
+        /// — if IWC was launched via `dotnet run` the auto-relaunch path is
         /// skipped, but the host still stops cleanly. Dev users can rerun
         /// `dotnet run` manually.
         /// </summary>
@@ -364,12 +293,12 @@ namespace Yaesu_Web_Control.Pages
             // Schedule a relaunch of the same exe. We use a detached cmd helper
             // that waits 2 s (long enough for the current host to fully stop and
             // release its HTTP port) and then `start`s the exe — `start` returns
-            // immediately so cmd exits cleanly, leaving the new YWC running.
+            // immediately so cmd exits cleanly, leaving the new IWC running.
             try
             {
                 var exePath = Process.GetCurrentProcess().MainModule?.FileName;
                 if (!string.IsNullOrEmpty(exePath) &&
-                    exePath.EndsWith("Yaesu_Web_Control.exe", StringComparison.OrdinalIgnoreCase) &&
+                    exePath.EndsWith("Icom_Web_Control.exe", StringComparison.OrdinalIgnoreCase) &&
                     System.IO.File.Exists(exePath))
                 {
                     Process.Start(new ProcessStartInfo
@@ -379,7 +308,7 @@ namespace Yaesu_Web_Control.Pages
                         UseShellExecute = false,
                         CreateNoWindow  = true,
                     });
-                    _logger.LogInformation("Scheduled YWC relaunch via detached cmd helper: {Exe}", exePath);
+                    _logger.LogInformation("Scheduled IWC relaunch via detached cmd helper: {Exe}", exePath);
                 }
                 else
                 {
@@ -388,7 +317,7 @@ namespace Yaesu_Web_Control.Pages
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to schedule YWC relaunch — user will need to relaunch manually");
+                _logger.LogError(ex, "Failed to schedule IWC relaunch — user will need to relaunch manually");
             }
 
             // Stop the host. Hosted services (MeterPollingService, the tray icon,
@@ -428,6 +357,19 @@ namespace Yaesu_Web_Control.Pages
             }
 
             return addresses;
+        }
+
+        /// <summary>
+        /// Space cannot round-trip through an HTML form as a lone " " (Tag Helpers
+        /// and browsers treat whitespace-only input values as empty). Persist the
+        /// KeyboardEvent.code token instead; migrate any legacy " " on save.
+        /// </summary>
+        private static string NormalizeTxToggleKey(string? key)
+        {
+            if (string.IsNullOrEmpty(key)) return string.Empty;
+            if (key == " " || key.Equals("Space", StringComparison.OrdinalIgnoreCase))
+                return "Space";
+            return key;
         }
     }
 }

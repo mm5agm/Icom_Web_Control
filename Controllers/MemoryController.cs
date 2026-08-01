@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -26,29 +26,29 @@ namespace Yaesu_Web_Control.Controllers
         };
 
         private readonly MemoryService _memoryService;
-        private readonly ICatClient _catClient;
         private readonly ISettingsService _settingsService;
         private readonly RadioStateService _radioStateService;
         private readonly ILogger<MemoryController> _logger;
         private readonly IWebHostEnvironment _env;
         private readonly MemoryBankService _bankService;
+        private readonly IRadioController _radio;
 
         public MemoryController(
             MemoryService memoryService,
-            ICatClient catClient,
             ISettingsService settingsService,
             RadioStateService radioStateService,
             ILogger<MemoryController> logger,
             IWebHostEnvironment env,
-            MemoryBankService bankService)
+            MemoryBankService bankService,
+            IRadioController radio)
         {
             _memoryService = memoryService;
-            _catClient = catClient;
             _settingsService = settingsService;
             _radioStateService = radioStateService;
             _logger = logger;
             _env = env;
             _bankService = bankService;
+            _radio = radio;
         }
 
         // ── CRUD ─────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ namespace Yaesu_Web_Control.Controllers
             return Ok();
         }
 
-        // ── Recall (tune VFO A to a memory) ─────────────────────────────────
+        // ── Recall (tune the active VFO to a memory) ────────────────────────
 
         [HttpPost("{id:int}/recall")]
         public async Task<IActionResult> Recall(int id)
@@ -89,105 +89,46 @@ namespace Yaesu_Web_Control.Controllers
             var memory = _memoryService.GetById(id);
             if (memory == null) return NotFound();
 
-            var settings = await _settingsService.GetSettingsAsync();
-            bool useCf = settings.RadioModel is "FTdx10" or "FT-710";
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
 
-            // Set mode before frequency so the radio applies any pitch/carrier offset
-            // (e.g. CW sidetone offset) before the VFO is tuned — prevents ~700 Hz landing error.
-            if (ModeToCode.TryGetValue(memory.Mode, out char modeCode))
-            {
-                await _catClient.SendCommandAsync($"MD0{modeCode};", "MemRecall", CancellationToken.None);
-                _radioStateService.ModeA = memory.Mode;
-                await Task.Delay(50);
-            }
+            // Recall tunes the currently-active VFO to the stored memory. IWC
+            // drives the IC-7300 through the CI-V seam (IRadioController), so the
+            // two universal fields — mode and frequency — are pushed here and that
+            // is what "recall a memory" means on this radio. The Yaesu-specific
+            // extras the old CAT recall also sent (clarifier, antenna, roofing
+            // filter, NB/NR/AGC, per-memory power) are not part of the IC-7300
+            // memory model; they remain stored in the app memory but are not
+            // applied. A later CI-V Memories block can extend this if wanted.
+            var vfo = _radioStateService.ActiveVfo == 1 ? RadioVfo.B : RadioVfo.A;
 
-            // Set frequency
-            string freqStr = memory.FrequencyHz.ToString("D9");
-            await _catClient.SendCommandAsync($"FA{freqStr};", "MemRecall", CancellationToken.None);
-            _radioStateService.FrequencyA = memory.FrequencyHz;
-
-            // Set clarifier
-            if (useCf)
+            try
             {
-                int rxBit = memory.RxClarOn ? 1 : 0;
-                int txBit = memory.TxClarOn ? 1 : 0;
-                await _catClient.SendCommandAsync($"CF001{rxBit}{txBit}000;", "MemRecall", CancellationToken.None);
-                string sign = memory.ClarifierOffsetHz >= 0 ? "+" : "-";
-                await _catClient.SendCommandAsync($"CF001{sign}{Math.Abs(memory.ClarifierOffsetHz):D4};", "MemRecall", CancellationToken.None);
-            }
-            else
-            {
-                await _catClient.SendCommandAsync($"RT{(memory.RxClarOn ? 1 : 0)};", "MemRecall", CancellationToken.None);
-                await _catClient.SendCommandAsync($"XT{(memory.TxClarOn ? 1 : 0)};", "MemRecall", CancellationToken.None);
-                await _catClient.SendCommandAsync("RC;", "MemRecall", CancellationToken.None);
-                if (memory.ClarifierOffsetHz > 0)
-                    await _catClient.SendCommandAsync($"RU{memory.ClarifierOffsetHz:D4};", "MemRecall", CancellationToken.None);
-                else if (memory.ClarifierOffsetHz < 0)
-                    await _catClient.SendCommandAsync($"RD{Math.Abs(memory.ClarifierOffsetHz):D4};", "MemRecall", CancellationToken.None);
-            }
-
-            _radioStateService.ClarifierOffsetA = memory.ClarifierOffsetHz;
-            _radioStateService.RxClarOn = memory.RxClarOn;
-            _radioStateService.TxClarOn = memory.TxClarOn;
-
-            // ── Apply advanced / optional fields ───────────────────────────────
-            // Each field is applied only if non-null. Null = leave radio alone.
-            if (!string.IsNullOrEmpty(memory.Antenna))
-            {
-                await _catClient.SendCommandAsync($"AN0{memory.Antenna};", "MemRecall", CancellationToken.None);
-                _radioStateService.AntennaA = memory.Antenna;
-            }
-            if (!string.IsNullOrEmpty(memory.IfWidthCode) && int.TryParse(memory.IfWidthCode, out int ifw))
-            {
-                await _catClient.SendCommandAsync($"SH00{ifw:D2};", "MemRecall", CancellationToken.None);
-                _radioStateService.IfWidthA = memory.IfWidthCode;
-            }
-            if (memory.IfShiftHz.HasValue)
-            {
-                int shift = memory.IfShiftHz.Value;
-                char sign = shift >= 0 ? '+' : '-';
-                await _catClient.SendCommandAsync($"IS00{sign}{Math.Abs(shift):D4};", "MemRecall", CancellationToken.None);
-                _radioStateService.IfShiftA = shift;
-            }
-            if (!string.IsNullOrEmpty(memory.RoofingCode))
-            {
-                // FTdx10/FT-710 have no CAT roofing filter control; skip silently.
-                if (settings.RadioModel is not ("FTdx10" or "FT-710"))
+                // Mode before frequency so the radio applies any mode-dependent
+                // offset (e.g. CW pitch) before it tunes — avoids a small landing
+                // error on the first read-back.
+                if (!string.IsNullOrEmpty(memory.Mode))
                 {
-                    await _catClient.SendCommandAsync($"RF0{memory.RoofingCode};", "MemRecall", CancellationToken.None);
-                    _radioStateService.RoofingFilterA = memory.RoofingCode;
+                    await _radio.SetModeAsync(vfo, memory.Mode, CancellationToken.None);
+                    if (vfo == RadioVfo.B) _radioStateService.ModeB = memory.Mode;
+                    else _radioStateService.ModeA = memory.Mode;
+                    await Task.Delay(50);
                 }
-            }
-            if (memory.NbOn.HasValue)
-            {
-                await _catClient.SendCommandAsync($"NB0{(memory.NbOn.Value ? 1 : 0)};", "MemRecall", CancellationToken.None);
-                _radioStateService.NbA = memory.NbOn.Value ? "1" : "0";
-            }
-            if (memory.NbLevel.HasValue)
-            {
-                int nbl = Math.Clamp(memory.NbLevel.Value, 1, 20);
-                await _catClient.SendCommandAsync($"NL0{nbl:D3};", "MemRecall", CancellationToken.None);
-                _radioStateService.NbLevelA = nbl;
-            }
-            if (!string.IsNullOrEmpty(memory.NrLevel))
-            {
-                await _catClient.SendCommandAsync($"NR0{memory.NrLevel};", "MemRecall", CancellationToken.None);
-                _radioStateService.NrA = memory.NrLevel;
-            }
-            if (!string.IsNullOrEmpty(memory.AgcMode))
-            {
-                await _catClient.SendCommandAsync($"GT0{memory.AgcMode};", "MemRecall", CancellationToken.None);
-                _radioStateService.AgcA = memory.AgcMode;
-            }
-            if (memory.PowerWatts.HasValue)
-            {
-                int pw = Math.Clamp(memory.PowerWatts.Value, 5, 200);
-                await _catClient.SendCommandAsync($"PC{pw:D3};", "MemRecall", CancellationToken.None);
-                _radioStateService.Power = pw;
-            }
-            // Notes are app-side only; not sent to the radio.
 
-            return Ok();
+                await _radio.SetFrequencyHzAsync(vfo, memory.FrequencyHz, CancellationToken.None);
+                if (vfo == RadioVfo.B) _radioStateService.FrequencyB = memory.FrequencyHz;
+                else _radioStateService.FrequencyA = memory.FrequencyHz;
+
+                _logger.LogInformation("Recalled memory {Id} ('{Label}') to VFO-{Vfo}: {Freq} Hz {Mode}",
+                    id, memory.Label, vfo, memory.FrequencyHz, memory.Mode);
+
+                return Ok(new { recalled = true, vfo = vfo.ToString(), frequencyHz = memory.FrequencyHz, mode = memory.Mode });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to recall memory {Id} to the radio", id);
+                return StatusCode(500, new { error = "Failed to tune the radio to that memory." });
+            }
         }
 
         // ── Save current VFO state as a new memory (with advanced fields) ────
@@ -235,170 +176,119 @@ namespace Yaesu_Web_Control.Controllers
             public string Mode { get; set; } = "replace"; // "replace" or "merge"
         }
 
+        // The IC-7300 has 99 internal memory channels, read/written whole over
+        // CI-V 1A 00 (IRadioController.ReadMemoryChannelAsync / Write / Clear).
+        // Only the three universal fields survive the round-trip — label (channel
+        // name), frequency and mode — because that is all the radio's channel model
+        // holds that maps to an app memory. The app's advanced fields (NB/NR/AGC,
+        // per-memory power, notes) stay app-side. Memory read/write never keys TX.
+        private const int RadioChannelCount = 99;
+
         [HttpPost("import-radio")]
         [RequestSizeLimit(1_000_000)]
-        public async Task<IActionResult> ImportFromRadio(
-            [FromBody] ImportRequest request,
-            CancellationToken cancellationToken)
+        public async Task<IActionResult> ImportFromRadio([FromBody] ImportRequest request)
         {
-            var settings = await _settingsService.GetSettingsAsync();
-            bool isFtdx3000 = settings.RadioModel == "FTDX3000";
-            bool hasMt = !isFtdx3000;
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
 
-            // Disable Auto-Information so responses are direct query replies,
-            // not unsolicited AI updates that would bypass _pendingResponses.
-            await _catClient.SendCommandAsync("AI0;", "MemImport", cancellationToken);
-            await Task.Delay(50, cancellationToken);
+            bool replace = string.Equals(request?.Mode, "replace", StringComparison.OrdinalIgnoreCase);
 
             var imported = new List<AppMemory>();
-
-            try
+            int misses = 0;
+            for (int ch = 1; ch <= RadioChannelCount; ch++)
             {
-                for (int ch = 1; ch <= 99; ch++)
+                var channel = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
+                if (channel == null) { misses++; continue; }   // transaction miss — skip
+                if (channel.IsEmpty || channel.FrequencyHz <= 0) continue;
+
+                imported.Add(new AppMemory
                 {
-                    if (cancellationToken.IsCancellationRequested) break;
-
-                    string channel = ch.ToString("D3");
-
-                    // MR{ch}; queries memory data without recalling to VFO.
-                    // Format: MR{ch3}{freq9}{clardir1}{claroff4}{rx1}{tx1}{mode1}... (27 chars)
-                    // Note: MR{ch}0; is the RECALL command (no response); MR{ch}; is the READ command.
-                    var mrResp = await _catClient.SendCommandAsync($"MR{channel};", "MemImport", cancellationToken, timeoutMs: 500);
-                    if (string.IsNullOrWhiteSpace(mrResp) || !mrResp.StartsWith("MR") || mrResp.Length < 22)
-                        continue;
-
-                    if (!long.TryParse(mrResp.Substring(5, 9), out long freqHz) || freqHz == 0)
-                        continue;
-
-                    char clarDir = mrResp[14];
-                    int clarOffset = 0;
-                    if (int.TryParse(mrResp.Substring(15, 4), out int clarAbs))
-                        clarOffset = clarDir == '-' ? -clarAbs : clarAbs;
-
-                    bool rxClar = mrResp[19] == '1';
-                    bool txClar = mrResp[20] == '1';
-
-                    string mode = "USB";
-                    CodeToMode.TryGetValue(char.ToUpper(mrResp[21]), out mode!);
-                    mode ??= "USB";
-
-                    // Read label via MT{ch}; — only available on non-FTDX3000 radios.
-                    // The label sits at position 28 of the 40-char MT response.
-                    string label = $"CH{channel}";
-                    if (hasMt)
-                    {
-                        var mtResp = await _catClient.SendCommandAsync($"MT{channel};", "MemImport", cancellationToken, timeoutMs: 500);
-                        if (!string.IsNullOrWhiteSpace(mtResp) && mtResp.Length >= 40)
-                        {
-                            label = mtResp.Substring(28, Math.Min(12, mtResp.Length - 29)).TrimEnd();
-                            if (string.IsNullOrWhiteSpace(label)) label = $"CH{channel}";
-                        }
-                    }
-
-                    imported.Add(new AppMemory
-                    {
-                        Label             = label,
-                        FrequencyHz       = freqHz,
-                        Mode              = mode,
-                        ClarifierOffsetHz = clarOffset,
-                        RxClarOn          = rxClar,
-                        TxClarOn          = txClar
-                    });
-                }
-            }
-            finally
-            {
-                // Always re-enable Auto-Information, even if import was cancelled or failed
-                await _catClient.SendCommandAsync("AI1;", "MemImport", CancellationToken.None);
+                    Label       = string.IsNullOrWhiteSpace(channel.Name) ? $"CH {ch:000}" : channel.Name.Trim(),
+                    FrequencyHz = channel.FrequencyHz,
+                    Mode        = string.IsNullOrWhiteSpace(channel.Mode) ? "USB" : channel.Mode,
+                });
             }
 
             if (imported.Count == 0)
-                return Ok(new { imported = 0, mode = request.Mode, warning = "No channels found on radio — existing app memories were not changed." });
+            {
+                var reason = misses > 0
+                    ? "The radio did not respond to memory reads. Check the connection and try again."
+                    : "No programmed memory channels were found on the radio.";
+                _logger.LogInformation("Import from radio found no channels ({Misses} misses)", misses);
+                return Ok(new { imported = 0, warning = reason });
+            }
 
-            if (request.Mode == "replace")
-                await _memoryService.ReplaceAllAsync(imported);
-            else
-                await _memoryService.MergeAsync(imported);
+            if (replace) await _memoryService.ReplaceAllAsync(imported);
+            else         await _memoryService.MergeAsync(imported);
 
-            return Ok(new { imported = imported.Count, mode = request.Mode });
+            _logger.LogInformation("Imported {Count} memory channels from the radio ({Mode})",
+                imported.Count, replace ? "replace" : "merge");
+            return Ok(new { imported = imported.Count });
         }
 
         // ── Export to Radio ──────────────────────────────────────────────────
 
         [HttpPost("export-radio")]
-        public async Task<IActionResult> ExportToRadio(CancellationToken cancellationToken)
+        public async Task<IActionResult> ExportToRadio()
         {
-            var settings = await _settingsService.GetSettingsAsync();
-            bool hasMt = settings.RadioModel != "FTDX3000";
-            var memories = _memoryService.GetAll();
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
+
+            // "Replace all": write app memories into channels 1..N, then clear the
+            // remaining channels so the radio ends up matching the app exactly.
+            var memories = _memoryService.GetAll()
+                .Where(m => m.FrequencyHz > 0)
+                .Take(RadioChannelCount)
+                .ToList();
+
             int written = 0;
-            for (int i = 0; i < Math.Min(memories.Count, 99); i++)
+            for (int i = 0; i < memories.Count; i++)
             {
-                if (cancellationToken.IsCancellationRequested) break;
-                await WriteMemoryToChannel(memories[i], i + 1, hasMt, cancellationToken);
-                written++;
+                var ok = await _radio.WriteMemoryChannelAsync(ToRadioChannel(memories[i], i + 1), CancellationToken.None);
+                if (ok) written++;
             }
-            return Ok(new { written });
+            for (int ch = memories.Count + 1; ch <= RadioChannelCount; ch++)
+                await _radio.ClearMemoryChannelAsync(ch, CancellationToken.None);
+
+            bool truncated = _memoryService.GetAll().Count(m => m.FrequencyHz > 0) > RadioChannelCount;
+            _logger.LogInformation("Exported {Written} memories to the radio (replace all)", written);
+            return Ok(new { written, truncated });
         }
 
         [HttpPost("export-radio-add")]
-        public async Task<IActionResult> ExportToRadioAdd(CancellationToken cancellationToken)
+        public async Task<IActionResult> ExportToRadioAdd()
         {
-            var settings = await _settingsService.GetSettingsAsync();
-            bool hasMt = settings.RadioModel != "FTDX3000";
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
 
-            // Scan rig to find empty channels
-            var emptyChannels = new List<int>();
-            for (int ch = 1; ch <= 99; ch++)
+            // Add into the radio's empty channels only, leaving programmed ones
+            // untouched. Walk the channels, filling blanks from the app list.
+            var memories = _memoryService.GetAll().Where(m => m.FrequencyHz > 0).ToList();
+            int written = 0, next = 0;
+            for (int ch = 1; ch <= RadioChannelCount && next < memories.Count; ch++)
             {
-                if (cancellationToken.IsCancellationRequested)
-                    return Ok(new { written = 0, noRoom = 0, cancelled = true });
-
-                var mrResp = await _catClient.SendCommandAsync($"MR{ch:D3}0;", "MemExportAdd", cancellationToken);
-                bool isEmpty = string.IsNullOrWhiteSpace(mrResp)
-                    || mrResp.Length < 14
-                    || !long.TryParse(mrResp.Substring(5, 9), out long f)
-                    || f == 0;
-                if (isEmpty) emptyChannels.Add(ch);
+                var existing = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
+                if (existing == null || !existing.IsEmpty) continue;   // skip misses and occupied channels
+                if (await _radio.WriteMemoryChannelAsync(ToRadioChannel(memories[next], ch), CancellationToken.None))
+                    written++;
+                next++;
             }
 
-            var memories = _memoryService.GetAll();
-            int written = 0, noRoom = 0;
-
-            for (int i = 0; i < memories.Count; i++)
-            {
-                if (cancellationToken.IsCancellationRequested) break;
-                if (i >= emptyChannels.Count) { noRoom++; continue; }
-                await WriteMemoryToChannel(memories[i], emptyChannels[i], hasMt, cancellationToken);
-                written++;
-            }
-
-            return Ok(new { written, noRoom, totalEmpty = emptyChannels.Count });
+            _logger.LogInformation("Added {Written} memories into the radio's empty channels", written);
+            return Ok(new { written });
         }
 
-        private async Task WriteMemoryToChannel(
-            AppMemory mem, int channel, bool hasMt, CancellationToken cancellationToken)
+        /// <summary>Map an app memory onto a radio channel (label→name capped at 16, split off, TX mirrors RX).</summary>
+        private static RadioMemoryChannel ToRadioChannel(AppMemory m, int channel) => new()
         {
-            string ch      = channel.ToString("D3");
-            string freq    = mem.FrequencyHz.ToString("D9");
-            string clarDir = mem.ClarifierOffsetHz >= 0 ? "+" : "-";
-            string clarOff = Math.Abs(mem.ClarifierOffsetHz).ToString("D4");
-            int rxBit      = mem.RxClarOn ? 1 : 0;
-            int txBit      = mem.TxClarOn ? 1 : 0;
-            char modeCode  = ModeToCode.TryGetValue(mem.Mode, out char mc) ? mc : '2';
+            Channel     = channel,
+            FrequencyHz = m.FrequencyHz,
+            Mode        = string.IsNullOrWhiteSpace(m.Mode) ? "USB" : m.Mode,
+            Filter      = 1,
+            Name        = (m.Label ?? "").Length > 16 ? m.Label!.Substring(0, 16) : (m.Label ?? ""),
+        };
 
-            await _catClient.SendCommandAsync(
-                $"MW{ch}{freq}{clarDir}{clarOff}{rxBit}{txBit}{modeCode}000000;", "MemExport", cancellationToken);
-
-            if (hasMt)
-            {
-                string tag = mem.Label.Length > 12 ? mem.Label[..12] : mem.Label.PadRight(12);
-                await _catClient.SendCommandAsync(
-                    $"MT{ch}{freq}{clarDir}{clarOff}{rxBit}{txBit}{modeCode}000000{0}{tag};", "MemExport", cancellationToken);
-            }
-        }
-
-        // ── YWC starter bank (bundled with the app) ──────────────────────────
+        // ── IWC starter bank (bundled with the app) ──────────────────────────
         //
         // The starter bank is a region-specific set of watering-hole memories
         // (FT8/FT4/SSB/CW/RTTY/beacons) shipped in wwwroot/data/starter-bank-*.json.
@@ -641,12 +531,12 @@ namespace Yaesu_Web_Control.Controllers
         // ── ADIF memory import ─────────────────────────────────────────────
         //
         // Read an ADIF file and turn each unique (frequency, mode) pair into
-        // a YWC memory. Many operators already have their favourite
+        // a IWC memory. Many operators already have their favourite
         // frequencies in Log4OM or another logger — this saves them retyping.
         //
         // Strategy:
         //  - Parse all QSO records
-        //  - Bucket by (frequency-in-Hz, ywc-mode-string) so duplicates from
+        //  - Bucket by (frequency-in-Hz, iwc-mode-string) so duplicates from
         //    multiple QSOs on the same frequency collapse into one memory
         //  - Skip entries whose label already exists in the current memory
         //    list (collision-safe; users can re-import without doubling up)
@@ -677,7 +567,7 @@ namespace Yaesu_Web_Control.Controllers
             if (records.Count == 0)
                 return BadRequest(new { error = "No ADIF records found in the file." });
 
-            // Deduplicate by (Hz, ywc-mode) so the same frequency appearing in
+            // Deduplicate by (Hz, iwc-mode) so the same frequency appearing in
             // hundreds of QSOs only produces one new memory.
             var seen = new HashSet<(long, string)>();
             var newMemories = new List<AppMemory>();

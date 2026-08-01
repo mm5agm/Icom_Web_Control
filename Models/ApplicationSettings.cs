@@ -1,10 +1,13 @@
-﻿namespace Yaesu_Web_Control.Models
+﻿namespace Icom_Web_Control.Models
 {
     public class ApplicationSettings
     {
         // Connection Settings
-        public string SerialPort { get; set; } = "COM3";
-        public int BaudRate { get; set; } = 38400;
+        // IWC defaults are the verified IC-7300 MkII CI-V values (2026-07-25):
+        // COM8 = "IC-7300MK2 Serial Port A (CI-V)", 19200 8N1. Change the port
+        // in Settings if the radio enumerates elsewhere on another machine.
+        public string SerialPort { get; set; } = "COM8";
+        public int BaudRate { get; set; } = 19200;
         public string WebAddress { get; set; } = "0.0.0.0"; // Bind to all interfaces
 
         // HTTP port the web server listens on. Default 8080. If that port is
@@ -13,7 +16,7 @@
         // know 8080 always clashes on their machine (e.g. Plex, Jenkins).
         public int HttpPort { get; set; } = 8080;
 
-        public string RadioModel { get; set; } = "FTdx101MP"; // MP = dual receiver, D = single receiver
+        public string RadioModel { get; set; } = "IC-7300MK2"; // Icom single-receiver HF+6m(+4m EU)
 
 
         // External Applications - Command Lines.
@@ -65,7 +68,7 @@
         // legacy "sdrplay:<serial>" (still accepted; auto-migrated on save).
         // SoapySDR-format keys: "driver=rtlsdr,serial=00000001" etc.
         //
-        // The SDRplay API enforces one device per process, so YWC spawns a
+        // The SDRplay API enforces one device per process, so IWC spawns a
         // dedicated Yaesu_Sdr_Worker.exe process per SDR — see
         // docs/decisions/0001-dual-sdr-architecture.md.
         //
@@ -101,7 +104,7 @@
 
         // Per-VFO spectrum DSP knobs (see SpectrumProcessor). Live-controlled
         // from the three sliders on each spectrum panel; persisted here so
-        // settings survive YWC restarts and re-apply to a new worker session.
+        // settings survive IWC restarts and re-apply to a new worker session.
         //
         //   Gain    — pre-dB linear gain G (design doc §4.1). 1.0 = no boost.
         //   LowDb   — display clamp lower bound (SDR Console "Low"). Bins below
@@ -114,6 +117,60 @@
         public float SdrSpectrumLowDbB  { get; set; } = -120f;
         public float SdrSpectrumHighDbA { get; set; } = 0f;
         public float SdrSpectrumHighDbB { get; set; } = 0f;
+
+        //   WaterfallSpeed — divisor into SpectrumPanel.WATERFALL_SPEEDS
+        //             [1,2,4,8,16,32,64,128]; 1 = fastest scroll. Default 1.
+        //   WaterfallBrightDb — additive dB brightness lift for the waterfall,
+        //             0..60. Default 0. Both mirror the index panel sliders and
+        //             persist across sessions/devices (superseding the old
+        //             localStorage-only iwc.waterfall* keys).
+        public int SdrWaterfallSpeedA   { get; set; } = 1;
+        public int SdrWaterfallSpeedB   { get; set; } = 1;
+        public int SdrWaterfallBrightDbA { get; set; } = 0;
+        public int SdrWaterfallBrightDbB { get; set; } = 0;
+
+        // ── Pseudo-dual receiver (Phase 5) ────────────────────────────────
+        // The IC-7300 MkII has ONE receiver. This feature *presents* a second
+        // VFO's spectrum ("watch" panel) alongside the primary you actually
+        // listen to, by time-sharing the single scope. See
+        // docs/design/iwc-clone-split-plan.md Phase 5.
+        //
+        // Master switch. When true, the index page shows two spectrum panels
+        // (primary + watch) instead of one. Default OFF — opt-in flagship
+        // feature; a single-panel layout is the plain default.
+        public bool PseudoDualReceiverEnabled { get; set; } = false;
+
+        // Whether the watch panel may show a DIFFERENT band from the primary.
+        //
+        // Same-band watch is glitch-free (the single scope covers both VFOs at
+        // once, audio never moves). Cross-band watch is physically impossible
+        // on one receiver WITHOUT briefly retuning the RX — so enabling this
+        // lets the app "peek" at the watch band every few seconds, which dips
+        // the primary audio for ~0.4 s per peek. OFF = same-band only, the
+        // zero-glitch fallback: the watch panel shows "out of range" when the
+        // two VFOs are on different bands. Default OFF.
+        public bool PseudoDualCrossBandEnabled { get; set; } = false;
+
+        // How often (seconds) the cross-band peek borrows the receiver to
+        // refresh the watch band. Only used when PseudoDualCrossBandEnabled.
+        // Bigger = fewer/rarer audio dips but a staler watch trace. Default 15
+        // (≈4 brief dips/min). Clamped to 5–60 in the UI.
+        public int PseudoDualPeekIntervalSeconds { get; set; } = 15;
+
+        // How the watch panel's (VFO B) span buttons behave. The radio has ONE
+        // scope with ONE span (CI-V 27 15), and the watch panel is a crop of that
+        // single sweep — so B can never be WIDER than A. Three modes:
+        //   "ZoomIn" (default) — B's buttons narrow B's crop around the watch VFO
+        //             in software only; they never touch the physical scope, so
+        //             changing B no longer changes A. B can go narrower than A
+        //             (zoom into the watch signal); asking for wider than the
+        //             available sweep just clamps to the max crop.
+        //   "Shared" — B's buttons set the one physical span like A's; both panels'
+        //             active span highlights follow it, making the single scope
+        //             obvious. B always matches A.
+        //   "Hidden" — B shows no span buttons; only A controls the shared span.
+        // Default "ZoomIn" so the panels feel independent out of the box.
+        public string PseudoDualWatchSpanMode { get; set; } = "ZoomIn";
 
         // Optional user override for the SDRplay API install directory
         // (the folder that contains the x64\sdrplay_api.dll subfolder).
@@ -167,6 +224,18 @@
         // Yuri W4YSW request 2026-06-17.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
 
+        // Browser key that toggles TX (transmit). Empty / null = disabled.
+        // Stored as a KeyboardEvent.key value such as "t" or "F8", except
+        // Space which is stored as the token "Space" (a lone " " cannot
+        // survive HTML form / input value round-trips).
+        // Ignored while typing in inputs to avoid accidental keying during
+        // form entry or frequency editing.
+        // Nullable so an empty input does not get an implicit [Required] from
+        // <Nullable>enable</Nullable> — that would make jQuery unobtrusive
+        // validation silently block the entire Settings form (same class of
+        // bug as #65 / SdrplayInstallPath and the DX-cluster fields).
+        public string? TxToggleKey { get; set; } = "";
+
         // ── Voice Control (in-process SAPI) ───────────────────────────────
         // When true, the navbar mic button is shown and the SAPI recogniser
         // engages on PTT. Default OFF -- voice control is opt-in so users
@@ -212,6 +281,26 @@
         // an app restart. Defaults to en-GB since that's the only pack that
         // ships today. docs/VoiceControl/language-pack-manager-design.md §4.4.
         public string VoiceActiveLocale { get; set; } = "en-GB";
+
+        // Which microphone the speech recogniser listens to. Empty = the
+        // Windows default recording device (SetInputToDefaultAudioDevice).
+        // A non-empty value is a WaveIn/MME product name (see
+        // MicrophoneCapture): IWC captures that device itself and feeds SAPI a
+        // MicrophoneStream, because System.Speech can't target a device by name.
+        // Chosen from the picker in Settings → Voice Control so partially-
+        // sighted operators never have to change the Windows default device
+        // (which would disturb whatever else -- WSJT-X etc. -- relies on it).
+        public string VoiceInputDeviceName { get; set; } = "";
+
+        // Which speaker/output device the spoken confirmations play through.
+        // Empty = the Windows default playback device (SetOutputToDefaultAudioDevice).
+        // A non-empty value is a WaveOut/MME product name (see AudioOutput);
+        // VoiceTtsService renders the phrase to a WAV and plays it to that device
+        // itself, because System.Speech can't target an output device by name.
+        // Chosen from the picker in Settings → Voice Control so a partially-
+        // sighted operator can send confirmations to their own speakers/headset
+        // while the Windows default stays pointed at WSJT-X, rig audio, etc.
+        public string VoiceOutputDeviceName { get; set; } = "";
     }
 
     public class RadioState
@@ -241,14 +330,17 @@
         public int SquelchB { get; set; } = 0;
     }
 
-    // Stores per-band IF Width/Shift/Mode/Antenna so they are restored when the operator returns to a band.
+    // Per-band "stacking register": remembers where you were on each band
+    // (frequency + mode) so clicking back to the band returns you there.
+    // FrequencyHz == 0 means "no saved spot yet" — fall back to the band default.
+    // IfWidthCode/IfShiftHz/Antenna are inherited Yaesu fields, unused on the
+    // IC-7300 (direct-sampling, single antenna); kept only for profile back-compat.
     public class BandProfile
     {
+        public long FrequencyHz { get; set; } = 0;
+        public string Mode { get; set; } = "";
         public string IfWidthCode { get; set; } = "";
         public int IfShiftHz { get; set; } = 0;
-        public string Mode { get; set; } = "";
-        // Antenna selection ("1" / "2" / "3"). Empty for legacy profiles
-        // saved before this field existed — guard restore with IsNullOrEmpty.
         public string Antenna { get; set; } = "";
     }
 }

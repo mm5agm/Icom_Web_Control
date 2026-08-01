@@ -1,10 +1,10 @@
 using System.Text.Json.Serialization;
 
-namespace Yaesu_Web_Control.Models
+namespace Icom_Web_Control.Models
 {
     /// <summary>
     /// User-editable voice phrase configuration persisted to
-    /// %APPDATA%\MM5AGM\Yaesu Web Control\voice_phrases.json.
+    /// %APPDATA%\MM5AGM\Icom Web Control\voice_phrases.json.
     /// </summary>
     public sealed class VoicePhrasesConfig
     {

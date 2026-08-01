@@ -4,10 +4,10 @@ using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
-using Yaesu_Web_Control.Hubs;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Hubs;
+using Icom_Web_Control.Models;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     /// <summary>
     /// Maintains a TCP connection to a DX cluster server, parses incoming spot
@@ -45,7 +45,7 @@ namespace Yaesu_Web_Control.Services
         // to see exactly what the cluster has been sending.
         public static readonly string LogFilePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control", "dx-cluster.log");
+            "MM5AGM", "Icom Web Control", "dx-cluster.log");
         private readonly object _logFileLock = new();
 
         private void AppendLogFile(string line)
@@ -265,7 +265,7 @@ namespace Yaesu_Web_Control.Services
                 // Log every line received. Three destinations:
                 //   1. Standard ILogger (filtered to Information for DxCluster)
                 //   2. Browser-visible ring buffer via /api/dxcluster/recent
-                //   3. Diagnostic file (%APPDATA%\MM5AGM\Yaesu Web Control\dx-cluster.log)
+                //   3. Diagnostic file (%APPDATA%\MM5AGM\Icom Web Control\dx-cluster.log)
                 _logger.LogInformation("[DxCluster] << {Line}", line);
                 AppendLogFile($"<< {line}");
                 lock (_recentLinesLock)

@@ -1,4 +1,4 @@
-// Yaesu Web Control – Meter Formatters
+// Icom Web Control – Meter Formatters
 // Pure UI formatting helpers. No calibration, no DOM, no gauge logic, no side effects.
 //
 // Method naming convention:
@@ -33,13 +33,10 @@ export const MeterFormatters = {
     },
 
     // ----------------------------------------------------------------
-    // ALC  (ALCGauge has no gaugeTitleSuffix — full text goes in span)
+    // ALC — IC-7300 reports ALC as a 0–100 % scale (not volts). The overlay
+    // number comes straight from dv.percent with '%' as the gauge suffix; the
+    // freestanding bar label uses percent() below.
     // ----------------------------------------------------------------
-
-    // Gauge overlay — calibrated volts display.
-    alcVolts(volts) {
-        return `${Math.round(volts)}V`;
-    },
 
     // ----------------------------------------------------------------
     // COMPRESSION  (CompressionGauge appends 'dB' as gaugeTitleSuffix)
@@ -63,14 +60,6 @@ export const MeterFormatters = {
 
     vddOverlay(volts) {
         return volts.toFixed(1);
-    },
-
-    // ----------------------------------------------------------------
-    // PA TEMPERATURE  (TempGauge appends '°C' as gaugeTitleSuffix)
-    // ----------------------------------------------------------------
-
-    tempOverlay(tempC) {
-        return String(Math.round(tempC));
     },
 
     // ----------------------------------------------------------------

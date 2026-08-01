@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something in YWC misbehaves — please tell me what and how to reproduce it.
+about: Something in IWC misbehaves — please tell me what and how to reproduce it.
 title: "[BUG] "
 labels: bug
 ---
@@ -28,7 +28,7 @@ What did happen?
 
 ## Diagnostics
 
-Open the YWC **About** page from the top navigation bar, click **Copy
+Open the IWC **About** page from the top navigation bar, click **Copy
 diagnostics**, and paste the result here. It's a single small block
 covering version, radio, browser, OS, etc.
 

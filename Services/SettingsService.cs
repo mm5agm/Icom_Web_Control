@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
-using Yaesu_Web_Control.Models;
+using Icom_Web_Control.Models;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class SettingsService : ISettingsService
     {
@@ -12,13 +12,13 @@ namespace Yaesu_Web_Control.Services
 
         public SettingsService(IWebHostEnvironment environment, ILogger<SettingsService> logger)
         {
+            _logger = logger;
             var appData = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MM5AGM", "Yaesu Web Control");
-            MigrateAppDataIfNeeded(appData);
+                "MM5AGM", "Icom Web Control");
             Directory.CreateDirectory(appData);
             _settingsFilePath = Path.Combine(appData, "appsettings.user.json");
-            _logger = logger;
+            MigrateSettingsFromYwcIfNeeded();
             _logger.LogInformation("SettingsService initialized. File path: {Path}", _settingsFilePath);
         }
 
@@ -180,16 +180,123 @@ namespace Yaesu_Web_Control.Services
             return System.IO.File.Exists(trimmed) ? $"\"{trimmed}\"" : trimmed;
         }
 
-        private static void MigrateAppDataIfNeeded(string newFolder)
+        // One-time first-run migration of radio-AGNOSTIC user preferences from a
+        // sibling Yaesu Web Control (or the older FTdx101 WebApp) install into
+        // this Icom Web Control settings file. Runs only when IWC has no settings
+        // file of its own yet, so it never clobbers an existing IWC config and
+        // never runs twice.
+        //
+        // Radio-SPECIFIC fields are deliberately NOT carried across: IWC talks to
+        // an IC-7300 (COM8, 19200, CI-V) not a Yaesu (COM4, 38400, Yaesu CAT), the
+        // SDR wiring and meter calibration differ, and the Yaesu IF-width codes in
+        // band profiles / last-radio-state don't map onto Icom. Those stay at
+        // IWC's own defaults — see CopyRadioAgnosticSettings for the exact allowlist.
+        //
+        // Best-effort: any failure here must never stop the app from starting.
+        // Other user-data files (memories.json, memory-banks.json, labels.json,
+        // voice_phrases.json) are NOT touched — a Yaesu calibration.user.json /
+        // radio_state.json would be wrong on Icom, and the rest are a separate
+        // decision. This is settings-only by design.
+        private void MigrateSettingsFromYwcIfNeeded()
         {
-            if (Directory.Exists(newFolder)) return;
-            var oldFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MM5AGM", "FTdx101 WebApp");
-            if (!Directory.Exists(oldFolder)) return;
-            Directory.CreateDirectory(newFolder);
-            foreach (var file in Directory.GetFiles(oldFolder))
-                File.Copy(file, Path.Combine(newFolder, Path.GetFileName(file)), overwrite: false);
+            try
+            {
+                if (File.Exists(_settingsFilePath)) return;   // IWC already has settings — nothing to do
+
+                var appDataRoot = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MM5AGM");
+
+                // Newest lineage first; both are Yaesu-flavoured YWC configs.
+                string[] legacyFolders = { "Yaesu Web Control", "FTdx101 WebApp" };
+
+                var sourceFile = legacyFolders
+                    .Select(f => Path.Combine(appDataRoot, f, "appsettings.user.json"))
+                    .FirstOrDefault(File.Exists);
+
+                if (sourceFile is null) return;   // fresh install, no YWC to inherit from
+
+                var json = File.ReadAllText(sourceFile);
+                var old = JsonSerializer.Deserialize<ApplicationSettings>(json);
+                if (old is null) return;
+
+                // Start from IWC defaults (correct IC-7300 port/baud/model/SDR/etc.)
+                // and overlay ONLY the radio-agnostic preferences.
+                var merged = new ApplicationSettings();
+                CopyRadioAgnosticSettings(from: old, to: merged);
+
+                var outJson = JsonSerializer.Serialize(merged, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_settingsFilePath, outJson);
+
+                _logger.LogInformation(
+                    "First-run: migrated radio-agnostic settings from '{Source}' into '{Dest}' " +
+                    "(radio/SDR/calibration fields left at IWC defaults).",
+                    sourceFile, _settingsFilePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "First-run settings migration from a Yaesu Web Control install failed; continuing with IWC defaults.");
+            }
+        }
+
+        // The allowlist of radio-AGNOSTIC fields carried across on first-run
+        // migration (see MigrateSettingsFromYwcIfNeeded). Anything NOT copied here
+        // — SerialPort, BaudRate, RadioModel, every Sdr* field, SdrplayInstallPath,
+        // InstalledRoofingFilters, BandProfilesA/B, LastRadioState — is Yaesu-
+        // specific and intentionally stays at IWC's IC-7300 defaults.
+        private static void CopyRadioAgnosticSettings(ApplicationSettings from, ApplicationSettings to)
+        {
+            // Web server host settings
+            to.WebAddress = from.WebAddress;
+            to.HttpPort   = from.HttpPort;
+
+            // External application launchers (installed-app paths are portable)
+            to.WsjtxCommandLine       = from.WsjtxCommandLine;
+            to.JtalertCommandLine     = from.JtalertCommandLine;
+            to.Log4omCommandLine      = from.Log4omCommandLine;
+            to.GridtrackerCommandLine = from.GridtrackerCommandLine;
+            to.FldigiCommandLine      = from.FldigiCommandLine;
+            to.App1Name = from.App1Name;
+            to.App2Name = from.App2Name;
+            to.App3Name = from.App3Name;
+            to.App4Name = from.App4Name;
+            to.App5Name = from.App5Name;
+            to.ShowWsjtxButton       = from.ShowWsjtxButton;
+            to.ShowJtalertButton     = from.ShowJtalertButton;
+            to.ShowLog4omButton      = from.ShowLog4omButton;
+            to.ShowGridtrackerButton = from.ShowGridtrackerButton;
+            to.ShowFldigiButton      = from.ShowFldigiButton;
+
+            // WSJT-X UDP link
+            to.WsjtxUdpAddress = from.WsjtxUdpAddress;
+            to.WsjtxUdpPort    = from.WsjtxUdpPort;
+
+            // Band-plan region (regulatory IARU region, not a radio setting)
+            to.BandPlan = from.BandPlan;
+
+            // DX cluster
+            to.DxClusterEnabled           = from.DxClusterEnabled;
+            to.DxClusterHost              = from.DxClusterHost;
+            to.DxClusterPort              = from.DxClusterPort;
+            to.DxClusterLoginCallsign     = from.DxClusterLoginCallsign;
+            to.DxSpotAgeMinutes           = from.DxSpotAgeMinutes;
+            to.DxClusterPostLoginCommands = from.DxClusterPostLoginCommands;
+            to.DxClusterWatchedCallsigns  = from.DxClusterWatchedCallsigns;
+
+            // CW keyer message memories (user text macros; radio-agnostic)
+            to.CwMessages = from.CwMessages;
+
+            // Accessibility / input
+            to.ShowFrequencyArrowButtons = from.ShowFrequencyArrowButtons;
+            to.TxToggleKey               = from.TxToggleKey;
+
+            // Voice control
+            to.VoiceControlEnabled            = from.VoiceControlEnabled;
+            to.VoiceSpokenConfirmationEnabled = from.VoiceSpokenConfirmationEnabled;
+            to.VoiceNudgeStepHzA              = from.VoiceNudgeStepHzA;
+            to.VoiceNudgeStepHzB              = from.VoiceNudgeStepHzB;
+            to.VoiceAdvancedModeEnabled       = from.VoiceAdvancedModeEnabled;
+            to.VoiceActiveLocale              = from.VoiceActiveLocale;
         }
     }
 }

@@ -1,5 +1,5 @@
 ﻿@page
-@model Yaesu_Web_Control.Pages.PortsModel
+@model Icom_Web_Control.Pages.PortsModel
 @{
     ViewData["Title"] = "Available COM Ports";
 }
@@ -24,11 +24,11 @@
 }
 </ul>
 
-@if (Model.Com6Present)
+@if (Model.ConfiguredPresent)
 {
-    <div style="color: green; font-weight: bold;">COM6 is available.</div>
+    <div style="color: green; font-weight: bold;">Configured port @Model.ConfiguredPort is available.</div>
 }
 else
 {
-    <div style="color: red; font-weight: bold;">COM6 is NOT available.</div>
+    <div style="color: red; font-weight: bold;">Configured port @Model.ConfiguredPort is NOT available.</div>
 }

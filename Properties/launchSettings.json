@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
-    "Yaesu_Web_Control": {
+    "Icom_Web_Control": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": false,

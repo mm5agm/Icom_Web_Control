@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace Yaesu_Web_Control.Pages.Shared
+namespace Icom_Web_Control.Pages.Shared
 {
     public class _BandButtonsPartialModel : PageModel
     {

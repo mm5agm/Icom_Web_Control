@@ -34,7 +34,7 @@ High-level shape:
 
 ```
 ┌─────────────────────────────────────────────┐
-│ Yaesu_Web_Control.exe (main)                │
+│ Icom_Web_Control.exe (main)                │
 │   ┌──────────────────────────────────────┐  │
 │   │ Kestrel web + SignalR + CAT + UI     │  │
 │   │ SdrManager (NEW) — supervises        │  │

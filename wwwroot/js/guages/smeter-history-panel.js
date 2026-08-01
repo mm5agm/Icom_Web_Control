@@ -1,4 +1,4 @@
-// Yaesu Web Control – S-Meter History Panel
+// Icom Web Control – S-Meter History Panel
 //
 // Compact 30-second strip-chart that sits below the analog S-meter and shows:
 //   - History polyline of the last 30 s of raw S-meter readings

@@ -1,16 +1,16 @@
 using System.IO.Compression;
 using Microsoft.AspNetCore.Mvc;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     /// <summary>
-    /// Export / import everything the operator has customised in YWC as a
+    /// Export / import everything the operator has customised in IWC as a
     /// single zip — settings, memories, memory banks, calibration, labels.
     /// Replaces the v2.0.0 settings-only backup with a clean one-file PC
     /// migration path.
     ///
-    /// Files included (whichever exist in %APPDATA%\MM5AGM\Yaesu Web Control\):
+    /// Files included (whichever exist in %APPDATA%\MM5AGM\Icom Web Control\):
     ///   appsettings.user.json   user settings
     ///   memories.json           memory channels
     ///   memory-banks.json       saved memory banks
@@ -57,7 +57,7 @@ namespace Yaesu_Web_Control.Controllers
         {
             var appDataDir = Path.GetDirectoryName(_settingsService.GetSettingsFilePath());
             if (string.IsNullOrEmpty(appDataDir) || !Directory.Exists(appDataDir))
-                return NotFound(new { error = "User data folder not found yet — has YWC ever saved any settings?" });
+                return NotFound(new { error = "User data folder not found yet — has IWC ever saved any settings?" });
 
             using var ms = new MemoryStream();
             int included = 0;
@@ -78,10 +78,10 @@ namespace Yaesu_Web_Control.Controllers
                 var readme = zip.CreateEntry("README.txt", CompressionLevel.Optimal);
                 using (var w = new StreamWriter(readme.Open()))
                 {
-                    w.WriteLine($"YWC user data backup — created {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+                    w.WriteLine($"IWC user data backup — created {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
                     w.WriteLine($"App version: {AppVersion.Current}");
                     w.WriteLine();
-                    w.WriteLine("To restore: open YWC → Settings → Import full backup, and pick this zip.");
+                    w.WriteLine("To restore: open IWC → Settings → Import full backup, and pick this zip.");
                     w.WriteLine("Files included: " + included);
                 }
             }
@@ -90,7 +90,7 @@ namespace Yaesu_Web_Control.Controllers
             var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             return new FileContentResult(ms.ToArray(), "application/zip")
             {
-                FileDownloadName = $"ywc-backup-{stamp}.zip"
+                FileDownloadName = $"iwc-backup-{stamp}.zip"
             };
         }
 
@@ -164,7 +164,7 @@ namespace Yaesu_Web_Control.Controllers
                     skipped,
                     restartNeeded = true,
                     message = $"Imported {restored} file{(restored == 1 ? "" : "s")}. " +
-                              "Restart YWC for the radio-connection, DX-cluster, SDR and rigctld services to pick up the new values."
+                              "Restart IWC for the radio-connection, DX-cluster, SDR and rigctld services to pick up the new values."
                 });
             }
             catch (Exception ex)

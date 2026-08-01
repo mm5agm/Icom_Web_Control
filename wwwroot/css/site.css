@@ -393,6 +393,43 @@ pre, code { tab-size: 4; }
     white-space: nowrap;
 }
 
+/* Segmented button group for DSP on/off + few-value controls (replaces the
+   old <select> dropdowns). Every option is visible; the active one is filled. */
+.dsp-seg-group {
+    display: flex;
+    flex: 1;
+    gap: 0;
+    min-width: 52px;
+}
+
+.dsp-seg {
+    flex: 1;
+    font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1.1;
+    padding: 0.12rem 0.15rem;
+    border: 1px solid #adb5bd;
+    background: #e9ecef;
+    color: #000;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.dsp-seg + .dsp-seg {
+    border-left: none;
+}
+
+.dsp-seg:first-child { border-radius: 0.25rem 0 0 0.25rem; }
+.dsp-seg:last-child  { border-radius: 0 0.25rem 0.25rem 0; }
+
+.dsp-seg:hover { background: #dbe0e5; }
+
+.dsp-seg.active {
+    background: #198754;
+    border-color: #146c43;
+    color: #fff;
+}
+
 /* Compact band button grid layout - 4 columns, sized to content */
 .band-radio-grid {
     display: grid;

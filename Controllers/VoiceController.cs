@@ -2,11 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
-using Yaesu_Web_Control.Models;
-using Yaesu_Web_Control.Services;
-using Yaesu_Web_Control.Services.Voice;
+using Icom_Web_Control.Models;
+using Icom_Web_Control.Services;
+using Icom_Web_Control.Services.Voice;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     /// <summary>
     /// HTTP entry points for the on-screen mic button. The frontend POSTs
@@ -129,7 +129,7 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                var path = Path.Combine(appData, "MM5AGM", "Yaesu Web Control", "Grammars");
+                var path = Path.Combine(appData, "MM5AGM", "Icom Web Control", "Grammars");
                 Directory.CreateDirectory(path);
                 Process.Start(new ProcessStartInfo
                 {
@@ -146,11 +146,11 @@ namespace Yaesu_Web_Control.Controllers
         }
 
         /// <summary>
-        /// Extracts voice-related log lines from today's YWC log file. Used by
+        /// Extracts voice-related log lines from today's IWC log file. Used by
         /// the "Voice Control Log" panel on the Diagnostics page. A bug
         /// reporter clicks the panel, copies the output, pastes it into a
         /// GitHub issue -- without ever having to know the log file lives at
-        /// %APPDATA%\MM5AGM\Yaesu Web Control\logs\ywc-YYYYMMDD.log or that
+        /// %APPDATA%\MM5AGM\Icom Web Control\logs\iwc-YYYYMMDD.log or that
         /// they need to grep it. The full log can grow to many MB; this
         /// endpoint reads only the tail and filters server-side so the
         /// reporter sees a focused, copy-pastable list.
@@ -266,12 +266,145 @@ namespace Yaesu_Web_Control.Controllers
             return Ok(new { ok = true, culture = request.Culture, hasWindowsRecognizer = hasRecognizer, status = _voice.CurrentStatus });
         }
 
+        /// <summary>
+        /// Recording-device discovery for the Settings microphone picker. Lists
+        /// the WaveIn devices Windows exposes right now plus which one is
+        /// currently selected (empty = Windows default). System.Speech can't
+        /// target a device by name, so IWC captures the chosen one itself — see
+        /// MicrophoneCapture / VoiceControlService.ApplyInputDevice.
+        /// </summary>
+        [HttpGet("microphones")]
+        public async Task<IActionResult> GetMicrophones()
+        {
+            var selected = (await _settings.GetSettingsAsync()).VoiceInputDeviceName ?? "";
+            var devices = MicrophoneCapture.ListInputDevices()
+                .Select(d => new
+                {
+                    name = d.Name,
+                    isSelected = string.Equals(d.Name, selected, StringComparison.OrdinalIgnoreCase),
+                    present = true,
+                })
+                .ToArray();
+
+            // If the saved device isn't in the live list (unplugged), still
+            // report it so the picker can show it selected-but-missing rather
+            // than silently reverting to the default in the UI.
+            bool selectedPresent = string.IsNullOrEmpty(selected) ||
+                devices.Any(d => d.isSelected);
+
+            return Ok(new
+            {
+                devices,
+                selected,
+                selectedPresent,
+                usingDefault = string.IsNullOrEmpty(selected),
+            });
+        }
+
+        public record SetMicrophoneRequest(string? Name);
+
+        /// <summary>
+        /// Persists the chosen recording device and rebinds the live SAPI
+        /// engine to it — no restart needed. An empty/blank name selects the
+        /// Windows default device.
+        /// </summary>
+        [HttpPost("microphone")]
+        public async Task<IActionResult> SetMicrophone([FromBody] SetMicrophoneRequest request)
+        {
+            var name = request?.Name?.Trim() ?? "";
+            var settings = await _settings.GetSettingsAsync();
+            settings.VoiceInputDeviceName = name;
+            await _settings.SaveSettingsAsync(settings);
+
+            _voice.ApplyInputDevice(string.IsNullOrEmpty(name) ? null : name);
+            _logger.LogInformation("[Voice] Microphone set to {Name}", string.IsNullOrEmpty(name) ? "(Windows default)" : name);
+            return Ok(new { ok = true, name });
+        }
+
+        /// <summary>
+        /// Playback-device discovery for the Settings speaker picker. Lists the
+        /// WaveOut devices Windows exposes right now plus which one is currently
+        /// selected (empty = Windows default). System.Speech can't target an
+        /// output device by name, so IWC renders the confirmation and plays it to
+        /// the chosen device itself — see AudioOutput / VoiceTtsService.
+        /// </summary>
+        [HttpGet("speakers")]
+        public async Task<IActionResult> GetSpeakers()
+        {
+            var selected = (await _settings.GetSettingsAsync()).VoiceOutputDeviceName ?? "";
+            var devices = AudioOutput.ListOutputDevices()
+                .Select(d => new
+                {
+                    name = d.Name,
+                    isSelected = string.Equals(d.Name, selected, StringComparison.OrdinalIgnoreCase),
+                    present = true,
+                })
+                .ToArray();
+
+            bool selectedPresent = string.IsNullOrEmpty(selected) ||
+                devices.Any(d => d.isSelected);
+
+            return Ok(new
+            {
+                devices,
+                selected,
+                selectedPresent,
+                usingDefault = string.IsNullOrEmpty(selected),
+            });
+        }
+
+        public record SetSpeakerRequest(string? Name);
+
+        /// <summary>
+        /// Persists the chosen playback device for spoken confirmations and
+        /// applies it live — no restart needed. An empty/blank name selects the
+        /// Windows default device.
+        /// </summary>
+        [HttpPost("speaker")]
+        public async Task<IActionResult> SetSpeaker([FromBody] SetSpeakerRequest request)
+        {
+            var name = request?.Name?.Trim() ?? "";
+            var settings = await _settings.GetSettingsAsync();
+            settings.VoiceOutputDeviceName = name;
+            await _settings.SaveSettingsAsync(settings);
+
+            _voice.ApplyOutputDevice(string.IsNullOrEmpty(name) ? null : name);
+            _logger.LogInformation("[Voice] Speaker set to {Name}", string.IsNullOrEmpty(name) ? "(Windows default)" : name);
+            return Ok(new { ok = true, name });
+        }
+
+        /// <summary>
+        /// Speak a fixed test phrase through the currently-selected speaker so
+        /// the operator can confirm they'll actually hear confirmations. Used by
+        /// the "Test" button next to the Settings speaker picker.
+        /// </summary>
+        [HttpPost("speaker-test")]
+        public IActionResult TestSpeaker()
+        {
+            _voice.TestSpeak("Voice confirmation test. If you can hear this, announcements will play on this device.");
+            return Ok(new { ok = true });
+        }
+
         /// <summary>Returns the current voice phrases configuration (user file or built-in defaults).</summary>
         [HttpGet("phrases")]
         public IActionResult GetPhrases()
         {
             var config = _phraseStore.Load();
             return Ok(config);
+        }
+
+        /// <summary>
+        /// Display-ready, grouped list of available voice commands for the
+        /// right-click mic-button help popup. Generated from the live phrase
+        /// config for the active locale, so it always matches what recognition
+        /// actually accepts (including any user-customised phrases).
+        /// </summary>
+        [HttpGet("help")]
+        public IActionResult GetHelp()
+        {
+            var culture = _voice.ActiveCulture;
+            var config = _phraseStore.Load(culture);
+            return Ok(VoiceHelpBuilder.Build(config, culture));
         }
 
         /// <summary>
@@ -407,7 +540,7 @@ namespace Yaesu_Web_Control.Controllers
 
         /// <summary>
         /// Bundles the current phrases, a freshly-regenerated SRGS reference
-        /// copy, and metadata into a YWC-VoicePack-&lt;culture&gt;-v&lt;version&gt;.zip
+        /// copy, and metadata into a IWC-VoicePack-&lt;culture&gt;-v&lt;version&gt;.zip
         /// for the user to share or attach to a GitHub Discussion post — see
         /// docs/VoiceControl/language-pack-manager-design.md §3.1. Exporting
         /// increments the stored pack version and re-saves the installed
@@ -441,7 +574,7 @@ namespace Yaesu_Web_Control.Controllers
                 }
 
                 _logger.LogInformation("[Voice] Exported language pack {Culture} v{Version}", culture, meta.Version);
-                return File(ms.ToArray(), "application/zip", $"YWC-VoicePack-{culture}-v{meta.Version}.zip");
+                return File(ms.ToArray(), "application/zip", $"IWC-VoicePack-{culture}-v{meta.Version}.zip");
             }
             catch (Exception ex)
             {
@@ -865,18 +998,18 @@ namespace Yaesu_Web_Control.Controllers
             try
             {
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                var logDir = Path.Combine(appData, "MM5AGM", "Yaesu Web Control", "logs");
+                var logDir = Path.Combine(appData, "MM5AGM", "Icom Web Control", "logs");
                 if (!Directory.Exists(logDir))
                     return Ok(new { lines = Array.Empty<string>(), source = (string?)null, note = "Log folder doesn't exist yet." });
 
                 // Pick today's file, falling back to whatever is newest if the
                 // run started on a previous day and hasn't rolled over yet.
-                var todayName = $"ywc-{DateTime.Now:yyyyMMdd}.log";
+                var todayName = $"iwc-{DateTime.Now:yyyyMMdd}.log";
                 var todayPath = Path.Combine(logDir, todayName);
                 string? sourcePath = System.IO.File.Exists(todayPath)
                     ? todayPath
                     : new DirectoryInfo(logDir)
-                        .GetFiles("ywc-*.log")
+                        .GetFiles("iwc-*.log")
                         .OrderByDescending(f => f.LastWriteTimeUtc)
                         .FirstOrDefault()?.FullName;
 

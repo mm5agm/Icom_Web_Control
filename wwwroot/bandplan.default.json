@@ -1,5 +1,5 @@
 {
-  "_comment": "Yaesu Web Control band-plan data. Loaded by wwwroot/js/ui/band-plan.js at startup; overrides the hardcoded defaults that ship inside the JS. To update band plans without a full app release: download an updated copy of this file from the YWC GitHub release page and replace this one in your YWC install folder, then restart YWC. Frequencies are in Hz throughout.",
+  "_comment": "Icom Web Control band-plan data. Loaded by wwwroot/js/ui/band-plan.js at startup; overrides the hardcoded defaults that ship inside the JS. To update band plans without a full app release: download an updated copy of this file from the IWC GitHub release page and replace this one in your IWC install folder, then restart IWC. Frequencies are in Hz throughout.",
   "_format": "version 1",
 
   "bandPlans": {

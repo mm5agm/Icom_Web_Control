@@ -1,6 +1,7 @@
 // Band segment data for IARU Region 1, Region 2, Region 3, and Japan.
 // Frequencies in Hz. Each entry gives the representative dial frequency and
-// the mode string used by this app (matches CatMessageDispatcher mode names).
+// the mode string used by this app (the vocabulary CivRadioController accepts,
+// e.g. 'CW-U', 'DATA-U', 'RTTY-L', 'LSB', 'USB' — mapped to IC-7300 CI-V bytes).
 //
 // Region 1 = Europe, Africa, Middle East, Northern Asia (IARU R1 band plan)
 // Region 2 = Americas (IARU R2; USA FCC Part 97 used as primary reference)
@@ -298,7 +299,7 @@ BAND_PLANS.USA = BAND_PLANS.Region2;
 // advice.
 //
 // Externalising this data to a JSON file in the install folder is on the
-// roadmap for the next release so corrections can ship without a YWC update.
+// roadmap for the next release so corrections can ship without a IWC update.
 export const BAND_EDGES = {
     Region1: [
         { name: '160m', lo:   1810000, hi:   2000000 },
@@ -373,7 +374,7 @@ BAND_EDGES.USA = BAND_EDGES.Region2;
 // At startup, Index.cshtml calls loadBandPlanFromServer() to overlay updates
 // from /bandplan.default.json (sitting in the install folder). Operators who
 // notice the RSGB / FCC / JARL has tweaked a band plan can drop in an updated
-// JSON file without waiting for a YWC release — restart the app and the new
+// JSON file without waiting for a IWC release — restart the app and the new
 // data takes effect. The format is documented in the file's _comment field.
 //
 // We mutate BAND_PLANS / BAND_EDGES in place rather than re-exporting so

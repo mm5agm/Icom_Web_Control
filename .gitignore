@@ -139,7 +139,7 @@ obj/
 
 FTdx101 WebApp_Setup.exe
 FTdx101_WebApp_Setup_*.exe
-Yaesu_Web_Control_Setup*.exe
+Icom_Web_Control_Setup*.exe
 
 # Local reference documents — not committed to repo (Yaesu manual PDFs etc.)
 docs/*
@@ -152,6 +152,10 @@ docs/*
 !docs/VoiceControl/
 docs/VoiceControl/*
 !docs/VoiceControl/*.md
+# …and design/planning docs (markdown only, same rule).
+!docs/design/
+docs/design/*
+!docs/design/*.md
 
 # Runtime logs
 *.log
@@ -160,8 +164,9 @@ run.log
 # Local scratch / temp files (test plans, draft notes, etc.)
 .tmp_*
 
-# Local backup scripts
+# Local backup scripts (e.g. IWC_Backup.ps1 — copies the project to Colin's NAS)
 Backup*.ps1
+*Backup*.ps1
 
 # Local Claude Code settings
 .claude/settings.local.json
@@ -176,3 +181,7 @@ Backup*.ps1
 # Local planning notes
 plan.txt
 .tmp_*
+
+# Local radio product photos (IC-7300 / IC-7300 MkII) — reference only, not tracked
+pictures/ico-ic-7300_it_xl.jpg
+pictures/icom-ic-7300MK2-2.jpg

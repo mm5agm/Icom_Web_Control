@@ -1,12 +1,12 @@
 using System.Text.Json;
 
-namespace Yaesu_Web_Control.Services
+namespace Icom_Web_Control.Services
 {
     public class MemoryBankService
     {
         private static readonly string BanksPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MM5AGM", "Yaesu Web Control", "memory-banks.json");
+            "MM5AGM", "Icom Web Control", "memory-banks.json");
 
         private static readonly JsonSerializerOptions _opts = new()
         {

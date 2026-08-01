@@ -1,4 +1,4 @@
-// Yaesu Web Control – Spectrum Panel
+// Icom Web Control – Spectrum Panel
 // UI module — DOM access is intentional and correct here.
 // Owns a single <canvas> element that is divided into two rendering zones:
 //   Top 45%  — spectrum trace (line graph of dBFS vs frequency)
@@ -42,12 +42,38 @@ export class SpectrumPanel {
         this._waterfallSpeed = this._loadWaterfallSpeed();
         this._waterfallFrameCounter = 0;
 
+        // Waterfall brightness — a dB offset added to each bin before it is
+        // mapped to a thermal colour. 0 = no lift (raw Low/High window); higher
+        // values push weak signals further up the colour scale so a dark
+        // waterfall brightens. This is YWC's old "gain" brightening as a
+        // dedicated slider, independent of the spectrum trace. Persisted
+        // per-VFO like the scroll speed and split ratio.
+        this._wfBrightDb = this._loadWaterfallBrightness();
+
         this._errorDetail = null;
 
         // Last received spectrum data; held so the canvas can be redrawn on resize.
+        // This is the *averaged* trace (see _applyAveraging) — the raw IC-7300
+        // sweep is too noisy frame-to-frame to display directly.
         this._lastBins    = null;
         this._lastCentreHz = 0;
         this._lastSpanHz   = 0;
+
+        // Two-stage spectrum smoothing, because the raw IC-7300 sweep is both
+        // jittery in time *and* grassy across frequency:
+        //   1. Temporal (EMA) — blend each sweep into a running average to kill
+        //      frame-to-frame flicker. _avgBins is that average; _specAvgWeight is
+        //      the new-frame weight (1 = off, lower = smoother/slower).
+        //   2. Spatial — a short moving average across adjacent bins that turns the
+        //      noise-floor grass into a smooth curve. _specSmoothRadius is the
+        //      half-window (0 = off, 2 = 5-bin window). Kept separate from the EMA
+        //      so it doesn't compound over successive frames. _smoothOut is the
+        //      reused output buffer.
+        // Both reset cleanly on a retune so the old band never ghosts into the new.
+        this._avgBins         = null;
+        this._specAvgWeight   = SpectrumPanel.DEFAULT_SPEC_AVG;
+        this._smoothOut       = null;
+        this._specSmoothRadius = SpectrumPanel.DEFAULT_SPEC_SMOOTH;
 
         // DX cluster spots overlaid on the spectrum. Each entry is the JSON
         // shape from /api/dxcluster/spots — { callsign, frequencyHz, spotter,
@@ -85,17 +111,33 @@ export class SpectrumPanel {
         this._splitRatio = this._loadSplitRatio();
         this._splitterDragging = false;
 
-        // dB range — vertical scale of the spectrum trace, in dBFS.
-        // Default fallback only; the real values come from the server-rendered
-        // Low/High sliders which call setDbRange() once their wire-up runs.
+        // dB range — vertical scale of the spectrum trace, in dBFS. These are the
+        // actual render window; with auto-floor on (below) they are recomputed
+        // every sweep. Default fallback only, used until the first frame arrives.
         this._dbMin = -120;
         this._dbMax = 0;
+
+        // Auto noise-floor tracking. The IC-7300 scope streams a fixed 0–160
+        // amplitude trace, so the meaningful thing to control is how tall the
+        // *peaks* are, not where the absolute floor sits. With auto-floor on we
+        // measure the noise floor each sweep and pin it a few dB above the bottom
+        // edge; the operator's single "Range" control then sets how much dB of
+        // headroom sits above it (smaller = taller peaks). This removes the old
+        // Floor/Range coupling where widening the span slid the noise off-screen —
+        // the floor now follows the noise no matter what Range is.
+        //   _autoFloorDb  — the EMA-smoothed measured noise floor (null until the
+        //                   first frame, and reset on retune so it snaps to the
+        //                   new band rather than drifting across).
+        //   _rangeDb      — dB span from the pinned floor to the top of the scale.
+        this._autoFloor   = true;
+        this._autoFloorDb = null;
+        this._rangeDb     = SpectrumPanel.DEFAULT_SPEC_RANGE;
 
         // Garbage-collect the pre-v2.4.0 client-side dB-range persistence.
         // The server now owns this via /api/sdr/dsp/{vfo}; the old key would
         // just sit forever in users' browsers otherwise. Safe to remove
         // unconditionally — removeItem on a missing key is a no-op.
-        try { localStorage.removeItem('ywc.spectrumDbRange.' + this._vfo); }
+        try { localStorage.removeItem('iwc.spectrumDbRange.' + this._vfo); }
         catch (e) { /* localStorage may be unavailable */ }
 
         this._init();
@@ -105,7 +147,7 @@ export class SpectrumPanel {
     // so a corrupt value can't make either zone vanish entirely.
     _loadSplitRatio() {
         try {
-            const raw = localStorage.getItem('ywc.spectrumSplit.' + this._vfo);
+            const raw = localStorage.getItem('iwc.spectrumSplit.' + this._vfo);
             const v = parseFloat(raw);
             if (isFinite(v) && v >= 0.15 && v <= 0.85) return v;
         } catch (e) { /* localStorage may be unavailable */ }
@@ -114,7 +156,7 @@ export class SpectrumPanel {
 
     _saveSplitRatio() {
         try {
-            localStorage.setItem('ywc.spectrumSplit.' + this._vfo, this._splitRatio.toFixed(3));
+            localStorage.setItem('iwc.spectrumSplit.' + this._vfo, this._splitRatio.toFixed(3));
         } catch (e) { /* localStorage may be unavailable */ }
     }
 
@@ -124,9 +166,46 @@ export class SpectrumPanel {
     // aren't evenly spaced.
     static WATERFALL_SPEEDS = [1, 2, 4, 8, 16, 32, 64, 128];
 
+    // Default temporal-averaging weight — the fraction of each new sweep blended
+    // into the running average. Lower = calmer/slower. 1 disables it. Kept fairly
+    // responsive (0.7) because the spatial stage below removes the grass, so the
+    // EMA only has to take the edge off flicker rather than carry all the smoothing.
+    static DEFAULT_SPEC_AVG = 0.7;
+
+    // Default spatial-smoothing half-window, in bins. 0 = off; 2 = a 5-bin moving
+    // average, enough to smooth the noise-floor grass without visibly widening
+    // real signals across the 475-point sweep.
+    static DEFAULT_SPEC_SMOOTH = 2;
+
+    // Auto noise-floor parameters:
+    //   DEFAULT_SPEC_RANGE   — dB of headroom above the pinned floor (the "Range"
+    //                          slider's default); ~60 dB shows band noise plus
+    //                          strong signals without clipping SSB peaks.
+    //   AUTOFLOOR_PERCENTILE — which order-statistic of the sweep is taken as the
+    //                          noise floor. Most bins are noise, so a low
+    //                          percentile lands in it while ignoring signal peaks.
+    //   AUTOFLOOR_MARGIN_FRAC— where the noise floor is parked, as a fraction of
+    //                          the spectrum height up from the bottom edge. A
+    //                          *fraction* (not a fixed dB) is what keeps the floor
+    //                          in the same spot at any Range — a fixed dB margin
+    //                          would shrink to a smaller slice as Range grows and
+    //                          the floor would sink. 0.15 sits it just above the
+    //                          frequency-axis labels, near the top of the waterfall.
+    //   AUTOFLOOR_SMOOTH     — EMA weight for the floor estimate; low = calm scale
+    //                          that doesn't bounce as the noise wanders sweep-to-sweep.
+    static DEFAULT_SPEC_RANGE    = 60;
+    static AUTOFLOOR_PERCENTILE  = 0.15;
+    static AUTOFLOOR_MARGIN_FRAC = 0.05;
+    static AUTOFLOOR_SMOOTH      = 0.1;
+
+    // Height in px reserved at the bottom of the spectrum zone for the frequency-
+    // axis labels. The trace maps into the area above this; _drawFrequencyAxis
+    // paints its strip into it. Kept as one constant so the two never disagree.
+    static AXIS_H = 20;
+
     _loadWaterfallSpeed() {
         try {
-            const v = parseInt(localStorage.getItem('ywc.waterfallSpeed.' + this._vfo), 10);
+            const v = parseInt(localStorage.getItem('iwc.waterfallSpeed.' + this._vfo), 10);
             if (SpectrumPanel.WATERFALL_SPEEDS.includes(v)) return v;
         } catch (e) { /* localStorage may be unavailable */ }
         return 1;
@@ -134,7 +213,7 @@ export class SpectrumPanel {
 
     _saveWaterfallSpeed() {
         try {
-            localStorage.setItem('ywc.waterfallSpeed.' + this._vfo, String(this._waterfallSpeed));
+            localStorage.setItem('iwc.waterfallSpeed.' + this._vfo, String(this._waterfallSpeed));
         } catch (e) { /* localStorage may be unavailable */ }
     }
 
@@ -156,6 +235,41 @@ export class SpectrumPanel {
     /** Returns the current waterfall speed divisor (1 = full speed). */
     getWaterfallSpeed() { return this._waterfallSpeed; }
 
+    // Waterfall brightness range, in dB of lift. 0 = off; MAX chosen so a
+    // signal sitting on the noise floor can be pushed near full colour.
+    static WATERFALL_BRIGHT_MAX = 60;
+
+    _loadWaterfallBrightness() {
+        try {
+            const v = parseInt(localStorage.getItem('iwc.waterfallBright.' + this._vfo), 10);
+            if (isFinite(v) && v >= 0 && v <= SpectrumPanel.WATERFALL_BRIGHT_MAX) return v;
+        } catch (e) { /* localStorage may be unavailable */ }
+        return 0;
+    }
+
+    _saveWaterfallBrightness() {
+        try {
+            localStorage.setItem('iwc.waterfallBright.' + this._vfo, String(this._wfBrightDb));
+        } catch (e) { /* localStorage may be unavailable */ }
+    }
+
+    /**
+     * Set the waterfall brightness lift, in dB (0 … WATERFALL_BRIGHT_MAX).
+     * Only the waterfall's colour mapping is affected — the spectrum trace is
+     * unchanged. Takes effect on the next scrolled-in rows (history keeps its
+     * existing colours, same as a scroll-speed change).
+     * @param {number} db  dB of lift; clamped to the valid range.
+     */
+    setWaterfallBrightness(db) {
+        const v = parseInt(db, 10);
+        if (!isFinite(v)) return;
+        this._wfBrightDb = Math.max(0, Math.min(SpectrumPanel.WATERFALL_BRIGHT_MAX, v));
+        this._saveWaterfallBrightness();
+    }
+
+    /** Returns the current waterfall brightness lift in dB (0 = off). */
+    getWaterfallBrightness() { return this._wfBrightDb; }
+
     /**
      * Set the spectrum dB range. Called by the Low/High slider handler in
      * Index.cshtml whenever the user moves a slider. Persistence is handled
@@ -171,19 +285,81 @@ export class SpectrumPanel {
         if (this._lastBins) this._render();
     }
 
+    /**
+     * Set the vertical scale height in dB (the "Range" control) while auto-floor
+     * keeps the noise pinned near the bottom. Smaller = taller peaks (more gain);
+     * larger = flatter. The floor never moves as a result — that's the whole point
+     * of auto-floor. Out-of-range values are ignored.
+     * @param {number} db  dB of headroom above the tracked noise floor.
+     */
+    setSpectrumRange(db) {
+        const r = parseFloat(db);
+        if (!isFinite(r) || r < 5 || r > 160) return;
+        this._rangeDb = r;
+        // Re-apply against the current floor so the change is visible immediately,
+        // without waiting for the next sweep.
+        if (this._autoFloorDb != null) this._applyAutoFloorWindow();
+        if (this._lastBins) this._render();
+    }
+
+    /** Returns the current vertical-scale height in dB (the Range control). */
+    getSpectrumRange() { return this._rangeDb; }
+
+    /**
+     * Track the noise floor from a smoothed sweep and set the render window to
+     * [floor − margin, floor − margin + range]. A low percentile of the bins is a
+     * robust noise-floor estimate (most bins are noise); it is EMA-smoothed so the
+     * scale stays calm as the noise wanders. No-op when auto-floor is off.
+     * @param {ArrayLike<number>} bins  The smoothed sweep.
+     */
+    _updateAutoFloor(bins) {
+        if (!this._autoFloor || !bins || !bins.length) return;
+        // Float32Array.sort() is numeric by default (unlike Array.prototype.sort).
+        const sorted = Float32Array.from(bins).sort();
+        const idx = Math.min(sorted.length - 1,
+            Math.max(0, Math.floor(sorted.length * SpectrumPanel.AUTOFLOOR_PERCENTILE)));
+        const measured = sorted[idx];
+        if (this._autoFloorDb == null) this._autoFloorDb = measured;
+        else this._autoFloorDb += SpectrumPanel.AUTOFLOOR_SMOOTH * (measured - this._autoFloorDb);
+        this._applyAutoFloorWindow();
+    }
+
+    // Set the render window [dbMin, dbMax] from the tracked floor and Range so the
+    // noise floor lands at a *fixed screen fraction* (AUTOFLOOR_MARGIN_FRAC) up
+    // from the bottom, independent of Range. Because the trace height fraction is
+    // (v − dbMin)/range, parking the floor at fraction f means dbMin = floor − f·range;
+    // Range then only stretches the peaks above it, never the floor's position.
+    _applyAutoFloorWindow() {
+        this._dbMin = this._autoFloorDb - SpectrumPanel.AUTOFLOOR_MARGIN_FRAC * this._rangeDb;
+        this._dbMax = this._dbMin + this._rangeDb;
+    }
+
     // ── Public API ───────────────────────────────────────────────────────────
 
     /** Update the spectrum/waterfall with a new frame of FFT data. */
-    update({ bins, centreHz, spanHz }) {
+    update({ bins, centreHz, spanHz, mode }) {
         // Hold mode (set via setHold(true)) freezes the display at the
         // last received frame so the operator can inspect a fleeting signal
         // without it scrolling off the waterfall. Incoming frames are
         // dropped — _lastBins / _lastCentreHz / _lastSpanHz are not
         // updated so a forced re-render shows the frozen frame.
         if (this._hold) return;
-        this._lastBins    = bins;
+        // Smooth this sweep before anything else uses it, so the trace, waterfall
+        // and crosshair readout all see the calmed data. Stage 1 (temporal) must
+        // see the span change *before* _lastSpanHz is updated, to detect a retune.
+        const retuned  = (spanHz !== this._lastSpanHz);
+        const averaged = this._applyAveraging(bins, spanHz);   // temporal (EMA)
+        this._lastBins    = this._spatialSmooth(averaged);     // spatial (moving avg)
+        // Auto noise-floor: recompute the vertical window from the tracked floor.
+        // Snap (don't drift) to the new band's floor on a retune.
+        if (retuned) this._autoFloorDb = null;
+        this._updateAutoFloor(this._lastBins);
         this._lastCentreHz = centreHz;
         this._lastSpanHz   = spanHz;
+        // Radio scope mode (CENT / FIX / SCROLL-C / SCROLL-F) for the corner
+        // badge. Only the CI-V scope path sends it; SDR frames leave it
+        // undefined, which the badge treats as "nothing to show".
+        if (mode !== undefined) this._scopeMode = mode;
 
         // Only scroll the waterfall every Nth frame per _waterfallSpeed;
         // the spectrum trace above it still redraws every frame regardless.
@@ -192,6 +368,81 @@ export class SpectrumPanel {
 
         this._render(shouldScrollWaterfall);
     }
+
+    /**
+     * Exponential moving average of the incoming sweep. Returns the (mutated-in-
+     * place) running-average buffer. Re-seeds — i.e. shows the raw sweep with no
+     * lag — on the first frame, a bin-count change, or a span change (retune), so
+     * the previous band never bleeds into the new display.
+     * @param {number[]} bins    Raw sweep bins (dBFS-ish).
+     * @param {number}   spanHz  Span of this sweep; compared to the previous
+     *                           frame's span to detect a retune.
+     * @returns {Float32Array} The averaged trace.
+     */
+    _applyAveraging(bins, spanHz) {
+        const a = this._specAvgWeight;
+        if (a >= 1 || !this._avgBins
+            || this._avgBins.length !== bins.length
+            || spanHz !== this._lastSpanHz) {
+            this._avgBins = Float32Array.from(bins);
+            return this._avgBins;
+        }
+        const avg = this._avgBins;
+        for (let i = 0; i < bins.length; i++)
+            avg[i] += a * (bins[i] - avg[i]);
+        return avg;
+    }
+
+    /**
+     * Stage 2: spatial smoothing — a moving average of half-window
+     * _specSmoothRadius across adjacent bins, into a reused output buffer so the
+     * temporal average (stage 1) is left untouched. Radius 0 passes through.
+     * @param {ArrayLike<number>} src  The temporally-averaged bins.
+     * @returns {ArrayLike<number>} The spatially-smoothed trace.
+     */
+    _spatialSmooth(src) {
+        const r = this._specSmoothRadius;
+        if (r <= 0) return src;
+        const n = src.length;
+        let out = this._smoothOut;
+        if (!out || out.length !== n) out = this._smoothOut = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            const lo = i - r < 0 ? 0 : i - r;
+            const hi = i + r >= n ? n - 1 : i + r;
+            let sum = 0;
+            for (let j = lo; j <= hi; j++) sum += src[j];
+            out[i] = sum / (hi - lo + 1);
+        }
+        return out;
+    }
+
+    /**
+     * Set the temporal-averaging weight (0 < w ≤ 1). Lower = smoother/slower;
+     * 1 disables averaging (raw sweeps). Out-of-range values are ignored.
+     * @param {number} weight
+     */
+    setSpectrumAveraging(weight) {
+        const w = parseFloat(weight);
+        if (!isFinite(w) || w <= 0 || w > 1) return;
+        this._specAvgWeight = w;
+    }
+
+    /** Returns the current temporal-averaging weight (1 = averaging off). */
+    getSpectrumAveraging() { return this._specAvgWeight; }
+
+    /**
+     * Set the spatial-smoothing half-window in bins (0 = off). Values are
+     * floored to an integer; negatives are ignored.
+     * @param {number} radius
+     */
+    setSpectrumSmoothing(radius) {
+        const r = parseInt(radius, 10);
+        if (!isFinite(r) || r < 0) return;
+        this._specSmoothRadius = r;
+    }
+
+    /** Returns the current spatial-smoothing half-window (0 = off). */
+    getSpectrumSmoothing() { return this._specSmoothRadius; }
 
     /**
      * Freeze (true) or resume (false) the display. While held the spectrum
@@ -369,11 +620,12 @@ export class SpectrumPanel {
             this._crosshairX = (e.clientX - rect.left) * (canvas.width  / rect.width);
             this._crosshairY = (e.clientY - rect.top)  * (canvas.height / rect.height);
 
-            // Swap cursor to row-resize when over the splitter so the
-            // affordance is obvious before the user tries to drag.
+            // Swap cursor to row-resize over the splitter and to a pointer over
+            // the clickable scope-mode badge, so each affordance is obvious
+            // before the user tries to interact.
             canvas.style.cursor = this._isOnSplitter(this._crosshairY, canvas.height)
                 ? 'row-resize'
-                : 'crosshair';
+                : (this._isOnScopeModeBadge(this._crosshairX, this._crosshairY) ? 'pointer' : 'crosshair');
 
             if (this._lastBins) this._render();
             // Announce cursor frequency to screen readers via a live region (debounced to 1 s).
@@ -414,6 +666,15 @@ export class SpectrumPanel {
         return Math.abs(canvasY - splitY) <= 6;
     }
 
+    // Hit test for the scope-mode badge (canvas-internal pixels). Null-safe:
+    // the badge only exists while a CI-V scope mode is known.
+    _isOnScopeModeBadge(canvasX, canvasY) {
+        const b = this._scopeModeBadgeRect;
+        if (!b || canvasX == null || canvasY == null) return false;
+        return canvasX >= b.x && canvasX <= b.x + b.w &&
+               canvasY >= b.y && canvasY <= b.y + b.h;
+    }
+
     _onCanvasClick(e) {
         if (!this._lastBins || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
 
@@ -424,6 +685,17 @@ export class SpectrumPanel {
         const rect   = canvas.getBoundingClientRect();
         const x      = e.clientX - rect.left;
         const W      = canvas.width;
+
+        // Clicks on the scope-mode badge toggle the radio between Center and
+        // Fixed rather than tuning. CENT is the mode the panel's axis assumes;
+        // clicking a green CENT badge flips to Fixed, an amber FIX badge back to
+        // Center. The badge only appears on the CI-V scope path (not SDR).
+        if (this._isOnScopeModeBadge(x * (W / rect.width), this._canvasYFromEvent(e, canvas))) {
+            const target = (this._scopeMode === 'CENT') ? 'fixed' : 'center';
+            fetch(`/api/cat/scopemode/${target}`, { method: 'POST' })
+                .catch(() => { /* ignore network errors */ });
+            return;
+        }
 
         // Click-to-tune is active across the whole panel — both the live
         // spectrum (top ~45%) and the waterfall (bottom ~55%). Clicking a
@@ -525,12 +797,26 @@ export class SpectrumPanel {
     // ── Rendering ────────────────────────────────────────────────────────────
 
     // @param {boolean} scrollWaterfall  Whether to advance the waterfall by
-    //   one row this frame. Defaults to true for the many forced-redraw call
-    //   sites (resize, dB range change, hold toggle, etc.) which historically
-    //   always scrolled; update() passes this explicitly per _waterfallSpeed.
-    _render(scrollWaterfall = true) {
+    //   one row this frame. Defaults to FALSE so the many cosmetic forced
+    //   redraws (crosshair on mousemove, cursor, hold, resize, dB/Bright
+    //   changes) repaint the spectrum WITHOUT scrolling the waterfall — moving
+    //   the mouse must not make the waterfall march. Only update(), fed by a
+    //   real FFT frame, passes true (throttled by _waterfallSpeed). The
+    //   !_waterfallData guard below still lets the very first paint build the
+    //   buffer regardless.
+    _render(scrollWaterfall = false) {
         const canvas = document.getElementById(this._canvasId);
         if (!canvas || !this._lastBins) return;
+
+        // Out of range (Phase 5 pseudo-dual: the watch VFO has moved outside the
+        // shared sweep) — the last frame is stale and meaningless, so keep the
+        // "off-screen" overlay instead of repainting it. Without this, any
+        // mouse-driven re-render (crosshair tracking on hover) would paint the
+        // stale trace over the overlay and the message would vanish.
+        if (this._status === 'outofrange') {
+            this._drawStatusOverlay('outofrange');
+            return;
+        }
 
         const ctx         = canvas.getContext('2d');
         const W           = canvas.width;
@@ -542,11 +828,13 @@ export class SpectrumPanel {
         const spanHz      = this._lastSpanHz;
 
         this._drawSpectrum(ctx, bins, W, specH);
+        this._drawOutOfBandShade(ctx, W, specH);
         this._drawFrequencyAxis(ctx, bins, W, specH, centreHz, spanHz);
         this._drawBandEdges(ctx, W, specH);
         this._drawBandMarkers(ctx, W, specH);
         this._drawSpots(ctx, W, specH);
         this._drawDxBadge(ctx, W);
+        this._drawScopeModeBadge(ctx);
         if (scrollWaterfall || !this._waterfallData) this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawPinnedCursor(ctx, W, specH);
         this._drawCrosshair(ctx, W, specH, spanHz);
@@ -642,6 +930,53 @@ export class SpectrumPanel {
         ctx.fillRect(4, 4, textWidth + padX * 2, 20);
         ctx.fillStyle = '#000000';
         ctx.fillText(label, 4 + padX, 4 + padY);
+        ctx.restore();
+    }
+
+    // ── Out-of-band dimming ──────────────────────────────────────────────────
+    // The IC-7300's scope is a fixed ± window centred on the VFO, so on most
+    // bands it spills past the amateur allocation (e.g. on 20 m the sweep runs
+    // below 14.000 and above 14.350). Rather than crop — which would change the
+    // horizontal scale per band and break every overlay's hz→x maths — we lay a
+    // translucent dark veil over the out-of-band columns so the in-band section
+    // clearly stands out while adjacent activity stays visible (just greyed).
+    // Drawn between the trace and the axis/edge lines so those render crisp on
+    // top. Same edge data as _drawBandEdges.
+    _drawOutOfBandShade(ctx, W, specH) {
+        if (this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        const edges = this._bandEdges ?? SpectrumPanel.BAND_EDGES;
+        if (!edges || !edges.length) return;
+
+        // In-band intervals overlapping the visible window, clipped to it.
+        const inBand = [];
+        for (const edge of edges) {
+            const lo = Math.max(edge.lo, leftHz);
+            const hi = Math.min(edge.hi, rightHz);
+            if (hi > lo) inBand.push([lo, hi]);
+        }
+        inBand.sort((a, b) => a[0] - b[0]);
+
+        const hzToX = (hz) => ((hz - leftHz) / this._lastSpanHz) * W;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';   // dim veil over out-of-band
+
+        // Shade every gap: window-start → first band, between bands, last band →
+        // window-end. If no band overlaps the window the whole thing is shaded.
+        let cursor = leftHz;
+        for (const [lo, hi] of inBand) {
+            if (lo > cursor) {
+                const x0 = hzToX(cursor);
+                ctx.fillRect(x0, 0, hzToX(lo) - x0, specH);
+            }
+            if (hi > cursor) cursor = hi;
+        }
+        if (cursor < rightHz) {
+            const x0 = hzToX(cursor);
+            ctx.fillRect(x0, 0, hzToX(rightHz) - x0, specH);
+        }
         ctx.restore();
     }
 
@@ -784,6 +1119,41 @@ export class SpectrumPanel {
         ctx.restore();
     }
 
+    // Small badge in the top-left showing the radio's live scope mode
+    // (CENT / FIX / SCROLL-C / SCROLL-F), read from the 27 00 waveform header.
+    // Only the CI-V scope path sets _scopeMode; SDR frames leave it undefined,
+    // so the badge is drawn only when a mode is actually known. CENT is the
+    // mode this panel's axis assumes, so it reads neutral/green; any other mode
+    // is amber to warn that the trace may not line up with the frequency axis.
+    _drawScopeModeBadge(ctx) {
+        const mode = this._scopeMode;
+        if (!mode) { this._scopeModeBadgeRect = null; return; }
+
+        const aligned = (mode === 'CENT');
+        const bg = aligned ? '#1e7e34' : '#b58900';
+        const fg = aligned ? '#ffffff' : '#000000';
+
+        ctx.save();
+        ctx.font         = 'bold 14px sans-serif';
+        ctx.textBaseline = 'top';
+        const padX = 8;
+        const padY = 5;
+        const w = ctx.measureText(mode).width + padX * 2;
+        const h = 24;
+        const x = 4;
+        const y = 4;
+        ctx.fillStyle = bg;
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = fg;
+        ctx.textAlign = 'left';
+        ctx.fillText(mode, x + padX, y + padY);
+        ctx.restore();
+
+        // Remember the hit rect (canvas-internal pixels) so a click here toggles
+        // the radio's scope mode instead of tuning.
+        this._scopeModeBadgeRect = { x, y, w, h };
+    }
+
     // ── DX cluster spot overlay ──────────────────────────────────────────────
     //
     // Draws a small downward-pointing tick at each spot's frequency with the
@@ -866,20 +1236,30 @@ export class SpectrumPanel {
 
     // ── Spectrum trace ───────────────────────────────────────────────────────
 
-    _drawSpectrum(ctx, bins, W, H) {
+    _drawSpectrum(ctx, bins, W, specH) {
         const N      = bins.length;
         const dbMin  = this._dbMin;
         const dbMax  = this._dbMax;
         const range  = dbMax - dbMin;
 
-        // Background
-        ctx.fillStyle = '#0a0a14';
-        ctx.fillRect(0, 0, W, H);
+        // The bottom AXIS_H px of the spectrum zone are reserved for the frequency
+        // labels (drawn later by _drawFrequencyAxis). Map the trace, grid and dB
+        // scale into the area *above* that strip so the noise floor can sit right on
+        // top of the labels instead of hiding behind them — that's what removes the
+        // dead space the operator saw between the floor and the waterfall.
+        const H = Math.max(1, specH - SpectrumPanel.AXIS_H);
 
-        // Grid lines at every 20 dB
+        // Background — fill the whole zone (incl. the axis strip's backing) so no
+        // gap shows; the axis strip repaints its own darker band over the bottom.
+        ctx.fillStyle = '#0a0a14';
+        ctx.fillRect(0, 0, W, specH);
+
+        // Horizontal grid lines at a "nice" dB step chosen for the current range,
+        // aligned to round multiples so the scale reads cleanly at any Range.
+        const dbStep = this._niceDbStep(range);
         ctx.strokeStyle = '#1e2030';
         ctx.lineWidth   = 1;
-        for (let db = dbMin; db <= dbMax; db += 20) {
+        for (let db = Math.ceil(dbMin / dbStep) * dbStep; db <= dbMax; db += dbStep) {
             const y = H - ((db - dbMin) / range) * H;
             ctx.beginPath();
             ctx.moveTo(0, y);
@@ -896,7 +1276,7 @@ export class SpectrumPanel {
             else         ctx.lineTo(x, y);
         }
 
-        // Close path to the bottom to fill
+        // Close path to the bottom of the trace area (top of the axis strip) to fill
         ctx.lineTo(W, H);
         ctx.lineTo(0, H);
         ctx.closePath();
@@ -916,15 +1296,10 @@ export class SpectrumPanel {
         ctx.lineWidth   = 1.5;
         ctx.stroke();
 
-        // dB scale labels (right-aligned). Font bumped from 10px → 12px
-        // for accessibility (same complaint, same release: 2026-06-13).
-        ctx.fillStyle  = '#667799';
-        ctx.font       = '12px monospace';
-        ctx.textAlign  = 'right';
-        for (let db = dbMin; db <= dbMax; db += 20) {
-            const y = H - ((db - dbMin) / range) * H;
-            ctx.fillText(`${db} dB`, W - 4, y - 2);
-        }
+        // dB scale down the right edge — shows the exact values the Range window
+        // spans, including the true top and bottom, so the vertical scale is
+        // readable at a glance. Confined to the trace area (above the axis strip).
+        this._drawDbScale(ctx, W, H, dbMin, dbMax, range, dbStep);
 
         // Centre frequency label
         if (this._vfoHz > 0) {
@@ -936,10 +1311,61 @@ export class SpectrumPanel {
         }
     }
 
+    // Pick a "nice" dB grid step (5/10/20/25/50/100) that yields roughly half a
+    // dozen gridlines across the current vertical range, so the scale stays
+    // legible whether the Range slider is at 20 dB or 140 dB.
+    _niceDbStep(range) {
+        const steps = [5, 10, 20, 25, 50, 100];
+        const target = 6;
+        return steps.find(s => range / s <= target) ?? steps[steps.length - 1];
+    }
+
+    // Draw the dB scale down the right edge: a label at each nice gridline level
+    // plus the exact top and bottom of the window, each on a dark backing strip so
+    // it stays readable over the trace. This is the "what dB is it set to" readout.
+    _drawDbScale(ctx, W, H, dbMin, dbMax, range, step) {
+        if (range <= 0) return;
+
+        // Nice multiples inside the window, plus the true endpoints.
+        const levels = new Set();
+        for (let db = Math.ceil(dbMin / step) * step; db <= dbMax; db += step)
+            levels.add(db);
+        levels.add(dbMin);
+        levels.add(dbMax);
+
+        ctx.save();
+        ctx.font         = '12px monospace';
+        ctx.textAlign    = 'right';
+        ctx.textBaseline = 'alphabetic';
+        for (const db of levels) {
+            // Clamp so the top/bottom labels sit fully on-screen rather than being
+            // clipped at the very edge.
+            let y = H - ((db - dbMin) / range) * H;
+            y = Math.max(12, Math.min(H - 3, y));
+
+            const text = db === dbMax ? `${db} dB` : `${db}`;
+            const tw   = ctx.measureText(text).width;
+
+            ctx.fillStyle = 'rgba(6, 8, 16, 0.72)';
+            ctx.fillRect(W - tw - 10, y - 12, tw + 10, 14);
+
+            ctx.strokeStyle = 'rgba(120, 140, 170, 0.55)';
+            ctx.lineWidth   = 1;
+            ctx.beginPath();
+            ctx.moveTo(W - tw - 12, y - 5);
+            ctx.lineTo(W - tw - 7,  y - 5);
+            ctx.stroke();
+
+            ctx.fillStyle = '#9fb3cc';
+            ctx.fillText(text, W - 4, y - 2);
+        }
+        ctx.restore();
+    }
+
     // ── Frequency axis ───────────────────────────────────────────────────────
 
     _drawFrequencyAxis(ctx, bins, W, specH, centreHz, spanHz) {
-        const axisH  = 20;
+        const axisH  = SpectrumPanel.AXIS_H;
         const tickY0 = specH - axisH;       // top of axis strip
         const labelY = specH - 4;           // baseline for text
 
@@ -1086,7 +1512,7 @@ export class SpectrumPanel {
         // Draw new row at the top.
         for (let x = 0; x < W; x++) {
             const binIdx = Math.floor((x / W) * N);
-            const [r, g, b] = SpectrumPanel._dbToColor(bins[binIdx]);
+            const [r, g, b] = this._dbToColor(bins[binIdx]);
             const p = x * 4;
             data[p + 0] = r;
             data[p + 1] = g;
@@ -1126,6 +1552,7 @@ export class SpectrumPanel {
             connecting:   'Connecting to SDR device…',
             disconnected: 'SDR device unavailable — retrying every 5 s',
             nodll:        'SoapySDR.dll not found — install SoapySDR + device driver',
+            outofrange:   'Watch VFO is off-screen — widen the scope span, or turn on cross-band peek in Settings',
         };
 
         const line1 = messages[status] ?? `SDR status: ${status}`;
@@ -1172,11 +1599,20 @@ export class SpectrumPanel {
     // ── Color mapping ────────────────────────────────────────────────────────
 
     /**
-     * Maps a dBFS value (−120 … 0) to an RGB thermal colour.
-     * Black → blue → cyan → green → yellow → red.
+     * Maps a dBFS value to an RGB thermal colour: black → blue → cyan →
+     * green → yellow → red.
+     *
+     * The waterfall uses a FIXED reference window (−120 … 0 dBFS), deliberately
+     * independent of the Low/High trace sliders, so "Bright = Off" always means
+     * the same dark baseline. The Bright slider (_wfBrightDb) is the only thing
+     * that lifts weak signals up the colour scale — it's YWC's old "gain"
+     * brightening, as a dedicated waterfall control. Instance method (not
+     * static) so it can read the per-panel brightness.
      */
-    static _dbToColor(db) {
-        const t = Math.max(0, Math.min(1, (db + 120) / 120));
+    _dbToColor(db) {
+        // Bright slider adds _wfBrightDb of lift before mapping into the fixed
+        // 120 dB window; at Off (0) the mapping is the original dark baseline.
+        const t = Math.max(0, Math.min(1, (db + this._wfBrightDb + 120) / 120));
         if (t < 0.2)  return [0,                   0,                   Math.round(t * 5 * 180)];
         if (t < 0.4)  return [0,                   Math.round((t - 0.2) * 5 * 200), 180];
         if (t < 0.6)  return [0,                   200,                 Math.round(180 - (t - 0.4) * 5 * 180)];

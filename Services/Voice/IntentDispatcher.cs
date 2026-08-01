@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
-using Yaesu_Web_Control.Hubs;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Hubs;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Services.Voice
+namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>
     /// Maps a recognised semantic intent + parameter dictionary (from the
@@ -17,23 +17,34 @@ namespace Yaesu_Web_Control.Services.Voice
     public sealed class IntentDispatcher
     {
         private readonly ILogger<IntentDispatcher> _logger;
-        private readonly ICatClient _catClient;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hub;
+        // Phase 3: the semantic seam. Most voice intents are now repointed here
+        // (real CI-V): frequency, band, mode, TX, split, VFO-swap, AF gain,
+        // preamp. The few still on the inert Yaesu _catClient below need an
+        // Icom-specific control-model rework, not just a repoint (the IC-7300's
+        // attenuator/AGC/IF-width vocabulary differs from Yaesu's), so they are
+        // deliberately left broken-on-Icom and marked TODO(voice-civ):
+        //   SetAttenuator  — IC-7300 has one on/off pad, not off/6/12/18 dB.
+        //   SetAgc         — IC-7300 is fast/mid/slow only, no off/auto.
+        //   NudgeIfWidth   — no clean seam equivalent yet (PBT/filter model differs).
+        //   BandUp/Down    — no seam band-step; would need band-stacking logic.
+        //   Macro          — sends arbitrary Yaesu CAT strings; Icom needs CI-V hex.
+        private readonly IRadioController _radio;
 
         public IntentDispatcher(
             ILogger<IntentDispatcher> logger,
-            ICatClient catClient,
             RadioStateService state,
             ISettingsService settings,
-            IHubContext<RadioHub> hub)
+            IHubContext<RadioHub> hub,
+            IRadioController radio)
         {
             _logger = logger;
-            _catClient = catClient;
             _state = state;
             _settings = settings;
             _hub = hub;
+            _radio = radio;
         }
 
         // §6.5 dry-run testing: when set, SendCommand() logs the CAT string
@@ -141,9 +152,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] SetFrequency {Hz} out of range", hz);
                 return new DispatchResult(false, phrase);
             }
-            var command = $"{(VfoIsB ? "FB" : "FA")}{hz:D9};";
-            await SendCommand(command, ct);
-            if (VfoIsB) _state.FrequencyB = hz; else _state.FrequencyA = hz;
+            await SetRadioFrequency(VfoIsB ? RadioVfo.B : RadioVfo.A, hz, ct);
             _logger.LogInformation("[Voice] SetFrequency -> {Hz} Hz (VFO {Vfo})", hz, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
@@ -185,9 +194,10 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] SetBand: no default frequency for {Metres}m", metres);
                 return new DispatchResult(false, phrase);
             }
-            var command = $"{(VfoIsB ? "FB" : "FA")}{hz:D9};";
-            await SendCommand(command, ct);
-            if (VfoIsB) _state.FrequencyB = hz; else _state.FrequencyA = hz;
+            // Icom: set the band-default frequency through the CI-V seam, exactly
+            // like SetFrequency. On the single-receiver IC-7300 a VFO-B set uses
+            // CI-V 25 01 (unselected) so it never swaps the operating VFO.
+            await SetRadioFrequency(VfoIsB ? RadioVfo.B : RadioVfo.A, hz, ct);
             _logger.LogInformation("[Voice] SetBand -> {Metres}m -> {Hz} Hz (VFO {Vfo})", metres, hz, CurrentVfo);
             return new DispatchResult(true, phrase);
         }
@@ -202,11 +212,10 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] SetMode missing/invalid mode parameter");
                 return new DispatchResult(false, "Set mode");
             }
-            // CatCommands.FormatMode handles the Yaesu-mode-string -> MD code
-            // translation.
-            var command = CatCommands.FormatMode(mode, isSubVfo: VfoIsB);
-            await SendCommand(command, ct);
-            if (VfoIsB) _state.ModeB = mode; else _state.ModeA = mode;
+            // Phase 3 block 2: set mode through the CI-V seam (command 06). The
+            // recognised `mode` is already a display string ("USB", "CW-U", …),
+            // which is exactly what the seam speaks.
+            await SetRadioMode(VfoIsB ? RadioVfo.B : RadioVfo.A, mode, ct);
             _logger.LogInformation("[Voice] SetMode -> {Mode} (VFO {Vfo})", mode, CurrentVfo);
             return new DispatchResult(true, $"Mode {ModeForSpeech(mode)}");
         }
@@ -215,40 +224,13 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private async Task<DispatchResult> SwapVfoAsync(CancellationToken ct)
         {
-            var settings = await _settings.GetSettingsAsync();
-            var isSingleReceiver = RadioCapabilities.IsSingleReceiver(settings.RadioModel);
             const string phrase = "Swap V F O";
-
-            if (isSingleReceiver)
-            {
-                // Single-receiver radios (FTdx10/FT-710): no atomic SV;
-                // command. Fake the swap by reading both stored frequencies
-                // and writing them back swapped. Simpler than toggling VS,
-                // and matches what the radio actually does when the user
-                // presses A/B on the front panel.
-                var faRaw = await SendCommand("FA;", ct);
-                var fbRaw = await SendCommand("FB;", ct);
-                if (!TryParseFreqResponse(faRaw, "FA", out var fa) ||
-                    !TryParseFreqResponse(fbRaw, "FB", out var fb))
-                {
-                    _logger.LogWarning("[Voice] SwapVFO: couldn't parse FA/FB readback");
-                    return new DispatchResult(false, phrase);
-                }
-                await SendCommand($"FA{fb:D9};", ct);
-                await SendCommand($"FB{fa:D9};", ct);
-                _state.FrequencyA = fb;
-                _state.FrequencyB = fa;
-                _logger.LogInformation("[Voice] SwapVFO (fake) -> A={A}, B={B}", fb, fa);
-                return new DispatchResult(true, phrase);
-            }
-            else
-            {
-                // Dual-receiver (FTdx101): atomic SV; — the radio handles the
-                // swap and broadcasts new FA/FB via auto-info.
-                await SendCommand("SV;", ct);
-                _logger.LogInformation("[Voice] SwapVFO (SV;)");
-                return new DispatchResult(true, phrase);
-            }
+            // Icom: CI-V 07 B0 atomically exchanges A↔B on the radio (the seam
+            // swaps the cached freq/mode and the poll re-reads both). No need for
+            // the Yaesu single-vs-dual FA/FB read-write-back dance.
+            await ExchangeRadioVfos(ct);
+            _logger.LogInformation("[Voice] SwapVFO (07 B0 exchange)");
+            return new DispatchResult(true, phrase);
         }
 
         // -- SetNudgeStep --------------------------------------------------
@@ -303,8 +285,7 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogWarning("[Voice] NudgeFrequency would go out of range ({Next})", next);
                 return new DispatchResult(false, phrase);
             }
-            await SendCommand($"{(isB ? "FB" : "FA")}{next:D9};", ct);
-            if (isB) _state.FrequencyB = next; else _state.FrequencyA = next;
+            await SetRadioFrequency(isB ? RadioVfo.B : RadioVfo.A, next, ct);
             _logger.LogInformation("[Voice] NudgeFrequency {Dir} -> {Hz} Hz (VFO {Vfo})",
                 direction > 0 ? "up" : "down", next, CurrentVfo);
             return new DispatchResult(true, phrase);
@@ -312,34 +293,35 @@ namespace Yaesu_Web_Control.Services.Voice
 
         // -- BandUp / BandDown ---------------------------------------------
 
-        private async Task<DispatchResult> BandStepAsync(bool up, CancellationToken ct)
+        private Task<DispatchResult> BandStepAsync(bool up, CancellationToken ct)
         {
-            var phrase = up ? "Band up" : "Band down";
-            // BU/BD require a P1 band selector (0=MAIN, 1=SUB) per the
-            // FTdx101MP CAT manual -- a bare "BU;"/"BD;" is malformed and
-            // the radio silently ignores it.
-            var command = (up ? "BU" : "BD") + VfoP1 + ";";
-            await SendCommand(command, ct);
-            _logger.LogInformation("[Voice] {Phrase} (VFO {Vfo})", phrase, CurrentVfo);
-            return new DispatchResult(true, phrase);
+            // TODO(voice-civ): no CI-V seam band-step yet. Could map onto the
+            // band-stacking registers (like the HTTP band buttons) later. Until
+            // then this intent is inert on Icom, so report it honestly rather
+            // than falsely confirming. "Go to <band> metres" (SetBand) works today.
+            _logger.LogInformation("[Voice] Band {Dir} recognised but not yet wired to CI-V (VFO {Vfo})", up ? "up" : "down", CurrentVfo);
+            return Task.FromResult(new DispatchResult(false,
+                "Band up and down aren't available yet — say go to, then a band", IsReadBack: true));
         }
 
         // -- Macro ---------------------------------------------------------
 
-        private async Task<DispatchResult> MacroAsync(
+        private Task<DispatchResult> MacroAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             var name = args.TryGetValue("macroName", out var n) ? n?.ToString() ?? "Macro" : "Macro";
             if (!args.TryGetValue("macroCat", out var c) || c is not string cat || string.IsNullOrWhiteSpace(cat))
             {
                 _logger.LogWarning("[Voice] Macro '{Name}' has no CAT string", name);
-                return new DispatchResult(false, name);
+                return Task.FromResult(new DispatchResult(false, name));
             }
-            // Split on ';' to support multi-command macros like "NR01;NB01;"
-            foreach (var seg in cat.Split(';', StringSplitOptions.RemoveEmptyEntries))
-                await SendCommand(seg + ";", ct);
-            _logger.LogInformation("[Voice] Macro '{Name}' -> {Cat}", name, cat);
-            return new DispatchResult(true, name);
+            // TODO(voice-civ): the default macros still hold Yaesu ASCII CAT
+            // strings (AB;, NR01;, …). They need CI-V hex equivalents before they
+            // can reach the IC-7300, so macros are inert on Icom. Report it
+            // honestly (IsReadBack, plain spoken message) rather than falsely
+            // confirming a command that never left the app.
+            _logger.LogInformation("[Voice] Macro '{Name}' ({Cat}) recognised but not yet wired to CI-V", name, cat);
+            return Task.FromResult(new DispatchResult(false, $"The {name} macro isn't available on the IC-7300 yet", IsReadBack: true));
         }
 
         // -- Status read-back (IsReadBack=true → no ", successful" appended) -----
@@ -395,24 +377,21 @@ namespace Yaesu_Web_Control.Services.Voice
 
         private async Task<DispatchResult> TxOnAsync(CancellationToken ct)
         {
-            await SendCommand("TX0;", ct);
-            _state.IsTransmitting = true;
+            await SetRadioTransmit(true, ct);
             _logger.LogInformation("[Voice] TxOn");
             return new DispatchResult(true, "Transmitting");
         }
 
         private async Task<DispatchResult> TxOffAsync(CancellationToken ct)
         {
-            await SendCommand("RX;", ct);
-            _state.IsTransmitting = false;
+            await SetRadioTransmit(false, ct);
             _logger.LogInformation("[Voice] TxOff");
             return new DispatchResult(true, "Receive");
         }
 
         private async Task<DispatchResult> SplitAsync(bool on, CancellationToken ct)
         {
-            await SendCommand(on ? "FT1;" : "FT0;", ct);
-            _state.SplitMode = on ? 1 : 0;
+            await SetRadioSplit(on, ct);
             _logger.LogInformation("[Voice] Split {State}", on ? "on" : "off");
             return new DispatchResult(true, on ? "Split on" : "Split off");
         }
@@ -425,6 +404,9 @@ namespace Yaesu_Web_Control.Services.Voice
             if (!TryGetLong(args, "direction", out var direction) || (direction != 1 && direction != -1))
                 return new DispatchResult(false, "Filter width");
 
+            // TODO(voice-civ): Yaesu SH filter-width nudge has no clean IC-7300
+            // seam equivalent yet (the Icom passband/filter model differs). Inert
+            // on Icom until a CI-V filter-width path is designed.
             var p1 = VfoP1;
             var raw = await SendCommand($"SH{p1};", ct);
             if (!TryParseIntResponse(raw, "SH", out var current))
@@ -446,7 +428,7 @@ namespace Yaesu_Web_Control.Services.Voice
 
             pct = Math.Clamp(pct, 0, 100);
             var catValue = (int)Math.Round(pct * 255.0 / 100.0);
-            await SendCommand($"AG{VfoP1}{catValue:D3};", ct);
+            await SetRadioAfGain(catValue, ct);
             if (VfoIsB) _state.AfGainB = catValue; else _state.AfGainA = catValue;
             _logger.LogInformation("[Voice] SetAfGain {Pct}% -> CAT {CatValue} (VFO {Vfo})", pct, catValue, CurrentVfo);
             return new DispatchResult(true, $"Audio gain {pct}");
@@ -454,11 +436,11 @@ namespace Yaesu_Web_Control.Services.Voice
 
         // -- Attenuator / Preamp / AGC -------------------------------------
 
-        private async Task<DispatchResult> SetAttenuatorAsync(
+        private Task<DispatchResult> SetAttenuatorAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!args.TryGetValue("level", out var lvlObj) || lvlObj is not string level)
-                return new DispatchResult(false, "Attenuator");
+                return Task.FromResult(new DispatchResult(false, "Attenuator"));
 
             var code = level switch
             {
@@ -468,14 +450,16 @@ namespace Yaesu_Web_Control.Services.Voice
                 "18"  => "3",
                 _     => null,
             };
-            if (code == null) return new DispatchResult(false, "Attenuator");
+            if (code == null) return Task.FromResult(new DispatchResult(false, "Attenuator"));
 
-            await SendCommand($"RA{VfoP1}{code};", ct);
-            var attValue = level switch { "off" => "00", "6" => "06", "12" => "12", "18" => "18", _ => (string?)null };
-            if (VfoIsB) _state.AttB = attValue ?? _state.AttB; else _state.AttA = attValue ?? _state.AttA;
-            var phrase = level == "off" ? "Attenuator off" : $"Attenuator {level} decibels";
-            _logger.LogInformation("[Voice] SetAttenuator -> {Level} (VFO {Vfo})", level, CurrentVfo);
-            return new DispatchResult(true, phrase);
+            // TODO(voice-civ): the IC-7300 attenuator is a single on/off ~20 dB
+            // pad (CI-V 11), not Yaesu's off/6/12/18 dB set. Until the vocabulary
+            // is reduced to on/off and repointed to _radio, this intent is inert
+            // on Icom. Report that honestly (IsReadBack speaks the message plainly
+            // and always, with no false ", successful") rather than confirming a
+            // change that never reached the radio.
+            _logger.LogInformation("[Voice] SetAttenuator '{Level}' recognised but not yet wired to CI-V (VFO {Vfo})", level, CurrentVfo);
+            return Task.FromResult(new DispatchResult(false, "Attenuator control isn't available on the IC-7300 yet", IsReadBack: true));
         }
 
         private async Task<DispatchResult> SetPreampAsync(
@@ -493,7 +477,8 @@ namespace Yaesu_Web_Control.Services.Voice
             };
             if (code == null) return new DispatchResult(false, "Preamp");
 
-            await SendCommand($"PA{VfoP1}{code};", ct);
+            // code is "0"/"1"/"2" — IC-7300 preamp off / amp 1 / amp 2 (CI-V 16 02).
+            await SetRadioPreamp(int.Parse(code), ct);
             if (VfoIsB) _state.IpoB = code; else _state.IpoA = code;
             var phrase = level switch
             {
@@ -506,11 +491,11 @@ namespace Yaesu_Web_Control.Services.Voice
             return new DispatchResult(true, phrase);
         }
 
-        private async Task<DispatchResult> SetAgcAsync(
+        private Task<DispatchResult> SetAgcAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!args.TryGetValue("speed", out var spObj) || spObj is not string speed)
-                return new DispatchResult(false, "A G C");
+                return Task.FromResult(new DispatchResult(false, "A G C"));
 
             var code = speed switch
             {
@@ -521,12 +506,14 @@ namespace Yaesu_Web_Control.Services.Voice
                 "auto" => "4",
                 _      => null,
             };
-            if (code == null) return new DispatchResult(false, "A G C");
+            if (code == null) return Task.FromResult(new DispatchResult(false, "A G C"));
 
-            await SendCommand($"GT{VfoP1}{code};", ct);
-            if (VfoIsB) _state.AgcB = code; else _state.AgcA = code;
-            _logger.LogInformation("[Voice] SetAgc -> {Speed} (VFO {Vfo})", speed, CurrentVfo);
-            return new DispatchResult(true, $"A G C {speed}");
+            // TODO(voice-civ): IC-7300 AGC is fast/mid/slow (16 12 → 1/2/3) only,
+            // no off/auto. Until the vocabulary is trimmed and repointed to
+            // _radio.SetAgcAsync, this intent is inert on Icom. Report it honestly
+            // (IsReadBack, plain spoken message) rather than falsely confirming.
+            _logger.LogInformation("[Voice] SetAgc '{Speed}' recognised but not yet wired to CI-V (VFO {Vfo})", speed, CurrentVfo);
+            return Task.FromResult(new DispatchResult(false, "A G C control isn't available on the IC-7300 yet", IsReadBack: true));
         }
 
         // -- CAT send, dry-run-aware ----------------------------------------
@@ -547,7 +534,110 @@ namespace Yaesu_Web_Control.Services.Voice
                 _logger.LogInformation("[Voice] DRY RUN -- would send {Command}", command);
                 return Task.FromResult(string.Empty);
             }
-            return _catClient.SendCommandAsync(command, "Voice", ct);
+            // The Yaesu CAT transport this used to reach was deleted in the IWC
+            // carve. The handful of voice intents still routed here (attenuator,
+            // AGC, IF-width nudge, band up/down, raw macros) need Icom-specific
+            // CI-V reworks, not a straight repoint — see the TODO(voice-civ) notes
+            // on the field declarations above. Until then they are inert no-ops.
+            _logger.LogInformation("[Voice] intent not yet on CI-V — dropped legacy CAT send: {Command}", command);
+            return Task.FromResult(string.Empty);
+        }
+
+        /// <summary>
+        /// Set a VFO's frequency through the CI-V seam, honouring the §6.5
+        /// dry-run flag (no radio traffic during a pack test). The seam updates
+        /// RadioStateService on the radio's ACK; in dry-run we set state
+        /// optimistically so the confirmation phrase still reflects the move.
+        /// </summary>
+        private async Task SetRadioFrequency(RadioVfo vfo, long hz, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set VFO {Vfo} to {Hz} Hz", vfo, hz);
+                if (vfo == RadioVfo.B) _state.FrequencyB = hz; else _state.FrequencyA = hz;
+                return;
+            }
+            await _radio.SetFrequencyHzAsync(vfo, hz, ct);
+        }
+
+        /// <summary>
+        /// Set a VFO's mode through the CI-V seam, honouring the §6.5 dry-run
+        /// flag. As with <see cref="SetRadioFrequency"/>, dry-run sets state
+        /// optimistically so the spoken confirmation still reflects the change.
+        /// </summary>
+        private async Task SetRadioMode(RadioVfo vfo, string mode, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set VFO {Vfo} to mode {Mode}", vfo, mode);
+                if (vfo == RadioVfo.B) _state.ModeB = mode; else _state.ModeA = mode;
+                return;
+            }
+            await _radio.SetModeAsync(vfo, mode, ct);
+        }
+
+        /// <summary>
+        /// Key/unkey the radio through the CI-V seam (software PTT), honouring the
+        /// §6.5 dry-run flag. As with the frequency/mode helpers, dry-run sets
+        /// state optimistically so the spoken confirmation still reflects it —
+        /// and, importantly, dry-run never actually transmits.
+        /// </summary>
+        private async Task SetRadioTransmit(bool transmit, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set PTT {State}", transmit ? "TX" : "RX");
+                _state.IsTransmitting = transmit;
+                return;
+            }
+            await _radio.SetTransmitAsync(transmit, ct);
+        }
+
+        /// <summary>Exchange VFO A↔B through the CI-V seam (07 B0), dry-run-aware.</summary>
+        private async Task ExchangeRadioVfos(CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would exchange VFO A<->B");
+                (_state.FrequencyA, _state.FrequencyB) = (_state.FrequencyB, _state.FrequencyA);
+                (_state.ModeA, _state.ModeB) = (_state.ModeB, _state.ModeA);
+                return;
+            }
+            await _radio.ExchangeVfosAsync(ct);
+        }
+
+        /// <summary>Set split on/off through the CI-V seam (0F), dry-run-aware.</summary>
+        private async Task SetRadioSplit(bool on, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set split {State}", on ? "on" : "off");
+                _state.SplitMode = on ? 1 : 0;
+                return;
+            }
+            await _radio.SetSplitAsync(on, ct);
+        }
+
+        /// <summary>Set AF gain (0–255) through the CI-V seam (14 01), dry-run-aware.</summary>
+        private async Task SetRadioAfGain(int value, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set AF gain {Value}", value);
+                return;
+            }
+            await _radio.SetAfGainAsync(value, ct);
+        }
+
+        /// <summary>Set preamp (0/1/2) through the CI-V seam (16 02), dry-run-aware.</summary>
+        private async Task SetRadioPreamp(int value, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set preamp {Value}", value);
+                return;
+            }
+            await _radio.SetPreampAsync(value, ct);
         }
 
         // -- helpers -------------------------------------------------------
@@ -582,23 +672,13 @@ namespace Yaesu_Web_Control.Services.Voice
             return int.TryParse(trimmed.AsSpan(prefix.Length), out value);
         }
 
-        /// <summary>Parses "FA01407400000;" or "FA01407400000" into a long Hz value.</summary>
-        private static bool TryParseFreqResponse(string? raw, string prefix, out long hz)
-        {
-            hz = 0;
-            if (string.IsNullOrWhiteSpace(raw)) return false;
-            var trimmed = raw.Trim().TrimEnd(';');
-            if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
-            return long.TryParse(trimmed.AsSpan(prefix.Length), out hz);
-        }
-
         // ── Speech-formatting helpers for the spoken confirmation ─────────
         //
         // TTS handles raw numbers ("14.074 megahertz") inconsistently across
         // installed voices -- one voice says "fourteen point oh seven four",
         // another says "fourteen point seventy-four". We spell the value out
         // digit-by-digit so the spoken confirmation matches what the user
-        // said (digit-by-digit fractional MHz is the YWC v1 grammar).
+        // said (digit-by-digit fractional MHz is the IWC v1 grammar).
 
         private static string FormatFrequencyForSpeech(long hz)
         {

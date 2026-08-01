@@ -1,6 +1,6 @@
-﻿using Yaesu_Web_Control.Models.Calibration;
+﻿using Icom_Web_Control.Models.Calibration;
 
-namespace Yaesu_Web_Control.Services;
+namespace Icom_Web_Control.Services;
 
 public interface ICalibrationService
 {
@@ -12,6 +12,10 @@ public interface ICalibrationService
     void ResetToDefault();
     string GetSavePath();
     bool IsDevelopmentMode { get; }
+
+    // Development-only: fold a user-emailed calibration into the shipped default
+    // file for its radio. Callers must gate on IsDevelopmentMode first.
+    CalibrationImportResult ImportEmailedCalibrationIntoDefault(string? emailText);
 }
 
 public class CalibrationService : ICalibrationService
@@ -111,5 +115,8 @@ public class CalibrationService : ICalibrationService
         Current = _storage.LoadDefault();
         _storage.Save(Current);
     }
+
+    public CalibrationImportResult ImportEmailedCalibrationIntoDefault(string? emailText) =>
+        _storage.ImportEmailedCalibrationIntoDefault(emailText);
 }
 

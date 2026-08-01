@@ -1,4 +1,4 @@
-// Yaesu Web Control – Calibration Engine
+// Icom Web Control – Calibration Engine
 // Pure functions only. No DOM, no UI, no gauge logic, no side effects.
 //
 // This is the single source of truth for all meter calibration.

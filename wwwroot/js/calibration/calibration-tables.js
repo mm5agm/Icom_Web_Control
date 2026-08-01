@@ -1,4 +1,4 @@
-// Yaesu Web Control – Default Calibration Tables
+// Icom Web Control – Default Calibration Tables
 // Pure data only. No functions, no DOM, no side effects.
 //
 // Keys match the meterName strings passed to calibrateNumeric() in calibration-engine.js.
@@ -34,13 +34,13 @@ export const defaultTables = {
         { raw: 240, label: '+40' }
     ],
 
-    // Power output — RM5 (0–255 ADC → 0–200 watts)
+    // Power output — IC-7300 Po meter (CI-V 15 11, 0–255 raw → 0–100 W).
+    // The Po meter is a percentage scale (raw 0=0%, 143=50%, 213=100%); for a
+    // 100 W radio 100% maps directly to 100 W.
     PWR: [
         { raw: 0,   value: 0   },
-        { raw: 64,  value: 25  },
-        { raw: 128, value: 50  },
-        { raw: 192, value: 100 },
-        { raw: 255, value: 200 }
+        { raw: 143, value: 50  },
+        { raw: 213, value: 100 }
     ],
 
     // SWR — MS03+RM0 right meter (0–255 ADC → SWR ratio)
@@ -55,54 +55,35 @@ export const defaultTables = {
         { raw: 242, value: 9.9 }
     ],
 
-    // Compression — RM3 (0–255 ADC → 0–20 dB)
-    // Scale matches friend's FTdx101MP table: { 0dB:0%, 5dB:22%, 10dB:40%, 15dB:55%, 20dB:80% }.
+    // Compression — IC-7300 COMP meter (CI-V 15 14, 0–255 raw → 0–30 dB).
+    // Manual points: raw 0=0 dB, 130=15 dB, 210=30 dB.
     Compression: [
         { raw: 0,   value: 0  },
-        { raw: 56,  value: 5  },
-        { raw: 102, value: 10 },
-        { raw: 140, value: 15 },
-        { raw: 204, value: 20 }
+        { raw: 130, value: 15 },
+        { raw: 210, value: 30 }
     ],
 
-    // ALC — RM4 (0–255 ADC → 0–50 volts)
-    // Per FTdx101 service data: raw 178 corresponds to 50 V full-scale.
+    // ALC — IC-7300 ALC meter (CI-V 15 13, 0–255 raw → 0–100 %).
+    // The meter is a relative scale, not volts: raw 0=minimum, 120=maximum.
     ALC: [
-        { raw: 0,   value: 0  },
-        { raw: 178, value: 50 },
-        { raw: 255, value: 72 }
+        { raw: 0,   value: 0   },
+        { raw: 120, value: 100 }
     ],
 
-    // Drain current IDD — RM7 (0–255 ADC → 0–25 amps)
-    // Scale matches friend's FTdx101MP table: { 0A:0%, 5A:20%, 10A:40%, 15A:60%, 20A:80%, 25A:95% }.
+    // Drain current IDD — IC-7300 Id meter (CI-V 15 16, 0–255 raw → 0–25 A).
+    // Manual points: raw 0=0 A, 97=10 A, 146=15 A, 241=25 A.
     IDD: [
         { raw: 0,   value: 0  },
-        { raw: 51,  value: 5  },
-        { raw: 102, value: 10 },
-        { raw: 153, value: 15 },
-        { raw: 204, value: 20 },
-        { raw: 242, value: 25 }
+        { raw: 97,  value: 10 },
+        { raw: 146, value: 15 },
+        { raw: 241, value: 25 }
     ],
 
-    // PA supply voltage VDD — RM8 (0–255 ADC → 0–60 volts)
-    // The valid operating range is 40–55 V (raw ≈ 170–235).
-    // Full table covers 0–255 to avoid identity fall-through for out-of-range readings.
+    // PA supply voltage VDD — IC-7300 Vd meter (CI-V 15 15, 0–255 raw → 0–16 V).
+    // Manual points: raw 0=0 V, 13=10 V, 241=16 V. Nominal shack-PSU rail ≈ 13.8 V.
     VPA: [
         { raw: 0,   value: 0  },
-        { raw: 170, value: 40 },
-        { raw: 204, value: 48 },
-        { raw: 235, value: 55 },
-        { raw: 255, value: 60 }
-    ],
-
-    // PA temperature — RM9 (0-255 ADC → 0-100 °C)
-    // Friend's formula: temp = (raw / 2.3) - 6
-    TPA: [
-        { raw: 14,  value: 0   },
-        { raw: 60,  value: 20  },
-        { raw: 106, value: 40  },
-        { raw: 152, value: 60  },
-        { raw: 198, value: 80  },
-        { raw: 244, value: 100 }
+        { raw: 13,  value: 10 },
+        { raw: 241, value: 16 }
     ]
 };

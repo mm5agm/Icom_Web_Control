@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using Yaesu_Web_Control.Models;
-using Yaesu_Web_Control.Services;
+using Icom_Web_Control.Models;
+using Icom_Web_Control.Services;
 
-namespace Yaesu_Web_Control.Controllers
+namespace Icom_Web_Control.Controllers
 {
     /// <summary>
     /// Export and import the entire user settings file. Designed for moving
-    /// a complete YWC configuration (band profiles, memories, CW messages,
+    /// a complete IWC configuration (band profiles, memories, CW messages,
     /// DX watch list, calibration, external app paths, etc.) between PCs or
     /// preserving it across a Windows rebuild.
     /// </summary>
@@ -121,7 +121,7 @@ namespace Yaesu_Web_Control.Controllers
             var date = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             return new FileContentResult(bytes, "application/json")
             {
-                FileDownloadName = $"ywc-settings-{date}.json"
+                FileDownloadName = $"iwc-settings-{date}.json"
             };
         }
     }

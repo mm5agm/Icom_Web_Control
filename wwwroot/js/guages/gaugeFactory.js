@@ -1,8 +1,8 @@
-// Yaesu Web Control – Gauge Factory
+// Icom Web Control – Gauge Factory
 // Creates gauge instances based on a type string.
 // No layout logic, no DOM queries, no calibration logic.
 
-import { SMeterGauge, PowerGauge, SWRGauge, ALCGauge, TempGauge, CompressionGauge, IDDGauge, VDDGauge } from './gauge.js';
+import { SMeterGauge, PowerGauge, SWRGauge, ALCGauge, CompressionGauge, IDDGauge, VDDGauge } from './gauge.js';
 
 // Registry of gauge constructors.
 // Add new meter types here as your UI grows.
@@ -11,7 +11,6 @@ const gaugeRegistry = {
     power:  PowerGauge,
     swr:    SWRGauge,
     alc:    ALCGauge,
-    temp:   TempGauge,
     compression: CompressionGauge,
     idd: IDDGauge,
     vdd: VDDGauge
@@ -77,7 +76,6 @@ export function createSMeterGauge(canvasId, options = {}) { return createGauge('
 export function createPowerGauge(canvasId, options = {})  { return createGauge('power',  canvasId, options); }
 export function createSWRGauge(canvasId, options = {})    { return createGauge('swr',    canvasId, options); }
 export function createALCGauge(canvasId, options = {})    { return createGauge('alc',    canvasId, options); }
-export function createTempGauge(canvasId, options = {})   { return createGauge('temp',   canvasId, options); }
 export function createCompressionGauge(canvasId, options = {}) { return createGauge('compression', canvasId, options); }
 export function createIDDGauge(canvasId, options = {})    { return createGauge('idd', canvasId, options); }
 export function createVDDGauge(canvasId, options = {})    { return createGauge('vdd', canvasId, options); }

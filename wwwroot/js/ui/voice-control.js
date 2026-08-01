@@ -12,14 +12,72 @@
 // is being reported; a button ignores updates that aren't its own so the
 // other button doesn't flicker.
 //
-// window.ywcVoiceEnabled (server-rendered in _Layout.cshtml) gates whether
+// window.iwcVoiceEnabled (server-rendered in _Layout.cshtml) gates whether
 // any mic button is shown at all. VFO B's button is additionally hidden on
 // single-receiver radios via #vfoRow's data-single-receiver attribute.
 
 (function () {
     'use strict';
 
-    if (!window.ywcVoiceEnabled) return;
+    if (!window.iwcVoiceEnabled) return;
+
+    // ---- Right-click voice-command help ----------------------------------
+    //
+    // Generated from the live grammar config via GET /api/voice/help, so the
+    // on-screen list can never drift from what the radio actually responds to
+    // (including phrases the user has customised). Fetched fresh each open so
+    // config edits show up without a page reload; cheap and rarely triggered.
+
+    function esc(s) {
+        return String(s).replace(/[&<>"]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+    }
+
+    function renderVoiceHelp(doc) {
+        const parts = [];
+        if (doc.intro) parts.push('<div class="vh-intro">' + esc(doc.intro) + '</div>');
+        (doc.groups || []).forEach(function (g) {
+            parts.push('<div class="vh-group">');
+            parts.push('<h6>' + esc(g.name) + '</h6>');
+            (g.items || []).forEach(function (item) {
+                const examples = (item.examples || [])
+                    .map(function (ex) { return ex === '…' ? '…' : '<code>' + esc(ex) + '</code>'; })
+                    .join(' ');
+                parts.push(
+                    '<div class="vh-item">' +
+                        '<span class="vh-what">' + esc(item.what) + '</span>' +
+                        '<span class="vh-ex">' + examples + '</span>' +
+                    '</div>');
+            });
+            parts.push('</div>');
+        });
+        return parts.join('');
+    }
+
+    let voiceHelpLoaded = false;
+    function openVoiceHelp() {
+        const dlg  = document.getElementById('voiceHelpDialog');
+        const body = document.getElementById('voiceHelpBody');
+        if (!dlg) return;
+        if (typeof dlg.show === 'function') dlg.show(); else dlg.setAttribute('open', '');
+
+        // Refetch each open so customised phrases stay current.
+        if (body) body.innerHTML = '<div class="text-muted small">Loading…</div>';
+        fetch('/api/voice/help')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (doc) {
+                if (!body) return;
+                body.innerHTML = doc
+                    ? renderVoiceHelp(doc)
+                    : '<div class="text-danger small">Couldn’t load the command list.</div>';
+                voiceHelpLoaded = true;
+            })
+            .catch(function () {
+                if (body && !voiceHelpLoaded)
+                    body.innerHTML = '<div class="text-danger small">Couldn’t load the command list.</div>';
+            });
+    }
 
     function createVfoVoiceControl(vfo, defaultStepHz) {
         const suffix    = vfo; // 'A' | 'B'
@@ -49,11 +107,16 @@
 
         // ---- Visual state --------------------------------------------
 
+        // Only the colour variant is swapped; the button's layout classes
+        // (d-flex/centering) and its fixed size stay put. Rebuilding className
+        // wholesale used to drop those and reflow the icon.
+        const COLOUR_CLASSES = ['btn-outline-danger', 'btn-danger', 'btn-success', 'btn-warning'];
         function setButtonClass(styleSuffix) {
-            btn.className = 'btn btn-' + styleSuffix + ' btn-sm';
+            btn.classList.remove(...COLOUR_CLASSES);
+            btn.classList.add('btn-' + styleSuffix);
         }
-        function setIdleVisual()        { setButtonClass('outline-danger'); }
-        function setListeningVisual()   { setButtonClass('danger'); }
+        function setIdleVisual()        { btn.classList.remove('voice-mic-listening'); setButtonClass('outline-danger'); }
+        function setListeningVisual()   { setButtonClass('danger'); btn.classList.add('voice-mic-listening'); }
         function setHeardVisual()       { setButtonClass('success'); }
         function setExecutingVisual()   { setButtonClass('success'); }
         function setErrorVisual()       { setButtonClass('danger'); }
@@ -99,8 +162,19 @@
             }
         }
 
-        btn.addEventListener('mousedown', startListening);
+        // Only the primary (left) button starts PTT. mousedown fires for the
+        // right button too, so without this guard a right-click would key the
+        // recogniser as well as open the help popup below.
+        btn.addEventListener('mousedown', function (e) { if (e.button === 0) startListening(); });
         btn.addEventListener('touchstart', function (e) { e.preventDefault(); startListening(); });
+
+        // Right-click (desktop only — long-press is already PTT on touch) pops
+        // up the generated-from-config voice command list. Shared across both
+        // mic buttons, so it lives in openVoiceHelp() outside this factory.
+        btn.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            openVoiceHelp();
+        });
 
         // mouseup/touchend is listened on document (not just the button) so
         // that dragging the pointer off the button while held still stops
@@ -139,8 +213,8 @@
     }
 
     const controls = [
-        createVfoVoiceControl('A', window.ywcVoiceNudgeStepHzA),
-        createVfoVoiceControl('B', window.ywcVoiceNudgeStepHzB),
+        createVfoVoiceControl('A', window.iwcVoiceNudgeStepHzA),
+        createVfoVoiceControl('B', window.iwcVoiceNudgeStepHzB),
     ].filter(Boolean);
 
     // VFO B's mic button exists in the DOM even on single-receiver radios

@@ -1,4 +1,4 @@
-namespace Yaesu_Web_Control.Services;
+namespace Icom_Web_Control.Services;
 
 // Capability lookup for per-model behaviour differences. Currently used only
 // for the dual- vs single-receiver UI decision (active-VFO greying-out and
@@ -46,15 +46,16 @@ public static class RadioCapabilities
     public static bool IsSingleReceiver(string radioModel) => !IsDualReceiver(radioModel);
 
     /// <summary>
-    /// True when the radio has more than one antenna jack and YWC should
+    /// True when the radio has more than one antenna jack and IWC should
     /// expose a per-VFO antenna selector. Single-antenna radios get the
     /// selector hidden (Jacek SP3L #34, FTdx10 has one ANT jack — showing
     /// a selector for a control that does nothing is just visual noise).
+    /// The IC-7300 family has a single SO-239 ANT jack, so no selector.
     /// </summary>
     public static bool HasAntennaSelector(string radioModel) => radioModel switch
     {
-        "FTdx10" or "FT-991A" => false,
-        _                     => true
+        "FTdx10" or "FT-991A" or "IC-7300" or "IC-7300MK2" => false,
+        _                                                  => true
     };
 
     /// <summary>
