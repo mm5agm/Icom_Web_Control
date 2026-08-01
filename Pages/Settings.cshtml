@@ -501,6 +501,15 @@
             </div>
             <div class="mb-3">
                 <label class="form-label">Import language pack</label>
+                <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="setupUsVoiceBtn" onclick="iwcSetupUsEnglishVoice()">
+                        <i class="bi bi-translate" aria-hidden="true"></i>&nbsp;Install US English voice pack
+                    </button>
+                    <span class="form-text mb-0">
+                        One click for operators whose Windows is set to <strong>English (United States)</strong> —
+                        installs the bundled US pack and makes it the active language. The built-in default is en-GB.
+                    </span>
+                </div>
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <input type="file" class="form-control form-control-sm w-auto" id="importPackFile" accept=".zip">
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="previewImportBtn" onclick="iwcPreviewImport()">
@@ -508,7 +517,7 @@
                     </button>
                 </div>
                 <div class="form-text">
-                    Pick a <code>IWC-VoicePack-&lt;culture&gt;-vN.zip</code> exported from this or another
+                    Or pick any <code>IWC-VoicePack-&lt;culture&gt;-vN.zip</code> exported from this or another
                     install. Nothing is written until you review the preview below and click Install.
                 </div>
                 <div id="importPreviewResults" class="mt-2"></div>
@@ -1071,6 +1080,91 @@
                     }
                 } catch (e) {
                     resultsEl.innerHTML = '<span class="text-danger">Install failed: ' + escapeHtml(String(e)) + '</span>';
+                } finally {
+                    if (btn) btn.disabled = false;
+                }
+            }
+
+            // One-click setup for US operators: load the bundled en-US pack,
+            // install it, and switch the active recognition locale to en-US —
+            // the default en-GB pack has no recogniser on a US Windows install,
+            // so an en-US machine needs both steps to get voice working.
+            async function iwcSetupUsEnglishVoice() {
+                const resultsEl = document.getElementById('importPreviewResults');
+                const btn = document.getElementById('setupUsVoiceBtn');
+                if (btn) btn.disabled = true;
+                resultsEl.innerHTML = '<em class="text-muted">Setting up US English voice…</em>';
+                try {
+                    // 1. Load the pack that ships inside the installer.
+                    const packResp = await fetch('/voice-packs/IWC-VoicePack-en-US-v1.zip');
+                    if (!packResp.ok) {
+                        resultsEl.innerHTML = '<span class="text-danger">Couldn\'t load the bundled US English pack (HTTP ' +
+                            packResp.status + ').</span>';
+                        return;
+                    }
+                    const blob = await packResp.blob();
+
+                    // 2. Preview — validates the pack and reports whether Windows
+                    //    has the matching speech recogniser installed.
+                    const fd = new FormData();
+                    fd.append('pack', blob, 'IWC-VoicePack-en-US-v1.zip');
+                    const pv = await fetch('/api/voice/phrases/import/preview', { method: 'POST', body: fd });
+                    const preview = await pv.json();
+                    if (!pv.ok) {
+                        resultsEl.innerHTML = '<span class="text-danger">' + escapeHtml(preview.error || ('HTTP ' + pv.status)) + '</span>';
+                        return;
+                    }
+                    if (preview.errors && preview.errors.length) {
+                        resultsEl.innerHTML = '<span class="text-danger">The bundled US pack failed validation.</span>' +
+                            renderValidationResults(preview.errors, preview.warnings || []);
+                        return;
+                    }
+
+                    // 3. Install (replace any existing en-US pack).
+                    const inst = await fetch('/api/voice/phrases/import/install', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            culture: preview.culture,
+                            config: preview.config,
+                            meta: preview.meta,
+                            mergeStrategy: 'replace',
+                            collisionResolutions: null,
+                        }),
+                    });
+                    const instData = await inst.json();
+                    if (!inst.ok) {
+                        resultsEl.innerHTML = '<span class="text-danger">' + escapeHtml(instData.error || ('HTTP ' + inst.status)) + '</span>';
+                        return;
+                    }
+
+                    // 4. Make en-US the active recognition locale.
+                    const loc = await fetch('/api/voice/locale', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ culture: preview.culture }),
+                    });
+                    const locData = await loc.json().catch(() => ({}));
+
+                    // 5. Report, flagging the one thing IWC can't do for them —
+                    //    installing the Windows en-US speech recogniser.
+                    let msg = '<div class="alert alert-success py-2 px-2 mb-0">US English voice pack installed and set as the active language.';
+                    if (!preview.hasWindowsRecognizer) {
+                        msg += ' <strong>Windows has no US English speech recogniser installed yet</strong> — add it in ' +
+                            '<a href="ms-settings:speech" target="_blank" rel="noopener">Settings → Time &amp; Language → Speech</a>, ' +
+                            'then restart IWC.';
+                    } else {
+                        msg += ' Make sure <em>Enable voice control</em> is ticked, then restart IWC if the mic button isn\'t already showing.';
+                    }
+                    msg += '</div>';
+                    resultsEl.innerHTML = msg;
+
+                    // Reflect the switch in the locale dropdown and diagnostics.
+                    iwcImportPreview = null;
+                    iwcLoadLocales();
+                    iwcRefreshVoiceDiagnostics();
+                } catch (e) {
+                    resultsEl.innerHTML = '<span class="text-danger">Setup failed: ' + escapeHtml(String(e)) + '</span>';
                 } finally {
                     if (btn) btn.disabled = false;
                 }

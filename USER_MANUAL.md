@@ -302,7 +302,7 @@ The slider snaps to 5 W steps for ease of dragging, but the numerical label show
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over CI-V — there is no external SDR and nothing extra to plug in. It shows a real-time spectrum and scrolling waterfall of the band around the current VFO A frequency, and appears automatically once the radio is connected.
 
-> **Note (pre-alpha):** the on-screen spectrum panel is inherited from IWC's Yaesu sibling and is still being re-fitted for the IC-7300 scope. The click-to-tune, crosshair, band-plan markers and guard-rail behaviour below are stable; some display mechanics (span control, waterfall speed, dB scaling) may change as the CI-V scope integration settles. The span and centre are driven by the radio's own scope settings.
+> **Note (alpha):** the on-screen spectrum panel is inherited from IWC's Yaesu sibling and is still being re-fitted for the IC-7300 scope. The click-to-tune, crosshair, band-plan markers and guard-rail behaviour below are stable; some display mechanics (span control, waterfall speed, dB scaling) may change as the CI-V scope integration settles. The span and centre are driven by the radio's own scope settings.
 
 **Span buttons** — Click **250k**, **500k**, **1M**, or **2M** to change the visible bandwidth. The display recentres on VFO A.
 
@@ -589,7 +589,7 @@ Close the panel by clicking the **×** button in its title bar. Drag the title b
 
 Click the **CW** button to open the CW Keyer pop-up panel.
 
-> **Note (pre-alpha):** the CW Keyer panel is inherited from IWC's Yaesu sibling and is **not yet wired to the IC-7300's CI-V CW keyer**. The layout below describes the intended controls; the underlying CI-V commands (keyer memory send, auto-zero, break-in) are part of the ongoing carve and may not all function yet.
+> **Note (alpha):** the CW Keyer panel is inherited from IWC's Yaesu sibling and is **not yet wired to the IC-7300's CI-V CW keyer**. The layout below describes the intended controls; the underlying CI-V commands (keyer memory send, auto-zero, break-in) are part of the ongoing carve and may not all function yet.
 
 | Control | Description |
 |---------|-------------|
@@ -823,7 +823,7 @@ The Settings page also shows the full URL for each detected network interface so
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over the CI-V connection. There is **no external SDR, no IF tap, and no extra hardware or drivers** — once the radio is connected the spectrum and waterfall appear on the main page automatically. Consequently this section has **no settings to configure**; the scope's span and reference level are set on the radio itself.
 
-> **Note (pre-alpha):** the spectrum panel is inherited from IWC's Yaesu sibling, where it displayed an external SDR, and is still being re-fitted to the IC-7300's CI-V scope. The features below (Hold, the persistent cursor, the band-plan overlay) are carried over from that panel; expect their exact behaviour to be tidied up as the CI-V scope integration settles. The IC-7300 is a single-receiver radio, so there is one live scope (VFO A); the VFO-B panel is part of the ongoing re-fit.
+> **Note (alpha):** the spectrum panel is inherited from IWC's Yaesu sibling, where it displayed an external SDR, and is still being re-fitted to the IC-7300's CI-V scope. The features below (Hold, the persistent cursor, the band-plan overlay) are carried over from that panel; expect their exact behaviour to be tidied up as the CI-V scope integration settles. The IC-7300 is a single-receiver radio, so there is one live scope (VFO A); the VFO-B panel is part of the ongoing re-fit.
 
 #### Updating the band plan without an IWC release
 
@@ -1068,7 +1068,7 @@ The editor shows all your saved memories in a table. For each memory you can edi
 
 **Each advanced field is applied on recall only if you have set a value.** Leave any field blank and the radio's current value for that setting is left alone. This means you can save a memory that only changes frequency and mode (the simple use case), or one that fully configures the radio (e.g. "20m FT8" with IF Width 2.4 kHz, NR2, 50 W, AGC Auto).
 
-> **Note (pre-alpha):** The Memories editor is inherited from IWC's Yaesu sibling and still shows advanced columns — **Ant**, **IF Shift**, **Roofing** — that don't apply to the IC-7300. They are harmless (left blank they do nothing) and will be tidied out as the memory system is re-fitted for CI-V.
+> **Note (alpha):** The Memories editor is inherited from IWC's Yaesu sibling and still shows advanced columns — **Ant**, **IF Shift**, **Roofing** — that don't apply to the IC-7300. They are harmless (left blank they do nothing) and will be tidied out as the memory system is re-fitted for CI-V.
 
 > **Important:** Advanced fields are **app-side only**. They are stored in `memories.json` on your PC but the radio's own memory channels (used by the Import/Export buttons) cannot hold these fields. Exporting to the radio writes only label, frequency, mode, and clarifier values.
 
@@ -2143,6 +2143,11 @@ This is a primary accessibility feature: a partially-sighted operator can drive 
 3. Tick **Enable voice control**, then click **Save**.
 4. **Restart IWC.** The speech engine is loaded once at startup; the toggle takes effect on the next launch.
 5. Confirm the **Windows speech recognition pack for your active language** is installed. Open Windows → Settings → Time &amp; Language → Speech and check the installed-languages list. The active language defaults to English (United Kingdom) — if it isn't listed, install it from there (most UK Windows installs already have it). The **Active language** dropdown in the Voice Control section lets you switch to any other installed language pack (see [§17.7](#177-more-languages)).
+6. **Pick the right microphone and speaker in Windows.** Voice control listens through the Windows **default recording device** and speaks its confirmations through the Windows **default playback device** — IWC uses whatever Windows has set as default, it does not have its own device picker. Open **Windows → Settings → System → Sound** and set:
+   - **Input (microphone):** your actual microphone or headset — *not* the radio.
+   - **Output (speaker):** your PC speakers or headset — *not* the radio.
+
+   > ⚠️ **IC-7300 USB gotcha.** Connecting the IC-7300 by USB adds a **"USB Audio CODEC"** device to both the Input and Output lists, and Windows often makes it the default. If that happens, voice control ends up "listening" to the radio's received audio instead of your microphone (so nothing you say is recognised), and the spoken confirmations get routed into the radio's USB input instead of your speakers. In Windows Sound settings, leave the "USB Audio CODEC" set aside for WSJT-X/digital modes and make sure your **microphone** and **speakers/headset** are the defaults for general use.
 
 After restart, you should see a **mic button on the Index page beside the VFO panel**, next to the band/mode controls. If you don't see it, jump to [§17.4 Troubleshooting](#174-troubleshooting).
 
@@ -2173,6 +2178,8 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 **Mic button is there but commands don't do anything.**
 - Open the **Diagnostics page** (`http://localhost:8080/Diagnostics`), click the **Voice Control Log** button at the top, then click **Refresh**. This shows the recent voice events (start / stop / heard / rejected / dispatched) from today's log without you having to find or parse the raw log file. Click **Copy to clipboard** to grab them for a bug report.
 - You should see `SAPI recogniser ready` shortly after IWC startup and a `Rejected (best alt: '…')` line for each unmatched press. The "best alt" is the engine's best guess at what you said — if it's wildly wrong, the mic itself may have a problem (try Windows Sound settings → Input → speak and see if the level meter responds).
+- **Check the default microphone.** Voice control listens to the Windows **default recording device**. If the `Rejected` line is empty or nonsense every time, the wrong device is probably the default — most often the IC-7300's **"USB Audio CODEC"** grabbed the default slot when you plugged the radio in, so the engine is hearing the radio's receive audio, not you. Set your real microphone as the default input in **Windows → Settings → System → Sound → Input** (see [§17.2](#172-enabling-voice-control)).
+- **No spoken confirmation?** Confirmations play through the Windows **default playback device**. If commands work but you hear nothing, the wrong output is default (again, often the radio's "USB Audio CODEC") — set your speakers/headset as the default output in the same Sound settings.
 - If the log shows `Rejected (best alt: '<your phrase>')` and your phrase looks correct, the grammar wording isn't matching what you said. Try one of the alternative phrasings listed in [§17.1](#171-what-you-can-say), or open a [GitHub discussion](https://github.com/mm5agm/Icom_Web_Control/discussions) and propose a new phrasing.
 - The raw log file lives at `%APPDATA%\MM5AGM\Icom Web Control\logs\iwc-YYYYMMDD.log` if you ever need the unfiltered version (e.g. CAT command traffic, SDR worker status, etc.), but the Diagnostics page is the right tool for voice-specific issues.
 
