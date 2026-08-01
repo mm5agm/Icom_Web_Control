@@ -302,7 +302,7 @@ The slider snaps to 5 W steps for ease of dragging, but the numerical label show
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over CI-V — there is no external SDR and nothing extra to plug in. It shows a real-time spectrum and scrolling waterfall of the band around the current VFO A frequency, and appears automatically once the radio is connected.
 
-> **Note (alpha):** the on-screen spectrum panel is inherited from IWC's Yaesu sibling and is still being re-fitted for the IC-7300 scope. The click-to-tune, crosshair, band-plan markers and guard-rail behaviour below are stable; some display mechanics (span control, waterfall speed, dB scaling) may change as the CI-V scope integration settles. The span and centre are driven by the radio's own scope settings.
+> **Note:** the on-screen spectrum panel is inherited from IWC's Yaesu sibling and is still being re-fitted for the IC-7300 scope. The click-to-tune, crosshair, band-plan markers and guard-rail behaviour below are stable; some display mechanics (span control, waterfall speed, dB scaling) may change as the CI-V scope integration settles. The span and centre are driven by the radio's own scope settings.
 
 **Span buttons** — Click **250k**, **500k**, **1M**, or **2M** to change the visible bandwidth. The display recentres on VFO A.
 
@@ -589,7 +589,7 @@ Close the panel by clicking the **×** button in its title bar. Drag the title b
 
 Click the **CW** button to open the CW Keyer pop-up panel.
 
-> **Note (alpha):** the CW Keyer panel is inherited from IWC's Yaesu sibling and is **not yet wired to the IC-7300's CI-V CW keyer**. The layout below describes the intended controls; the underlying CI-V commands (keyer memory send, auto-zero, break-in) are part of the ongoing carve and may not all function yet.
+> **Note:** the CW Keyer panel is inherited from IWC's Yaesu sibling and is **not yet wired to the IC-7300's CI-V CW keyer**. The layout below describes the intended controls; the underlying CI-V commands (keyer memory send, auto-zero, break-in) are part of the ongoing carve and may not all function yet.
 
 | Control | Description |
 |---------|-------------|
@@ -823,7 +823,7 @@ The Settings page also shows the full URL for each detected network interface so
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over the CI-V connection. There is **no external SDR, no IF tap, and no extra hardware or drivers** — once the radio is connected the spectrum and waterfall appear on the main page automatically. Consequently this section has **no settings to configure**; the scope's span and reference level are set on the radio itself.
 
-> **Note (alpha):** the spectrum panel is inherited from IWC's Yaesu sibling, where it displayed an external SDR, and is still being re-fitted to the IC-7300's CI-V scope. The features below (Hold, the persistent cursor, the band-plan overlay) are carried over from that panel; expect their exact behaviour to be tidied up as the CI-V scope integration settles. The IC-7300 is a single-receiver radio, so there is one live scope (VFO A); the VFO-B panel is part of the ongoing re-fit.
+> **Note:** the spectrum panel is inherited from IWC's Yaesu sibling, where it displayed an external SDR, and is still being re-fitted to the IC-7300's CI-V scope. The features below (Hold, the persistent cursor, the band-plan overlay) are carried over from that panel; expect their exact behaviour to be tidied up as the CI-V scope integration settles. The IC-7300 is a single-receiver radio, so there is one live scope (VFO A); the VFO-B panel is part of the ongoing re-fit.
 
 #### Updating the band plan without an IWC release
 
@@ -1068,7 +1068,7 @@ The editor shows all your saved memories in a table. For each memory you can edi
 
 **Each advanced field is applied on recall only if you have set a value.** Leave any field blank and the radio's current value for that setting is left alone. This means you can save a memory that only changes frequency and mode (the simple use case), or one that fully configures the radio (e.g. "20m FT8" with IF Width 2.4 kHz, NR2, 50 W, AGC Auto).
 
-> **Note (alpha):** The Memories editor is inherited from IWC's Yaesu sibling and still shows advanced columns — **Ant**, **IF Shift**, **Roofing** — that don't apply to the IC-7300. They are harmless (left blank they do nothing) and will be tidied out as the memory system is re-fitted for CI-V.
+> **Note:** The Memories editor is inherited from IWC's Yaesu sibling and still shows advanced columns — **Ant**, **IF Shift**, **Roofing** — that don't apply to the IC-7300. They are harmless (left blank they do nothing) and will be tidied out as the memory system is re-fitted for CI-V.
 
 > **Important:** Advanced fields are **app-side only**. They are stored in `memories.json` on your PC but the radio's own memory channels (used by the Import/Export buttons) cannot hold these fields. Exporting to the radio writes only label, frequency, mode, and clarifier values.
 

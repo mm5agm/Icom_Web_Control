@@ -9,9 +9,9 @@ the [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) repository.
 
 _Nothing yet._
 
-## [0.1.0-alpha] - 2026-08-01
+## [1.0.0] - 2026-08-01
 
-First public preview. Carved from Yaesu Web Control and re-fitted for Icom CI-V,
+First public release. Carved from Yaesu Web Control and re-fitted for Icom CI-V,
 targeting the **IC-7300 MkII** (CI-V over USB, default address `B6`). See
 [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md) for
 the phased roadmap.

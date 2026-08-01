@@ -2,10 +2,9 @@ namespace Icom_Web_Control;
 
 public static class AppVersion
 {
-    // Fresh IWC version line — IWC starts its own numbering at 0.x (pre-alpha),
-    // NOT continued from the inherited YWC 2.4.x lineage. "-alpha" signals to
-    // first-time Facebook downloaders that this is early-preview software.
-    public const string Current = "0.1.0-alpha";
+    // Fresh IWC version line — IWC starts its own numbering at 1.0.0, NOT
+    // continued from the inherited YWC 2.4.x lineage.
+    public const string Current = "1.0.0";
 
     /// <summary>Date this version was released, ISO format.
     /// Bump on actual release; current value reflects the planned ship date.</summary>
