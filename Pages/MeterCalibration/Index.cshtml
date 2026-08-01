@@ -19,6 +19,7 @@
             @if (Model.IsDevelopmentMode)
             {
                 <button id="importDefaultBtn" class="btn-help" title="Read an emailed calibration from the clipboard and fold it into the shipped default file (developer only)">⬇ Import emailed cal → default (dev)</button>
+                <button id="importCurrentBtn" class="btn-help" title="Fold the calibration currently SAVED on this PC into the shipped default file — no email, no clipboard (developer only)">⬇ My saved cal → default (dev)</button>
             }
             <span id="saveStatus" class="save-status"></span>
         </div>
@@ -391,16 +392,35 @@
                     "(If the JSON below is missing, it has been copied to your clipboard — just paste it here.)\n\n" +
                     cal + "\n";
 
+                // Copy BEFORE navigating, and wait for it. The mailto: navigation
+                // below pulls focus off the document, which makes an in-flight
+                // clipboard write reject with "Document is not focused". That
+                // used to be swallowed by an empty .catch(), so the status line
+                // claimed the copy had happened while the clipboard still held
+                // an older calibration — which then imported as "nothing to
+                // apply". (Colin, 2026-08-01.)
+                let copied = false;
+                let copyError = "";
                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(cal).catch(() => { });
+                    try {
+                        await navigator.clipboard.writeText(cal);
+                        copied = true;
+                    } catch (e) {
+                        copyError = e && e.message ? e.message : String(e);
+                    }
+                } else {
+                    copyError = "clipboard API unavailable (use http://localhost, not the LAN IP)";
                 }
 
                 window.location.href =
                     "mailto:mm5agm@@outlook.com?subject=" + encodeURIComponent(subject) +
                     "&body=" + encodeURIComponent(body);
 
-                status.textContent = "Opening your email app… (also copied to clipboard)";
-                setTimeout(() => { status.textContent = ""; }, 4000);
+                status.textContent = copied
+                    ? "Opening your email app… calibration copied to clipboard (" + cal.length + " chars)."
+                    : "Opening your email app… ⚠ clipboard copy FAILED (" + copyError +
+                      ") — paste the JSON from the email body instead.";
+                setTimeout(() => { status.textContent = ""; }, 8000);
             } catch (err) {
                 status.textContent = "Could not read calibration: " + err.message;
                 setTimeout(() => { status.textContent = ""; }, 4000);
@@ -426,24 +446,47 @@
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ text })
                     });
-                    const r = await resp.json();
-                    if (resp.ok && r.ok) {
-                        if (r.changed) {
-                            status.textContent =
-                                "Imported into " + r.fileName + " (" + r.model + "): updated " +
-                                (r.updated && r.updated.length ? r.updated.join(", ") : "—") +
-                                (r.structural ? "  ⚠ " + r.structural : "");
-                        } else {
-                            status.textContent = (r.message || "No changes — default already matches.") +
-                                " (" + (r.model || "") + ")";
-                        }
-                    } else {
-                        status.textContent = "Import failed: " + (r.message || ("HTTP " + resp.status));
-                    }
+                    reportImport(status, resp, await resp.json());
                 } catch (err) {
                     status.textContent = "Import failed: " + err.message;
                 }
             });
+        }
+
+        // ── Developer-only: promote MY OWN saved calibration into the default ──
+        // Colin's own workflow: calibrate his radio on this PC, save, then fold
+        // those values into the shipped table. That used to require emailing
+        // himself and round-tripping through the clipboard, and a silently
+        // failed clipboard copy meant an older calibration got imported instead.
+        // The server reads the saved file directly, so nothing can go stale.
+        const importCurrentBtn = document.getElementById("importCurrentBtn");
+        if (importCurrentBtn) {
+            importCurrentBtn.addEventListener("click", async () => {
+                const status = document.getElementById("saveStatus");
+                status.textContent = "Importing saved calibration into the shipped default…";
+                try {
+                    const resp = await fetch("/api/calibration/import-default/current", { method: "POST" });
+                    reportImport(status, resp, await resp.json());
+                } catch (err) {
+                    status.textContent = "Import failed: " + err.message;
+                }
+            });
+        }
+
+        function reportImport(status, resp, r) {
+            if (resp.ok && r.ok) {
+                if (r.changed) {
+                    status.textContent =
+                        "Imported into " + r.fileName + " (" + r.model + "): updated " +
+                        (r.updated && r.updated.length ? r.updated.join(", ") : "—") +
+                        (r.structural && r.structural.length ? "  ⚠ " + r.structural.join(", ") : "");
+                } else {
+                    status.textContent = (r.message || "No changes — default already matches.") +
+                        " (" + (r.model || "") + ")";
+                }
+            } else {
+                status.textContent = "Import failed: " + (r.message || ("HTTP " + resp.status));
+            }
         }
 
         // Help modal
@@ -793,8 +836,8 @@
 
         <h3>Where Calibration Data Is Saved</h3>
         <ul>
-            <li><strong>Installed app:</strong> %APPDATA%\MM5AGM\Icom Web Control\calibration.user.json</li>
-            <li><strong>Development:</strong> wwwroot/calibration.default.json</li>
+            <li><strong>Installed app and development:</strong> %APPDATA%\MM5AGM\Icom Web Control\calibration.user.json</li>
+            <li><strong>Shipped starting point (read-only):</strong> wwwroot/calibration.default.&lt;model&gt;.json — copied to your user file on first launch</li>
         </ul>
         <p>The save path is shown at the top of this page.</p>
     </div>

@@ -16,6 +16,11 @@ public class CalibrationImportResult
     public List<string> Structural { get; init; } = new();
     public string Message { get; init; } = "";
 
+    // One-line dump of the raw values actually parsed out of the pasted text.
+    // Logged on every import so a stale clipboard is obvious: if this doesn't
+    // match what the user just saved, the paste is old, not the diff broken.
+    public string IncomingSummary { get; set; } = "";
+
     public static CalibrationImportResult Fail(string msg) => new() { Ok = false, Message = msg };
 }
 
@@ -50,13 +55,20 @@ public class CalibrationStorage
 
     public bool IsDevelopmentMode => _isDevelopment;
 
-    // Per-model default calibration path. When the user has an FTdx10
-    // configured, we look for calibration.default.FTdx10.json first; if
+    // Per-model default calibration path. When the user has an IC-7300 MkII
+    // configured, we look for calibration.default.IC-7300MK2.json first; if
     // it doesn't exist we fall back to the generic calibration.default.json
-    // (currently a copy of the FTdx101MP-calibrated table — the only model
-    // with measured data so far). This lets us ship per-model placeholders
-    // that improve over time as users send in calibration measurements,
-    // without forcing every install to re-calibrate from scratch.
+    // (a copy of the IC-7300 MkII table). This lets us ship per-model
+    // placeholders that improve over time as users send in calibration
+    // measurements, without forcing every install to re-calibrate from scratch.
+    //
+    // The inherited Yaesu tables (FT-710/FTDX3000/FTdx10/FTdx101D/FTdx101MP)
+    // were deleted on 2026-08-01: the Settings dropdown only offers IC-7300
+    // and IC-7300MK2, so they were unreachable, and leaving the generic
+    // fallback pointing at the FTdx101MP table meant a blank/unrecognised
+    // RadioModel would silently seed an Icom user with Yaesu calibration.
+    // They also polluted the model list ImportEmailedCalibrationIntoDefault
+    // builds by scanning these filenames.
     private string GetDefaultPath()
     {
         var radioModel = _settings.GetSettingsAsync().GetAwaiter().GetResult().RadioModel ?? "";
@@ -94,6 +106,48 @@ public class CalibrationStorage
     private static readonly System.Text.RegularExpressions.Regex RawRe =
         new(@"(""raw""\s*:\s*)(-?\d+(?:\.\d+)?)", System.Text.RegularExpressions.RegexOptions.Compiled);
 
+    private const string DefaultPre = "calibration.default.", DefaultSuf = ".json";
+
+    // Shipped per-model default files (excluding the generic fallback), and the
+    // model names derived from their filenames.
+    private (List<string> files, List<string> models) KnownDefaults()
+    {
+        var files = Directory.GetFiles(_wwwrootPath, "calibration.default.*.json")
+            .Where(f => !Path.GetFileName(f).Equals("calibration.default.json", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var models = files
+            .Select(p => Path.GetFileName(p))
+            .Select(n => n.Substring(DefaultPre.Length, n.Length - DefaultPre.Length - DefaultSuf.Length))
+            .ToList();
+        return (files, models);
+    }
+
+    // Fold the calibration IWC currently has loaded straight into the shipped
+    // default for the configured radio — no email, no clipboard. This is the
+    // path Colin actually uses (calibrate his own radio, then promote it to the
+    // shipped table); routing that through mailto: + clipboard was needless, and
+    // the clipboard hop turned out to be the fragile part: a failed copy silently
+    // re-imported an older calibration. The emailed-text path below stays for
+    // calibrations that genuinely arrive from other users.
+    public CalibrationImportResult ImportCalibrationIntoDefault(CalibrationFile? incoming)
+    {
+        if (!_isDevelopment)
+            return CalibrationImportResult.Fail("Importing to shipped defaults is only available in the development build.");
+        if (incoming is null || incoming.Meters.Count == 0)
+            return CalibrationImportResult.Fail("Nothing to import — the current calibration has no meters.");
+
+        var (files, models) = KnownDefaults();
+        var configured = _settings.GetSettingsAsync().GetAwaiter().GetResult().RadioModel ?? "";
+        var model = models.FirstOrDefault(m => m.Equals(configured, StringComparison.OrdinalIgnoreCase));
+        if (model is null)
+            return CalibrationImportResult.Fail(
+                $"No shipped default file for the configured radio ('{configured}'). " +
+                "Check the Radio Model in Settings.");
+
+        foreach (var m in incoming.Meters) m.Normalize();
+        return ApplyIntoDefault(incoming, model, files);
+    }
+
     public CalibrationImportResult ImportEmailedCalibrationIntoDefault(string? emailText)
     {
         if (!_isDevelopment)
@@ -102,16 +156,7 @@ public class CalibrationStorage
             return CalibrationImportResult.Fail("Nothing to import — the clipboard was empty.");
 
         // Which models do we have shipped default files for?
-        var defaultFiles = Directory.GetFiles(_wwwrootPath, "calibration.default.*.json")
-            .Where(f => !Path.GetFileName(f).Equals("calibration.default.json", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        const string pre = "calibration.default.", suf = ".json";
-        string ModelOf(string path)
-        {
-            var n = Path.GetFileName(path);
-            return n.Substring(pre.Length, n.Length - pre.Length - suf.Length);
-        }
-        var models = defaultFiles.Select(ModelOf).ToList();
+        var (defaultFiles, models) = KnownDefaults();
 
         // Detect the radio from the email text (its body/subject names the model);
         // longest match first so "IC-7300" doesn't win inside "IC-7300MK2".
@@ -148,6 +193,17 @@ public class CalibrationStorage
         foreach (var m in incoming.Meters) m.Normalize();   // fold legacy "label" into "Radio"
         if (incoming.Meters.Count == 0)
             return CalibrationImportResult.Fail("The pasted data has no meters.");
+
+        return ApplyIntoDefault(incoming, model, defaultFiles);
+    }
+
+    // The shared half: minimal-diff surgery of `incoming`'s raw values into the
+    // shipped default file for `model`.
+    private CalibrationImportResult ApplyIntoDefault(
+        CalibrationFile incoming, string model, List<string> defaultFiles)
+    {
+        const string pre = DefaultPre, suf = DefaultSuf;
+        var incomingSummary = CalibrationService.Summarise(incoming);
 
         var targetPath = defaultFiles.First(f =>
             Path.GetFileName(f).Equals($"{pre}{model}{suf}", StringComparison.OrdinalIgnoreCase));
@@ -211,8 +267,10 @@ public class CalibrationStorage
                 Model = model,
                 FileName = Path.GetFileName(targetPath),
                 Structural = structural,
+                IncomingSummary = incomingSummary,
                 Message = structural.Count == 0
-                    ? $"Nothing to apply for {model} — this calibration already matches the shipped default."
+                    ? $"Nothing to apply for {model} — the pasted calibration already matches the shipped default. " +
+                      "If you expected changes, the clipboard is probably stale: re-copy from the Meter Calibration page."
                     : $"No value changes for {model}. Some meters differ structurally (point labels/count) and need a hand edit."
             };
         }
@@ -229,6 +287,7 @@ public class CalibrationStorage
             FileName = Path.GetFileName(targetPath),
             Updated = updated,
             Structural = structural,
+            IncomingSummary = incomingSummary,
             Message = $"Updated {Path.GetFileName(targetPath)}. Review the git diff, then commit."
         };
     }

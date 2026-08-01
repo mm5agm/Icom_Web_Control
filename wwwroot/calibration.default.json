@@ -4,30 +4,12 @@
       "name": "PWR",
       "type": "numeric",
       "points": [
-        {
-          "Radio": "5",
-          "raw": 30
-        },
-        {
-          "Radio": "25",
-          "raw": 76
-        },
-        {
-          "Radio": "50",
-          "raw": 112
-        },
-        {
-          "Radio": "100",
-          "raw": 157
-        },
-        {
-          "Radio": "150",
-          "raw": 190
-        },
-        {
-          "Radio": "200",
-          "raw": 222
-        }
+        { "Radio": "0",   "raw": 0   },
+        { "Radio": "5",   "raw": 22  },
+        { "Radio": "25",  "raw": 83  },
+        { "Radio": "50",  "raw": 142 },
+        { "Radio": "75",  "raw": 182 },
+        { "Radio": "100", "raw": 225 }
       ],
       "isGauge": true,
       "units": "W"
@@ -50,26 +32,9 @@
       "name": "Compression",
       "type": "numeric",
       "points": [
-        {
-          "Radio": "0",
-          "raw": 0
-        },
-        {
-          "Radio": "5",
-          "raw": 56
-        },
-        {
-          "Radio": "10",
-          "raw": 102
-        },
-        {
-          "Radio": "15",
-          "raw": 140
-        },
-        {
-          "Radio": "20",
-          "raw": 204
-        }
+        { "Radio": "0",  "raw": 0   },
+        { "Radio": "15", "raw": 130 },
+        { "Radio": "30", "raw": 210 }
       ],
       "isGauge": true,
       "units": "dB"
@@ -78,94 +43,20 @@
       "name": "ALC",
       "type": "numeric",
       "points": [
-        {
-          "Radio": "5",
-          "raw": 30
-        },
-        {
-          "Radio": "15",
-          "raw": 76
-        },
-        {
-          "Radio": "25",
-          "raw": 112
-        },
-        {
-          "Radio": "40",
-          "raw": 157
-        },
-        {
-          "Radio": "50",
-          "raw": 190
-        },
-        {
-          "Radio": "70",
-          "raw": 222
-        }
+        { "Radio": "0",   "raw": 0   },
+        { "Radio": "100", "raw": 120 }
       ],
       "isGauge": true,
-      "units": "V"
-    },
-    {
-      "name": "TPA",
-      "type": "numeric",
-      "points": [
-        {
-          "Radio": "0",
-          "raw": 14
-        },
-        {
-          "Radio": "20",
-          "raw": 60
-        },
-        {
-          "Radio": "40",
-          "raw": 106
-        },
-        {
-          "Radio": "60",
-          "raw": 152
-        },
-        {
-          "Radio": "80",
-          "raw": 198
-        },
-        {
-          "Radio": "100",
-          "raw": 244
-        }
-      ],
-      "isGauge": true,
-      "units": "C"
+      "units": "%"
     },
     {
       "name": "IDD",
       "type": "numeric",
       "points": [
-        {
-          "Radio": "0",
-          "raw": 0
-        },
-        {
-          "Radio": "5",
-          "raw": 51
-        },
-        {
-          "Radio": "10",
-          "raw": 102
-        },
-        {
-          "Radio": "15",
-          "raw": 153
-        },
-        {
-          "Radio": "20",
-          "raw": 204
-        },
-        {
-          "Radio": "25",
-          "raw": 242
-        }
+        { "Radio": "0",  "raw": 0   },
+        { "Radio": "10", "raw": 97  },
+        { "Radio": "15", "raw": 146 },
+        { "Radio": "25", "raw": 241 }
       ],
       "isGauge": true,
       "units": "A"
@@ -174,30 +65,9 @@
       "name": "VPA",
       "type": "numeric",
       "points": [
-        {
-          "Radio": "40",
-          "raw": 170
-        },
-        {
-          "Radio": "44",
-          "raw": 182
-        },
-        {
-          "Radio": "48",
-          "raw": 194
-        },
-        {
-          "Radio": "51",
-          "raw": 206
-        },
-        {
-          "Radio": "54",
-          "raw": 218
-        },
-        {
-          "Radio": "55",
-          "raw": 235
-        }
+        { "Radio": "0",  "raw": 0   },
+        { "Radio": "10", "raw": 13  },
+        { "Radio": "16", "raw": 241 }
       ],
       "isGauge": true,
       "units": "V"
@@ -206,42 +76,15 @@
       "name": "S-Meter",
       "type": "s_meter",
       "points": [
-        {
-          "Radio": "S0",
-          "raw": 0
-        },
-        {
-          "Radio": "S1",
-          "raw": 4
-        },
-        {
-          "Radio": "S3",
-          "raw": 30
-        },
-        {
-          "Radio": "S5",
-          "raw": 65
-        },
-        {
-          "Radio": "S7",
-          "raw": 95
-        },
-        {
-          "Radio": "S9",
-          "raw": 131
-        },
-        {
-          "Radio": "\u002B20",
-          "raw": 171
-        },
-        {
-          "Radio": "\u002B40",
-          "raw": 208
-        },
-        {
-          "Radio": "\u002B60",
-          "raw": 255
-        }
+        { "Radio": "S0",  "raw": 0   },
+        { "Radio": "S1",  "raw": 4   },
+        { "Radio": "S3",  "raw": 30  },
+        { "Radio": "S5",  "raw": 65  },
+        { "Radio": "S7",  "raw": 95  },
+        { "Radio": "S9",  "raw": 131 },
+        { "Radio": "+20", "raw": 171 },
+        { "Radio": "+40", "raw": 208 },
+        { "Radio": "+60", "raw": 255 }
       ],
       "isGauge": true,
       "units": "S"
