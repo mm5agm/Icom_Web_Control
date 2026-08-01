@@ -1,10 +1,10 @@
 # Icom Web Control
 
-![Status](https://img.shields.io/badge/Status-alpha-orange?style=flat-square)
+![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
-![Latest release](https://img.shields.io/badge/Download-v0.1.0--alpha-brightgreen?style=flat-square)
+![Latest release](https://img.shields.io/badge/Download-v1.0.0-brightgreen?style=flat-square)
 
-> **Alpha — early preview.** The first release (`v0.1.0-alpha`) controls an **Icom IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. It has been tested on one radio by one operator — expect rough edges, and please report what you find. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
+> **v1.0.0 — first public release.** IWC controls an **Icom IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. It has been developed and tested against a single IC-7300 MkII by one operator, so if anything behaves unexpectedly please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
 >
 > **[⬇ Download the latest installer](https://github.com/mm5agm/Icom_Web_Control/releases/latest)**
 
@@ -25,13 +25,13 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Status & plan
 
-**`v0.1.0-alpha` is the first working release** — it controls an IC-7300 MkII end-to-end (see the summary at the top). It's early-preview software tested on a single radio, so treat it as an alpha. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
+**`v1.0.0` is the first public release** — it controls an IC-7300 MkII end-to-end (see the summary at the top), tested against a single radio. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
 
-### v0.1.0-alpha (2026-08-01)
+### v1.0.0 (2026-08-01)
 
-First public preview. Carved from Yaesu Web Control and re-fitted for Icom CI-V, targeting the **IC-7300 MkII** (CI-V over USB, default address `B6`).
+First public release. Carved from Yaesu Web Control and re-fitted for Icom CI-V, targeting the **IC-7300 MkII** (CI-V over USB, default address `B6`).
 
 - **Rig control:** frequency and mode per VFO (incl. DATA modes), band / VFO / split, RF power set, ATU, and radio power on/off.
 - **Metering:** S-meter plus Po / SWR / ALC gauges, polled at ~10 Hz.
@@ -42,7 +42,7 @@ First public preview. Carved from Yaesu Web Control and re-fitted for Icom CI-V,
 - Memory-channel banks carried over from YWC (read/save without writing to the transceiver unless you choose to).
 - Tested on IC-7300 MkII firmware: Main CPU 1.02, Front CPU 1.01, DSP Program 1.01, DSP Data 1.00, FPGA 1.01.
 
-Known limitations: single radio / single operator tested; tablet testing limited; installer is unsigned (see the security-warning notes below).
+Known limitations: single radio / single operator tested; tablet testing limited; the **CW keyer is present but untested** — I don't operate CW, so I can't verify it, and feedback from CW operators is especially welcome; installer is unsigned (see the security-warning notes below).
 
 ## 📖 Why This Application Exists
 
@@ -58,7 +58,7 @@ If this project has helped you, please consider sponsoring it. Even small contri
 
 ## 🎨 Skins and appearance
 
-IWC's look is being built around swappable **skins** — a planned feature that will let you restyle the whole panel (layout, controls and colours), including a front-panel replica of the radio. If there's a skin or a look you'd like to see, I'd love to hear it. Please post your suggestions in [Discussions](https://github.com/mm5agm/Icom_Web_Control/discussions) so other users can add to them, or send them to me directly.
+IWC's look is being built around swappable **skins** — a planned feature that will let you restyle the whole panel (layout, controls and colours), including a front-panel replica of the radio. If there's a skin or a look you'd like to see, I'd love to hear about it. Please post your suggestions in [Discussions](https://github.com/mm5agm/Icom_Web_Control/discussions) so other users can add to them, or send them to me directly.
 
 ## ⚠️ Windows Security Warnings on First Install
 
@@ -94,7 +94,7 @@ IWC carries over YWC's in-app update check — a banner appears the first time y
 
 ## ⚠️ Warning
 
-**IWC is alpha software and it keys your transmitter.** It has been tested on a single IC-7300 MkII by one operator — yours is the second radio it has ever seen. It uses only the official Icom CI-V commands as documented, but bugs are expected at this stage and **you use it entirely at your own risk.**
+**IWC keys your transmitter.** It has been developed and tested against a single IC-7300 MkII by one operator — yours may be the second radio it has ever seen. It uses only the official Icom CI-V commands as documented, but no software is bug-free and **you use it entirely at your own risk.**
 
 - **Test into a dummy load first.** Confirm transmit, power, and mode behave before you put a signal on air.
 - **Always verify transmit frequency, power level, and mode** before transmitting — do not assume the app and the radio agree.
