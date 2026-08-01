@@ -1055,10 +1055,7 @@ The editor shows all your saved memories in a table. For each memory you can edi
 
 | Field | Description |
 |-------|-------------|
-| Ant | Antenna selector — *inherited field; the IC-7300 has a single antenna jack, so this is ignored* |
 | IF Width | The desired filter width |
-| IF Shift | *Inherited field; not used by the IC-7300* |
-| Roofing | *Inherited field; the IC-7300 is a direct-sampling SDR with no roofing filters, so this is ignored* |
 | NB | Noise blanker on/off |
 | NB Lvl | Noise blanker level, 1–20 |
 | NR | Noise reduction (Off / NR1 / NR2) |
@@ -1068,9 +1065,7 @@ The editor shows all your saved memories in a table. For each memory you can edi
 
 **Each advanced field is applied on recall only if you have set a value.** Leave any field blank and the radio's current value for that setting is left alone. This means you can save a memory that only changes frequency and mode (the simple use case), or one that fully configures the radio (e.g. "20m FT8" with IF Width 2.4 kHz, NR2, 50 W, AGC Auto).
 
-> **Note:** The Memories editor is inherited from IWC's Yaesu sibling and still shows advanced columns — **Ant**, **IF Shift**, **Roofing** — that don't apply to the IC-7300. They are harmless (left blank they do nothing) and will be tidied out as the memory system is re-fitted for CI-V.
-
-> **Important:** Advanced fields are **app-side only**. They are stored in `memories.json` on your PC but the radio's own memory channels (used by the Import/Export buttons) cannot hold these fields. Exporting to the radio writes only label, frequency, mode, and clarifier values.
+> **Important:** Advanced fields are **app-side only**. They are stored in `memories.json` on your PC. The radio's own memory channels (used by the Import/Export buttons) hold only a channel name, frequency and mode, so **Export to Radio** writes just the label, frequency and mode of each memory; the advanced fields stay in the app.
 
 Click **Save** to save all changes. Click **Add Memory** to append a blank row. Click the **trash** icon on any row to delete that memory.
 

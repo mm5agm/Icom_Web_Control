@@ -333,6 +333,28 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- Radio memory channels (canned; no hardware) -----------------------
+        // A tiny fake bank so the Memories import/export flow can be exercised
+        // without a radio: channels 1–3 are programmed, the rest report empty.
+
+        public Task<RadioMemoryChannel?> ReadMemoryChannelAsync(int channel, CancellationToken cancellationToken = default)
+        {
+            RadioMemoryChannel ch = channel switch
+            {
+                1 => new() { Channel = 1, FrequencyHz = 14_074_000, Mode = "USB", Name = "20m FT8" },
+                2 => new() { Channel = 2, FrequencyHz =  7_074_000, Mode = "USB", Name = "40m FT8" },
+                3 => new() { Channel = 3, FrequencyHz =  3_573_000, Mode = "USB", Name = "80m FT8" },
+                _ => new() { Channel = channel, IsEmpty = true },
+            };
+            return Task.FromResult<RadioMemoryChannel?>(ch);
+        }
+
+        public Task<bool> WriteMemoryChannelAsync(RadioMemoryChannel memory, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
+
+        public Task<bool> ClearMemoryChannelAsync(int channel, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
+
         // -- Canned spectrum (Phase 5 dual-panel demo) -------------------------
         //
         // The real CivRadioController reassembles CI-V 27 00 scope frames and

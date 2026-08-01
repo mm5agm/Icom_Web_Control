@@ -1659,6 +1659,154 @@ namespace Icom_Web_Control.Services
             _logger.LogInformation("[CivRadioController] Power ON (18 01) sent with {Wake}× FE wake preamble", wake);
         }
 
+        // -- Radio memory channels (CI-V 1A 00) --------------------------------
+        //
+        // The 1A 00 content frame carries 47 data bytes after the channel number:
+        //   [chHi chLo] (2)  channel number, BCD 00 01–00 99
+        //   [split/sel] (1)  hi nibble SPLIT (0/1), lo nibble SELECT (0=off)
+        //   [RX block]  (14) freq(5 BCD LE) mode(1) filter(1) data/tone(1)
+        //                    rptrTone(3) toneSql(3)
+        //   [TX block]  (14) same layout, used when split is on
+        //   [name]      (16) ASCII, space-padded
+        // Tone frequency is 3 BCD bytes 0-0 / 100-10 Hz / 1-0.1 Hz; 88.5 Hz
+        // (00 08 85) is the radio default and inert while the tone type is OFF,
+        // so it is a safe filler for channels we write with no tone.
+
+        private const int MemoryNameLength = 16;
+        private static readonly byte[] DefaultToneFreq = { 0x00, 0x08, 0x85 }; // 88.5 Hz
+
+        public async Task<RadioMemoryChannel?> ReadMemoryChannelAsync(int channel, CancellationToken cancellationToken = default)
+        {
+            if (channel is < 1 or > 99) return null;
+            byte chLo = (byte)(((channel / 10) << 4) | (channel % 10));
+
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubMemoryChannel, 0x00, chLo);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: cancellationToken);
+
+            // Reply body: 1A 00 <chHi> <chLo> [<content…>] → Data = [00, chHi, chLo, …].
+            if (reply == null || reply.Cmd != CivProtocol.CmdMenu
+                || reply.Data.Length < 3 || reply.Data[0] != CivProtocol.SubMemoryChannel)
+                return null; // transaction miss — distinct from an empty channel
+
+            var d = reply.Data;
+
+            // A blank channel echoes just the number with no content payload.
+            if (d.Length < 18)
+                return new RadioMemoryChannel { Channel = channel, IsEmpty = true };
+
+            int p = 3;                                          // skip sub + 2 ch bytes
+            byte split = d[p]; p += 1;
+            long rxFreq = CivProtocol.DecodeBcd(d.AsSpan(p, 5)); p += 5;
+            byte rxMode = d[p]; p += 1;
+            byte rxFilter = d[p]; p += 1;
+            byte rxDataTone = d[p]; p += 1;
+            p += 6;                                             // rptr tone (3) + tone sql (3)
+
+            long txFreq = rxFreq; byte txMode = rxMode; byte txDataTone = rxDataTone;
+            if (d.Length >= 32)                                 // TX block present
+            {
+                txFreq = CivProtocol.DecodeBcd(d.AsSpan(p, 5)); p += 5;
+                txMode = d[p]; p += 1;
+                p += 1;                                         // TX filter (unused by the app)
+                txDataTone = d[p]; p += 1;
+                p += 6;                                         // TX rptr tone (3) + tone sql (3)
+            }
+
+            string name = "";
+            if (d.Length >= p + MemoryNameLength)
+                name = DecodeName(d.AsSpan(p, MemoryNameLength));
+
+            return new RadioMemoryChannel
+            {
+                Channel       = channel,
+                IsEmpty       = false,
+                FrequencyHz   = rxFreq,
+                Mode          = NameForMode(rxMode, (rxDataTone >> 4) != 0),
+                Filter        = rxFilter is >= 1 and <= 3 ? rxFilter : 1,
+                SplitOn       = (split >> 4) != 0,
+                TxFrequencyHz = txFreq,
+                TxMode        = NameForMode(txMode, (txDataTone >> 4) != 0),
+                Name          = name,
+            };
+        }
+
+        public async Task<bool> WriteMemoryChannelAsync(RadioMemoryChannel memory, CancellationToken cancellationToken = default)
+        {
+            if (memory.Channel is < 1 or > 99) return false;
+            byte chLo = (byte)(((memory.Channel / 10) << 4) | (memory.Channel % 10));
+
+            var body = new List<byte>(49)
+            {
+                CivProtocol.CmdMenu, CivProtocol.SubMemoryChannel,
+                0x00, chLo,
+                (byte)(memory.SplitOn ? 0x10 : 0x00),          // split hi nibble, select 0
+            };
+            AppendModeBlock(body, memory.FrequencyHz, memory.Mode, memory.Filter);
+            // TX block: mirror RX when not splitting (the manual's recommendation).
+            if (memory.SplitOn)
+                AppendModeBlock(body, memory.TxFrequencyHz, memory.TxMode, memory.Filter);
+            else
+                AppendModeBlock(body, memory.FrequencyHz, memory.Mode, memory.Filter);
+            body.AddRange(EncodeName(memory.Name));
+
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body.ToArray());
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
+            if (!ok)
+                _logger.LogWarning("[CivRadioController] Write memory channel {Ch} was not acknowledged", memory.Channel);
+            return ok;
+        }
+
+        public async Task<bool> ClearMemoryChannelAsync(int channel, CancellationToken cancellationToken = default)
+        {
+            if (channel is < 1 or > 99) return false;
+            byte chLo = (byte)(((channel / 10) << 4) | (channel % 10));
+
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubMemoryChannel, 0x00, chLo, 0xFF);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
+            if (!ok)
+                _logger.LogWarning("[CivRadioController] Clear memory channel {Ch} was not acknowledged", channel);
+            return ok;
+        }
+
+        /// <summary>Append a 14-byte RX-or-TX block: freq(5) mode(1) filter(1) data/tone(1) rptrTone(3) toneSql(3).</summary>
+        private static void AppendModeBlock(List<byte> body, long freqHz, string mode, int filter)
+        {
+            body.AddRange(CivProtocol.EncodeBcd(freqHz, 5));
+            var (baseByte, data) = ModeNameToIcom.TryGetValue(mode, out var m) ? m : ((byte)0x01, false); // default USB
+            byte fil = filter is >= 1 and <= 3 ? (byte)filter : (byte)0x01;
+            body.Add(baseByte);
+            body.Add(fil);
+            body.Add((byte)(data ? 0x10 : 0x00));               // DATA hi nibble, TONE type OFF
+            body.AddRange(DefaultToneFreq);                     // repeater tone (inert while OFF)
+            body.AddRange(DefaultToneFreq);                     // tone squelch  (inert while OFF)
+        }
+
+        /// <summary>16 ASCII bytes, space-padded, disallowed characters mapped to space.</summary>
+        private static byte[] EncodeName(string name)
+        {
+            var bytes = new byte[MemoryNameLength];
+            for (int i = 0; i < MemoryNameLength; i++)
+            {
+                char c = i < name.Length ? name[i] : ' ';
+                bytes[i] = c is >= ' ' and <= '~' ? (byte)c : (byte)' ';
+            }
+            return bytes;
+        }
+
+        /// <summary>Decode a fixed-width memory name, trimming trailing spaces and nulls.</summary>
+        private static string DecodeName(ReadOnlySpan<byte> raw)
+        {
+            Span<char> chars = stackalloc char[raw.Length];
+            int n = 0;
+            foreach (var b in raw)
+                chars[n++] = b is >= 0x20 and <= 0x7E ? (char)b : ' ';
+            return new string(chars).TrimEnd(' ', '\0');
+        }
+
         // -- Connect / identify -------------------------------------------------
 
         /// <summary>

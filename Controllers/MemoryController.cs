@@ -176,48 +176,117 @@ namespace Icom_Web_Control.Controllers
             public string Mode { get; set; } = "replace"; // "replace" or "merge"
         }
 
+        // The IC-7300 has 99 internal memory channels, read/written whole over
+        // CI-V 1A 00 (IRadioController.ReadMemoryChannelAsync / Write / Clear).
+        // Only the three universal fields survive the round-trip — label (channel
+        // name), frequency and mode — because that is all the radio's channel model
+        // holds that maps to an app memory. The app's advanced fields (NB/NR/AGC,
+        // per-memory power, notes) stay app-side. Memory read/write never keys TX.
+        private const int RadioChannelCount = 99;
+
         [HttpPost("import-radio")]
         [RequestSizeLimit(1_000_000)]
-        public IActionResult ImportFromRadio([FromBody] ImportRequest request)
+        public async Task<IActionResult> ImportFromRadio([FromBody] ImportRequest request)
         {
-            // Reading the radio's 99 memory channels was the Yaesu MR/MT CAT
-            // path, deleted in the IWC carve. The IC-7300 exposes its memories
-            // over CI-V (1A 00 / cmd 1A) with a different data model; wiring that
-            // in is part of the dedicated Memories block, not this rebrand. The
-            // app's own memory list, banks and ADIF import are unaffected.
-            return StatusCode(501, new
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
+
+            bool replace = string.Equals(request?.Mode, "replace", StringComparison.OrdinalIgnoreCase);
+
+            var imported = new List<AppMemory>();
+            int misses = 0;
+            for (int ch = 1; ch <= RadioChannelCount; ch++)
             {
-                error = "Importing memories from the radio is not yet supported on the IC-7300 (CI-V). " +
-                        "It will arrive in a later update; the app's own memory list is unaffected."
-            });
+                var channel = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
+                if (channel == null) { misses++; continue; }   // transaction miss — skip
+                if (channel.IsEmpty || channel.FrequencyHz <= 0) continue;
+
+                imported.Add(new AppMemory
+                {
+                    Label       = string.IsNullOrWhiteSpace(channel.Name) ? $"CH {ch:000}" : channel.Name.Trim(),
+                    FrequencyHz = channel.FrequencyHz,
+                    Mode        = string.IsNullOrWhiteSpace(channel.Mode) ? "USB" : channel.Mode,
+                });
+            }
+
+            if (imported.Count == 0)
+            {
+                var reason = misses > 0
+                    ? "The radio did not respond to memory reads. Check the connection and try again."
+                    : "No programmed memory channels were found on the radio.";
+                _logger.LogInformation("Import from radio found no channels ({Misses} misses)", misses);
+                return Ok(new { imported = 0, warning = reason });
+            }
+
+            if (replace) await _memoryService.ReplaceAllAsync(imported);
+            else         await _memoryService.MergeAsync(imported);
+
+            _logger.LogInformation("Imported {Count} memory channels from the radio ({Mode})",
+                imported.Count, replace ? "replace" : "merge");
+            return Ok(new { imported = imported.Count });
         }
 
         // ── Export to Radio ──────────────────────────────────────────────────
 
         [HttpPost("export-radio")]
-        public IActionResult ExportToRadio()
+        public async Task<IActionResult> ExportToRadio()
         {
-            // Writing the app's memories into the radio's channels was the Yaesu
-            // MW/MT CAT path, deleted in the IWC carve. CI-V memory-channel writes
-            // for the IC-7300 are part of the dedicated Memories block. Stubbed.
-            return StatusCode(501, new
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
+
+            // "Replace all": write app memories into channels 1..N, then clear the
+            // remaining channels so the radio ends up matching the app exactly.
+            var memories = _memoryService.GetAll()
+                .Where(m => m.FrequencyHz > 0)
+                .Take(RadioChannelCount)
+                .ToList();
+
+            int written = 0;
+            for (int i = 0; i < memories.Count; i++)
             {
-                error = "Exporting memories to the radio is not yet supported on the IC-7300 (CI-V). " +
-                        "It will arrive in a later update."
-            });
+                var ok = await _radio.WriteMemoryChannelAsync(ToRadioChannel(memories[i], i + 1), CancellationToken.None);
+                if (ok) written++;
+            }
+            for (int ch = memories.Count + 1; ch <= RadioChannelCount; ch++)
+                await _radio.ClearMemoryChannelAsync(ch, CancellationToken.None);
+
+            bool truncated = _memoryService.GetAll().Count(m => m.FrequencyHz > 0) > RadioChannelCount;
+            _logger.LogInformation("Exported {Written} memories to the radio (replace all)", written);
+            return Ok(new { written, truncated });
         }
 
         [HttpPost("export-radio-add")]
-        public IActionResult ExportToRadioAdd()
+        public async Task<IActionResult> ExportToRadioAdd()
         {
-            // As ExportToRadio, but into the radio's empty channels only. Same
-            // Yaesu CAT path, deleted in the carve; awaiting the CI-V Memories block.
-            return StatusCode(501, new
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
+
+            // Add into the radio's empty channels only, leaving programmed ones
+            // untouched. Walk the channels, filling blanks from the app list.
+            var memories = _memoryService.GetAll().Where(m => m.FrequencyHz > 0).ToList();
+            int written = 0, next = 0;
+            for (int ch = 1; ch <= RadioChannelCount && next < memories.Count; ch++)
             {
-                error = "Exporting memories to the radio is not yet supported on the IC-7300 (CI-V). " +
-                        "It will arrive in a later update."
-            });
+                var existing = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
+                if (existing == null || !existing.IsEmpty) continue;   // skip misses and occupied channels
+                if (await _radio.WriteMemoryChannelAsync(ToRadioChannel(memories[next], ch), CancellationToken.None))
+                    written++;
+                next++;
+            }
+
+            _logger.LogInformation("Added {Written} memories into the radio's empty channels", written);
+            return Ok(new { written });
         }
+
+        /// <summary>Map an app memory onto a radio channel (label→name capped at 16, split off, TX mirrors RX).</summary>
+        private static RadioMemoryChannel ToRadioChannel(AppMemory m, int channel) => new()
+        {
+            Channel     = channel,
+            FrequencyHz = m.FrequencyHz,
+            Mode        = string.IsNullOrWhiteSpace(m.Mode) ? "USB" : m.Mode,
+            Filter      = 1,
+            Name        = (m.Label ?? "").Length > 16 ? m.Label!.Substring(0, 16) : (m.Label ?? ""),
+        };
 
         // ── IWC starter bank (bundled with the app) ──────────────────────────
         //

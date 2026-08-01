@@ -57,6 +57,15 @@ namespace Icom_Web_Control.Services.Civ
         public const byte CmdMenu = 0x1A;
         public const byte SubDataMode = 0x06;
 
+        // Memory-channel content (command 1A 00) — the radio's own 99 internal
+        // memory channels, read/written whole so the operating VFO is untouched.
+        //   Read : send 1A 00 <chHi> <chLo>              → reply 1A 00 <chHi> <chLo> <content…> (or no content when the channel is blank)
+        //   Write: send 1A 00 <chHi> <chLo> <content…>   → reply FB / FA
+        //   Clear: send 1A 00 <chHi> <chLo> FF           → reply FB / FA
+        // Channel number is 2 BCD bytes (00 01–00 99). See MemoryChannelCodec in
+        // CivRadioController for the 47-byte content layout.
+        public const byte SubMemoryChannel = 0x00;
+
         // IF passband filter width (command 1A 03) — the width of the currently
         // selected FIL slot for the current mode. One BCD data byte whose code
         // range and Hz meaning depend on the mode group (SSB/CW, RTTY, AM); FM

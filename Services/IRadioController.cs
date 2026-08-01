@@ -15,6 +15,26 @@ namespace Icom_Web_Control.Services
     }
 
     /// <summary>
+    /// One of the radio's own internal memory channels (1–99), in protocol-free
+    /// terms. Frequencies are Hz; <see cref="Mode"/> is the app's display string.
+    /// <see cref="IsEmpty"/> flags a blank/unprogrammed channel — its other fields
+    /// are meaningless. The TX fields carry the split transmit frequency/mode when
+    /// <see cref="SplitOn"/>; controllers that don't split mirror the RX values.
+    /// </summary>
+    public sealed record RadioMemoryChannel
+    {
+        public int Channel { get; init; }              // 1..99
+        public bool IsEmpty { get; init; }
+        public long FrequencyHz { get; init; }
+        public string Mode { get; init; } = "USB";
+        public int Filter { get; init; } = 1;          // 1=FIL1, 2=FIL2, 3=FIL3
+        public bool SplitOn { get; init; }
+        public long TxFrequencyHz { get; init; }
+        public string TxMode { get; init; } = "USB";
+        public string Name { get; init; } = "";        // up to 16 chars
+    }
+
+    /// <summary>
     /// The semantic seam IWC introduces (the thing YWC lacked — see
     /// docs/design/iwc-clone-split-plan.md). Everything above this line —
     /// touch UI (CatController), voice (IntentDispatcher), Hamlib (RigctldServer),
@@ -296,5 +316,21 @@ namespace Icom_Web_Control.Services
         /// only works over a separately-powered CI-V remote-jack link.
         /// </summary>
         Task SetPowerAsync(bool on, CancellationToken cancellationToken = default);
+
+        // -- Radio memory channels (CI-V 1A 00) --------------------------------
+        // The transceiver's own 99 internal memory channels, read/written as
+        // whole-channel content so the operating VFO is never disturbed. These
+        // back the Memories page's "Import from Radio" / "Export to Radio"
+        // buttons; the app's own memory list is a separate store. Memory
+        // read/write does not transmit.
+
+        /// <summary>Read the full content of memory channel <paramref name="channel"/> (1–99) via CI-V 1A 00. Returns a channel flagged <see cref="RadioMemoryChannel.IsEmpty"/> when blank, or null on a transaction miss.</summary>
+        Task<RadioMemoryChannel?> ReadMemoryChannelAsync(int channel, CancellationToken cancellationToken = default);
+
+        /// <summary>Write the full content of a memory channel via CI-V 1A 00. Returns false if the write was not acknowledged.</summary>
+        Task<bool> WriteMemoryChannelAsync(RadioMemoryChannel memory, CancellationToken cancellationToken = default);
+
+        /// <summary>Clear (blank) memory channel <paramref name="channel"/> (1–99) via CI-V 1A 00 … FF. Returns false if not acknowledged.</summary>
+        Task<bool> ClearMemoryChannelAsync(int channel, CancellationToken cancellationToken = default);
     }
 }
