@@ -20,7 +20,7 @@ IWC is a web-based control panel and panadapter for Icom transceivers, cloned fr
 - Single receiver, HF + 6 m (+ 4 m on European versions)
 - Spectrum scope streamed **over CI-V** (`27 00`, 475 points) — so no external SDR is needed, unlike some setups. The MkII's rear LAN port offers a faster scope feed later.
 
-Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol family and can follow once the IC-7300 MkII works end-to-end.
+Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol family and will be added if there is a user that will do testing of the radio functions- not programming
 
 ## Status & plan
 
@@ -55,6 +55,10 @@ I'm retired and maintain this project on a limited income, funding all developme
 
 If this project has helped you, please consider sponsoring it. Even small contributions make a real difference and help keep the development tools running.
 
+## 🎨 Skins and appearance
+
+IWC's look is being built around swappable **skins** — a planned feature that will let you restyle the whole panel (layout, controls and colours), including a front-panel replica of the radio. If there's a skin or a look you'd like to see, I'd love to hear it. Please post your suggestions in [Discussions](https://github.com/mm5agm/Icom_Web_Control/discussions) so other users can add to them, or send them to me directly.
+
 ## ⚠️ Windows Security Warnings on First Install
 
 Because the installer is not code-signed, Windows and third-party antivirus tools will warn you before it runs. This is expected — the file is not malware. Follow these steps if you hit a block:
@@ -76,7 +80,7 @@ These are one-time steps — once the app is installed you won't see them again.
 
 ## Staying informed about updates
 
-Once IWC goes public and starts publishing releases, it will include the same in-app update check as YWC — a banner the first time you run it after a new release lands. Until then, **any one of these will let you know when the first builds appear**:
+IWC carries over YWC's in-app update check — a banner appears the first time you run it after a new release lands. To also be notified outside the app, **any one of these works**:
 
 - **GitHub release notifications** (most reliable, free, no spam):
   1. Make sure you're signed in to GitHub
@@ -89,7 +93,14 @@ Once IWC goes public and starts publishing releases, it will include the same in
 
 ## ⚠️ Warning
 
-This software will interact with radio hardware. When it reaches a testable state I will use only the official Icom CI-V commands as documented, but you will use it entirely at your own risk. Always verify transmit frequencies, power levels, and settings before use.
+**IWC is alpha software and it keys your transmitter.** It has been tested on a single IC-7300 MkII by one operator — yours is the second radio it has ever seen. It uses only the official Icom CI-V commands as documented, but bugs are expected at this stage and **you use it entirely at your own risk.**
+
+- **Test into a dummy load first.** Confirm transmit, power, and mode behave before you put a signal on air.
+- **Always verify transmit frequency, power level, and mode** before transmitting — do not assume the app and the radio agree.
+- **Voice control keys the radio.** A misheard command can start a transmission; keep an eye (and ear) on the radio's TX state.
+- **Memory operations can overwrite your transceiver's memories.** Read the Settings and the memory functions carefully before saving to the radio.
+
+If something looks wrong, stop transmitting and check the radio's own display. Please report anything you find on the [GitHub issues page](https://github.com/mm5agm/Icom_Web_Control/issues).
 
 ## Licence
 
