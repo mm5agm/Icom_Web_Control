@@ -38,6 +38,15 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Release notes
 
+### v1.0.1 (2026-08-01) — pre-release
+
+Meter-calibration fixes. Nothing here changes rig control; if v1.0.0 is working for you there is no urgency.
+
+- **"Reload From File" now genuinely re-reads the file.** It was reloading from memory, so a calibration changed by anything other than the page itself — a hand edit, or a second copy of IWC sharing the same file — stayed invisible until you restarted the app. Reverting an edit could appear to work while the old values were still in force.
+- **The ✉ Email calibration button no longer claims success when the copy failed.** Opening your mail app takes focus off the browser, which can make the clipboard copy fail; that failure was being swallowed and reported as "copied". It now says so plainly and tells you to paste the JSON from the email body instead.
+- **Removed the inherited Yaesu default calibration tables.** They were unreachable from the Settings dropdown, and a blank or unrecognised Radio Model could seed a new install with FTdx101MP calibration data. The generic fallback is now the IC-7300 MkII table.
+- Corrected the on-page help and the manual, which claimed development builds save calibration to the installation folder. Calibration has always saved to `%APPDATA%\MM5AGM\Icom Web Control\calibration.user.json`.
+
 ### v1.0.0 (2026-08-01)
 
 First public release. Carved from Yaesu Web Control and re-fitted for Icom CI-V, targeting the **IC-7300 MkII** (CI-V over USB, default address `B6`).

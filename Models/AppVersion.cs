@@ -4,7 +4,7 @@ public static class AppVersion
 {
     // Fresh IWC version line — IWC starts its own numbering at 1.0.0, NOT
     // continued from the inherited YWC 2.4.x lineage.
-    public const string Current = "1.0.0";
+    public const string Current = "1.0.1";
 
     /// <summary>Date this version was released, ISO format.
     /// Bump on actual release; current value reflects the planned ship date.</summary>
