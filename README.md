@@ -14,11 +14,12 @@ IWC is a web-based control panel and panadapter for Icom transceivers, cloned fr
 
 **Voice control is a first-class requirement, not an add-on** — several of the operators I build for are partially sighted, so hands-free operation matters from day one.
 
-## First target radio: Icom IC-7300 MkII
+## First target radios: Icom IC-7300 and IC-7300 MkII
 
-- CI-V over USB Type-C (default address `B6`)
-- Single receiver, HF + 6 m (+ 4 m on European versions)
-- Spectrum scope streamed **over CI-V** (`27 00`, 475 points) — so no external SDR is needed, unlike some setups. The MkII's rear LAN port offers a faster scope feed later.
+Both are single-receiver HF + 6 m (+ 4 m on European versions) transceivers that speak Icom's CI-V protocol and stream a spectrum scope **over CI-V** (`27 00`) — so no external SDR is needed, unlike some setups.
+
+- **IC-7300 MkII** — the primary bench radio, tested end-to-end. CI-V over USB Type-C, default address `B6`, 475-point scope. Its rear LAN port offers a faster scope feed later.
+- **IC-7300** (original) — near-identical over CI-V, default address `94`, CI-V over USB Type-B. Expected to work but not yet bench-tested; if you have one, please try it and tell me how it goes (set the CI-V address to `94` in Settings).
 
 Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol family and will be added if there is a user that will do testing of the radio functions- not programming
 
