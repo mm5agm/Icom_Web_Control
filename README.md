@@ -98,7 +98,7 @@ IWC carries over YWC's in-app update check — a banner appears the first time y
 
 - **Test into a dummy load first.** Confirm transmit, power, and mode behave before you put a signal on air.
 - **Always verify transmit frequency, power level, and mode** before transmitting — do not assume the app and the radio agree.
-- **Voice control keys the radio.** A misheard command can start a transmission; keep an eye (and ear) on the radio's TX state.
+- **If Voice control is enabled it keys the radio.** A misheard command can start a transmission; keep an eye (and ear) on the radio's TX state.
 - **Memory operations can overwrite your transceiver's memories.** Read the Settings and the memory functions carefully before saving to the radio.
 
 If something looks wrong, stop transmitting and check the radio's own display. Please report anything you find on the [GitHub issues page](https://github.com/mm5agm/Icom_Web_Control/issues).
