@@ -48,7 +48,14 @@ There are no automated tests. Verification is manual via the browser at `http://
 
 ## Release Process
 
-Before releasing: bump `Models/AppVersion.cs`, `installer.nsi`, add release notes to `README.md`, update `USER_MANUAL.md` if needed, and bump the per-release download badge in `README.md` to the new version (search for the previous `vX.Y.Z` tag in the shields.io URL near the top of the file).
+Before releasing: bump `Models/AppVersion.cs` and `installer.nsi`.
+
+**Then update the documentation — mandatory, and this includes pre-releases. See rule 13 in `.claude/rules.md`.**
+
+- `README.md` — add the release-notes entry for the new version, **and** bump the per-release download badge to the new tag (search for the previous `vX.Y.Z` in the shields.io URL near the top of the file).
+- `USER_MANUAL.md` — bring every section the release touches in line with what the app now does. Not "if needed": check it every time, and say what changed.
+
+Do not start the git steps below until both documents are done.
 
 ```powershell
 # 1. Commit everything on develop

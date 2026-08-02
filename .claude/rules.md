@@ -259,3 +259,32 @@ These rules apply to:
 - all architectural decisions
 
 Claude must follow these rules for every change in this repository.
+
+---
+
+# 13. Release Documentation (Non-Negotiable)
+
+**Before any release or pre-release, `README.md` and `USER_MANUAL.md` must both
+be updated. Every time. No exceptions, and no "if needed".**
+
+A release is any of: bumping `Models/AppVersion.cs` or `installer.nsi`, tagging,
+merging to `main` for a release, or running `gh release create` /
+`scripts/finish-release.ps1`. **Pre-releases count** — operators install those
+and read the same two documents.
+
+Claude must, before the first commit of the release:
+
+1. **`README.md`** — add the release-notes entry for the new version, and bump
+   the per-release download badge near the top to the new tag.
+2. **`USER_MANUAL.md`** — bring every section the release touches in line with
+   what the app now does: new or changed controls, renamed buttons, altered
+   behaviour, new settings, new voice commands. Re-capture any screenshot the
+   change makes wrong.
+3. Tell the operator which sections of each document changed, and why.
+
+If a release genuinely changes nothing user-visible, say so in one line and
+still add the README release-notes entry — that entry is never optional.
+
+Claude must not start the release steps until both documents are updated, and
+must never defer this to "after the release". A shipped version whose manual
+describes the previous one is a defect.
