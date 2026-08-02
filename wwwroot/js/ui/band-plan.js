@@ -366,6 +366,43 @@ export const BAND_EDGES = {
 BAND_EDGES.UK  = BAND_EDGES.Region1;
 BAND_EDGES.USA = BAND_EDGES.Region2;
 
+// ── Nearest band ────────────────────────────────────────────────────────────
+//
+// Answers a different question to the tables above: not "may I transmit here"
+// but "which band was the operator aiming at". Used to mark a band button red
+// when the radio is outside every allocation in the operator's region — a UK
+// operator on 3.9 MHz is unmistakably *at* 80m, just not legally on it, and a
+// band grid with nothing lit at all doesn't say that.
+//
+// Distance is measured to the nearest edge of each band, so it works the same
+// whether the operator has drifted off the top of a band or off the bottom.
+// (An earlier attempt used a worldwide band envelope and only ever caught the
+// top: for nearly every band the worldwide *lower* edge is the same as the
+// region's, so tuning below a band fell outside the envelope and matched
+// nothing at all.)
+//
+// Never use this to decide whether transmitting is permitted — a returned band
+// name means the opposite, that the frequency is NOT inside it. `edges` should
+// be BAND_EDGES resolved to the configured region; that is the authority.
+export function nearestBandForHz(hz, edges) {
+    if (!hz || hz <= 0 || !Array.isArray(edges) || edges.length === 0) return null;
+
+    let best = null;
+    let bestDistance = Infinity;
+    for (const band of edges) {
+        if (typeof band?.lo !== 'number' || typeof band?.hi !== 'number') continue;
+        // Zero inside the band, otherwise the gap to the closer edge.
+        const distance = hz < band.lo ? band.lo - hz
+                       : hz > band.hi ? hz - band.hi
+                       : 0;
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            best = band.name;
+        }
+    }
+    return best;
+}
+
 // ── External JSON override ──────────────────────────────────────────────────
 //
 // The hardcoded BAND_PLANS / BAND_EDGES above are the shipped defaults — they

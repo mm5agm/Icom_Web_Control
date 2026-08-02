@@ -1940,7 +1940,7 @@
         import { Ic7300Meters }         from "/js/orchestrators/Ic7300Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=6";
-        import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=5";
+        import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, nearestBandForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=7";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
         import { initMemoriesPanel }   from "/js/ui/memories.js?v=10";
@@ -1948,8 +1948,23 @@
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         window.getBandSegmentForHz = segmentForHz;
-        loadLabels();
-        window.addEventListener('focus', loadLabels);
+        // site.js is a classic script, not a module, so it reaches the band
+        // tables through window. Used to mark the band button red when the
+        // radio is out of the operator's regional allocation.
+        //
+        // Resolves BAND_EDGES on every call rather than capturing the array:
+        // loadBandPlanFromServer() replaces the per-region arrays wholesale
+        // when it overlays bandplan.default.json, so anything holding a
+        // reference would keep answering from the pre-overlay table.
+        window.nearestBandForHz = hz =>
+            nearestBandForHz(hz, BAND_EDGES['@Model.BandPlan'] || BAND_EDGES.Region1);
+        // loadLabels rewrites every data-a11y-key title from labels.json, which
+        // wipes the "out of band" suffix on a band button. Put it back after.
+        const reapplyLabels = () => loadLabels().finally(() => {
+            if (typeof window.refreshBandOutOfBand === 'function') window.refreshBandOutOfBand();
+        });
+        reapplyLabels();
+        window.addEventListener('focus', reapplyLabels);
         document.addEventListener('DOMContentLoaded', function () {
             initFreqKeyboard();
             initMemoriesPanel();
@@ -3633,6 +3648,11 @@
             // ─ Formatters ─
             function fmtBand(b) {
                 if (!b) return '';
+                // The server reports "Unknown" for a frequency outside every
+                // allocation in the operator's own region. Since band names
+                // became region-resolved that is a normal thing to hear, and
+                // "out of band" says what has actually happened.
+                if (String(b).toLowerCase() === 'unknown') return 'out of band';
                 const m = String(b).match(/^(\d+)m$/i);
                 return m ? `${m[1]} metres` : String(b);
             }

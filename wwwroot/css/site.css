@@ -494,6 +494,23 @@ pre, code { tab-size: 4; }
     color: #0f5132;
 }
 
+/* Out of band.
+   The radio is inside this band's worldwide envelope but outside the
+   operator's own IARU region allocation, so no band is selected and this
+   button shows why. Bold black on red, the same signal the Segment dropdown
+   uses for OOB. Applied by applyBandOutOfBand() in js/ui/site.js.
+   Listed after :hover so hovering an out-of-band button keeps the warning. */
+.band-radio-label.band-oob,
+.band-radio-label.band-oob:hover {
+    background-color: #dc3545;
+    border-color: #842029;
+    color: #000;
+}
+
+.band-radio-label.band-oob span {
+    font-weight: bold;
+}
+
 /* Responsive: 3 columns on smaller screens, still sized to content */
 @media (max-width: 768px) {
     .band-radio-grid {

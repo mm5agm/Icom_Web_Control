@@ -1127,6 +1127,11 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "FrequencyA") {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
         try { state.lastBackendFreq.A = update.value; } catch (_) { /* state lives in IIFE scope only */ }
+        // BandA only broadcasts when the band *changes*, so an operator who is
+        // already out of band at page load would never get the red marker from
+        // updateBandButton alone. Re-apply it whenever the frequency moves.
+        lastVfoHz.A = update.value;
+        try { applyBandOutOfBand('A'); } catch (e) { console.error('applyBandOutOfBand A error:', e); }
         try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
         // Feed the DX Spots panel's band filter from the main update stream —
         // the SDR-era spectrum pipeline that used to do this is dormant on the
@@ -1140,6 +1145,8 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "FrequencyB") {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
         try { state.lastBackendFreq.B = update.value; } catch (_) { /* state lives in IIFE scope only */ }
+        lastVfoHz.B = update.value;
+        try { applyBandOutOfBand('B'); } catch (e) { console.error('applyBandOutOfBand B error:', e); }
         try { updateFrequencyDisplay('B', update.value); } catch (e) { console.error('updateFrequencyDisplay B error:', e); }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
@@ -1780,23 +1787,78 @@ async function updateBandButtonsFromBackend() {
             // Always call updatePowerSliderMax to use latest radioModel
             updatePowerSliderMax();
         }
-        if (data.vfoA && data.vfoA.band) {
-            document.querySelectorAll('input[name="band-A"]').forEach(radio => {
-                radio.checked = (radio.value.toLowerCase() === data.vfoA.band.toLowerCase());
-            });
-            syncBandAriaChecked('A');
-        }
-        if (data.vfoB && data.vfoB.band) {
-            document.querySelectorAll('input[name="band-B"]').forEach(radio => {
-                radio.checked = (radio.value.toLowerCase() === data.vfoB.band.toLowerCase());
-            });
-            syncBandAriaChecked('B');
-        }
+        // Routed through updateBandButton rather than checking the radios here,
+        // so the poll keeps the out-of-band marker in step instead of leaving a
+        // stale red button behind.
+        if (data.vfoA && data.vfoA.band) updateBandButton('A', data.vfoA.band);
+        if (data.vfoB && data.vfoB.band) updateBandButton('B', data.vfoB.band);
     } catch (error) {
         // ...removed debug logging...
     }
 }
 
+
+// Last frequency and band seen per VFO, at this (top-level) scope.
+//
+// The `state` object further down the file is trapped inside an IIFE and is
+// not visible here — see the note above the FrequencyA handler. The band
+// buttons need both values together: the band name says *whether* we are out
+// of band, and the frequency says *which* band button to mark.
+const lastVfoHz   = { A: 0, B: 0 };
+const lastVfoBand = { A: null, B: null };
+
+// Paint the out-of-band marker on the band grid.
+//
+// The server reports "Unknown" for a frequency outside every allocation in the
+// operator's own IARU region, so no band button is selected. On its own that
+// just looks like nothing is happening. Here we mark the nearest band in the
+// operator's region instead: a UK operator on 3.9 MHz gets a red 80m button,
+// which says "you are at 80m, but not where you are allowed to be" — and so
+// does one on 3.4 MHz, having drifted off the bottom.
+function applyBandOutOfBand(receiver) {
+    const inputs = document.querySelectorAll(`input[name="band-${receiver}"]`);
+
+    // A checked button means we are in band, whatever lastVfoBand still says.
+    // Clicking a band button checks it immediately and tunes; the frequency
+    // update then lands before the BandA broadcast that clears lastVfoBand, so
+    // without this the button flashes red on the way in.
+    const anyChecked = Array.from(inputs).some(radio => radio.checked);
+
+    const band = lastVfoBand[receiver];
+    const isOutOfBand = !anyChecked && !!band && band.toLowerCase() === 'unknown';
+    const oobBand = (isOutOfBand && typeof window.nearestBandForHz === 'function')
+        ? window.nearestBandForHz(lastVfoHz[receiver])
+        : null;
+
+    inputs.forEach(radio => {
+        const label = radio.closest('.band-radio-label');
+        if (!label) return;
+
+        const marked = !!oobBand && radio.value.toLowerCase() === oobBand.toLowerCase();
+        label.classList.toggle('band-oob', marked);
+
+        // Red is no use to an operator using a screen reader, so say it in the
+        // tooltip too. Stash the original on the way in and release it on the
+        // way out, rather than caching it forever — a11y-labels.js rewrites
+        // these titles from labels.json whenever the window regains focus.
+        if (marked) {
+            if (!('titleOriginal' in label.dataset)) {
+                label.dataset.titleOriginal = label.getAttribute('title') || '';
+            }
+            label.setAttribute('title', `${label.dataset.titleOriginal} — out of band for your region`);
+        } else if ('titleOriginal' in label.dataset) {
+            label.setAttribute('title', label.dataset.titleOriginal);
+            delete label.dataset.titleOriginal;
+        }
+    });
+}
+
+// a11y-labels.js reapplies titles from labels.json on every window focus,
+// wiping the "out of band" suffix. Index.cshtml calls this once that has run.
+window.refreshBandOutOfBand = function () {
+    applyBandOutOfBand('A');
+    applyBandOutOfBand('B');
+};
 
 // Update band button selection for a specific receiver (called via SignalR)
 function updateBandButton(receiver, band) {
@@ -1805,6 +1867,7 @@ function updateBandButton(receiver, band) {
         // ...removed debug logging...
         return;
     }
+    lastVfoBand[receiver] = band;
     const bandLower = band.toLowerCase();
     const inputs = document.querySelectorAll(`input[name="band-${receiver}"]`);
     // ...removed debug logging...
@@ -1820,6 +1883,7 @@ function updateBandButton(receiver, band) {
     });
 
     if (typeof syncBandAriaChecked === 'function') syncBandAriaChecked(receiver);
+    applyBandOutOfBand(receiver);
 
     if (!foundMatch) {
         // ...removed debug logging...

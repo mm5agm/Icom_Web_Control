@@ -587,10 +587,14 @@ namespace Icom_Web_Control.Controllers
                 var profiles = vfo == RadioVfo.B ? settings.BandProfilesB : settings.BandProfilesA;
 
                 // Stack the band we're leaving (only if we know where we were).
+                // "Unknown" is a real answer now that band names are resolved
+                // against the operator's own region — a UK operator sitting on
+                // 3.9 MHz is outside the Region 1 allocation — and it is not a
+                // band we should be stacking a profile against.
                 var oldBand = vfo == RadioVfo.B ? _radioStateService.BandB : _radioStateService.BandA;
                 var curFreq = vfo == RadioVfo.B ? _radioStateService.FrequencyB : _radioStateService.FrequencyA;
                 var curMode = vfo == RadioVfo.B ? _radioStateService.ModeB : _radioStateService.ModeA;
-                if (!string.IsNullOrEmpty(oldBand) && curFreq > 0)
+                if (!string.IsNullOrEmpty(oldBand) && oldBand != BandPlanService.UnknownBand && curFreq > 0)
                 {
                     profiles[oldBand] = new BandProfile
                     {
@@ -658,8 +662,9 @@ namespace Icom_Web_Control.Controllers
                 // Without this, the antenna selection only lands in
                 // settings.BandProfilesA when the user switches AWAY from
                 // the band — so a shutdown mid-band would lose the choice.
+                // Skipped when out of band — see the band-stacking note in SetBand.
                 var bandA = _radioStateService.BandA;
-                if (!string.IsNullOrEmpty(bandA))
+                if (!string.IsNullOrEmpty(bandA) && bandA != BandPlanService.UnknownBand)
                 {
                     var settings = await _settingsService.GetSettingsAsync();
                     if (!settings.BandProfilesA.TryGetValue(bandA, out var prof))
@@ -702,7 +707,7 @@ namespace Icom_Web_Control.Controllers
                 // Persist immediately into the current band's profile.
                 // See SetAntennaA for the rationale.
                 var bandB = _radioStateService.BandB;
-                if (!string.IsNullOrEmpty(bandB))
+                if (!string.IsNullOrEmpty(bandB) && bandB != BandPlanService.UnknownBand)
                 {
                     var settings = await _settingsService.GetSettingsAsync();
                     if (!settings.BandProfilesB.TryGetValue(bandB, out var prof))
