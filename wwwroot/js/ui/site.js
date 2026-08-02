@@ -1642,6 +1642,86 @@ connection.on("RadioStateUpdate", function (update) {
 // ---------------------------------------------------------------------------
 let initPollingStopped = false; // Allow user to dismiss and continue
 
+// ── Start-up overlay gating ─────────────────────────────────────────────────
+// The overlay used to clear the instant the CI-V link came up. That is several
+// seconds before the page has actually settled: the spectrum card sits at
+// display:none until the first scope sweep arrives, so the operator got a live
+// S-meter on a half-built page and then the layout jumped underneath them.
+// Hold the overlay until every stage that still moves the layout is in.
+const initStages = { radio: false, spectrum: false };
+let initOverlayHidden = false;
+let initSpectrumTimer = null;
+
+// Longest we wait for the first scope sweep once the radio is up. The scope
+// can legitimately never produce one — switched off on the rig, or a fault on
+// the bus — and a spinner that never clears is worse than the layout jump it
+// was meant to hide.
+const INIT_SPECTRUM_TIMEOUT_MS = 12000;
+
+// Shortest time the overlay stays up. On a plain browser refresh of an app
+// that is already running, the init endpoint answers "complete" on the first
+// poll and the first scope sweep follows a few hundred milliseconds later, so
+// without this the overlay appears and vanishes inside a frame or two — which
+// looks like it never appeared at all.
+const INIT_MIN_VISIBLE_MS = 900;
+const initShownAt = Date.now();
+let initMinTimer = null;
+
+// force skips the minimum — used by the "Continue anyway" button, where the
+// operator has asked for the page *now* and making them wait would be absurd.
+function hideInitOverlay(force = false) {
+    if (initOverlayHidden) return;
+
+    const waited = Date.now() - initShownAt;
+    if (!force && waited < INIT_MIN_VISIBLE_MS) {
+        // Stages can report in either order and either may land here first;
+        // only ever arm the one timer.
+        if (!initMinTimer) {
+            initMinTimer = setTimeout(() => {
+                initMinTimer = null;
+                hideInitOverlay();
+            }, INIT_MIN_VISIBLE_MS - waited);
+        }
+        return;
+    }
+
+    initOverlayHidden = true;
+    if (initSpectrumTimer) {
+        clearTimeout(initSpectrumTimer);
+        initSpectrumTimer = null;
+    }
+    if (initMinTimer) {
+        clearTimeout(initMinTimer);
+        initMinTimer = null;
+    }
+    const overlay = document.getElementById('initOverlay');
+    if (overlay) overlay.style.display = "none";
+}
+
+// Called by pollInitStatus for 'radio', and — via window, since that module
+// script can't see this scope — by the spectrum pipeline in Index.cshtml for
+// 'spectrum', on the first sweep that actually puts pixels on the canvas.
+// Stages may report in either order.
+function markInitStage(stage) {
+    if (initOverlayHidden || !(stage in initStages) || initStages[stage]) return;
+    initStages[stage] = true;
+
+    if (initStages.radio && initStages.spectrum) {
+        hideInitOverlay();
+        return;
+    }
+
+    if (stage === 'radio') {
+        // Radio is up, scope hasn't swept yet. Say which one we're waiting on
+        // rather than leaving a bare spinner — a silent wait reads as a hang,
+        // and this text is announced (the overlay is aria-live).
+        const statusText = document.getElementById('initStatusText');
+        if (statusText) statusText.innerText = "Starting spectrum scope, please wait...";
+        initSpectrumTimer = setTimeout(hideInitOverlay, INIT_SPECTRUM_TIMEOUT_MS);
+    }
+}
+window.markInitStage = markInitStage;
+
 async function pollInitStatus() {
     if (initPollingStopped) return; // User dismissed, stop polling
 
@@ -1661,7 +1741,9 @@ async function pollInitStatus() {
         statusText.innerText = data.status;
 
         if (data.status === "complete") {
-            overlay.style.display = "none";
+            // Not a straight hide any more — the overlay stays up until the
+            // spectrum reports in too (or times out). See markInitStage.
+            markInitStage('radio');
             initPollingStopped = true; // Stop polling
             radioPowerOn = true;
             updateRadioPowerButton();
@@ -1676,8 +1758,10 @@ async function pollInitStatus() {
             // the saved frequency back to the radio. The rig's current state
             // is the source of truth.
         } else if (data.status === "radio_off") {
-            // Radio is off - hide overlay and let user turn it on via power button
-            overlay.style.display = "none";
+            // Radio is off - hide overlay and let user turn it on via power
+            // button. No point waiting on the scope: it can't sweep with the
+            // radio off, so hide outright rather than going through the stages.
+            hideInitOverlay();
             initPollingStopped = true;
             radioPowerOn = false;
             updateRadioPowerButton();
@@ -1717,8 +1801,7 @@ async function pollInitStatus() {
 
 function dismissInitOverlay() {
     initPollingStopped = true;
-    const overlay = document.getElementById('initOverlay');
-    if (overlay) overlay.style.display = "none";
+    hideInitOverlay(true);
 }
 
 // Touch device detection helper

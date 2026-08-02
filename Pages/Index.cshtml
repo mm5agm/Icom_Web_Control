@@ -78,8 +78,12 @@
     }
 }
 
-<!-- Cache-busted CSS reference -->
-<link rel="stylesheet" href="~/css/site.css?v=20260520a" />
+<!-- Cache-busted CSS reference.
+     site.css used to be linked here too, with a hand-written ?v= that nobody
+     remembered to bump. _Layout already links it with asp-append-version, so
+     this was a second download of the same file on a URL that went stale
+     silently. The layout's copy comes later in the document, so it was the one
+     winning the cascade anyway. -->
 <link rel="stylesheet" href="~/css/closer-to-raw-power.css?v=20260226n" />
 <style>
     #saveMemBtnA, #saveMemBtnB { font-weight: 700 !important; font-size: 0.85rem !important; color: #212529 !important; }
@@ -205,11 +209,18 @@
     </div>
 </div>
 
-<!-- Overlay for initialization status -->
-<div id="initOverlay" class="init-overlay">
+<!-- Start-up overlay. Covers the page from first paint until the UI has
+     settled — see the stage gating in site.js. aria-live so the status text
+     is announced as it changes rather than only being visible. -->
+<div id="initOverlay" class="init-overlay" role="status" aria-live="polite">
     <div class="init-message">
-        <span id="initStatusText">Initializing radio, please wait...</span>
-        <div class="spinner-border text-primary" role="status"></div>
+        <div class="spinner-border text-primary" aria-hidden="true"></div>
+        <div id="initStatusText">Initializing radio, please wait...</div>
+        <!-- Escape hatch. The overlay is opaque and covers the whole page, so
+             anything that stops it clearing would otherwise lock the operator
+             out entirely. -->
+        <button type="button" class="btn btn-sm btn-outline-light mt-3"
+                onclick="dismissInitOverlay()">Continue anyway</button>
     </div>
 </div>
 
@@ -2092,6 +2103,27 @@
                 _lastSpanHz[vfo] = span;
                 if (window.__markActiveSpan) window.__markActiveSpan(vfo, Math.round(span / 2));
             }
+            // What finally clears the start-up overlay: an SdrStatus of
+            // "streaming", NOT the first SpectrumUpdate. Frames arrive well
+            // before the panel is visible — #spectrumContainer starts at
+            // display:none and is only un-hidden by updateContainerVisibility,
+            // which runs off SdrStatus, and CivRadioController only announces
+            // that every 30th sweep (_scopeBroadcasts % 30). A client that
+            // connects mid-stream therefore gets bins for up to ~2 s before the
+            // card appears, so gating on the first frame cleared the overlay
+            // while the operator was still waiting for the spectrum. Called
+            // from the onStatusChange handlers below; markInitStage ignores
+            // repeats, so the 30-sweep re-announce costs nothing.
+            const markSpectrumReady = () => window.markInitStage && window.markInitStage('spectrum');
+
+            // Scope switched off in an earlier page view: no sweep is coming, so
+            // release the overlay's spectrum stage now instead of making the
+            // operator wait out the timeout on every load.
+            const SCOPE_STATE_KEY = 'iwc.scopeEnabled';
+            let _scopeLastState = null;
+            try { _scopeLastState = localStorage.getItem(SCOPE_STATE_KEY); } catch { /* private mode */ }
+            if (_scopeLastState === 'off') markSpectrumReady();
+
             spectrumPipeline.onSpectrumUpdate('A', data => { spectrumPanelA.update(data); syncSpanButtons('A', data); });
             spectrumPipeline.onSpectrumUpdate('B', data => { spectrumPanelB.update(data); syncSpanButtons('B', data); });
 
@@ -2101,6 +2133,14 @@
             if (scopeSwitch) {
                 scopeSwitch.addEventListener('change', () => {
                     const state = scopeSwitch.checked ? 'on' : 'off';
+                    // Remembered only so the start-up overlay doesn't wait for a
+                    // sweep that isn't coming — the controller honours a manual
+                    // scope-off across reconnects (_operatorScopeOff), so after
+                    // turning it off every page load would otherwise sit on the
+                    // spinner until the timeout. If this flag is stale (the app
+                    // restarted and the scope really is on) the worst case is
+                    // that the overlay clears at radio-ready, as it used to.
+                    try { localStorage.setItem(SCOPE_STATE_KEY, state); } catch { /* private mode */ }
                     fetch(`/api/cat/scope/${state}`, { method: 'POST' })
                         .catch(() => { /* ignore network errors */ });
                 });
@@ -2239,12 +2279,14 @@
                 spectrumPanelA.setStatus(status);
                 setStatusBadge('A', status);
                 updateContainerVisibility();
+                if (status === 'streaming') markSpectrumReady();
             });
             spectrumPipeline.onStatusChange('B', status => {
                 sdrState.B = status;
                 spectrumPanelB.setStatus(status);
                 setStatusBadge('B', status);
                 updateContainerVisibility();
+                if (status === 'streaming') markSpectrumReady();
             });
             spectrumPipeline.onError('A', detail => spectrumPanelA.setError(detail));
             spectrumPipeline.onError('B', detail => spectrumPanelB.setError(detail));

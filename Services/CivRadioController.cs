@@ -120,6 +120,16 @@ namespace Icom_Web_Control.Services
         // back on. Turning it on again clears it.
         private volatile bool _operatorScopeOff;
 
+        // Set by RequestScopeStatusAnnounce (a browser just connected) and cleared
+        // by the next sweep, which announces regardless of where the periodic
+        // counter happens to be. int rather than bool so Interlocked can
+        // read-and-clear it in one step — the sweep handler and the hub run on
+        // different threads.
+        private int _announceScopeStatus;
+
+        /// <inheritdoc />
+        public void RequestScopeStatusAnnounce() => Interlocked.Exchange(ref _announceScopeStatus, 1);
+
         public CivRadioController(
             RadioStateService state,
             ICivClient bus,
@@ -364,7 +374,14 @@ namespace Icom_Web_Control.Services
 
             // Re-assert "streaming" on the first sweep and every ~30 thereafter
             // so a client that loads mid-stream un-hides its spectrum panel.
-            bool announce = _scopeBroadcasts++ % 30 == 0;
+            // The counter runs from app start, not from connect, so on its own it
+            // leaves a newly-connected browser waiting up to 29 sweeps with the
+            // panel still hidden — RadioHub asks for an immediate announce on
+            // connect and that request is honoured here. The read-and-clear is on
+            // its own line so the request is consumed even on a sweep where the
+            // periodic announce was due anyway.
+            bool requested = Interlocked.Exchange(ref _announceScopeStatus, 0) == 1;
+            bool announce = _scopeBroadcasts++ % 30 == 0 || requested;
 
             if (!_pseudoDual)
             {

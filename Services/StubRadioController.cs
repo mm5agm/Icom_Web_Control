@@ -369,6 +369,14 @@ namespace Icom_Web_Control.Services
         private readonly float[] _binsB = new float[ScopeBinCount];
         private int _scopeFrame;
 
+        // See CivRadioController: a browser that connects mid-stream needs an
+        // SdrStatus before its spectrum panel is revealed, and the frame counter
+        // runs from app start rather than from connect.
+        private int _announceScopeStatus;
+
+        /// <inheritdoc />
+        public void RequestScopeStatusAnnounce() => Interlocked.Exchange(ref _announceScopeStatus, 1);
+
         /// <summary>
         /// Fill <paramref name="bins"/> with a canned noise floor plus a couple of
         /// slowly-drifting Gaussian "signal" humps, so the trace and waterfall
@@ -452,7 +460,8 @@ namespace Icom_Web_Control.Services
                             new { sdrId = "A", bins = _binsA, centreHz = _freqA, spanHz = _scopeSpanHz * 2, mode }, stoppingToken);
                         await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
                             new { sdrId = "B", bins = _binsB, centreHz = _freqB, spanHz = _scopeSpanHz * 2, mode }, stoppingToken);
-                        if (_scopeFrame++ % 6 == 0)
+                        bool requested = Interlocked.Exchange(ref _announceScopeStatus, 0) == 1;
+                        if (_scopeFrame++ % 6 == 0 || requested)
                         {
                             await _hubContext.Clients.All.SendAsync("SdrStatus", new { sdrId = "A", status = "streaming" }, stoppingToken);
                             await _hubContext.Clients.All.SendAsync("SdrStatus", new { sdrId = "B", status = "streaming" }, stoppingToken);

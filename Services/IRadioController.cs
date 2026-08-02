@@ -60,6 +60,16 @@ namespace Icom_Web_Control.Services
         bool IsConnected { get; }
 
         /// <summary>
+        /// Re-broadcast the current scope status ("SdrStatus") on the next sweep
+        /// instead of waiting for the periodic re-announce. Called when a browser
+        /// connects: the spectrum panel starts hidden and is only revealed by an
+        /// SdrStatus, so without this a late-joining client watches an empty gap
+        /// while frames are already arriving. Default no-op — a controller with
+        /// no scope has nothing to announce.
+        /// </summary>
+        void RequestScopeStatusAnnounce() { }
+
+        /// <summary>
         /// The radio's self-reported model identifier, read from the radio at
         /// connect (never hard-coded). Null until known. For CI-V this is the
         /// value returned by the transceiver-ID query.
