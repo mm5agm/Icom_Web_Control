@@ -88,14 +88,18 @@ Other apps' own screens; no IWC branding to change:
 
 ## Still open
 
-Neither is a re-capture — both are shots that have never existed.
+Neither was a re-capture — both are shots that never existed.
 
-- [ ] **A CI-V band-scope screenshot for manual §5.4.** §5.4 (Spectrum Display)
-      currently has no image at all: the dual-SDR shots were deleted with the
-      SDR prose and nothing replaced them, so the manual describes the
-      IC-7300's built-in scope in words only. This is the most visually
-      distinctive thing IWC does and the section showing it is the one section
-      with nothing to look at.
+- [x] **A CI-V band-scope screenshot for manual §5.4.** Done 2026-08-02. Colin
+      shot the full-width two-panel view; it was cropped into two assets:
+      `Spectrum_Scope.png` (VFO A alone, legible at manual width) leading §5.4,
+      and `Spectrum_Scope_Both.png` (both panels side by side) illustrating the
+      pseudo-dual receiver further down. Cropping the page-background strip off
+      the top also removed some cut-off UI from the row above the panels.
+      Embedding it forced the §5.4 rewrite: the prose still described a
+      **250k/500k/1M/2M** span row, a dB-range dropdown and a Gain slider, none
+      of which exist — the screenshot is what caught it. Worth remembering that
+      a screenshot is a spec check, not just decoration.
 - [ ] **Decide whether the manual wants a rig photo at all.** The Yaesu front
       and back photos were deleted rather than replaced. If §1 or §2 should
       show the radio, an IC-7300 MkII photo needs shooting *and* embedding;

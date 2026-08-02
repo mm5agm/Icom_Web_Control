@@ -311,9 +311,11 @@ The slider snaps to 5 W steps for ease of dragging, but the numerical label show
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over CI-V — there is no external SDR and nothing extra to plug in. It shows a real-time spectrum and scrolling waterfall of the band around the current VFO A frequency, and appears automatically once the radio is connected.
 
-> **Note:** the click-to-tune, crosshair, band-plan markers and guard-rail behaviour below are stable; some display mechanics (span control, waterfall speed, dB scaling) may still change as the CI-V scope integration settles. The span and centre are driven by the radio's own scope settings.
+![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
 
-**Span buttons** — Click **250k**, **500k**, **1M**, or **2M** to change the visible bandwidth. The display recentres on VFO A.
+**Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for two reasons: to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
+
+**Span buttons** — eight buttons in the panel header set the visible bandwidth, from **±2.5k** (narrowest — a single QSO fills the screen) through **±5k**, **±10k**, **±25k**, **±50k**, **±100k**, **±250k** to **±500k** (widest — a 1 MHz-wide view). The figure is the *half*-width either side of centre, matching the way the IC-7300 labels its own scope, so **±500k** shows a megahertz across the screen. Clicking one sets the radio's scope span, so the radio's front panel changes too; equally, changing the span on the radio lights the matching button in IWC, because the active button is re-synced from every incoming sweep.
 
 **Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
 
@@ -323,22 +325,37 @@ The spectrum comes from the **IC-7300's own built-in band scope**, streamed to t
 
 **Resize spectrum vs waterfall** — Hover the horizontal boundary between the spectrum trace (top) and the waterfall (bottom); the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room — useful when you're hunting weak signals close to the noise floor. Drag down to give the waterfall more history. The ratio is remembered per VFO across browser reloads, so the next time you open IWC the panel is back the way you left it. Two short grey grip-bars at the centre of the boundary mark the handle; they turn cyan while you're dragging.
 
-**Speed slider** — The slider next to Gain controls how fast the waterfall scrolls, from **Full** speed down to **1/128**. Drag it left to slow the waterfall down if signal trails are scrolling past faster than you can read them; the spectrum trace above it keeps updating live regardless of this setting. Set independently per VFO and remembered across browser reloads.
+**Hold** — Freezes the spectrum and waterfall on the frame that was on screen when you clicked, so you can study a fleeting signal without it scrolling away — or grab a screenshot of a particular moment. Three things show it is frozen: the button turns amber, the status badge changes to a yellow **Hold**, and a small `HOLD` banner appears in the top-left of the canvas. Click **Hold** again to resume live streaming. Hold affects only what is drawn — the radio keeps sweeping, and frequency, mode and meters carry on updating as normal. The state is per panel, so you can freeze one and leave the other running.
 
-**dB range** — The dropdown beside the **Hold** button picks the vertical scale of the spectrum trace, in dBFS:
+**Persistent cursor — bookmark a frequency** — **Shift-click** anywhere on the panel to drop a persistent cyan cursor at that frequency, with the frequency in a small boxed label beside it. It stays put as you tune around with ordinary clicks, so you can mark a station to come back to. To remove it, **Shift-click on or near it** (within about 10 pixels).
 
-- **0/-120** (default) — the full scope range; signals span the whole vertical height of the spectrum panel.
-- **-40/-120**, **-60/-120**, **-80/-120** — progressively zoom into the lower part of the scale, where weak signals normally sit. The strongest signals get clipped at the top of the panel, but the noise floor and anything just above it spreads out vertically and is much easier to see.
+#### The Range / Speed / Bright bar
 
-Pick whichever lets you see your noise floor without weak signals being squashed into the bottom row of pixels. The choice is remembered per VFO.
+The three sliders under the panel header shape the display. All three are per-VFO and are saved **on the server**, not just in your browser, so they follow you to a phone or tablet as well as surviving a reload.
+
+**Range** — the height of the vertical scale, in dB (5–140). This is a gain control for the trace: a *smaller* Range makes peaks taller, a *larger* one flattens everything out. It does **not** move the noise floor. IWC measures the noise floor on every sweep and pins it just above the bottom edge of the panel automatically, so the noise stays where you put it no matter how you set Range, and no matter how far you zoom the span in or out. Wind Range down until weak signals stand clear of the grass, and up again if strong signals are running off the top.
+
+**Speed** — how fast the waterfall scrolls, from **Full** down to **1/128**. Drag it left if signal trails are scrolling past faster than you can read them. The spectrum trace above the waterfall keeps updating live regardless of this setting.
+
+**Bright** — lifts the waterfall's colour mapping by up to 60 dB, bringing weak signals further up the colour scale so they show as blue-green rather than near-black. **Off** (0) is the unmodified mapping. Like Speed, it affects only the waterfall; the spectrum trace above it is untouched. The change applies to new rows as they scroll in — the history already on screen keeps the colours it was drawn with.
+
+#### The three badges
+
+**Scope mode** (top-left of the canvas) — shows the scope mode the radio is actually in, read from the sweep data itself: **CENT**, **FIX**, **SCROLL-C** or **SCROLL-F**. IWC's frequency axis assumes centre mode, so **CENT** is green — everything lines up. Any other mode is shown in amber as a warning that the trace may not match the frequency axis beneath it. **Click the badge to switch the radio between Centre and Fixed**, which is the quick way back to green if the radio was left in Fixed mode.
+
+**Scope status** (right-hand end of the panel header) — **No SDR** (no scope source), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, or **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show).
+
+**DX cluster** (top-right of the canvas) — the cluster connection state: green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.5 for cluster setup and troubleshooting.
+
+#### Overlays
 
 **DX cluster spots** — If you have configured a DX cluster server in Settings (see §6.5), incoming spots are overlaid as small yellow callsign labels along the top of the spectrum at each spot's frequency. Clicking on a spot (within a few pixels of its marker) tunes VFO A exactly to that frequency. Spots outside the current span are not drawn; spots older than the configured age (default 15 minutes) are removed automatically.
 
-**How spots are filtered for display** — the spectrum panel shows any spot whose frequency falls inside the currently visible window (VFO A ± half the span). When you change band, VFO A moves and the spectrum recentres, so the visible spots change automatically to match the new band. There is no explicit band filter — just a "is this spot inside the visible window?" check. In practice this means you see only the current band, because amateur bands have large gaps between them. If you zoom out to a 2 MHz span you'd technically see a wider chunk, but adjacent bands rarely overlap that window.
+**How spots are filtered for display** — the spectrum panel shows any spot whose frequency falls inside the currently visible window (VFO A ± half the span). When you change band, VFO A moves and the spectrum recentres, so the visible spots change automatically to match the new band. There is no explicit band filter — just a "is this spot inside the visible window?" check. In practice this means you see only the current band, because amateur bands have large gaps between them. At the widest span (±500 kHz) you'd technically see a wider chunk, but adjacent bands rarely overlap that window.
 
 The cluster feed itself is not band-filtered by IWC — spots arrive for every band the cluster carries. They are all kept client-side; only the ones inside the visible window get drawn. To reduce traffic at the source (for example, to receive only 20 m and 40 m spots), add a line like `set/filter band 20 or band 40` to **Settings → DX Cluster → Post-login commands**. That filter runs on the cluster server and cuts down on spots before they reach IWC.
 
-On crowded bands (the lower end of 20m on a contest weekend, for example) labels are stacked across up to five rows to avoid overlap. If even five rows can't fit everything in a tight cluster of nearby frequencies, **the app drops the spots that don't fit rather than letting labels overlap and become illegible**. The dropped spots are still in the underlying spot list — they just aren't drawn. Zooming the spectrum to a narrower span (e.g. 250k or 500k) spreads spots out and reveals the ones that were hidden.
+On crowded bands (the lower end of 20m on a contest weekend, for example) labels are stacked across up to five rows to avoid overlap. If even five rows can't fit everything in a tight cluster of nearby frequencies, **the app drops the spots that don't fit rather than letting labels overlap and become illegible**. The dropped spots are still in the underlying spot list — they just aren't drawn. Zooming the spectrum to a narrower span (e.g. ±100k or ±50k) spreads spots out and reveals the ones that were hidden.
 
 **Decluttering with the watch list** — if cluster traffic is making the spectrum unreadable, open the DX Watch popup (§5.14) and tick **Show only watched callsigns**. Every yellow (non-watched) spot disappears from the spectrum and the DX Spots list, leaving only the red watched-list matches. Toast / beep / voice alerts still fire as normal on watched spots; the toggle only changes what's drawn. Untick to bring all spots back. Setting is remembered per browser.
 
@@ -346,9 +363,28 @@ On crowded bands (the lower end of 20m on a contest weekend, for example) labels
 
 **Band-edge guard rails** — dashed red vertical lines drawn at the lower and upper edges of every amateur band that falls inside the visible window. They make it immediately obvious when you've tuned outside the amateur allocation (e.g. clicking 14.396 MHz on the spectrum lands you above the 20m upper edge at 14.350 — the red line is right there, telling you why no DX cluster spots are appearing and why the mode hasn't auto-changed). The edges use the worldwide amateur envelopes (the broadest limits across all regions), so a Region 1 operator may see a guard rail slightly beyond their own legal limit on a few bands — never the other way round.
 
-A status badge in the spectrum panel shows the current scope state: **No scope**, **Connecting…**, **Live**, or **Disconnected**.
+#### Two panels — the pseudo-dual receiver
 
-A second small badge in the **top-right corner of the spectrum canvas** shows the DX cluster connection state — green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.5 for cluster setup and troubleshooting.
+By default IWC shows **one** spectrum panel, for VFO A. The IC-7300 has a single receiver and a single scope, so that is the honest picture.
+
+Switching on **Enable pseudo-dual receiver** in **Settings → Spectrum Display** adds a second panel for VFO B — a *watch* panel — by time-sharing the one scope between them. On the **same band** both panels update live and your audio is never interrupted, because the single sweep covers both frequencies. Watching a **different** band is only possible by briefly borrowing the receiver, so it is off unless you also tick **Allow cross-band watch**; with that on, IWC retunes for a moment every few seconds (interval configurable, default 15 s) and your listening audio dips for about 0.4 s per peek. With cross-band watch off, a watch panel pointed at another band simply shows **Off-screen**.
+
+![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel](pictures/Spectrum_Scope_Both.png)
+
+**Listen / Listening** — with two panels up, the one you are hearing carries a green **Listening** badge and the other carries a **Listen** button. Click **Listen** to move the radio's audio to that VFO; the badge and button swap over. The badge follows the radio, so switching VFOs on the front panel moves it too.
+
+**Layout toggles** — two small button groups appear above the panels (only when both are showing):
+
+- **Stacked** / **Side by side** — panels one above the other, or splitting the width between them.
+- **VFO A** / **VFO B** / **Both** — show just one panel, or both.
+
+Both choices are remembered in your browser.
+
+**The watch panel's span buttons** — because there is only one scope with one span, VFO B can never show a *wider* view than VFO A. **Settings → Spectrum Display → Watch panel (VFO B) span buttons** decides what B's buttons do:
+
+- **Zoom in independently** (default) — B's buttons crop its own view tighter in software, leaving VFO A and the radio alone.
+- **Share one span** — B's buttons drive the one physical span exactly as A's do, and both panels' buttons light up together.
+- **Hide** — B has no span buttons at all; only VFO A controls the shared span. (This is the setting in the screenshot above.)
 
 ---
 
@@ -842,9 +878,18 @@ The Settings page also shows the full URL for each detected network interface so
 
 ### 6.3 Spectrum Scope
 
-The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over the CI-V connection. There is **no external SDR, no IF tap, and no extra hardware or drivers** — once the radio is connected the spectrum and waterfall appear on the main page automatically. Consequently this section has **no settings to configure**; the scope's span and reference level are set on the radio itself.
+The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over the CI-V connection. There is **no external SDR, no IF tap, and no extra hardware or drivers** — once the radio is connected the spectrum and waterfall appear on the main page automatically. Span, Range, waterfall Speed and Brightness are all driven from the panel itself; see Section 5.4 for those. This section covers the handful of settings that decide **how many panels you get**.
 
-> **Note:** expect the exact behaviour of the display features below (Hold, the persistent cursor, the band-plan overlay) to be tidied up as the CI-V scope integration settles. The IC-7300 is a single-receiver radio, so there is one live scope, on VFO A; the second panel is part of ongoing work.
+The radio has one receiver and one scope, so a second panel can only ever be made by time-sharing that one scope. These settings control whether IWC does that, and how far it is allowed to go:
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Enable pseudo-dual receiver (two spectrum panels)** | Off | Adds a second, *watch* panel for VFO B, with a **Listen** button on each panel to choose which one you hear. Off gives the plain single-panel layout. |
+| **Allow cross-band watch (dips audio to peek at the other band)** | Off | Off = same-band only, and your audio is never interrupted; a watch panel on another band shows **Off-screen**. On = IWC briefly borrows the receiver to refresh the other band, dipping your listening audio for about 0.4 s each time. |
+| **Cross-band peek interval (seconds)** | 15 | How often that borrow happens (5–60 s). Larger means fewer audio dips but a staler watch trace. Ignored unless cross-band watch is on. |
+| **Watch panel (VFO B) span buttons** | Zoom in independently | Whether VFO B's span buttons crop its own view in software, share the one physical span with VFO A, or are hidden entirely. VFO B can never be *wider* than VFO A. |
+
+Section 5.4 shows what each of these looks like in use.
 
 #### Updating the band plan without an IWC release
 
@@ -855,14 +900,6 @@ The band-plan data (activity-centre markers like CW / FT8 / SSB, plus the red ba
 ```
 
 If a regulator (RSGB, FCC, JARL, etc.) tweaks a band plan and the change matters to you, download an updated copy of `bandplan.default.json` from the IWC GitHub release page and drop it in over the existing file. Restart IWC and the new values take effect — no need to wait for a full app release. The hardcoded JS defaults shipped inside the app are used as a fallback if the JSON file is missing or corrupt, so a botched edit can't permanently break anything; just delete the file and IWC reverts to the built-in defaults.
-
-#### Hold — freeze the spectrum at the current frame
-
-The spectrum panel header has a **Hold** button. Click it to freeze the spectrum + waterfall at the last received frame; the header badge changes to a yellow **Hold** indicator and a small `HOLD` banner appears in the top-left of the canvas. Click **Hold** again to resume live streaming. Useful for studying a fleeting signal without it scrolling off the waterfall, or grabbing a screenshot of a particular moment.
-
-#### Persistent cursor — bookmark a frequency
-
-**Shift-click** anywhere on the spectrum panel to drop a persistent cyan cursor at that frequency. The cursor stays visible as you tune around with normal clicks, so you can mark a station you want to come back to; the frequency is shown in a small boxed label near the cursor. To remove the cursor, **Shift-click on or near it** (within ~10 pixels).
 
 ---
 
