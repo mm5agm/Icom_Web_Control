@@ -528,6 +528,22 @@ pre, code { tab-size: 4; }
     padding-right: 2.25rem;
 }
 
+/* Out of band: the frequency is outside every allocation in the operator's
+   own IARU region, so there is no segment to show. Matches the .band-oob
+   marker on the band buttons. The :disabled qualifier is needed to outrank
+   Bootstrap's own .form-select:disabled background, and the two-colour
+   overrides below stop the disabled state washing the red out. */
+.segment-select.segment-oob,
+.segment-select.segment-oob:disabled,
+.segment-select.segment-oob:hover,
+.segment-select.segment-oob:focus {
+    background-color: #dc3545;
+    border-color: #842029;
+    color: #000;
+    font-weight: bold;
+    opacity: 1;
+}
+
 /* Maximize usable width for receiver panels */
 .container-fluid {
     padding-left: 8px !important;

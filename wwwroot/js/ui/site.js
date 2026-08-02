@@ -3293,6 +3293,28 @@ document.addEventListener('DOMContentLoaded', function() {
         return `bandSeg_${vfo}_${band}`;
     }
 
+    // The server (BandPlanService) reports this when the frequency falls
+    // outside every allocation in the operator's own IARU region.
+    const OOB_BAND = 'unknown';
+    function isOutOfBand(band) {
+        return typeof band === 'string' && band.toLowerCase() === OOB_BAND;
+    }
+
+    // Paint (or clear) the out-of-band state on a Segment dropdown. The
+    // dropdown carries the warning as well as the colour, because a
+    // partially-sighted operator gets the accessible name, not the red.
+    function setSegmentOutOfBand(select, vfo, on) {
+        select.classList.toggle('segment-oob', on);
+        if (!('labelOriginal' in select.dataset)) {
+            select.dataset.labelOriginal = select.getAttribute('aria-label') || `VFO ${vfo} band segment`;
+        }
+        const label = on
+            ? `VFO ${vfo} out of band — frequency is outside every allocation in your region`
+            : select.dataset.labelOriginal;
+        select.setAttribute('aria-label', label);
+        select.setAttribute('title', label);
+    }
+
     // Set the Segment dropdown to reflect whichever segment of the band
     // contains the current frequency. Called from the FrequencyA/B SignalR
     // handlers so the dropdown stays in sync when the operator tunes via
@@ -3301,9 +3323,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // initial connect before BandA arrives).
     function syncSegmentSelectToFrequency(vfo, hz) {
         const select = document.getElementById(`segmentSelect${vfo}`);
+        // Disabled means the dropdown holds a single OOB or "--" placeholder,
+        // so there is no segment to select. populateSegmentSelect re-runs on
+        // the next band change and picks the sync back up.
         if (!select || select.disabled) return;
         const band = state.lastBand && state.lastBand[vfo];
-        if (!band) return;
+        if (!band || isOutOfBand(band)) return;
         const plan = window.bandPlan || 'UK';
         if (!window.bandPlanData || !window.getBandSegmentForHz) {
             // Fallback if helper not loaded — use inline lookup against the plan.
@@ -3340,18 +3365,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!bandPlanData) return;
 
         const segments = (bandPlanData[plan] || {})[band] || null;
+        const oob = isOutOfBand(band);
         select.innerHTML = '';
 
         if (!segments) {
+            // Two different "no segments" cases, and they mean different
+            // things to the operator: OOB is a warning (you are outside your
+            // region's allocations), whereas "--" just means this band has no
+            // activity plan in the JSON — 4m outside Region 1, say.
             const opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = '--';
+            opt.textContent = oob ? 'OOB' : '--';
             select.appendChild(opt);
             select.disabled = true;
+            setSegmentOutOfBand(select, vfo, oob);
             return;
         }
 
         select.disabled = false;
+        setSegmentOutOfBand(select, vfo, false);
         const placeholder = document.createElement('option');
         placeholder.value = '';
         placeholder.textContent = '--';
@@ -3364,11 +3396,34 @@ document.addEventListener('DOMContentLoaded', function() {
             select.appendChild(opt);
         }
 
-        // Restore last used segment for this band
+        // Restore last used segment for this band. This is only a fallback
+        // for the moment before we know the frequency — the radio's actual
+        // frequency wins immediately below, because the dropdown's job is to
+        // say where the operator *is*, not where they last went.
         const saved = localStorage.getItem(segmentStorageKey(vfo, band));
         if (saved && select.querySelector(`option[value="${saved}"]`)) {
             select.value = saved;
         }
+
+        // Use lastVfoHz (top-level, written directly by the FrequencyA/B
+        // SignalR handlers) rather than state.lastBackendFreq — that one is
+        // written inside a try/catch from a scope where `state` isn't
+        // visible, so it throws and is swallowed on every update and holds a
+        // stale frequency. Getting this wrong showed up as the dropdown
+        // dropping to "--" when tuning back in from out of band: FrequencyA
+        // arrives before BandA, so the good sync early-returns against the
+        // still-disabled OOB placeholder and this call is the last word.
+        const hz = (lastVfoHz && lastVfoHz[vfo]) || (state.lastBackendFreq && state.lastBackendFreq[vfo]);
+        if (typeof hz !== 'number' || hz <= 0) return;
+
+        // Only override the saved value when the frequency really lands in
+        // the band we just populated. On a band-button click we are called
+        // before the radio has retuned, so hz is still the *old* band's —
+        // syncing blindly would flash "--" until the new frequency arrived.
+        const live = window.getBandSegmentForHz
+            ? window.getBandSegmentForHz(plan, band, hz)
+            : null;
+        if (live) syncSegmentSelectToFrequency(vfo, hz);
     }
 
     // Called when the user picks a segment from the dropdown.
@@ -3378,9 +3433,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const bandPlanData = window.bandPlanData;
         if (!bandPlanData) return;
 
-        // Determine the current band for this VFO
+        // Determine the current band for this VFO. Out of band there is no
+        // segment to tune to and nothing worth remembering, so bail before
+        // we touch the radio or localStorage.
         const band = state.lastBand[vfo];
-        if (!band) return;
+        if (!band || isOutOfBand(band)) return;
 
         const segments = (bandPlanData[plan] || {})[band];
         if (!segments || !segments[segKey]) return;
