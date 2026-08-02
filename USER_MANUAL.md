@@ -2126,6 +2126,7 @@ The commands are split into two groups. The **first table** is fully wired to th
 | Set AF gain | "set a f gain fifty" / "audio gain fifty" (0–100 in the steps listed in the phrase editor, or "mute" / "maximum") | Sets the AF (volume) level |
 | Transmit | "key transmitter" / "start transmitting"; "stop transmitting" / "go to receive" | Radio keys up / drops back to receive |
 | Split | "split on" / "enable split"; "split off" / "simplex" | Split operation toggles |
+| Custom commands (macros) | "noise reduction on/off", "noise blanker on/off", "copy a to b" / "copy b to a" | Sends the CI-V command attached to that phrase. Those six ship as defaults; you can add your own for anything in the IC-7300's CI-V command set — see [§17.6](#176-adding-your-own-commands) |
 | Status read-back | "what frequency", "what mode", "what band" | IWC speaks the current value out loud — nothing is sent to the radio |
 | Help | "help", "what can I say" | IWC speaks a short list of the available command categories |
 
@@ -2137,7 +2138,6 @@ The commands are split into two groups. The **first table** is fully wired to th
 | Set AGC | "set a g c fast" (also mid, slow, auto, off) | Not yet wired to CI-V. The IC-7300 has fast/mid/slow only (no off/auto); the command is being reworked |
 | Band up / down | "band up" / "band down" | Not yet wired to CI-V. Use "go to \<band\> metres" instead, which works |
 | IF filter width | "filter wider" / "filter narrower" | Not yet wired to CI-V — use the on-screen IF Width control instead |
-| Macros | "noise reduction on/off", "noise blanker on/off", "copy a to b" / "copy b to a", "fine step up/down" | The default macros still hold Yaesu CAT strings and don't reach the IC-7300 yet |
 
 > ℹ️ **These commands tell you they're not available.** Say one and IWC speaks a short "…isn't available on the IC-7300 yet" message instead of a false "successful" — so you're never misled into thinking the radio changed when it didn't. They'll be wired up in a later build.
 
@@ -2148,6 +2148,7 @@ A few notes on phrasing:
 - **"megahertz" is optional.** Both "set frequency to fourteen point zero seven four megahertz" and "tune to fourteen point zero seven four" work — say it or skip it.
 - **MHz only — no kHz.** The grammar recognises frequencies in whole-or-decimal **megahertz**, from 1 MHz up to 71 MHz (covering HF + 6 m + 4 m). It does **not** recognise kilohertz input. If you say something the grammar can't parse — e.g. "tune to thirty kilohertz" — the engine will fuzzy-match to the nearest valid in-range phrase ("tune to thirty point eight") and act on that instead. **Listen to the spoken confirmation** that follows every command: it tells you exactly what got recognised, which is the safety net against misrecognition. For sub-MHz tuning (LF, MF, down to the IC-7300's 30 kHz lower limit), use the mouse or the keyboard-driven frequency display instead — see §16.7.
 - **Bands supported:** 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The default frequency picked for each band is roughly the FT8 / digital hangout — adjust with a follow-up "set frequency to …" or "tune up" / "tune down".
+- **"Fine step up" / "fine step down" are gone.** They were shortcuts for the microphone UP/DN keys on the Yaesu radio IWC grew out of, and CI-V has no equivalent command. "Tune up" / "tune down" with the step size set to 10 Hz does the same job. If you upgraded from v1.0.0, your saved phrase pack is replaced by the new defaults the first time you run this version — its custom commands carried the old radio's command format and could not be sent. The previous pack is snapshotted into **Show version history** the next time you save.
 - **Scots variants** are accepted where they're in the default phrase list — e.g. "tune tae fourteen point zero seven four" works the same as "tune to …". Add your own in the phrase editor (§17.6) for any command you like.
 
 **After every command, IWC speaks a short confirmation** through the PC's default audio output:
@@ -2219,7 +2220,7 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 
 - All speech recognition happens **locally on your PC** through the Windows SAPI 5 engine. No audio is uploaded to Anthropic, Microsoft, Amazon, or anyone else.
 - Recognised phrases are written to IWC's log file (`iwc-YYYYMMDD.log`) so that misrecognitions can be diagnosed. If that's a concern, set the log retention / rotation in Settings, or simply disable voice control when not in use.
-- Nothing leaves the PC except the standard CAT commands going to the radio over the serial port.
+- Nothing leaves the PC except the CI-V commands going to the radio over the serial port.
 
 ### 17.6 Adding your own commands
 
@@ -2230,13 +2231,14 @@ The voice command grammar is **data, not code** — it lives at `%APPDATA%\MM5AG
 - **Version history.** Every save (and every pack import) snapshots the previous version — up to the last 5 — so a bad edit or import can be undone from **Show version history**.
 - **Export / import as a language pack.** **Export language pack** bundles the current phrases, a generated `.srgs` reference copy, and author/description metadata into `IWC-VoicePack-<culture>-vN.zip` — share it on the [GitHub Discussions](https://github.com/mm5agm/Icom_Web_Control/discussions) group. **Preview import** lets you inspect another pack's contents before installing it.
 - **Open user grammars folder** jumps straight to the `Grammars\` folder in Explorer if you'd rather hand-edit the JSON or inspect the generated `.srgs` file (a human-readable reference copy, not what the engine actually loads).
-- **Advanced mode** (off by default) allows a Custom Command's CAT string to be anything, not just a recombination of prefixes the built-in Core Commands already send. Only enable it if you trust the source of any pack you import.
+- **Custom Commands.** The one place you can add a command IWC has no built-in intent for. A row is a name, the phrases that trigger it, and the **CI-V command** to send, written as hex bytes — command, sub-command, data — exactly as they appear in the CI-V reference in the IC-7300 manual. `16 40 01;` is noise reduction on; chain commands with `;`, e.g. `16 40 01;16 22 01;` for NR on *and* NB on. Spaces are optional (`164001;` is the same command). IWC adds the framing and the radio's address itself, so a Custom Command chooses *which* command is sent and nothing more. The Category column is free text — type a new name to start a new group.
+- **Advanced mode** (off by default) allows a Custom Command to use any CI-V command, not just the command bytes the built-in Core Commands already send. The radio's power command (`18`) is one of the ones it unlocks — worth knowing before you turn it on, because over the IC-7300's USB CI-V link a power-off drops the serial port with it, and the radio can't then be switched back on remotely. Only enable Advanced mode if you trust the source of any pack you import.
 
 If there's a particular command or phrasing you'd like added to the *built-in* defaults (as opposed to your own local edit), please file it as a GitHub issue or discussion.
 
 ### 17.7 More languages
 
-Only **English (UK)** ships as the built-in default, but the language pack system itself is already multi-language. As of v2.4.1 an **English (US)** pack is also available — same commands and phrases as the UK default, with US spelling ("meters" instead of "metres"). Get it from `/voice-packs/IWC-VoicePack-en-US-v1.zip` on your running IWC instance and install it via **Preview import** below.
+Only **English (UK)** ships as the built-in default, but the language pack system itself is already multi-language. An **English (US)** pack is also available — same commands and phrases as the UK default, with US spelling ("meters" instead of "metres"). Get it from `/voice-packs/IWC-VoicePack-en-US-v2.zip` on your running IWC instance and install it via **Preview import** below.
 
 1. **The Windows speech pack for the target language must be installed** on the operator's PC (Windows → Settings → Time &amp; Language → Speech → Add a language). Microsoft ships full recognition packs for US English, French, German, Spanish, Italian, Japanese, Mandarin Chinese, Brazilian Portuguese and Australian English (the list shifts between Windows releases). Some languages only ship voice synthesis, not recognition — those can't be used for voice control regardless of what IWC does.
 2. **A phrase pack for that culture.** The **Active language** dropdown in Settings → Voice Control lists every culture with an installed pack (a ✓ or ⚠ shows whether Windows also has a matching recogniser). Installing a new one means either importing a `IWC-VoicePack-<culture>-vN.zip` someone else has authored and shared (**Preview import** → **Install**), or hand-authoring `Commands.<culture>.json` and dropping it into `Grammars\<culture>\` via **Open user grammars folder** — the semantic keys (intent names, parameter vocab) stay identical to the English defaults, only the phrases change.

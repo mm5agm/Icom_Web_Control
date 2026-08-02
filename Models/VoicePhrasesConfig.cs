@@ -61,7 +61,7 @@ namespace Icom_Web_Control.Models
         public SetFrequencyPhrases SetFrequency { get; set; } = new();
 
         /// <summary>
-        /// User-defined macros. Each sends one or more CAT commands verbatim.
+        /// User-defined macros. Each sends one or more CI-V commands.
         /// Power users can add their own; the defaults cover common shortcuts.
         /// </summary>
         [JsonPropertyName("macros")]
@@ -88,9 +88,11 @@ namespace Icom_Web_Control.Models
     }
 
     /// <summary>
-    /// A user-defined voice command that sends one or more CAT strings.
-    /// Multi-command macros: chain commands back-to-back e.g. "NR01;NB01;".
-    /// The dispatcher splits on ';' and sends each segment.
+    /// A user-defined voice command that sends one or more CI-V commands.
+    /// Multi-command macros chain commands back-to-back, e.g.
+    /// "16 40 01;16 22 01;" (NR on then NB on); the dispatcher splits on ';'
+    /// and sends each command in turn. See
+    /// <see cref="Services.Civ.CivMacroCodec"/> for the payload format.
     /// </summary>
     public sealed class MacroDefinition
     {
@@ -100,13 +102,13 @@ namespace Icom_Web_Control.Models
         [JsonPropertyName("phrases")]
         public List<string> Phrases { get; set; } = new();
 
-        /// <summary>One or more CAT commands, e.g. "NR01;" or "NR01;NB01;".</summary>
+        /// <summary>One or more CI-V commands in hex, e.g. "16 40 01;" or "16 40 01;16 22 01;".</summary>
         [JsonPropertyName("cat")]
         public string Cat { get; set; } = "";
 
         /// <summary>
         /// Free-text grouping shown in the Settings "Custom Commands" editor
-        /// (e.g. "Noise Reduction", "Custom CAT commands"). Defaults to
+        /// (e.g. "Noise Reduction", "Custom CI-V commands"). Defaults to
         /// "Macros" for anything created before this field existed. Purely
         /// presentational — has no effect on recognition or dispatch.
         /// </summary>

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -342,5 +343,23 @@ namespace Icom_Web_Control.Services
 
         /// <summary>Clear (blank) memory channel <paramref name="channel"/> (1–99) via CI-V 1A 00 … FF. Returns false if not acknowledged.</summary>
         Task<bool> ClearMemoryChannelAsync(int channel, CancellationToken cancellationToken = default);
+
+        // -- Raw command escape hatch ------------------------------------------
+        // Every other member above is semantic by design. This one is not, and
+        // it exists for exactly one caller: user-defined voice macros (Settings →
+        // Voice Control → Custom Commands), which are a data-driven extension
+        // point — the user names a command the app has no intent for and IWC
+        // sends it. Giving that a home on the seam keeps the rule intact that
+        // only the concrete controller builds frames and touches the port: the
+        // caller supplies a command body, never a framed, addressed message.
+        // Nothing else in the app should use this; add a semantic member instead.
+
+        /// <summary>
+        /// Send one raw command body — command byte, optional sub-command byte,
+        /// then data — and report whether the radio acknowledged it. The
+        /// controller adds its own framing and address. Returns false on a
+        /// rejection, a timeout, or an empty body.
+        /// </summary>
+        Task<bool> SendRawCommandAsync(IReadOnlyList<byte> commandBody, CancellationToken cancellationToken = default);
     }
 }

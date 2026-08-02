@@ -13,8 +13,8 @@ This spec extends real, working code. Getting the extension points right depends
 | Fact | Where |
 |---|---|
 | Runtime grammar is built **in-memory from JSON** via `GrammarBuilder`/`Choices`/`SemanticResultValue` — **not** loaded from the `.srgs` XML file. `System.Speech` on .NET 6+ throws `PlatformNotSupportedException` from the SRGS→CFG compiler path, so SRGS can't be the live source. | `VoiceGrammar.cs`, `VoiceControlService.TryInitialiseEngine` |
-| The JSON schema (`VoicePhrasesConfig`) already has: flat `SimpleCommands` (intent → phrase list), several `DecomposedCommand` fields (trigger phrases + value vocabulary) for `SetMode`/`SetBand`/`SetNudgeStep`/`SetAttenuator`/`SetPreamp`/`SetAgc`/`SetAfGain`, a bespoke `SetFrequencyPhrases`, and a fully user-extensible `Macros` list (name, phrases, raw CAT string). | `Models/VoicePhrasesConfig.cs` |
-| Every built-in command's *behaviour* is a hardcoded `switch` in `IntentDispatcher` — translatable, not addable. **Macros are the only fully data-driven extension point today** — arbitrary phrases → arbitrary CAT string, no code change needed. | `Services/Voice/IntentDispatcher.cs` |
+| The JSON schema (`VoicePhrasesConfig`) already has: flat `SimpleCommands` (intent → phrase list), several `DecomposedCommand` fields (trigger phrases + value vocabulary) for `SetMode`/`SetBand`/`SetNudgeStep`/`SetAttenuator`/`SetPreamp`/`SetAgc`/`SetAfGain`, a bespoke `SetFrequencyPhrases`, and a fully user-extensible `Macros` list (name, phrases, raw CI-V command hex). | `Models/VoicePhrasesConfig.cs` |
+| Every built-in command's *behaviour* is a hardcoded `switch` in `IntentDispatcher` — translatable, not addable. **Macros are the only fully data-driven extension point today** — arbitrary phrases → an arbitrary CI-V command body in hex, no code change needed. | `Services/Voice/IntentDispatcher.cs` |
 | Value-space openness varies per built-in command: `SetFrequency`/`SetAfGain` accept any numeric value; `SetMode` accepts any string `CatCommands.FormatMode` understands; `SetBand`/`SetAttenuator`/`SetPreamp`/`SetAgc` are constrained to fixed dictionaries in `IntentDispatcher`. | same |
 | Single locale today: `en-GB` hardcoded in `TryInitialiseEngine`. Multi-language was explicitly deferred to v2 in the v1 plan. | `docs/VoiceControl/v1-plan.md` |
 | Settings → Voice Control already has: enable toggle, spoken-confirmation toggle, nudge-step dropdown, a flat phrase-table editor (`buildPhrasesEditor` in `Settings.cshtml`), a dynamic macros table (add/delete rows), a diagnostics panel (`/api/voice/status`), and an "open user grammars folder" button (currently a no-op placeholder pointing at `%APPDATA%\...\Grammars\`). | `Pages/Settings.cshtml` |
@@ -61,7 +61,7 @@ This is the load-bearing decision for the whole design. Because SRGS can't be lo
   | Transmit | TxOn, TxOff, SplitOn, SplitOff |
   | Status & Help | StatusFrequency, StatusMode, StatusBand, Help |
 
-- `Macros[]` (presented in the UI as **Custom Commands**) gains a `category` string field — free text, defaults to `"Macros"`, autocompletes from categories already present in the pack. This is how a user creates a "Noise Reduction" or "Custom CAT commands" grouping: they just type that category name once and every custom command tagged with it groups together. No schema change needed beyond the one new field — the category *system* is entirely data, not a fixed enum.
+- `Macros[]` (presented in the UI as **Custom Commands**) gains a `category` string field — free text, defaults to `"Macros"`, autocompletes from categories already present in the pack. This is how a user creates a "Noise Reduction" or "Custom CI-V commands" grouping: they just type that category name once and every custom command tagged with it groups together. No schema change needed beyond the one new field — the category *system* is entirely data, not a fixed enum.
 
 This directly resolves the "add new categories" requirement without inventing a second command-type hierarchy: **categories are a tag on commands, not a container users create separately.** A category with zero commands in it simply doesn't render.
 
@@ -92,7 +92,7 @@ Two stages, mirroring the app's existing `ModelState`-driven validation UX (Sett
 **Stage B — semantic** (before install/activate, and on-demand "Validate" button in the editor):
 - Every category has ≥1 command; every command has ≥1 phrase.
 - No duplicate phrases *within the pack* — SAPI grammar ambiguity means a duplicate silently favours whichever variant compiled first; this is exactly the kind of bug the existing `MinConfidence` threshold was added to guard against, so it's caught here instead.
-- Macro/Custom Command CAT strings: syntactically checked (letters/digits/semicolons only) and, unless **Advanced Mode** is on, checked against the CAT allowlist (§5.4).
+- Macro/Custom Command payloads: parsed as CI-V command bodies by `CivMacroCodec` (hex byte pairs, `;` between commands, ≤16 bytes each) and, unless **Advanced Mode** is on, checked against the trusted CI-V command set (§5.5).
 - Built-in command vocabulary keys: open-set commands (`SetFrequency`, `SetAfGain`) skip this check; closed-set commands (`SetBand`, `SetAttenuator`, `SetPreamp`, `SetAgc`) report unknown keys as **warnings** (forward-compatible — a future app version might add a value this pack predates), never hard errors.
 
 Every check returns `{ severity: error | warning, path, message }` — `path` is a dotted schema path (e.g. `macros[2].cat`, `setBand.vocabulary.90`) so the editor can jump to and highlight the exact field. **Errors block save/install. Warnings show inline with an explicit "proceed anyway" affordance** — never silently swallowed, never silently blocking.
@@ -117,7 +117,7 @@ This generalises the existing `Grammars/` (shipped) + `%APPDATA%\...\Grammars\` 
 The editor must be honest about what's actually editable, or "add a new command" becomes a promise the app can't keep:
 
 - **Core Commands** — the built-in intents wired into `IntentDispatcher`. Fixed set; cannot be added or deleted (their behaviour is compiled into the app). Every phrase is editable; open-set values (`SetFrequency`, `SetAfGain`) accept any new value key; closed-set values (`SetBand`, `SetAttenuator`, `SetPreamp`, `SetAgc`) can have synonyms added to an *existing* key but not a brand-new key (Stage B would warn, and `IntentDispatcher` wouldn't know what to do with it anyway).
-- **Custom Commands** — the generalised Macro system. Fully user-owned: name, phrases, one-or-more CAT strings, category. This is the actual answer to "add new commands" and "add new categories."
+- **Custom Commands** — the generalised Macro system. Fully user-owned: name, phrases, one-or-more CI-V commands, category. This is the actual answer to "add new commands" and "add new categories."
 
 This distinction is surfaced in the UI as two visually different row styles within the same category groups (§2.2), not as two separate tabs — a user thinking "I want a Noise Reduction section" shouldn't have to know or care which tier NR-on/NR-off (Core? No — they're already Custom Commands today) happen to be.
 
@@ -135,15 +135,15 @@ Replaces today's one long flat page (`buildPhrasesEditor`) with a collapsible gr
     [Core] Set mode                triggers: mode, set mode  →  8 mode values…       [reset]
     ...
 ▾ Noise Reduction                                                    + Add command
-    [Custom] NR on      phrases: noise reduction on, n r on      cat: NR01;         [✕]
-    [Custom] NR off     phrases: noise reduction off, n r off    cat: NR00;         [✕]
-▾ Custom CAT commands                                                + Add command
-    [Custom] Roofing 3 kHz  phrases: roofing three kilohertz     cat: RF03;         [✕]
+    [Custom] NR on      phrases: noise reduction on, n r on      cat: 16 40 01;     [✕]
+    [Custom] NR off     phrases: noise reduction off, n r off    cat: 16 40 00;     [✕]
+▾ Custom CI-V commands                                               + Add command
+    [Custom] Preamp 1   phrases: preamp one                      cat: 16 02 01;     [✕]
 ▸ Macros (collapsed)                                                 + Add command
 ```
 
 - Core rows keep today's inline comma-separated phrase input (proven, low-friction) plus a per-value vocabulary sub-table for decomposed commands — same interaction, just grouped.
-- Custom rows keep today's macro-row pattern (name / phrases / CAT / delete), with a new **category** field (autocomplete dropdown + free-text "new category…").
+- Custom rows keep today's macro-row pattern (name / phrases / CI-V / delete), with a new **category** field (autocomplete dropdown + free-text "new category…").
 - A category with zero commands doesn't render. Typing a brand-new category name into any "+ Add command" form and saving a command into it is how a category is created — there is no separate "create category" action, matching §1.3's "category is a tag, not a container."
 - Search/filter box above the accordion (new) — filters visible rows by phrase or command name text match, auto-expanding matching categories. Necessary once the page holds an open-ended number of custom commands rather than today's fixed ~15 rows.
 
@@ -151,10 +151,10 @@ Replaces today's one long flat page (`buildPhrasesEditor`) with a collapsible gr
 
 | Action | UI |
 |---|---|
-| Add command | "+ Add command" in any category header → inline form: Name, Phrases (chip/tag input — upgrade from today's comma-separated text field for clearer editing and better accessibility with screen readers), CAT string(s) (monospace textarea, `;`-joined or one-per-line, live allowlist check as they type), Category (prefilled to the section they clicked from, changeable) |
+| Add command | "+ Add command" in any category header → inline form: Name, Phrases (chip/tag input — upgrade from today's comma-separated text field for clearer editing and better accessibility with screen readers), CI-V command(s) (monospace textarea, hex bytes, `;`-joined or one-per-line, live trusted-command check as they type), Category (prefilled to the section they clicked from, changeable) |
 | Delete command | Trash icon on Custom rows only (matches today's macro delete). Core rows show "reset to default phrases" instead — deleting a Core command would leave its intent permanently silent, which is a confusing dead-end for a user, so it's reframed as a revert |
 | Modify phrases | Inline chip input, same interaction as today, now consistent across Core and Custom rows |
-| Modify values | Vocabulary sub-table under decomposed Core commands (today's pattern, unchanged); for Custom Commands, "value" *is* the CAT string, edited directly |
+| Modify values | Vocabulary sub-table under decomposed Core commands (today's pattern, unchanged); for Custom Commands, "value" *is* the CI-V command hex, edited directly |
 | Add new category | Implicit — type a new name into any "+ Add command" form's Category field |
 
 ### 2.4 Auto-generation of JSON + SRGS
@@ -249,13 +249,13 @@ Per §1.2, the runtime never parses XML from a pack at all — only JSON, only t
 
 ### 5.4 Intent registration — no reflection
 
-The mapping from intent name to behaviour stays the fixed `switch` in `IntentDispatcher` for Core Commands — deliberately **not** made "pluggable via reflection or attribute scanning," even though that's a tempting generalisation once packs become dynamic, because a reflection-loaded handler sourced from a downloaded pack is arbitrary code execution. Custom Commands never execute code: they only ever produce a CAT string sent through the exact same `ICatClient.SendCommandAsync` path every other CAT write in the app already uses (on-screen buttons, rigctld, existing macros). **A voice pack is data, never code, at every layer** — this is the single sentence that should gate any future feature request that tries to make commands "more powerful."
+The mapping from intent name to behaviour stays the fixed `switch` in `IntentDispatcher` for Core Commands — deliberately **not** made "pluggable via reflection or attribute scanning," even though that's a tempting generalisation once packs become dynamic, because a reflection-loaded handler sourced from a downloaded pack is arbitrary code execution. Custom Commands never execute code: they only ever produce a CI-V *command body*, handed to `IRadioController.SendRawCommandAsync`, which is the one deliberate escape hatch in an otherwise semantic seam. The macro supplies the body only — `CivRadioController` still applies framing and addressing itself, so a pack can neither forge a radio address nor split/join frames. **A voice pack is data, never code, at every layer** — this is the single sentence that should gate any future feature request that tries to make commands "more powerful."
 
-### 5.5 CAT allowlist & Advanced Mode
+### 5.5 CI-V allowlist & Advanced Mode
 
-A small static allowlist of CAT command prefixes considered safe for voice-invoked Custom Commands in normal mode — in practice, the same prefixes `IntentDispatcher`'s own Core Commands already send (`NR`, `NB`, `RA`, `PA`, `GT`, `SH`, `AG`, `MD`, `FA`/`FB` with the existing range checks, etc.). Framed precisely: **Advanced-Mode-off means custom commands can only recombine the primitives the built-in commands already trust** — not a new trust boundary, just an extension of the existing one.
+A small static set of CI-V command bytes considered safe for voice-invoked Custom Commands in normal mode — in practice, the same commands the app itself already sends through `IRadioController` (`05`/`06`/`07`, `0F`, `11`, `14`, `16`, `17`, `1A`, `1C`, `25`/`26`, `27`). Framed precisely: **Advanced-Mode-off means custom commands can only recombine the primitives the built-in commands already trust** — not a new trust boundary, just an extension of the existing one. One deliberate exception: `18` (power on/off) is *not* trusted even though the app sends it, because over the IC-7300's USB CI-V link a power-off takes the serial port down with it, leaving nothing to power the radio back on with.
 
-- Stage B validation rejects any Custom Command CAT string using a prefix outside the allowlist, unless the user has ticked **Settings → Voice Control → "Advanced mode: allow any CAT command in custom commands"** (off by default).
+- Stage B validation rejects any Custom Command whose command byte is outside the trusted set, unless the user has ticked **Settings → Voice Control → "Advanced mode: allow any CI-V command in Custom Commands"** (off by default).
 - First-time enable shows an interstitial confirm: *"A malformed or malicious voice pack could send commands that alter your radio's configuration. Only enable this if you trust the source of packs you import, or you're hand-authoring your own."*
 - This directly answers the question that will come up the moment community pack-sharing exists: *"I imported someone else's pack — can it damage my radio?"* Answer: not unless they explicitly opted into Advanced Mode.
 
@@ -326,5 +326,5 @@ For whoever implements this — dependency-ordered, each step independently ship
 6. **Import + preview + validation report** (§3.2) — the highest-value, highest-risk piece; build on top of the now-proven validation pipeline from step 2.
 7. **Multi-locale runtime switch** (§4) — active-locale setting, `ReloadGrammar()` generalised to take a locale, the Windows-recognizer mismatch banner.
 8. **Version history / rollback** (§3.3) — thin wrapper around the import pipeline from step 6.
-9. **CAT allowlist + Advanced Mode gate** (§5.5) — should land no later than step 6, since import is the first point untrusted CAT strings enter the system.
+9. **CI-V allowlist + Advanced Mode gate** (§5.5) — should land no later than step 6, since import is the first point untrusted CI-V commands enter the system.
 10. **Per-row "Try it" + dry-run testing** (§2.5, §6.5) — polish, but the single most-requested-once-people-see-it feature based on how translators actually work; don't leave it for "later" indefinitely.

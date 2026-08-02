@@ -1789,6 +1789,27 @@ namespace Icom_Web_Control.Services
             return ok;
         }
 
+        // -- Raw command escape hatch (voice macros only) ----------------------
+        // See IRadioController.SendRawCommandAsync. The body comes from a user's
+        // Custom Command; framing and address stay ours, so a macro chooses the
+        // command but never the frame. Set commands answer FB/FA — a read
+        // command in a macro answers with data instead and is reported as an
+        // unacknowledged send, which is honest: nothing consumes the reply.
+
+        public async Task<bool> SendRawCommandAsync(IReadOnlyList<byte> commandBody, CancellationToken cancellationToken = default)
+        {
+            if (commandBody == null || commandBody.Count == 0) return false;
+
+            var body = commandBody as byte[] ?? commandBody.ToArray();
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
+            if (!ok)
+                _logger.LogWarning("[CivRadioController] Raw command {Body} was not acknowledged",
+                    CivMacroCodec.Describe(body));
+            return ok;
+        }
+
         /// <summary>Append a 14-byte RX-or-TX block: freq(5) mode(1) filter(1) data/tone(1) rptrTone(3) toneSql(3).</summary>
         private static void AppendModeBlock(List<byte> body, long freqHz, string mode, int filter)
         {

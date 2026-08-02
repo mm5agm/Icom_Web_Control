@@ -355,6 +355,16 @@ namespace Icom_Web_Control.Services
         public Task<bool> ClearMemoryChannelAsync(int channel, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
 
+        // -- Raw command escape hatch (voice macros; nothing to send here) ------
+
+        public Task<bool> SendRawCommandAsync(System.Collections.Generic.IReadOnlyList<byte> commandBody, CancellationToken cancellationToken = default)
+        {
+            if (commandBody == null || commandBody.Count == 0) return Task.FromResult(false);
+            _logger.LogInformation("[StubRadioController] Raw command {Body} accepted (no hardware)",
+                Civ.CivMacroCodec.Describe(System.Linq.Enumerable.ToArray(commandBody)));
+            return Task.FromResult(true);
+        }
+
         // -- Canned spectrum (Phase 5 dual-panel demo) -------------------------
         //
         // The real CivRadioController reassembles CI-V 27 00 scope frames and

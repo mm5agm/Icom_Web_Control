@@ -25,7 +25,8 @@ namespace Icom_Web_Control.Services.Voice
     ///
     ///   Macros           — flat Choices; each phrase maps to
     ///                      "Macro:{name}|{cat}" encoding both spoken name
-    ///                      (for the TTS confirmation) and CAT string to send.
+    ///                      (for the TTS confirmation) and the CI-V commands
+    ///                      to send.
     ///
     ///   SetFrequency     — flat variants (whole + 1..6 fractional digits,
     ///                      giving full 1 Hz voice resolution) to avoid the SAPI
@@ -353,10 +354,11 @@ namespace Icom_Web_Control.Services.Voice
             return gb;
         }
 
-        // ── Macros (user-defined CAT shortcuts) ──────────────────────────
+        // ── Macros (user-defined CI-V shortcuts) ─────────────────────────
         // Intent encoding: "Macro:{name}|{cat}" — name is for the spoken
-        // confirmation, cat is sent verbatim to the radio (split on ';').
-        // The '|' separator is safe because CAT strings never contain '|'.
+        // confirmation, cat is the ';'-separated CI-V command hex the
+        // dispatcher decodes (CivMacroCodec) and sends. The '|' separator is
+        // safe because a macro payload is only hex digits, spaces and ';'.
 
         private static GrammarBuilder? BuildMacros(List<MacroDefinition> macros)
         {

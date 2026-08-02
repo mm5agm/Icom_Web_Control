@@ -31,7 +31,7 @@ via `GrammarBuilder`/`Choices`/`SemanticResultValue`, not by parsing this XML
 
 Each command emits a `out.intent` string and zero or more parameters. The
 intent name + parameter dictionary are handed to `IntentDispatcher` which
-maps to the existing CAT helpers. The equivalent live encoding (in
+maps them onto the `IRadioController` seam (CI-V). The equivalent live encoding (in
 `VoiceGrammar.cs`) uses a single `"intent"` semantic key carrying strings like
 `"SetMode:USB"` or `"Macro:{name}|{cat}"`, parsed back apart in
 `VoiceControlService.NormaliseIntent()`.

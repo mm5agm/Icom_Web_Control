@@ -432,7 +432,7 @@ namespace Icom_Web_Control.Controllers
         /// Saves a new voice phrases configuration and hot-reloads the SAPI
         /// grammar so changes take effect immediately without an app restart.
         /// Validates first — a config with blocking errors (e.g. a macro
-        /// with no CAT string) is rejected with 422 and never written to
+        /// with no CI-V command) is rejected with 422 and never written to
         /// disk; warnings don't block the save but are returned alongside
         /// the success response so the UI can still show them.
         /// </summary>

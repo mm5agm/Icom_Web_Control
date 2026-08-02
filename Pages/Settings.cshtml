@@ -396,10 +396,10 @@
                 <input class="form-check-input" type="checkbox" role="switch"
                        id="voiceAdvancedModeEnabled" asp-for="Settings.VoiceAdvancedModeEnabled" />
                 <label class="form-check-label" for="voiceAdvancedModeEnabled">
-                    Advanced mode: allow any CAT command in Custom Commands
+                    Advanced mode: allow any CI-V command in Custom Commands
                 </label>
                 <div class="form-text">
-                    Off by default. When off, a Custom Command's CAT string must start with a prefix one of
+                    Off by default. When off, every CI-V command in a Custom Command must use a command byte one of
                     the built-in Core Commands already sends — a Custom Command can only recombine
                     primitives the app already trusts, not send anything new. Only enable this if you trust
                     the source of any language pack you import, or you're hand-authoring your own commands.
@@ -1096,7 +1096,7 @@
                 resultsEl.innerHTML = '<em class="text-muted">Setting up US English voice…</em>';
                 try {
                     // 1. Load the pack that ships inside the installer.
-                    const packResp = await fetch('/voice-packs/IWC-VoicePack-en-US-v1.zip');
+                    const packResp = await fetch('/voice-packs/IWC-VoicePack-en-US-v2.zip');
                     if (!packResp.ok) {
                         resultsEl.innerHTML = '<span class="text-danger">Couldn\'t load the bundled US English pack (HTTP ' +
                             packResp.status + ').</span>';
@@ -1107,7 +1107,7 @@
                     // 2. Preview — validates the pack and reports whether Windows
                     //    has the matching speech recogniser installed.
                     const fd = new FormData();
-                    fd.append('pack', blob, 'IWC-VoicePack-en-US-v1.zip');
+                    fd.append('pack', blob, 'IWC-VoicePack-en-US-v2.zip');
                     const pv = await fetch('/api/voice/phrases/import/preview', { method: 'POST', body: fd });
                     const preview = await pv.json();
                     if (!pv.ok) {
@@ -1359,7 +1359,7 @@
                 return `<tr class="macro-row">
                     <td><input type="text" class="form-control form-control-sm macro-name" value="${escapeAttr(name)}" placeholder="e.g. NR on"></td>
                     <td><input type="text" class="form-control form-control-sm macro-phrases" value="${escapeAttr(phrasesToStr(phrases))}" placeholder="noise reduction on, n r on"></td>
-                    <td><input type="text" class="form-control form-control-sm macro-cat" style="font-family:monospace" value="${escapeAttr(catString)}" placeholder="NR01;"></td>
+                    <td><input type="text" class="form-control form-control-sm macro-cat" style="font-family:monospace" value="${escapeAttr(catString)}" placeholder="16 40 01;"></td>
                     <td><input type="text" class="form-control form-control-sm macro-category" value="${escapeAttr(category)}" placeholder="Macros"></td>
                     <td class="text-nowrap">
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-action="try-it" title="Say one of these phrases into the mic">Try it</button>
@@ -1371,12 +1371,14 @@
 
             const CUSTOM_COMMANDS_THEAD =
                 '<thead><tr><th style="width:18%">Name</th><th style="width:25%">Phrases (comma-separated)</th>' +
-                '<th style="width:20%">CAT string</th><th style="width:17%">Category</th><th style="width:12%">Test</th><th></th></tr></thead>';
+                '<th style="width:20%">CI-V command</th><th style="width:17%">Category</th><th style="width:12%">Test</th><th></th></tr></thead>';
 
             function buildCustomCommandsSection(cfg) {
                 const groups = groupMacrosByCategory(cfg.macros);
                 let html = `<h6 class="mt-3 mb-1 text-uppercase text-muted small">Custom Commands</h6>`;
-                html += `<p class="text-muted mb-2" style="font-size:0.82em">Custom commands send CAT strings directly. Use <code>;</code> to chain commands, e.g. <code>NR01;NB01;</code>. ` +
+                html += `<p class="text-muted mb-2" style="font-size:0.82em">Custom commands send CI-V commands straight to the radio, written as hex bytes — ` +
+                    `command, sub-command, data. Use <code>;</code> to chain commands, e.g. <code>16 40 01;16 22 01;</code> (NR on, then NB on). ` +
+                    `The command codes are in the IC-7300 CI-V reference in the radio's manual. ` +
                     `Change a command's Category field to move it to a different group — it moves next time the editor reloads.</p>`;
                 html += `<div id="macroGroups">`;
                 let idx = 0;

@@ -2,16 +2,17 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Icom_Web_Control.Hubs;
 using Icom_Web_Control.Services;
+using Icom_Web_Control.Services.Civ;
 
 namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>
     /// Maps a recognised semantic intent + parameter dictionary (from the
-    /// SRGS grammar's <c>out.intent</c> tags) to CAT commands sent via
-    /// <see cref="ICatClient"/>. Voice commands target whichever VFO's mic
-    /// button was pressed (v2, per-VFO voice) — see <see cref="_vfo"/>.
-    /// FTdx10 / FT-710 are single-receiver, so the target always collapses
-    /// to A there (<see cref="RadioCapabilities.VfoP1"/> /
+    /// SRGS grammar's <c>out.intent</c> tags) to radio operations sent through
+    /// the <see cref="IRadioController"/> seam. Voice commands target whichever
+    /// VFO's mic button was pressed (v2, per-VFO voice) — see <see cref="_vfo"/>.
+    /// The IC-7300 is single-receiver, so the target always collapses to A
+    /// (<see cref="RadioCapabilities.VfoP1"/> /
     /// <see cref="RadioCapabilities.VfoIsB"/> already enforce this).
     /// </summary>
     public sealed class IntentDispatcher
@@ -30,7 +31,6 @@ namespace Icom_Web_Control.Services.Voice
         //   SetAgc         — IC-7300 is fast/mid/slow only, no off/auto.
         //   NudgeIfWidth   — no clean seam equivalent yet (PBT/filter model differs).
         //   BandUp/Down    — no seam band-step; would need band-stacking logic.
-        //   Macro          — sends arbitrary Yaesu CAT strings; Icom needs CI-V hex.
         private readonly IRadioController _radio;
 
         public IntentDispatcher(
@@ -47,8 +47,8 @@ namespace Icom_Web_Control.Services.Voice
             _radio = radio;
         }
 
-        // §6.5 dry-run testing: when set, SendCommand() logs the CAT string
-        // instead of sending it. AsyncLocal rather than a field/parameter
+        // §6.5 dry-run testing: when set, the seam wrappers below log what they
+        // would send instead of sending it. AsyncLocal rather than a field/parameter
         // threaded through every intent handler -- it scopes cleanly to the
         // single DispatchAsync call tree without touching ~20 method
         // signatures, and doesn't leak into unrelated concurrent dispatches.
@@ -306,22 +306,48 @@ namespace Icom_Web_Control.Services.Voice
 
         // -- Macro ---------------------------------------------------------
 
-        private Task<DispatchResult> MacroAsync(
+        private async Task<DispatchResult> MacroAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             var name = args.TryGetValue("macroName", out var n) ? n?.ToString() ?? "Macro" : "Macro";
             if (!args.TryGetValue("macroCat", out var c) || c is not string cat || string.IsNullOrWhiteSpace(cat))
             {
-                _logger.LogWarning("[Voice] Macro '{Name}' has no CAT string", name);
-                return Task.FromResult(new DispatchResult(false, name));
+                _logger.LogWarning("[Voice] Macro '{Name}' has no CI-V command", name);
+                return new DispatchResult(false, name);
             }
-            // TODO(voice-civ): the default macros still hold Yaesu ASCII CAT
-            // strings (AB;, NR01;, …). They need CI-V hex equivalents before they
-            // can reach the IC-7300, so macros are inert on Icom. Report it
-            // honestly (IsReadBack, plain spoken message) rather than falsely
-            // confirming a command that never left the app.
-            _logger.LogInformation("[Voice] Macro '{Name}' ({Cat}) recognised but not yet wired to CI-V", name, cat);
-            return Task.FromResult(new DispatchResult(false, $"The {name} macro isn't available on the IC-7300 yet", IsReadBack: true));
+
+            // The macro payload is CI-V command bodies in hex, ';'-separated —
+            // see CivMacroCodec. A malformed one never reaches the radio (the
+            // Settings validator rejects it at save time too): report it
+            // unsuccessful rather than sending a guess.
+            if (!CivMacroCodec.TryParse(cat, out var commands, out var error))
+            {
+                _logger.LogWarning("[Voice] Macro '{Name}' payload '{Cat}' isn't valid CI-V: {Error}", name, cat, error);
+                return new DispatchResult(false, name);
+            }
+
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would send macro '{Name}': {Commands}",
+                    name, string.Join(" | ", commands.Select(CivMacroCodec.Describe)));
+                return new DispatchResult(true, name);
+            }
+
+            // Chained commands go in order and stop at the first rejection. A
+            // half-applied macro is untidy, but pressing on past a command the
+            // radio refused is worse — and the spoken "unsuccessful" tells the
+            // operator to look, which is the whole point of the confirmation.
+            foreach (var command in commands)
+            {
+                if (!await _radio.SendRawCommandAsync(command, ct))
+                {
+                    _logger.LogWarning("[Voice] Macro '{Name}': command {Command} was not acknowledged",
+                        name, CivMacroCodec.Describe(command));
+                    return new DispatchResult(false, name);
+                }
+            }
+            _logger.LogInformation("[Voice] Macro '{Name}' sent {Count} CI-V command(s)", name, commands.Count);
+            return new DispatchResult(true, name);
         }
 
         // -- Status read-back (IsReadBack=true → no ", successful" appended) -----

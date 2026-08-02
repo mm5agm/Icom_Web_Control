@@ -88,8 +88,12 @@ namespace Icom_Web_Control.Services.Voice
                 // Version 3 changed SetMode/SetBand to DecomposedCommand and merged
                 // Verbs+Connectors into Triggers for SetFrequency. Version 7 added
                 // the natural "status frequency" / "transmit on" trigger synonyms.
+                // Version 8 replaced the inherited Yaesu ASCII macro payloads
+                // ("NR01;") with CI-V hex ("16 40 01;") — a v7 pack's macros
+                // would be rejected by the validator and unsendable, so it has
+                // to be reset, not carried forward.
                 // Older files are reset to defaults rather than partially migrated.
-                if (config == null || config.Version < 7)
+                if (config == null || config.Version < 8)
                     return BuildDefaults();
                 return config;
             }
@@ -321,7 +325,7 @@ namespace Icom_Web_Control.Services.Voice
 
         public static VoicePhrasesConfig BuildDefaults() => new()
         {
-            Version = 7,
+            Version = 8,
             SimpleCommands = new()
             {
                 ["SwapVFO"]          = ["swap v f o", "swap v f os", "swap a and b", "swap a b", "switch v f o", "switch a and b"],
@@ -374,19 +378,27 @@ namespace Icom_Web_Control.Services.Voice
                     ["4"]   = ["four metres"],
                 },
             },
+            // Macro payloads are CI-V command bodies in hex, ';'-separated —
+            // command byte, sub-command byte, data. See CivMacroCodec.
             Macros = new()
             {
-                new() { Name = "Copy A to B",    Phrases = ["copy a to b", "a to b"],         Cat = "AB;",   Category = "Macros" },
-                new() { Name = "Copy B to A",    Phrases = ["copy b to a", "b to a"],         Cat = "BA;",   Category = "Macros" },
-                new() { Name = "Fine step up",   Phrases = ["fine up", "fine step up"],       Cat = "UP;",   Category = "Macros" },
-                new() { Name = "Fine step down", Phrases = ["fine down", "fine step down"],   Cat = "DN;",   Category = "Macros" },
-                new() { Name = "NR on",           Phrases = ["noise reduction on", "n r on"],           Cat = "NR01;", Category = "Noise Reduction" },
-                new() { Name = "NR off",          Phrases = ["noise reduction off", "n r off"],          Cat = "NR00;", Category = "Noise Reduction" },
-                new() { Name = "NB on",           Phrases = ["noise blanker on", "n b on"],              Cat = "NB01;", Category = "Noise Reduction" },
-                new() { Name = "NB off",          Phrases = ["noise blanker off", "n b off"],            Cat = "NB00;", Category = "Noise Reduction" },
+                // Icom has no one-shot "copy A to B": 07 A0 equalizes, i.e.
+                // copies the SELECTED VFO into the other. So each direction
+                // selects its source first, and "copy B to A" hands the
+                // operating VFO back to A afterwards so the macro leaves the
+                // selection exactly as it found it.
+                new() { Name = "Copy A to B",    Phrases = ["copy a to b", "a to b"],         Cat = "07 00;07 A0;",         Category = "Macros" },
+                new() { Name = "Copy B to A",    Phrases = ["copy b to a", "b to a"],         Cat = "07 01;07 A0;07 00;",   Category = "Macros" },
+                new() { Name = "NR on",           Phrases = ["noise reduction on", "n r on"],           Cat = "16 40 01;", Category = "Noise Reduction" },
+                new() { Name = "NR off",          Phrases = ["noise reduction off", "n r off"],         Cat = "16 40 00;", Category = "Noise Reduction" },
+                new() { Name = "NB on",           Phrases = ["noise blanker on", "n b on"],             Cat = "16 22 01;", Category = "Noise Reduction" },
+                new() { Name = "NB off",          Phrases = ["noise blanker off", "n b off"],           Cat = "16 22 00;", Category = "Noise Reduction" },
                 // (The Yaesu roofing-filter macros were removed for IWC — the
                 //  IC-7300 is a DSP receiver with no switchable roofing filters;
-                //  its IF passband is set via the IF Width / FIL slot controls.)
+                //  its IF passband is set via the IF Width / FIL slot controls.
+                //  The Yaesu "fine step up/down" macros went too: they were the
+                //  mic UP/DN keys, which CI-V has no equivalent of. "Tune up" /
+                //  "tune down" with a 10 Hz step size is the same operation.)
             },
             SetAttenuator = new()
             {
