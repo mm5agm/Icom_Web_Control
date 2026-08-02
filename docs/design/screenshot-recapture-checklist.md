@@ -37,7 +37,8 @@ IWC's own screens, which have changed for the IC-7300 build:
 - [ ] `CW-Keyer.png`
 - [ ] `FM-Repeater.png`
 - [ ] `Vox-Control.png`
-- [ ] `Calibration.png`
+- [x] `Calibration.png` — recaptured in 2c9d443, and now actually embedded in
+      manual §10, which it never was before
 
 **DX**
 - [ ] `DX-Watch.png`

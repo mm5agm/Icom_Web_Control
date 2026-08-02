@@ -275,7 +275,15 @@ and read the same two documents.
 Claude must, before the first commit of the release:
 
 1. **`README.md`** — add the release-notes entry for the new version, and bump
-   the per-release download badge near the top to the new tag.
+   the per-release download badge near the top **if this is a full release**.
+   The badge is the front page's "get this one" button, so it tracks the newest
+   **full** release only — never a pre-release. That is the same call rule 14
+   makes for the in-app banner, for the same reason: an operator who lands on
+   the repo should be pointed at the tested build, and reach a pre-release only
+   by going to the releases page on purpose. So a pre-release bumps
+   `AppVersion.cs`, `installer.nsi` and the release notes, and leaves the badge
+   pointing at the last full release. Promoting a pre-release to full
+   (`gh release edit vX.Y.Z --prerelease=false`) is what finally moves it.
 2. **`USER_MANUAL.md`** — bring every section the release touches in line with
    what the app now does: new or changed controls, renamed buttons, altered
    behaviour, new settings, new voice commands. Re-capture any screenshot the

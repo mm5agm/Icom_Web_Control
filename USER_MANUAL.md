@@ -1453,7 +1453,11 @@ GridTracker is a separate desktop app that draws a live world map of WSJT-X grid
 
 The calibration page lets you adjust the scale of each meter gauge to match your radio's actual output. This is useful if the meter readings seem inaccurate.
 
-Access calibration from **Calibrate Meters** in the navigation bar.
+Access calibration from **Meter Calibration** in the navigation bar.
+
+![The Meter Calibration page: a live gauge and its raw-to-display point table for each meter](pictures/Calibration.png)
+
+Each meter gets its own column — a live gauge at the top, then the table of calibration points below it. The **Raw:** and **Calibrated:** readings above each table show what the radio is sending right now and what your table turns it into, so you can watch the effect of a change as you make it. The path to the file your work is saved in is shown at the top of the page.
 
 **How calibration works:**
 
