@@ -42,8 +42,12 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ### v1.0.2 (unreleased) — pre-release
 
-Band-plan accuracy and a visible start-up. Nothing here changes how the radio is driven.
+Band-plan accuracy, a visible start-up, and the voice macros finally reaching the radio.
 
+- **Voice macros now actually work.** "Noise reduction on", "noise blanker off" and "copy a to b" were recognised, spoke a cheerful "successful" back at you, and did nothing at all — the six default macros still carried the *Yaesu* command strings IWC inherited when it was cloned, which an Icom radio has no idea what to do with. They now send proper CI-V commands, and the confirmation you hear is the truth.
+  - **"Fine step up" / "fine step down" are gone.** They were the Yaesu microphone UP/DN keys and CI-V has no equivalent. "Tune up" / "tune down" with the step set to 10 Hz does the same job.
+  - **Your saved phrase pack is replaced by the new defaults the first time you run this version** — its custom commands were in the old radio's format and could not be sent. The old pack is kept in **Show version history** if you need to look at it.
+  - **Custom Commands are now written as CI-V hex** — `16 40 01;` is noise reduction on, straight out of the CI-V table in the IC-7300 manual. So a custom command can now reach anything in the radio's command set, not just the handful IWC has buttons for. See §17.6 of the [User Manual](USER_MANUAL.md).
 - **Band buttons and the toolbar now use *your* band plan.** IWC had two sets of band edges and only one of them knew about your region: the display used a single hard-coded worldwide table, so a UK operator on 3.900 MHz was told "80m" even though that is outside the Region 1 allocation. Both now resolve against the **Band Plan** you chose in Settings.
   - **Behaviour change to expect:** on frequencies outside your region's allocation the band button no longer lights up normally — it turns **red**, on whichever band you were nearest to. Region 1 operators will see this above 3.800, above 7.200, and below 1.810 MHz, where the old table let those frequencies pass as in-band. That is the correct answer, not a fault.
   - DX-spot filtering and the spectrum's band shading are unaffected — they deliberately use worldwide envelopes.
