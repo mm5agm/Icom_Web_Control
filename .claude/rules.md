@@ -288,3 +288,26 @@ still add the README release-notes entry — that entry is never optional.
 Claude must not start the release steps until both documents are updated, and
 must never defer this to "after the release". A shipped version whose manual
 describes the previous one is a defect.
+
+---
+
+# 14. In-App Update Notifications — Full Releases Only (Non-Negotiable)
+
+**The in-app update banner must only ever announce a full release. It must never
+announce a pre-release or a draft.**
+
+Pre-releases are opt-in: an operator who wants to test one goes to the GitHub
+releases page and downloads it deliberately. Interrupting someone who is
+operating the radio to push a less-tested build at them is the wrong trade.
+
+Concretely, the update check (`wwwroot/js/ui/site.js`, `_checkForUpdate`) must:
+
+- fetch `…/releases/latest` — **never** the `/releases` list endpoint, which
+  includes pre-releases and drafts;
+- bail out if the payload comes back with `prerelease` or `draft` set;
+- never gain a setting, flag or "advanced" opt-in that surfaces pre-releases in
+  the banner.
+
+This applies to any future notification channel added to the app — a tray
+balloon, a Settings "check now" button, an About-page version line. Same rule:
+full releases only.

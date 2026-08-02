@@ -1,5 +1,15 @@
 # Screenshot recapture checklist — IWC release (Phase 1 rebrand)
 
+> ## ✅ DONE — closed by commit `2c9d443` (2026-07-30)
+>
+> 24 app-UI images were re-shot under the Icom branding, the Yaesu hardware
+> photos and the dead SDR/Log4OM orphans were deleted, and the manual's
+> "every screenshot is still the Yaesu build" caveat was removed with them.
+> Verified 2026-08-02: `pictures/` contains no `ftdx101mp*`, `Yaesu_*`,
+> `Spectrum_*` or `Settings_SDR_Warning` files, and every image the manual
+> references exists. The unticked boxes below are kept as the historical
+> worklist — **do not treat them as outstanding.**
+
 > Cross-referenced between the images `USER_MANUAL.md` actually embeds and the
 > `pictures/` folder, so we only re-shoot what genuinely changed. Every image the
 > manual references currently exists (no broken links) — the work is **replacing

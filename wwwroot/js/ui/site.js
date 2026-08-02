@@ -3851,11 +3851,22 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!meta) return;
         const current = meta.content.trim();
         try {
+            // /releases/latest — NOT /releases. GitHub defines "latest" as the
+            // newest release that is neither a draft nor a pre-release, which is
+            // exactly the policy we want: operators are told about full releases
+            // only. Pre-releases are opt-in — someone who wants to test one goes
+            // to the releases page and picks it deliberately. Never switch this
+            // to the list endpoint or add a "include pre-releases" option; a
+            // banner is an interruption, and interrupting someone mid-QSO to
+            // offer them a less-tested build is the wrong trade.
             const resp = await fetch('https://api.github.com/repos/mm5agm/Icom_Web_Control/releases/latest', {
                 headers: { Accept: 'application/vnd.github+json' }
             });
             if (!resp.ok) return;
             const data = await resp.json();
+            // Belt and braces: if GitHub ever hands back a pre-release or draft
+            // here, stay quiet rather than trusting the endpoint's contract.
+            if (data.prerelease || data.draft) return;
             const latest = (data.tag_name || '').replace(/^v/i, '');
             if (latest && _isNewer(latest, current)) {
                 _showUpdateBanner(latest, data.html_url || 'https://github.com/mm5agm/Icom_Web_Control/releases');

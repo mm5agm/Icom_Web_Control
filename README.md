@@ -17,6 +17,8 @@ They have had less testing than the full releases. If you want the quiet life, u
 
 If something has been biting you and a pre-release says it is fixed, or you want the newest features and do not mind the odd rough edge, go ahead and install it — and please tell me how you get on. That feedback is what turns a pre-release into a full one.
 
+**Pre-releases never nag you.** IWC's in-app update banner only ever announces a full release, so if you don't go looking for a pre-release you will never be told one exists. Trying one is always a deliberate trip to the releases page. (GitHub's own **Watch → Releases** notifications are a separate thing and *do* include pre-releases — see [Staying informed about updates](#staying-informed-about-updates) below.)
+
 ## What this is
 
 IWC is a web-based control panel and panadapter for Icom transceivers, cloned from YWC and re-fitted for Icom's CI-V protocol. The plumbing YWC already got right — the real-time SignalR pipeline, the meter gauges, the spectrum display, the settings and rigctld bridge, and the voice control — is being kept; the Yaesu CAT layer is being replaced with a fresh CI-V layer behind a clean radio-control seam.
@@ -37,6 +39,18 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 **`v1.0.0` is the first public release** — it controls an IC-7300 MkII end-to-end (see the summary at the top), tested against a single radio. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
+
+### v1.0.2 (unreleased) — pre-release
+
+Band-plan accuracy and a visible start-up. Nothing here changes how the radio is driven.
+
+- **Band buttons and the toolbar now use *your* band plan.** IWC had two sets of band edges and only one of them knew about your region: the display used a single hard-coded worldwide table, so a UK operator on 3.900 MHz was told "80m" even though that is outside the Region 1 allocation. Both now resolve against the **Band Plan** you chose in Settings.
+  - **Behaviour change to expect:** on frequencies outside your region's allocation the band button no longer lights up normally — it turns **red**, on whichever band you were nearest to. Region 1 operators will see this above 3.800, above 7.200, and below 1.810 MHz, where the old table let those frequencies pass as in-band. That is the correct answer, not a fault.
+  - DX-spot filtering and the spectrum's band shading are unaffected — they deliberately use worldwide envelopes.
+- **The Segment dropdown now shows where you actually are.** It tracks the live frequency wherever it comes from (spectrum click, front-panel knob, on-screen keyboard), and it is bounded by the band edges: previously the highest segment kept claiming your frequency however far above the band you tuned. Out of band it reads **OOB** on red, and selecting it can no longer tune the radio.
+- **A proper start-up screen.** The "Initialising" overlay was never actually styled — it rendered as a strip at the top of a half-built page. It is now a full-screen panel that stays up until the spectrum appears, so the layout stops rearranging itself under you. A **Continue anyway** button is there if you ever need it.
+- **The spectrum appears sooner** when you open IWC in a new tab or reload the page. The panel was waiting for a periodic status broadcast that could be up to 29 sweeps away; a browser that connects now gets one on the next sweep.
+- **The update banner is now guaranteed to ignore pre-releases.** It already only asked GitHub for the newest *full* release, but that was an unwritten assumption; it is now documented, guarded in code, and written into the project's rules so it can't drift. Nothing changes for you — pre-releases stay something you go and fetch on purpose.
 
 ### v1.0.1 (2026-08-01) — pre-release
 
@@ -99,7 +113,7 @@ These are one-time steps — once the app is installed you won't see them again.
 
 ## Staying informed about updates
 
-IWC carries over YWC's in-app update check — a banner appears the first time you run it after a new release lands. To also be notified outside the app, **any one of these works**:
+IWC carries over YWC's in-app update check — a banner appears the first time you run it after a new **full** release lands. Pre-releases are never announced in the app. To also be notified outside the app, **any one of these works** (note that both of these *do* fire for pre-releases, unlike the in-app banner):
 
 - **GitHub release notifications** (most reliable, free, no spam):
   1. Make sure you're signed in to GitHub
