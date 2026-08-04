@@ -343,7 +343,7 @@ The three sliders under the panel header shape the display. All three are per-VF
 
 **Scope mode** (top-left of the canvas) — shows the scope mode the radio is actually in, read from the sweep data itself: **CENT**, **FIX**, **SCROLL-C** or **SCROLL-F**. IWC's frequency axis assumes centre mode, so **CENT** is green — everything lines up. Any other mode is shown in amber as a warning that the trace may not match the frequency axis beneath it. **Click the badge to switch the radio between Centre and Fixed**, which is the quick way back to green if the radio was left in Fixed mode.
 
-**Scope status** (right-hand end of the panel header) — **No SDR** (no scope source), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, or **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show).
+**Scope status** (right-hand end of the panel header) — **Scope off** (no sweeps; the scope is switched off, or the radio isn't up yet), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, or **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show).
 
 **DX cluster** (top-right of the canvas) — the cluster connection state: green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.5 for cluster setup and troubleshooting.
 
@@ -1054,7 +1054,7 @@ Default command lines:
 | GridTracker | `"C:\Program Files\GridTracker2\GridTracker2.exe"` |
 | Fldigi | `"C:\Program Files\Fldigi-4.2.11\fldigi.exe"` (version may differ) |
 
-Adjust these to match where you have installed each program. GridTracker and Fldigi are **off by default** — tick the **Show** box for each once you've installed it and confirmed the command line is correct. The Fldigi button was added at the request of Bill W1WRH; the process detection uses the `fldigi.exe` task-manager name.
+Adjust these to match where you have installed each program. GridTracker and Fldigi are **off by default** — tick the **Show** box for each once you've installed it and confirmed the command line is correct. The Fldigi process detection uses the `fldigi.exe` task-manager name.
 
 #### Path quoting — important
 
@@ -1910,7 +1910,7 @@ All interactive controls in the app have accessible labels that screen readers a
 | Frequency display | "VFO A frequency" with current value in MHz |
 | Sliders, dropdowns, buttons | Their purpose — e.g., "Transmit power", "VFO A mode" |
 
-**Announcements interrupt rather than queue.** The ARIA live region used for hover and value-change announcements is set to `assertive`, meaning each new announcement cancels whatever was previously being read out. Combined with longer debounces on rapid-fire events (mouse-wheel frequency changes wait 500 ms after the last tick before announcing; sweeping the mouse across a row of controls only announces controls you pause on for ≥400 ms), this stops the screen reader from reading every passed-over button on the way to the one you actually wanted. Thanks to Thomas (OZ1JTE) for the detailed report that drove these changes.
+**Announcements interrupt rather than queue.** The ARIA live region used for hover and value-change announcements is set to `assertive`, meaning each new announcement cancels whatever was previously being read out. Combined with longer debounces on rapid-fire events (mouse-wheel frequency changes wait 500 ms after the last tick before announcing; sweeping the mouse across a row of controls only announces controls you pause on for ≥400 ms), this stops the screen reader from reading every passed-over button on the way to the one you actually wanted.
 
 ---
 
@@ -2137,8 +2137,6 @@ If you can't use a mouse wheel — head-tracking input, on-screen keyboard users
 - The first arrow press when nothing is selected just highlights the kHz digit — a second press then steps it. This protects against an accidental ArrowUp changing the radio without you realising a digit was selected.
 - Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown). Press and hold to repeat that step every 500 ms until released.
 - Clicking outside the display deselects.
-
-Originally requested by Yuri W4YSW.
 
 ---
 

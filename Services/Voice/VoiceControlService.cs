@@ -708,9 +708,9 @@ namespace Icom_Web_Control.Services.Voice
                 // Spoken confirmation via TTS, if enabled in Settings. Phrase
                 // template is "<intent description>, successful/unsuccessful"
                 // so a listener hears the whole command echoed back along
-                // with the outcome -- key for accessibility (Yuri W4YSW,
-                // Thomas OZ1JTE) where the operator may not be watching the
-                // screen for visual confirmation. In a dry run (§6.5) nothing
+                // with the outcome -- key for accessibility, where the
+                // operator may not be watching the screen for visual
+                // confirmation. In a dry run (§6.5) nothing
                 // was actually sent, so the confirmation says so instead of
                 // claiming success/failure it didn't earn.
                 var settings = await _settings.GetSettingsAsync();

@@ -357,8 +357,9 @@ export class SpectrumPanel {
         this._lastCentreHz = centreHz;
         this._lastSpanHz   = spanHz;
         // Radio scope mode (CENT / FIX / SCROLL-C / SCROLL-F) for the corner
-        // badge. Only the CI-V scope path sends it; SDR frames leave it
-        // undefined, which the badge treats as "nothing to show".
+        // badge, read from the 27 00 waveform header. Left undefined until a
+        // sweep carrying it arrives, which the badge treats as "nothing to
+        // show" rather than guessing a mode.
         if (mode !== undefined) this._scopeMode = mode;
 
         // Only scroll the waterfall every Nth frame per _waterfallSpeed;
@@ -446,7 +447,7 @@ export class SpectrumPanel {
 
     /**
      * Freeze (true) or resume (false) the display. While held the spectrum
-     * and waterfall stop scrolling and the panel ignores incoming SDR frames.
+     * and waterfall stop scrolling and the panel ignores incoming sweeps.
      * Click-to-tune, wheel-tune, and cursor tracking still work — only
      * automatic updates are paused.
      * @param {boolean} hold
@@ -539,9 +540,9 @@ export class SpectrumPanel {
     }
 
     /**
-     * Respond to SDR lifecycle state changes.
+     * Respond to scope lifecycle state changes.
      * @param {string} status  One of: "unconfigured" | "connecting" | "streaming"
-     *                                 | "disconnected" | "nodll"
+     *                                 | "disconnected" | "outofrange"
      */
     setStatus(status) {
         this._status = status;
@@ -689,7 +690,7 @@ export class SpectrumPanel {
         // Clicks on the scope-mode badge toggle the radio between Center and
         // Fixed rather than tuning. CENT is the mode the panel's axis assumes;
         // clicking a green CENT badge flips to Fixed, an amber FIX badge back to
-        // Center. The badge only appears on the CI-V scope path (not SDR).
+        // Center. The badge only appears once a sweep has reported a mode.
         if (this._isOnScopeModeBadge(x * (W / rect.width), this._canvasYFromEvent(e, canvas))) {
             const target = (this._scopeMode === 'CENT') ? 'fixed' : 'center';
             fetch(`/api/cat/scopemode/${target}`, { method: 'POST' })
@@ -1121,8 +1122,8 @@ export class SpectrumPanel {
 
     // Small badge in the top-left showing the radio's live scope mode
     // (CENT / FIX / SCROLL-C / SCROLL-F), read from the 27 00 waveform header.
-    // Only the CI-V scope path sets _scopeMode; SDR frames leave it undefined,
-    // so the badge is drawn only when a mode is actually known. CENT is the
+    // _scopeMode stays undefined until a sweep carries one, so the badge is
+    // drawn only when a mode is actually known. CENT is the
     // mode this panel's axis assumes, so it reads neutral/green; any other mode
     // is amber to warn that the trace may not line up with the frequency axis.
     _drawScopeModeBadge(ctx) {
@@ -1539,7 +1540,7 @@ export class SpectrumPanel {
         }
 
         // If we have a previous frame and this is just a brief transition
-        // (span change, SDR restart), keep the existing spectrum visible
+        // (span change, radio reconnect), keep the existing spectrum visible
         // instead of wiping to a "connecting…" message. The status badge in
         // the panel header carries the state info; blanking out a working
         // spectrum for a 3-second reconnect is jarring.
@@ -1549,13 +1550,13 @@ export class SpectrumPanel {
         }
 
         const messages = {
-            connecting:   'Connecting to SDR device…',
-            disconnected: 'SDR device unavailable — retrying every 5 s',
-            nodll:        'SoapySDR.dll not found — install SoapySDR + device driver',
+            connecting:   'Waiting for the radio’s band scope…',
+            disconnected: 'Radio unavailable — retrying every 5 s',
+            unconfigured: 'Band scope is off — switch it on above the panel',
             outofrange:   'Watch VFO is off-screen — widen the scope span, or turn on cross-band peek in Settings',
         };
 
-        const line1 = messages[status] ?? `SDR status: ${status}`;
+        const line1 = messages[status] ?? `Scope status: ${status}`;
         const line2 = status === 'disconnected' && this._errorDetail
             ? this._errorDetail
             : null;

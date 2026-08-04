@@ -1,6 +1,6 @@
 !define APPNAME "Icom Web Control"
 !define COMPANY "MM5AGM"
-!define VERSION "1.0.1"
+!define VERSION "1.0.2"
 !define INSTALLDIR "$PROGRAMFILES64\${COMPANY}\${APPNAME}"
 Name "${APPNAME} ${VERSION}"
 OutFile "Icom_Web_Control_Setup.exe"

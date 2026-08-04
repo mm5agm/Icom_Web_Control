@@ -295,17 +295,35 @@ server-rendered initial values), `Settings`, `Diagnostics`, `Labels`
 
 Do not treat these as authoritative when reading the codebase:
 
-- `Services/RadioCapabilities.cs` — Yaesu-era per-model capability lookup
-  (FTdx101MP, VC Tune, dual-receiver detection). Nothing in the live source
-  references it any more; only stale `bin/` copies do.
-- `Pages/Labels.cshtml` registers `spectrum.span250k/500k/1m/2m`, but the span
-  buttons in `Index.cshtml` use `spectrum.spanA5k` … `spanB1m`. The registry
-  advertises four keys nothing uses, and the sixteen real span buttons cannot
-  have their accessibility labels edited.
-- The scope status badge still reads **"No SDR"** / **"No SoapySDR"** on a build
-  with no SDR — inherited strings, documented as-is in `USER_MANUAL.md` §5.4.
-- `scripts/collect-soapy-deps.ps1` — SoapySDR dependency collector, no longer
-  part of any build.
+- **`Controllers/CatController.cs` still carries Yaesu special-cases.** Around
+  the CO (contour/notch) endpoints it branches on `settings.RadioModel ==
+  "FTDX3000"` and builds Yaesu CAT strings. `RadioModel` can only ever be
+  `IC-7300` or `IC-7300MK2` (those are the only two options `Settings.cshtml`
+  offers), so the branch is unreachable — but the surrounding code is live.
+  Read carefully before editing there.
+- `Pages/Index.cshtml` computes `isFtdx3000` and uses it for one value
+  (`apfStep`), which therefore always resolves to the non-FTDX3000 branch.
+- `Pages/Labels.cshtml` advertises **28 keys no element carries** — the whole
+  `controls.*` group (TX power, mic gain, AF gain, IF shift, AGC, NR, NB,
+  notch, and the Yaesu-only IPO / roofing / antenna entries), plus
+  `vfo.*.up/down/mode`, `meters.temp` and `spectrum.display`. Labels are bound
+  strictly by `data-a11y-key`, and those elements have none, so editing those
+  rows does nothing. The real controls need the attribute adding before the
+  rows mean anything — worth doing, since voice/screen-reader support is a
+  release blocker here.
 - `bin/`, `obj/` and `Workers/Yaesu_Sdr_Worker/obj/` still hold
   `Yaesu_Web_Control.*` artefacts from before the rebrand. Git-ignored;
   `dotnet clean` clears them.
+
+Cleared in the 2026-08-04 sweep, so do **not** go looking for them: the VC Tune
+preselector UI and its `site.js` driver (a Yaesu-only control whose API
+endpoints the carve had already removed), `scripts/collect-soapy-deps.ps1`,
+`Yaesu_Web_Control.slnx`, the "No SDR" / "No SoapySDR" badge strings, and the
+root `Plan.md` / `docs/VoiceControl/v1-plan.md` (both pure YWC planning docs
+full of Yaesu CAT commands).
+
+`Services/RadioCapabilities.cs` is **live**, not dead — `Index.cshtml` reads
+`IsSingleReceiver` / `HasAntennaSelector` from it, and `CatController` and
+`IntentDispatcher` both route per-VFO commands through `VfoP1` / `VfoIsB`.
+Every method now returns the same answer for both supported models; that is
+deliberate, so the assumption is stated in one place.

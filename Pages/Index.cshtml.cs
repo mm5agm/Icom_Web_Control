@@ -94,11 +94,11 @@ namespace Icom_Web_Control.Pages
         public int SdrWaterfallBrightDbB { get; set; } = 0;
 
         public string BandPlan { get; set; } = "Region1";
-        public string RadioModel { get; set; } = "FTdx101MP";
+        public string RadioModel { get; set; } = "IC-7300MK2";
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
 
         // Accessibility — show ▲/▼ arrow buttons beside each VFO's frequency
-        // display for users who can't use a scroll wheel (Yuri W4YSW, etc.).
+        // display for users who can't use a scroll wheel.
         // Default false; user enables via Settings > Accessibility.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
 

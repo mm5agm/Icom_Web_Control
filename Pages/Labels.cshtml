@@ -10,7 +10,7 @@
         ("vfo",      "VFO Controls",        "Frequency displays and up/down buttons",         "bg-info bg-opacity-10"),
         ("keyboard", "Frequency Keyboard",  "On-screen frequency keyboard buttons",           "bg-warning bg-opacity-10"),
         ("controls",  "Radio Controls",      "Sliders, toggles, and selectors",                "bg-secondary bg-opacity-10"),
-        ("spectrum",  "Spectrum Display",   "SDR spectrum panel and span buttons",            "bg-dark bg-opacity-10"),
+        ("spectrum",  "Spectrum Display",   "Band scope span buttons, VFO A and VFO B",       "bg-dark bg-opacity-10"),
         ("nav",       "Navigation",         "Navigation bar links",                           "bg-light"),
     };
 
@@ -93,12 +93,27 @@
         ["controls.manualNotchB"] = "Manual notch — VFO B",
         ["controls.roofingA"]     = "Roofing filter — VFO A",
         ["controls.roofingB"]     = "Roofing filter — VFO B",
-        // Spectrum
-        ["spectrum.display"]  = "Spectrum canvas",
-        ["spectrum.span250k"] = "Span 250 kHz button",
-        ["spectrum.span500k"] = "Span 500 kHz button",
-        ["spectrum.span1m"]   = "Span 1 MHz button",
-        ["spectrum.span2m"]   = "Span 2 MHz button",
+        // Spectrum — the span-button keys are named after the TOTAL width the
+        // button gives you; the button face shows the HALF-width either side of
+        // centre, which is how the radio's own scope menu states it. So
+        // spanA5k is the ±2.5k button. Keep the key names in step with the
+        // data-a11y-key attributes in Index.cshtml, not with the face labels.
+        ["spectrum.spanA5k"]   = "VFO A span ±2.5 kHz button",
+        ["spectrum.spanA10k"]  = "VFO A span ±5 kHz button",
+        ["spectrum.spanA20k"]  = "VFO A span ±10 kHz button",
+        ["spectrum.spanA50k"]  = "VFO A span ±25 kHz button",
+        ["spectrum.spanA100k"] = "VFO A span ±50 kHz button",
+        ["spectrum.spanA200k"] = "VFO A span ±100 kHz button",
+        ["spectrum.spanA500k"] = "VFO A span ±250 kHz button",
+        ["spectrum.spanA1m"]   = "VFO A span ±500 kHz button",
+        ["spectrum.spanB5k"]   = "VFO B span ±2.5 kHz button",
+        ["spectrum.spanB10k"]  = "VFO B span ±5 kHz button",
+        ["spectrum.spanB20k"]  = "VFO B span ±10 kHz button",
+        ["spectrum.spanB50k"]  = "VFO B span ±25 kHz button",
+        ["spectrum.spanB100k"] = "VFO B span ±50 kHz button",
+        ["spectrum.spanB200k"] = "VFO B span ±100 kHz button",
+        ["spectrum.spanB500k"] = "VFO B span ±250 kHz button",
+        ["spectrum.spanB1m"]   = "VFO B span ±500 kHz button",
         // Navigation
         ["nav.brand"] = "Application name / home link",
     };
