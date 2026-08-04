@@ -1,48 +1,62 @@
 # CLAUDE.md
 
-> ## ⭐ START HERE — read this first
+Guidance for Claude Code (claude.ai/code) when working in this repository.
+
+> ## ⭐ START HERE
 >
-> This is **Icom Web Control (IWC)**, a **pre-alpha** sibling of [Yaesu Web Control (YWC)](https://github.com/mm5agm/Yaesu_Web_Control). It was cloned from YWC and is being re-fitted for Icom CI-V radios. **Nothing here controls a radio yet.**
+> **Icom Web Control (IWC)** is a browser-based control and monitoring interface
+> for the **Icom IC-7300 MkII** over CI-V. It is a sibling of, and was cloned
+> from, [Yaesu Web Control (YWC)](https://github.com/mm5agm/Yaesu_Web_Control) —
+> but the carve is **done**: the Yaesu CAT layer is gone, replaced by a CI-V
+> stack behind a protocol-free `IRadioController` seam.
 >
-> **Before doing anything, read [`docs/design/iwc-clone-split-plan.md`](docs/design/iwc-clone-split-plan.md)** — the authoritative plan for how IWC is carved out of YWC (what's kept, what's rebuilt, the phased CI-V roadmap, and the `IRadioController` seam).
+> **v1.0.0 shipped on 2026-08-01** and controls the radio end-to-end. This is a
+> working application, not scaffolding.
 >
-> **Key facts:**
-> - **Target radio (v1):** Icom **IC-7300 MkII** — CI-V over USB Type-C, address `B6`, single-receiver HF+6m(+4m EU), scope over CI-V (`27 00`, 475 bins). Manuals are in `docs/manuals/` (local, git-ignored).
-> - **Voice control is a required feature** (partially-sighted operators), not optional.
-> - This is a **separate repo** from YWC — its `origin` points at `mm5agm/Icom_Web_Control`. Keep YWC concerns out of here and vice-versa.
->
-> **⛔ Work is GATED:** do **not** start the rebrand/carve or any coding until Colin (MM5AGM) has the IC-7300 MkII in hand **and** explicitly says go. Until then this repo is scaffolding only. When he says go, the design doc's **Phase 0 → Phase 1** checklist is the starting point.
->
-> **🔔 SESSION-START REMINDER (do this in your first reply, every IWC session):** greet Colin with a one-line reminder that IWC is parked waiting on the **IC-7300 MkII**, and that all he has to do is say **"go"** once the radio is in hand to kick off Phase 1. Keep it brief; don't start any work until he actually says go.
->
-> **Everything below this banner is inherited verbatim from YWC.** It accurately describes the parts IWC keeps (SignalR pipeline, gauges, spectrum frontend, settings, rigctld, voice), but the Yaesu-specific CAT sections will be replaced during the carve — treat them as reference, not current IWC truth, until this file is rewritten in Phase 1.
+> - **Radio:** IC-7300 MkII, CI-V over the USB Type-C "Serial A" port.
+>   Default **COM8, 19200 8N1**, radio address **B6** (`94` on the original
+>   IC-7300), controller address **E0**. Manuals are in `docs/manuals/`
+>   (local, git-ignored).
+> - **Voice control is a required feature**, not optional — it exists for
+>   partially-sighted operators. Treat regressions in it as release blockers.
+> - **Separate repo from YWC** (`origin` = `mm5agm/Icom_Web_Control`). Keep YWC
+>   concerns out of here and vice-versa. Where a comment still says "Yaesu", it
+>   is almost always explaining *why the Icom code differs* — read before
+>   "fixing".
+> - **Roadmap:** [`docs/design/iwc-clone-split-plan.md`](docs/design/iwc-clone-split-plan.md).
+>   Phases 0–5 are built (carve → CI-V transport → command roadmap → parity →
+>   pseudo-dual receiver). Phase 6 (CW decode), Phase 7 (skins) and Phase 8
+>   (settings backup/restore over CI-V) are open.
 
 ---
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Architecture Rules
 
-Before making any changes, read and follow all rules in `.claude/rules.md` and `.claude/project-overview.md`. These are non-negotiable and override any default behaviour.
+Before making changes, read `.claude/rules.md` and `.claude/project-overview.md`.
+They are non-negotiable and override default behaviour.
 
 ---
 
 ## Build & Run
 
-**Target:** .NET 10, x64 Windows only (`net10.0-windows`, `OutputType=WinExe`, `UseWindowsForms=true`).
+**Target:** .NET 10, x64 Windows only (`net10.0-windows`, `OutputType=WinExe`,
+`UseWindowsForms=true` — a WinForms host process running Kestrel).
 
 ```bash
-# Build
 dotnet build Icom_Web_Control.csproj
-
-# Run (launches WinForms host + Kestrel on http://0.0.0.0:8080)
-dotnet run --project Icom_Web_Control.csproj
-
-# Publish self-contained
+dotnet run --project Icom_Web_Control.csproj      # WinForms host + Kestrel on http://0.0.0.0:8080
 dotnet publish -c Release -r win-x64 --self-contained
 ```
 
-There are no automated tests. Verification is manual via the browser at `http://localhost:8080`.
+There are **no automated tests** — `Tests/test-api.ps1` is a manual API-poking
+script, not a suite. Verification is manual, in the browser at
+`http://localhost:8080`, against the radio. When a change is protocol-level,
+say so and let Colin bench-check it; do not report CI-V behaviour as verified
+on the strength of a build succeeding.
+
+User data lives in `%APPDATA%\MM5AGM\Icom Web Control\`:
+`appsettings.user.json`, `radio_state.json`, `memories.json`,
+`memory-banks.json`, `voice-phrases.json`, `logs\iwc-YYYYMMDD.log`.
 
 ---
 
@@ -50,111 +64,142 @@ There are no automated tests. Verification is manual via the browser at `http://
 
 Before releasing: bump `Models/AppVersion.cs` and `installer.nsi`.
 
-**Then update the documentation — mandatory, and this includes pre-releases. See rule 13 in `.claude/rules.md`.**
+**Then update the documentation — mandatory, pre-releases included. See rules 13
+and 14 in `.claude/rules.md`.**
 
-- `README.md` — add the release-notes entry for the new version, **and** bump the per-release download badge to the new tag (search for the previous `vX.Y.Z` in the shields.io URL near the top of the file).
-- `USER_MANUAL.md` — bring every section the release touches in line with what the app now does. Not "if needed": check it every time, and say what changed.
+- `README.md` — add the release-notes entry, and bump the per-release download
+  badge **only for a full release**, never a pre-release.
+- `USER_MANUAL.md` — bring every section the release touches in line with what
+  the app now does, and re-capture any screenshot the change makes wrong.
 
-Do not start the git steps below until both documents are done.
+Do not start the git steps until both documents are done.
 
 ```powershell
-# 1. Commit everything on develop
 git add -A
 git commit -m "Release vX.Y.Z: ..."
-
-# 2. Merge to main and tag
 git checkout main
 git merge develop --no-ff -m "Release vX.Y.Z"
 git tag vX.Y.Z
 git checkout develop
-
-# 3. Push branches and tag
-git push origin develop
-git push origin main
-git push origin vX.Y.Z
-
-# 4. Create the GitHub Release — this triggers the build workflow
+git push origin develop; git push origin main; git push origin vX.Y.Z
 gh release create vX.Y.Z --title "vX.Y.Z" --notes "See README.md for full release notes."
 ```
 
-**Step 4 is required.** The build workflow triggers on `release: [created]`, not on tag push alone.
-Alternatively run `.\scripts\finish-release.ps1 -Version vX.Y.Z` which does all four steps.
-
-User settings persist to `%APPDATA%\MM5AGM\Yaesu Web Control\appsettings.user.json`.  
-Radio state persists to `%APPDATA%\MM5AGM\Yaesu Web Control\radio_state.json`.
+**The `gh release create` step is required** — the build workflow triggers on
+`release: [created]`, not on a tag push. `.\scripts\finish-release.ps1 -Version vX.Y.Z`
+does all four steps.
 
 ---
 
 ## Backend Architecture
 
-### Service Dependency Map
+### The `IRadioController` seam — the one rule that matters most
+
+`Services/IRadioController.cs` is the semantic seam IWC introduced and YWC
+lacked. **Everything above it speaks radio concepts** — frequency in Hz, mode
+as a display string ("USB", "CW-U"), S-meter units — and knows nothing about
+the wire protocol. That includes `CatController` (touch UI), `IntentDispatcher`
+(voice), `RigctldServer` (Hamlib/WSJT-X) and the Razor pages.
+
+**Exactly one class below the seam emits bytes:**
+
+- `CivRadioController` — the real one (~2,200 lines: connect, poll loop, all
+  commands, scope assembly, pseudo-dual routing).
+- `StubRadioController` — canned values, no hardware. Selected in `Program.cs`
+  when no radio is configured, so the UI is developable without the rig.
+
+The seam's **only** raw-bytes escape hatch is
+`SendRawCommandAsync(IReadOnlyList<byte>)`, and it exists for user-defined
+voice macros alone. It takes a command *body*; `CivRadioController` still
+applies framing and addressing, so a shared phrase pack can neither forge a
+radio address nor split a frame. **Anything else that wants to talk to the
+radio gets a semantic member on the interface instead.**
+
+### Service map
 
 ```
-RadioInitializationService (IHostedService)
-  └─ opens serial port via CatMultiplexerService
-       └─ MultiplexedCatClient (ICatClient)
-            └─ CatMessageDispatcher → RadioStateService → SignalR (RadioHub)
-                                                        → RadioStatePersistenceService
+CivBusService (ICivClient) — owns the serial port
+  ├─ binary reads via SerialPort.Read (never ReadExisting — it would corrupt
+  │  the 0x00–0xFF payload as text)
+  ├─ drops the CI-V bus echo (frames addressed To the radio, not To us)
+  └─ DTR/RTS left de-asserted — on Icom's Serial A those lines can be PTT
+       │
+       ├─ CivFrameBuffer  — reassembles FE FE … FD frames from the byte stream
+       ├─ CivFrame        — encode/decode, BCD helpers
+       └─ CivScopeAssembler — concatenates 27 00 waveform segments into one
+                              475-point sweep (BinCount = 475)
 
-MeterPollingService (IHostedService) — polls CAT FA/FB/SM etc. at ~10 Hz
-SdrManager (IHostedService) — supervises one Yaesu_Sdr_Worker.exe per
-                              configured SDR; reads FFT frames over
-                              localhost TCP and broadcasts via SignalR
-RigctldServer (IHostedService) — exposes rigctld TCP interface for WSJT-X etc.
+CivRadioController (IRadioController, IHostedService)
+  ├─ poll loop: 150 ms (~6–7 Hz), backing off to 280 ms while the scope
+  │  streams — the scope and the meters share one 19200-baud bus, so polling
+  │  slower is how the trace stays smooth. Mode every 3rd loop, split every 4th.
+  ├─ RadioStateService → SignalR (RadioHub) → browser
+  └─ RadioStatePersistenceService → radio_state.json
+
+RigctldServer (IHostedService)       — rigctld TCP for WSJT-X, Log4OM, etc.
+WsjtxUdpService (IHostedService)     — WSJT-X UDP status/QSO feed
+DxClusterService (IHostedService)    — cluster telnet feed → DX spot overlay
+VoiceControlService (IHostedService) — SAPI recognition → IntentDispatcher
+SystemTrayService (IHostedService)
 ```
 
-### SignalR Message Envelope
+There is **no SDR subsystem**. The spectrum comes from the radio's own scope
+over CI-V. `Services/Sdr/`, `Workers/Yaesu_Sdr_Worker/` and the SDRplay P/Invoke
+layer were dropped in the carve; only the *names* survive on the wire (see
+below), because renaming them would have churned the frontend for nothing.
 
-All real-time updates use a single hub method `RadioStateUpdate` with envelope `{ property, value }`.  
-The frontend's `WsUpdatePipeline` routes on `property`. The same hub carries:
-- CAT state (FrequencyA, FrequencyB, PowerMeter, SMeter, etc.)
-- SDR lifecycle (sdrId-tagged from v2.3.0):
-  - `SdrStatus`     value = `{ sdrId, status }` — "unconfigured" / "connecting" / "streaming" / "disconnected" / "nodll"
-  - `SdrError`      value = `{ sdrId, error  }` — human-readable detail
-- SDR spectrum frames:
-  - `SpectrumUpdate` value = `{ sdrId, bins, centreHz, spanHz }`
+### SignalR
 
-`sdrId` is `"A"` or `"B"`. `SdrSpectrumPipeline` routes by sdrId to the appropriate `SpectrumPanel` instance.
+One hub, `RadioHub` at `/radioHub`. Messages:
 
-### CAT Frequency Format
+| Message | Payload |
+|---|---|
+| `RadioStateUpdate` | `{ property, value }` — all CAT state; routed by `property` in `ws-update-pipeline.js` |
+| `SpectrumUpdate` | `{ sdrId, bins, centreHz, spanHz, mode }` — `sdrId` is `"A"` or `"B"` |
+| `SdrStatus` | `{ sdrId, status }` — `streaming` / `outofrange` / `disconnected` / `unconfigured` |
+| `VoiceStatusUpdate` | voice recogniser state |
+| `InitializationStatus` | start-up overlay text |
 
-`CatMessageDispatcher` parses `FA` / `FB` CAT responses. The FTdx101 sends frequencies as a plain integer string in **Hz** (e.g. `FA000880600;` = 880,600 Hz = 880.6 kHz). Values are stored and broadcast in Hz with no unit conversion. The FTdx101MP range is 30 kHz–75 MHz.
+`sdrId` and `SdrStatus` are **inherited names for the scope panels**, not SDR
+hardware. `RadioHub.OnConnectedAsync` replays a full state snapshot to the
+joining client and asks the controller to re-announce scope status, so a second
+tab or another computer gets a populated UI immediately.
+
+The hub also owns app lifetime: the main page heartbeats every 5 s, and when
+the last heartbeating tab closes the app stops after a 30 s grace period.
+
+### Spectrum over CI-V, and the pseudo-dual receiver
+
+The IC-7300 has **one receiver and one scope**. `CivRadioController` broadcasts
+each 475-bin sweep as `SpectrumUpdate`:
+
+- **Normal:** one sweep → `sdrId: "A"`.
+- **Pseudo-dual on, same band:** the Centre-mode sweep feeds the panel for the
+  operating VFO; a window cropped around the watch VFO feeds the other. No extra
+  CI-V, no scope-mode churn, and the audio VFO never moves.
+- **Watch VFO outside the sweep:** that panel reports `outofrange` ("Off-screen").
+- **Cross-band peek (opt-in):** the loop briefly retunes the receiver, routes the
+  whole sweep to the watch panel, and dips audio ~0.4 s.
+
+Scope on/off is `27 10` / `27 11`; a manual scope-off is honoured across
+reconnects (`_operatorScopeOff`) so the app never switches it back on unasked.
 
 ### Settings
 
-`SettingsService` reads/writes `appsettings.user.json` via a read-modify-write pattern.  
-`Settings.cshtml.cs`: `ModelState.Remove("Settings.SdrDeviceKeyA")` and `Settings.SdrDeviceKeyB` **must** appear before `ModelState.IsValid` — `<Nullable>enable</Nullable>` adds implicit `[Required]` to non-nullable strings, which silently blocks saves of empty values otherwise. The legacy `Settings.SdrDeviceKey` is also removed for the same reason; it's kept on the model as a migration anchor only.
+`SettingsService` uses read-modify-write on `appsettings.user.json`.
 
-**v2.2.x → v2.3.0 SDR settings migration:** the single `SdrDeviceKey` split into per-VFO `SdrDeviceKeyA` / `SdrDeviceKeyB`. `SettingsService.MigrateSdrDeviceKey` auto-promotes any legacy value into `SdrDeviceKeyA` on read; the legacy field is cleared on the next save.
-
-### SDR Subsystem — Dual-process architecture (v2.3.0+)
-
-The SDRplay API v3 service enforces one Selected device per host process (confirmed by [scripts/probe/](../scripts/probe/) — see [docs/decisions/0001-dual-sdr-architecture.md](../docs/decisions/0001-dual-sdr-architecture.md) for the four-pattern probe evidence). So:
-
-- **YWC main never opens an SDR directly.**
-- **`SdrManager`** (`Services/Sdr/SdrManager.cs`) spawns one `Yaesu_Sdr_Worker.exe` per configured device, connects to its localhost TCP port, reads FFT frames via `FrameReader`, and broadcasts them via SignalR with sdrId tagging.
-- **`Yaesu_Sdr_Worker`** (`Workers/Yaesu_Sdr_Worker/`) — separate `.exe` per SDR. Each holds exactly one device. File-links the device code from `Services/Sdr/` so one source of truth.
-- **`WorkerProcess`** — spawn/stop/locate the worker exe; picks free TCP port from 17001-17099; pipes worker stderr into the main Serilog stream.
-- **Wire protocol** — length-prefixed binary, big-endian. Three message types: `SpectrumFrame` (sequence + centreHz + spanHz + bins[]), `StatusUpdate` (string), `ErrorReport` (string). See `Workers/Yaesu_Sdr_Worker/WireProtocol.cs` (writer) and `Services/Sdr/FrameReader.cs` (reader).
-- **Build pipeline** — YWC's `.csproj` has a `<ProjectReference>` (no DLL link) so the worker builds first; `<None>` items with `CopyToOutputDirectory`/`CopyToPublishDirectory` land the worker exe alongside YWC's main exe. `installer.nsi` picks it up automatically via `File /r "publish\*"`.
-
-Device code (still in `Services/Sdr/` but linked into both projects):
-- `SdrplayDevice` — P/Invoke into `sdrplay_api.dll` (SDRplay API v3). Critical struct offsets verified against `C:\Program Files\SDRplay\API\inc\sdrplay_api_tuner.h`:
-  - `tunerParams.bwType` @ offset 0
-  - `tunerParams.gain.gRdB` @ offset 12 (`int`)
-  - `tunerParams.gain.LNAstate` @ offset 16 (`unsigned char` — **not** int)
-  - `tunerParams.rfFreq.rfHz` @ offset **40** (gain is 24 bytes; padding aligns double to 8-byte boundary)
-  - `tunerParams.dcOffsetTuner.refreshRateTime` @ offset **64** (`sizeof(RfFreqT)`=16 due to 7-byte tail padding after syncUpdate uchar)
-  - `ctrlParams.decimation.enable` @ offset **74**, `.decimationFactor` @ **75** (`sizeof(TunerParamsT)`=72)
-  - `devParams.fsFreq.fsHz` @ offset 8 within DevParamsT
-- `SoapySdrDevice` — SoapySDR wrapper for RTL-SDR, Airspy, etc.
-- `FftProcessor` — Hann-windowed FFT → dBFS bins.
+**`Settings.cshtml.cs` gotcha:** `<Nullable>enable</Nullable>` puts an implicit
+`[Required]` on every non-nullable string, which silently blocks saving an
+*empty* value. Any setting where empty means "feature off" therefore needs a
+`ModelState.Remove("Settings.X")` **before** `ModelState.IsValid`. Currently:
+`DxClusterHost`, `DxClusterLoginCallsign`, `DxClusterPostLoginCommands`,
+`TxToggleKey`. Add to that list when adding an optional string setting.
 
 ---
 
 ## Frontend Architecture
 
-### Module Map (`wwwroot/js/`)
+### Module map (`wwwroot/js/`)
 
 ```
 websocket/
@@ -164,56 +209,103 @@ websocket/
 calibration/
   calibration-engine.js   — pure functions, no DOM, no side effects
   calibration-tables.js   — single source of truth for all scaling tables
-  FTdx101Calibration.js
+  Ic7300Calibration.js
 
-ui/
+guages/                   — (sic: the folder name is misspelt; leave it alone
+  gauge.js                   unless deliberately renaming — it is referenced by
+  gaugeFactory.js            path in every importing module)
+  meter-gauge.js
   meter-panel.js          — owns all meter DOM and canvas rendering
-  gaugeFactory.js         — ONLY place RadialGauge instances are created
+  smeter-history-panel.js
   update-engine.js        — performs gauge updates
-  meter-formatters.js     — ALL UI text formatting lives here
-  overlays.js
 
 orchestrators/
-  FTdx101Meters.js        — wires websocket → calibration → MeterPanel; no logic of its own
+  Ic7300Meters.js         — wires websocket → calibration → MeterPanel; no logic of its own
 
 sdr/
-  sdr-spectrum-pipeline.js  — SignalR transport for spectrum; no DOM
-  spectrum-panel.js         — owns spectrum canvas; DOM access intentional here
+  sdr-spectrum-pipeline.js — SignalR transport for spectrum; no DOM
+  spectrum-panel.js        — owns the spectrum canvas; DOM access intentional here
+
+ui/
+  site.js, meter-formatters.js, band-plan.js, a11y-labels.js, voice-control.js,
+  memories.js, dx-spots-panel.js, freq-keyboard.js, calibration-editor.js,
+  ic7300-if-width.js
 ```
 
-### Value Flow (strict — never bypass or reorder)
+### Value flow (strict — never bypass or reorder)
 
 ```
 SignalR RadioStateUpdate
   → WsUpdatePipeline (route by property)
   → calibration-engine (pure transform)
-  → FTdx101Meters (orchestrate)
+  → Ic7300Meters (orchestrate)
   → MeterPanel.update()
   → gaugeFactory / update-engine
   → canvas
 ```
 
-### Spectrum Display (dual-VFO, v2.3.0+)
+### Spectrum panels
 
-`SdrSpectrumPipeline` creates its own SignalR connection. It maintains per-sdrId handler maps and dispatches `SpectrumUpdate` / `SdrStatus` / `SdrError` to whichever `SpectrumPanel` registered for that sdrId. Also handles `FrequencyA`, `FrequencyB`, `DxSpot`, `DxClusterStatus`, `DxAlert`.
+`SdrSpectrumPipeline` opens its own SignalR connection and keeps per-`sdrId`
+handler maps, dispatching `SpectrumUpdate` / `SdrStatus` to whichever
+`SpectrumPanel` registered for that id. It also carries `FrequencyA`,
+`FrequencyB`, `DxSpot`, `DxClusterStatus` and `DxAlert`.
 
-`SpectrumPanel` is instance-able with a `vfo` parameter ("A" or "B") in the constructor. The vfo arg determines which `/api/cat/frequency/{a|b}` endpoint click-to-tune and wheel-tune use, and which `window.setMode('A'|'B', mode)` call follows a click. Each panel's frequency axis uses its own `_vfoHz` from the matching `FrequencyA`/`FrequencyB` SignalR updates.
+`SpectrumPanel` takes a `vfo` ("A"/"B") in its constructor, which decides which
+`/api/cat/frequency/{a|b}` endpoint click- and wheel-tune hit and which
+`window.setMode('A'|'B', mode)` follows a click. Each panel tracks its own
+`_vfoHz` from the matching frequency update.
 
-Index page lays out two card panels (`spectrumContainerA`, `spectrumContainerB`) with a Mono A / Mono B / Both toggle persisted in `localStorage.ywc.spectrumMode`. Outer container hides when neither VFO has an SDR; toggle hides when only one is configured.
+`Pages/Index.cshtml` lays out `spectrumContainerA` / `spectrumContainerB` with
+Stacked / Side-by-side and VFO A / VFO B / Both toggles (both persisted in
+`localStorage`, both hidden unless two panels are showing). The outer container
+hides itself when no scope source is configured.
 
-### Razor Pages
+**`Pages/Index.cshtml` is ~4,500 lines** — markup plus the page's own script
+block. Most spectrum-control wiring lives there rather than in a module. That is
+a known wart; prefer extending an existing block over adding a new global.
 
-- `Index.cshtml` / `Index.cshtml.cs` — main control panel; `RadioState` property exposes `RadioStateService` for server-rendered initial values.
-- `Settings.cshtml` / `Settings.cshtml.cs` — persists `ApplicationSettings`; note the `ModelState.Remove` order requirement above.
-- `Diagnostics.cshtml` — SDR device scanning, port listing.
+### Razor pages
+
+`Index` (main control panel; `RadioState` exposes `RadioStateService` for
+server-rendered initial values), `Settings`, `Diagnostics`, `Labels`
+(accessibility label overrides), `Calibration`, `About`, `Memories`.
 
 ---
 
 ## Key Domain Facts
 
-- **FTdx101MP frequency range:** 30 kHz – 75 MHz. Frequencies are always in Hz in this codebase.
-- **IF output:** 9 MHz rear-panel IF fed to RSP1 antenna input for spectrum display.
-- **SDR default sample rate:** 2,048,000 Hz (2 MHz span). Spectrum centred on `SdrIfFrequencyHz` (default 9 MHz); axis labels show RF frequencies derived from VFO-A.
-- **S-meter raw values:** 0–255 → S0 to S9+60 dB via calibration tables.
-- **Meter poll rate:** ~10 Hz via `MeterPollingService`.
-- **SignalR heartbeat:** `SdrManager` re-broadcasts each worker's "streaming" status every 30 frames (~3 s) so clients that load after startup receive the current per-VFO status.
+- **IC-7300 MkII:** single receiver, HF + 6 m (+ 4 m in EU). Up to **100 W**
+  (25 W AM). Frequencies are **always Hz** in this codebase.
+- **Scope:** CI-V `27 00` waveform, **475 points** per sweep, assembled from
+  segments by `CivScopeAssembler`. Span is set with `27 15`; the eight UI
+  buttons are ± half-widths, ±2.5 kHz … ±500 kHz.
+- **CI-V is a bus.** The radio echoes our own transmission back before replying;
+  echo frames are addressed to the radio, real replies to us.
+- **Trusted voice-macro command set:** `05 06 07 0F 11 14 16 17 1A 1C 25 26 27`.
+  `18` (power) is deliberately excluded — over USB CI-V a power-off drops the
+  serial port with it, leaving nothing able to switch the radio back on.
+  Advanced Mode bypasses the set entirely.
+- **S-meter:** 0–255 raw → S0 to S9+60 dB via the calibration tables.
+- **Poll rate:** ~6–7 Hz, dropping to ~3–4 Hz while the scope streams.
+
+---
+
+## Known dead / stale code
+
+Do not treat these as authoritative when reading the codebase:
+
+- `Services/RadioCapabilities.cs` — Yaesu-era per-model capability lookup
+  (FTdx101MP, VC Tune, dual-receiver detection). Nothing in the live source
+  references it any more; only stale `bin/` copies do.
+- `Pages/Labels.cshtml` registers `spectrum.span250k/500k/1m/2m`, but the span
+  buttons in `Index.cshtml` use `spectrum.spanA5k` … `spanB1m`. The registry
+  advertises four keys nothing uses, and the sixteen real span buttons cannot
+  have their accessibility labels edited.
+- The scope status badge still reads **"No SDR"** / **"No SoapySDR"** on a build
+  with no SDR — inherited strings, documented as-is in `USER_MANUAL.md` §5.4.
+- `scripts/collect-soapy-deps.ps1` — SoapySDR dependency collector, no longer
+  part of any build.
+- `bin/`, `obj/` and `Workers/Yaesu_Sdr_Worker/obj/` still hold
+  `Yaesu_Web_Control.*` artefacts from before the rebrand. Git-ignored;
+  `dotnet clean` clears them.

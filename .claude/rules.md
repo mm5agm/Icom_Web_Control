@@ -1,11 +1,11 @@
-# Yaesu Web Control — Strict Architectural Rules (Authoritative Specification)
+# Icom Web Control — Strict Architectural Rules (Authoritative Specification)
 # Claude must follow these rules for ALL code in this repository.
 
 ---
 
-# 1. Subsystem Boundaries (Non‑Negotiable)
+# 1. Subsystem Boundaries (Non-Negotiable)
 
-The Yaesu Web Control is composed of strict, isolated subsystems.
+Icom Web Control is composed of strict, isolated subsystems.
 No subsystem may contain logic belonging to another.
 
 ## 1. Calibration Engine (Pure Logic Only)
@@ -20,8 +20,8 @@ No subsystem may contain logic belonging to another.
 - All calibration must follow: raw → calibrated → UI.
 
 ## 2. WebSocket Subsystem
-- WsConnection handles transport only.
-- WsUpdatePipeline handles message routing only.
+- `WsConnection` handles transport only.
+- `WsUpdatePipeline` handles message routing only.
 - No DOM access.
 - No gauge updates.
 - No formatting.
@@ -30,32 +30,34 @@ No subsystem may contain logic belonging to another.
 - No global state.
 
 ## 3. Meter Subsystem
-- MeterPanel owns all UI meter rendering.
-- gaugeFactory creates all gauges.
-- update-engine performs gauge updates.
-- meter-formatters handles UI text formatting.
+- `MeterPanel` owns all UI meter rendering.
+- `gaugeFactory` creates all gauges.
+- `update-engine` performs gauge updates.
+- `meter-formatters` handles UI text formatting.
 - DOM access allowed ONLY inside UI modules.
 - No calibration logic.
 - No WebSocket logic.
 
 ## 4. Orchestrator Subsystem
-- FTdx101Meters is the only orchestrator.
+- `Ic7300Meters` is the only orchestrator.
 - It wires together WebSocket → pipeline → MeterPanel.
 - It must not contain:
   - calibration logic
   - gauge creation logic
   - formatting logic
   - DOM manipulation
-- It may call MeterPanel.update() only.
+- It may call `MeterPanel.update()` only.
 
-## 5. CAT / Serial / Queue Subsystem
-- Serial timing lives ONLY in the serial layer.
-- Queueing logic lives ONLY in the queue layer.
-- Decoding logic lives ONLY in the decoding layer.
-- No UI logic.
-- No DOM access.
-- No WebSocket logic.
-- No calibration logic.
+## 5. Radio / CI-V / Serial Subsystem
+- **`IRadioController` is the seam.** Above it, everything speaks radio
+  concepts — frequency in Hz, mode as a display string, S-meter units — and
+  knows nothing about the wire protocol.
+- **Exactly one class below the seam emits bytes** (`CivRadioController`;
+  `StubRadioController` emits none and fakes the same semantics).
+- Serial timing lives ONLY in `CivBusService`.
+- Frame assembly lives ONLY in `CivFrameBuffer` / `CivFrame`.
+- Scope segment reassembly lives ONLY in `CivScopeAssembler`.
+- No UI logic. No DOM access. No SignalR logic. No calibration logic.
 
 ## 6. UI/State Subsystem
 - The ONLY subsystem allowed to touch the DOM.
@@ -63,7 +65,7 @@ No subsystem may contain logic belonging to another.
 - No calibration logic.
 - No decoding logic.
 - No WebSocket logic.
-- No serial/queue logic.
+- No serial/CI-V logic.
 
 ---
 
@@ -71,13 +73,13 @@ No subsystem may contain logic belonging to another.
 
 All meter values must follow this exact pipeline:
 
-WebSocket raw payload
+SignalR `RadioStateUpdate`
     ↓
 WsUpdatePipeline (routing only)
     ↓
 calibration-engine (pure functions)
     ↓
-FTdx101Meters orchestrator
+Ic7300Meters orchestrator
     ↓
 MeterPanel.update()
     ↓
@@ -89,20 +91,44 @@ Claude must never generate code that bypasses or rearranges this flow.
 
 ---
 
-# 3. DOM Access Rules (Strict)
+# 3. The Radio Seam (Strict)
+
+This is the rule IWC exists to enforce, and the one YWC lacked.
+
+## Forbidden
+- Any CI-V byte, frame, address or command code appearing **above**
+  `IRadioController` — in a controller, a Razor page, `IntentDispatcher`,
+  `RigctldServer`, or any JS.
+- Any new raw-bytes path through the seam.
+- Reaching around the seam to `CivBusService` from application code.
+
+## Allowed
+- Adding a **semantic** member to `IRadioController` and implementing it in
+  both `CivRadioController` and `StubRadioController`.
+- `SendRawCommandAsync(IReadOnlyList<byte>)` — the single, deliberate escape
+  hatch, for user-defined **voice macros only**. It takes a command *body*;
+  framing and addressing stay with the controller so a shared phrase pack can
+  neither forge an address nor split a frame. Nothing else may call it.
+
+When a new feature needs the radio, the answer is a new semantic member, not
+a raw send.
+
+---
+
+# 4. DOM Access Rules (Strict)
 
 ## Allowed
 - Only inside UI/state subsystem modules:
-  - MeterPanel
-  - gaugeFactory
-  - overlays
-  - UI helpers
+  - `MeterPanel`
+  - `gaugeFactory`
+  - `SpectrumPanel` (intentional — it owns its canvas)
+  - `ui/*` modules
+  - the script block in `Pages/Index.cshtml`
 
 ## Forbidden Everywhere Else
 - calibration engine
 - WebSocket subsystem
-- decoding subsystem
-- serial/queue subsystem
+- spectrum pipeline (`sdr-spectrum-pipeline.js` is transport only)
 - orchestrator
 - helpers
 - logic modules
@@ -111,34 +137,40 @@ Claude must refuse to generate DOM access in forbidden layers.
 
 ---
 
-# 4. Gauge Rules (Strict)
+# 5. Gauge Rules (Strict)
 
 ## Allowed
-- Gauges must be created ONLY through gaugeFactory.
-- Gauge updates must go through update-engine.
-- MeterPanel owns all gauge instances.
+- Gauges must be created ONLY through `gaugeFactory` (`createGauge` and its
+  per-meter helpers). New meter types are registered there.
+- `gauge.js` is the ONLY place that constructs the underlying canvas-gauges
+  `RadialGauge` — it is the base class every meter extends, and meter classes
+  supply configuration only.
+- Gauge updates must go through `update-engine`.
+- `MeterPanel` owns all gauge instances.
 
 ## Forbidden
-- Direct RadialGauge creation anywhere else.
+- `new RadialGauge` anywhere but `gauge.js`.
+- Constructing a meter class directly instead of going through `gaugeFactory`.
 - Inline gauge configuration.
+- Layout logic outside `gauge.js`.
 - Gauge logic inside calibration, WebSocket, or orchestrator layers.
 
 ---
 
-# 5. Formatting Rules (Strict)
+# 6. Formatting Rules (Strict)
 
 ## Allowed
-- All UI text formatting must live in meter-formatters.js.
+- All UI text formatting must live in `meter-formatters.js`.
 
 ## Forbidden
-- Formatting logic inside calibration engine.
-- Formatting logic inside WebSocket pipeline.
-- Formatting logic inside orchestrator.
-- Formatting logic inside gaugeFactory.
+- Formatting logic inside the calibration engine.
+- Formatting logic inside the WebSocket pipeline.
+- Formatting logic inside the orchestrator.
+- Formatting logic inside `gaugeFactory`.
 
 ---
 
-# 6. Naming Rules (Strict)
+# 7. Naming Rules (Strict)
 
 ## PascalCase
 For architectural units:
@@ -164,7 +196,7 @@ For flow-level identifiers:
 
 ---
 
-# 7. Empirical Behaviour Rules (Strict)
+# 8. Empirical Behaviour Rules (Strict)
 
 - Empirical findings (timing, scaling, decoding quirks) must be preserved.
 - They must live in the correct subsystem.
@@ -172,33 +204,47 @@ For flow-level identifiers:
 - Calibration tables must remain the single source of truth.
 - Decoding quirks must remain in the decoding layer.
 
+Several comments in this codebase record a *verified-on-the-radio* fact — bus
+echo behaviour, DTR/RTS being PTT lines on Serial A, the `18` power-command
+exclusion, poll-rate backoff while the scope streams. **Do not delete or
+"simplify" a comment that records why something is the way it is.** If the code
+changes, update the reasoning; don't drop it.
+
 ---
 
-# 8. Folder Structure Rules (Strict)
+# 9. Folder Structure Rules (Strict)
 
 Claude must maintain this structure:
 
-/websocket
-    ws-connection.js
-    ws-update-pipeline.js
+```
+wwwroot/js/
+  websocket/      ws-connection.js, ws-update-pipeline.js
+  calibration/    calibration-engine.js, calibration-tables.js, Ic7300Calibration.js
+  guages/         gauge.js, gaugeFactory.js, meter-gauge.js, meter-panel.js,
+                  smeter-history-panel.js, update-engine.js
+  orchestrators/  Ic7300Meters.js
+  sdr/            sdr-spectrum-pipeline.js, spectrum-panel.js
+  ui/             site.js, meter-formatters.js, band-plan.js, a11y-labels.js,
+                  voice-control.js, memories.js, dx-spots-panel.js,
+                  freq-keyboard.js, calibration-editor.js, ic7300-if-width.js
 
-/calibration
-    calibration-engine.js
-    calibration-tables.js
+Services/
+  Civ/            CivBusService.cs, CivFrame.cs, CivFrameBuffer.cs,
+                  CivMacroCodec.cs, CivScopeAssembler.cs, ICivClient.cs
+  Voice/          VoiceControlService.cs, IntentDispatcher.cs, VoiceGrammar.cs,
+                  VoicePhraseStore.cs, VoicePhraseValidator.cs, VoiceTtsService.cs,
+                  VoiceHelpBuilder.cs, MicrophoneCapture.cs, AudioOutput.cs,
+                  VoiceStatus.cs
+  (root)          IRadioController.cs, CivRadioController.cs, StubRadioController.cs,
+                  RadioStateService.cs, SettingsService.cs, RigctldServer.cs, …
+```
 
-/ui
-    meter-panel.js
-    gaugeFactory.js
-    update-engine.js
-    meter-formatters.js
-    overlays.js
+Two names are historical and **must not be "corrected" casually**:
 
-/orchestrators
-    FTdx101Meters.js
-
-/serial
-/queue
-/decoding
+- `wwwroot/js/guages/` is misspelt. Every importing module references it by
+  path; renaming is a deliberate, whole-repo change, not a drive-by fix.
+- `wwwroot/js/sdr/` and the `sdrId` / `SdrStatus` wire names survive from the
+  YWC clone. There is no SDR in IWC — these identify the **scope panels**.
 
 Claude must:
 - create new modules in the correct folder
@@ -207,21 +253,24 @@ Claude must:
 
 ---
 
-# 9. Global State Rules (Strict)
+# 10. Global State Rules (Strict)
 
 ## Forbidden
 - Global variables
-- Global FTdx101Meters instance
+- Global orchestrator instance
 - Global gauge instances
 - Global calibration tables
 - Global WebSocket references
 
 ## Allowed
 - Local orchestrator instance created on page load.
+- The small set of deliberate `window.*` hooks the Razor page already exports
+  (`window.setMode`, `window.onActiveVfoChanged`, `window.__markActiveSpan`).
+  Extend an existing one rather than adding another.
 
 ---
 
-# 10. Refactoring Rules (Strict)
+# 11. Refactoring Rules (Strict)
 
 When Claude refactors code, it must:
 - preserve subsystem boundaries
@@ -229,12 +278,12 @@ When Claude refactors code, it must:
 - correct drift
 - update comments immediately
 - maintain architectural purity
-- never introduce cross‑layer leakage
+- never introduce cross-layer leakage
 - never weaken the architecture
 
 ---
 
-# 11. Output Style Rules
+# 12. Output Style Rules
 
 Claude must:
 - use clear, natural language
@@ -244,7 +293,7 @@ Claude must:
 
 ---
 
-# 12. Scope
+# 13. Scope
 
 These rules apply to:
 - all code
@@ -252,17 +301,17 @@ These rules apply to:
 - all comments
 - all documentation
 - all UI/state logic
-- all WebSocket logic
+- all SignalR logic
 - all calibration logic
-- all decoding logic
-- all serial/queue logic
+- all CI-V / decoding logic
+- all serial logic
 - all architectural decisions
 
 Claude must follow these rules for every change in this repository.
 
 ---
 
-# 13. Release Documentation (Non-Negotiable)
+# 14. Release Documentation (Non-Negotiable)
 
 **Before any release or pre-release, `README.md` and `USER_MANUAL.md` must both
 be updated. Every time. No exceptions, and no "if needed".**
@@ -277,7 +326,7 @@ Claude must, before the first commit of the release:
 1. **`README.md`** — add the release-notes entry for the new version, and bump
    the per-release download badge near the top **if this is a full release**.
    The badge is the front page's "get this one" button, so it tracks the newest
-   **full** release only — never a pre-release. That is the same call rule 14
+   **full** release only — never a pre-release. That is the same call rule 15
    makes for the in-app banner, for the same reason: an operator who lands on
    the repo should be pointed at the tested build, and reach a pre-release only
    by going to the releases page on purpose. So a pre-release bumps
@@ -297,9 +346,14 @@ Claude must not start the release steps until both documents are updated, and
 must never defer this to "after the release". A shipped version whose manual
 describes the previous one is a defect.
 
+**A screenshot is a spec check, not decoration.** Embedding one has twice caught
+prose that had drifted from the app (the nav label in §10, the whole span /
+slider set in §5.4). When a section gains an image, read the image against the
+text before committing.
+
 ---
 
-# 14. In-App Update Notifications — Full Releases Only (Non-Negotiable)
+# 15. In-App Update Notifications — Full Releases Only (Non-Negotiable)
 
 **The in-app update banner must only ever announce a full release. It must never
 announce a pre-release or a draft.**
@@ -319,3 +373,20 @@ Concretely, the update check (`wwwroot/js/ui/site.js`, `_checkForUpdate`) must:
 This applies to any future notification channel added to the app — a tray
 balloon, a Settings "check now" button, an About-page version line. Same rule:
 full releases only.
+
+---
+
+# 16. Voice Control Is Not Optional (Non-Negotiable)
+
+Voice control exists so partially-sighted operators can use the radio. It is a
+**required feature**, and that has consequences:
+
+- A change that breaks recognition, the grammar, or the spoken feedback is a
+  release blocker, not a nice-to-have.
+- Every new radio control added to the touch UI should be considered for a
+  voice intent at the same time. Say so if you skip it.
+- **Never let the app announce success for something it did not do.** An intent
+  that is recognised but inert must say so. This has been a real bug twice.
+- Accessibility labels (`Pages/Labels.cshtml`) must gain an entry whenever a new
+  control gets a `data-a11y-key`. A key with no registry entry is a control a
+  screen-reader user cannot relabel.
