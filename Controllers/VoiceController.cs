@@ -973,6 +973,15 @@ namespace Icom_Web_Control.Controllers
             Add("Radio Controls", cfg.SetAttenuator?.Triggers);
             Add("Radio Controls", cfg.SetPreamp?.Triggers);
             Add("Radio Controls", cfg.SetAgc?.Triggers);
+            Add("Radio Controls", cfg.SetNoiseReduction?.Triggers);
+            Add("Radio Controls", cfg.SetNoiseBlanker?.Triggers);
+            Add("Radio Controls", cfg.SetNotch?.Triggers);
+            Add("Radio Controls", cfg.SetRfGain?.Triggers);
+            Add("Radio Controls", cfg.SetSquelch?.Triggers);
+            Add("Radio Controls", cfg.SetApf?.Triggers);
+            Add("Transmit", cfg.SetTxPower?.Triggers);
+            Add("Transmit", cfg.SetMicGain?.Triggers);
+            Add("Transmit", cfg.SetProcessor?.Triggers);
 
             foreach (var m in cfg.Macros ?? new())
                 Add(string.IsNullOrWhiteSpace(m.Category) ? "Macros" : m.Category, m.Phrases);

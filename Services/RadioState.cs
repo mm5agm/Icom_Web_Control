@@ -161,17 +161,8 @@
         public int ClarifierOffsetA { get; set; } = 0;
         public int ClarifierOffsetB { get; set; } = 0;
 
-        /// <summary>
-        /// Contour filter on/off per VFO
-        /// </summary>
-        public bool ContourOnA { get; set; } = false;
-        public bool ContourOnB { get; set; } = false;
-
-        /// <summary>
-        /// Contour filter frequency in Hz per VFO (100–3200 Hz FTdx101/10/710; 100–4000 Hz FTDX3000)
-        /// </summary>
-        public int ContourFreqA { get; set; } = 800;
-        public int ContourFreqB { get; set; } = 800;
+        // Contour has no entry here. It is a Yaesu control with no IC-7300
+        // equivalent, and the carve removed the endpoint and the UI with it.
 
         /// <summary>
         /// APF (Audio Peak Filter) on/off per VFO
@@ -180,10 +171,14 @@
         public bool ApfOnB { get; set; } = false;
 
         /// <summary>
-        /// APF frequency offset in Hz per VFO (-250 to +250 Hz)
+        /// APF width per VFO: 0=OFF, 1=WIDE, 2=MID, 3=NAR (CI-V 16 32).
+        /// The IC-7300 has no APF frequency shift — the filter always sits on
+        /// the CW pitch — so the position, not an offset, is what there is to
+        /// store. <see cref="ApfOnA"/> is simply "width != 0", kept because the
+        /// UI and the state feed both want the on/off answer directly.
         /// </summary>
-        public int ApfFreqA { get; set; } = 0;
-        public int ApfFreqB { get; set; } = 0;
+        public int ApfWidthA { get; set; } = 0;
+        public int ApfWidthB { get; set; } = 0;
 
         /// <summary>
         /// Additional controls and settings (for future expansion)

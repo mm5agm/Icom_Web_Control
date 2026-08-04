@@ -40,10 +40,20 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Release notes
 
-### v1.0.2 (unreleased) — pre-release
+### v1.0.2 (2026-08-04) — pre-release
 
-Band-plan accuracy, a visible start-up, and the voice macros finally reaching the radio.
+The first two bug reports from operators, a much larger voice vocabulary, band-plan accuracy, a visible start-up, and the voice macros finally reaching the radio.
 
+**If you reported [#1](https://github.com/mm5agm/Icom_Web_Control/issues/1) or [#2](https://github.com/mm5agm/Icom_Web_Control/issues/2), this is the build to try.** Please still send your log file (`%APPDATA%\MM5AGM\Icom Web Control\logs\`) — #1 fixes the dead end you hit, but not necessarily the reason your radio sent no scope data in the first place, and the log is what will tell us that.
+
+- **The spectrum panel could vanish completely, taking the Scope switch with it** ([#1](https://github.com/mm5agm/Icom_Web_Control/issues/1)). If no scope sweep ever reached IWC — the scope switched off, or a radio not sending scope data at all — the whole spectrum card stayed hidden, and since the **Scope** on/off switch sits inside that card there was no way to switch it back on. You got a page with no spectrum, no waterfall and no explanation. The card now appears whenever the radio is connected, and tells you which of those it is: **Scope off**, **Waiting for the radio's band scope…**, or the live trace.
+  - The **Scope** switch now also remembers its real position across a restart, and corrects itself the moment a sweep proves the scope is running. Previously it could show *off* over a live trace, and the next click would then turn the scope on by sending "off".
+  - The **About** page's diagnostics block now reports the band scope directly — on or off, how many sweeps have arrived, how many were dropped, how long ago the last one was. That line replaces `SDR device`, which was left over from the Yaesu app IWC was cloned from and always read "(none configured)". Paste it into any report about a missing spectrum.
+- **"Icom Web Control is already running" is no longer a dead end** ([#2](https://github.com/mm5agm/Icom_Web_Control/issues/2)). A copy that failed to exit blocked every attempt to start the app behind an OK-only dialog — with no window to close, Task Manager was the only way out. The dialog now names the stuck process and offers to **open** the running copy in your browser, or to **close** it and start a fresh one.
+  - And the app is much less likely to get into that state: if it is still alive ten seconds after being asked to shut down, it now exits anyway rather than lingering invisibly and blocking the next start.
+- **Voice control learned eleven more controls.** Attenuator, AGC, RF gain, squelch, noise reduction, noise blanker, notch, APF, TX power, mic gain and speech processor can all be set by voice now — "r f gain seventy", "squelch zero", "noise reduction on", "t x power twenty five", "a g c fast". Levels use a fixed vocabulary (zero, ten, twenty, twenty five, thirty, forty, fifty, sixty, seventy, seventy five, eighty, ninety, one hundred / maximum / full); see §17 of the [User Manual](USER_MANUAL.md) for the full list.
+  - Those same controls also gained the accessibility label keys they had been advertising. The **Accessibility Labels** page listed 28 entries that matched nothing on screen, so renaming them for a screen reader did nothing. They are now attached to the real controls.
+  - **Your saved phrase pack resets to defaults again** (pack schema 8 → 9). The bundled **US English** pack is rebuilt to match — an older one would silently fall back to the UK defaults on import.
 - **Voice macros now actually work.** "Noise reduction on", "noise blanker off" and "copy a to b" were recognised, spoke a cheerful "successful" back at you, and did nothing at all — the six default macros still carried the *Yaesu* command strings IWC inherited when it was cloned, which an Icom radio has no idea what to do with. They now send proper CI-V commands, and the confirmation you hear is the truth.
   - **"Fine step up" / "fine step down" are gone.** They were the Yaesu microphone UP/DN keys and CI-V has no equivalent. "Tune up" / "tune down" with the step set to 10 Hz does the same job.
   - **Your saved phrase pack is replaced by the new defaults the first time you run this version** — its custom commands were in the old radio's format and could not be sent. The old pack is kept in **Show version history** if you need to look at it.

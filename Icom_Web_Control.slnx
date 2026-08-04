@@ -1,0 +1,10 @@
+<Solution>
+  <!-- The project is x64-only (<Platforms>x64</Platforms> in the csproj):
+       WinForms host, System.IO.Ports and the win-x64 self-contained publish.
+       Declaring "Any CPU" here, as the old Yaesu-era solution did, offers the
+       IDE a configuration the project cannot build. -->
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="Icom_Web_Control.csproj" />
+</Solution>

@@ -15,18 +15,17 @@ namespace Icom_Web_Control.Services
 
         public bool IsInitialized { get; set; } = false;
 
-        // True when the configured radio model has a single physical receiver
-        // (FTdx10 / FT-710 / FTDX3000 / FT-991A). Set by RadioInitialization-
-        // Service at startup from RadioCapabilities. The dispatcher uses this
-        // to route P1=0 ("Fixed" on single-receiver radios) responses to
-        // whichever VFO is currently active (per VS), instead of always
-        // writing to *A state — see #34 R2 controls-bleed-across-panels fix.
+        // True when the configured radio model has a single physical receiver.
+        // Both IC-7300 models do, so this is true throughout; it is set at
+        // startup from RadioCapabilities so the assumption lives in one place.
+        // IntentDispatcher uses it to route a per-VFO control onto whichever
+        // VFO is currently active, rather than always writing to *A state —
+        // on one receiver the targeted panel is a hint, not an address.
         public bool IsSingleReceiver { get; set; } = false;
 
-        // Configured radio model (e.g. "FTDX3000"). Set by RadioInitialization-
-        // Service at startup. The dispatcher uses this to normalise model-
-        // specific CAT read codes — notably the FTDX3000 roofing-filter answer,
-        // whose read code space differs from its set code space.
+        // Configured radio model — "IC-7300" or "IC-7300MK2". Set at startup;
+        // the two differ in CI-V default address (94 vs B6) rather than in
+        // anything this class has to normalise.
         public string RadioModel { get; set; } = "";
 
         private RadioState _initialState;
@@ -319,22 +318,14 @@ namespace Icom_Web_Control.Services
         private bool _txClarOn = false;
         public bool TxClarOn { get => _txClarOn; set => SetField(ref _txClarOn, value); }
 
-        private bool _contourOnA = false;
-        public bool ContourOnA { get => _contourOnA; set => SetField(ref _contourOnA, value); }
-        private bool _contourOnB = false;
-        public bool ContourOnB { get => _contourOnB; set => SetField(ref _contourOnB, value); }
         private bool _apfOnA = false;
         public bool ApfOnA { get => _apfOnA; set => SetField(ref _apfOnA, value); }
         private bool _apfOnB = false;
         public bool ApfOnB { get => _apfOnB; set => SetField(ref _apfOnB, value); }
-        private int _contourFreqA = 800;
-        public int ContourFreqA { get => _contourFreqA; set => SetField(ref _contourFreqA, value); }
-        private int _contourFreqB = 800;
-        public int ContourFreqB { get => _contourFreqB; set => SetField(ref _contourFreqB, value); }
-        private int _apfFreqA = 0;
-        public int ApfFreqA { get => _apfFreqA; set => SetField(ref _apfFreqA, value); }
-        private int _apfFreqB = 0;
-        public int ApfFreqB { get => _apfFreqB; set => SetField(ref _apfFreqB, value); }
+        private int _apfWidthA = 0;
+        public int ApfWidthA { get => _apfWidthA; set => SetField(ref _apfWidthA, value); }
+        private int _apfWidthB = 0;
+        public int ApfWidthB { get => _apfWidthB; set => SetField(ref _apfWidthB, value); }
 
         private bool _isConnected = false;
         public bool IsConnected { get => _isConnected; set => SetField(ref _isConnected, value); }
@@ -567,7 +558,8 @@ namespace Icom_Web_Control.Services
         public int FmOffsetHz { get => _fmOffsetHz; set => SetField(ref _fmOffsetHz, value); }
         private string _ctcssMode = "00";
         public string CtcssMode { get => _ctcssMode; set => SetField(ref _ctcssMode, value); }
-        private string _ctcssTone = "01";
+        // Tenths of a Hz, as CI-V 1B carries it: "885" is 88.5 Hz.
+        private string _ctcssTone = "885";
         public string CtcssTone { get => _ctcssTone; set => SetField(ref _ctcssTone, value); }
 
         // CW Keyer. Speed in WPM (6–48); break-in mode "0"/"1"/"2"; break-in
@@ -664,14 +656,10 @@ namespace Icom_Web_Control.Services
                 new("TxClarOn", TxClarOn),
                 new("ClarifierOffsetA", ClarifierOffsetA),
                 new("ClarifierOffsetB", ClarifierOffsetB),
-                new("ContourOnA", ContourOnA),
-                new("ContourOnB", ContourOnB),
-                new("ContourFreqA", ContourFreqA),
-                new("ContourFreqB", ContourFreqB),
                 new("ApfOnA", ApfOnA),
                 new("ApfOnB", ApfOnB),
-                new("ApfFreqA", ApfFreqA),
-                new("ApfFreqB", ApfFreqB),
+                new("ApfWidthA", ApfWidthA),
+                new("ApfWidthB", ApfWidthB),
                 new("AfGainA", AfGainA),
                 new("AfGainB", AfGainB),
                 new("RfGainA", RfGainA),
@@ -795,14 +783,10 @@ namespace Icom_Web_Control.Services
                 IfShiftB = IfShiftB,
                 ClarifierOffsetA = ClarifierOffsetA,
                 ClarifierOffsetB = ClarifierOffsetB,
-                ContourOnA = ContourOnA,
-                ContourOnB = ContourOnB,
-                ContourFreqA = ContourFreqA,
-                ContourFreqB = ContourFreqB,
                 ApfOnA = ApfOnA,
                 ApfOnB = ApfOnB,
-                ApfFreqA = ApfFreqA,
-                ApfFreqB = ApfFreqB,
+                ApfWidthA = ApfWidthA,
+                ApfWidthB = ApfWidthB,
                 ProcEnabled = ProcEnabled,
                 ProcLevel = ProcLevel
             };

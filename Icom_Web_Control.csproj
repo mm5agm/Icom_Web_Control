@@ -81,9 +81,9 @@
   <PropertyGroup>
     <!-- Fresh IWC version line starting at 1.0.0; keep in step with Models/AppVersion.cs.
          AssemblyVersion/FileVersion must stay numeric; Version carries any label. -->
-    <Version>1.0.0</Version>
-    <FileVersion>1.0.0.0</FileVersion>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Version>1.0.2</Version>
+    <FileVersion>1.0.2.0</FileVersion>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
     <AssemblyTitle>Icom Web Control</AssemblyTitle>
     <Product>Icom Web Control</Product>
     <Description>Browser-based CI-V controller for Icom HF transceivers</Description>

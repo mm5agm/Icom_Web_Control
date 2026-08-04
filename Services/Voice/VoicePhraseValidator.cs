@@ -44,10 +44,26 @@ namespace Icom_Web_Control.Services.Voice
     public static class VoicePhraseValidator
     {
         private static readonly HashSet<string> KnownBandMetres = ["160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "4"];
-        private static readonly HashSet<string> KnownAttenuatorLevels = ["off", "6", "12", "18"];
+        // Attenuator is one 20 dB pad on/off (CI-V 11) and AGC is a
+        // three-position time constant (16 12) — the Yaesu 6/12/18 dB steps and
+        // the OFF/AUTO AGC positions this used to accept do not exist on the
+        // IC-7300, so a pack still offering them is describing a radio the app
+        // cannot drive.
+        private static readonly HashSet<string> KnownAttenuatorLevels = ["off", "on"];
         private static readonly HashSet<string> KnownPreampLevels = ["off", "1", "2"];
-        private static readonly HashSet<string> KnownAgcSpeeds = ["off", "fast", "mid", "slow", "auto"];
+        private static readonly HashSet<string> KnownAgcSpeeds = ["fast", "mid", "slow"];
         private static readonly HashSet<string> KnownNudgeSteps = ["10", "100", "1000", "10000", "100000"];
+        private static readonly HashSet<string> KnownNotchModes = ["off", "auto", "manual"];
+        private static readonly HashSet<string> KnownApfSettings = ["0", "1", "2", "3"];
+
+        // The 0–100 level ladder shared by AF/RF gain, squelch, TX power, mic
+        // gain and the level half of NR/NB/processor. Any whole number in range
+        // is legal — the vocabulary is the user's to extend, so this is a range
+        // check, not a fixed set.
+        private static bool IsLevelKey(string key) =>
+            int.TryParse(key, out var n) && n is >= 0 and <= 100;
+
+        private static readonly HashSet<string> SwitchWords = ["off", "on"];
 
         // CI-V command bytes the app itself already sends through
         // IRadioController — set frequency (05/25), set mode (06/26), VFO
@@ -81,9 +97,9 @@ namespace Icom_Web_Control.Services.Voice
 
         private static void ValidateStructural(VoicePhrasesConfig cfg, List<ValidationIssue> issues)
         {
-            if (cfg.Version < 8)
+            if (cfg.Version < 9)
                 issues.Add(new ValidationIssue(ValidationSeverity.Error, "version",
-                    $"Schema version {cfg.Version} predates the current format (8) and cannot be validated."));
+                    $"Schema version {cfg.Version} predates the current format (9) and cannot be validated."));
 
             cfg.SimpleCommands ??= new();
             cfg.Macros ??= new();
@@ -113,6 +129,15 @@ namespace Icom_Web_Control.Services.Voice
             ValidateDecomposed(cfg.SetPreamp, "setPreamp", KnownPreampLevels, issues);
             ValidateDecomposed(cfg.SetAgc, "setAgc", KnownAgcSpeeds, issues);
             ValidateDecomposed(cfg.SetAfGain, "setAfGain", null, issues);
+            ValidateDecomposed(cfg.SetNoiseReduction, "setNoiseReduction", SwitchWords, issues, allowLevels: true);
+            ValidateDecomposed(cfg.SetNoiseBlanker, "setNoiseBlanker", SwitchWords, issues, allowLevels: true);
+            ValidateDecomposed(cfg.SetProcessor, "setProcessor", SwitchWords, issues, allowLevels: true);
+            ValidateDecomposed(cfg.SetNotch, "setNotch", KnownNotchModes, issues);
+            ValidateDecomposed(cfg.SetApf, "setApf", KnownApfSettings, issues);
+            ValidateDecomposed(cfg.SetRfGain, "setRfGain", null, issues);
+            ValidateDecomposed(cfg.SetSquelch, "setSquelch", null, issues);
+            ValidateDecomposed(cfg.SetTxPower, "setTxPower", null, issues);
+            ValidateDecomposed(cfg.SetMicGain, "setMicGain", null, issues);
 
             if (cfg.SetFrequency == null || cfg.SetFrequency.Triggers.Count == 0)
                 issues.Add(new ValidationIssue(ValidationSeverity.Warning, "setFrequency.triggers",
@@ -162,7 +187,15 @@ namespace Icom_Web_Control.Services.Voice
             return null;
         }
 
-        private static void ValidateDecomposed(DecomposedCommand? cmd, string prefix, HashSet<string>? knownKeys, List<ValidationIssue> issues)
+        /// <summary>
+        /// <paramref name="allowLevels"/> widens the closed set to also accept
+        /// any whole 0–100 level key, for the controls that are a switch and a
+        /// level in one (NR, NB, speech processor) and for the pure level
+        /// ladders. The level range is a rule rather than an enumerated set
+        /// because the numbers in a pack are the user's to extend.
+        /// </summary>
+        private static void ValidateDecomposed(DecomposedCommand? cmd, string prefix, HashSet<string>? knownKeys,
+            List<ValidationIssue> issues, bool allowLevels = false)
         {
             if (cmd == null) return;
 
@@ -183,7 +216,7 @@ namespace Icom_Web_Control.Services.Voice
                 // Closed-set commands: an unknown key is a warning, not an
                 // error — it might be authored against a newer app version
                 // that added a value this build doesn't recognise yet.
-                if (knownKeys != null && !knownKeys.Contains(key))
+                if (knownKeys != null && !knownKeys.Contains(key) && !(allowLevels && IsLevelKey(key)))
                 {
                     issues.Add(new ValidationIssue(ValidationSeverity.Warning, $"{prefix}.vocabulary.{key}",
                         $"'{key}' isn't a value '{prefix}' currently understands — this app version will ignore it if spoken."));

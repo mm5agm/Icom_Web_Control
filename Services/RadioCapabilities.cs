@@ -33,25 +33,16 @@ public static class RadioCapabilities
     /// </summary>
     public static bool IsSingleReceiver(string radioModel) => !IsDualReceiver(radioModel);
 
-    /// <summary>
-    /// True when the radio has more than one antenna jack and IWC should
-    /// expose a per-VFO antenna selector. Showing a selector for a control
-    /// that does nothing is just visual noise, so single-antenna radios get
-    /// it hidden. The IC-7300 family has a single SO-239 ANT jack.
-    /// </summary>
-    public static bool HasAntennaSelector(string radioModel) => radioModel switch
-    {
-        "IC-7300" or "IC-7300MK2" => false,
-        _                         => true
-    };
+    // There is no HasAntennaSelector. Both supported models have one SO-239
+    // ANT jack, so the per-VFO antenna selector was removed outright rather
+    // than gated behind a flag that could only ever answer "no".
 
     /// <summary>
     /// Returns the P1 character for a per-VFO command, given the user's (or
     /// voice command's) targeted receiver ("A" or "B"). On single-receiver
-    /// radios always "0" -- the firmware hard-codes that position and rejects
-    /// P1=1; on dual-receiver "0" for A, "1" for B.
-    /// Shared by CatController (mouse/keyboard input) and IntentDispatcher
-    /// (voice input) so the routing rule lives in exactly one place.
+    /// radios always "0"; on dual-receiver "0" for A, "1" for B.
+    /// Used by IntentDispatcher (voice input) so the routing rule lives in
+    /// exactly one place.
     /// </summary>
     public static string VfoP1(bool isSingleReceiver, string receiver) =>
         isSingleReceiver

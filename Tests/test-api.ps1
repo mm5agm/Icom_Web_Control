@@ -498,18 +498,21 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  11. CAT -- IF WIDTH, IF SHIFT, MANUAL NOTCH
+#  11. IF WIDTH, FILTER SLOT, MANUAL NOTCH
 # ==============================================================================
-Section "CAT -- IF Width, IF Shift, Manual Notch"
+# IF Width lives on /api/radio/ifwidth (the IC-7300 filter-select command), not
+# on /api/cat. There is no IF Shift endpoint -- the radio splits the passband
+# edges into Twin PBT instead, covered in the Twin PBT section.
+Section "IF Width, Filter Slot, Manual Notch"
 
 if ($script:RadioOnline) {
-    Test-Ok "IF Width A code 8"            -Method POST -Path "/api/cat/ifwidth/a"        -Body @{ code = "8" }
-    Test-Ok "IF Width B code 4"            -Method POST -Path "/api/cat/ifwidth/b"        -Body @{ code = "4" }
-    Test-Status "IF Width invalid code 400" -Method POST -Path "/api/cat/ifwidth/a"       -Body @{ code = "99" } -ExpectedStatus 400
+    Test-Ok "IF Width A 2400 Hz"           -Method POST -Path "/api/radio/ifwidth/a"      -Body @{ hz = 2400 }
+    Test-Ok "IF Width B 1800 Hz"           -Method POST -Path "/api/radio/ifwidth/b"      -Body @{ hz = 1800 }
+    Test-Status "IF Width bad receiver 400" -Method POST -Path "/api/radio/ifwidth/z"     -Body @{ hz = 2400 } -ExpectedStatus 400
 
-    Test-Ok "IF Shift A +100 Hz"           -Method POST -Path "/api/cat/ifshift/a"        -Body @{ shiftHz = 100 }
-    Test-Ok "IF Shift A 0 Hz"              -Method POST -Path "/api/cat/ifshift/a"        -Body @{ shiftHz = 0 }
-    Test-Status "IF Shift out of range 400" -Method POST -Path "/api/cat/ifshift/a"       -Body @{ shiftHz = 2000 } -ExpectedStatus 400
+    Test-Ok "Filter slot A = FIL2"         -Method POST -Path "/api/radio/filter/a"       -Body @{ fil = 2 }
+    Test-Ok "Filter slot A = FIL1"         -Method POST -Path "/api/radio/filter/a"       -Body @{ fil = 1 }
+    Test-Status "Filter slot invalid 400"  -Method POST -Path "/api/radio/filter/a"       -Body @{ fil = 4 } -ExpectedStatus 400
 
     Test-Ok "Manual notch A on"            -Method POST -Path "/api/cat/manualnotch/a"    -Body @{ enabled = "1" }
     Test-Ok "Manual notch A off"           -Method POST -Path "/api/cat/manualnotch/a"    -Body @{ enabled = "0" }
@@ -544,48 +547,22 @@ if ($script:RadioOnline) {
 }
 
 # ==============================================================================
-#  13. CAT -- ANTENNA
+#  13. CAT -- APF
 # ==============================================================================
-Section "CAT -- Antenna"
+# No antenna section: the IC-7300 family has one SO-239 jack.
+# No roofing-filter section: it is a direct-sampling SDR and has none.
+# No contour section: contour is a Yaesu control with no IC-7300 equivalent.
+Section "CAT -- APF"
 
 if ($script:RadioOnline) {
-    Test-Ok "Antenna A = ANT1" -Method POST -Path "/api/cat/antenna/a" -Body @{ antenna = "1" }
-    Test-Ok "Antenna B = ANT1" -Method POST -Path "/api/cat/antenna/b" -Body @{ antenna = "1" }
+    # Width, not a frequency offset: 0=OFF, 1=WIDE, 2=MID, 3=NAR (CI-V 16 32).
+    Test-Ok "APF A wide"        -Method POST -Path "/api/cat/apf/a" -Body @{ width = 1 }
+    Test-Ok "APF A mid"         -Method POST -Path "/api/cat/apf/a" -Body @{ width = 2 }
+    Test-Ok "APF B narrow"      -Method POST -Path "/api/cat/apf/b" -Body @{ width = 3 }
+    Test-Ok "APF A off"         -Method POST -Path "/api/cat/apf/a" -Body @{ width = 0 }
+    Test-Status "APF width out of range 400" -Method POST -Path "/api/cat/apf/a" -Body @{ width = 4 } -ExpectedStatus 400
 } else {
-    Skip "Antenna tests" "Radio offline"
-}
-
-# ==============================================================================
-#  14. CAT -- ROOFING FILTER
-# ==============================================================================
-Section "CAT -- Roofing filter"
-
-if ($script:RadioOnline) {
-    # Code 7 = 3 kHz on FTdx101
-    Test-Ok "Roofing filter A code 7"      -Method POST -Path "/api/cat/roofingfilter/a" -Body @{ filter = "7" }
-    Test-Ok "Roofing filter B code 7"      -Method POST -Path "/api/cat/roofingfilter/b" -Body @{ filter = "7" }
-    Test-Status "Invalid roofing filter 400" -Method POST -Path "/api/cat/roofingfilter/a" -Body @{ filter = "Z" } -ExpectedStatus 400
-} else {
-    Skip "Roofing filter tests" "Radio offline"
-}
-
-# ==============================================================================
-#  15. CAT -- CONTOUR AND APF
-# ==============================================================================
-Section "CAT -- Contour and APF"
-
-if ($script:RadioOnline) {
-    Test-Ok "Contour A on 800 Hz"  -Method POST -Path "/api/cat/contour/a" -Body @{ on = $true;  freqHz = 800 }
-    Test-Ok "Contour A off"        -Method POST -Path "/api/cat/contour/a" -Body @{ on = $false; freqHz = 800 }
-    Test-Ok "Contour B on 1200 Hz" -Method POST -Path "/api/cat/contour/b" -Body @{ on = $true;  freqHz = 1200 }
-    Test-Ok "Contour B off"        -Method POST -Path "/api/cat/contour/b" -Body @{ on = $false; freqHz = 1200 }
-
-    Test-Ok "APF A on 0 Hz"  -Method POST -Path "/api/cat/apf/a" -Body @{ on = $true;  freqHz = 0 }
-    Test-Ok "APF A off"       -Method POST -Path "/api/cat/apf/a" -Body @{ on = $false; freqHz = 0 }
-    Test-Ok "APF B on"        -Method POST -Path "/api/cat/apf/b" -Body @{ on = $true;  freqHz = 0 }
-    Test-Ok "APF B off"       -Method POST -Path "/api/cat/apf/b" -Body @{ on = $false; freqHz = 0 }
-} else {
-    Skip "Contour/APF tests" "Radio offline"
+    Skip "APF tests" "Radio offline"
 }
 
 # ==============================================================================

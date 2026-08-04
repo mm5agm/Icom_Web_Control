@@ -73,7 +73,7 @@ namespace Icom_Web_Control.Pages
         public string FmShiftDir { get; set; } = "0";
         public int FmOffsetHz { get; set; } = 600000;
         public string CtcssMode { get; set; } = "00";
-        public string CtcssTone { get; set; } = "01";
+        public string CtcssTone { get; set; } = "885";   // tenths of a Hz: 88.5
 
         public double SdrSampleRateHz  { get; set; } = 2_048_000;
         public double SdrSampleRateHzA { get; set; } = 2_048_000;
@@ -130,7 +130,7 @@ namespace Icom_Web_Control.Pages
             // Deliberately no server-side redirect to Settings on
             // InitializationStatus == "error" here. If radio initialization
             // keeps failing (e.g. an unhandled exception deep in the init
-            // sequence — see Issue #65, FTDX3000), that status flag can get
+            // sequence), that status flag can get
             // stuck at "error" indefinitely, since nothing resets it except
             // a fully successful re-init. A hard redirect here trapped users
             // on the Settings page with no way back to Home even after they

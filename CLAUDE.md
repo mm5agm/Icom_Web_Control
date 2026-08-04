@@ -295,14 +295,6 @@ server-rendered initial values), `Settings`, `Diagnostics`, `Labels`
 
 Do not treat these as authoritative when reading the codebase:
 
-- **`Controllers/CatController.cs` still carries Yaesu special-cases.** Around
-  the CO (contour/notch) endpoints it branches on `settings.RadioModel ==
-  "FTDX3000"` and builds Yaesu CAT strings. `RadioModel` can only ever be
-  `IC-7300` or `IC-7300MK2` (those are the only two options `Settings.cshtml`
-  offers), so the branch is unreachable — but the surrounding code is live.
-  Read carefully before editing there.
-- `Pages/Index.cshtml` computes `isFtdx3000` and uses it for one value
-  (`apfStep`), which therefore always resolves to the non-FTDX3000 branch.
 - `Pages/Labels.cshtml` advertises **28 keys no element carries** — the whole
   `controls.*` group (TX power, mic gain, AF gain, IF shift, AGC, NR, NB,
   notch, and the Yaesu-only IPO / roofing / antenna entries), plus
@@ -322,8 +314,23 @@ endpoints the carve had already removed), `scripts/collect-soapy-deps.ps1`,
 root `Plan.md` / `docs/VoiceControl/v1-plan.md` (both pure YWC planning docs
 full of Yaesu CAT commands).
 
+Cleared in the follow-up `CatController` sweep, likewise gone for good:
+`ICatClient` / `NullCatClient` and the `_catClient` field (every call site is
+now on the seam), `EnsureConnectedAsync` / `GetMainVfoAsync`, the contour and
+IF-shift endpoints, the `/api/cat/ifwidth` pair (superseded by
+`/api/radio/ifwidth`), the per-VFO antenna selector end-to-end (markup,
+`setAntenna`, `RadioCapabilities.HasAntennaSelector`), and the dead
+roofing-filter JS. **`CatController.cs` no longer contains a Yaesu code path.**
+Where it still says "Yaesu", it is explaining why the Icom code differs.
+
+Yaesu residue does survive elsewhere in comments and inherited names —
+`CalibrationStorage.cs`, `RadioStateService.cs` NR notes, `AppMemory.RoofingCode`,
+the `site.js` header and several FTdx10/FTdx101 anecdotes, plus the inherited
+`ipo` route name (it drives the IC-7300 preamp) and `sdrId` on the hub. Names on
+the wire are deliberate; the comments are simply unswept.
+
 `Services/RadioCapabilities.cs` is **live**, not dead — `Index.cshtml` reads
-`IsSingleReceiver` / `HasAntennaSelector` from it, and `CatController` and
-`IntentDispatcher` both route per-VFO commands through `VfoP1` / `VfoIsB`.
-Every method now returns the same answer for both supported models; that is
+`IsSingleReceiver` from it, and `IntentDispatcher` routes per-VFO commands
+through `VfoP1` / `VfoIsB` (`CatController` uses `VfoIsB` for the mode setter).
+Every method returns the same answer for both supported models; that is
 deliberate, so the assumption is stated in one place.

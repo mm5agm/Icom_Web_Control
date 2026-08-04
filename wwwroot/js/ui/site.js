@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function () {
 //     polling logic, highlightButtons, gauge init, etc.
 //
 // The outer globals are kept because the Razor pages call window.setBand,
-// window.setMode, window.setAntenna, and window.radioControl directly via
+// window.setMode and window.radioControl directly via
 // inline onchange="..." attributes, and the IIFE overwrites window.radioControl
 // at the end with the real implementations.
 //
@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ---------------------------------------------------------------------------
 // OUTER GLOBALS
 // These exist because the Razor page's inline onchange handlers fire before
-// the IIFE runs, so window.setBand / setMode / setAntenna must be defined
+// the IIFE runs, so window.setBand / setMode must be defined
 // at global scope.  The IIFE later replaces window.radioControl with its
 // own (better) versions.
 // ---------------------------------------------------------------------------
@@ -325,22 +325,9 @@ window.setMode = async function (receiver, mode) {
     // No debug logging
 };
 
-// Outer antenna setter - called from Razor inline onchange on antenna buttons
-window.setAntenna = async function (receiver, antenna) {
-    if (window.pausePolling) pausePolling();
-    try {
-        if (window.highlightButtons) highlightButtons(receiver, state.lastBand ? state.lastBand[receiver] : undefined, state.lastMode ? state.lastMode[receiver] : undefined, antenna);
-        if (state.lastAntenna) state.lastAntenna[receiver] = antenna;
-        const response = await fetch(`/api/cat/antenna/${receiver.toLowerCase()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ antenna })
-        });
-        // No debug logging
-    } catch (error) {
-        // No debug logging
-    }
-};
+// No antenna setter. The IC-7300 family has one SO-239 ANT jack, so the
+// per-VFO antenna selector and its /api/cat/antenna endpoint both went with
+// the Yaesu multi-antenna support they existed for.
 
 // Centralised radio -> max-power mapping. IWC targets the Icom IC-7300 family
 // (IC-7300 and IC-7300 MkII), both 100 W radios, so this is 100 W across the
@@ -614,7 +601,7 @@ let txVfo = 0; // 0 = VFO A, 1 = VFO B (the TX VFO — only flips with split)
 let activeVfo = 0;
 
 // Apply the .vfo-inactive class to whichever VFO panel is NOT the active
-// (RX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
+// (RX) one — but only on single-receiver radios, which the IC-7300 is.
 // CSS greys only that panel's .card-body (header stays normal so TX looks
 // enabled). Dual-receiver radios leave both panels active because each
 // VFO is its own physical receiver chain. The data-single-receiver
@@ -720,8 +707,10 @@ let clarOffsets = { A: 0, B: 0 };
 let rxClarOn = false;
 let txClarOn = false;
 
-let contourState = { A: { on: false, freqHz: 800 }, B: { on: false, freqHz: 800 } };
-let apfState     = { A: { on: false, freqHz: 0   }, B: { on: false, freqHz: 0   } };
+// APF width per VFO: 0=OFF, 1=WIDE, 2=MID, 3=NAR. The IC-7300 has one APF
+// with no frequency shift, so both VFOs always hold the same value — the two
+// entries exist because the page draws a control in each VFO panel.
+let apfState = { A: 0, B: 0 };
 
 async function toggleTx() {
     const newTxState = !isTransmitting;
@@ -1052,7 +1041,6 @@ connection.on("RadioStateUpdate", function (update) {
         updateModeSelect('A', update.value);
         updateMicGainLabel(update.value);
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ mode: update.value });
-        updateContourSliderBounds('A');
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('A', update.value);
         if (window.IfWidth && window._radioModel) {
             window.IfWidth.rebuildIfWidthSelect(
@@ -1066,7 +1054,6 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ mode: update.value });
-        updateContourSliderBounds('B');
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('B', update.value);
         if (window.IfWidth && window._radioModel) {
             window.IfWidth.rebuildIfWidthSelect(
@@ -1273,20 +1260,6 @@ connection.on("RadioStateUpdate", function (update) {
         if (result) updateMeterDomLabel(update.property, result);
     }
 
-    // --- ROOFING FILTER ---
-    if (update.property === "RoofingFilterA") {
-        const selectEl = document.getElementById('roofingFilterSelectA');
-        if (selectEl) selectEl.value = update.value;
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ roofingCode: update.value });
-        updateContourSliderBounds('A');
-    }
-    if (update.property === "RoofingFilterB") {
-        const selectEl = document.getElementById('roofingFilterSelectB');
-        if (selectEl) selectEl.value = update.value;
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ roofingCode: update.value });
-        updateContourSliderBounds('B');
-    }
-
     // --- AGC ---
     if (update.property === "AgcA") {
         if (window.dspSetActive) window.dspSetActive('agcGroupA', update.value);
@@ -1377,7 +1350,6 @@ connection.on("RadioStateUpdate", function (update) {
             if (exists) el.value = update.value;
         }
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifWidthCode: update.value });
-        updateContourSliderBounds('A');
     }
     if (update.property === "IfWidthB") {
         const el = document.getElementById('ifWidthSelectB');
@@ -1386,24 +1358,10 @@ connection.on("RadioStateUpdate", function (update) {
             if (exists) el.value = update.value;
         }
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifWidthCode: update.value });
-        updateContourSliderBounds('B');
     }
 
-    // --- IF SHIFT ---
-    if (update.property === "IfShiftA" && !ifShiftDragging.A) {
-        const slider = document.getElementById('ifShiftSliderA');
-        const label = document.getElementById('ifShiftValueA');
-        if (slider) slider.value = update.value;
-        if (label) label.textContent = update.value;
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifShiftHz: parseInt(update.value) || 0 });
-    }
-    if (update.property === "IfShiftB" && !ifShiftDragging.B) {
-        const slider = document.getElementById('ifShiftSliderB');
-        const label = document.getElementById('ifShiftValueB');
-        if (slider) slider.value = update.value;
-        if (label) label.textContent = update.value;
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifShiftHz: parseInt(update.value) || 0 });
-    }
+    // IF Shift has no handler: the IC-7300 shifts the passband edges with Twin
+    // PBT, whose updates arrive as PbtInner/PbtOuter.
 
     // --- CLARIFIER ---
     if (update.property === "RxClarOn") {
@@ -1436,60 +1394,11 @@ connection.on("RadioStateUpdate", function (update) {
     }
 
     // --- CONTOUR ---
-    if (update.property === "ContourOnA") {
-        contourState.A.on = update.value === true || update.value === 'true' || update.value === 1;
-        _updateContourBtn('A');
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ contourOn: contourState.A.on });
-    }
-    if (update.property === "ContourOnB") {
-        contourState.B.on = update.value === true || update.value === 'true' || update.value === 1;
-        _updateContourBtn('B');
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ contourOn: contourState.B.on });
-    }
-    if (update.property === "ContourFreqA") {
-        contourState.A.freqHz = parseInt(update.value) || 800;
-        const slider = document.getElementById('contourFreqSliderA');
-        const label  = document.getElementById('contourFreqValueA');
-        if (slider) slider.value = contourState.A.freqHz;
-        if (label)  label.textContent = contourState.A.freqHz + ' Hz';
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ contourFreqHz: contourState.A.freqHz });
-    }
-    if (update.property === "ContourFreqB") {
-        contourState.B.freqHz = parseInt(update.value) || 800;
-        const slider = document.getElementById('contourFreqSliderB');
-        const label  = document.getElementById('contourFreqValueB');
-        if (slider) slider.value = contourState.B.freqHz;
-        if (label)  label.textContent = contourState.B.freqHz + ' Hz';
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ contourFreqHz: contourState.B.freqHz });
-    }
-
-    // --- APF ---
-    if (update.property === "ApfOnA") {
-        apfState.A.on = update.value === true || update.value === 'true' || update.value === 1;
-        _updateApfBtn('A');
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ apfOn: apfState.A.on });
-    }
-    if (update.property === "ApfOnB") {
-        apfState.B.on = update.value === true || update.value === 'true' || update.value === 1;
-        _updateApfBtn('B');
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfOn: apfState.B.on });
-    }
-    if (update.property === "ApfFreqA") {
-        apfState.A.freqHz = parseInt(update.value) || 0;
-        const slider = document.getElementById('apfFreqSliderA');
-        const label  = document.getElementById('apfFreqValueA');
-        if (slider) slider.value = apfState.A.freqHz;
-        if (label)  label.textContent = apfState.A.freqHz + ' Hz';
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ apfFreqHz: apfState.A.freqHz });
-    }
-    if (update.property === "ApfFreqB") {
-        apfState.B.freqHz = parseInt(update.value) || 0;
-        const slider = document.getElementById('apfFreqSliderB');
-        const label  = document.getElementById('apfFreqValueB');
-        if (slider) slider.value = apfState.B.freqHz;
-        if (label)  label.textContent = apfState.B.freqHz + ' Hz';
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfFreqHz: apfState.B.freqHz });
-    }
+    // --- APF (width: 0=off, 1=wide, 2=mid, 3=nar) ---
+    // ApfOnA/ApfOnB are the derived on/off flags; the width updates carry the
+    // value the selector shows, so only those need to touch the DOM.
+    if (update.property === "ApfWidthA") _applyApfWidth('A', update.value);
+    if (update.property === "ApfWidthB") _applyApfWidth('B', update.value);
 
     // --- MANUAL NOTCH (folded into the single Notch group) ---
     if (update.property === "ManualNotchA") {
@@ -1813,7 +1722,6 @@ function isTouchDevice() {
 window.radioControl = {
     setBand: window.setBand,
     setMode: window.setMode,
-    setAntenna: window.setAntenna,
     setPower: window.setPower,
     updatePowerDisplay: window.updatePowerDisplay,
     setAgc: async function (receiver, code) {
@@ -1847,15 +1755,10 @@ window.radioControl = {
     setManualNotchFreq: async function (receiver, frequencyHz) {
         await fetch(`/api/cat/manualnotchfreq/${receiver.toLowerCase()}`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frequencyHz: parseInt(frequencyHz) }) });
-    },
-    setIfWidth: async function (receiver, code) {
-        await fetch(`/api/cat/ifwidth/${receiver.toLowerCase()}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
-    },
-    setIfShift: async function (receiver, shiftHz) {
-        await fetch(`/api/cat/ifshift/${receiver.toLowerCase()}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftHz: parseInt(shiftHz) }) });
     }
+    // No setIfWidth here: ic7300-if-width.js owns window.setIfWidth and posts
+    // to /api/radio/ifwidth. No setIfShift either — the IC-7300 has Twin PBT
+    // instead, at /api/cat/pbt.
 };
 
 // Fetch and apply band button state from the backend on page load
@@ -2032,16 +1935,10 @@ window.addEventListener('DOMContentLoaded', () => {
         txClarOn = initMode === 'tx' || initMode === 'rxtx';
     }
 
-    // Contour/APF: seed JS state from server-rendered HTML values
+    // APF: seed JS state from the server-rendered selector
     for (const vfo of ['A', 'B']) {
-        const cBtn = document.getElementById(`contourBtn${vfo}`);
-        if (cBtn) contourState[vfo].on = cBtn.classList.contains('btn-success');
-        const cSlider = document.getElementById(`contourFreqSlider${vfo}`);
-        if (cSlider) contourState[vfo].freqHz = parseInt(cSlider.value) || 800;
-        const aBtn = document.getElementById(`apfBtn${vfo}`);
-        if (aBtn) apfState[vfo].on = aBtn.classList.contains('btn-success');
-        const aSlider = document.getElementById(`apfFreqSlider${vfo}`);
-        if (aSlider) apfState[vfo].freqHz = parseInt(aSlider.value) || 0;
+        const sel = document.getElementById(`apfSelect${vfo}`);
+        if (sel) apfState[vfo] = parseInt(sel.value) || 0;
     }
 
     // Event delegation for band button changes
@@ -2132,35 +2029,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupAfGainSlider('A');
     setupAfGainSlider('B');
 });
-
-// IF Shift slider: send only on release, block SignalR updates while dragging
-const ifShiftDragging = { A: false, B: false };
-
-function setupIfShiftSlider(receiver) {
-    const slider = document.getElementById(`ifShiftSlider${receiver}`);
-    if (!slider) return;
-    const sendShift = () => {
-        if (window.radioControl) window.radioControl.setIfShift(receiver, parseInt(slider.value));
-    };
-    slider.addEventListener('mousedown',  () => { ifShiftDragging[receiver] = true; });
-    slider.addEventListener('touchstart', () => { ifShiftDragging[receiver] = true; }, { passive: true });
-    // Document-level mouseup catches releases anywhere, not just over the slider element
-    document.addEventListener('mouseup', () => {
-        if (ifShiftDragging[receiver]) { ifShiftDragging[receiver] = false; sendShift(); }
-    });
-    slider.addEventListener('touchend',   () => { ifShiftDragging[receiver] = false; sendShift(); });
-    // Keyboard arrow keys fire 'change' after the value settles
-    slider.addEventListener('change', sendShift);
-}
-
-function resetIfShift(receiver) {
-    const slider = document.getElementById(`ifShiftSlider${receiver}`);
-    const label  = document.getElementById(`ifShiftValue${receiver}`);
-    if (slider) slider.value = 0;
-    if (label)  label.textContent = '0';
-    if (window.radioControl) window.radioControl.setIfShift(receiver, 0);
-}
-window.resetIfShift = resetIfShift;
 
 function selectClarVfo(vfo) {
     clarVfo = vfo;
@@ -2280,134 +2148,32 @@ function resetIfWidth(receiver) {
 }
 window.resetIfWidth = resetIfWidth;
 
-function _updateContourBtn(vfo) {
-    const btn = document.getElementById(`contourBtn${vfo}`);
-    if (!btn) return;
-    const on = contourState[vfo].on;
-    btn.textContent = on ? 'Contour On' : 'Contour Off';
-    btn.className = btn.className.replace(/btn-success|btn-outline-secondary/g, '').trim();
-    btn.classList.add(on ? 'btn-success' : 'btn-outline-secondary');
-}
-
-function _updateApfBtn(vfo) {
-    const btn = document.getElementById(`apfBtn${vfo}`);
-    if (!btn) return;
-    const on = apfState[vfo].on;
-    btn.textContent = on ? 'APF On' : 'APF Off';
-    btn.className = btn.className.replace(/btn-success|btn-outline-secondary/g, '').trim();
-    btn.classList.add(on ? 'btn-success' : 'btn-outline-secondary');
-}
-
-async function toggleContour(vfo) {
-    const newOn = !contourState[vfo].on;
-    contourState[vfo].on = newOn;
-    _updateContourBtn(vfo);
-    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
-    if (panel) panel.setState({ contourOn: newOn });
-    try {
-        await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ on: newOn, freqHz: contourState[vfo].freqHz })
-        });
-    } catch (e) { console.error('Contour toggle failed:', e); }
-}
-window.toggleContour = toggleContour;
-
-async function setContourFreq(vfo, hz) {
-    contourState[vfo].freqHz = hz;
-    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
-    if (panel) panel.setState({ contourFreqHz: hz });
-    try {
-        await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ on: contourState[vfo].on, freqHz: hz })
-        });
-    } catch (e) { console.error('Contour freq failed:', e); }
-}
-window.setContourFreq = setContourFreq;
-
-// Recompute the contour slider's min/max for a VFO based on the current
-// passband (mode + IF Width + roofing). The radio's hard CAT range is
-// preserved as an outer clamp via the slider's initial min/max values,
-// so we never let the user set a value the radio can't accept. If the
-// existing contour value falls outside the new (narrower) range, clamp
-// it in place and send the clamped value to the radio.
-//
-// Called from the SignalR handlers for ModeA/ModeB, IfWidthA/IfWidthB,
-// and the per-VFO roofing-filter changes; also once at startup after the
-// FilterScopePanel instances are constructed.
-function updateContourSliderBounds(vfo) {
-    const panel = window['filterScopePanel' + vfo];
-    if (!panel || typeof panel.getPassband !== 'function') return;
-    const slider = document.getElementById('contourFreqSlider' + vfo);
-    if (!slider) return;
-
-    // Cache the radio's hard limits on first run (the values rendered
-    // server-side from the radio model: 100..3200 for FTdx101, 100..4000
-    // for FTDX3000). After that, future updates only narrow within those.
-    if (slider._hardMin == null) slider._hardMin = parseInt(slider.min);
-    if (slider._hardMax == null) slider._hardMax = parseInt(slider.max);
-
-    const { lo, hi } = panel.getPassband();
-    const newMin = Math.max(slider._hardMin, Math.round(lo));
-    const newMax = Math.min(slider._hardMax, Math.round(hi));
-    if (newMin >= newMax) return;
-
-    // Capture the OLD value before changing min/max — once we set the new
-    // max, the browser auto-clamps slider.value to fit, so reading it
-    // afterwards would always give the clamped (= new max) value and we'd
-    // never realise the value had actually moved.
-    const oldVal  = parseInt(slider.value);
-    const clamped = Math.max(newMin, Math.min(newMax, oldVal));
-
-    slider.min = newMin;
-    slider.max = newMax;
-
-    if (clamped !== oldVal) {
-        slider.value = clamped;
-        const label = document.getElementById('contourFreqValue' + vfo);
-        if (label) label.textContent = clamped + ' Hz';
-        setContourFreq(vfo, clamped);  // updates panel state + sends CAT
+// Apply an APF width to the local state and both selectors. The radio has one
+// APF, so a change on either VFO panel is shown on both — leaving the other
+// selector stale would tell the operator the two VFOs differ, and they cannot.
+function _applyApfWidth(vfo, value) {
+    const width = parseInt(value) || 0;
+    apfState.A = width;
+    apfState.B = width;
+    for (const v of ['A', 'B']) {
+        const sel = document.getElementById(`apfSelect${v}`);
+        if (sel && parseInt(sel.value) !== width) sel.value = String(width);
     }
 }
-window.updateContourSliderBounds = updateContourSliderBounds;
 
-async function toggleApf(vfo) {
-    const newOn = !apfState[vfo].on;
-    apfState[vfo].on = newOn;
-    _updateApfBtn(vfo);
-    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
-    if (panel) panel.setState({ apfOn: newOn });
+// vfo decides only which endpoint segment is used; the setting itself is
+// radio-wide (see _applyApfWidth).
+async function setApf(vfo, width) {
+    _applyApfWidth(vfo, width);
     try {
         await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ on: newOn, freqHz: apfState[vfo].freqHz })
+            body: JSON.stringify({ width })
         });
-    } catch (e) { console.error('APF toggle failed:', e); }
+    } catch (e) { console.error('APF set failed:', e); }
 }
-window.toggleApf = toggleApf;
-
-async function setApfFreq(vfo, hz) {
-    apfState[vfo].freqHz = hz;
-    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
-    if (panel) panel.setState({ apfFreqHz: hz });
-    try {
-        await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ on: apfState[vfo].on, freqHz: hz })
-        });
-    } catch (e) { console.error('APF freq failed:', e); }
-}
-window.setApfFreq = setApfFreq;
-
-document.addEventListener('DOMContentLoaded', function() {
-    setupIfShiftSlider('A');
-    setupIfShiftSlider('B');
-});
+window.setApf = setApf;
 
 
 (function () {
@@ -2512,14 +2278,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const antennaSelect = document.getElementById(`antennaSelect${receiver}`);
         if (antennaSelect && antenna) {
             antennaSelect.value = antenna;
-        }
-    }
-
-    // Update roofing filter dropdown
-    function updateRoofingFilterSelect(receiver, filterCode) {
-        const selectEl = document.getElementById(`roofingFilterSelect${receiver}`);
-        if (selectEl && filterCode) {
-            selectEl.value = filterCode;
         }
     }
 
@@ -2852,24 +2610,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    async function setAntenna(receiver, antenna) {
-        const didPause = pausePolling();
-        try {
-            highlightButtons(receiver, state.lastBand[receiver], state.lastMode[receiver], antenna);
-            state.lastAntenna[receiver] = antenna;
-            const response = await fetch(`/api/cat/antenna/${receiver.toLowerCase()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ antenna })
-            });
-        } catch (error) {
-        } finally {
-            if (didPause) {
-                resumePolling();
-            }
-        }
-    }
-
     // Show Windows-style message box (auto-dismisses after 3 seconds)
     function showMessageBox(message, title = 'Warning') {
         const modalEl = document.getElementById('messageBoxModal');
@@ -2974,60 +2714,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) { console.error('setManualNotchFreq error:', e); }
     }
 
-    async function setIfWidth(receiver, code) {
-        try {
-            await fetch(`/api/cat/ifwidth/${receiver.toLowerCase()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code })
-            });
-        } catch (e) { console.error('setIfWidth error:', e); }
-    }
-
-    async function setIfShift(receiver, shiftHz) {
-        try {
-            await fetch(`/api/cat/ifshift/${receiver.toLowerCase()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shiftHz: parseInt(shiftHz) })
-            });
-        } catch (e) { console.error('setIfShift error:', e); }
-    }
-
-    async function setRoofingFilter(receiver, filter) {
-        const didPause = pausePolling();
-
-        try {
-            const response = await fetch(`/api/cat/roofingfilter/${receiver.toLowerCase()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filter })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                showMessageBox(`Failed to set roofing filter: ${data.error}`, 'Error');
-                return;
-            }
-
-            // Check if there's a warning (filter not installed)
-            if (data.warning) {
-                showMessageBox(data.message, 'Roofing Filter');
-                // Update dropdown to show actual filter
-                const selectEl = document.getElementById(`roofingFilterSelect${receiver}`);
-                if (selectEl && data.filter) {
-                    selectEl.value = data.filter;
-                }
-            }
-        } catch (error) {
-            showMessageBox('Error setting roofing filter. Check console for details.', 'Error');
-        } finally {
-            if (didPause) {
-                resumePolling();
-            }
-        }
-    }
+    // No setRoofingFilter. Roofing filters are an analogue-superhet feature;
+    // the direct-sampling IC-7300 has none, so the control, its endpoint and
+    // the Installed-Filters setting all went in the carve.
 
     function pausePolling() {
         if (state.pollingInterval && !state.operationInProgress) {
@@ -3146,14 +2835,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update mode and antenna buttons from polling
             updateModeAndAntennaButtons('A', data.vfoA.mode, data.vfoA.antenna);
             updateModeAndAntennaButtons('B', data.vfoB.mode, data.vfoB.antenna);
-
-            // Update roofing filter dropdowns
-            if (data.vfoA.roofingFilter) {
-                updateRoofingFilterSelect('A', data.vfoA.roofingFilter);
-            }
-            if (data.vfoB.roofingFilter) {
-                updateRoofingFilterSelect('B', data.vfoB.roofingFilter);
-            }
 
             // Update MIC Gain / Data Out Gain label based on current mode (VFO A is main)
             updateMicGainLabel(data.vfoA.mode);
@@ -3341,8 +3022,6 @@ document.addEventListener('DOMContentLoaded', function() {
         setFrequency,
         setBand,
         setMode,
-        setAntenna,
-        setRoofingFilter,
         setAgc,
         setIpo,
         setAutoNotch,
@@ -3351,8 +3030,6 @@ document.addEventListener('DOMContentLoaded', function() {
         setManualNotch,
         setNoiseBlanker,
         setManualNotchFreq,
-        setIfWidth,
-        setIfShift,
         _state: state,  // Expose state for TX indicator updates
         updatePowerDisplay: updatePowerDisplay,
         setPower: setPower

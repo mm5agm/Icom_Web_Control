@@ -265,6 +265,91 @@ namespace Icom_Web_Control.Services
         public Task<int> GetCwBreakInAsync(CancellationToken ct = default) => Task.FromResult(_cwBreakIn);
         public Task SetCwBreakInAsync(int mode, CancellationToken ct = default) { _cwBreakIn = Math.Clamp(mode, 0, 2); _state.CwBreakIn = _cwBreakIn.ToString(); return Task.CompletedTask; }
 
+        // -- TX audio chain, VOX and APF (canned) ------------------------------
+        // Percentages here, matching the seam — the 0–255 scaling lives in
+        // CivRadioController, so the stub has nothing to convert.
+
+        private int _micGain = 50, _compLevel = 50, _monitorLevel = 30;
+        private int _voxGain = 50, _antiVox = 50, _voxDelayMs = 300;
+        private bool _speechComp, _monitor, _vox;
+        private int _apf; // 0=OFF, 1=WIDE, 2=MID, 3=NAR
+
+        public Task<int> GetMicGainPercentAsync(CancellationToken ct = default) => Task.FromResult(_micGain);
+        public Task SetMicGainPercentAsync(int percent, CancellationToken ct = default) { _micGain = Math.Clamp(percent, 0, 100); _state.MicGain = _micGain; return Task.CompletedTask; }
+
+        public Task<bool> GetSpeechCompressorAsync(CancellationToken ct = default) => Task.FromResult(_speechComp);
+        public Task SetSpeechCompressorAsync(bool on, CancellationToken ct = default) { _speechComp = on; _state.ProcEnabled = on; return Task.CompletedTask; }
+        public Task<int> GetCompressorLevelPercentAsync(CancellationToken ct = default) => Task.FromResult(_compLevel);
+        public Task SetCompressorLevelPercentAsync(int percent, CancellationToken ct = default) { _compLevel = Math.Clamp(percent, 0, 100); _state.ProcLevel = _compLevel; return Task.CompletedTask; }
+
+        public Task<bool> GetMonitorAsync(CancellationToken ct = default) => Task.FromResult(_monitor);
+        public Task SetMonitorAsync(bool on, CancellationToken ct = default) { _monitor = on; _state.MonitorOn = on; return Task.CompletedTask; }
+        public Task<int> GetMonitorLevelPercentAsync(CancellationToken ct = default) => Task.FromResult(_monitorLevel);
+        public Task SetMonitorLevelPercentAsync(int percent, CancellationToken ct = default) { _monitorLevel = Math.Clamp(percent, 0, 100); _state.MonitorLevelA = _monitorLevel; _state.MonitorLevelB = _monitorLevel; return Task.CompletedTask; }
+
+        public Task<bool> GetVoxAsync(CancellationToken ct = default) => Task.FromResult(_vox);
+        public Task SetVoxAsync(bool on, CancellationToken ct = default) { _vox = on; _state.VoxOn = on; return Task.CompletedTask; }
+        public Task<int> GetVoxGainPercentAsync(CancellationToken ct = default) => Task.FromResult(_voxGain);
+        public Task SetVoxGainPercentAsync(int percent, CancellationToken ct = default) { _voxGain = Math.Clamp(percent, 0, 100); _state.VoxGain = _voxGain; return Task.CompletedTask; }
+        public Task<int> GetAntiVoxPercentAsync(CancellationToken ct = default) => Task.FromResult(_antiVox);
+        public Task SetAntiVoxPercentAsync(int percent, CancellationToken ct = default) { _antiVox = Math.Clamp(percent, 0, 100); _state.AntiVoxGain = _antiVox; return Task.CompletedTask; }
+        public Task<int> GetVoxDelayMsAsync(CancellationToken ct = default) => Task.FromResult(_voxDelayMs);
+        public Task SetVoxDelayMsAsync(int ms, CancellationToken ct = default) { _voxDelayMs = Math.Clamp((int)Math.Round(ms / 100.0), 0, 20) * 100; _state.VoxDelay = _voxDelayMs; return Task.CompletedTask; }
+
+        public Task<int> GetApfAsync(CancellationToken ct = default) => Task.FromResult(_apf);
+        public Task SetApfAsync(int setting, CancellationToken ct = default)
+        {
+            if (setting is < 0 or > 3) return Task.CompletedTask;
+            _apf = setting;
+            // One APF, one receiver: both VFO panels show the same setting.
+            _state.ApfWidthA = _apf;
+            _state.ApfWidthB = _apf;
+            _state.ApfOnA = _apf != 0;
+            _state.ApfOnB = _apf != 0;
+            return Task.CompletedTask;
+        }
+
+        // -- RIT / ΔTX (CI-V 21, canned) ---------------------------------------
+
+        private int _ritHz;
+        private bool _ritOn, _deltaTxOn;
+
+        public Task<int> GetRitOffsetHzAsync(CancellationToken ct = default) => Task.FromResult(_ritHz);
+        public Task SetRitOffsetHzAsync(int hz, CancellationToken ct = default)
+        {
+            _ritHz = (int)Math.Round(Math.Clamp(hz, -9990, 9990) / 10.0) * 10;
+            _state.ClarifierOffsetA = _ritHz;
+            _state.ClarifierOffsetB = _ritHz;
+            return Task.CompletedTask;
+        }
+        public Task<bool> GetRitEnabledAsync(CancellationToken ct = default) => Task.FromResult(_ritOn);
+        public Task SetRitEnabledAsync(bool on, CancellationToken ct = default) { _ritOn = on; _state.RxClarOn = on; return Task.CompletedTask; }
+        public Task<bool> GetDeltaTxEnabledAsync(CancellationToken ct = default) => Task.FromResult(_deltaTxOn);
+        public Task SetDeltaTxEnabledAsync(bool on, CancellationToken ct = default) { _deltaTxOn = on; _state.TxClarOn = on; return Task.CompletedTask; }
+
+        // -- FM repeater tone (CI-V 16 42 / 16 43 / 1B, canned) ----------------
+
+        private bool _repeaterTone, _toneSquelch;
+        private int _toneTenths = 885;   // 88.5 Hz, the commonest CTCSS tone
+        private int _tsqlTenths = 885;
+        private int _fmSplitOffsetHz = -600_000;
+
+        public Task<bool> GetRepeaterToneAsync(CancellationToken ct = default) => Task.FromResult(_repeaterTone);
+        public Task SetRepeaterToneAsync(bool on, CancellationToken ct = default) { _repeaterTone = on; return Task.CompletedTask; }
+        public Task<bool> GetToneSquelchAsync(CancellationToken ct = default) => Task.FromResult(_toneSquelch);
+        public Task SetToneSquelchAsync(bool on, CancellationToken ct = default) { _toneSquelch = on; return Task.CompletedTask; }
+        public Task<int> GetRepeaterToneTenthsHzAsync(CancellationToken ct = default) => Task.FromResult(_toneTenths);
+        public Task SetRepeaterToneTenthsHzAsync(int tenthsHz, CancellationToken ct = default) { _toneTenths = Math.Clamp(tenthsHz, 0, 9999); return Task.CompletedTask; }
+        public Task<int> GetToneSquelchTenthsHzAsync(CancellationToken ct = default) => Task.FromResult(_tsqlTenths);
+        public Task SetToneSquelchTenthsHzAsync(int tenthsHz, CancellationToken ct = default) { _tsqlTenths = Math.Clamp(tenthsHz, 0, 9999); return Task.CompletedTask; }
+        public Task<int> GetFmSplitOffsetHzAsync(CancellationToken ct = default) => Task.FromResult(_fmSplitOffsetHz);
+        public Task SetFmSplitOffsetHzAsync(int hz, CancellationToken ct = default)
+        {
+            _fmSplitOffsetHz = (int)Math.Round(Math.Clamp(hz, -9_999_000, 9_999_000) / 1000.0) * 1000;
+            _state.FmOffsetHz = Math.Abs(_fmSplitOffsetHz);
+            return Task.CompletedTask;
+        }
+
         // -- Twin PBT (CI-V 14 07 / 14 08, canned) -----------------------------
 
         private int _pbtInner = 128; // 128 = passband centre / no shift

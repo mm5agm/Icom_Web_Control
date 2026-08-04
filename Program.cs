@@ -17,16 +17,74 @@ var mutex = new Mutex(initiallyOwned: true, name: MutexName, out bool createdNew
 
 if (!createdNew)
 {
+    // This used to be an OK-only "already running" box, which is a dead end when
+    // the running copy is a stuck one: the operator sees no window, closes
+    // nothing, and every relaunch hits this same box. That is exactly what
+    // GitHub #2 reported — the only way out was Task Manager. Offer the two
+    // useful actions instead: go to the running copy, or end it and start fresh.
 #pragma warning disable CA1416
-    MessageBox.Show(
-        "Icom Web Control is already running.",
-        "Already Running",
-        MessageBoxButtons.OK,
-        MessageBoxIcon.Information);
-#pragma warning restore CA1416
+    var me = Process.GetCurrentProcess();
+    Process[] others;
+    try   { others = Process.GetProcessesByName(me.ProcessName).Where(p => p.Id != me.Id).ToArray(); }
+    catch { others = Array.Empty<Process>(); }
 
+    int existingPort = LoadConfiguredHttpPort();
+    string url = $"http://localhost:{existingPort}";
+    string who = others.Length > 0
+        ? $"(process ID {string.Join(", ", others.Select(p => p.Id))})"
+        : "(its window may be minimised to the system tray)";
+
+    var choice = MessageBox.Show(
+        $"Icom Web Control is already running {who}.\n\n" +
+        $"Yes\t— open the running copy at {url}\n" +
+        "No\t— close the running copy and start a new one\n" +
+        "Cancel\t— do nothing",
+        "Already Running",
+        MessageBoxButtons.YesNoCancel,
+        MessageBoxIcon.Information);
+
+    if (choice == DialogResult.Yes)
+    {
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+        mutex.Dispose();
+        return;
+    }
+
+    if (choice != DialogResult.No)
+    {
+        mutex.Dispose();
+        return;
+    }
+
+    // Asked to end the running copy: request a clean close first, then force it.
+    foreach (var p in others)
+    {
+        try
+        {
+            if (!p.CloseMainWindow() || !p.WaitForExit(4000))
+                p.Kill(entireProcessTree: true);
+            p.WaitForExit(4000);
+        }
+        catch { /* already gone, or access denied — the mutex retry below decides */ }
+    }
+
+    // The old process holds the mutex until it actually exits; give the handle a
+    // moment to be released, then try to claim it ourselves.
     mutex.Dispose();
-    return;
+    Thread.Sleep(500);
+    mutex = new Mutex(initiallyOwned: true, name: MutexName, out createdNew);
+    if (!createdNew)
+    {
+        MessageBox.Show(
+            "The running copy of Icom Web Control could not be closed.\n\n" +
+            "End \"Icom_Web_Control.exe\" in Task Manager (Ctrl+Shift+Esc), then start it again.",
+            "Still Running",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        mutex.Dispose();
+        return;
+    }
+#pragma warning restore CA1416
 }
 
 // Keep the mutex alive for the lifetime of the process
@@ -220,15 +278,6 @@ builder.Services.AddSingleton<IBandPlanService, BandPlanService>();
 
 // Register RadioStateService as a singleton
 builder.Services.AddSingleton<RadioStateService>();
-
-// ICatClient is now a no-op stub. The Yaesu CAT transport it used to front
-// (CatMultiplexerService / CatMessageDispatcher / CatMessageBuffer /
-// MultiplexedCatClient / CatCommands) was deleted in the IWC carve — IWC drives
-// the IC-7300 through the IRadioController / CI-V seam below. NullCatClient keeps
-// the not-yet-ported vestigial call sites (some CatController controls, the
-// Memory radio-sync paths, one voice intent) compiling and inert until each is
-// re-implemented on the seam in its own block. See NullCatClient for detail.
-builder.Services.AddSingleton<ICatClient, NullCatClient>();
 
 // ── IRadioController seam (Phase 2) ─────────────────────────────────────────
 // The semantic, protocol-free seam IWC introduces. Phase 2 backs it with the
@@ -453,6 +502,26 @@ try
     // StopAsync" — see project todo memory.
     lifetime.ApplicationStopping.Register(() => Log.Information("[Lifecycle] ApplicationStopping fired"));
     lifetime.ApplicationStopped.Register(()  => Log.Information("[Lifecycle] ApplicationStopped fired"));
+
+    // Hard-exit watchdog. Shutdown is capped (HostOptions.ShutdownTimeout = 2 s)
+    // and each service unwinds its own blocking reads, but a process that
+    // *doesn't* exit is uniquely bad here: the single-instance mutex then blocks
+    // every relaunch, so the operator is locked out of the app entirely with no
+    // window to close (GitHub #2). Whatever the cause of a stall — a serial read
+    // wedged in the driver, a non-background thread nobody joined — 10 seconds
+    // after shutdown starts we leave. Logged so the file still names the stall.
+    lifetime.ApplicationStopping.Register(() =>
+    {
+        var bail = new Thread(() =>
+        {
+            Thread.Sleep(10_000);
+            Log.Warning("[Lifecycle] Still alive 10s after ApplicationStopping — forcing exit");
+            Log.CloseAndFlush();
+            Environment.Exit(0);
+        })
+        { IsBackground = true, Name = "ShutdownWatchdog" };
+        bail.Start();
+    });
 
     lifetime.ApplicationStarted.Register(() =>
     {

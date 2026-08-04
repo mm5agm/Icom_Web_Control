@@ -550,11 +550,15 @@ export class SpectrumPanel {
         const container = document.getElementById(this._containerId);
         if (!container) return;
 
-        if (status === 'unconfigured') {
-            container.style.display = 'none';
-            return;
-        }
-
+        // "unconfigured" used to hide the card outright — inherited from YWC,
+        // where it meant "no SDR device for this VFO", a permanent condition. On
+        // IWC the trace comes from the radio's own band scope, so it means
+        // "the scope isn't streaming", which is usually just "it's switched
+        // off" — and the Scope switch lives inside this very card. Hiding it
+        // trapped the operator on a blank page (GitHub #1). Show the card and
+        // let the overlay say so instead; Index.cshtml's
+        // updateContainerVisibility() runs immediately after this and still has
+        // the last word on which panels belong on screen.
         container.style.display = '';
         this._drawStatusOverlay(status);
     }

@@ -315,6 +315,8 @@ The spectrum comes from the **IC-7300's own built-in band scope**, streamed to t
 
 **Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for two reasons: to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
 
+The panel itself stays on screen whenever the radio is connected, whether or not sweeps are arriving — it just says what is happening instead ("Band scope is off — switch it on above the panel", or "Waiting for the radio's band scope…"). That keeps the **Scope** switch reachable: it lives above the panel, so a panel that hid itself when nothing was streaming took the only way of switching the scope back on with it.
+
 **Span buttons** — eight buttons in the panel header set the visible bandwidth, from **±2.5k** (narrowest — a single QSO fills the screen) through **±5k**, **±10k**, **±25k**, **±50k**, **±100k**, **±250k** to **±500k** (widest — a 1 MHz-wide view). The figure is the *half*-width either side of centre, matching the way the IC-7300 labels its own scope, so **±500k** shows a megahertz across the screen. Clicking one sets the radio's scope span, so the radio's front panel changes too; equally, changing the span on the radio lights the matching button in IWC, because the active button is re-synced from every incoming sweep.
 
 **Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
@@ -1678,7 +1680,7 @@ The fastest way to get a bug fixed is a good report. IWC has three features that
 - Radio model and selected band plan
 - Serial port and baud rate
 - Current radio connection state
-- SDR device (if configured)
+- Band scope state — whether it is on, how many sweeps have arrived, how many were dropped, and how long ago the last one was
 - DX cluster host and your cluster login callsign (if configured)
 - Browser and version
 - .NET runtime version and Windows version
@@ -1729,6 +1731,14 @@ The radio is talking, but no spectrum sweep has arrived. The panel gives up afte
 - Check the scope is switched on at the radio itself.
 - Everything except the spectrum works normally in the meantime — use **Continue anyway** if you do not want to wait out the 12 seconds.
 
+**Spectrum panel is empty, or says "Waiting for the radio's band scope…"**
+
+The panel is on screen and the radio is connected, but no sweep is arriving. The status badge at the right-hand end of the panel header says the same thing in one word (**Scope off**, **Connecting…**, **Live**).
+
+- Check the **Scope** switch above the panel, and the scope on the radio's own screen.
+- Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate.
+- Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
+
 **Frequency display shows 0 or does not update**
 
 - The radio may not be responding to CAT commands. Test the connection from the Settings page.
@@ -1760,9 +1770,15 @@ The scope comes from the radio over CI-V, so there is no SDR, driver or device s
 
 - The meters use a default calibration that may not exactly match every individual radio. See Section 10 to adjust the calibration.
 
-**App will not start — "Another instance is already running"**
+**App will not start — "Icom Web Control is already running"**
 
-- Only one instance of the app can run at a time. Check the Windows taskbar or system tray for an existing instance. If the previous instance crashed and left a stale lock, restart Windows.
+Only one instance can run at a time, so a copy that is still running — even one you cannot see, because it never opened a window or is sitting in the system tray — blocks the next start. The dialog names the process ID and gives you three choices:
+
+- **Yes** — open the running copy in your browser. Use this when you simply lost the tab.
+- **No** — close the running copy and start a fresh one. Use this when the running copy is stuck.
+- **Cancel** — do nothing.
+
+If **No** cannot shift it, the app says so and asks you to end `Icom_Web_Control.exe` in Task Manager (Ctrl+Shift+Esc).
 
 **App shuts down unexpectedly after closing the browser**
 
@@ -2165,10 +2181,21 @@ The commands are split into two groups. The **first table** is fully wired to th
 | Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Switches mode |
 | Swap VFOs | "swap V F O", "swap A and B" | Exchanges VFO A and B contents |
 | Set preamp | "set preamp off", "preamp one" (also two) | Preamp off / amp 1 / amp 2 (IC-7300 has two preamp stages) |
+| Set attenuator | "attenuator off", "attenuator on" / "attenuator twenty d b" | The IC-7300's attenuator is a single 20 dB pad — on or off |
+| Set AGC | "set a g c fast" (also mid, slow) | AGC speed. The IC-7300 has fast/mid/slow only — there is no off or auto |
 | Set AF gain | "set a f gain fifty" / "audio gain fifty" (0–100 in the steps listed in the phrase editor, or "mute" / "maximum") | Sets the AF (volume) level |
+| Set RF gain | "r f gain seventy", "set r f gain one hundred" | Sets RF gain, 0–100 |
+| Set squelch | "squelch thirty", "set squelch zero" | Sets the squelch threshold, 0–100 |
+| Noise reduction | "noise reduction off", "noise reduction on", "n r forty" | Off, on, or on at that level (0–100) in one command — a level turns NR on as well as setting it |
+| Noise blanker | "noise blanker off", "n b on", "noise blanker fifty" | Same pattern as NR: off, on, or on at a level |
+| Notch filter | "notch off", "notch auto", "notch manual" | Selects auto notch, manual notch, or neither. Each choice sets both notches, so one can't be left running under the other |
+| Audio peak filter | "a p f off", "audio peak filter narrow" (also wide, medium) | CW audio peak filter width |
+| Set TX power | "transmit power fifty", "set power one hundred" | Sets transmit power as a percentage — 100 is full power (100 W SSB/CW/FM, 25 W AM) |
+| Set mic gain | "mic gain fifty", "microphone gain sixty" | Sets microphone gain, 0–100 |
+| Speech processor | "processor off", "speech processor on", "compressor forty" | Off, on, or on at that compression level |
 | Transmit | "key transmitter" / "start transmitting"; "stop transmitting" / "go to receive" | Radio keys up / drops back to receive |
 | Split | "split on" / "enable split"; "split off" / "simplex" | Split operation toggles |
-| Custom commands (macros) | "noise reduction on/off", "noise blanker on/off", "copy a to b" / "copy b to a" | Sends the CI-V command attached to that phrase. Those six ship as defaults; you can add your own for anything in the IC-7300's CI-V command set — see [§17.6](#176-adding-your-own-commands) |
+| Custom commands (macros) | "copy a to b" / "copy b to a" | Sends the CI-V command attached to that phrase. Those two ship as defaults; you can add your own for anything in the IC-7300's CI-V command set — see [§17.6](#176-adding-your-own-commands) |
 | Status read-back | "what frequency", "what mode", "what band" | IWC speaks the current value out loud — nothing is sent to the radio |
 | Help | "help", "what can I say" | IWC speaks a short list of the available command categories |
 
@@ -2176,8 +2203,6 @@ The commands are split into two groups. The **first table** is fully wired to th
 
 | Command family | Say | Status |
 | --- | --- | --- |
-| Set attenuator | "set attenuator off", "attenuator six d b" (also twelve, eighteen dB) | Not yet wired to CI-V. The IC-7300's attenuator is a single on/off pad, not the off/6/12/18 dB set these phrases assume — the command is being reworked for the Icom control model |
-| Set AGC | "set a g c fast" (also mid, slow, auto, off) | Not yet wired to CI-V. The IC-7300 has fast/mid/slow only (no off/auto); the command is being reworked |
 | Band up / down | "band up" / "band down" | Not yet wired to CI-V. Use "go to \<band\> metres" instead, which works |
 | IF filter width | "filter wider" / "filter narrower" | Not yet wired to CI-V — use the on-screen IF Width control instead |
 
@@ -2189,8 +2214,9 @@ A few notes on phrasing:
 - **Fractional frequencies are spoken digit-by-digit** after "point". "Fourteen point zero seven four" parses as 14.074, not "fourteen point seventy-four". "Oh" is accepted as an alternative to "zero".
 - **"megahertz" is optional.** Both "set frequency to fourteen point zero seven four megahertz" and "tune to fourteen point zero seven four" work — say it or skip it.
 - **MHz only — no kHz.** The grammar recognises frequencies in whole-or-decimal **megahertz**, from 1 MHz up to 71 MHz (covering HF + 6 m + 4 m). It does **not** recognise kilohertz input. If you say something the grammar can't parse — e.g. "tune to thirty kilohertz" — the engine will fuzzy-match to the nearest valid in-range phrase ("tune to thirty point eight") and act on that instead. **Listen to the spoken confirmation** that follows every command: it tells you exactly what got recognised, which is the safety net against misrecognition. For sub-MHz tuning (LF, MF, down to the IC-7300's 30 kHz lower limit), use the mouse or the keyboard-driven frequency display instead — see §16.7.
+- **Levels come from a fixed list, not any number you like.** The controls that take a 0–100 level — AF gain, RF gain, squelch, NR, NB, TX power, mic gain, processor — recognise **zero, ten, twenty, twenty five, thirty, forty, fifty, sixty, seventy, seventy five, eighty, ninety** and **one hundred** (also "maximum" or "full"). A number that isn't in that list will be fuzzy-matched to the nearest one that is, so listen to the spoken confirmation. The full list per command is in the phrase editor, and you can add or remove values there.
 - **Bands supported:** 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The default frequency picked for each band is roughly the FT8 / digital hangout — adjust with a follow-up "set frequency to …" or "tune up" / "tune down".
-- **"Fine step up" / "fine step down" are gone.** They were shortcuts for the microphone UP/DN keys on the Yaesu radio IWC grew out of, and CI-V has no equivalent command. "Tune up" / "tune down" with the step size set to 10 Hz does the same job. If you upgraded from v1.0.0, your saved phrase pack is replaced by the new defaults the first time you run this version — its custom commands carried the old radio's command format and could not be sent. The previous pack is snapshotted into **Show version history** the next time you save.
+- **"Fine step up" / "fine step down" are gone.** They were shortcuts for the microphone UP/DN keys on the Yaesu radio IWC grew out of, and CI-V has no equivalent command. "Tune up" / "tune down" with the step size set to 10 Hz does the same job. If you are upgrading, your saved phrase pack is replaced by the new defaults the first time you run this version — the noise-reduction and noise-blanker macros it carried are now proper commands with their own phrases, and the two would have competed for the same words. The previous pack is snapshotted into **Show version history** the next time you save.
 - **Scots variants** are accepted where they're in the default phrase list — e.g. "tune tae fourteen point zero seven four" works the same as "tune to …". Add your own in the phrase editor (§17.6) for any command you like.
 
 **After every command, IWC speaks a short confirmation** through the PC's default audio output:
@@ -2273,14 +2299,14 @@ The voice command grammar is **data, not code** — it lives at `%APPDATA%\MM5AG
 - **Version history.** Every save (and every pack import) snapshots the previous version — up to the last 5 — so a bad edit or import can be undone from **Show version history**.
 - **Export / import as a language pack.** **Export language pack** bundles the current phrases, a generated `.srgs` reference copy, and author/description metadata into `IWC-VoicePack-<culture>-vN.zip` — share it on the [GitHub Discussions](https://github.com/mm5agm/Icom_Web_Control/discussions) group. **Preview import** lets you inspect another pack's contents before installing it.
 - **Open user grammars folder** jumps straight to the `Grammars\` folder in Explorer if you'd rather hand-edit the JSON or inspect the generated `.srgs` file (a human-readable reference copy, not what the engine actually loads).
-- **Custom Commands.** The one place you can add a command IWC has no built-in intent for. A row is a name, the phrases that trigger it, and the **CI-V command** to send, written as hex bytes — command, sub-command, data — exactly as they appear in the CI-V reference in the IC-7300 manual. `16 40 01;` is noise reduction on; chain commands with `;`, e.g. `16 40 01;16 22 01;` for NR on *and* NB on. Spaces are optional (`164001;` is the same command). IWC adds the framing and the radio's address itself, so a Custom Command chooses *which* command is sent and nothing more. The Category column is free text — type a new name to start a new group.
+- **Custom Commands.** The one place you can add a command IWC has no built-in intent for. A row is a name, the phrases that trigger it, and the **CI-V command** to send, written as hex bytes — command, sub-command, data — exactly as they appear in the CI-V reference in the IC-7300 manual. `16 40 01;` is noise reduction on; chain commands with `;`, e.g. `16 40 01;16 22 01;` for NR on *and* NB on in one phrase. (NR and NB have built-in commands of their own now — the example is here because it shows the syntax, and because chaining is the thing only a custom command can do.) Spaces are optional (`164001;` is the same command). IWC adds the framing and the radio's address itself, so a Custom Command chooses *which* command is sent and nothing more. The Category column is free text — type a new name to start a new group.
 - **Advanced mode** (off by default) allows a Custom Command to use any CI-V command, not just the command bytes the built-in Core Commands already send. The radio's power command (`18`) is one of the ones it unlocks — worth knowing before you turn it on, because over the IC-7300's USB CI-V link a power-off drops the serial port with it, and the radio can't then be switched back on remotely. Only enable Advanced mode if you trust the source of any pack you import.
 
 If there's a particular command or phrasing you'd like added to the *built-in* defaults (as opposed to your own local edit), please file it as a GitHub issue or discussion.
 
 ### 17.7 More languages
 
-Only **English (UK)** ships as the built-in default, but the language pack system itself is already multi-language. An **English (US)** pack is also available — same commands and phrases as the UK default, with US spelling ("meters" instead of "metres"). Get it from `/voice-packs/IWC-VoicePack-en-US-v2.zip` on your running IWC instance and install it via **Preview import** below.
+Only **English (UK)** ships as the built-in default, but the language pack system itself is already multi-language. An **English (US)** pack is also available — same commands and phrases as the UK default, with US spelling ("meters" instead of "metres"). Get it from `/voice-packs/IWC-VoicePack-en-US-v3.zip` on your running IWC instance and install it via **Preview import** below.
 
 1. **The Windows speech pack for the target language must be installed** on the operator's PC (Windows → Settings → Time &amp; Language → Speech → Add a language). Microsoft ships full recognition packs for US English, French, German, Spanish, Italian, Japanese, Mandarin Chinese, Brazilian Portuguese and Australian English (the list shifts between Windows releases). Some languages only ship voice synthesis, not recognition — those can't be used for voice control regardless of what IWC does.
 2. **A phrase pack for that culture.** The **Active language** dropdown in Settings → Voice Control lists every culture with an installed pack (a ✓ or ⚠ shows whether Windows also has a matching recogniser). Installing a new one means either importing a `IWC-VoicePack-<culture>-vN.zip` someone else has authored and shared (**Preview import** → **Install**), or hand-authoring `Commands.<culture>.json` and dropping it into `Grammars\<culture>\` via **Open user grammars folder** — the semantic keys (intent names, parameter vocab) stay identical to the English defaults, only the phrases change.

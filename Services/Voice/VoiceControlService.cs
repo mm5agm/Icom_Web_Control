@@ -734,6 +734,18 @@ namespace Icom_Web_Control.Services.Voice
             }
         }
 
+        /// <summary>
+        /// Intents whose grammar tag is just "Name:value" and whose dispatcher
+        /// handler reads one string argument, "value" — a 0–100 level or a
+        /// position word ("off", "on", "auto", "manual"). Listed once here
+        /// rather than as nine near-identical blocks in NormaliseIntent.
+        /// </summary>
+        private static readonly string[] PlainValueIntents =
+        [
+            "SetNoiseReduction", "SetNoiseBlanker", "SetNotch", "SetRfGain",
+            "SetSquelch", "SetTxPower", "SetMicGain", "SetProcessor", "SetApf",
+        ];
+
         private static (string intent, Dictionary<string, object> args) NormaliseIntent(
             string intent, Dictionary<string, object> args, string heard)
         {
@@ -803,6 +815,13 @@ namespace Icom_Web_Control.Services.Voice
             {
                 args["speed"] = intent["SetAgc:".Length..];
                 return ("SetAgc", args);
+            }
+            foreach (var name in PlainValueIntents)
+            {
+                if (!intent.StartsWith(name, StringComparison.Ordinal) ||
+                    intent.Length <= name.Length || intent[name.Length] != ':') continue;
+                args["value"] = intent[(name.Length + 1)..];
+                return (name, args);
             }
             if (intent.StartsWith("Macro:", StringComparison.Ordinal))
             {
