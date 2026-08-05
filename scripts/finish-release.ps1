@@ -6,6 +6,13 @@
 #   Production release: .\scripts\finish-release.ps1 -Version v1.1.0
 #   Pre-release:        .\scripts\finish-release.ps1 -Version v1.1.0-pre1 -PreRelease
 #
+# Documentation (rules 13/14 in .claude/rules.md):
+#   The script rewrites the version strings in README.md and USER_MANUAL.md to
+#   match the release, and refuses to release at all if README.md has no
+#   release-notes entry for it. It will not write those notes for you -- see
+#   the long comment at the preflight for why. -NoDocUpdate leaves the docs
+#   alone; -SkipVersionCheck skips the lot.
+#
 # A pre-release differs in three ways:
 #   1. develop is NOT merged into main (pre-releases live on the develop line only).
 #   2. The tag is created on develop, not main.
@@ -37,7 +44,12 @@ param(
 
     # Skip the preflight that checks the version in the source files and the
     # README release notes. Use only when you know why they disagree.
-    [switch]$SkipVersionCheck
+    [switch]$SkipVersionCheck,
+
+    # By default the script rewrites the version strings in README.md and
+    # USER_MANUAL.md to match the release. Pass this to leave the docs exactly
+    # as they are and be told about mismatches instead.
+    [switch]$NoDocUpdate
 )
 
 Set-StrictMode -Version Latest
@@ -127,58 +139,169 @@ if ($existingRemote) {
     throw "Tag $Version already exists on origin.`nTo redo the release: gh release delete $Version --yes --cleanup-tag"
 }
 
-# Version consistency. Every one of these has to say the same thing, or the
-# installer, the About page and the tag disagree about what this build is.
-# Icom_Web_Control.csproj is included because it was missed by hand in v1.0.3 --
-# it is NOT in the release checklist in CLAUDE.md.
+# ---------------------------------------------------------------------------
+# Version consistency, and the documentation rules
+#
+# Every version site has to say the same thing, or the installer, the About
+# page, the manual and the tag disagree about what this build is.
+# Icom_Web_Control.csproj is in the list because it was missed by hand during
+# v1.0.3 -- it is NOT in the release checklist in CLAUDE.md.
+#
+# What this script WILL fix for you (unless -NoDocUpdate): every one of these
+# is a deterministic string substitution with exactly one right answer.
+# What it will NOT do is write your release notes. A script can tell that the
+# v1.2.3 section is missing; it cannot tell an operator which of their problems
+# this build fixes, and generating something from commit subjects would produce
+# developer prose under a heading that rules 13/14 want written for users. It
+# refuses and tells you what to add, which is the honest failure.
+# ---------------------------------------------------------------------------
+
+# Read/write helper that leaves the file's encoding alone. These docs are
+# UTF-8 with no BOM and CRLF throughout; targeted regex replacement on the raw
+# text preserves the line endings, and this preserves the missing BOM.
+function Set-FileTextPreservingEncoding {
+    param([string]$Path, [string]$Text)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Text, $utf8NoBom)
+}
+
 if (-not $SkipVersionCheck) {
+    # --- the part a script must not invent, checked FIRST ----------------
+    # Rules 13/14: README release notes are mandatory, pre-releases included.
+    # This runs before the doc rewriting below so that a release refused for
+    # missing notes leaves the working tree exactly as it found it.
+    $readme = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'README.md'))
+    $headingRe = "(?m)^(#{2,4})\s+v$([regex]::Escape($VersionCore))\b"
+    $heading = [regex]::Match($readme, $headingRe)
+    if (-not $heading.Success) {
+        throw @"
+README.md has no release-notes entry for v$VersionCore (rule 13).
+
+Add one under '## Release notes', above the previous version:
+
+    ### v$VersionCore ($(Get-Date -Format 'yyyy-MM-dd'))
+
+    <what changed, written for an operator: what was wrong, what they will
+     notice, and anything they must do differently>
+
+This is not auto-generated on purpose -- commit subjects describe the code,
+and these notes are the only thing most users ever read about a release.
+Re-run with -SkipVersionCheck to release without them.
+"@
+    }
+
+    # A heading with nothing under it is the same failure wearing a hat.
+    $afterHeading = $readme.Substring($heading.Index + $heading.Length)
+    $nextHeading = [regex]::Match($afterHeading, "(?m)^#{1,4}\s")
+    $body = $afterHeading
+    if ($nextHeading.Success) { $body = $afterHeading.Substring(0, $nextHeading.Index) }
+    if ($body.Trim().Length -lt 40) {
+        throw "README.md has a v$VersionCore heading but essentially nothing under it (rule 13). Write the notes, or re-run with -SkipVersionCheck."
+    }
+
+    # --- version strings, rewritten in place -----------------------------
+    # Pattern must capture the version in group 1. Fixable = the script can
+    # rewrite it; the rest are code and get bumped by hand, deliberately, so a
+    # release cannot happen without someone having looked at them.
     $versionSites = @(
-        @{ File = 'Models/AppVersion.cs'; Pattern = 'Current\s*=\s*"([^"]+)"' },
-        @{ File = 'installer.nsi';        Pattern = '!define\s+VERSION\s+"([^"]+)"' },
-        @{ File = 'Icom_Web_Control.csproj'; Pattern = '<Version>([^<]+)</Version>' },
-        @{ File = 'Icom_Web_Control.csproj'; Pattern = '<FileVersion>([^<]+)</FileVersion>' },
-        @{ File = 'Icom_Web_Control.csproj'; Pattern = '<AssemblyVersion>([^<]+)</AssemblyVersion>' }
+        @{ File = 'Models/AppVersion.cs';    Pattern = 'Current\s*=\s*"([^"]+)"';                 Fixable = $false },
+        @{ File = 'installer.nsi';           Pattern = '!define\s+VERSION\s+"([^"]+)"';           Fixable = $false },
+        @{ File = 'Icom_Web_Control.csproj'; Pattern = '<Version>([^<]+)</Version>';              Fixable = $false },
+        @{ File = 'Icom_Web_Control.csproj'; Pattern = '<FileVersion>([^<]+)</FileVersion>';      Fixable = $false },
+        @{ File = 'Icom_Web_Control.csproj'; Pattern = '<AssemblyVersion>([^<]+)</AssemblyVersion>'; Fixable = $false },
+
+        # Documentation. All auto-fixable, all pure version strings.
+        # USER_MANUAL section 5 shows the version in the top bar.
+        @{ File = 'USER_MANUAL.md'; Pattern = 'Icom Web Control v([0-9]+\.[0-9]+\.[0-9]+)';       Fixable = $true },
+        # README blockquote: "**v1.0.3 <em dash> current release.**"
+        # Note: '\u2014' rather than a literal em dash. PowerShell 5.1 reads a BOM-less
+        # UTF-8 .ps1 as cp1252, so a literal em dash in this file arrives as
+        # three characters and the pattern silently stops matching -- which is
+        # exactly how this line failed the first time. Keep the file pure ASCII.
+        @{ File = 'README.md';      Pattern = '\*\*v([0-9]+\.[0-9]+\.[0-9]+) \u2014 current release\.\*\*'; Fixable = $true },
+        # README Status & plan: "**`v1.0.3` is the current release**"
+        @{ File = 'README.md';      Pattern = '\*\*`v([0-9]+\.[0-9]+\.[0-9]+)` is the current release\*\*'; Fixable = $true }
     )
 
+    # The download badge tracks FULL releases only (rule 13), so it is only a
+    # version site when this is a full release.
+    if (-not $PreRelease) {
+        $versionSites += @{ File = 'README.md'; Pattern = 'badge/Download-v([0-9]+\.[0-9]+\.[0-9]+)-'; Fixable = $true }
+    }
+
     $mismatches = @()
+    $fixed = @()
     foreach ($site in $versionSites) {
         $path = Join-Path $RepoRoot $site.File
         if (-not (Test-Path $path)) {
             $mismatches += "$($site.File) -- file not found"
             continue
         }
-        $text = Get-Content $path -Raw
+        $text = [System.IO.File]::ReadAllText($path)
         $m = [regex]::Match($text, $site.Pattern)
         if (-not $m.Success) {
-            $mismatches += "$($site.File) -- no match for $($site.Pattern)"
+            # A doc pattern that no longer matches means the wording was
+            # reworded, not that the version is wrong. Say which, rather than
+            # blocking the release over a sentence someone rephrased.
+            if ($site.Fixable) {
+                Write-Warn "$($site.File): could not find the version in '$($site.Pattern)' -- wording changed? Check it by hand."
+            }
+            else {
+                $mismatches += "$($site.File) -- no match for $($site.Pattern)"
+            }
             continue
         }
         $found = $m.Groups[1].Value
         # AssemblyVersion/FileVersion are four-part (1.0.3.0); compare the stem.
-        if ($found -ne $VersionCore -and $found -ne "$VersionCore.0") {
+        if ($found -eq $VersionCore -or $found -eq "$VersionCore.0") { continue }
+
+        if ($site.Fixable -and -not $NoDocUpdate) {
+            # Replace only the captured version, inside this one match, so the
+            # surrounding sentence is untouched and other versions on the page
+            # (the older release-notes headings) are left alone.
+            $g = $m.Groups[1]
+            $text = $text.Substring(0, $g.Index) + $VersionCore + $text.Substring($g.Index + $g.Length)
+            Set-FileTextPreservingEncoding -Path $path -Text $text
+            $fixed += "$($site.File): '$found' -> '$VersionCore'"
+        }
+        else {
             $mismatches += "$($site.File) says '$found', expected '$VersionCore'"
         }
     }
 
+    if ($fixed.Count -gt 0) {
+        Write-Host "Updated the version in the documentation:" -ForegroundColor Green
+        $fixed | ForEach-Object { Write-Host "  $_" -ForegroundColor Green }
+        Write-Host "  (these are staged with the rest of the pending changes below)" -ForegroundColor DarkGray
+    }
     if ($mismatches.Count -gt 0) {
         throw "Version bump incomplete:`n  $($mismatches -join "`n  ")`nBump them, or re-run with -SkipVersionCheck."
     }
-    Write-Host "Version $VersionCore is consistent across AppVersion.cs, installer.nsi and the csproj." -ForegroundColor Green
+    Write-Host "Version $VersionCore is consistent across the source, the installer and the docs." -ForegroundColor Green
 
-    # Rules 13/14 in .claude/rules.md: README release notes are mandatory,
-    # pre-releases included. The download badge tracks FULL releases only.
-    $readme = Get-Content (Join-Path $RepoRoot 'README.md') -Raw
-    if ($readme -notmatch "(?m)^#{2,4}\s+v$([regex]::Escape($VersionCore))\b") {
-        throw "README.md has no release-notes heading for v$VersionCore (rule 13). Add it, or re-run with -SkipVersionCheck."
-    }
-    $badgeCurrent = [regex]::Match($readme, 'badge/Download-v([0-9.]+)-')
-    if ($badgeCurrent.Success) {
-        $badgeVersion = $badgeCurrent.Groups[1].Value
-        if (-not $PreRelease -and $badgeVersion -ne $VersionCore) {
-            throw "README download badge still says v$badgeVersion but this is a full release of v$VersionCore (rule 13)."
-        }
-        if ($PreRelease -and $badgeVersion -eq $VersionCore) {
-            Write-Warn "README download badge has been bumped to v$VersionCore, but rule 13 says the badge tracks full releases only. Continuing."
+    # --- staleness heuristic, advisory only ------------------------------
+    # Rule 14 wants the manual brought in line with whatever the release
+    # touched. No script can judge that, but it can notice that user-facing
+    # code changed while the manual did not -- which is the usual way the
+    # manual quietly drifts out of date.
+    $prevTag = & git describe --tags --abbrev=0 2>$null
+    if ($LASTEXITCODE -eq 0 -and $prevTag) {
+        $touched = & git diff --name-only "$prevTag..HEAD"
+        if ($LASTEXITCODE -eq 0 -and $touched) {
+            # @() around every pipeline result: a Where-Object that matches one
+            # item returns a bare string, and under Set-StrictMode asking a
+            # string for .Count is a terminating error.
+            $userFacing = @($touched | Where-Object { $_ -match '^(Pages/|wwwroot/|Grammars/)' })
+            $manualTouched = @($touched | Where-Object { $_ -eq 'USER_MANUAL.md' })
+            if ($userFacing.Count -gt 0 -and $manualTouched.Count -eq 0) {
+                Write-Warn ""
+                Write-Warn "USER_MANUAL.md has not changed since $prevTag, but these user-facing files have:"
+                $userFacing | Select-Object -First 12 | ForEach-Object { Write-Warn "  $_" }
+                if ($userFacing.Count -gt 12) { Write-Warn "  ... and $($userFacing.Count - 12) more" }
+                Write-Warn "Rule 14: bring every section the release touches in line, and re-capture any screenshot"
+                Write-Warn "the change makes wrong. This is a warning, not a block -- plenty of changes need no manual edit."
+                Write-Warn ""
+            }
         }
     }
 }
