@@ -211,22 +211,29 @@ Re-run with -SkipVersionCheck to release without them.
         @{ File = 'Icom_Web_Control.csproj'; Pattern = '<AssemblyVersion>([^<]+)</AssemblyVersion>'; Fixable = $false },
 
         # Documentation. All auto-fixable, all pure version strings.
-        # USER_MANUAL section 5 shows the version in the top bar.
-        @{ File = 'USER_MANUAL.md'; Pattern = 'Icom Web Control v([0-9]+\.[0-9]+\.[0-9]+)';       Fixable = $true },
+        # USER_MANUAL section 5 shows the version in the top bar. This one IS a
+        # version site for a pre-release too: the manual ships inside the build,
+        # and the top bar it describes shows AppVersion.Current.
+        @{ File = 'USER_MANUAL.md'; Pattern = 'Icom Web Control v([0-9]+\.[0-9]+\.[0-9]+)';       Fixable = $true }
+    )
+
+    # Three README sites that mean "the current FULL release" -- the download
+    # badge and the two sentences that say so in words. A pre-release is not the
+    # current release: it is not what the download link hands out and not what
+    # the in-app update banner offers, so bumping these would tell every reader
+    # of the front page that a build most of them should not install is the one
+    # they are on. Rule 13 says the badge tracks full releases only; the two
+    # sentences say the same thing in prose and follow the same rule.
+    if (-not $PreRelease) {
+        $versionSites += @{ File = 'README.md'; Pattern = 'badge/Download-v([0-9]+\.[0-9]+\.[0-9]+)-'; Fixable = $true }
         # README blockquote: "**v1.0.3 <em dash> current release.**"
         # Note: '\u2014' rather than a literal em dash. PowerShell 5.1 reads a BOM-less
         # UTF-8 .ps1 as cp1252, so a literal em dash in this file arrives as
         # three characters and the pattern silently stops matching -- which is
         # exactly how this line failed the first time. Keep the file pure ASCII.
-        @{ File = 'README.md';      Pattern = '\*\*v([0-9]+\.[0-9]+\.[0-9]+) \u2014 current release\.\*\*'; Fixable = $true },
+        $versionSites += @{ File = 'README.md'; Pattern = '\*\*v([0-9]+\.[0-9]+\.[0-9]+) \u2014 current release\.\*\*'; Fixable = $true }
         # README Status & plan: "**`v1.0.3` is the current release**"
-        @{ File = 'README.md';      Pattern = '\*\*`v([0-9]+\.[0-9]+\.[0-9]+)` is the current release\*\*'; Fixable = $true }
-    )
-
-    # The download badge tracks FULL releases only (rule 13), so it is only a
-    # version site when this is a full release.
-    if (-not $PreRelease) {
-        $versionSites += @{ File = 'README.md'; Pattern = 'badge/Download-v([0-9]+\.[0-9]+\.[0-9]+)-'; Fixable = $true }
+        $versionSites += @{ File = 'README.md'; Pattern = '\*\*`v([0-9]+\.[0-9]+\.[0-9]+)` is the current release\*\*'; Fixable = $true }
     }
 
     $mismatches = @()

@@ -94,6 +94,10 @@ Icom Web Control — **IWC** for short — is a web-based control panel for the 
 
 > **Windows only.** IWC runs on Windows 10 or 11 (64-bit). There is no Linux or macOS build, and none is planned. The app is hosted by a small WinForms process and uses a Windows serial-port driver to reach the radio. You can still access the browser interface itself from any device on your home network (tablet, phone, Linux laptop) — but the IWC server must be running on a Windows PC.
 
+> **No internet connection needed.** IWC reaches the radio over a serial cable and serves its own web page from your own PC, so the whole of it works on a shack computer that has never been online. Only two things reach out to the internet, and neither is required: the **DX cluster** spot feed (Section 6.5), which is off until you switch it on, and the **update check** that tells you when a new version is available. With no connection the cluster badge simply reads *Disconnected* and the update banner never appears. Everything else — meters, spectrum, tuning, voice control, WSJT-X and the rest — is entirely local.
+>
+> **This was not quite true up to and including v1.0.3.** The page fetched three files — the meter-gauge library, the icon font and the library that carries live updates from the radio to the browser — from public servers on the internet instead of from your PC. Almost nobody noticed, because a browser that had loaded them once kept its own copy for a year afterwards. On a PC that had never been online they never arrived at all, and the page opened with no meters and no value that ever changed. All three now ship inside IWC. **If your shack PC has no internet, use v1.0.4 or later — the v1.0.4 pre-releases carry the fix too.**
+
 Supported radio:
 
 | Model | Power | Receiver | Interface |
@@ -213,7 +217,7 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.3**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.4**) are shown in the top-left corner.
 
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 
@@ -932,6 +936,8 @@ Note: `{CALL}` is a reminder placeholder — the radio's KY command does not per
 Connect to a DX cluster server to overlay live DX spots on the SDR spectrum display. Spots appear as small yellow callsign labels at each spot's frequency on the spectrum panel; clicking a spot tunes VFO A exactly to that frequency. See Section 5.4 for how the overlay behaves on crowded bands.
 
 There is **no default cluster server** — pick one you have access to. The connection is only made when you tick the **Enable** switch below.
+
+This is one of only two parts of IWC that need an **internet connection** (the other is the update check). On a shack PC with no internet, leave the **Enable** switch off — if you switch it on anyway, nothing breaks: the status badge sits at *Disconnected* and IWC keeps retrying quietly in the background. Nothing else in the app is affected.
 
 | Setting | Description |
 |---------|-------------|
@@ -1738,6 +1744,14 @@ The panel is on screen and the radio is connected, but no sweep is arriving. The
 - Check the **Scope** switch above the panel, and the scope on the radio's own screen.
 - Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate.
 - Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
+
+**The page opens, but there are no meters and no value ever changes** (v1.0.3 and earlier)
+
+The layout, the buttons and the band selectors are all there, but the gauges are missing, the frequency never moves, and the icons show as empty boxes. The browser's status bar may sit on "Transferring data from cdn.jsdelivr.net…" while the page loads.
+
+Up to and including v1.0.3, the page fetched three files from public servers on the internet. A PC that had been online at some point kept its own copy of them and worked fine; a PC that had never been online got nothing, and without the library that carries live updates the rest of the page's script stopped before it started. See the note in Section 1.
+
+- **Upgrade to v1.0.4 or later** (its pre-releases carry the fix too). All three files now ship inside IWC and nothing is fetched from the internet. There is no setting to change and no workaround on older versions.
 
 **Frequency display shows 0 or does not update**
 
