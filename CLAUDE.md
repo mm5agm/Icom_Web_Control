@@ -62,7 +62,15 @@ User data lives in `%APPDATA%\MM5AGM\Icom Web Control\`:
 
 ## Release Process
 
-Before releasing: bump `Models/AppVersion.cs` and `installer.nsi`.
+Before releasing, bump the version in **all three** files — five sites in total:
+
+- `Models/AppVersion.cs` — `Current` (and `ReleaseDate`)
+- `installer.nsi` — `!define VERSION`
+- `Icom_Web_Control.csproj` — `<Version>`, `<FileVersion>`, `<AssemblyVersion>`
+  (the last two are four-part: `X.Y.Z.0`)
+
+The csproj is easy to forget — it shipped on 1.0.2 through the whole v1.0.3
+release. `finish-release.ps1` now refuses to run unless all five agree.
 
 **Then update the documentation — mandatory, pre-releases included. See rules 13
 and 14 in `.claude/rules.md`.**
@@ -72,7 +80,11 @@ and 14 in `.claude/rules.md`.**
 - `USER_MANUAL.md` — bring every section the release touches in line with what
   the app now does, and re-capture any screenshot the change makes wrong.
 
-Do not start the git steps until both documents are done.
+Do not start the git steps until both documents are done. The script helps with
+the mechanical half — it rewrites the version strings in both documents, and
+the download badge on a full release — but it refuses to release at all unless
+you have written the README release-notes entry yourself, and it can only
+*warn* that the manual looks stale, never judge whether a section is right.
 
 ```powershell
 git add -A
@@ -86,8 +98,13 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "See README.md for full releas
 ```
 
 **The `gh release create` step is required** — the build workflow triggers on
-`release: [created]`, not on a tag push. `.\scripts\finish-release.ps1 -Version vX.Y.Z`
-does all four steps.
+`release: [created]`, not on a tag push.
+
+`.\scripts\finish-release.ps1 -Version vX.Y.Z` does all of the above, with the
+version and documentation checks in front of it, and stops before tagging if
+anything is wrong. Prefer it to the raw commands: run by hand, the merge can
+conflict and leave `main` unmerged while the tag and release go out anyway,
+which is exactly how v1.0.3 first shipped v1.0.0's code.
 
 ---
 
