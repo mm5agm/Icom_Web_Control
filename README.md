@@ -2,10 +2,10 @@
 
 ![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
-![Latest release](https://img.shields.io/badge/Download-v1.0.0-brightgreen?style=flat-square)
+![Latest release](https://img.shields.io/badge/Download-v1.0.3-brightgreen?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Icom_Web_Control/latest/Icom_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 
-> **v1.0.0 — first public release.** IWC controls an **Icom IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. It has been developed and tested against a single IC-7300 MkII by one operator, so if anything behaves unexpectedly please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
+> **v1.0.3 — current release.** IWC controls an **Icom IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. It has been developed and tested against a single IC-7300 MkII by one operator, so if anything behaves unexpectedly please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
 >
 > **[⬇ Download the latest installer](https://github.com/mm5agm/Icom_Web_Control/releases/latest)**
 
@@ -36,9 +36,19 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Status & plan
 
-**`v1.0.0` is the first public release** — it controls an IC-7300 MkII end-to-end (see the summary at the top), tested against a single radio. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
+**`v1.0.3` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 MkII end-to-end (see the summary at the top), tested against a single radio. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
+
+### v1.0.3 (2026-08-05)
+
+**The first full release since v1.0.0.** If you have been staying on full releases — which is what the ⬇ Download link and the in-app update banner give you — this is a large step: everything in the **v1.0.1** and **v1.0.2** pre-release notes below arrives with it. That includes the two operator bug fixes ([#1](https://github.com/mm5agm/Icom_Web_Control/issues/1), [#2](https://github.com/mm5agm/Icom_Web_Control/issues/2)), eleven more voice-controlled functions, region-aware band edges, and working voice macros. Read those two sections as part of this release.
+
+Two changes are new since v1.0.2:
+
+- **The "discuss this" links now land somewhere you can actually post.** The links on the **About** page, in **Settings**, and in the documentation pointed at a Discussions category that is announcement-only, so anyone following them found a page with no way to reply. They now open the right category with a new post ready to write.
+- **Calibrations sent in by different operators are now combined instead of overwriting each other.** When you use **✉ Email calibration to developer**, your measurements used to replace whatever the previous contributor sent, so the shipped table was only ever as good as the last person's radio. Every contribution is now kept separately and the shipped table is the **median** across all of them, which is what turns several operators' measurements into a meter that reads correctly on an average radio rather than on one particular one. If two operators disagree sharply on a point, that disagreement is now visible rather than silently averaged away.
+  - Nothing about this is visible in your copy of IWC and nothing you do changes — it is entirely on the development side. It is here because it is the reason **sending your calibration in is worth doing**: with one contributor per model the table is one radio's opinion, and with several it starts being the radio's.
 
 ### v1.0.2 (2026-08-04) — pre-release
 

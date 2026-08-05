@@ -9,6 +9,35 @@ the [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) repository.
 
 _Nothing yet._
 
+## [1.0.3] - 2026-08-05
+
+First full release since 1.0.0, so it also delivers everything in the 1.0.1 and
+1.0.2 pre-releases to anyone who tracks full releases only. See
+[README.md](README.md#release-notes) for the operator-facing notes.
+
+### Fixed
+- **Discussions links led into a category that does not accept replies.** The
+  links on the About page, in Settings, and in the README and User Manual
+  pointed at an announcement-only category, so following them produced a page
+  with no way to post. They now target the right category with a new post
+  pre-selected.
+
+### Added
+- **Contributed-calibration store with median aggregation**
+  (`Services/CalibrationContributionsStore.cs`,
+  `Models/Calibration/CalibrationContributions.cs`,
+  `calibration-contributions/`). Importing a second operator's calibration used
+  to overwrite the first wherever the two disagreed, with nothing recording
+  that the first had contributed. Each contribution is now stored separately
+  and the shipped default is the per-point median: none keeps the placeholder,
+  one is used as-is, two or more are combined. A meter whose median comes out
+  non-monotonic or out of range is refused rather than shipped, and the spread
+  between contributors is reported so a real disagreement is visible.
+  Development-side only — every endpoint returns `NotFound` outside
+  Development, and the store directory is never published or installed, so an
+  installed copy is unaffected. Design notes:
+  [docs/design/calibration-contributions.md](docs/design/calibration-contributions.md).
+
 ## [1.0.2] - 2026-08-04 (pre-release)
 
 > This file was not kept up between 1.0.0 and here. [README.md](README.md#release-notes)
