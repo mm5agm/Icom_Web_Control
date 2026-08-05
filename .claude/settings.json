@@ -4,11 +4,6 @@
       "Bash",
       "PowerShell",
       "WebFetch"
-    ],
-    "additionalDirectories": [
-      "C:\\build",
-      "C:\\deps\\rtlsdr",
-      "C:\\deps"
     ]
   }
 }

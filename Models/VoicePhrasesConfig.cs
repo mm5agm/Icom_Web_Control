@@ -52,6 +52,50 @@ namespace Icom_Web_Control.Models
         [JsonPropertyName("setAfGain")]
         public DecomposedCommand SetAfGain { get; set; } = new();
 
+        // ── Receive-chain controls the accessibility label registry exposes ──
+        // Each of these matches a control on the main page that carries a
+        // data-a11y-key, so a screen-reader user who can find the control by
+        // name can also drive it by name. NR/NB/processor fold their on/off
+        // and their level into one vocabulary ("noise reduction off" /
+        // "noise reduction fifty"): one spoken command per control reads more
+        // naturally than two, and a level implies "on" anyway.
+
+        /// <summary>Noise reduction: "off"/"on" plus 0–100 level keys (CI-V 16 40 + 14 06).</summary>
+        [JsonPropertyName("setNoiseReduction")]
+        public DecomposedCommand SetNoiseReduction { get; set; } = new();
+
+        /// <summary>Noise blanker: "off"/"on" plus 0–100 level keys (CI-V 16 22 + 14 12).</summary>
+        [JsonPropertyName("setNoiseBlanker")]
+        public DecomposedCommand SetNoiseBlanker { get; set; } = new();
+
+        /// <summary>Notch filter: "off"/"auto"/"manual" (CI-V 16 41 / 16 48).</summary>
+        [JsonPropertyName("setNotch")]
+        public DecomposedCommand SetNotch { get; set; } = new();
+
+        /// <summary>RF gain as a 0–100 level (CI-V 14 02).</summary>
+        [JsonPropertyName("setRfGain")]
+        public DecomposedCommand SetRfGain { get; set; } = new();
+
+        /// <summary>Squelch threshold as a 0–100 level (CI-V 14 03).</summary>
+        [JsonPropertyName("setSquelch")]
+        public DecomposedCommand SetSquelch { get; set; } = new();
+
+        /// <summary>Transmit power as a 0–100 % level (CI-V 14 0A).</summary>
+        [JsonPropertyName("setTxPower")]
+        public DecomposedCommand SetTxPower { get; set; } = new();
+
+        /// <summary>Microphone gain as a 0–100 % level (CI-V 14 0B).</summary>
+        [JsonPropertyName("setMicGain")]
+        public DecomposedCommand SetMicGain { get; set; } = new();
+
+        /// <summary>Speech processor: "off"/"on" plus 0–100 level keys (CI-V 16 44 + 14 0E).</summary>
+        [JsonPropertyName("setProcessor")]
+        public DecomposedCommand SetProcessor { get; set; } = new();
+
+        /// <summary>Audio Peak Filter: "off"/"wide"/"mid"/"narrow" (CI-V 16 32, CW only).</summary>
+        [JsonPropertyName("setApf")]
+        public DecomposedCommand SetApf { get; set; } = new();
+
         /// <summary>
         /// SetFrequency still needs structured decomposition because MHz values
         /// are a large enumerated set with optional fractional digits.
@@ -61,7 +105,7 @@ namespace Icom_Web_Control.Models
         public SetFrequencyPhrases SetFrequency { get; set; } = new();
 
         /// <summary>
-        /// User-defined macros. Each sends one or more CAT commands verbatim.
+        /// User-defined macros. Each sends one or more CI-V commands.
         /// Power users can add their own; the defaults cover common shortcuts.
         /// </summary>
         [JsonPropertyName("macros")]
@@ -88,9 +132,11 @@ namespace Icom_Web_Control.Models
     }
 
     /// <summary>
-    /// A user-defined voice command that sends one or more CAT strings.
-    /// Multi-command macros: chain commands back-to-back e.g. "NR01;NB01;".
-    /// The dispatcher splits on ';' and sends each segment.
+    /// A user-defined voice command that sends one or more CI-V commands.
+    /// Multi-command macros chain commands back-to-back, e.g.
+    /// "16 40 01;16 22 01;" (NR on then NB on); the dispatcher splits on ';'
+    /// and sends each command in turn. See
+    /// <see cref="Services.Civ.CivMacroCodec"/> for the payload format.
     /// </summary>
     public sealed class MacroDefinition
     {
@@ -100,13 +146,13 @@ namespace Icom_Web_Control.Models
         [JsonPropertyName("phrases")]
         public List<string> Phrases { get; set; } = new();
 
-        /// <summary>One or more CAT commands, e.g. "NR01;" or "NR01;NB01;".</summary>
+        /// <summary>One or more CI-V commands in hex, e.g. "16 40 01;" or "16 40 01;16 22 01;".</summary>
         [JsonPropertyName("cat")]
         public string Cat { get; set; } = "";
 
         /// <summary>
         /// Free-text grouping shown in the Settings "Custom Commands" editor
-        /// (e.g. "Noise Reduction", "Custom CAT commands"). Defaults to
+        /// (e.g. "Noise Reduction", "Custom CI-V commands"). Defaults to
         /// "Macros" for anything created before this field existed. Purely
         /// presentational — has no effect on recognition or dispatch.
         /// </summary>

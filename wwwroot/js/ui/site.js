@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function () {
 //     polling logic, highlightButtons, gauge init, etc.
 //
 // The outer globals are kept because the Razor pages call window.setBand,
-// window.setMode, window.setAntenna, and window.radioControl directly via
+// window.setMode and window.radioControl directly via
 // inline onchange="..." attributes, and the IIFE overwrites window.radioControl
 // at the end with the real implementations.
 //
@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ---------------------------------------------------------------------------
 // OUTER GLOBALS
 // These exist because the Razor page's inline onchange handlers fire before
-// the IIFE runs, so window.setBand / setMode / setAntenna must be defined
+// the IIFE runs, so window.setBand / setMode must be defined
 // at global scope.  The IIFE later replaces window.radioControl with its
 // own (better) versions.
 // ---------------------------------------------------------------------------
@@ -241,8 +241,8 @@ document.addEventListener('DOMContentLoaded', function () {
 // Visual updates (innerHTML) happen immediately; screen-reader attributes
 // are only written after 500 ms of no further changes so the reader
 // announces the final frequency rather than every scroll-wheel step.
-// Bumped from 300 ms (2026-06-14) — OZ1JTE on #20 reported still hearing
-// intermediate frequencies during rapid wheel scrolling. The visible
+// Bumped from 300 ms (2026-06-14) — at 300 ms a screen-reader user still
+// heard intermediate frequencies during rapid wheel scrolling. The visible
 // digit spans are aria-hidden so the spinbutton's accessible value comes
 // only from aria-valuenow, which this debounce gates.
 const _ariaDebounceTimers = {};
@@ -325,22 +325,9 @@ window.setMode = async function (receiver, mode) {
     // No debug logging
 };
 
-// Outer antenna setter - called from Razor inline onchange on antenna buttons
-window.setAntenna = async function (receiver, antenna) {
-    if (window.pausePolling) pausePolling();
-    try {
-        if (window.highlightButtons) highlightButtons(receiver, state.lastBand ? state.lastBand[receiver] : undefined, state.lastMode ? state.lastMode[receiver] : undefined, antenna);
-        if (state.lastAntenna) state.lastAntenna[receiver] = antenna;
-        const response = await fetch(`/api/cat/antenna/${receiver.toLowerCase()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ antenna })
-        });
-        // No debug logging
-    } catch (error) {
-        // No debug logging
-    }
-};
+// No antenna setter. The IC-7300 family has one SO-239 ANT jack, so the
+// per-VFO antenna selector and its /api/cat/antenna endpoint both went with
+// the Yaesu multi-antenna support they existed for.
 
 // Centralised radio -> max-power mapping. IWC targets the Icom IC-7300 family
 // (IC-7300 and IC-7300 MkII), both 100 W radios, so this is 100 W across the
@@ -614,7 +601,7 @@ let txVfo = 0; // 0 = VFO A, 1 = VFO B (the TX VFO — only flips with split)
 let activeVfo = 0;
 
 // Apply the .vfo-inactive class to whichever VFO panel is NOT the active
-// (RX) one — but only on single-receiver radios (FTdx10, FT-710, FTDX3000).
+// (RX) one — but only on single-receiver radios, which the IC-7300 is.
 // CSS greys only that panel's .card-body (header stays normal so TX looks
 // enabled). Dual-receiver radios leave both panels active because each
 // VFO is its own physical receiver chain. The data-single-receiver
@@ -720,8 +707,10 @@ let clarOffsets = { A: 0, B: 0 };
 let rxClarOn = false;
 let txClarOn = false;
 
-let contourState = { A: { on: false, freqHz: 800 }, B: { on: false, freqHz: 800 } };
-let apfState     = { A: { on: false, freqHz: 0   }, B: { on: false, freqHz: 0   } };
+// APF width per VFO: 0=OFF, 1=WIDE, 2=MID, 3=NAR. The IC-7300 has one APF
+// with no frequency shift, so both VFOs always hold the same value — the two
+// entries exist because the page draws a control in each VFO panel.
+let apfState = { A: 0, B: 0 };
 
 async function toggleTx() {
     const newTxState = !isTransmitting;
@@ -1052,7 +1041,6 @@ connection.on("RadioStateUpdate", function (update) {
         updateModeSelect('A', update.value);
         updateMicGainLabel(update.value);
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ mode: update.value });
-        updateContourSliderBounds('A');
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('A', update.value);
         if (window.IfWidth && window._radioModel) {
             window.IfWidth.rebuildIfWidthSelect(
@@ -1066,7 +1054,6 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ mode: update.value });
-        updateContourSliderBounds('B');
         if (typeof window._updateSquelchVisibility === 'function') window._updateSquelchVisibility('B', update.value);
         if (window.IfWidth && window._radioModel) {
             window.IfWidth.rebuildIfWidthSelect(
@@ -1127,6 +1114,11 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "FrequencyA") {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzA', update.value);
         try { state.lastBackendFreq.A = update.value; } catch (_) { /* state lives in IIFE scope only */ }
+        // BandA only broadcasts when the band *changes*, so an operator who is
+        // already out of band at page load would never get the red marker from
+        // updateBandButton alone. Re-apply it whenever the frequency moves.
+        lastVfoHz.A = update.value;
+        try { applyBandOutOfBand('A'); } catch (e) { console.error('applyBandOutOfBand A error:', e); }
         try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
         // Feed the DX Spots panel's band filter from the main update stream —
         // the SDR-era spectrum pipeline that used to do this is dormant on the
@@ -1140,6 +1132,8 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "FrequencyB") {
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('freqHzB', update.value);
         try { state.lastBackendFreq.B = update.value; } catch (_) { /* state lives in IIFE scope only */ }
+        lastVfoHz.B = update.value;
+        try { applyBandOutOfBand('B'); } catch (e) { console.error('applyBandOutOfBand B error:', e); }
         try { updateFrequencyDisplay('B', update.value); } catch (e) { console.error('updateFrequencyDisplay B error:', e); }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
@@ -1266,20 +1260,6 @@ connection.on("RadioStateUpdate", function (update) {
         if (result) updateMeterDomLabel(update.property, result);
     }
 
-    // --- ROOFING FILTER ---
-    if (update.property === "RoofingFilterA") {
-        const selectEl = document.getElementById('roofingFilterSelectA');
-        if (selectEl) selectEl.value = update.value;
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ roofingCode: update.value });
-        updateContourSliderBounds('A');
-    }
-    if (update.property === "RoofingFilterB") {
-        const selectEl = document.getElementById('roofingFilterSelectB');
-        if (selectEl) selectEl.value = update.value;
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ roofingCode: update.value });
-        updateContourSliderBounds('B');
-    }
-
     // --- AGC ---
     if (update.property === "AgcA") {
         if (window.dspSetActive) window.dspSetActive('agcGroupA', update.value);
@@ -1370,7 +1350,6 @@ connection.on("RadioStateUpdate", function (update) {
             if (exists) el.value = update.value;
         }
         if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifWidthCode: update.value });
-        updateContourSliderBounds('A');
     }
     if (update.property === "IfWidthB") {
         const el = document.getElementById('ifWidthSelectB');
@@ -1379,24 +1358,10 @@ connection.on("RadioStateUpdate", function (update) {
             if (exists) el.value = update.value;
         }
         if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifWidthCode: update.value });
-        updateContourSliderBounds('B');
     }
 
-    // --- IF SHIFT ---
-    if (update.property === "IfShiftA" && !ifShiftDragging.A) {
-        const slider = document.getElementById('ifShiftSliderA');
-        const label = document.getElementById('ifShiftValueA');
-        if (slider) slider.value = update.value;
-        if (label) label.textContent = update.value;
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ ifShiftHz: parseInt(update.value) || 0 });
-    }
-    if (update.property === "IfShiftB" && !ifShiftDragging.B) {
-        const slider = document.getElementById('ifShiftSliderB');
-        const label = document.getElementById('ifShiftValueB');
-        if (slider) slider.value = update.value;
-        if (label) label.textContent = update.value;
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ ifShiftHz: parseInt(update.value) || 0 });
-    }
+    // IF Shift has no handler: the IC-7300 shifts the passband edges with Twin
+    // PBT, whose updates arrive as PbtInner/PbtOuter.
 
     // --- CLARIFIER ---
     if (update.property === "RxClarOn") {
@@ -1429,60 +1394,11 @@ connection.on("RadioStateUpdate", function (update) {
     }
 
     // --- CONTOUR ---
-    if (update.property === "ContourOnA") {
-        contourState.A.on = update.value === true || update.value === 'true' || update.value === 1;
-        _updateContourBtn('A');
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ contourOn: contourState.A.on });
-    }
-    if (update.property === "ContourOnB") {
-        contourState.B.on = update.value === true || update.value === 'true' || update.value === 1;
-        _updateContourBtn('B');
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ contourOn: contourState.B.on });
-    }
-    if (update.property === "ContourFreqA") {
-        contourState.A.freqHz = parseInt(update.value) || 800;
-        const slider = document.getElementById('contourFreqSliderA');
-        const label  = document.getElementById('contourFreqValueA');
-        if (slider) slider.value = contourState.A.freqHz;
-        if (label)  label.textContent = contourState.A.freqHz + ' Hz';
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ contourFreqHz: contourState.A.freqHz });
-    }
-    if (update.property === "ContourFreqB") {
-        contourState.B.freqHz = parseInt(update.value) || 800;
-        const slider = document.getElementById('contourFreqSliderB');
-        const label  = document.getElementById('contourFreqValueB');
-        if (slider) slider.value = contourState.B.freqHz;
-        if (label)  label.textContent = contourState.B.freqHz + ' Hz';
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ contourFreqHz: contourState.B.freqHz });
-    }
-
-    // --- APF ---
-    if (update.property === "ApfOnA") {
-        apfState.A.on = update.value === true || update.value === 'true' || update.value === 1;
-        _updateApfBtn('A');
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ apfOn: apfState.A.on });
-    }
-    if (update.property === "ApfOnB") {
-        apfState.B.on = update.value === true || update.value === 'true' || update.value === 1;
-        _updateApfBtn('B');
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfOn: apfState.B.on });
-    }
-    if (update.property === "ApfFreqA") {
-        apfState.A.freqHz = parseInt(update.value) || 0;
-        const slider = document.getElementById('apfFreqSliderA');
-        const label  = document.getElementById('apfFreqValueA');
-        if (slider) slider.value = apfState.A.freqHz;
-        if (label)  label.textContent = apfState.A.freqHz + ' Hz';
-        if (window.filterScopePanelA) window.filterScopePanelA.setState({ apfFreqHz: apfState.A.freqHz });
-    }
-    if (update.property === "ApfFreqB") {
-        apfState.B.freqHz = parseInt(update.value) || 0;
-        const slider = document.getElementById('apfFreqSliderB');
-        const label  = document.getElementById('apfFreqValueB');
-        if (slider) slider.value = apfState.B.freqHz;
-        if (label)  label.textContent = apfState.B.freqHz + ' Hz';
-        if (window.filterScopePanelB) window.filterScopePanelB.setState({ apfFreqHz: apfState.B.freqHz });
-    }
+    // --- APF (width: 0=off, 1=wide, 2=mid, 3=nar) ---
+    // ApfOnA/ApfOnB are the derived on/off flags; the width updates carry the
+    // value the selector shows, so only those need to touch the DOM.
+    if (update.property === "ApfWidthA") _applyApfWidth('A', update.value);
+    if (update.property === "ApfWidthB") _applyApfWidth('B', update.value);
 
     // --- MANUAL NOTCH (folded into the single Notch group) ---
     if (update.property === "ManualNotchA") {
@@ -1635,6 +1551,86 @@ connection.on("RadioStateUpdate", function (update) {
 // ---------------------------------------------------------------------------
 let initPollingStopped = false; // Allow user to dismiss and continue
 
+// ── Start-up overlay gating ─────────────────────────────────────────────────
+// The overlay used to clear the instant the CI-V link came up. That is several
+// seconds before the page has actually settled: the spectrum card sits at
+// display:none until the first scope sweep arrives, so the operator got a live
+// S-meter on a half-built page and then the layout jumped underneath them.
+// Hold the overlay until every stage that still moves the layout is in.
+const initStages = { radio: false, spectrum: false };
+let initOverlayHidden = false;
+let initSpectrumTimer = null;
+
+// Longest we wait for the first scope sweep once the radio is up. The scope
+// can legitimately never produce one — switched off on the rig, or a fault on
+// the bus — and a spinner that never clears is worse than the layout jump it
+// was meant to hide.
+const INIT_SPECTRUM_TIMEOUT_MS = 12000;
+
+// Shortest time the overlay stays up. On a plain browser refresh of an app
+// that is already running, the init endpoint answers "complete" on the first
+// poll and the first scope sweep follows a few hundred milliseconds later, so
+// without this the overlay appears and vanishes inside a frame or two — which
+// looks like it never appeared at all.
+const INIT_MIN_VISIBLE_MS = 900;
+const initShownAt = Date.now();
+let initMinTimer = null;
+
+// force skips the minimum — used by the "Continue anyway" button, where the
+// operator has asked for the page *now* and making them wait would be absurd.
+function hideInitOverlay(force = false) {
+    if (initOverlayHidden) return;
+
+    const waited = Date.now() - initShownAt;
+    if (!force && waited < INIT_MIN_VISIBLE_MS) {
+        // Stages can report in either order and either may land here first;
+        // only ever arm the one timer.
+        if (!initMinTimer) {
+            initMinTimer = setTimeout(() => {
+                initMinTimer = null;
+                hideInitOverlay();
+            }, INIT_MIN_VISIBLE_MS - waited);
+        }
+        return;
+    }
+
+    initOverlayHidden = true;
+    if (initSpectrumTimer) {
+        clearTimeout(initSpectrumTimer);
+        initSpectrumTimer = null;
+    }
+    if (initMinTimer) {
+        clearTimeout(initMinTimer);
+        initMinTimer = null;
+    }
+    const overlay = document.getElementById('initOverlay');
+    if (overlay) overlay.style.display = "none";
+}
+
+// Called by pollInitStatus for 'radio', and — via window, since that module
+// script can't see this scope — by the spectrum pipeline in Index.cshtml for
+// 'spectrum', on the first sweep that actually puts pixels on the canvas.
+// Stages may report in either order.
+function markInitStage(stage) {
+    if (initOverlayHidden || !(stage in initStages) || initStages[stage]) return;
+    initStages[stage] = true;
+
+    if (initStages.radio && initStages.spectrum) {
+        hideInitOverlay();
+        return;
+    }
+
+    if (stage === 'radio') {
+        // Radio is up, scope hasn't swept yet. Say which one we're waiting on
+        // rather than leaving a bare spinner — a silent wait reads as a hang,
+        // and this text is announced (the overlay is aria-live).
+        const statusText = document.getElementById('initStatusText');
+        if (statusText) statusText.innerText = "Starting spectrum scope, please wait...";
+        initSpectrumTimer = setTimeout(hideInitOverlay, INIT_SPECTRUM_TIMEOUT_MS);
+    }
+}
+window.markInitStage = markInitStage;
+
 async function pollInitStatus() {
     if (initPollingStopped) return; // User dismissed, stop polling
 
@@ -1654,7 +1650,9 @@ async function pollInitStatus() {
         statusText.innerText = data.status;
 
         if (data.status === "complete") {
-            overlay.style.display = "none";
+            // Not a straight hide any more — the overlay stays up until the
+            // spectrum reports in too (or times out). See markInitStage.
+            markInitStage('radio');
             initPollingStopped = true; // Stop polling
             radioPowerOn = true;
             updateRadioPowerButton();
@@ -1669,8 +1667,10 @@ async function pollInitStatus() {
             // the saved frequency back to the radio. The rig's current state
             // is the source of truth.
         } else if (data.status === "radio_off") {
-            // Radio is off - hide overlay and let user turn it on via power button
-            overlay.style.display = "none";
+            // Radio is off - hide overlay and let user turn it on via power
+            // button. No point waiting on the scope: it can't sweep with the
+            // radio off, so hide outright rather than going through the stages.
+            hideInitOverlay();
             initPollingStopped = true;
             radioPowerOn = false;
             updateRadioPowerButton();
@@ -1710,8 +1710,7 @@ async function pollInitStatus() {
 
 function dismissInitOverlay() {
     initPollingStopped = true;
-    const overlay = document.getElementById('initOverlay');
-    if (overlay) overlay.style.display = "none";
+    hideInitOverlay(true);
 }
 
 // Touch device detection helper
@@ -1723,7 +1722,6 @@ function isTouchDevice() {
 window.radioControl = {
     setBand: window.setBand,
     setMode: window.setMode,
-    setAntenna: window.setAntenna,
     setPower: window.setPower,
     updatePowerDisplay: window.updatePowerDisplay,
     setAgc: async function (receiver, code) {
@@ -1757,15 +1755,10 @@ window.radioControl = {
     setManualNotchFreq: async function (receiver, frequencyHz) {
         await fetch(`/api/cat/manualnotchfreq/${receiver.toLowerCase()}`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frequencyHz: parseInt(frequencyHz) }) });
-    },
-    setIfWidth: async function (receiver, code) {
-        await fetch(`/api/cat/ifwidth/${receiver.toLowerCase()}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
-    },
-    setIfShift: async function (receiver, shiftHz) {
-        await fetch(`/api/cat/ifshift/${receiver.toLowerCase()}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shiftHz: parseInt(shiftHz) }) });
     }
+    // No setIfWidth here: ic7300-if-width.js owns window.setIfWidth and posts
+    // to /api/radio/ifwidth. No setIfShift either — the IC-7300 has Twin PBT
+    // instead, at /api/cat/pbt.
 };
 
 // Fetch and apply band button state from the backend on page load
@@ -1780,23 +1773,78 @@ async function updateBandButtonsFromBackend() {
             // Always call updatePowerSliderMax to use latest radioModel
             updatePowerSliderMax();
         }
-        if (data.vfoA && data.vfoA.band) {
-            document.querySelectorAll('input[name="band-A"]').forEach(radio => {
-                radio.checked = (radio.value.toLowerCase() === data.vfoA.band.toLowerCase());
-            });
-            syncBandAriaChecked('A');
-        }
-        if (data.vfoB && data.vfoB.band) {
-            document.querySelectorAll('input[name="band-B"]').forEach(radio => {
-                radio.checked = (radio.value.toLowerCase() === data.vfoB.band.toLowerCase());
-            });
-            syncBandAriaChecked('B');
-        }
+        // Routed through updateBandButton rather than checking the radios here,
+        // so the poll keeps the out-of-band marker in step instead of leaving a
+        // stale red button behind.
+        if (data.vfoA && data.vfoA.band) updateBandButton('A', data.vfoA.band);
+        if (data.vfoB && data.vfoB.band) updateBandButton('B', data.vfoB.band);
     } catch (error) {
         // ...removed debug logging...
     }
 }
 
+
+// Last frequency and band seen per VFO, at this (top-level) scope.
+//
+// The `state` object further down the file is trapped inside an IIFE and is
+// not visible here — see the note above the FrequencyA handler. The band
+// buttons need both values together: the band name says *whether* we are out
+// of band, and the frequency says *which* band button to mark.
+const lastVfoHz   = { A: 0, B: 0 };
+const lastVfoBand = { A: null, B: null };
+
+// Paint the out-of-band marker on the band grid.
+//
+// The server reports "Unknown" for a frequency outside every allocation in the
+// operator's own IARU region, so no band button is selected. On its own that
+// just looks like nothing is happening. Here we mark the nearest band in the
+// operator's region instead: a UK operator on 3.9 MHz gets a red 80m button,
+// which says "you are at 80m, but not where you are allowed to be" — and so
+// does one on 3.4 MHz, having drifted off the bottom.
+function applyBandOutOfBand(receiver) {
+    const inputs = document.querySelectorAll(`input[name="band-${receiver}"]`);
+
+    // A checked button means we are in band, whatever lastVfoBand still says.
+    // Clicking a band button checks it immediately and tunes; the frequency
+    // update then lands before the BandA broadcast that clears lastVfoBand, so
+    // without this the button flashes red on the way in.
+    const anyChecked = Array.from(inputs).some(radio => radio.checked);
+
+    const band = lastVfoBand[receiver];
+    const isOutOfBand = !anyChecked && !!band && band.toLowerCase() === 'unknown';
+    const oobBand = (isOutOfBand && typeof window.nearestBandForHz === 'function')
+        ? window.nearestBandForHz(lastVfoHz[receiver])
+        : null;
+
+    inputs.forEach(radio => {
+        const label = radio.closest('.band-radio-label');
+        if (!label) return;
+
+        const marked = !!oobBand && radio.value.toLowerCase() === oobBand.toLowerCase();
+        label.classList.toggle('band-oob', marked);
+
+        // Red is no use to an operator using a screen reader, so say it in the
+        // tooltip too. Stash the original on the way in and release it on the
+        // way out, rather than caching it forever — a11y-labels.js rewrites
+        // these titles from labels.json whenever the window regains focus.
+        if (marked) {
+            if (!('titleOriginal' in label.dataset)) {
+                label.dataset.titleOriginal = label.getAttribute('title') || '';
+            }
+            label.setAttribute('title', `${label.dataset.titleOriginal} — out of band for your region`);
+        } else if ('titleOriginal' in label.dataset) {
+            label.setAttribute('title', label.dataset.titleOriginal);
+            delete label.dataset.titleOriginal;
+        }
+    });
+}
+
+// a11y-labels.js reapplies titles from labels.json on every window focus,
+// wiping the "out of band" suffix. Index.cshtml calls this once that has run.
+window.refreshBandOutOfBand = function () {
+    applyBandOutOfBand('A');
+    applyBandOutOfBand('B');
+};
 
 // Update band button selection for a specific receiver (called via SignalR)
 function updateBandButton(receiver, band) {
@@ -1805,6 +1853,7 @@ function updateBandButton(receiver, band) {
         // ...removed debug logging...
         return;
     }
+    lastVfoBand[receiver] = band;
     const bandLower = band.toLowerCase();
     const inputs = document.querySelectorAll(`input[name="band-${receiver}"]`);
     // ...removed debug logging...
@@ -1820,6 +1869,7 @@ function updateBandButton(receiver, band) {
     });
 
     if (typeof syncBandAriaChecked === 'function') syncBandAriaChecked(receiver);
+    applyBandOutOfBand(receiver);
 
     if (!foundMatch) {
         // ...removed debug logging...
@@ -1885,16 +1935,10 @@ window.addEventListener('DOMContentLoaded', () => {
         txClarOn = initMode === 'tx' || initMode === 'rxtx';
     }
 
-    // Contour/APF: seed JS state from server-rendered HTML values
+    // APF: seed JS state from the server-rendered selector
     for (const vfo of ['A', 'B']) {
-        const cBtn = document.getElementById(`contourBtn${vfo}`);
-        if (cBtn) contourState[vfo].on = cBtn.classList.contains('btn-success');
-        const cSlider = document.getElementById(`contourFreqSlider${vfo}`);
-        if (cSlider) contourState[vfo].freqHz = parseInt(cSlider.value) || 800;
-        const aBtn = document.getElementById(`apfBtn${vfo}`);
-        if (aBtn) apfState[vfo].on = aBtn.classList.contains('btn-success');
-        const aSlider = document.getElementById(`apfFreqSlider${vfo}`);
-        if (aSlider) apfState[vfo].freqHz = parseInt(aSlider.value) || 0;
+        const sel = document.getElementById(`apfSelect${vfo}`);
+        if (sel) apfState[vfo] = parseInt(sel.value) || 0;
     }
 
     // Event delegation for band button changes
@@ -1985,35 +2029,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupAfGainSlider('A');
     setupAfGainSlider('B');
 });
-
-// IF Shift slider: send only on release, block SignalR updates while dragging
-const ifShiftDragging = { A: false, B: false };
-
-function setupIfShiftSlider(receiver) {
-    const slider = document.getElementById(`ifShiftSlider${receiver}`);
-    if (!slider) return;
-    const sendShift = () => {
-        if (window.radioControl) window.radioControl.setIfShift(receiver, parseInt(slider.value));
-    };
-    slider.addEventListener('mousedown',  () => { ifShiftDragging[receiver] = true; });
-    slider.addEventListener('touchstart', () => { ifShiftDragging[receiver] = true; }, { passive: true });
-    // Document-level mouseup catches releases anywhere, not just over the slider element
-    document.addEventListener('mouseup', () => {
-        if (ifShiftDragging[receiver]) { ifShiftDragging[receiver] = false; sendShift(); }
-    });
-    slider.addEventListener('touchend',   () => { ifShiftDragging[receiver] = false; sendShift(); });
-    // Keyboard arrow keys fire 'change' after the value settles
-    slider.addEventListener('change', sendShift);
-}
-
-function resetIfShift(receiver) {
-    const slider = document.getElementById(`ifShiftSlider${receiver}`);
-    const label  = document.getElementById(`ifShiftValue${receiver}`);
-    if (slider) slider.value = 0;
-    if (label)  label.textContent = '0';
-    if (window.radioControl) window.radioControl.setIfShift(receiver, 0);
-}
-window.resetIfShift = resetIfShift;
 
 function selectClarVfo(vfo) {
     clarVfo = vfo;
@@ -2133,134 +2148,32 @@ function resetIfWidth(receiver) {
 }
 window.resetIfWidth = resetIfWidth;
 
-function _updateContourBtn(vfo) {
-    const btn = document.getElementById(`contourBtn${vfo}`);
-    if (!btn) return;
-    const on = contourState[vfo].on;
-    btn.textContent = on ? 'Contour On' : 'Contour Off';
-    btn.className = btn.className.replace(/btn-success|btn-outline-secondary/g, '').trim();
-    btn.classList.add(on ? 'btn-success' : 'btn-outline-secondary');
-}
-
-function _updateApfBtn(vfo) {
-    const btn = document.getElementById(`apfBtn${vfo}`);
-    if (!btn) return;
-    const on = apfState[vfo].on;
-    btn.textContent = on ? 'APF On' : 'APF Off';
-    btn.className = btn.className.replace(/btn-success|btn-outline-secondary/g, '').trim();
-    btn.classList.add(on ? 'btn-success' : 'btn-outline-secondary');
-}
-
-async function toggleContour(vfo) {
-    const newOn = !contourState[vfo].on;
-    contourState[vfo].on = newOn;
-    _updateContourBtn(vfo);
-    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
-    if (panel) panel.setState({ contourOn: newOn });
-    try {
-        await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ on: newOn, freqHz: contourState[vfo].freqHz })
-        });
-    } catch (e) { console.error('Contour toggle failed:', e); }
-}
-window.toggleContour = toggleContour;
-
-async function setContourFreq(vfo, hz) {
-    contourState[vfo].freqHz = hz;
-    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
-    if (panel) panel.setState({ contourFreqHz: hz });
-    try {
-        await fetch(`/api/cat/contour/${vfo.toLowerCase()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ on: contourState[vfo].on, freqHz: hz })
-        });
-    } catch (e) { console.error('Contour freq failed:', e); }
-}
-window.setContourFreq = setContourFreq;
-
-// Recompute the contour slider's min/max for a VFO based on the current
-// passband (mode + IF Width + roofing). The radio's hard CAT range is
-// preserved as an outer clamp via the slider's initial min/max values,
-// so we never let the user set a value the radio can't accept. If the
-// existing contour value falls outside the new (narrower) range, clamp
-// it in place and send the clamped value to the radio.
-//
-// Called from the SignalR handlers for ModeA/ModeB, IfWidthA/IfWidthB,
-// and the per-VFO roofing-filter changes; also once at startup after the
-// FilterScopePanel instances are constructed.
-function updateContourSliderBounds(vfo) {
-    const panel = window['filterScopePanel' + vfo];
-    if (!panel || typeof panel.getPassband !== 'function') return;
-    const slider = document.getElementById('contourFreqSlider' + vfo);
-    if (!slider) return;
-
-    // Cache the radio's hard limits on first run (the values rendered
-    // server-side from the radio model: 100..3200 for FTdx101, 100..4000
-    // for FTDX3000). After that, future updates only narrow within those.
-    if (slider._hardMin == null) slider._hardMin = parseInt(slider.min);
-    if (slider._hardMax == null) slider._hardMax = parseInt(slider.max);
-
-    const { lo, hi } = panel.getPassband();
-    const newMin = Math.max(slider._hardMin, Math.round(lo));
-    const newMax = Math.min(slider._hardMax, Math.round(hi));
-    if (newMin >= newMax) return;
-
-    // Capture the OLD value before changing min/max — once we set the new
-    // max, the browser auto-clamps slider.value to fit, so reading it
-    // afterwards would always give the clamped (= new max) value and we'd
-    // never realise the value had actually moved.
-    const oldVal  = parseInt(slider.value);
-    const clamped = Math.max(newMin, Math.min(newMax, oldVal));
-
-    slider.min = newMin;
-    slider.max = newMax;
-
-    if (clamped !== oldVal) {
-        slider.value = clamped;
-        const label = document.getElementById('contourFreqValue' + vfo);
-        if (label) label.textContent = clamped + ' Hz';
-        setContourFreq(vfo, clamped);  // updates panel state + sends CAT
+// Apply an APF width to the local state and both selectors. The radio has one
+// APF, so a change on either VFO panel is shown on both — leaving the other
+// selector stale would tell the operator the two VFOs differ, and they cannot.
+function _applyApfWidth(vfo, value) {
+    const width = parseInt(value) || 0;
+    apfState.A = width;
+    apfState.B = width;
+    for (const v of ['A', 'B']) {
+        const sel = document.getElementById(`apfSelect${v}`);
+        if (sel && parseInt(sel.value) !== width) sel.value = String(width);
     }
 }
-window.updateContourSliderBounds = updateContourSliderBounds;
 
-async function toggleApf(vfo) {
-    const newOn = !apfState[vfo].on;
-    apfState[vfo].on = newOn;
-    _updateApfBtn(vfo);
-    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
-    if (panel) panel.setState({ apfOn: newOn });
+// vfo decides only which endpoint segment is used; the setting itself is
+// radio-wide (see _applyApfWidth).
+async function setApf(vfo, width) {
+    _applyApfWidth(vfo, width);
     try {
         await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ on: newOn, freqHz: apfState[vfo].freqHz })
+            body: JSON.stringify({ width })
         });
-    } catch (e) { console.error('APF toggle failed:', e); }
+    } catch (e) { console.error('APF set failed:', e); }
 }
-window.toggleApf = toggleApf;
-
-async function setApfFreq(vfo, hz) {
-    apfState[vfo].freqHz = hz;
-    const panel = vfo === 'B' ? window.filterScopePanelB : window.filterScopePanelA;
-    if (panel) panel.setState({ apfFreqHz: hz });
-    try {
-        await fetch(`/api/cat/apf/${vfo.toLowerCase()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ on: apfState[vfo].on, freqHz: hz })
-        });
-    } catch (e) { console.error('APF freq failed:', e); }
-}
-window.setApfFreq = setApfFreq;
-
-document.addEventListener('DOMContentLoaded', function() {
-    setupIfShiftSlider('A');
-    setupIfShiftSlider('B');
-});
+window.setApf = setApf;
 
 
 (function () {
@@ -2365,14 +2278,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const antennaSelect = document.getElementById(`antennaSelect${receiver}`);
         if (antennaSelect && antenna) {
             antennaSelect.value = antenna;
-        }
-    }
-
-    // Update roofing filter dropdown
-    function updateRoofingFilterSelect(receiver, filterCode) {
-        const selectEl = document.getElementById(`roofingFilterSelect${receiver}`);
-        if (selectEl && filterCode) {
-            selectEl.value = filterCode;
         }
     }
 
@@ -2594,7 +2499,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // ▲ / ▼ buttons — visible when Settings > Accessibility >
-        // Show frequency arrow buttons is on (Yuri W4YSW request). A single
+        // Show frequency arrow buttons is on. A single
         // click/tap steps the currently-selected digit by 1 — same action as
         // ArrowUp / ArrowDown and the mouse wheel. Press-and-hold repeats
         // that same step every 500 ms until released, so reaching a distant
@@ -2705,24 +2610,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    async function setAntenna(receiver, antenna) {
-        const didPause = pausePolling();
-        try {
-            highlightButtons(receiver, state.lastBand[receiver], state.lastMode[receiver], antenna);
-            state.lastAntenna[receiver] = antenna;
-            const response = await fetch(`/api/cat/antenna/${receiver.toLowerCase()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ antenna })
-            });
-        } catch (error) {
-        } finally {
-            if (didPause) {
-                resumePolling();
-            }
-        }
-    }
-
     // Show Windows-style message box (auto-dismisses after 3 seconds)
     function showMessageBox(message, title = 'Warning') {
         const modalEl = document.getElementById('messageBoxModal');
@@ -2827,60 +2714,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) { console.error('setManualNotchFreq error:', e); }
     }
 
-    async function setIfWidth(receiver, code) {
-        try {
-            await fetch(`/api/cat/ifwidth/${receiver.toLowerCase()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code })
-            });
-        } catch (e) { console.error('setIfWidth error:', e); }
-    }
-
-    async function setIfShift(receiver, shiftHz) {
-        try {
-            await fetch(`/api/cat/ifshift/${receiver.toLowerCase()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shiftHz: parseInt(shiftHz) })
-            });
-        } catch (e) { console.error('setIfShift error:', e); }
-    }
-
-    async function setRoofingFilter(receiver, filter) {
-        const didPause = pausePolling();
-
-        try {
-            const response = await fetch(`/api/cat/roofingfilter/${receiver.toLowerCase()}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filter })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                showMessageBox(`Failed to set roofing filter: ${data.error}`, 'Error');
-                return;
-            }
-
-            // Check if there's a warning (filter not installed)
-            if (data.warning) {
-                showMessageBox(data.message, 'Roofing Filter');
-                // Update dropdown to show actual filter
-                const selectEl = document.getElementById(`roofingFilterSelect${receiver}`);
-                if (selectEl && data.filter) {
-                    selectEl.value = data.filter;
-                }
-            }
-        } catch (error) {
-            showMessageBox('Error setting roofing filter. Check console for details.', 'Error');
-        } finally {
-            if (didPause) {
-                resumePolling();
-            }
-        }
-    }
+    // No setRoofingFilter. Roofing filters are an analogue-superhet feature;
+    // the direct-sampling IC-7300 has none, so the control, its endpoint and
+    // the Installed-Filters setting all went in the carve.
 
     function pausePolling() {
         if (state.pollingInterval && !state.operationInProgress) {
@@ -2999,14 +2835,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update mode and antenna buttons from polling
             updateModeAndAntennaButtons('A', data.vfoA.mode, data.vfoA.antenna);
             updateModeAndAntennaButtons('B', data.vfoB.mode, data.vfoB.antenna);
-
-            // Update roofing filter dropdowns
-            if (data.vfoA.roofingFilter) {
-                updateRoofingFilterSelect('A', data.vfoA.roofingFilter);
-            }
-            if (data.vfoB.roofingFilter) {
-                updateRoofingFilterSelect('B', data.vfoB.roofingFilter);
-            }
 
             // Update MIC Gain / Data Out Gain label based on current mode (VFO A is main)
             updateMicGainLabel(data.vfoA.mode);
@@ -3194,8 +3022,6 @@ document.addEventListener('DOMContentLoaded', function() {
         setFrequency,
         setBand,
         setMode,
-        setAntenna,
-        setRoofingFilter,
         setAgc,
         setIpo,
         setAutoNotch,
@@ -3204,8 +3030,6 @@ document.addEventListener('DOMContentLoaded', function() {
         setManualNotch,
         setNoiseBlanker,
         setManualNotchFreq,
-        setIfWidth,
-        setIfShift,
         _state: state,  // Expose state for TX indicator updates
         updatePowerDisplay: updatePowerDisplay,
         setPower: setPower
@@ -3229,6 +3053,28 @@ document.addEventListener('DOMContentLoaded', function() {
         return `bandSeg_${vfo}_${band}`;
     }
 
+    // The server (BandPlanService) reports this when the frequency falls
+    // outside every allocation in the operator's own IARU region.
+    const OOB_BAND = 'unknown';
+    function isOutOfBand(band) {
+        return typeof band === 'string' && band.toLowerCase() === OOB_BAND;
+    }
+
+    // Paint (or clear) the out-of-band state on a Segment dropdown. The
+    // dropdown carries the warning as well as the colour, because a
+    // partially-sighted operator gets the accessible name, not the red.
+    function setSegmentOutOfBand(select, vfo, on) {
+        select.classList.toggle('segment-oob', on);
+        if (!('labelOriginal' in select.dataset)) {
+            select.dataset.labelOriginal = select.getAttribute('aria-label') || `VFO ${vfo} band segment`;
+        }
+        const label = on
+            ? `VFO ${vfo} out of band — frequency is outside every allocation in your region`
+            : select.dataset.labelOriginal;
+        select.setAttribute('aria-label', label);
+        select.setAttribute('title', label);
+    }
+
     // Set the Segment dropdown to reflect whichever segment of the band
     // contains the current frequency. Called from the FrequencyA/B SignalR
     // handlers so the dropdown stays in sync when the operator tunes via
@@ -3237,9 +3083,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // initial connect before BandA arrives).
     function syncSegmentSelectToFrequency(vfo, hz) {
         const select = document.getElementById(`segmentSelect${vfo}`);
+        // Disabled means the dropdown holds a single OOB or "--" placeholder,
+        // so there is no segment to select. populateSegmentSelect re-runs on
+        // the next band change and picks the sync back up.
         if (!select || select.disabled) return;
         const band = state.lastBand && state.lastBand[vfo];
-        if (!band) return;
+        if (!band || isOutOfBand(band)) return;
         const plan = window.bandPlan || 'UK';
         if (!window.bandPlanData || !window.getBandSegmentForHz) {
             // Fallback if helper not loaded — use inline lookup against the plan.
@@ -3276,18 +3125,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!bandPlanData) return;
 
         const segments = (bandPlanData[plan] || {})[band] || null;
+        const oob = isOutOfBand(band);
         select.innerHTML = '';
 
         if (!segments) {
+            // Two different "no segments" cases, and they mean different
+            // things to the operator: OOB is a warning (you are outside your
+            // region's allocations), whereas "--" just means this band has no
+            // activity plan in the JSON — 4m outside Region 1, say.
             const opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = '--';
+            opt.textContent = oob ? 'OOB' : '--';
             select.appendChild(opt);
             select.disabled = true;
+            setSegmentOutOfBand(select, vfo, oob);
             return;
         }
 
         select.disabled = false;
+        setSegmentOutOfBand(select, vfo, false);
         const placeholder = document.createElement('option');
         placeholder.value = '';
         placeholder.textContent = '--';
@@ -3300,11 +3156,34 @@ document.addEventListener('DOMContentLoaded', function() {
             select.appendChild(opt);
         }
 
-        // Restore last used segment for this band
+        // Restore last used segment for this band. This is only a fallback
+        // for the moment before we know the frequency — the radio's actual
+        // frequency wins immediately below, because the dropdown's job is to
+        // say where the operator *is*, not where they last went.
         const saved = localStorage.getItem(segmentStorageKey(vfo, band));
         if (saved && select.querySelector(`option[value="${saved}"]`)) {
             select.value = saved;
         }
+
+        // Use lastVfoHz (top-level, written directly by the FrequencyA/B
+        // SignalR handlers) rather than state.lastBackendFreq — that one is
+        // written inside a try/catch from a scope where `state` isn't
+        // visible, so it throws and is swallowed on every update and holds a
+        // stale frequency. Getting this wrong showed up as the dropdown
+        // dropping to "--" when tuning back in from out of band: FrequencyA
+        // arrives before BandA, so the good sync early-returns against the
+        // still-disabled OOB placeholder and this call is the last word.
+        const hz = (lastVfoHz && lastVfoHz[vfo]) || (state.lastBackendFreq && state.lastBackendFreq[vfo]);
+        if (typeof hz !== 'number' || hz <= 0) return;
+
+        // Only override the saved value when the frequency really lands in
+        // the band we just populated. On a band-button click we are called
+        // before the radio has retuned, so hz is still the *old* band's —
+        // syncing blindly would flash "--" until the new frequency arrived.
+        const live = window.getBandSegmentForHz
+            ? window.getBandSegmentForHz(plan, band, hz)
+            : null;
+        if (live) syncSegmentSelectToFrequency(vfo, hz);
     }
 
     // Called when the user picks a segment from the dropdown.
@@ -3314,9 +3193,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const bandPlanData = window.bandPlanData;
         if (!bandPlanData) return;
 
-        // Determine the current band for this VFO
+        // Determine the current band for this VFO. Out of band there is no
+        // segment to tune to and nothing worth remembering, so bail before
+        // we touch the radio or localStorage.
         const band = state.lastBand[vfo];
-        if (!band) return;
+        if (!band || isOutOfBand(band)) return;
 
         const segments = (bandPlanData[plan] || {})[band];
         if (!segments || !segments[segKey]) return;
@@ -3472,8 +3353,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const liveRegion = document.createElement('div');
     liveRegion.id = '_sr_live';
     // ASSERTIVE (not polite): each new announcement interrupts the
-    // previous one rather than queueing behind it. This addresses
-    // OZ1JTE's feedback on #20 — when sweeping the mouse across many
+    // previous one rather than queueing behind it. Reported from the
+    // field: when sweeping the mouse across many
     // interactive elements (memory channels, settings inputs) the
     // screen reader was reading every passed-over button in turn
     // because polite-mode queued them all. Assertive plus the longer
@@ -3541,7 +3422,7 @@ document.addEventListener('DOMContentLoaded', function () {
         clearTimeout(timer);
         // 400 ms (was 200 ms) so the screen reader doesn't announce every
         // interactive element the mouse sweeps over on its way to the
-        // intended target. OZ1JTE reported this on the Memories page in
+        // intended target. Reported on the Memories page in
         // particular, where dense rows of inputs/buttons make a quick
         // sweep noisy. 400 ms requires a genuine pause-and-hover.
         timer = setTimeout(function () {
@@ -3647,11 +3528,22 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!meta) return;
         const current = meta.content.trim();
         try {
+            // /releases/latest — NOT /releases. GitHub defines "latest" as the
+            // newest release that is neither a draft nor a pre-release, which is
+            // exactly the policy we want: operators are told about full releases
+            // only. Pre-releases are opt-in — someone who wants to test one goes
+            // to the releases page and picks it deliberately. Never switch this
+            // to the list endpoint or add a "include pre-releases" option; a
+            // banner is an interruption, and interrupting someone mid-QSO to
+            // offer them a less-tested build is the wrong trade.
             const resp = await fetch('https://api.github.com/repos/mm5agm/Icom_Web_Control/releases/latest', {
                 headers: { Accept: 'application/vnd.github+json' }
             });
             if (!resp.ok) return;
             const data = await resp.json();
+            // Belt and braces: if GitHub ever hands back a pre-release or draft
+            // here, stay quiet rather than trusting the endpoint's contract.
+            if (data.prerelease || data.draft) return;
             const latest = (data.tag_name || '').replace(/^v/i, '');
             if (latest && _isNewer(latest, current)) {
                 _showUpdateBanner(latest, data.html_url || 'https://github.com/mm5agm/Icom_Web_Control/releases');
@@ -3665,122 +3557,3 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(_checkForUpdate, 3000);
     }
 })();
-
-// ─────────────────────────────────────────────────────────────────────────────
-// VC Tune preselector controls
-// Sends commands to /api/vctune/{band}/{command} and updates button states
-// from the JSON response.  Band is 'a' (MAIN) or 'b' (SUB).
-// ─────────────────────────────────────────────────────────────────────────────
-(function () {
-    var _state         = { a: 'Unknown', b: 'Unknown' };
-    var _catBlocked    = { a: false, b: false };  // true when hardware rejects VT CAT
-
-    function _updateUi(band, data) {
-        var vfo       = band.toUpperCase();
-        var toggleBtn = document.getElementById('vcTuneToggleBtn' + vfo);
-        var defBtn    = document.getElementById('vcTuneDefaultBtn' + vfo);
-        var ctrBtn    = document.getElementById('vcTuneCenterBtn' + vfo);
-        var meter     = document.getElementById('vcTuneMeter' + vfo);
-        var warn      = document.getElementById('vcTuneWarn' + vfo);
-        var row       = document.getElementById('vcTuneRow' + vfo);
-
-        var catNotSupported = (data.errorCategory === 'CatNotSupported');
-        if (catNotSupported) _catBlocked[band] = true;
-
-        // Hardware does not support VC Tune over CAT — hide everything immediately.
-        if (catNotSupported) {
-            if (toggleBtn) toggleBtn.style.display = 'none';
-            if (row)       row.style.display       = 'none';
-            return;
-        }
-
-        var state = data.state || 'Unknown';
-        var avail = (data.availability != null) ? data.availability : 0;
-        _state[band] = state;
-
-        var notInstalled = (avail === 0);
-
-        if (toggleBtn) {
-            var isActive = (state === 'On' || state === 'Stepping' || state === 'Centering');
-            toggleBtn.classList.remove('btn-outline-light', 'btn-warning');
-            toggleBtn.classList.add(isActive ? 'btn-warning' : 'btn-outline-light');
-            toggleBtn.disabled = notInstalled;
-            if (band === 'b') toggleBtn.style.display = avail > 0 ? '' : 'none';
-        }
-
-        if (defBtn) defBtn.disabled = notInstalled;
-        if (ctrBtn) ctrBtn.disabled = notInstalled;
-
-        if (meter) {
-            var m = (data.meter != null) ? data.meter : -1;
-            meter.textContent = m >= 0 ? 'P5: ' + m : 'P5: -';
-        }
-
-        if (warn) {
-            var txt = '';
-            if (avail === 0)                        txt = 'Not installed';
-            else if (avail === 2)                   txt = 'Temporarily unavailable';
-            else if (!data.success && data.message) txt = data.message;
-            warn.textContent   = txt;
-            warn.style.display = txt ? '' : 'none';
-        }
-
-        if (band === 'b' && row) row.style.display = avail > 0 ? '' : 'none';
-    }
-
-    async function vcTuneCommand(band, cmd) {
-        try {
-            var resp = await fetch('/api/vctune/' + band + '/' + cmd, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            });
-            if (!resp.ok) return;
-            _updateUi(band, await resp.json());
-        } catch(e) { console.error('VC Tune ' + cmd + ' failed:', e); }
-    }
-
-    async function vcTuneToggle(band) {
-        if (_catBlocked[band]) return;
-        var isOn = (_state[band] === 'On' || _state[band] === 'Stepping' || _state[band] === 'Centering');
-        await vcTuneCommand(band, isOn ? 'off' : 'on');
-    }
-
-    async function vcTuneStep(band, direction) {
-        if (_catBlocked[band]) return;
-        var sel    = document.getElementById('vcTuneStep' + band.toUpperCase());
-        var amount = sel ? parseInt(sel.value, 10) : 5;
-        try {
-            var resp = await fetch('/api/vctune/' + band + '/step', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ direction: direction, amount: amount })
-            });
-            if (!resp.ok) return;
-            _updateUi(band, await resp.json());
-        } catch(e) { console.error('VC Tune step failed:', e); }
-    }
-
-    async function _refreshStatus(band) {
-        try {
-            var resp = await fetch('/api/vctune/' + band + '/status');
-            if (!resp.ok) return;
-            _updateUi(band, await resp.json());
-        } catch(e) { /* non-fatal */ }
-    }
-
-    function _vcTuneInit() {
-        if (document.getElementById('vcTuneToggleBtnA')) _refreshStatus('a');
-        if (document.getElementById('vcTuneToggleBtnB')) _refreshStatus('b');
-    }
-
-    window.vcTuneCommand = vcTuneCommand;
-    window.vcTuneToggle  = vcTuneToggle;
-    window.vcTuneStep    = vcTuneStep;
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _vcTuneInit);
-    } else {
-        _vcTuneInit();
-    }
-})()

@@ -221,7 +221,6 @@
         // (head-tracking + on-screen keyboard, mouse-only users with reduced
         // dexterity) can step the selected digit by clicking. Default OFF
         // so users with mouse wheels see the uncluttered default layout.
-        // Yuri W4YSW request 2026-06-17.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
 
         // Browser key that toggles TX (transmit). Empty / null = disabled.
@@ -249,8 +248,8 @@
         // ("Move to fourteen point zero seven four megahertz, successful")
         // back through the PC's default audio output. Default ON when voice
         // control is enabled -- key accessibility feature for partially-
-        // sighted operators (Yuri W4YSW, Thomas OZ1JTE) who can't see the
-        // screen to know whether a CAT command landed. Users who find it
+        // sighted operators, who can't see the screen to know whether a
+        // command landed. Users who find it
         // chatty can disable here without disabling voice control itself.
         public bool VoiceSpokenConfirmationEnabled { get; set; } = true;
 

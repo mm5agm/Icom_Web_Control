@@ -432,7 +432,7 @@ namespace Icom_Web_Control.Controllers
         /// Saves a new voice phrases configuration and hot-reloads the SAPI
         /// grammar so changes take effect immediately without an app restart.
         /// Validates first — a config with blocking errors (e.g. a macro
-        /// with no CAT string) is rejected with 422 and never written to
+        /// with no CI-V command) is rejected with 422 and never written to
         /// disk; warnings don't block the save but are returned alongside
         /// the success response so the UI can still show them.
         /// </summary>
@@ -973,6 +973,15 @@ namespace Icom_Web_Control.Controllers
             Add("Radio Controls", cfg.SetAttenuator?.Triggers);
             Add("Radio Controls", cfg.SetPreamp?.Triggers);
             Add("Radio Controls", cfg.SetAgc?.Triggers);
+            Add("Radio Controls", cfg.SetNoiseReduction?.Triggers);
+            Add("Radio Controls", cfg.SetNoiseBlanker?.Triggers);
+            Add("Radio Controls", cfg.SetNotch?.Triggers);
+            Add("Radio Controls", cfg.SetRfGain?.Triggers);
+            Add("Radio Controls", cfg.SetSquelch?.Triggers);
+            Add("Radio Controls", cfg.SetApf?.Triggers);
+            Add("Transmit", cfg.SetTxPower?.Triggers);
+            Add("Transmit", cfg.SetMicGain?.Triggers);
+            Add("Transmit", cfg.SetProcessor?.Triggers);
 
             foreach (var m in cfg.Macros ?? new())
                 Add(string.IsNullOrWhiteSpace(m.Category) ? "Macros" : m.Category, m.Phrases);

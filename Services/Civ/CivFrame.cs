@@ -96,6 +96,15 @@ namespace Icom_Web_Control.Services.Civ
         // The IC-7300's RX Tone Control is unavailable in SSB-DATA mode.
         public const byte SubRxTone = 0x05;
 
+        /// <summary>
+        /// The same byte as <see cref="SubRxTone"/>, under the name the CI-V
+        /// manual uses. 1A 05 is the whole SET menu, not just Tone Control —
+        /// every item is 1A 05 &lt;hi&gt; &lt;lo&gt;, and the RX HPF/LPF items just
+        /// happen to be the first ones IWC needed. Use this name for anything
+        /// that is not Tone Control (VOX delay, APF type, …).
+        /// </summary>
+        public const byte SubSetMenu = 0x05;
+
         // Phase 3 block 3 — meters (command 15 family). Sub 02 = S-meter.
         //   Read : send 15 02   → reply 15 02 <d1> <d2>
         // The level is a 0–255 value as two big-endian BCD bytes (unlike the
@@ -223,6 +232,104 @@ namespace Icom_Web_Control.Services.Civ
         public const byte SubCwPitch      = 0x09; // 14 09
         public const byte SubCwBreakInDelay = 0x0F; // 14 0F
         public const byte SubCwBreakIn    = 0x47; // 16 47
+
+        // -- TX-side audio chain: mic, speech compressor, monitor, VOX --------
+        //
+        // All of these follow the two families already established above, so
+        // they need no new decoding: the levels are 14-family (two big-endian
+        // BCD bytes, 0000–0255) and the on/off switches are 16-family (one
+        // byte, 00/01). CI-V manual pp. 5–6.
+        //   14 0B = microphone gain      (0–255)
+        //   14 0E = speech-compressor level (0000–0255 maps to the panel's 0–10)
+        //   14 15 = monitor level        (0–255 = 0–100 %)
+        //   14 16 = VOX sensitivity/gain (0–255 = 0–100 %)
+        //   14 17 = ANTI-VOX             (0–255; HIGHER is LESS sensitive)
+        //   16 44 = speech compressor on/off
+        //   16 45 = monitor on/off
+        //   16 46 = VOX on/off
+        public const byte SubMicGain      = 0x0B; // 14 0B
+        public const byte SubCompLevel    = 0x0E; // 14 0E
+        public const byte SubMonitorLevel = 0x15; // 14 15
+        public const byte SubVoxGain      = 0x16; // 14 16
+        public const byte SubAntiVox      = 0x17; // 14 17
+        public const byte SubSpeechComp   = 0x44; // 16 44
+        public const byte SubMonitor      = 0x45; // 16 45
+        public const byte SubVox          = 0x46; // 16 46
+
+        // APF (Audio Peak Filter) — 16 32, CW only. Unlike the other 16-family
+        // switches this is not a simple on/off: the value selects the WIDTH,
+        // and OFF is one of the four positions rather than a separate flag.
+        //   00 = OFF, 01 = WIDE, 02 = MID, 03 = NAR
+        // The widths above are the SOFT-type figures; with APF TYPE set to
+        // SHARP the same three positions mean 320 / 160 / 80 Hz. Type itself is
+        // a SET-menu item (1A 05 02 69), as is the APF AF level (1A 05 02 70).
+        public const byte SubApf          = 0x32; // 16 32
+        public const byte ApfOff          = 0x00;
+        public const byte ApfWide         = 0x01;
+        public const byte ApfMid          = 0x02;
+        public const byte ApfNarrow       = 0x03;
+
+        // VOX delay — a SET-menu item rather than a 14-family level, reached the
+        // same way as the RX tone controls (SubRxTone is the 1A 05 SET-menu
+        // subcommand) but with a two-byte item selector of 02 67:
+        //   Read : send 1A 05 02 67          → reply 1A 05 02 67 <val>
+        //   Set  : send 1A 05 02 67 <val>    → FB / FA
+        // val is 00–20 BCD = 0.0–2.0 s in 0.1 s steps — NOT the 0–255 the
+        // 14-family levels use. Note 1A 05 00 67 is a different item entirely
+        // (the calibration marker), so the high selector byte matters.
+        public const byte MenuHiVoxDelay   = 0x02; // 1A 05 [02] 67
+        public const byte MenuLoVoxDelay   = 0x67;
+        public const int  VoxDelayMaxTenths = 20;  // 20 = 2.0 s, the radio's ceiling
+
+        // RIT / ΔTX (command 21) — the IC-7300's equivalent of the Yaesu
+        // clarifier. Three subcommands:
+        //   21 00 = RIT offset frequency (read/set)
+        //   21 01 = RIT on/off      (00/01)
+        //   21 02 = ΔTX on/off      (00/01)
+        //
+        // The offset is THREE data bytes, and only the first two are BCD digit
+        // pairs — the third is a sign flag, not a digit:
+        //   <d0> = 1 Hz + 10 Hz digits,  <d1> = 100 Hz + 1 kHz digits,
+        //   <sign> = 00 for +, 01 for −
+        // i.e. little-endian BCD like the frequency commands, then the sign.
+        // Range is therefore ±9.99 kHz; the front panel clamps to ±9.999 kHz.
+        public const byte CmdRit          = 0x21;
+        public const byte SubRitFrequency = 0x00;
+        public const byte SubRitOn        = 0x01;
+        public const byte SubDeltaTxOn    = 0x02;
+        public const int  RitMaxHz        = 9990;  // largest offset the 2-BCD-byte field can carry
+        public const byte RitSignPlus     = 0x00;
+        public const byte RitSignMinus    = 0x01;
+
+        // -- FM repeater tone (16 42 / 16 43 / 1B 00 / 1B 01) ------------------
+        // Sub-audible CTCSS for repeater access. The on/off switches are
+        // ordinary 16-family functions; the frequencies get their own command.
+        //   1B 00 = repeater (TX) tone frequency
+        //   1B 01 = tone-squelch (TSQL) frequency
+        // Three data bytes, big-endian BCD, in tenths of a Hz:
+        //   <00> <100Hz|10Hz> <1Hz|0.1Hz>   e.g. 88.5 Hz → 00 08 85
+        // The first byte's two digits are fixed 0 (there is no 10 kHz or 1 kHz
+        // CTCSS tone), so the usable range is 0.0–999.9 Hz.
+        public const byte SubRepeaterTone = 0x42; // 16 42 — tone on/off
+        public const byte SubTsql         = 0x43; // 16 43 — tone squelch on/off
+        public const byte CmdToneFreq     = 0x1B;
+        public const byte SubToneFrequency = 0x00; // 1B 00
+        public const byte SubTsqlFrequency = 0x01; // 1B 01
+
+        // FM split (repeater) offset — a SET-menu item, with a SEPARATE item per
+        // band group because the radio remembers a different shift for HF and
+        // for 6 m:
+        //   1A 05 00 34 = FM SPLIT Offset (HF)
+        //   1A 05 00 35 = FM SPLIT Offset (50M)
+        // Four data bytes: three little-endian BCD pairs carrying the magnitude
+        // (1 kHz/100 Hz, 100 kHz/10 kHz, 10 MHz/1 MHz — the 100 Hz and 10 MHz
+        // digits are fixed 0, so the offset is a whole number of kHz below
+        // 10 MHz), then a direction byte, 00 = plus, 01 = minus.
+        public const byte MenuHiFmSplitOffset    = 0x00;
+        public const byte MenuLoFmSplitOffsetHf  = 0x34; // 1A 05 00 34
+        public const byte MenuLoFmSplitOffset6m  = 0x35; // 1A 05 00 35
+        /// <summary>Frequency at or above which the 50 MHz FM-split-offset menu item applies.</summary>
+        public const long SixMetreBandStartHz    = 50_000_000;
 
         // Phase 3 block 5 — VFO select, split, and true per-VFO frequency/mode.
         //

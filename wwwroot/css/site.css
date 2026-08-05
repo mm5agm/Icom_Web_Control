@@ -494,11 +494,63 @@ pre, code { tab-size: 4; }
     color: #0f5132;
 }
 
+/* Out of band.
+   The radio is inside this band's worldwide envelope but outside the
+   operator's own IARU region allocation, so no band is selected and this
+   button shows why. Bold black on red, the same signal the Segment dropdown
+   uses for OOB. Applied by applyBandOutOfBand() in js/ui/site.js.
+   Listed after :hover so hovering an out-of-band button keeps the warning. */
+.band-radio-label.band-oob,
+.band-radio-label.band-oob:hover {
+    background-color: #dc3545;
+    border-color: #842029;
+    color: #000;
+}
+
+.band-radio-label.band-oob span {
+    font-weight: bold;
+}
+
 /* Responsive: 3 columns on smaller screens, still sized to content */
 @media (max-width: 768px) {
     .band-radio-grid {
         grid-template-columns: repeat(3, auto);
     }
+}
+
+/* Start-up overlay (Pages/Index.cshtml #initOverlay).
+   Markup has existed since the YWC days but was never styled, so it rendered
+   as an ordinary block at the top of the page and the half-built UI showed
+   underneath it. Opaque rather than translucent, for the same reason as the
+   server-stopped overlay: canvas panels that animate themselves ghost through
+   any transparency and make a loading page look broken instead of loading.
+   The child is absolutely positioned so site.js can keep toggling
+   display:block / none on the overlay without a flex rule fighting it. */
+.init-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background: #141820;
+    color: #e0e0e0;
+}
+.init-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: max-content;
+    max-width: 90vw;
+    text-align: center;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    font-family: system-ui, sans-serif;
+}
+.init-message .spinner-border {
+    display: block;
+    margin: 0 auto 1rem;
+}
+.init-message a {
+    color: #9ec5fe;
 }
 
 /* Band segment dropdown — narrow, bold text */
@@ -509,6 +561,22 @@ pre, code { tab-size: 4; }
     font-weight: bold;
     font-size: 0.8rem;
     padding-right: 2.25rem;
+}
+
+/* Out of band: the frequency is outside every allocation in the operator's
+   own IARU region, so there is no segment to show. Matches the .band-oob
+   marker on the band buttons. The :disabled qualifier is needed to outrank
+   Bootstrap's own .form-select:disabled background, and the two-colour
+   overrides below stop the disabled state washing the red out. */
+.segment-select.segment-oob,
+.segment-select.segment-oob:disabled,
+.segment-select.segment-oob:hover,
+.segment-select.segment-oob:focus {
+    background-color: #dc3545;
+    border-color: #842029;
+    color: #000;
+    font-weight: bold;
+    opacity: 1;
 }
 
 /* Maximize usable width for receiver panels */

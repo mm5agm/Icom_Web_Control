@@ -50,6 +50,9 @@
    - 9.3 [Log4OM](#93-log4om)
    - 9.4 [GridTracker](#94-gridtracker)
 10. [Meter Calibration](#10-meter-calibration)
+    - 10.1 [Calibrating the S-Meter (receive)](#101-calibrating-the-s-meter-receive)
+    - 10.2 [Calibrating the Power meter (transmit)](#102-calibrating-the-power-meter-transmit)
+    - 10.3 [Other meters](#103-other-meters)
 11. [Diagnostics](#11-diagnostics)
 12. [Using the App on a Tablet or Phone](#12-using-the-app-on-a-tablet-or-phone)
 13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
@@ -81,13 +84,6 @@
 
 ---
 
-<!-- SCREENSHOT: recapture — this, and EVERY app-UI screenshot in this manual, was
-     captured on the old Yaesu (YWC) build and still shows the YWC layout/branding.
-     They are ALL pending recapture on the IC-7300 IWC build. The authoritative
-     per-file worklist is docs/design/screenshot-recapture-checklist.md — that
-     list, not scattered inline comments, tracks what still needs re-shooting.
-     Third-party screenshots (Log4OM, JTAlert, GridTracker, WSJT-X Reporting,
-     GitHub) are unaffected and stay as-is. -->
 ![Icom Web Control main screen](pictures/DevelopScreen.png)
 
 ---
@@ -191,7 +187,18 @@ A small **IWC tray icon** appears in the Windows system tray (down by the clock,
 
 ![IWC tray icon with right-click menu open, showing Open / About / Open user data folder / Exit](pictures/SystemTrayIcon.png)
 
-If the radio is powered on and the serial connection is correct, a brief "Initialising…" overlay appears while the app reads the current radio state. After a few seconds the overlay disappears and all controls reflect the current state of the radio. This includes frequencies, mode, AGC, NB level, ATU state, VOX settings, FM repeater settings, CW keyer speed and break-in mode, IF width, and more — no software defaults are applied.
+If the radio is powered on and the serial connection is correct, a full-screen **start-up panel** with a spinner covers the page while the app gets going. It reports what it is waiting for:
+
+- **"Initializing radio, please wait…"** — IWC is opening the serial port and reading the radio's current state.
+- **"Starting spectrum scope, please wait…"** — the radio is talking; IWC is now waiting for the first spectrum sweep.
+
+The panel clears when the spectrum appears, so the page you are handed is finished rather than still rearranging itself. On a healthy start with the radio already on this takes about a second and you may barely see it.
+
+If the scope cannot produce a sweep — switched off at the radio, or a fault on the CI-V bus — the panel gives up after about 12 seconds and hands you the rest of the app anyway. There is also a **Continue anyway** button: you should never need it, but the panel covers the whole page, so it is there to make sure nothing can lock you out.
+
+Once it clears, all controls reflect the current state of the radio. This includes frequencies, mode, AGC, NB level, ATU state, VOX settings, FM repeater settings, CW keyer speed and break-in mode, IF width, and more — no software defaults are applied.
+
+If the radio is switched **off**, the panel clears straight away and leaves you on the main page so you can turn the radio on with the power button. If the serial port is wrong or missing, the panel says so and offers a link to Settings rather than spinning indefinitely.
 
 **Closing the app:** Three ways:
 1. **Right-click the tray icon → Exit Icom Web Control.** Cleanest — confirms first, then shuts the server down properly.
@@ -206,9 +213,11 @@ If the radio is powered on and the serial connection is correct, a brief "Initia
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v2.0.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.3**) are shown in the top-left corner.
 
-**Update notification** — on startup the app silently checks the GitHub releases page for a newer version. If one is available, a small banner appears in the bottom-right corner with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
+**Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
+
+The banner only ever tells you about **full releases**. Pre-releases are deliberately left out of it — if you want to try one you go and fetch it yourself from the [releases page](https://github.com/mm5agm/Icom_Web_Control/releases), rather than being nudged towards a less-tested build while you're operating.
 
 **External app buttons** (WSJT-X, JTAlert, Log4OM, GridTracker, Fldigi) appear if they are enabled in Application Setup. The colour of each button indicates status:
 
@@ -302,9 +311,13 @@ The slider snaps to 5 W steps for ease of dragging, but the numerical label show
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over CI-V — there is no external SDR and nothing extra to plug in. It shows a real-time spectrum and scrolling waterfall of the band around the current VFO A frequency, and appears automatically once the radio is connected.
 
-> **Note:** the on-screen spectrum panel is inherited from IWC's Yaesu sibling and is still being re-fitted for the IC-7300 scope. The click-to-tune, crosshair, band-plan markers and guard-rail behaviour below are stable; some display mechanics (span control, waterfall speed, dB scaling) may change as the CI-V scope integration settles. The span and centre are driven by the radio's own scope settings.
+![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
 
-**Span buttons** — Click **250k**, **500k**, **1M**, or **2M** to change the visible bandwidth. The display recentres on VFO A.
+**Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for two reasons: to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
+
+The panel itself stays on screen whenever the radio is connected, whether or not sweeps are arriving — it just says what is happening instead ("Band scope is off — switch it on above the panel", or "Waiting for the radio's band scope…"). That keeps the **Scope** switch reachable: it lives above the panel, so a panel that hid itself when nothing was streaming took the only way of switching the scope back on with it.
+
+**Span buttons** — eight buttons in the panel header set the visible bandwidth, from **±2.5k** (narrowest — a single QSO fills the screen) through **±5k**, **±10k**, **±25k**, **±50k**, **±100k**, **±250k** to **±500k** (widest — a 1 MHz-wide view). The figure is the *half*-width either side of centre, matching the way the IC-7300 labels its own scope, so **±500k** shows a megahertz across the screen. Clicking one sets the radio's scope span, so the radio's front panel changes too; equally, changing the span on the radio lights the matching button in IWC, because the active button is re-synced from every incoming sweep.
 
 **Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
 
@@ -314,22 +327,37 @@ The spectrum comes from the **IC-7300's own built-in band scope**, streamed to t
 
 **Resize spectrum vs waterfall** — Hover the horizontal boundary between the spectrum trace (top) and the waterfall (bottom); the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room — useful when you're hunting weak signals close to the noise floor. Drag down to give the waterfall more history. The ratio is remembered per VFO across browser reloads, so the next time you open IWC the panel is back the way you left it. Two short grey grip-bars at the centre of the boundary mark the handle; they turn cyan while you're dragging.
 
-**Speed slider** — The slider next to Gain controls how fast the waterfall scrolls, from **Full** speed down to **1/128**. Drag it left to slow the waterfall down if signal trails are scrolling past faster than you can read them; the spectrum trace above it keeps updating live regardless of this setting. Set independently per VFO and remembered across browser reloads.
+**Hold** — Freezes the spectrum and waterfall on the frame that was on screen when you clicked, so you can study a fleeting signal without it scrolling away — or grab a screenshot of a particular moment. Three things show it is frozen: the button turns amber, the status badge changes to a yellow **Hold**, and a small `HOLD` banner appears in the top-left of the canvas. Click **Hold** again to resume live streaming. Hold affects only what is drawn — the radio keeps sweeping, and frequency, mode and meters carry on updating as normal. The state is per panel, so you can freeze one and leave the other running.
 
-**dB range** — The dropdown beside the **Hold** button picks the vertical scale of the spectrum trace, in dBFS:
+**Persistent cursor — bookmark a frequency** — **Shift-click** anywhere on the panel to drop a persistent cyan cursor at that frequency, with the frequency in a small boxed label beside it. It stays put as you tune around with ordinary clicks, so you can mark a station to come back to. To remove it, **Shift-click on or near it** (within about 10 pixels).
 
-- **0/-120** (default) — the full scope range; signals span the whole vertical height of the spectrum panel.
-- **-40/-120**, **-60/-120**, **-80/-120** — progressively zoom into the lower part of the scale, where weak signals normally sit. The strongest signals get clipped at the top of the panel, but the noise floor and anything just above it spreads out vertically and is much easier to see.
+#### The Range / Speed / Bright bar
 
-Pick whichever lets you see your noise floor without weak signals being squashed into the bottom row of pixels. The choice is remembered per VFO.
+The three sliders under the panel header shape the display. All three are per-VFO and are saved **on the server**, not just in your browser, so they follow you to a phone or tablet as well as surviving a reload.
+
+**Range** — the height of the vertical scale, in dB (5–140). This is a gain control for the trace: a *smaller* Range makes peaks taller, a *larger* one flattens everything out. It does **not** move the noise floor. IWC measures the noise floor on every sweep and pins it just above the bottom edge of the panel automatically, so the noise stays where you put it no matter how you set Range, and no matter how far you zoom the span in or out. Wind Range down until weak signals stand clear of the grass, and up again if strong signals are running off the top.
+
+**Speed** — how fast the waterfall scrolls, from **Full** down to **1/128**. Drag it left if signal trails are scrolling past faster than you can read them. The spectrum trace above the waterfall keeps updating live regardless of this setting.
+
+**Bright** — lifts the waterfall's colour mapping by up to 60 dB, bringing weak signals further up the colour scale so they show as blue-green rather than near-black. **Off** (0) is the unmodified mapping. Like Speed, it affects only the waterfall; the spectrum trace above it is untouched. The change applies to new rows as they scroll in — the history already on screen keeps the colours it was drawn with.
+
+#### The three badges
+
+**Scope mode** (top-left of the canvas) — shows the scope mode the radio is actually in, read from the sweep data itself: **CENT**, **FIX**, **SCROLL-C** or **SCROLL-F**. IWC's frequency axis assumes centre mode, so **CENT** is green — everything lines up. Any other mode is shown in amber as a warning that the trace may not match the frequency axis beneath it. **Click the badge to switch the radio between Centre and Fixed**, which is the quick way back to green if the radio was left in Fixed mode.
+
+**Scope status** (right-hand end of the panel header) — **Scope off** (no sweeps; the scope is switched off, or the radio isn't up yet), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, or **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show).
+
+**DX cluster** (top-right of the canvas) — the cluster connection state: green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.5 for cluster setup and troubleshooting.
+
+#### Overlays
 
 **DX cluster spots** — If you have configured a DX cluster server in Settings (see §6.5), incoming spots are overlaid as small yellow callsign labels along the top of the spectrum at each spot's frequency. Clicking on a spot (within a few pixels of its marker) tunes VFO A exactly to that frequency. Spots outside the current span are not drawn; spots older than the configured age (default 15 minutes) are removed automatically.
 
-**How spots are filtered for display** — the spectrum panel shows any spot whose frequency falls inside the currently visible window (VFO A ± half the span). When you change band, VFO A moves and the spectrum recentres, so the visible spots change automatically to match the new band. There is no explicit band filter — just a "is this spot inside the visible window?" check. In practice this means you see only the current band, because amateur bands have large gaps between them. If you zoom out to a 2 MHz span you'd technically see a wider chunk, but adjacent bands rarely overlap that window.
+**How spots are filtered for display** — the spectrum panel shows any spot whose frequency falls inside the currently visible window (VFO A ± half the span). When you change band, VFO A moves and the spectrum recentres, so the visible spots change automatically to match the new band. There is no explicit band filter — just a "is this spot inside the visible window?" check. In practice this means you see only the current band, because amateur bands have large gaps between them. At the widest span (±500 kHz) you'd technically see a wider chunk, but adjacent bands rarely overlap that window.
 
 The cluster feed itself is not band-filtered by IWC — spots arrive for every band the cluster carries. They are all kept client-side; only the ones inside the visible window get drawn. To reduce traffic at the source (for example, to receive only 20 m and 40 m spots), add a line like `set/filter band 20 or band 40` to **Settings → DX Cluster → Post-login commands**. That filter runs on the cluster server and cuts down on spots before they reach IWC.
 
-On crowded bands (the lower end of 20m on a contest weekend, for example) labels are stacked across up to five rows to avoid overlap. If even five rows can't fit everything in a tight cluster of nearby frequencies, **the app drops the spots that don't fit rather than letting labels overlap and become illegible**. The dropped spots are still in the underlying spot list — they just aren't drawn. Zooming the spectrum to a narrower span (e.g. 250k or 500k) spreads spots out and reveals the ones that were hidden.
+On crowded bands (the lower end of 20m on a contest weekend, for example) labels are stacked across up to five rows to avoid overlap. If even five rows can't fit everything in a tight cluster of nearby frequencies, **the app drops the spots that don't fit rather than letting labels overlap and become illegible**. The dropped spots are still in the underlying spot list — they just aren't drawn. Zooming the spectrum to a narrower span (e.g. ±100k or ±50k) spreads spots out and reveals the ones that were hidden.
 
 **Decluttering with the watch list** — if cluster traffic is making the spectrum unreadable, open the DX Watch popup (§5.14) and tick **Show only watched callsigns**. Every yellow (non-watched) spot disappears from the spectrum and the DX Spots list, leaving only the red watched-list matches. Toast / beep / voice alerts still fire as normal on watched spots; the toggle only changes what's drawn. Untick to bring all spots back. Setting is remembered per browser.
 
@@ -337,9 +365,28 @@ On crowded bands (the lower end of 20m on a contest weekend, for example) labels
 
 **Band-edge guard rails** — dashed red vertical lines drawn at the lower and upper edges of every amateur band that falls inside the visible window. They make it immediately obvious when you've tuned outside the amateur allocation (e.g. clicking 14.396 MHz on the spectrum lands you above the 20m upper edge at 14.350 — the red line is right there, telling you why no DX cluster spots are appearing and why the mode hasn't auto-changed). The edges use the worldwide amateur envelopes (the broadest limits across all regions), so a Region 1 operator may see a guard rail slightly beyond their own legal limit on a few bands — never the other way round.
 
-A status badge in the spectrum panel shows the current scope state: **No scope**, **Connecting…**, **Live**, or **Disconnected**.
+#### Two panels — the pseudo-dual receiver
 
-A second small badge in the **top-right corner of the spectrum canvas** shows the DX cluster connection state — green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.5 for cluster setup and troubleshooting.
+By default IWC shows **one** spectrum panel, for VFO A. The IC-7300 has a single receiver and a single scope, so that is the honest picture.
+
+Switching on **Enable pseudo-dual receiver** in **Settings → Spectrum Display** adds a second panel for VFO B — a *watch* panel — by time-sharing the one scope between them. On the **same band** both panels update live and your audio is never interrupted, because the single sweep covers both frequencies. Watching a **different** band is only possible by briefly borrowing the receiver, so it is off unless you also tick **Allow cross-band watch**; with that on, IWC retunes for a moment every few seconds (interval configurable, default 15 s) and your listening audio dips for about 0.4 s per peek. With cross-band watch off, a watch panel pointed at another band simply shows **Off-screen**.
+
+![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel](pictures/Spectrum_Scope_Both.png)
+
+**Listen / Listening** — with two panels up, the one you are hearing carries a green **Listening** badge and the other carries a **Listen** button. Click **Listen** to move the radio's audio to that VFO; the badge and button swap over. The badge follows the radio, so switching VFOs on the front panel moves it too.
+
+**Layout toggles** — two small button groups appear above the panels (only when both are showing):
+
+- **Stacked** / **Side by side** — panels one above the other, or splitting the width between them.
+- **VFO A** / **VFO B** / **Both** — show just one panel, or both.
+
+Both choices are remembered in your browser.
+
+**The watch panel's span buttons** — because there is only one scope with one span, VFO B can never show a *wider* view than VFO A. **Settings → Spectrum Display → Watch panel (VFO B) span buttons** decides what B's buttons do:
+
+- **Zoom in independently** (default) — B's buttons crop its own view tighter in software, leaving VFO A and the radio alone.
+- **Share one span** — B's buttons drive the one physical span exactly as A's do, and both panels' buttons light up together.
+- **Hide** — B has no span buttons at all; only VFO A controls the shared span. (This is the setting in the screenshot above.)
 
 ---
 
@@ -497,6 +544,14 @@ Available bands depend on your band plan setting:
 
 Region 1 is the only plan that includes the 4m (70 MHz) band. Japan has no 60m secondary allocation.
 
+**Out of band — the red band button.** The band buttons use the band plan you selected, not a generic worldwide table. If you tune outside every allocation in your own region, no band button lights up normally; instead the button for the band you were **nearest to** turns **red** with bold black text. If voice announcements are on, the band is spoken as **"out of band"**.
+
+This matters most in Region 1, where several allocations are narrower than the worldwide envelope: 80m ends at 3.800 (not 4.000), 40m ends at 7.200 (not 7.300), and 160m starts at 1.810 (not 1.800). Tuning to 3.900 MHz as a Region 1 operator is out of band, and IWC now says so.
+
+The red marker answers "which band were you aiming at" — it is **not** a licence check and it is not permission to transmit. Your own licence conditions are narrower than the IARU allocation in many countries. Check your licence, not this button.
+
+If your national allocation differs from the IARU default, you can edit the band edges yourself without waiting for an IWC release — see [Updating the band plan without an IWC release](#updating-the-band-plan-without-an-iwc-release) in section 6.3.
+
 **Segment dropdown** — After selecting a band, a dropdown appears above the frequency display showing common operating segments for that band. Select a segment to jump directly to its standard frequency and set the appropriate mode:
 
 | Segment | Example (20m) | Mode set |
@@ -509,6 +564,10 @@ Region 1 is the only plan that includes the 4m (70 MHz) band. Japan has no 60m s
 The last segment you used on each band is remembered, so when you return to a band the dropdown re-selects your previous segment.
 
 **Auto-sync to current frequency** — the Segment dropdown also follows your actual tuning. When you change frequency by any means (clicking the spectrum, turning the radio's front-panel knob, typing on the on-screen frequency keyboard), the dropdown updates to show the segment that contains your new frequency. If you tune into a gap between segments (e.g. 14.150 — between FT8 at 14.074 and SSB at 14.225 on 20m), the dropdown shows the closest segment at or below your frequency. This keeps the dropdown's display honest — it always tells you where you actually are, not where you last clicked.
+
+**Out of band — OOB.** Segments describe activity centres and have no upper edge of their own, so they stop at the band edge. Tune outside your region's allocation and the dropdown goes **red and reads OOB**, matching the red band button. It is disabled while it says OOB — there is no segment to select, and choosing one cannot retune the radio. Tune back into the band and it returns to the correct segment for wherever you now are.
+
+This is different from **`--`**, which means the band you are on has no segments defined in the band plan (4m outside Region 1, for example). `--` says "no plan for this band"; **OOB** says "you are outside the band".
 
 **Per-band frequency and mode memory** — When you switch away from a band the app saves the frequency and mode you were last using on that band. When you return to the band it takes you back to that spot instead of a fixed default. Settings are saved per-VFO (VFO A and VFO B are independent) and persist between sessions.
 
@@ -589,7 +648,7 @@ Close the panel by clicking the **×** button in its title bar. Drag the title b
 
 Click the **CW** button to open the CW Keyer pop-up panel.
 
-> **Note:** the CW Keyer panel is inherited from IWC's Yaesu sibling and is **not yet wired to the IC-7300's CI-V CW keyer**. The layout below describes the intended controls; the underlying CI-V commands (keyer memory send, auto-zero, break-in) are part of the ongoing carve and may not all function yet.
+> **Note:** the CW Keyer panel is wired to the IC-7300's CI-V keyer — memory send, speed, pitch, break-in and break-in delay all map to real CI-V commands. It is, however, **untested on air**: I don't operate CW, so this is the one panel in IWC that has never been exercised by someone who would notice it misbehaving. Feedback from CW operators is especially welcome.
 
 | Control | Description |
 |---------|-------------|
@@ -716,7 +775,7 @@ The feature uses your browser's built-in text-to-speech engine (Web Speech API),
 
 **What's announced (each can be toggled separately):**
 
-- **Band changes** — "forty metres" when you change band on VFO A
+- **Band changes** — "forty metres" when you change band on VFO A. Tune outside every allocation in your region and it says **"out of band"** instead of a band name (see §5.9).
 - **Mode changes** — "upper sideband", "C W upper", "data lower", etc.
 - **TX / RX state** — "transmit" when you key up, "receive" when you stop
 - **Manual frequency entry** — confirmation after typing a frequency on the on-screen keyboard
@@ -821,9 +880,18 @@ The Settings page also shows the full URL for each detected network interface so
 
 ### 6.3 Spectrum Scope
 
-The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over the CI-V connection. There is **no external SDR, no IF tap, and no extra hardware or drivers** — once the radio is connected the spectrum and waterfall appear on the main page automatically. Consequently this section has **no settings to configure**; the scope's span and reference level are set on the radio itself.
+The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over the CI-V connection. There is **no external SDR, no IF tap, and no extra hardware or drivers** — once the radio is connected the spectrum and waterfall appear on the main page automatically. Span, Range, waterfall Speed and Brightness are all driven from the panel itself; see Section 5.4 for those. This section covers the handful of settings that decide **how many panels you get**.
 
-> **Note:** the spectrum panel is inherited from IWC's Yaesu sibling, where it displayed an external SDR, and is still being re-fitted to the IC-7300's CI-V scope. The features below (Hold, the persistent cursor, the band-plan overlay) are carried over from that panel; expect their exact behaviour to be tidied up as the CI-V scope integration settles. The IC-7300 is a single-receiver radio, so there is one live scope (VFO A); the VFO-B panel is part of the ongoing re-fit.
+The radio has one receiver and one scope, so a second panel can only ever be made by time-sharing that one scope. These settings control whether IWC does that, and how far it is allowed to go:
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Enable pseudo-dual receiver (two spectrum panels)** | Off | Adds a second, *watch* panel for VFO B, with a **Listen** button on each panel to choose which one you hear. Off gives the plain single-panel layout. |
+| **Allow cross-band watch (dips audio to peek at the other band)** | Off | Off = same-band only, and your audio is never interrupted; a watch panel on another band shows **Off-screen**. On = IWC briefly borrows the receiver to refresh the other band, dipping your listening audio for about 0.4 s each time. |
+| **Cross-band peek interval (seconds)** | 15 | How often that borrow happens (5–60 s). Larger means fewer audio dips but a staler watch trace. Ignored unless cross-band watch is on. |
+| **Watch panel (VFO B) span buttons** | Zoom in independently | Whether VFO B's span buttons crop its own view in software, share the one physical span with VFO A, or are hidden entirely. VFO B can never be *wider* than VFO A. |
+
+Section 5.4 shows what each of these looks like in use.
 
 #### Updating the band plan without an IWC release
 
@@ -834,14 +902,6 @@ The band-plan data (activity-centre markers like CW / FT8 / SSB, plus the red ba
 ```
 
 If a regulator (RSGB, FCC, JARL, etc.) tweaks a band plan and the change matters to you, download an updated copy of `bandplan.default.json` from the IWC GitHub release page and drop it in over the existing file. Restart IWC and the new values take effect — no need to wait for a full app release. The hardcoded JS defaults shipped inside the app are used as a fallback if the JSON file is missing or corrupt, so a botched edit can't permanently break anything; just delete the file and IWC reverts to the built-in defaults.
-
-#### Hold — freeze the spectrum at the current frame
-
-The spectrum panel header has a **Hold** button. Click it to freeze the spectrum + waterfall at the last received frame; the header badge changes to a yellow **Hold** indicator and a small `HOLD` banner appears in the top-left of the canvas. Click **Hold** again to resume live streaming. Useful for studying a fleeting signal without it scrolling off the waterfall, or grabbing a screenshot of a particular moment.
-
-#### Persistent cursor — bookmark a frequency
-
-**Shift-click** anywhere on the spectrum panel to drop a persistent cyan cursor at that frequency. The cursor stays visible as you tune around with normal clicks, so you can mark a station you want to come back to; the frequency is shown in a small boxed label near the cursor. To remove the cursor, **Shift-click on or near it** (within ~10 pixels).
 
 ---
 
@@ -903,7 +963,7 @@ set/filter ...            # whatever spot filters you prefer
 
 The app uses a generous parser that accepts spot lines from AR-Cluster, CC-Cluster, and DXSpider format servers. The cluster connection sends the configured callsign 1.5 seconds after the TCP socket opens — this handles servers whose login prompt has no newline (which would otherwise cause our reader to hang silently).
 
-**Test cluster connection** *(v2.2.2 and later)* — a yellow **Test cluster connection** button appears below the Post-login commands textarea. Click it and the app opens a TCP connection to the host/port/callsign you've typed into the form (**without** saving them first), sends your callsign, reads about ten seconds of output, then shows the full transcript in a popup so you can see exactly what the cluster said back. Use it to verify a new cluster before committing to it, to confirm a working cluster is still up after a network change, or to diagnose a connection problem.
+**Test cluster connection** — a yellow **Test cluster connection** button appears below the Post-login commands textarea. Click it and the app opens a TCP connection to the host/port/callsign you've typed into the form (**without** saving them first), sends your callsign, reads about ten seconds of output, then shows the full transcript in a popup so you can see exactly what the cluster said back. Use it to verify a new cluster before committing to it, to confirm a working cluster is still up after a network change, or to diagnose a connection problem.
 
 ![Successful Test cluster connection against dxspider.co.uk:7300 — the modal shows the full login transcript including the cluster's welcome banner, and the button below has turned solid green with the "Cluster connection successful" label](pictures/Settings_Test_Cluster.png)
 
@@ -996,7 +1056,7 @@ Default command lines:
 | GridTracker | `"C:\Program Files\GridTracker2\GridTracker2.exe"` |
 | Fldigi | `"C:\Program Files\Fldigi-4.2.11\fldigi.exe"` (version may differ) |
 
-Adjust these to match where you have installed each program. GridTracker and Fldigi are **off by default** — tick the **Show** box for each once you've installed it and confirmed the command line is correct. The Fldigi button was added in v2.4.0 at the request of Bill W1WRH ([#52](https://github.com/mm5agm/Icom_Web_Control/issues/52)); the process detection uses the `fldigi.exe` task-manager name.
+Adjust these to match where you have installed each program. GridTracker and Fldigi are **off by default** — tick the **Show** box for each once you've installed it and confirmed the command line is correct. The Fldigi process detection uses the `fldigi.exe` task-manager name.
 
 #### Path quoting — important
 
@@ -1432,7 +1492,11 @@ GridTracker is a separate desktop app that draws a live world map of WSJT-X grid
 
 The calibration page lets you adjust the scale of each meter gauge to match your radio's actual output. This is useful if the meter readings seem inaccurate.
 
-Access calibration from **Calibrate Meters** in the navigation bar.
+Access calibration from **Meter Calibration** in the navigation bar.
+
+![The Meter Calibration page: a live gauge and its raw-to-display point table for each meter](pictures/Calibration.png)
+
+Each meter gets its own column — a live gauge at the top, then the table of calibration points below it. The **Raw:** and **Calibrated:** readings above each table show what the radio is sending right now and what your table turns it into, so you can watch the effect of a change as you make it. The path to the file your work is saved in is shown at the top of the page.
 
 **How calibration works:**
 
@@ -1455,7 +1519,7 @@ The gauge interpolates between points to produce smooth readings.
 
 Calibration is saved to `%APPDATA%\MM5AGM\Icom Web Control\calibration.user.json`.
 
-**Per-model defaults:** IWC ships separate default calibration tables per radio (`calibration.default.IC-7300.json`, `calibration.default.IC-7300MK2.json`, etc.) in the installation folder. On first launch your `calibration.user.json` is created by copying the default for whichever radio you have configured. These defaults are starting points; if you calibrate your own radio (especially the S-Meter) and would like to help, please share your `calibration.user.json` on [Discussion #30](https://github.com/mm5agm/Icom_Web_Control/discussions/30) — submissions are averaged and shipped as improved per-model defaults in future releases.
+**Per-model defaults:** IWC ships a default calibration table for each supported radio (`calibration.default.IC-7300.json`, `calibration.default.IC-7300MK2.json`) in the installation folder. On first launch your `calibration.user.json` is created by copying the default for whichever radio you have configured. These defaults are starting points typed by hand, not measurements; if you calibrate your own radio (especially the S-Meter) and would like to help, please share your `calibration.user.json` on [Discussion #3](https://github.com/mm5agm/Icom_Web_Control/discussions/3), or use the **✉ Email calibration to developer** button on the Meter Calibration page. Contributions are folded into the per-model defaults shipped with future releases.
 
 > **Changing radio model later:** if you switch to a different radio in Settings, your existing calibration is **not** automatically reset to the new model's defaults — your custom values stay in place. If you want a fresh start tuned for the new radio, open the **Meter Calibration** page and click the **Reset to Defaults** button. It rebuilds your calibration from the shipped defaults for whichever radio you currently have configured.
 
@@ -1484,7 +1548,7 @@ The shipped default is a starting point. Your individual radio may differ by 1�
 7. **Look at the gauge.** The needle should now move to the correct S-unit position as you adjust the signal. Walk the control through one more time to verify IWC tracks the rig at each S-unit.
 8. After you're finished, return the control to fully clockwise (max RF gain) for normal listening.
 
-**Sharing your data.** If your calibration result is meaningfully different from the shipped default, please copy your `calibration.user.json` to [Discussion #30](https://github.com/mm5agm/Icom_Web_Control/discussions/30). Multiple submissions per model are averaged into improved shipped defaults in future releases.
+**Sharing your data.** If your calibration result is meaningfully different from the shipped default, please copy your `calibration.user.json` to [Discussion #3](https://github.com/mm5agm/Icom_Web_Control/discussions/3). Multiple submissions per model are averaged into improved shipped defaults in future releases.
 
 ### 10.2 Calibrating the Power meter (transmit)
 
@@ -1532,7 +1596,7 @@ Access the Diagnostics page from the navigation bar. It is primarily used when s
 
 **SignalR Event Log** — A scrolling log of every radio state update received over the websocket connection, with millisecond timestamps. Use the filter dropdown to narrow the log to a single property (e.g., SWR, Power, S-Meter). The **Pause** button freezes the log so you can read it; **Clear** empties it; **Save…** downloads the current log as a text file.
 
-**About-page Diagnostics block** — the **About** page in the navigation bar has a separate Diagnostics block with a one-click **Copy diagnostics** button. The block lists IWC version, radio model, COM port, browser, .NET runtime, operating system, and (from v2.3.7) the **CPU model + logical core count** and **total physical memory** of the host PC. Paste the block when reporting a bug so it's clear whether you're running on hardware that can comfortably drive two SDRs + radio polling + spectrum render or whether resource pressure might be a factor.
+**About-page Diagnostics block** — the **About** page in the navigation bar has a separate Diagnostics block with a one-click **Copy diagnostics** button. The block lists IWC version, radio model, COM port, browser, .NET runtime, operating system, plus the **CPU model + logical core count** and **total physical memory** of the host PC. Paste the block when reporting a bug so it's clear whether you're running on hardware that can comfortably drive radio polling + the CI-V scope + spectrum render, or whether resource pressure might be a factor.
 
 ---
 
@@ -1616,7 +1680,7 @@ The fastest way to get a bug fixed is a good report. IWC has three features that
 - Radio model and selected band plan
 - Serial port and baud rate
 - Current radio connection state
-- SDR device (if configured)
+- Band scope state — whether it is on, how many sweeps have arrived, how many were dropped, and how long ago the last one was
 - DX cluster host and your cluster login callsign (if configured)
 - Browser and version
 - .NET runtime version and Windows version
@@ -1624,7 +1688,7 @@ The fastest way to get a bug fixed is a good report. IWC has three features that
 
 That gives me everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
 
-**Radio firmware versions worth knowing.** Above the Diagnostics block on the About page there's a section titled **Developer's tested radio firmware** that lists my bench radio firmware values. Some IWC behaviours depend on the radio's firmware version — for example, the FTdx101's IF Width dropdown gained 3.5 kHz and 4.0 kHz options only in firmware released after the 2023 CAT manual was published. If you're hitting a CAT-related bug, comparing your firmware against the listed values quickly tells you whether a Yaesu firmware difference might be involved. To read your own firmware on an FTdx101MP / FTdx101D: **Func → Extension Settings → Soft Version** on the radio's front panel. Include any firmware mismatch in your bug report.
+**Radio firmware versions worth knowing.** Above the Diagnostics block on the About page there's a section titled **Developer's tested radio firmware** that lists my bench radio firmware values. Some IWC behaviours can depend on the radio's firmware version, because Icom has both added CI-V commands and changed the behaviour of existing ones between firmware releases. If you're hitting a CI-V-related bug, comparing your firmware against the listed values quickly tells you whether a firmware difference might be involved. To read your own firmware on an IC-7300 MkII: **MENU → SET → Others → Version Information** on the radio's front panel. Include any firmware mismatch in your bug report.
 
 ![The About page — version + release date at top, Resources section, Diagnostics block with the user's environment summary, and the Copy diagnostics + Report a bug buttons that send everything straight into a GitHub bug-report form](pictures/AboutPage.png)
 
@@ -1648,13 +1712,32 @@ A **Feature request** template is also available for ideas / improvements rather
 
 ### 14.2 Common problems
 
-**App shows "Initialising…" and never clears**
+**Start-up panel stays on "Initializing radio, please wait…"**
+
+The radio is not answering on CI-V. IWC keeps retrying, so it clears itself the moment the link comes up.
 
 - Check that the radio is powered on.
 - Check the COM port in Settings. Go to **Diagnostics → Ports** to see which ports are available.
-- Check the baud rate in Settings matches the radio's **Menu → CAT Rate** setting (default 38400).
+- Check the baud rate in Settings matches the radio's **MENU → SET → Connectors → CI-V → CI-V Baud Rate**.
+- Check the CI-V address in Settings (`B6` for the IC-7300 MkII, `94` for the original IC-7300).
 - Click **Test Connection** in Settings.
-- If meters and frequency are otherwise updating live and only the overlay itself is stuck, this was a known bug (a one-off network hiccup during startup could strand the overlay permanently) fixed in v2.4.2-pre2 — just reload the page, or update to the latest version.
+- If IWC knows *why* it cannot connect — a COM port that is not present, for instance — the panel says so and offers a link to Settings instead of spinning.
+
+**Start-up panel stays on "Starting spectrum scope, please wait…"**
+
+The radio is talking, but no spectrum sweep has arrived. The panel gives up after about 12 seconds and hands you the rest of the app, so this is never permanent.
+
+- Check the **Scope** switch above the spectrum display is on.
+- Check the scope is switched on at the radio itself.
+- Everything except the spectrum works normally in the meantime — use **Continue anyway** if you do not want to wait out the 12 seconds.
+
+**Spectrum panel is empty, or says "Waiting for the radio's band scope…"**
+
+The panel is on screen and the radio is connected, but no sweep is arriving. The status badge at the right-hand end of the panel header says the same thing in one word (**Scope off**, **Connecting…**, **Live**).
+
+- Check the **Scope** switch above the panel, and the scope on the radio's own screen.
+- Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate.
+- Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
 
 **Frequency display shows 0 or does not update**
 
@@ -1675,20 +1758,27 @@ A **Feature request** template is also available for ideas / improvements rather
   - Network Server: localhost, port 4532
 - The rigctld server starts automatically when this app starts. Check the app is running.
 
-**Spectrum display shows "No SDR" or "Disconnected"**
+**Spectrum display is blank or never appears**
 
-- For SDRplay devices: confirm the **SDRplay API** is installed and the **SDRplay API Service** is running (check services.msc).
-- For RTL-SDR: check the device is plugged in and not in use by another application (e.g., SDR#).
-- Try clicking **Scan** again in Settings and re-selecting the device.
-- Verify the IF Frequency is set to `9000000`.
+The scope comes from the radio over CI-V, so there is no SDR, driver or device setting to check — if the rest of the app is talking to the radio, the scope should follow.
+
+- Check the panel's **scope on/off** toggle hasn't been left off. Switching it off is remembered for the rest of the session — IWC won't quietly switch the scope back on under you if the radio drops and reconnects — so it stays off until you switch it back on or restart the app.
+- Confirm the radio itself is connected — if the meters are dead and the frequency isn't tracking the VFO knob, fix the CI-V connection first (see the two entries at the top of this section).
+- The scope shares the CI-V bus with everything else. At the default 19200 baud a sweep takes a noticeable slice of the link, and IWC deliberately slows its meter polling while the scope streams. If the trace is ragged rather than absent, try **115200** on both the radio (**MENU → SET → Connectors → CI-V → CI-V Baud Rate**) and in Settings.
 
 **Meters appear to show incorrect values**
 
 - The meters use a default calibration that may not exactly match every individual radio. See Section 10 to adjust the calibration.
 
-**App will not start — "Another instance is already running"**
+**App will not start — "Icom Web Control is already running"**
 
-- Only one instance of the app can run at a time. Check the Windows taskbar or system tray for an existing instance. If the previous instance crashed and left a stale lock, restart Windows.
+Only one instance can run at a time, so a copy that is still running — even one you cannot see, because it never opened a window or is sitting in the system tray — blocks the next start. The dialog names the process ID and gives you three choices:
+
+- **Yes** — open the running copy in your browser. Use this when you simply lost the tab.
+- **No** — close the running copy and start a fresh one. Use this when the running copy is stuck.
+- **Cancel** — do nothing.
+
+If **No** cannot shift it, the app says so and asks you to end `Icom_Web_Control.exe` in Task Manager (Ctrl+Shift+Esc).
 
 **App shuts down unexpectedly after closing the browser**
 
@@ -1836,7 +1926,7 @@ All interactive controls in the app have accessible labels that screen readers a
 | Frequency display | "VFO A frequency" with current value in MHz |
 | Sliders, dropdowns, buttons | Their purpose — e.g., "Transmit power", "VFO A mode" |
 
-**Announcements interrupt rather than queue.** From v2.3.7, the ARIA live region used for hover and value-change announcements is set to `assertive`, meaning each new announcement cancels whatever was previously being read out. Combined with longer debounces on rapid-fire events (mouse-wheel frequency changes wait 500 ms after the last tick before announcing; sweeping the mouse across a row of controls only announces controls you pause on for ≥400 ms), this stops the screen reader from reading every passed-over button on the way to the one you actually wanted. Thanks to Thomas (OZ1JTE) for the detailed report on issue #20 that drove these changes.
+**Announcements interrupt rather than queue.** The ARIA live region used for hover and value-change announcements is set to `assertive`, meaning each new announcement cancels whatever was previously being read out. Combined with longer debounces on rapid-fire events (mouse-wheel frequency changes wait 500 ms after the last tick before announcing; sweeping the mouse across a row of controls only announces controls you pause on for ≥400 ms), this stops the screen reader from reading every passed-over button on the way to the one you actually wanted.
 
 ---
 
@@ -2064,8 +2154,6 @@ If you can't use a mouse wheel — head-tracking input, on-screen keyboard users
 - Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown). Press and hold to repeat that step every 500 ms until released.
 - Clicking outside the display deselects.
 
-Originally requested by Yuri W4YSW. Shipped in v2.3.9.
-
 ---
 
 ## 17. Voice Control
@@ -2093,9 +2181,21 @@ The commands are split into two groups. The **first table** is fully wired to th
 | Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Switches mode |
 | Swap VFOs | "swap V F O", "swap A and B" | Exchanges VFO A and B contents |
 | Set preamp | "set preamp off", "preamp one" (also two) | Preamp off / amp 1 / amp 2 (IC-7300 has two preamp stages) |
+| Set attenuator | "attenuator off", "attenuator on" / "attenuator twenty d b" | The IC-7300's attenuator is a single 20 dB pad — on or off |
+| Set AGC | "set a g c fast" (also mid, slow) | AGC speed. The IC-7300 has fast/mid/slow only — there is no off or auto |
 | Set AF gain | "set a f gain fifty" / "audio gain fifty" (0–100 in the steps listed in the phrase editor, or "mute" / "maximum") | Sets the AF (volume) level |
+| Set RF gain | "r f gain seventy", "set r f gain one hundred" | Sets RF gain, 0–100 |
+| Set squelch | "squelch thirty", "set squelch zero" | Sets the squelch threshold, 0–100 |
+| Noise reduction | "noise reduction off", "noise reduction on", "n r forty" | Off, on, or on at that level (0–100) in one command — a level turns NR on as well as setting it |
+| Noise blanker | "noise blanker off", "n b on", "noise blanker fifty" | Same pattern as NR: off, on, or on at a level |
+| Notch filter | "notch off", "notch auto", "notch manual" | Selects auto notch, manual notch, or neither. Each choice sets both notches, so one can't be left running under the other |
+| Audio peak filter | "a p f off", "audio peak filter narrow" (also wide, medium) | CW audio peak filter width |
+| Set TX power | "transmit power fifty", "set power one hundred" | Sets transmit power as a percentage — 100 is full power (100 W SSB/CW/FM, 25 W AM) |
+| Set mic gain | "mic gain fifty", "microphone gain sixty" | Sets microphone gain, 0–100 |
+| Speech processor | "processor off", "speech processor on", "compressor forty" | Off, on, or on at that compression level |
 | Transmit | "key transmitter" / "start transmitting"; "stop transmitting" / "go to receive" | Radio keys up / drops back to receive |
 | Split | "split on" / "enable split"; "split off" / "simplex" | Split operation toggles |
+| Custom commands (macros) | "copy a to b" / "copy b to a" | Sends the CI-V command attached to that phrase. Those two ship as defaults; you can add your own for anything in the IC-7300's CI-V command set — see [§17.6](#176-adding-your-own-commands) |
 | Status read-back | "what frequency", "what mode", "what band" | IWC speaks the current value out loud — nothing is sent to the radio |
 | Help | "help", "what can I say" | IWC speaks a short list of the available command categories |
 
@@ -2103,11 +2203,8 @@ The commands are split into two groups. The **first table** is fully wired to th
 
 | Command family | Say | Status |
 | --- | --- | --- |
-| Set attenuator | "set attenuator off", "attenuator six d b" (also twelve, eighteen dB) | Not yet wired to CI-V. The IC-7300's attenuator is a single on/off pad, not the off/6/12/18 dB set these phrases assume — the command is being reworked for the Icom control model |
-| Set AGC | "set a g c fast" (also mid, slow, auto, off) | Not yet wired to CI-V. The IC-7300 has fast/mid/slow only (no off/auto); the command is being reworked |
 | Band up / down | "band up" / "band down" | Not yet wired to CI-V. Use "go to \<band\> metres" instead, which works |
 | IF filter width | "filter wider" / "filter narrower" | Not yet wired to CI-V — use the on-screen IF Width control instead |
-| Macros | "noise reduction on/off", "noise blanker on/off", "copy a to b" / "copy b to a", "fine step up/down" | The default macros still hold Yaesu CAT strings and don't reach the IC-7300 yet |
 
 > ℹ️ **These commands tell you they're not available.** Say one and IWC speaks a short "…isn't available on the IC-7300 yet" message instead of a false "successful" — so you're never misled into thinking the radio changed when it didn't. They'll be wired up in a later build.
 
@@ -2117,7 +2214,9 @@ A few notes on phrasing:
 - **Fractional frequencies are spoken digit-by-digit** after "point". "Fourteen point zero seven four" parses as 14.074, not "fourteen point seventy-four". "Oh" is accepted as an alternative to "zero".
 - **"megahertz" is optional.** Both "set frequency to fourteen point zero seven four megahertz" and "tune to fourteen point zero seven four" work — say it or skip it.
 - **MHz only — no kHz.** The grammar recognises frequencies in whole-or-decimal **megahertz**, from 1 MHz up to 71 MHz (covering HF + 6 m + 4 m). It does **not** recognise kilohertz input. If you say something the grammar can't parse — e.g. "tune to thirty kilohertz" — the engine will fuzzy-match to the nearest valid in-range phrase ("tune to thirty point eight") and act on that instead. **Listen to the spoken confirmation** that follows every command: it tells you exactly what got recognised, which is the safety net against misrecognition. For sub-MHz tuning (LF, MF, down to the IC-7300's 30 kHz lower limit), use the mouse or the keyboard-driven frequency display instead — see §16.7.
+- **Levels come from a fixed list, not any number you like.** The controls that take a 0–100 level — AF gain, RF gain, squelch, NR, NB, TX power, mic gain, processor — recognise **zero, ten, twenty, twenty five, thirty, forty, fifty, sixty, seventy, seventy five, eighty, ninety** and **one hundred** (also "maximum" or "full"). A number that isn't in that list will be fuzzy-matched to the nearest one that is, so listen to the spoken confirmation. The full list per command is in the phrase editor, and you can add or remove values there.
 - **Bands supported:** 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The default frequency picked for each band is roughly the FT8 / digital hangout — adjust with a follow-up "set frequency to …" or "tune up" / "tune down".
+- **"Fine step up" / "fine step down" are gone.** They were shortcuts for the microphone UP/DN keys on the Yaesu radio IWC grew out of, and CI-V has no equivalent command. "Tune up" / "tune down" with the step size set to 10 Hz does the same job. If you are upgrading, your saved phrase pack is replaced by the new defaults the first time you run this version — the noise-reduction and noise-blanker macros it carried are now proper commands with their own phrases, and the two would have competed for the same words. The previous pack is snapshotted into **Show version history** the next time you save.
 - **Scots variants** are accepted where they're in the default phrase list — e.g. "tune tae fourteen point zero seven four" works the same as "tune to …". Add your own in the phrase editor (§17.6) for any command you like.
 
 **After every command, IWC speaks a short confirmation** through the PC's default audio output:
@@ -2175,7 +2274,7 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 - You should see `SAPI recogniser ready` shortly after IWC startup and a `Rejected (best alt: '…')` line for each unmatched press. The "best alt" is the engine's best guess at what you said — if it's wildly wrong, the mic itself may have a problem (try Windows Sound settings → Input → speak and see if the level meter responds).
 - **Check the default microphone.** Voice control listens to the Windows **default recording device**. If the `Rejected` line is empty or nonsense every time, the wrong device is probably the default — most often the IC-7300's **"USB Audio CODEC"** grabbed the default slot when you plugged the radio in, so the engine is hearing the radio's receive audio, not you. Set your real microphone as the default input in **Windows → Settings → System → Sound → Input** (see [§17.2](#172-enabling-voice-control)).
 - **No spoken confirmation?** Confirmations play through the Windows **default playback device**. If commands work but you hear nothing, the wrong output is default (again, often the radio's "USB Audio CODEC") — set your speakers/headset as the default output in the same Sound settings.
-- If the log shows `Rejected (best alt: '<your phrase>')` and your phrase looks correct, the grammar wording isn't matching what you said. Try one of the alternative phrasings listed in [§17.1](#171-what-you-can-say), or open a [GitHub discussion](https://github.com/mm5agm/Icom_Web_Control/discussions) and propose a new phrasing.
+- If the log shows `Rejected (best alt: '<your phrase>')` and your phrase looks correct, the grammar wording isn't matching what you said. Try one of the alternative phrasings listed in [§17.1](#171-what-you-can-say), or open a [GitHub discussion](https://github.com/mm5agm/Icom_Web_Control/discussions/new?category=ideas) and propose a new phrasing.
 - The raw log file lives at `%APPDATA%\MM5AGM\Icom Web Control\logs\iwc-YYYYMMDD.log` if you ever need the unfiltered version (e.g. CAT command traffic, SDR worker status, etc.), but the Diagnostics page is the right tool for voice-specific issues.
 
 **"Tune up" doesn't seem to do much.**
@@ -2189,7 +2288,7 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 
 - All speech recognition happens **locally on your PC** through the Windows SAPI 5 engine. No audio is uploaded to Anthropic, Microsoft, Amazon, or anyone else.
 - Recognised phrases are written to IWC's log file (`iwc-YYYYMMDD.log`) so that misrecognitions can be diagnosed. If that's a concern, set the log retention / rotation in Settings, or simply disable voice control when not in use.
-- Nothing leaves the PC except the standard CAT commands going to the radio over the serial port.
+- Nothing leaves the PC except the CI-V commands going to the radio over the serial port.
 
 ### 17.6 Adding your own commands
 
@@ -2200,13 +2299,14 @@ The voice command grammar is **data, not code** — it lives at `%APPDATA%\MM5AG
 - **Version history.** Every save (and every pack import) snapshots the previous version — up to the last 5 — so a bad edit or import can be undone from **Show version history**.
 - **Export / import as a language pack.** **Export language pack** bundles the current phrases, a generated `.srgs` reference copy, and author/description metadata into `IWC-VoicePack-<culture>-vN.zip` — share it on the [GitHub Discussions](https://github.com/mm5agm/Icom_Web_Control/discussions) group. **Preview import** lets you inspect another pack's contents before installing it.
 - **Open user grammars folder** jumps straight to the `Grammars\` folder in Explorer if you'd rather hand-edit the JSON or inspect the generated `.srgs` file (a human-readable reference copy, not what the engine actually loads).
-- **Advanced mode** (off by default) allows a Custom Command's CAT string to be anything, not just a recombination of prefixes the built-in Core Commands already send. Only enable it if you trust the source of any pack you import.
+- **Custom Commands.** The one place you can add a command IWC has no built-in intent for. A row is a name, the phrases that trigger it, and the **CI-V command** to send, written as hex bytes — command, sub-command, data — exactly as they appear in the CI-V reference in the IC-7300 manual. `16 40 01;` is noise reduction on; chain commands with `;`, e.g. `16 40 01;16 22 01;` for NR on *and* NB on in one phrase. (NR and NB have built-in commands of their own now — the example is here because it shows the syntax, and because chaining is the thing only a custom command can do.) Spaces are optional (`164001;` is the same command). IWC adds the framing and the radio's address itself, so a Custom Command chooses *which* command is sent and nothing more. The Category column is free text — type a new name to start a new group.
+- **Advanced mode** (off by default) allows a Custom Command to use any CI-V command, not just the command bytes the built-in Core Commands already send. The radio's power command (`18`) is one of the ones it unlocks — worth knowing before you turn it on, because over the IC-7300's USB CI-V link a power-off drops the serial port with it, and the radio can't then be switched back on remotely. Only enable Advanced mode if you trust the source of any pack you import.
 
 If there's a particular command or phrasing you'd like added to the *built-in* defaults (as opposed to your own local edit), please file it as a GitHub issue or discussion.
 
 ### 17.7 More languages
 
-Only **English (UK)** ships as the built-in default, but the language pack system itself is already multi-language. As of v2.4.1 an **English (US)** pack is also available — same commands and phrases as the UK default, with US spelling ("meters" instead of "metres"). Get it from `/voice-packs/IWC-VoicePack-en-US-v1.zip` on your running IWC instance and install it via **Preview import** below.
+Only **English (UK)** ships as the built-in default, but the language pack system itself is already multi-language. An **English (US)** pack is also available — same commands and phrases as the UK default, with US spelling ("meters" instead of "metres"). Get it from `/voice-packs/IWC-VoicePack-en-US-v3.zip` on your running IWC instance and install it via **Preview import** below.
 
 1. **The Windows speech pack for the target language must be installed** on the operator's PC (Windows → Settings → Time &amp; Language → Speech → Add a language). Microsoft ships full recognition packs for US English, French, German, Spanish, Italian, Japanese, Mandarin Chinese, Brazilian Portuguese and Australian English (the list shifts between Windows releases). Some languages only ship voice synthesis, not recognition — those can't be used for voice control regardless of what IWC does.
 2. **A phrase pack for that culture.** The **Active language** dropdown in Settings → Voice Control lists every culture with an installed pack (a ✓ or ⚠ shows whether Windows also has a matching recogniser). Installing a new one means either importing a `IWC-VoicePack-<culture>-vN.zip` someone else has authored and shared (**Preview import** → **Install**), or hand-authoring `Commands.<culture>.json` and dropping it into `Grammars\<culture>\` via **Open user grammars folder** — the semantic keys (intent names, parameter vocab) stay identical to the English defaults, only the phrases change.

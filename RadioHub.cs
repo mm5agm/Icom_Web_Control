@@ -10,6 +10,7 @@ namespace Icom_Web_Control.Hubs
         private readonly ILogger<RadioHub> _logger;
         private readonly IHostApplicationLifetime _lifetime;
         private readonly RadioStateService _radioState;
+        private readonly IRadioController _radio;
 
         // All currently open SignalR connections
         private static readonly ConcurrentDictionary<string, byte> _connections = new();
@@ -23,11 +24,13 @@ namespace Icom_Web_Control.Hubs
         private static CancellationTokenSource? _shutdownCts;
         private static readonly object _shutdownLock = new();
 
-        public RadioHub(ILogger<RadioHub> logger, IHostApplicationLifetime lifetime, RadioStateService radioState)
+        public RadioHub(ILogger<RadioHub> logger, IHostApplicationLifetime lifetime,
+                        RadioStateService radioState, IRadioController radio)
         {
             _logger   = logger;
             _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
             _radioState = radioState;
+            _radio = radio;
         }
 
         public override async Task OnConnectedAsync()
@@ -45,6 +48,14 @@ namespace Icom_Web_Control.Hubs
             {
                 await Clients.Caller.SendAsync("RadioStateUpdate", new { property, value });
             }
+
+            // The snapshot above covers RadioStateUpdate properties, but the
+            // spectrum panel is revealed by SdrStatus, which is broadcast on a
+            // sweep counter running from app start — not from connect. Ask for an
+            // immediate re-announce so this client's panel appears on the next
+            // sweep rather than up to 29 sweeps later, with frames arriving into a
+            // still-hidden card the whole time.
+            _radio.RequestScopeStatusAnnounce();
 
             await base.OnConnectedAsync();
         }

@@ -14,15 +14,19 @@ export async function loadLabels() {
     applyAll();
 }
 
+// Split at the FIRST dot only: labels.json is two levels deep, section then
+// key, and a key may itself contain dots ("vfo" → "a.frequency"). Labels.cshtml.cs
+// splits the same way when it reads and writes the file, so keeping the two in
+// step is what makes the editor round-trip. Walking every dot instead — which
+// this used to do — left every vfo.* label silently unapplied.
 function resolveKey(key) {
     if (!_labels) return null;
-    const parts = key.split('.');
-    let node = _labels;
-    for (const part of parts) {
-        if (node == null || typeof node !== 'object') return null;
-        node = node[part];
-    }
-    return typeof node === 'string' ? node : null;
+    const dot = key.indexOf('.');
+    if (dot < 0) return null;
+    const section = _labels[key.slice(0, dot)];
+    if (section == null || typeof section !== 'object') return null;
+    const label = section[key.slice(dot + 1)];
+    return typeof label === 'string' ? label : null;
 }
 
 function applyAll() {

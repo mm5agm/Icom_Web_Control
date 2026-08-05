@@ -256,7 +256,7 @@
                 The frequency display is fully keyboard-driven: focus it with Tab, then use ↑/↓ to step
                 the selected digit, ←/→ to move the selection, PageUp/PageDown for 10× steps, and
                 Home/End to jump to the most/least significant digit. Got a suggestion?
-                <a href="https://github.com/mm5agm/Icom_Web_Control/discussions" target="_blank" rel="noopener">Open a GitHub discussion</a>.
+                <a href="https://github.com/mm5agm/Icom_Web_Control/discussions/new?category=ideas" target="_blank" rel="noopener">Open a GitHub discussion</a>.
             </p>
             <div class="mb-3 form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch"
@@ -396,10 +396,10 @@
                 <input class="form-check-input" type="checkbox" role="switch"
                        id="voiceAdvancedModeEnabled" asp-for="Settings.VoiceAdvancedModeEnabled" />
                 <label class="form-check-label" for="voiceAdvancedModeEnabled">
-                    Advanced mode: allow any CAT command in Custom Commands
+                    Advanced mode: allow any CI-V command in Custom Commands
                 </label>
                 <div class="form-text">
-                    Off by default. When off, a Custom Command's CAT string must start with a prefix one of
+                    Off by default. When off, every CI-V command in a Custom Command must use a command byte one of
                     the built-in Core Commands already sends — a Custom Command can only recombine
                     primitives the app already trusts, not send anything new. Only enable this if you trust
                     the source of any language pack you import, or you're hand-authoring your own commands.
@@ -1096,7 +1096,7 @@
                 resultsEl.innerHTML = '<em class="text-muted">Setting up US English voice…</em>';
                 try {
                     // 1. Load the pack that ships inside the installer.
-                    const packResp = await fetch('/voice-packs/IWC-VoicePack-en-US-v1.zip');
+                    const packResp = await fetch('/voice-packs/IWC-VoicePack-en-US-v3.zip');
                     if (!packResp.ok) {
                         resultsEl.innerHTML = '<span class="text-danger">Couldn\'t load the bundled US English pack (HTTP ' +
                             packResp.status + ').</span>';
@@ -1107,7 +1107,7 @@
                     // 2. Preview — validates the pack and reports whether Windows
                     //    has the matching speech recogniser installed.
                     const fd = new FormData();
-                    fd.append('pack', blob, 'IWC-VoicePack-en-US-v1.zip');
+                    fd.append('pack', blob, 'IWC-VoicePack-en-US-v3.zip');
                     const pv = await fetch('/api/voice/phrases/import/preview', { method: 'POST', body: fd });
                     const preview = await pv.json();
                     if (!pv.ok) {
@@ -1209,8 +1209,9 @@
 
             const DECOMPOSED_BLOCKS_OF = {
                 tuning: ['setBand', 'setNudgeStep', 'setFrequency'],
-                radio: ['setMode', 'setAfGain', 'setAttenuator', 'setPreamp', 'setAgc'],
-                transmit: [],
+                radio: ['setMode', 'setAfGain', 'setRfGain', 'setSquelch', 'setAttenuator', 'setPreamp',
+                        'setAgc', 'setNoiseReduction', 'setNoiseBlanker', 'setNotch', 'setApf'],
+                transmit: ['setTxPower', 'setMicGain', 'setProcessor'],
                 status: [],
             };
 
@@ -1279,18 +1280,30 @@
                 return html;
             }
 
-            function blockSetAttenuator(cfg, row, thead1, thead2) {
-                let html = `<h6 class="mb-1 text-muted small text-uppercase">Set Attenuator</h6>`;
-                html += `<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger then a level — e.g. <em>"attenuator six d b"</em> or <em>"a t t off"</em>.</p>`;
-                html += `<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`;
-                html += row('Trigger phrases', 'setAttenuator.triggers', phrasesToStr(cfg.setAttenuator?.triggers));
-                html += '</tbody></table>';
-                html += `<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`;
-                for (const [key, label] of Object.entries({ 'off':'Off', '6':'6 dB', '12':'12 dB', '18':'18 dB' }))
-                    html += row(label, `setAttenuator.vocab.${key}`, phrasesToStr(cfg.setAttenuator?.vocabulary?.[key]));
-                html += '</tbody></table>';
-                return html;
+            // Every decomposed command below is the same two tables — triggers,
+            // then one row per vocabulary value — so they share one builder
+            // instead of a dozen near-identical copies of the twelve lines
+            // above. The older blocks keep their hand-written functions because
+            // their value tables aren't a flat label map.
+            function decomposedBlock(section, title, hint, labels) {
+                return function (cfg, row, thead1, thead2) {
+                    let html = `<h6 class="mb-1 text-muted small text-uppercase">${title}</h6>`;
+                    html += `<p class="text-muted mb-1" style="font-size:0.82em">${hint}</p>`;
+                    html += `<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`;
+                    html += row('Trigger phrases', `${section}.triggers`, phrasesToStr(cfg[section]?.triggers));
+                    html += '</tbody></table>';
+                    html += `<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`;
+                    for (const [key, label] of Object.entries(labels))
+                        html += row(label, `${section}.vocab.${key}`, phrasesToStr(cfg[section]?.vocabulary?.[key]));
+                    html += '</tbody></table>';
+                    return html;
+                };
             }
+
+            // The shared 0–100 ladder, and the same ladder with Off/On in front
+            // for the controls that are a switch and a level in one.
+            const LEVEL_LABELS = { '0':'0', '10':'10', '20':'20', '25':'25', '30':'30', '40':'40', '50':'50', '60':'60', '70':'70', '75':'75', '80':'80', '90':'90', '100':'100 (max)' };
+            const SWITCHED_LEVEL_LABELS = Object.assign({ 'off':'Off', 'on':'On' }, LEVEL_LABELS);
 
             function blockSetPreamp(cfg, row, thead1, thead2) {
                 let html = `<h6 class="mb-1 text-muted small text-uppercase">Set Preamp</h6>`;
@@ -1305,24 +1318,54 @@
                 return html;
             }
 
-            function blockSetAgc(cfg, row, thead1, thead2) {
-                let html = `<h6 class="mb-1 text-muted small text-uppercase">Set AGC</h6>`;
-                html += `<p class="text-muted mb-1" style="font-size:0.82em">Say a trigger then a speed — e.g. <em>"a g c slow"</em> or <em>"set a g c off"</em>.</p>`;
-                html += `<table class="table table-sm table-bordered mb-2">${thead1}<tbody>`;
-                html += row('Trigger phrases', 'setAgc.triggers', phrasesToStr(cfg.setAgc?.triggers));
-                html += '</tbody></table>';
-                html += `<table class="table table-sm table-bordered mb-3">${thead2}<tbody>`;
-                for (const [key, label] of Object.entries({ 'off':'Off', 'fast':'Fast', 'mid':'Mid', 'slow':'Slow', 'auto':'Auto' }))
-                    html += row(label, `setAgc.vocab.${key}`, phrasesToStr(cfg.setAgc?.vocabulary?.[key]));
-                html += '</tbody></table>';
-                return html;
-            }
-
             const DECOMPOSED_BLOCK_BUILDERS = {
                 setMode: blockSetMode, setBand: blockSetBand, setFrequency: blockSetFrequency,
                 setNudgeStep: blockSetNudgeStep, setAfGain: blockSetAfGain,
-                setAttenuator: blockSetAttenuator, setPreamp: blockSetPreamp, setAgc: blockSetAgc,
+                setPreamp: blockSetPreamp,
+
+                // The IC-7300's attenuator is one 20 dB pad, on or off, and its
+                // AGC is a three-position time constant — neither has the extra
+                // Yaesu positions these two rows used to offer.
+                setAttenuator: decomposedBlock('setAttenuator', 'Set Attenuator',
+                    'Say a trigger then on or off — e.g. <em>"attenuator on"</em> or <em>"a t t off"</em>.',
+                    { 'off':'Off', 'on':'On (20 dB)' }),
+                setAgc: decomposedBlock('setAgc', 'Set AGC',
+                    'Say a trigger then a speed — e.g. <em>"a g c slow"</em> or <em>"set a g c fast"</em>.',
+                    { 'fast':'Fast', 'mid':'Mid', 'slow':'Slow' }),
+
+                setNoiseReduction: decomposedBlock('setNoiseReduction', 'Noise Reduction',
+                    'Say a trigger then on, off, or a level — e.g. <em>"noise reduction off"</em> or <em>"n r fifty"</em>. A level switches NR on as well as setting its depth.',
+                    SWITCHED_LEVEL_LABELS),
+                setNoiseBlanker: decomposedBlock('setNoiseBlanker', 'Noise Blanker',
+                    'Say a trigger then on, off, or a level — e.g. <em>"noise blanker on"</em> or <em>"n b thirty"</em>.',
+                    SWITCHED_LEVEL_LABELS),
+                setNotch: decomposedBlock('setNotch', 'Notch Filter',
+                    'Say a trigger then a position — e.g. <em>"notch auto"</em> or <em>"notch off"</em>. Each position sets both the auto and the manual notch, so one can never be left running underneath the other.',
+                    { 'off':'Off', 'auto':'Auto', 'manual':'Manual' }),
+                setRfGain: decomposedBlock('setRfGain', 'Set RF Gain',
+                    'Say a trigger then a level (0–100) — e.g. <em>"r f gain eighty"</em>.',
+                    LEVEL_LABELS),
+                setSquelch: decomposedBlock('setSquelch', 'Set Squelch',
+                    'Say a trigger then a level (0–100) — e.g. <em>"squelch zero"</em> to open it fully.',
+                    LEVEL_LABELS),
+                setApf: decomposedBlock('setApf', 'Audio Peak Filter',
+                    'Say a trigger then a width — e.g. <em>"a p f narrow"</em>. CW only; the radio ignores it in other modes.',
+                    { '0':'Off', '1':'Wide', '2':'Mid', '3':'Narrow' }),
+                setTxPower: decomposedBlock('setTxPower', 'Set Transmit Power',
+                    'Say a trigger then a level (0–100 %) — e.g. <em>"transmit power fifty"</em>.',
+                    LEVEL_LABELS),
+                setMicGain: decomposedBlock('setMicGain', 'Set Mic Gain',
+                    'Say a trigger then a level (0–100 %) — e.g. <em>"mic gain forty"</em>.',
+                    LEVEL_LABELS),
+                setProcessor: decomposedBlock('setProcessor', 'Speech Processor',
+                    'Say a trigger then on, off, or a level — e.g. <em>"processor on"</em> or <em>"speech processor thirty"</em>.',
+                    SWITCHED_LEVEL_LABELS),
             };
+
+            // Section names readPhrasesFromEditor accepts verbatim: every
+            // decomposed command except setFrequency, whose editor rows are
+            // written under "setFreq".
+            const DECOMPOSED_SECTIONS = Object.keys(DECOMPOSED_BLOCK_BUILDERS).filter(k => k !== 'setFrequency');
 
             function buildCoreCategory(cat, cfg, row, thead1, thead2) {
                 let html = `<details class="mb-2" open><summary class="fw-semibold">${escapeHtml(cat.label)}</summary><div class="mt-2 ps-2">`;
@@ -1359,7 +1402,7 @@
                 return `<tr class="macro-row">
                     <td><input type="text" class="form-control form-control-sm macro-name" value="${escapeAttr(name)}" placeholder="e.g. NR on"></td>
                     <td><input type="text" class="form-control form-control-sm macro-phrases" value="${escapeAttr(phrasesToStr(phrases))}" placeholder="noise reduction on, n r on"></td>
-                    <td><input type="text" class="form-control form-control-sm macro-cat" style="font-family:monospace" value="${escapeAttr(catString)}" placeholder="NR01;"></td>
+                    <td><input type="text" class="form-control form-control-sm macro-cat" style="font-family:monospace" value="${escapeAttr(catString)}" placeholder="16 40 01;"></td>
                     <td><input type="text" class="form-control form-control-sm macro-category" value="${escapeAttr(category)}" placeholder="Macros"></td>
                     <td class="text-nowrap">
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-action="try-it" title="Say one of these phrases into the mic">Try it</button>
@@ -1371,12 +1414,14 @@
 
             const CUSTOM_COMMANDS_THEAD =
                 '<thead><tr><th style="width:18%">Name</th><th style="width:25%">Phrases (comma-separated)</th>' +
-                '<th style="width:20%">CAT string</th><th style="width:17%">Category</th><th style="width:12%">Test</th><th></th></tr></thead>';
+                '<th style="width:20%">CI-V command</th><th style="width:17%">Category</th><th style="width:12%">Test</th><th></th></tr></thead>';
 
             function buildCustomCommandsSection(cfg) {
                 const groups = groupMacrosByCategory(cfg.macros);
                 let html = `<h6 class="mt-3 mb-1 text-uppercase text-muted small">Custom Commands</h6>`;
-                html += `<p class="text-muted mb-2" style="font-size:0.82em">Custom commands send CAT strings directly. Use <code>;</code> to chain commands, e.g. <code>NR01;NB01;</code>. ` +
+                html += `<p class="text-muted mb-2" style="font-size:0.82em">Custom commands send CI-V commands straight to the radio, written as hex bytes — ` +
+                    `command, sub-command, data. Use <code>;</code> to chain commands, e.g. <code>16 40 01;16 22 01;</code> (NR on, then NB on). ` +
+                    `The command codes are in the IC-7300 CI-V reference in the radio's manual. ` +
                     `Change a command's Category field to move it to a different group — it moves next time the editor reloads.</p>`;
                 html += `<div id="macroGroups">`;
                 let idx = 0;
@@ -1477,29 +1522,19 @@
                     const phrases = strToPhrases(input.value);
                     if (section === 'simple') {
                         out.simpleCommands[sub] = phrases;
-                    } else if (section === 'setMode') {
-                        if (sub === 'triggers')      out.setMode.triggers = phrases;
-                        else if (sub === 'vocab')    out.setMode.vocabulary[param] = phrases;
-                    } else if (section === 'setBand') {
-                        if (sub === 'triggers')      out.setBand.triggers = phrases;
-                        else if (sub === 'vocab')    out.setBand.vocabulary[param] = phrases;
                     } else if (section === 'setFreq' && sub === 'triggers') {
+                        // The one section whose editor name differs from its
+                        // JSON name, because its block has no vocabulary table.
                         out.setFrequency.triggers = phrases;
-                    } else if (section === 'setNudgeStep') {
-                        if (sub === 'triggers')   out.setNudgeStep.triggers = phrases;
-                        else if (sub === 'vocab') out.setNudgeStep.vocabulary[param] = phrases;
-                    } else if (section === 'setAfGain') {
-                        if (sub === 'triggers')   out.setAfGain.triggers = phrases;
-                        else if (sub === 'vocab') out.setAfGain.vocabulary[param] = phrases;
-                    } else if (section === 'setAttenuator') {
-                        if (sub === 'triggers')   out.setAttenuator.triggers = phrases;
-                        else if (sub === 'vocab') out.setAttenuator.vocabulary[param] = phrases;
-                    } else if (section === 'setPreamp') {
-                        if (sub === 'triggers')   out.setPreamp.triggers = phrases;
-                        else if (sub === 'vocab') out.setPreamp.vocabulary[param] = phrases;
-                    } else if (section === 'setAgc') {
-                        if (sub === 'triggers')   out.setAgc.triggers = phrases;
-                        else if (sub === 'vocab') out.setAgc.vocabulary[param] = phrases;
+                    } else if (DECOMPOSED_SECTIONS.includes(section)) {
+                        // Every other decomposed command reads back identically —
+                        // "<section>.triggers" or "<section>.vocab.<key>" — so one
+                        // branch covers them all and adding a command means adding
+                        // it to DECOMPOSED_BLOCK_BUILDERS and nothing else.
+                        out[section] = out[section] || { triggers: [], vocabulary: {} };
+                        out[section].vocabulary = out[section].vocabulary || {};
+                        if (sub === 'triggers')   out[section].triggers = phrases;
+                        else if (sub === 'vocab') out[section].vocabulary[param] = phrases;
                     }
                 });
                 // Collect custom commands from every group table — a row's

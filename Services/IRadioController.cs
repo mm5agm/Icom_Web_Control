@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -58,6 +59,17 @@ namespace Icom_Web_Control.Services
 
         /// <summary>True once the link is up.</summary>
         bool IsConnected { get; }
+
+        /// <summary>
+        /// Re-broadcast the current scope status ("SdrStatus") now, and again on
+        /// the next sweep, instead of waiting for the periodic re-announce. Called
+        /// when a browser connects: the spectrum panel's state comes from
+        /// SdrStatus, so without this a late-joining client watches an empty gap
+        /// while frames are already arriving — and if no frames are arriving it
+        /// never hears why at all (GitHub #1). Default no-op — a controller with
+        /// no scope has nothing to announce.
+        /// </summary>
+        void RequestScopeStatusAnnounce() { }
 
         /// <summary>
         /// The radio's self-reported model identifier, read from the radio at
@@ -229,6 +241,146 @@ namespace Icom_Web_Control.Services
         /// <summary>Set the break-in mode (0=OFF, 1=SEMI, 2=FULL; CI-V 16 47).</summary>
         Task SetCwBreakInAsync(int mode, CancellationToken cancellationToken = default);
 
+        // -- TX audio chain: mic, speech compressor, monitor (CI-V 14 / 16) ----
+        // Percentages, not raw 0–255: these are the units the sliders and the
+        // radio's own menus use, and the controller does the 0–255 scaling. The
+        // compressor level is the exception the IC-7300 forces on us — its
+        // 0000–0255 wire range shows on the panel as 0–10, so the percentage
+        // here is of full scale, not the panel number.
+
+        /// <summary>Read microphone gain as 0–100 %. -1 on a miss (CI-V 14 0B).</summary>
+        Task<int> GetMicGainPercentAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set microphone gain as 0–100 % (CI-V 14 0B, scaled to 0–255).</summary>
+        Task SetMicGainPercentAsync(int percent, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the speech-compressor on/off state (CI-V 16 44).</summary>
+        Task<bool> GetSpeechCompressorAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Turn the speech compressor on or off (CI-V 16 44).</summary>
+        Task SetSpeechCompressorAsync(bool on, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the speech-compressor level as 0–100 % of full scale. -1 on a miss (CI-V 14 0E).</summary>
+        Task<int> GetCompressorLevelPercentAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the speech-compressor level as 0–100 % of full scale (CI-V 14 0E).</summary>
+        Task SetCompressorLevelPercentAsync(int percent, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the TX monitor on/off state (CI-V 16 45).</summary>
+        Task<bool> GetMonitorAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Turn the TX monitor on or off (CI-V 16 45).</summary>
+        Task SetMonitorAsync(bool on, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the monitor audio level as 0–100 %. -1 on a miss (CI-V 14 15).</summary>
+        Task<int> GetMonitorLevelPercentAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the monitor audio level as 0–100 % (CI-V 14 15).</summary>
+        Task SetMonitorLevelPercentAsync(int percent, CancellationToken cancellationToken = default);
+
+        // -- VOX (CI-V 16 46 / 14 16 / 14 17 / 1A 05 02 67) --------------------
+        // Sensitivity and ANTI-VOX are percentages; the delay is in
+        // MILLISECONDS at the seam because that is what an operator sets, but
+        // the radio stores 0.1 s steps up to 2.0 s, so the controller rounds and
+        // clamps. Note ANTI-VOX runs the other way to sensitivity: a HIGHER
+        // value makes VOX LESS likely to trip on receiver audio.
+
+        /// <summary>Read the VOX on/off state (CI-V 16 46).</summary>
+        Task<bool> GetVoxAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Turn VOX on or off (CI-V 16 46).</summary>
+        Task SetVoxAsync(bool on, CancellationToken cancellationToken = default);
+
+        /// <summary>Read VOX sensitivity as 0–100 %. -1 on a miss (CI-V 14 16).</summary>
+        Task<int> GetVoxGainPercentAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set VOX sensitivity as 0–100 % (CI-V 14 16).</summary>
+        Task SetVoxGainPercentAsync(int percent, CancellationToken cancellationToken = default);
+
+        /// <summary>Read ANTI-VOX as 0–100 %; higher = less sensitive. -1 on a miss (CI-V 14 17).</summary>
+        Task<int> GetAntiVoxPercentAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set ANTI-VOX as 0–100 %; higher = less sensitive (CI-V 14 17).</summary>
+        Task SetAntiVoxPercentAsync(int percent, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the VOX hang delay in ms (0–2000, 100 ms steps). -1 on a miss (CI-V 1A 05 02 67).</summary>
+        Task<int> GetVoxDelayMsAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the VOX hang delay in ms; rounded to the radio's 100 ms steps and clamped to 0–2000 (CI-V 1A 05 02 67).</summary>
+        Task SetVoxDelayMsAsync(int ms, CancellationToken cancellationToken = default);
+
+        // -- APF: Audio Peak Filter (CI-V 16 32) -------------------------------
+        // CW only, and not a simple on/off — OFF is one of four positions, the
+        // other three being the filter width. The audible width of each position
+        // depends on the APF TYPE menu setting (SHARP: 320/160/80 Hz, SOFT:
+        // wider), which IWC does not change.
+
+        /// <summary>Read the APF setting: 0=OFF, 1=WIDE, 2=MID, 3=NAR. -1 on a miss (CI-V 16 32).</summary>
+        Task<int> GetApfAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the APF: 0=OFF, 1=WIDE, 2=MID, 3=NAR. Values outside 0–3 are ignored (CI-V 16 32).</summary>
+        Task SetApfAsync(int setting, CancellationToken cancellationToken = default);
+
+        // -- RIT / ΔTX (CI-V 21) -----------------------------------------------
+        // The IC-7300's receive-incremental-tuning offset, which is what the
+        // app's "clarifier" controls drive. One offset serves both RIT and ΔTX,
+        // exactly as on the radio's own screen — turning ΔTX on makes the same
+        // offset apply to transmit. Offset is in Hz, ±9990, in 10 Hz steps.
+
+        /// <summary>Read the RIT offset in Hz (±9990). Returns 0 on a miss (CI-V 21 00).</summary>
+        Task<int> GetRitOffsetHzAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the RIT offset in Hz, clamped to ±9990 and rounded to 10 Hz (CI-V 21 00).</summary>
+        Task SetRitOffsetHzAsync(int hz, CancellationToken cancellationToken = default);
+
+        /// <summary>Read whether RIT is on (CI-V 21 01).</summary>
+        Task<bool> GetRitEnabledAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Turn RIT on or off (CI-V 21 01).</summary>
+        Task SetRitEnabledAsync(bool on, CancellationToken cancellationToken = default);
+
+        /// <summary>Read whether ΔTX is on — the RIT offset also applied to transmit (CI-V 21 02).</summary>
+        Task<bool> GetDeltaTxEnabledAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Turn ΔTX on or off (CI-V 21 02).</summary>
+        Task SetDeltaTxEnabledAsync(bool on, CancellationToken cancellationToken = default);
+
+        // -- FM repeater tone (CI-V 16 42 / 16 43 / 1B 00 / 1B 01) -------------
+        // Sub-audible tone for FM repeater access. "Tone" is the transmitted
+        // CTCSS tone; "tone squelch" (TSQL) additionally gates the receiver on
+        // the same tone. Each has its own frequency, in tenths of a Hz at the
+        // seam so 88.5 Hz is 885 — the standard CTCSS set is not integral.
+
+        /// <summary>Read whether the repeater tone is on (CI-V 16 42).</summary>
+        Task<bool> GetRepeaterToneAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Turn the repeater tone on or off (CI-V 16 42).</summary>
+        Task SetRepeaterToneAsync(bool on, CancellationToken cancellationToken = default);
+
+        /// <summary>Read whether tone squelch (TSQL) is on (CI-V 16 43).</summary>
+        Task<bool> GetToneSquelchAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Turn tone squelch (TSQL) on or off (CI-V 16 43).</summary>
+        Task SetToneSquelchAsync(bool on, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the repeater tone frequency in TENTHS of a Hz (885 = 88.5 Hz). -1 on a miss (CI-V 1B 00).</summary>
+        Task<int> GetRepeaterToneTenthsHzAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the repeater tone frequency in TENTHS of a Hz (885 = 88.5 Hz; CI-V 1B 00).</summary>
+        Task SetRepeaterToneTenthsHzAsync(int tenthsHz, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the tone-squelch (TSQL) frequency in TENTHS of a Hz. -1 on a miss (CI-V 1B 01).</summary>
+        Task<int> GetToneSquelchTenthsHzAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the tone-squelch (TSQL) frequency in TENTHS of a Hz (CI-V 1B 01).</summary>
+        Task SetToneSquelchTenthsHzAsync(int tenthsHz, CancellationToken cancellationToken = default);
+
+        /// <summary>Read the FM split (repeater) offset in Hz for the current band. -1 on a miss (CI-V 1A 05 00 34 / 00 35).</summary>
+        Task<int> GetFmSplitOffsetHzAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Set the FM split (repeater) offset in Hz for the current band; the controller picks the HF or 50 MHz menu item (CI-V 1A 05 00 34 / 00 35).</summary>
+        Task SetFmSplitOffsetHzAsync(int hz, CancellationToken cancellationToken = default);
+
         // -- VFO / split (Phase 3 block 5) --------------------------------------
         // GetFrequencyHzAsync / SetFrequencyHzAsync / GetModeAsync / SetModeAsync
         // above already take a RadioVfo and, from block 5, address each VFO
@@ -332,5 +484,45 @@ namespace Icom_Web_Control.Services
 
         /// <summary>Clear (blank) memory channel <paramref name="channel"/> (1–99) via CI-V 1A 00 … FF. Returns false if not acknowledged.</summary>
         Task<bool> ClearMemoryChannelAsync(int channel, CancellationToken cancellationToken = default);
+
+        // -- Raw command escape hatch ------------------------------------------
+        // Every other member above is semantic by design. This one is not, and
+        // it exists for exactly one caller: user-defined voice macros (Settings →
+        // Voice Control → Custom Commands), which are a data-driven extension
+        // point — the user names a command the app has no intent for and IWC
+        // sends it. Giving that a home on the seam keeps the rule intact that
+        // only the concrete controller builds frames and touches the port: the
+        // caller supplies a command body, never a framed, addressed message.
+        // Nothing else in the app should use this; add a semantic member instead.
+
+        /// <summary>
+        /// Send one raw command body — command byte, optional sub-command byte,
+        /// then data — and report whether the radio acknowledged it. The
+        /// controller adds its own framing and address. Returns false on a
+        /// rejection, a timeout, or an empty body.
+        /// </summary>
+        Task<bool> SendRawCommandAsync(IReadOnlyList<byte> commandBody, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Band-scope health for the About page's diagnostics block. "No spectrum"
+        /// bug reports are unanswerable without it — whether the scope is switched
+        /// on, whether sweeps are arriving at all, and how many are being dropped
+        /// separate three completely different faults. Default: a controller with
+        /// no scope has nothing to report.
+        /// </summary>
+        ScopeDiagnostics GetScopeDiagnostics() => new(false, 0, 0, null);
     }
+
+    /// <summary>
+    /// Snapshot of the band scope's state, for diagnostics only.
+    /// </summary>
+    /// <param name="Enabled">False once the operator has switched the scope off.</param>
+    /// <param name="SweepsCompleted">Fully-assembled sweeps since app start.</param>
+    /// <param name="SweepsDiscarded">Sweeps dropped on a lost or out-of-order segment.</param>
+    /// <param name="SecondsSinceLastSweep">Null when no sweep has ever arrived.</param>
+    public record ScopeDiagnostics(
+        bool Enabled,
+        long SweepsCompleted,
+        long SweepsDiscarded,
+        double? SecondsSinceLastSweep);
 }

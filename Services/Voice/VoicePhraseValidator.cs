@@ -1,4 +1,5 @@
 using Icom_Web_Control.Models;
+using Icom_Web_Control.Services.Civ;
 
 namespace Icom_Web_Control.Services.Voice
 {
@@ -27,36 +28,59 @@ namespace Icom_Web_Control.Services.Voice
     ///   before deserialisation without duplicating the schema checks.
     ///
     ///   Stage B (semantic) — empty categories/phrases, duplicate phrases,
-    ///   malformed macro CAT strings, unknown vocabulary keys for closed-set
+    ///   malformed macro CI-V payloads, unknown vocabulary keys for closed-set
     ///   commands (reported as warnings, not errors, so a pack authored
     ///   against a newer app version that added a value this app doesn't
     ///   know about yet still installs).
     ///
-    /// The CAT allowlist / Advanced Mode check (§5.5): unless
-    /// <c>advancedMode</c> is true, a Custom Command's CAT string must start
-    /// with a prefix one of the built-in Core Commands (or a shipped
-    /// default macro) already sends — a Custom Command can only recombine
-    /// primitives the app already trusts, not send anything new. This is
-    /// what stands between an imported/shared voice pack and "can it damage
-    /// my radio" — see ApplicationSettings.VoiceAdvancedModeEnabled.
+    /// The command allowlist / Advanced Mode check (§5.5): unless
+    /// <c>advancedMode</c> is true, every CI-V command in a Custom Command
+    /// must use a command byte one of the built-in Core Commands (or a
+    /// shipped default macro) already sends — a Custom Command can only
+    /// recombine primitives the app already trusts, not send anything new.
+    /// This is what stands between an imported/shared voice pack and "can it
+    /// damage my radio" — see ApplicationSettings.VoiceAdvancedModeEnabled.
     /// </summary>
     public static class VoicePhraseValidator
     {
         private static readonly HashSet<string> KnownBandMetres = ["160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "4"];
-        private static readonly HashSet<string> KnownAttenuatorLevels = ["off", "6", "12", "18"];
+        // Attenuator is one 20 dB pad on/off (CI-V 11) and AGC is a
+        // three-position time constant (16 12) — the Yaesu 6/12/18 dB steps and
+        // the OFF/AUTO AGC positions this used to accept do not exist on the
+        // IC-7300, so a pack still offering them is describing a radio the app
+        // cannot drive.
+        private static readonly HashSet<string> KnownAttenuatorLevels = ["off", "on"];
         private static readonly HashSet<string> KnownPreampLevels = ["off", "1", "2"];
-        private static readonly HashSet<string> KnownAgcSpeeds = ["off", "fast", "mid", "slow", "auto"];
+        private static readonly HashSet<string> KnownAgcSpeeds = ["fast", "mid", "slow"];
         private static readonly HashSet<string> KnownNudgeSteps = ["10", "100", "1000", "10000", "100000"];
+        private static readonly HashSet<string> KnownNotchModes = ["off", "auto", "manual"];
+        private static readonly HashSet<string> KnownApfSettings = ["0", "1", "2", "3"];
 
-        // Prefixes IntentDispatcher's own Core Commands already send
-        // (FA/FB, MD, SV, TX0/RX, FT0/FT1, SH, AG0, RA, PA, GT), plus the
-        // prefixes used by the shipped default Custom Commands (NR, NB, AB,
-        // BA, UP, DN, RF) — those ship trusted by default, so Advanced-Mode-
-        // off treats them the same as Core Command primitives.
-        private static readonly string[] TrustedCatPrefixes =
+        // The 0–100 level ladder shared by AF/RF gain, squelch, TX power, mic
+        // gain and the level half of NR/NB/processor. Any whole number in range
+        // is legal — the vocabulary is the user's to extend, so this is a range
+        // check, not a fixed set.
+        private static bool IsLevelKey(string key) =>
+            int.TryParse(key, out var n) && n is >= 0 and <= 100;
+
+        private static readonly HashSet<string> SwitchWords = ["off", "on"];
+
+        // CI-V command bytes the app itself already sends through
+        // IRadioController — set frequency (05/25), set mode (06/26), VFO
+        // select/exchange/equalize (07), split (0F), attenuator (11), levels
+        // (14: AF/RF gain, squelch, NR/NB level, PBT, power, CW speed/pitch),
+        // functions (16: preamp, AGC, NB, NR, notch, break-in), CW memory send
+        // (17), menu settings (1A: filter width, data mode, tone control),
+        // tuner/PTT (1C) and the scope (27). A Custom Command may recombine
+        // those; anything else needs Advanced Mode.
+        //
+        // 18 (power on/off) is deliberately NOT trusted even though the app
+        // sends it: over the IC-7300's USB CI-V a power-off drops the serial
+        // port with it, so a mistyped shared macro would take the radio off the
+        // air with no way back short of walking to the rig.
+        private static readonly HashSet<byte> TrustedCivCommands =
         [
-            "FA", "FB", "MD", "SV", "TX", "RX", "FT", "SH", "AG",
-            "RA", "PA", "GT", "NR", "NB", "AB", "BA", "UP", "DN", "RF",
+            0x05, 0x06, 0x07, 0x0F, 0x11, 0x14, 0x16, 0x17, 0x1A, 0x1C, 0x25, 0x26, 0x27,
         ];
 
         public static List<ValidationIssue> Validate(VoicePhrasesConfig cfg, bool advancedMode = false)
@@ -73,9 +97,9 @@ namespace Icom_Web_Control.Services.Voice
 
         private static void ValidateStructural(VoicePhrasesConfig cfg, List<ValidationIssue> issues)
         {
-            if (cfg.Version < 6)
+            if (cfg.Version < 9)
                 issues.Add(new ValidationIssue(ValidationSeverity.Error, "version",
-                    $"Schema version {cfg.Version} predates the current format (6) and cannot be validated."));
+                    $"Schema version {cfg.Version} predates the current format (9) and cannot be validated."));
 
             cfg.SimpleCommands ??= new();
             cfg.Macros ??= new();
@@ -105,6 +129,15 @@ namespace Icom_Web_Control.Services.Voice
             ValidateDecomposed(cfg.SetPreamp, "setPreamp", KnownPreampLevels, issues);
             ValidateDecomposed(cfg.SetAgc, "setAgc", KnownAgcSpeeds, issues);
             ValidateDecomposed(cfg.SetAfGain, "setAfGain", null, issues);
+            ValidateDecomposed(cfg.SetNoiseReduction, "setNoiseReduction", SwitchWords, issues, allowLevels: true);
+            ValidateDecomposed(cfg.SetNoiseBlanker, "setNoiseBlanker", SwitchWords, issues, allowLevels: true);
+            ValidateDecomposed(cfg.SetProcessor, "setProcessor", SwitchWords, issues, allowLevels: true);
+            ValidateDecomposed(cfg.SetNotch, "setNotch", KnownNotchModes, issues);
+            ValidateDecomposed(cfg.SetApf, "setApf", KnownApfSettings, issues);
+            ValidateDecomposed(cfg.SetRfGain, "setRfGain", null, issues);
+            ValidateDecomposed(cfg.SetSquelch, "setSquelch", null, issues);
+            ValidateDecomposed(cfg.SetTxPower, "setTxPower", null, issues);
+            ValidateDecomposed(cfg.SetMicGain, "setMicGain", null, issues);
 
             if (cfg.SetFrequency == null || cfg.SetFrequency.Triggers.Count == 0)
                 issues.Add(new ValidationIssue(ValidationSeverity.Warning, "setFrequency.triggers",
@@ -127,33 +160,42 @@ namespace Icom_Web_Control.Services.Voice
                 if (string.IsNullOrWhiteSpace(m.Cat))
                 {
                     issues.Add(new ValidationIssue(ValidationSeverity.Error, $"{path}.cat",
-                        $"'{(string.IsNullOrWhiteSpace(m.Name) ? "(unnamed)" : m.Name)}' has no CAT string."));
+                        $"'{(string.IsNullOrWhiteSpace(m.Name) ? "(unnamed)" : m.Name)}' has no CI-V command."));
                 }
-                else if (!LooksLikeCatCommand(m.Cat))
+                else if (!CivMacroCodec.TryParse(m.Cat, out var commands, out var parseError))
                 {
                     issues.Add(new ValidationIssue(ValidationSeverity.Error, $"{path}.cat",
-                        $"'{m.Name}': CAT string '{m.Cat}' doesn't look valid — expected letters/digits ending in ';', e.g. \"NR01;\" or \"NR01;NB01;\"."));
+                        $"'{m.Name}': {parseError}. Expected CI-V bytes in hex, ';' between commands — e.g. \"16 40 01;\" (NR on) or \"16 40 01;16 22 01;\"."));
                 }
-                else if (!advancedMode && !HasOnlyTrustedPrefixes(m.Cat))
+                else if (!advancedMode && FirstUntrustedCommand(commands) is byte untrusted)
                 {
                     issues.Add(new ValidationIssue(ValidationSeverity.Error, $"{path}.cat",
-                        $"'{m.Name}': CAT string '{m.Cat}' uses a command prefix outside the trusted set. " +
-                        "Enable Settings → Voice Control → Advanced Mode to allow any CAT command in Custom Commands."));
+                        $"'{m.Name}': CI-V command {untrusted:X2} is outside the trusted set. " +
+                        "Enable Settings → Voice Control → Advanced Mode to allow any CI-V command in Custom Commands."));
                 }
             }
         }
 
-        private static bool HasOnlyTrustedPrefixes(string cat)
+        /// <summary>The command byte of the first command outside <see cref="TrustedCivCommands"/>, or null if all are trusted.</summary>
+        private static byte? FirstUntrustedCommand(List<byte[]> commands)
         {
-            foreach (var segment in cat.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var command in commands)
             {
-                if (!TrustedCatPrefixes.Any(p => segment.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
-                    return false;
+                if (command.Length > 0 && !TrustedCivCommands.Contains(command[0]))
+                    return command[0];
             }
-            return true;
+            return null;
         }
 
-        private static void ValidateDecomposed(DecomposedCommand? cmd, string prefix, HashSet<string>? knownKeys, List<ValidationIssue> issues)
+        /// <summary>
+        /// <paramref name="allowLevels"/> widens the closed set to also accept
+        /// any whole 0–100 level key, for the controls that are a switch and a
+        /// level in one (NR, NB, speech processor) and for the pure level
+        /// ladders. The level range is a rule rather than an enumerated set
+        /// because the numbers in a pack are the user's to extend.
+        /// </summary>
+        private static void ValidateDecomposed(DecomposedCommand? cmd, string prefix, HashSet<string>? knownKeys,
+            List<ValidationIssue> issues, bool allowLevels = false)
         {
             if (cmd == null) return;
 
@@ -174,7 +216,7 @@ namespace Icom_Web_Control.Services.Voice
                 // Closed-set commands: an unknown key is a warning, not an
                 // error — it might be authored against a newer app version
                 // that added a value this build doesn't recognise yet.
-                if (knownKeys != null && !knownKeys.Contains(key))
+                if (knownKeys != null && !knownKeys.Contains(key) && !(allowLevels && IsLevelKey(key)))
                 {
                     issues.Add(new ValidationIssue(ValidationSeverity.Warning, $"{prefix}.vocabulary.{key}",
                         $"'{key}' isn't a value '{prefix}' currently understands — this app version will ignore it if spoken."));
@@ -201,17 +243,5 @@ namespace Icom_Web_Control.Services.Voice
             }
         }
 
-        private static bool LooksLikeCatCommand(string cat)
-        {
-            // Conservative shape check only (no allowlist yet — see class
-            // remarks): letters, digits and semicolons, must end with ';'.
-            if (!cat.EndsWith(';')) return false;
-            foreach (var c in cat)
-            {
-                if (!char.IsLetterOrDigit(c) && c != ';')
-                    return false;
-            }
-            return true;
-        }
     }
 }

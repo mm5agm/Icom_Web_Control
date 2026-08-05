@@ -51,9 +51,18 @@ namespace Icom_Web_Control.Services.Voice
             ["SetNudgeStep"]     = "Set the tuning step size",
             ["SetMode"]          = "Set the mode",
             ["SetAfGain"]        = "Set the volume (AF gain)",
-            ["SetAttenuator"]    = "Set the attenuator",
+            ["SetAttenuator"]    = "Turn the attenuator on or off",
             ["SetPreamp"]        = "Set the preamp",
             ["SetAgc"]           = "Set AGC speed",
+            ["SetNoiseReduction"]= "Noise reduction — on, off, or a level",
+            ["SetNoiseBlanker"]  = "Noise blanker — on, off, or a level",
+            ["SetNotch"]         = "Notch filter — off, auto or manual",
+            ["SetRfGain"]        = "Set RF gain",
+            ["SetSquelch"]       = "Set the squelch threshold",
+            ["SetApf"]           = "Set the audio peak filter (CW)",
+            ["SetTxPower"]       = "Set transmit power",
+            ["SetMicGain"]       = "Set microphone gain",
+            ["SetProcessor"]     = "Speech processor — on, off, or a level",
         };
 
         public static VoiceHelpDoc Build(VoicePhrasesConfig cfg, string culture)
@@ -79,19 +88,28 @@ namespace Icom_Web_Control.Services.Voice
             Group("Mode & filters",
                 Decomposed("SetMode", cfg.SetMode),
                 Simple("NudgeIfWidthUp", cfg),
-                Simple("NudgeIfWidthDown", cfg));
+                Simple("NudgeIfWidthDown", cfg),
+                Decomposed("SetNotch", cfg.SetNotch),
+                Decomposed("SetApf", cfg.SetApf));
 
             Group("Receiver controls",
                 Decomposed("SetAfGain", cfg.SetAfGain),
+                Decomposed("SetRfGain", cfg.SetRfGain),
+                Decomposed("SetSquelch", cfg.SetSquelch),
                 Decomposed("SetAttenuator", cfg.SetAttenuator),
                 Decomposed("SetPreamp", cfg.SetPreamp),
-                Decomposed("SetAgc", cfg.SetAgc));
+                Decomposed("SetAgc", cfg.SetAgc),
+                Decomposed("SetNoiseReduction", cfg.SetNoiseReduction),
+                Decomposed("SetNoiseBlanker", cfg.SetNoiseBlanker));
 
             Group("Transmit",
                 Simple("TxOn", cfg),
                 Simple("TxOff", cfg),
                 Simple("SplitOn", cfg),
-                Simple("SplitOff", cfg));
+                Simple("SplitOff", cfg),
+                Decomposed("SetTxPower", cfg.SetTxPower),
+                Decomposed("SetMicGain", cfg.SetMicGain),
+                Decomposed("SetProcessor", cfg.SetProcessor));
 
             Group("Status & help",
                 Simple("StatusFrequency", cfg),

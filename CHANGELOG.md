@@ -9,6 +9,69 @@ the [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) repository.
 
 _Nothing yet._
 
+## [1.0.3] - 2026-08-05
+
+First full release since 1.0.0, so it also delivers everything in the 1.0.1 and
+1.0.2 pre-releases to anyone who tracks full releases only. See
+[README.md](README.md#release-notes) for the operator-facing notes.
+
+### Fixed
+- **Discussions links led into a category that does not accept replies.** The
+  links on the About page, in Settings, and in the README and User Manual
+  pointed at an announcement-only category, so following them produced a page
+  with no way to post. They now target the right category with a new post
+  pre-selected.
+
+### Added
+- **Contributed-calibration store with median aggregation**
+  (`Services/CalibrationContributionsStore.cs`,
+  `Models/Calibration/CalibrationContributions.cs`,
+  `calibration-contributions/`). Importing a second operator's calibration used
+  to overwrite the first wherever the two disagreed, with nothing recording
+  that the first had contributed. Each contribution is now stored separately
+  and the shipped default is the per-point median: none keeps the placeholder,
+  one is used as-is, two or more are combined. A meter whose median comes out
+  non-monotonic or out of range is refused rather than shipped, and the spread
+  between contributors is reported so a real disagreement is visible.
+  Development-side only — every endpoint returns `NotFound` outside
+  Development, and the store directory is never published or installed, so an
+  installed copy is unaffected. Design notes:
+  [docs/design/calibration-contributions.md](docs/design/calibration-contributions.md).
+
+## [1.0.2] - 2026-08-04 (pre-release)
+
+> This file was not kept up between 1.0.0 and here. [README.md](README.md#release-notes)
+> carries the complete, operator-facing notes for 1.0.1 and 1.0.2 — including the
+> band-plan, Segment-dropdown and start-up-overlay work not repeated below.
+
+### Fixed
+- **The spectrum panel could never appear if the scope never streamed**
+  ([#1](https://github.com/mm5agm/Icom_Web_Control/issues/1)). The panel was
+  revealed only by an `SdrStatus` message, and the only thing that emitted one
+  was a completed sweep — so a radio whose scope was off, or wasn't sending
+  `27 00` at all, produced no spectrum card. The **Scope** on/off switch lives
+  inside that card, so there was no way to switch it back on. The card now
+  follows the radio connection, and the controller announces the scope's real
+  state (on / off / waiting / disconnected) whether or not sweeps are arriving.
+- **"Already running" was a dead end**
+  ([#2](https://github.com/mm5agm/Icom_Web_Control/issues/2)). A copy of IWC
+  that failed to exit blocked every relaunch behind an OK-only dialog, leaving
+  Task Manager as the only way out. The dialog now names the process and offers
+  to open the running copy or to close it and start a fresh one.
+- Added a hard-exit watchdog: if the process is still alive 10 s after shutdown
+  begins, it exits anyway rather than lingering and blocking the next start.
+
+### Changed
+- The About page's diagnostics block reports **band scope** state — on/off,
+  sweeps completed, sweeps discarded, age of the last sweep — in place of the
+  `SDR device` line, which was inherited from YWC and always read
+  "(none configured)" on IWC.
+- Voice control gained decomposed commands for attenuator, AGC, RF gain,
+  squelch, NR, NB, notch, APF, TX power, mic gain and processor, and the
+  screen-reader label keys those controls were advertising but not carrying.
+  Phrase-pack schema is now 9, so saved packs reset to defaults on first run;
+  the bundled US English pack is rebuilt to match.
+
 ## [1.0.0] - 2026-08-01
 
 First public release. Carved from Yaesu Web Control and re-fitted for Icom CI-V,

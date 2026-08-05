@@ -25,7 +25,8 @@ namespace Icom_Web_Control.Services.Voice
     ///
     ///   Macros           — flat Choices; each phrase maps to
     ///                      "Macro:{name}|{cat}" encoding both spoken name
-    ///                      (for the TTS confirmation) and CAT string to send.
+    ///                      (for the TTS confirmation) and the CI-V commands
+    ///                      to send.
     ///
     ///   SetFrequency     — flat variants (whole + 1..6 fractional digits,
     ///                      giving full 1 Hz voice resolution) to avoid the SAPI
@@ -95,6 +96,20 @@ namespace Icom_Web_Control.Services.Voice
             Try("SetPreamp",              () => BuildDecomposed("SetPreamp",      cfg.SetPreamp));
             Try("SetAgc",                 () => BuildDecomposed("SetAgc",         cfg.SetAgc));
             Try("SetAfGain",              () => BuildDecomposed("SetAfGain",      cfg.SetAfGain));
+            // The rest of the receive/transmit chain, one intent per control
+            // that carries a data-a11y-key on the main page — so anything a
+            // screen reader can name, the operator can also say. All
+            // trigger-required: their vocabularies are bare numbers and
+            // off/on/auto words that would collide across branches otherwise.
+            Try("SetNoiseReduction",      () => BuildDecomposed("SetNoiseReduction", cfg.SetNoiseReduction));
+            Try("SetNoiseBlanker",        () => BuildDecomposed("SetNoiseBlanker",   cfg.SetNoiseBlanker));
+            Try("SetNotch",               () => BuildDecomposed("SetNotch",          cfg.SetNotch));
+            Try("SetRfGain",              () => BuildDecomposed("SetRfGain",         cfg.SetRfGain));
+            Try("SetSquelch",             () => BuildDecomposed("SetSquelch",        cfg.SetSquelch));
+            Try("SetTxPower",             () => BuildDecomposed("SetTxPower",        cfg.SetTxPower));
+            Try("SetMicGain",             () => BuildDecomposed("SetMicGain",        cfg.SetMicGain));
+            Try("SetProcessor",           () => BuildDecomposed("SetProcessor",      cfg.SetProcessor));
+            Try("SetApf",                 () => BuildDecomposed("SetApf",            cfg.SetApf));
             if (cfg.Macros?.Count > 0)
                 Try("Macros",             () => BuildMacros(cfg.Macros));
             // TWO frequency variants only. The SAPI grammar compiler under the
@@ -153,6 +168,18 @@ namespace Icom_Web_Control.Services.Voice
             AddDecomposedSrgsItem(commandItems, "SetPreamp", cfg.SetPreamp);
             AddDecomposedSrgsItem(commandItems, "SetAgc", cfg.SetAgc);
             AddDecomposedSrgsItem(commandItems, "SetAfGain", cfg.SetAfGain);
+            // Keep this list in step with the Try(...) list in Build above —
+            // the SRGS export is meant to be a faithful transcription of the
+            // live grammar, and a command missing from one side is invisible.
+            AddDecomposedSrgsItem(commandItems, "SetNoiseReduction", cfg.SetNoiseReduction);
+            AddDecomposedSrgsItem(commandItems, "SetNoiseBlanker", cfg.SetNoiseBlanker);
+            AddDecomposedSrgsItem(commandItems, "SetNotch", cfg.SetNotch);
+            AddDecomposedSrgsItem(commandItems, "SetRfGain", cfg.SetRfGain);
+            AddDecomposedSrgsItem(commandItems, "SetSquelch", cfg.SetSquelch);
+            AddDecomposedSrgsItem(commandItems, "SetTxPower", cfg.SetTxPower);
+            AddDecomposedSrgsItem(commandItems, "SetMicGain", cfg.SetMicGain);
+            AddDecomposedSrgsItem(commandItems, "SetProcessor", cfg.SetProcessor);
+            AddDecomposedSrgsItem(commandItems, "SetApf", cfg.SetApf);
 
             foreach (var macro in cfg.Macros ?? new())
             {
@@ -353,10 +380,11 @@ namespace Icom_Web_Control.Services.Voice
             return gb;
         }
 
-        // ── Macros (user-defined CAT shortcuts) ──────────────────────────
+        // ── Macros (user-defined CI-V shortcuts) ─────────────────────────
         // Intent encoding: "Macro:{name}|{cat}" — name is for the spoken
-        // confirmation, cat is sent verbatim to the radio (split on ';').
-        // The '|' separator is safe because CAT strings never contain '|'.
+        // confirmation, cat is the ';'-separated CI-V command hex the
+        // dispatcher decodes (CivMacroCodec) and sends. The '|' separator is
+        // safe because a macro payload is only hex digits, spaces and ';'.
 
         private static GrammarBuilder? BuildMacros(List<MacroDefinition> macros)
         {

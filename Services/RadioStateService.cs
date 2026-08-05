@@ -11,21 +11,21 @@ namespace Icom_Web_Control.Services
         private readonly ILogger<RadioStateService> _logger;
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly RadioStatePersistenceService _statePersistence;
+        private readonly IBandPlanService _bandPlan;
 
         public bool IsInitialized { get; set; } = false;
 
-        // True when the configured radio model has a single physical receiver
-        // (FTdx10 / FT-710 / FTDX3000 / FT-991A). Set by RadioInitialization-
-        // Service at startup from RadioCapabilities. The dispatcher uses this
-        // to route P1=0 ("Fixed" on single-receiver radios) responses to
-        // whichever VFO is currently active (per VS), instead of always
-        // writing to *A state — see #34 R2 controls-bleed-across-panels fix.
+        // True when the configured radio model has a single physical receiver.
+        // Both IC-7300 models do, so this is true throughout; it is set at
+        // startup from RadioCapabilities so the assumption lives in one place.
+        // IntentDispatcher uses it to route a per-VFO control onto whichever
+        // VFO is currently active, rather than always writing to *A state —
+        // on one receiver the targeted panel is a hint, not an address.
         public bool IsSingleReceiver { get; set; } = false;
 
-        // Configured radio model (e.g. "FTDX3000"). Set by RadioInitialization-
-        // Service at startup. The dispatcher uses this to normalise model-
-        // specific CAT read codes — notably the FTDX3000 roofing-filter answer,
-        // whose read code space differs from its set code space.
+        // Configured radio model — "IC-7300" or "IC-7300MK2". Set at startup;
+        // the two differ in CI-V default address (94 vs B6) rather than in
+        // anything this class has to normalise.
         public string RadioModel { get; set; } = "";
 
         private RadioState _initialState;
@@ -33,11 +33,13 @@ namespace Icom_Web_Control.Services
         public RadioStateService(
             ILogger<RadioStateService> logger,
             RadioStatePersistenceService statePersistence,
-            IHubContext<RadioHub> hubContext)
+            IHubContext<RadioHub> hubContext,
+            IBandPlanService bandPlan)
         {
             _logger = logger;
             _statePersistence = statePersistence;
             _hubContext = hubContext;
+            _bandPlan = bandPlan;
             _initialState = _statePersistence.Load();
 
             _logger.LogInformation("RadioStateService constructed with IHubContext: {HubContextAvailable}", hubContext != null);
@@ -316,22 +318,14 @@ namespace Icom_Web_Control.Services
         private bool _txClarOn = false;
         public bool TxClarOn { get => _txClarOn; set => SetField(ref _txClarOn, value); }
 
-        private bool _contourOnA = false;
-        public bool ContourOnA { get => _contourOnA; set => SetField(ref _contourOnA, value); }
-        private bool _contourOnB = false;
-        public bool ContourOnB { get => _contourOnB; set => SetField(ref _contourOnB, value); }
         private bool _apfOnA = false;
         public bool ApfOnA { get => _apfOnA; set => SetField(ref _apfOnA, value); }
         private bool _apfOnB = false;
         public bool ApfOnB { get => _apfOnB; set => SetField(ref _apfOnB, value); }
-        private int _contourFreqA = 800;
-        public int ContourFreqA { get => _contourFreqA; set => SetField(ref _contourFreqA, value); }
-        private int _contourFreqB = 800;
-        public int ContourFreqB { get => _contourFreqB; set => SetField(ref _contourFreqB, value); }
-        private int _apfFreqA = 0;
-        public int ApfFreqA { get => _apfFreqA; set => SetField(ref _apfFreqA, value); }
-        private int _apfFreqB = 0;
-        public int ApfFreqB { get => _apfFreqB; set => SetField(ref _apfFreqB, value); }
+        private int _apfWidthA = 0;
+        public int ApfWidthA { get => _apfWidthA; set => SetField(ref _apfWidthA, value); }
+        private int _apfWidthB = 0;
+        public int ApfWidthB { get => _apfWidthB; set => SetField(ref _apfWidthB, value); }
 
         private bool _isConnected = false;
         public bool IsConnected { get => _isConnected; set => SetField(ref _isConnected, value); }
@@ -564,7 +558,8 @@ namespace Icom_Web_Control.Services
         public int FmOffsetHz { get => _fmOffsetHz; set => SetField(ref _fmOffsetHz, value); }
         private string _ctcssMode = "00";
         public string CtcssMode { get => _ctcssMode; set => SetField(ref _ctcssMode, value); }
-        private string _ctcssTone = "01";
+        // Tenths of a Hz, as CI-V 1B carries it: "885" is 88.5 Hz.
+        private string _ctcssTone = "885";
         public string CtcssTone { get => _ctcssTone; set => SetField(ref _ctcssTone, value); }
 
         // CW Keyer. Speed in WPM (6–48); break-in mode "0"/"1"/"2"; break-in
@@ -661,14 +656,10 @@ namespace Icom_Web_Control.Services
                 new("TxClarOn", TxClarOn),
                 new("ClarifierOffsetA", ClarifierOffsetA),
                 new("ClarifierOffsetB", ClarifierOffsetB),
-                new("ContourOnA", ContourOnA),
-                new("ContourOnB", ContourOnB),
-                new("ContourFreqA", ContourFreqA),
-                new("ContourFreqB", ContourFreqB),
                 new("ApfOnA", ApfOnA),
                 new("ApfOnB", ApfOnB),
-                new("ApfFreqA", ApfFreqA),
-                new("ApfFreqB", ApfFreqB),
+                new("ApfWidthA", ApfWidthA),
+                new("ApfWidthB", ApfWidthB),
                 new("AfGainA", AfGainA),
                 new("AfGainB", AfGainB),
                 new("RfGainA", RfGainA),
@@ -727,22 +718,17 @@ namespace Icom_Web_Control.Services
             BandA = newBandA;
             BandB = newBandB;
         }
-        public string GetBandFromFrequency(long freq)
-        {
-            if (freq >= 1800000 && freq < 2000000) return "160m";
-            if (freq >= 3500000 && freq < 4000000) return "80m";
-            if (freq >= 5258000 && freq <= 5408000) return "60m";
-            if (freq >= 7000000 && freq < 7300000) return "40m";
-            if (freq >= 10100000 && freq < 10150000) return "30m";
-            if (freq >= 14000000 && freq < 14350000) return "20m";
-            if (freq >= 18068000 && freq < 18168000) return "17m";
-            if (freq >= 21000000 && freq < 21450000) return "15m";
-            if (freq >= 24890000 && freq < 24990000) return "12m";
-            if (freq >= 28000000 && freq < 29700000) return "10m";
-            if (freq >= 50000000 && freq < 54000000) return "6m";
-            if (freq >= 70000000 && freq < 70500000) return "4m";
-            return "Unknown";
-        }
+        /// <summary>
+        /// Band name for a frequency, in the operator's own IARU region.
+        ///
+        /// This used to be a hardcoded ladder here, region-blind and generous
+        /// with the edges — it disagreed with the browser's region-aware
+        /// BAND_EDGES (R1 80m: 3.800 there, 4.000 here). BandPlanService now
+        /// answers from wwwroot/bandplan.default.json, the same table the
+        /// browser uses. Off-band still returns "Unknown", so every existing
+        /// consumer behaves as before.
+        /// </summary>
+        public string GetBandFromFrequency(long freq) => _bandPlan.BandForFrequency(freq);
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -797,14 +783,10 @@ namespace Icom_Web_Control.Services
                 IfShiftB = IfShiftB,
                 ClarifierOffsetA = ClarifierOffsetA,
                 ClarifierOffsetB = ClarifierOffsetB,
-                ContourOnA = ContourOnA,
-                ContourOnB = ContourOnB,
-                ContourFreqA = ContourFreqA,
-                ContourFreqB = ContourFreqB,
                 ApfOnA = ApfOnA,
                 ApfOnB = ApfOnB,
-                ApfFreqA = ApfFreqA,
-                ApfFreqB = ApfFreqB,
+                ApfWidthA = ApfWidthA,
+                ApfWidthB = ApfWidthB,
                 ProcEnabled = ProcEnabled,
                 ProcLevel = ProcLevel
             };

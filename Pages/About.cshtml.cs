@@ -9,11 +9,14 @@ namespace Icom_Web_Control.Pages
     {
         private readonly ISettingsService _settingsService;
         private readonly RadioStateService _radioStateService;
+        private readonly IRadioController _radio;
 
-        public AboutModel(ISettingsService settingsService, RadioStateService radioStateService)
+        public AboutModel(ISettingsService settingsService, RadioStateService radioStateService,
+                          IRadioController radio)
         {
             _settingsService = settingsService;
             _radioStateService = radioStateService;
+            _radio = radio;
         }
 
         // Surfaced to the view for the Diagnostics block.
@@ -24,7 +27,7 @@ namespace Icom_Web_Control.Pages
         public string SerialPort        { get; private set; } = "—";
         public int    BaudRate          { get; private set; }
         public bool   IsConnected       { get; private set; }
-        public string SdrDevice         { get; private set; } = "(none configured)";
+        public string BandScope         { get; private set; } = "(unknown)";
         public string DxClusterHost     { get; private set; } = "(off)";
         public string DxClusterCallsign { get; private set; } = "(blank)";
         public string DotNetVersion     { get; private set; } = System.Environment.Version.ToString();
@@ -52,14 +55,22 @@ namespace Icom_Web_Control.Pages
             BaudRate    = s.BaudRate;
             IsConnected = _radioStateService.IsConnected;
 
-            // Diagnostics shows whichever SDR(s) are configured. Two VFOs as
-            // of v2.3.0; bug reports from users with one configured still show
-            // the right device.
-            var sdrKeys = new List<string>();
-            if (!string.IsNullOrWhiteSpace(s.SdrDeviceKeyA)) sdrKeys.Add($"A: {s.SdrDeviceKeyA}");
-            if (!string.IsNullOrWhiteSpace(s.SdrDeviceKeyB)) sdrKeys.Add($"B: {s.SdrDeviceKeyB}");
-            if (sdrKeys.Count > 0)
-                SdrDevice = string.Join("   ", sdrKeys);
+            // Band scope. This line used to read "SDR device" and list the
+            // SdrDeviceKeyA/B settings inherited from YWC — always "(none
+            // configured)" on IWC, where the spectrum comes from the radio's own
+            // scope over CI-V. That told a "no spectrum" bug report nothing, and
+            // actively misled: the first two reports both read it as the cause.
+            // Report the scope's real state instead (GitHub #1).
+            var scope = _radio.GetScopeDiagnostics();
+            var age = scope.SecondsSinceLastSweep;
+            BandScope = !IsConnected
+                ? "radio not connected"
+                : !scope.Enabled
+                    ? "switched off by the operator"
+                    : age is null
+                        ? $"on, but NO sweep has ever arrived (discarded {scope.SweepsDiscarded})"
+                        : $"on, {scope.SweepsCompleted} sweeps / {scope.SweepsDiscarded} discarded, " +
+                          $"last {age:0.0}s ago";
             if (s.DxClusterEnabled && !string.IsNullOrWhiteSpace(s.DxClusterHost))
                 DxClusterHost = $"{s.DxClusterHost}:{s.DxClusterPort}";
             if (!string.IsNullOrWhiteSpace(s.DxClusterLoginCallsign))

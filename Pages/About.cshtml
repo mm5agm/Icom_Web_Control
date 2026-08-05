@@ -37,8 +37,9 @@
             📖 <a asp-page="/UserManual">User Manual</a> &mdash; comprehensive documentation, with screenshots
         </li>
         <li>
-            💬 <a href="https://github.com/mm5agm/Icom_Web_Control/discussions" target="_blank" rel="noopener">Discussions</a>
+            💬 <a href="https://github.com/mm5agm/Icom_Web_Control/discussions/new?category=q-a" target="_blank" rel="noopener">Ask a question</a>
             &mdash; questions, ideas, feature requests
+            (or <a href="https://github.com/mm5agm/Icom_Web_Control/discussions" target="_blank" rel="noopener">browse existing discussions</a>)
         </li>
         <li>
             📦 <a href="https://github.com/mm5agm/Icom_Web_Control" target="_blank" rel="noopener">Source code on GitHub</a>
@@ -94,7 +95,7 @@ Radio model    @Model.RadioModel
 Band plan      @Model.BandPlan
 Serial port    @Model.SerialPort at @Model.BaudRate baud
 Connection     @(Model.IsConnected ? "connected" : "not connected")
-SDR device     @Model.SdrDevice
+Band scope     @Model.BandScope
 DX cluster     @Model.DxClusterHost
 Cluster login  @Model.DxClusterCallsign
 Browser        <span id="diagBrowser">(detecting…)</span>

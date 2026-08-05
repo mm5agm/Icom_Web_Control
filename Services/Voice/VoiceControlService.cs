@@ -708,9 +708,9 @@ namespace Icom_Web_Control.Services.Voice
                 // Spoken confirmation via TTS, if enabled in Settings. Phrase
                 // template is "<intent description>, successful/unsuccessful"
                 // so a listener hears the whole command echoed back along
-                // with the outcome -- key for accessibility (Yuri W4YSW,
-                // Thomas OZ1JTE) where the operator may not be watching the
-                // screen for visual confirmation. In a dry run (§6.5) nothing
+                // with the outcome -- key for accessibility, where the
+                // operator may not be watching the screen for visual
+                // confirmation. In a dry run (§6.5) nothing
                 // was actually sent, so the confirmation says so instead of
                 // claiming success/failure it didn't earn.
                 var settings = await _settings.GetSettingsAsync();
@@ -733,6 +733,18 @@ namespace Icom_Web_Control.Services.Voice
                 UpdateStatus(VoiceState.Error, heard: heard, intent: intent, confidence: confidence, error: ex.Message);
             }
         }
+
+        /// <summary>
+        /// Intents whose grammar tag is just "Name:value" and whose dispatcher
+        /// handler reads one string argument, "value" — a 0–100 level or a
+        /// position word ("off", "on", "auto", "manual"). Listed once here
+        /// rather than as nine near-identical blocks in NormaliseIntent.
+        /// </summary>
+        private static readonly string[] PlainValueIntents =
+        [
+            "SetNoiseReduction", "SetNoiseBlanker", "SetNotch", "SetRfGain",
+            "SetSquelch", "SetTxPower", "SetMicGain", "SetProcessor", "SetApf",
+        ];
 
         private static (string intent, Dictionary<string, object> args) NormaliseIntent(
             string intent, Dictionary<string, object> args, string heard)
@@ -803,6 +815,13 @@ namespace Icom_Web_Control.Services.Voice
             {
                 args["speed"] = intent["SetAgc:".Length..];
                 return ("SetAgc", args);
+            }
+            foreach (var name in PlainValueIntents)
+            {
+                if (!intent.StartsWith(name, StringComparison.Ordinal) ||
+                    intent.Length <= name.Length || intent[name.Length] != ':') continue;
+                args["value"] = intent[(name.Length + 1)..];
+                return (name, args);
             }
             if (intent.StartsWith("Macro:", StringComparison.Ordinal))
             {

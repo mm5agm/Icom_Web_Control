@@ -73,7 +73,7 @@ namespace Icom_Web_Control.Pages
         public string FmShiftDir { get; set; } = "0";
         public int FmOffsetHz { get; set; } = 600000;
         public string CtcssMode { get; set; } = "00";
-        public string CtcssTone { get; set; } = "01";
+        public string CtcssTone { get; set; } = "885";   // tenths of a Hz: 88.5
 
         public double SdrSampleRateHz  { get; set; } = 2_048_000;
         public double SdrSampleRateHzA { get; set; } = 2_048_000;
@@ -94,11 +94,11 @@ namespace Icom_Web_Control.Pages
         public int SdrWaterfallBrightDbB { get; set; } = 0;
 
         public string BandPlan { get; set; } = "Region1";
-        public string RadioModel { get; set; } = "FTdx101MP";
+        public string RadioModel { get; set; } = "IC-7300MK2";
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
 
         // Accessibility — show ▲/▼ arrow buttons beside each VFO's frequency
-        // display for users who can't use a scroll wheel (Yuri W4YSW, etc.).
+        // display for users who can't use a scroll wheel.
         // Default false; user enables via Settings > Accessibility.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
 
@@ -130,7 +130,7 @@ namespace Icom_Web_Control.Pages
             // Deliberately no server-side redirect to Settings on
             // InitializationStatus == "error" here. If radio initialization
             // keeps failing (e.g. an unhandled exception deep in the init
-            // sequence — see Issue #65, FTDX3000), that status flag can get
+            // sequence), that status flag can get
             // stuck at "error" indefinitely, since nothing resets it except
             // a fully successful re-init. A hard redirect here trapped users
             // on the Settings page with no way back to Home even after they

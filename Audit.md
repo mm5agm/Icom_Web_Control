@@ -108,7 +108,10 @@
 
 ## RX Controls
 
-*(AGC, IPO/AMP, ATT, NR, NB, BC, Contour/APF, IF Shift, IF Width, RF Gain, AF Gain, Squelch are all implemented.)*
+*(AGC, preamp, ATT, NR, NB, APF, IF Width, Twin PBT, RF Gain, AF Gain,
+Squelch are all implemented. Contour and IF Shift are **not** — both are
+Yaesu controls with no IC-7300 equivalent; the radio offers Twin PBT and the
+manual notch instead, and those have their own endpoints.)*
 
 - **Busy / Squelch Open Status**
   - `BY;` → `BY{P1};` — 0 = not busy, 1 = busy (squelch open)

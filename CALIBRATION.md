@@ -106,7 +106,12 @@ The process is the same for all numeric meters:
 
 ## Where Calibration Data Is Saved
 
-- **Installed app:** `%APPDATA%\MM5AGM\Icom Web Control\calibration.user.json`
-- **Development:** `wwwroot/calibration.default.json`
+- **Installed app and development:** `%APPDATA%\MM5AGM\Icom Web Control\calibration.user.json`
+- **Shipped starting point (read-only):** `wwwroot/calibration.default.<model>.json` — copied to your user file on first launch
+
+Development builds save to the same `%APPDATA%` file as an installed app. Editing
+the shipped defaults is deliberately *not* something the Meter Calibration page
+does — use a text editor on the source file, or the developer-only
+"Import emailed cal → default" button.
 
 The save path is shown at the top of the Meter Calibration page.

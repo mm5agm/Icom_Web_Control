@@ -2,16 +2,17 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Icom_Web_Control.Hubs;
 using Icom_Web_Control.Services;
+using Icom_Web_Control.Services.Civ;
 
 namespace Icom_Web_Control.Services.Voice
 {
     /// <summary>
     /// Maps a recognised semantic intent + parameter dictionary (from the
-    /// SRGS grammar's <c>out.intent</c> tags) to CAT commands sent via
-    /// <see cref="ICatClient"/>. Voice commands target whichever VFO's mic
-    /// button was pressed (v2, per-VFO voice) — see <see cref="_vfo"/>.
-    /// FTdx10 / FT-710 are single-receiver, so the target always collapses
-    /// to A there (<see cref="RadioCapabilities.VfoP1"/> /
+    /// SRGS grammar's <c>out.intent</c> tags) to radio operations sent through
+    /// the <see cref="IRadioController"/> seam. Voice commands target whichever
+    /// VFO's mic button was pressed (v2, per-VFO voice) — see <see cref="_vfo"/>.
+    /// The IC-7300 is single-receiver, so the target always collapses to A
+    /// (<see cref="RadioCapabilities.VfoP1"/> /
     /// <see cref="RadioCapabilities.VfoIsB"/> already enforce this).
     /// </summary>
     public sealed class IntentDispatcher
@@ -20,17 +21,14 @@ namespace Icom_Web_Control.Services.Voice
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hub;
-        // Phase 3: the semantic seam. Most voice intents are now repointed here
-        // (real CI-V): frequency, band, mode, TX, split, VFO-swap, AF gain,
-        // preamp. The few still on the inert Yaesu _catClient below need an
-        // Icom-specific control-model rework, not just a repoint (the IC-7300's
-        // attenuator/AGC/IF-width vocabulary differs from Yaesu's), so they are
-        // deliberately left broken-on-Icom and marked TODO(voice-civ):
-        //   SetAttenuator  — IC-7300 has one on/off pad, not off/6/12/18 dB.
-        //   SetAgc         — IC-7300 is fast/mid/slow only, no off/auto.
+        // The semantic seam. Every intent that reaches the radio goes through
+        // it: frequency, band, mode, TX, split, VFO-swap, and the whole
+        // receive/transmit control chain (AF/RF gain, squelch, preamp,
+        // attenuator, AGC, NR, NB, notch, APF, TX power, mic gain, processor).
+        // Two intents remain deliberately inert on Icom, marked TODO(voice-civ)
+        // at their handlers:
         //   NudgeIfWidth   — no clean seam equivalent yet (PBT/filter model differs).
         //   BandUp/Down    — no seam band-step; would need band-stacking logic.
-        //   Macro          — sends arbitrary Yaesu CAT strings; Icom needs CI-V hex.
         private readonly IRadioController _radio;
 
         public IntentDispatcher(
@@ -47,8 +45,8 @@ namespace Icom_Web_Control.Services.Voice
             _radio = radio;
         }
 
-        // §6.5 dry-run testing: when set, SendCommand() logs the CAT string
-        // instead of sending it. AsyncLocal rather than a field/parameter
+        // §6.5 dry-run testing: when set, the seam wrappers below log what they
+        // would send instead of sending it. AsyncLocal rather than a field/parameter
         // threaded through every intent handler -- it scopes cleanly to the
         // single DispatchAsync call tree without touching ~20 method
         // signatures, and doesn't leak into unrelated concurrent dispatches.
@@ -123,6 +121,15 @@ namespace Icom_Web_Control.Services.Voice
                     case "SetAttenuator":     return await SetAttenuatorAsync(parameters, cancellationToken);
                     case "SetPreamp":         return await SetPreampAsync(parameters, cancellationToken);
                     case "SetAgc":            return await SetAgcAsync(parameters, cancellationToken);
+                    case "SetNoiseReduction": return await SetNoiseReductionAsync(parameters, cancellationToken);
+                    case "SetNoiseBlanker":   return await SetNoiseBlankerAsync(parameters, cancellationToken);
+                    case "SetNotch":          return await SetNotchAsync(parameters, cancellationToken);
+                    case "SetRfGain":         return await SetRfGainAsync(parameters, cancellationToken);
+                    case "SetSquelch":        return await SetSquelchAsync(parameters, cancellationToken);
+                    case "SetTxPower":        return await SetTxPowerAsync(parameters, cancellationToken);
+                    case "SetMicGain":        return await SetMicGainAsync(parameters, cancellationToken);
+                    case "SetProcessor":      return await SetProcessorAsync(parameters, cancellationToken);
+                    case "SetApf":            return await SetApfAsync(parameters, cancellationToken);
                     default:
                         _logger.LogWarning("[IntentDispatcher] Unknown intent: {Intent}", intent);
                         return new DispatchResult(false, "Unknown command");
@@ -306,22 +313,48 @@ namespace Icom_Web_Control.Services.Voice
 
         // -- Macro ---------------------------------------------------------
 
-        private Task<DispatchResult> MacroAsync(
+        private async Task<DispatchResult> MacroAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             var name = args.TryGetValue("macroName", out var n) ? n?.ToString() ?? "Macro" : "Macro";
             if (!args.TryGetValue("macroCat", out var c) || c is not string cat || string.IsNullOrWhiteSpace(cat))
             {
-                _logger.LogWarning("[Voice] Macro '{Name}' has no CAT string", name);
-                return Task.FromResult(new DispatchResult(false, name));
+                _logger.LogWarning("[Voice] Macro '{Name}' has no CI-V command", name);
+                return new DispatchResult(false, name);
             }
-            // TODO(voice-civ): the default macros still hold Yaesu ASCII CAT
-            // strings (AB;, NR01;, …). They need CI-V hex equivalents before they
-            // can reach the IC-7300, so macros are inert on Icom. Report it
-            // honestly (IsReadBack, plain spoken message) rather than falsely
-            // confirming a command that never left the app.
-            _logger.LogInformation("[Voice] Macro '{Name}' ({Cat}) recognised but not yet wired to CI-V", name, cat);
-            return Task.FromResult(new DispatchResult(false, $"The {name} macro isn't available on the IC-7300 yet", IsReadBack: true));
+
+            // The macro payload is CI-V command bodies in hex, ';'-separated —
+            // see CivMacroCodec. A malformed one never reaches the radio (the
+            // Settings validator rejects it at save time too): report it
+            // unsuccessful rather than sending a guess.
+            if (!CivMacroCodec.TryParse(cat, out var commands, out var error))
+            {
+                _logger.LogWarning("[Voice] Macro '{Name}' payload '{Cat}' isn't valid CI-V: {Error}", name, cat, error);
+                return new DispatchResult(false, name);
+            }
+
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would send macro '{Name}': {Commands}",
+                    name, string.Join(" | ", commands.Select(CivMacroCodec.Describe)));
+                return new DispatchResult(true, name);
+            }
+
+            // Chained commands go in order and stop at the first rejection. A
+            // half-applied macro is untidy, but pressing on past a command the
+            // radio refused is worse — and the spoken "unsuccessful" tells the
+            // operator to look, which is the whole point of the confirmation.
+            foreach (var command in commands)
+            {
+                if (!await _radio.SendRawCommandAsync(command, ct))
+                {
+                    _logger.LogWarning("[Voice] Macro '{Name}': command {Command} was not acknowledged",
+                        name, CivMacroCodec.Describe(command));
+                    return new DispatchResult(false, name);
+                }
+            }
+            _logger.LogInformation("[Voice] Macro '{Name}' sent {Count} CI-V command(s)", name, commands.Count);
+            return new DispatchResult(true, name);
         }
 
         // -- Status read-back (IsReadBack=true → no ", successful" appended) -----
@@ -436,30 +469,21 @@ namespace Icom_Web_Control.Services.Voice
 
         // -- Attenuator / Preamp / AGC -------------------------------------
 
-        private Task<DispatchResult> SetAttenuatorAsync(
+        // The IC-7300's attenuator is a single ~20 dB pad, switched on or off
+        // (CI-V 11) — the vocabulary is "off"/"on", not the Yaesu off/6/12/18 dB
+        // ladder this used to expect and could never send.
+        private async Task<DispatchResult> SetAttenuatorAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!args.TryGetValue("level", out var lvlObj) || lvlObj is not string level)
-                return Task.FromResult(new DispatchResult(false, "Attenuator"));
+                return new DispatchResult(false, "Attenuator");
 
-            var code = level switch
-            {
-                "off" => "0",
-                "6"   => "1",
-                "12"  => "2",
-                "18"  => "3",
-                _     => null,
-            };
-            if (code == null) return Task.FromResult(new DispatchResult(false, "Attenuator"));
+            bool? on = level switch { "off" => false, "on" => true, _ => null };
+            if (on == null) return new DispatchResult(false, "Attenuator");
 
-            // TODO(voice-civ): the IC-7300 attenuator is a single on/off ~20 dB
-            // pad (CI-V 11), not Yaesu's off/6/12/18 dB set. Until the vocabulary
-            // is reduced to on/off and repointed to _radio, this intent is inert
-            // on Icom. Report that honestly (IsReadBack speaks the message plainly
-            // and always, with no false ", successful") rather than confirming a
-            // change that never reached the radio.
-            _logger.LogInformation("[Voice] SetAttenuator '{Level}' recognised but not yet wired to CI-V (VFO {Vfo})", level, CurrentVfo);
-            return Task.FromResult(new DispatchResult(false, "Attenuator control isn't available on the IC-7300 yet", IsReadBack: true));
+            await SetRadioSwitch(_radio.SetAttenuatorAsync, on.Value, "attenuator", ct);
+            _logger.LogInformation("[Voice] SetAttenuator -> {Level} (VFO {Vfo})", level, CurrentVfo);
+            return new DispatchResult(true, on.Value ? "Attenuator on" : "Attenuator off");
         }
 
         private async Task<DispatchResult> SetPreampAsync(
@@ -491,29 +515,196 @@ namespace Icom_Web_Control.Services.Voice
             return new DispatchResult(true, phrase);
         }
 
-        private Task<DispatchResult> SetAgcAsync(
+        // IC-7300 AGC is a three-position time constant (CI-V 16 12 → 1/2/3).
+        // The Yaesu "off" and "auto" positions the old vocabulary offered do not
+        // exist on this radio and are gone from the pack; a v8 pack that still
+        // has them is reset by VoicePhraseStore.Load, so "off"/"auto" can only
+        // reach here from a hand-edited file — hence the plain rejection.
+        private async Task<DispatchResult> SetAgcAsync(
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!args.TryGetValue("speed", out var spObj) || spObj is not string speed)
-                return Task.FromResult(new DispatchResult(false, "A G C"));
+                return new DispatchResult(false, "A G C");
 
             var code = speed switch
             {
-                "off"  => "0",
-                "fast" => "1",
-                "mid"  => "2",
-                "slow" => "3",
-                "auto" => "4",
-                _      => null,
+                "fast" => 1,
+                "mid"  => 2,
+                "slow" => 3,
+                _      => 0,
             };
-            if (code == null) return Task.FromResult(new DispatchResult(false, "A G C"));
+            if (code == 0) return new DispatchResult(false, "A G C");
 
-            // TODO(voice-civ): IC-7300 AGC is fast/mid/slow (16 12 → 1/2/3) only,
-            // no off/auto. Until the vocabulary is trimmed and repointed to
-            // _radio.SetAgcAsync, this intent is inert on Icom. Report it honestly
-            // (IsReadBack, plain spoken message) rather than falsely confirming.
-            _logger.LogInformation("[Voice] SetAgc '{Speed}' recognised but not yet wired to CI-V (VFO {Vfo})", speed, CurrentVfo);
-            return Task.FromResult(new DispatchResult(false, "A G C control isn't available on the IC-7300 yet", IsReadBack: true));
+            await SetRadioLevel(_radio.SetAgcAsync, code, "AGC", ct);
+            if (VfoIsB) _state.AgcB = code.ToString(); else _state.AgcA = code.ToString();
+            _logger.LogInformation("[Voice] SetAgc -> {Speed} (VFO {Vfo})", speed, CurrentVfo);
+            return new DispatchResult(true, $"A G C {speed}");
+        }
+
+        // -- Receive/transmit chain (v9 intents) ---------------------------
+        //
+        // One handler per control that carries a data-a11y-key on the main
+        // page, so anything a screen reader can name is also sayable. They all
+        // read a single "value" argument: either a 0–100 level or a position
+        // word. Unlike the older handlers these do NOT write RadioStateService
+        // optimistically — CivRadioController's setters don't either, and the
+        // poll loop reads the real value back within a couple of hundred ms.
+
+        /// <summary>0–100 level words map to the radio's raw 0–255 range.</summary>
+        private static int PercentToRaw(long pct) =>
+            (int)Math.Round(Math.Clamp(pct, 0, 100) * 255.0 / 100.0);
+
+        /// <summary>Reads the shared "value" argument as a 0–100 level; false if it isn't one.</summary>
+        private static bool TryGetLevel(IReadOnlyDictionary<string, object> args, out long pct)
+        {
+            pct = 0;
+            return args.TryGetValue("value", out var v) && v is string s &&
+                   long.TryParse(s, out pct);
+        }
+
+        /// <summary>Reads the shared "value" argument as a position word ("off", "auto", …).</summary>
+        private static string? GetWord(IReadOnlyDictionary<string, object> args) =>
+            args.TryGetValue("value", out var v) && v is string s ? s : null;
+
+        // NR and NB are a switch and a depth in one command: a bare "off"/"on"
+        // toggles the function, a number sets its level AND switches it on, so
+        // the operator never has to say two commands to hear the difference.
+
+        private async Task<DispatchResult> SetNoiseReductionAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            var word = GetWord(args);
+            if (word == "off" || word == "on")
+            {
+                await SetRadioSwitch(_radio.SetNoiseReductionAsync, word == "on", "noise reduction", ct);
+                _logger.LogInformation("[Voice] SetNoiseReduction -> {State} (VFO {Vfo})", word, CurrentVfo);
+                return new DispatchResult(true, word == "on" ? "Noise reduction on" : "Noise reduction off");
+            }
+            if (!TryGetLevel(args, out var pct)) return new DispatchResult(false, "Noise reduction");
+
+            await SetRadioSwitch(_radio.SetNoiseReductionAsync, true, "noise reduction", ct);
+            await SetRadioLevel(_radio.SetNrLevelAsync, PercentToRaw(pct), "NR level", ct);
+            _logger.LogInformation("[Voice] SetNoiseReduction level -> {Pct}% (VFO {Vfo})", pct, CurrentVfo);
+            return new DispatchResult(true, $"Noise reduction {pct}");
+        }
+
+        private async Task<DispatchResult> SetNoiseBlankerAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            var word = GetWord(args);
+            if (word == "off" || word == "on")
+            {
+                await SetRadioSwitch(_radio.SetNoiseBlankerAsync, word == "on", "noise blanker", ct);
+                _logger.LogInformation("[Voice] SetNoiseBlanker -> {State} (VFO {Vfo})", word, CurrentVfo);
+                return new DispatchResult(true, word == "on" ? "Noise blanker on" : "Noise blanker off");
+            }
+            if (!TryGetLevel(args, out var pct)) return new DispatchResult(false, "Noise blanker");
+
+            await SetRadioSwitch(_radio.SetNoiseBlankerAsync, true, "noise blanker", ct);
+            await SetRadioLevel(_radio.SetNbLevelAsync, PercentToRaw(pct), "NB level", ct);
+            _logger.LogInformation("[Voice] SetNoiseBlanker level -> {Pct}% (VFO {Vfo})", pct, CurrentVfo);
+            return new DispatchResult(true, $"Noise blanker {pct}");
+        }
+
+        // The panel's notch control is one three-position selector, but the
+        // radio has two independent filters (auto 16 41, manual 16 48). Each
+        // position therefore sets both, so "notch auto" can't leave the manual
+        // notch quietly running underneath it.
+        private async Task<DispatchResult> SetNotchAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            var word = GetWord(args);
+            (bool auto, bool manual)? want = word switch
+            {
+                "off"    => (false, false),
+                "auto"   => (true, false),
+                "manual" => (false, true),
+                _        => null,
+            };
+            if (want == null) return new DispatchResult(false, "Notch");
+
+            await SetRadioSwitch(_radio.SetAutoNotchAsync, want.Value.auto, "auto notch", ct);
+            await SetRadioSwitch(_radio.SetManualNotchAsync, want.Value.manual, "manual notch", ct);
+            _logger.LogInformation("[Voice] SetNotch -> {Word} (VFO {Vfo})", word, CurrentVfo);
+            return new DispatchResult(true, word == "off" ? "Notch off" : $"Notch {word}");
+        }
+
+        private async Task<DispatchResult> SetRfGainAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!TryGetLevel(args, out var pct)) return new DispatchResult(false, "R F gain");
+            await SetRadioLevel(_radio.SetRfGainAsync, PercentToRaw(pct), "RF gain", ct);
+            _logger.LogInformation("[Voice] SetRfGain -> {Pct}% (VFO {Vfo})", pct, CurrentVfo);
+            return new DispatchResult(true, $"R F gain {pct}");
+        }
+
+        private async Task<DispatchResult> SetSquelchAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!TryGetLevel(args, out var pct)) return new DispatchResult(false, "Squelch");
+            await SetRadioLevel(_radio.SetSquelchAsync, PercentToRaw(pct), "squelch", ct);
+            _logger.LogInformation("[Voice] SetSquelch -> {Pct}% (VFO {Vfo})", pct, CurrentVfo);
+            return new DispatchResult(true, $"Squelch {pct}");
+        }
+
+        // TX power and mic gain are already percentages at the seam (the
+        // controller does the 0–255 scaling), so they pass the spoken number
+        // through unchanged rather than via PercentToRaw.
+        private async Task<DispatchResult> SetTxPowerAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!TryGetLevel(args, out var pct)) return new DispatchResult(false, "Transmit power");
+            await SetRadioLevel(_radio.SetRfPowerPercentAsync, (int)Math.Clamp(pct, 0, 100), "TX power", ct);
+            _logger.LogInformation("[Voice] SetTxPower -> {Pct}%", pct);
+            return new DispatchResult(true, $"Transmit power {pct}");
+        }
+
+        private async Task<DispatchResult> SetMicGainAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!TryGetLevel(args, out var pct)) return new DispatchResult(false, "Mic gain");
+            await SetRadioLevel(_radio.SetMicGainPercentAsync, (int)Math.Clamp(pct, 0, 100), "mic gain", ct);
+            _logger.LogInformation("[Voice] SetMicGain -> {Pct}%", pct);
+            return new DispatchResult(true, $"Mic gain {pct}");
+        }
+
+        private async Task<DispatchResult> SetProcessorAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            var word = GetWord(args);
+            if (word == "off" || word == "on")
+            {
+                await SetRadioSwitch(_radio.SetSpeechCompressorAsync, word == "on", "speech processor", ct);
+                _logger.LogInformation("[Voice] SetProcessor -> {State}", word);
+                return new DispatchResult(true, word == "on" ? "Processor on" : "Processor off");
+            }
+            if (!TryGetLevel(args, out var pct)) return new DispatchResult(false, "Processor");
+
+            await SetRadioSwitch(_radio.SetSpeechCompressorAsync, true, "speech processor", ct);
+            await SetRadioLevel(_radio.SetCompressorLevelPercentAsync, (int)Math.Clamp(pct, 0, 100), "processor level", ct);
+            _logger.LogInformation("[Voice] SetProcessor level -> {Pct}%", pct);
+            return new DispatchResult(true, $"Processor {pct}");
+        }
+
+        // APF is CW-only and OFF is simply its fourth position, so this is one
+        // set, not a switch plus a width (CI-V 16 32 → 0=OFF, 1=WIDE, 2=MID,
+        // 3=NAR). Sent in any mode; the radio ignores it outside CW.
+        private async Task<DispatchResult> SetApfAsync(
+            IReadOnlyDictionary<string, object> args, CancellationToken ct)
+        {
+            if (!TryGetLevel(args, out var setting) || setting is < 0 or > 3)
+                return new DispatchResult(false, "A P F");
+
+            await SetRadioLevel(_radio.SetApfAsync, (int)setting, "APF", ct);
+            var phrase = setting switch
+            {
+                0 => "A P F off",
+                1 => "A P F wide",
+                2 => "A P F medium",
+                _ => "A P F narrow",
+            };
+            _logger.LogInformation("[Voice] SetApf -> {Setting} (VFO {Vfo})", setting, CurrentVfo);
+            return new DispatchResult(true, phrase);
         }
 
         // -- CAT send, dry-run-aware ----------------------------------------
@@ -535,10 +726,9 @@ namespace Icom_Web_Control.Services.Voice
                 return Task.FromResult(string.Empty);
             }
             // The Yaesu CAT transport this used to reach was deleted in the IWC
-            // carve. The handful of voice intents still routed here (attenuator,
-            // AGC, IF-width nudge, band up/down, raw macros) need Icom-specific
-            // CI-V reworks, not a straight repoint — see the TODO(voice-civ) notes
-            // on the field declarations above. Until then they are inert no-ops.
+            // carve. Only NudgeIfWidth still routes here; it needs an
+            // Icom-specific rework of the filter-width model rather than a
+            // straight repoint (see its TODO(voice-civ)), so it stays a no-op.
             _logger.LogInformation("[Voice] intent not yet on CI-V — dropped legacy CAT send: {Command}", command);
             return Task.FromResult(string.Empty);
         }
@@ -638,6 +828,36 @@ namespace Icom_Web_Control.Services.Voice
                 return;
             }
             await _radio.SetPreampAsync(value, ct);
+        }
+
+        // The v9 receive/transmit-chain intents all reach the seam through one
+        // of these two, so §6.5 dry-run stays a single choke point rather than
+        // a copy of the same three lines in each of nine handlers. The seam
+        // member goes in as a method group (_radio.SetSquelchAsync), which
+        // keeps each call site readable about which command it is sending.
+
+        /// <summary>Set a seam on/off function, dry-run-aware.</summary>
+        private async Task SetRadioSwitch(
+            Func<bool, CancellationToken, Task> set, bool on, string what, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set {What} {State}", what, on ? "on" : "off");
+                return;
+            }
+            await set(on, ct);
+        }
+
+        /// <summary>Set a seam integer level (raw 0–255, a percentage, or a position code), dry-run-aware.</summary>
+        private async Task SetRadioLevel(
+            Func<int, CancellationToken, Task> set, int value, string what, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set {What} {Value}", what, value);
+                return;
+            }
+            await set(value, ct);
         }
 
         // -- helpers -------------------------------------------------------

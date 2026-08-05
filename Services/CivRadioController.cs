@@ -120,6 +120,66 @@ namespace Icom_Web_Control.Services
         // back on. Turning it on again clears it.
         private volatile bool _operatorScopeOff;
 
+        // Set by RequestScopeStatusAnnounce (a browser just connected) and cleared
+        // by the next sweep, which announces regardless of where the periodic
+        // counter happens to be. int rather than bool so Interlocked can
+        // read-and-clear it in one step — the sweep handler and the hub run on
+        // different threads.
+        private int _announceScopeStatus;
+
+        // Scope-status heartbeat (GitHub #1). "SdrStatus" used to be emitted only
+        // from the sweep-assembly path, so a radio whose scope never streams — off,
+        // or not pushing 27 00 at all — sent no status ever, and the frontend keeps
+        // its panel hidden until one arrives. Since the Scope on/off switch lives
+        // inside that hidden card, the operator was left with a blank page and no
+        // way back. These drive a watchdog that announces the true state whether or
+        // not sweeps are flowing. TickCount64 of the last such announce.
+        private long _lastScopeAnnounceTicks;
+        private const int ScopeStaleMs = 2000;          // no sweep this long ⇒ not streaming
+        private const int ScopeAnnounceEveryMs = 5000;  // watchdog re-announce cadence
+
+        /// <inheritdoc />
+        public void RequestScopeStatusAnnounce()
+        {
+            Interlocked.Exchange(ref _announceScopeStatus, 1);
+            // If nothing is streaming there is no next sweep to carry that request,
+            // so answer the joining client immediately as well.
+            AnnounceScopeStatus();
+        }
+
+        /// <summary>
+        /// Broadcast the scope's current status without waiting for a sweep, so a
+        /// panel that will never receive one still learns why. No-op while sweeps
+        /// are arriving — that path owns "streaming"/"outofrange" and knows about
+        /// the watch panel — unless <paramref name="force"/> says the state just
+        /// changed under it (scope switched off).
+        /// </summary>
+        private void AnnounceScopeStatus(bool force = false)
+        {
+            if (!force && Environment.TickCount64 - Volatile.Read(ref _lastSweepTicks) < ScopeStaleMs)
+                return;
+
+            string status = !_bus.IsOpen      ? "disconnected"
+                          : _operatorScopeOff ? "unconfigured"
+                                              : "connecting";
+
+            Volatile.Write(ref _lastScopeAnnounceTicks, Environment.TickCount64);
+            SendHub("SdrStatus", new { sdrId = "A", status });
+            if (_pseudoDual)
+                SendHub("SdrStatus", new { sdrId = "B", status });
+        }
+
+        /// <inheritdoc />
+        public ScopeDiagnostics GetScopeDiagnostics()
+        {
+            long last = Volatile.Read(ref _lastSweepTicks);
+            return new ScopeDiagnostics(
+                Enabled: !_operatorScopeOff,
+                SweepsCompleted: _scope.SweepsCompleted,
+                SweepsDiscarded: _scope.SweepsDiscarded,
+                SecondsSinceLastSweep: last == 0 ? null : (Environment.TickCount64 - last) / 1000.0);
+        }
+
         public CivRadioController(
             RadioStateService state,
             ICivClient bus,
@@ -208,6 +268,11 @@ namespace Icom_Web_Control.Services
             // the web spectrum. Best-effort — a miss just means no scope trace.
             await EnableScopeAsync(cancellationToken);
 
+            // Tell the browser where the scope stands *now*. Sweeps may never come
+            // (scope off, or a radio that doesn't push 27 00), and until this the
+            // panel — and the Scope switch inside it — stayed hidden. GitHub #1.
+            AnnounceScopeStatus();
+
             return true;
         }
 
@@ -252,12 +317,18 @@ namespace Icom_Web_Control.Services
                 bool center = !_operatorFixedMode;
                 await SetScopeModeAsync(center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed,
                     center ? "scope center mode" : "scope fixed mode", cancellationToken);
+                // No-op if sweeps are already flowing; otherwise the panel shows
+                // "waiting" rather than sitting on a stale "scope off".
+                AnnounceScopeStatus();
             }
             else
             {
                 // Stop the PC waveform stream first, then power the scope down.
                 await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x00, "scope waveform output off", cancellationToken);
                 await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x00, "scope off", cancellationToken);
+                // Forced: the last sweep is seconds old at most, but the operator
+                // has just turned the scope off and the panel must say so.
+                AnnounceScopeStatus(force: true);
             }
         }
 
@@ -364,7 +435,14 @@ namespace Icom_Web_Control.Services
 
             // Re-assert "streaming" on the first sweep and every ~30 thereafter
             // so a client that loads mid-stream un-hides its spectrum panel.
-            bool announce = _scopeBroadcasts++ % 30 == 0;
+            // The counter runs from app start, not from connect, so on its own it
+            // leaves a newly-connected browser waiting up to 29 sweeps with the
+            // panel still hidden — RadioHub asks for an immediate announce on
+            // connect and that request is honoured here. The read-and-clear is on
+            // its own line so the request is consumed even on a sweep where the
+            // periodic announce was due anyway.
+            bool requested = Interlocked.Exchange(ref _announceScopeStatus, 0) == 1;
+            bool announce = _scopeBroadcasts++ % 30 == 0 || requested;
 
             if (!_pseudoDual)
             {
@@ -1524,6 +1602,281 @@ namespace Icom_Web_Control.Services
                 => Math.Round((2.0 + Math.Clamp(code, 0, 255) / 255.0 * 11.0) * 10.0) / 10.0;
         }
 
+        // -- TX audio chain, VOX and APF ---------------------------------------
+        //
+        // Everything here is one of the two families already established above,
+        // so the only work is the unit conversion the seam promises. Percent ↔
+        // 0–255 rounds rather than truncates, so a slider at 50 % comes back as
+        // 50 % rather than 49 % after a read-back.
+
+        public async Task<int> GetMicGainPercentAsync(CancellationToken ct = default)
+            => RawToPercent(await ReadLevel14Async(CivProtocol.SubMicGain, ct));
+        public Task SetMicGainPercentAsync(int percent, CancellationToken ct = default)
+            => WriteLevel14Async(CivProtocol.SubMicGain, PercentToRaw(percent), "mic gain", ct);
+
+        public async Task<bool> GetSpeechCompressorAsync(CancellationToken ct = default)
+            => await ReadFunc16Async(CivProtocol.SubSpeechComp, ct) == 1;
+        public Task SetSpeechCompressorAsync(bool on, CancellationToken ct = default)
+            => WriteFunc16Async(CivProtocol.SubSpeechComp, on ? 1 : 0, "speech compressor", ct);
+
+        public async Task<int> GetCompressorLevelPercentAsync(CancellationToken ct = default)
+            => RawToPercent(await ReadLevel14Async(CivProtocol.SubCompLevel, ct));
+        public Task SetCompressorLevelPercentAsync(int percent, CancellationToken ct = default)
+            => WriteLevel14Async(CivProtocol.SubCompLevel, PercentToRaw(percent), "compressor level", ct);
+
+        public async Task<bool> GetMonitorAsync(CancellationToken ct = default)
+            => await ReadFunc16Async(CivProtocol.SubMonitor, ct) == 1;
+        public Task SetMonitorAsync(bool on, CancellationToken ct = default)
+            => WriteFunc16Async(CivProtocol.SubMonitor, on ? 1 : 0, "TX monitor", ct);
+
+        public async Task<int> GetMonitorLevelPercentAsync(CancellationToken ct = default)
+            => RawToPercent(await ReadLevel14Async(CivProtocol.SubMonitorLevel, ct));
+        public Task SetMonitorLevelPercentAsync(int percent, CancellationToken ct = default)
+            => WriteLevel14Async(CivProtocol.SubMonitorLevel, PercentToRaw(percent), "monitor level", ct);
+
+        public async Task<bool> GetVoxAsync(CancellationToken ct = default)
+            => await ReadFunc16Async(CivProtocol.SubVox, ct) == 1;
+        public Task SetVoxAsync(bool on, CancellationToken ct = default)
+            => WriteFunc16Async(CivProtocol.SubVox, on ? 1 : 0, "VOX", ct);
+
+        public async Task<int> GetVoxGainPercentAsync(CancellationToken ct = default)
+            => RawToPercent(await ReadLevel14Async(CivProtocol.SubVoxGain, ct));
+        public Task SetVoxGainPercentAsync(int percent, CancellationToken ct = default)
+            => WriteLevel14Async(CivProtocol.SubVoxGain, PercentToRaw(percent), "VOX gain", ct);
+
+        public async Task<int> GetAntiVoxPercentAsync(CancellationToken ct = default)
+            => RawToPercent(await ReadLevel14Async(CivProtocol.SubAntiVox, ct));
+        public Task SetAntiVoxPercentAsync(int percent, CancellationToken ct = default)
+            => WriteLevel14Async(CivProtocol.SubAntiVox, PercentToRaw(percent), "anti-VOX", ct);
+
+        public Task<int> GetApfAsync(CancellationToken ct = default)
+            => ReadFunc16Async(CivProtocol.SubApf, ct);
+
+        public Task SetApfAsync(int setting, CancellationToken ct = default)
+        {
+            if (setting is < CivProtocol.ApfOff or > CivProtocol.ApfNarrow)
+            {
+                _logger.LogWarning("[CivRadioController] Invalid APF setting {Setting} (0–3) — ignored", setting);
+                return Task.CompletedTask;
+            }
+            return WriteFunc16Async(CivProtocol.SubApf, setting, "APF", ct);
+        }
+
+        // VOX delay is a SET-menu item in 0.1 s steps, not a 14-family level, so
+        // it gets the menu read/write rather than the level helpers.
+        public async Task<int> GetVoxDelayMsAsync(CancellationToken ct = default)
+        {
+            int tenths = await ReadSetMenuByteAsync(CivProtocol.MenuHiVoxDelay, CivProtocol.MenuLoVoxDelay, ct);
+            return tenths < 0 ? -1 : tenths * 100;
+        }
+
+        public Task SetVoxDelayMsAsync(int ms, CancellationToken ct = default)
+        {
+            int tenths = Math.Clamp((int)Math.Round(ms / 100.0), 0, CivProtocol.VoxDelayMaxTenths);
+            return WriteSetMenuByteAsync(CivProtocol.MenuHiVoxDelay, CivProtocol.MenuLoVoxDelay,
+                tenths, "VOX delay", ct);
+        }
+
+        /// <summary>Convert a raw 0–255 level to 0–100 %, preserving the -1 miss sentinel.</summary>
+        private static int RawToPercent(int raw)
+            => raw < 0 ? -1 : (int)Math.Round(Math.Clamp(raw, 0, 255) / 255.0 * 100.0);
+
+        /// <summary>Convert 0–100 % to the radio's raw 0–255 level.</summary>
+        private static int PercentToRaw(int percent)
+            => (int)Math.Round(Math.Clamp(percent, 0, 100) / 100.0 * 255.0);
+
+        // -- SET-menu single-byte items (1A 05 <hi> <lo>) ----------------------
+        // The RX Tone Control helpers above are shaped for two-byte HH LL data;
+        // most other SET items are a single byte, so they get their own pair.
+
+        /// <summary>Read a one-byte SET-menu item (1A 05 hi lo). -1 on a miss.</summary>
+        private async Task<int> ReadSetMenuByteAsync(byte hi, byte lo, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
+            // Reply body: 1A 05 hi lo <val> → Data = [05, hi, lo, val].
+            if (reply == null || reply.Cmd != CivProtocol.CmdMenu
+                || reply.Data.Length < 4 || reply.Data[0] != CivProtocol.SubSetMenu
+                || reply.Data[1] != hi || reply.Data[2] != lo)
+                return -1;
+            return CivProtocol.BcdByte(reply.Data[3]);
+        }
+
+        /// <summary>Write a one-byte SET-menu item (1A 05 hi lo val), value 0–99 as BCD.</summary>
+        private async Task WriteSetMenuByteAsync(byte hi, byte lo, int value, string what, CancellationToken ct)
+        {
+            int v = Math.Clamp(value, 0, 99);
+            byte packed = (byte)(((v / 10) << 4) | (v % 10));
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo, packed);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set {What} to {Value} was not acknowledged", what, value);
+        }
+
+        // -- RIT / ΔTX (CI-V 21) -----------------------------------------------
+        //
+        // One offset, two switches. The offset's wire form is two little-endian
+        // BCD bytes of the MAGNITUDE followed by a separate sign byte — the sign
+        // is not folded into the digits, so a negative offset is encoded as its
+        // absolute value plus a 01. 10 Hz is the finest step the field expresses.
+
+        public async Task<int> GetRitOffsetHzAsync(CancellationToken ct = default)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdRit, CivProtocol.SubRitFrequency);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdRit, cancellationToken: ct);
+            // Reply body: 21 00 <d0> <d1> <sign> → Data = [00, d0, d1, sign].
+            if (reply == null || reply.Cmd != CivProtocol.CmdRit
+                || reply.Data.Length < 4 || reply.Data[0] != CivProtocol.SubRitFrequency)
+                return 0;
+            long magnitude = CivProtocol.DecodeBcd(reply.Data.AsSpan(1, 2));
+            return reply.Data[3] == CivProtocol.RitSignMinus ? (int)-magnitude : (int)magnitude;
+        }
+
+        public async Task SetRitOffsetHzAsync(int hz, CancellationToken ct = default)
+        {
+            int clamped = Math.Clamp(hz, -CivProtocol.RitMaxHz, CivProtocol.RitMaxHz);
+            int stepped = (int)Math.Round(clamped / 10.0) * 10;   // the field carries no 1 Hz digit
+            var digits = CivProtocol.EncodeBcd(Math.Abs(stepped), 2);
+            byte sign = stepped < 0 ? CivProtocol.RitSignMinus : CivProtocol.RitSignPlus;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdRit, CivProtocol.SubRitFrequency, digits[0], digits[1], sign);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set RIT offset to {Hz} Hz was not acknowledged", stepped);
+        }
+
+        public async Task<bool> GetRitEnabledAsync(CancellationToken ct = default)
+            => await ReadRitSwitchAsync(CivProtocol.SubRitOn, ct) == 1;
+        public Task SetRitEnabledAsync(bool on, CancellationToken ct = default)
+            => WriteRitSwitchAsync(CivProtocol.SubRitOn, on, "RIT", ct);
+
+        public async Task<bool> GetDeltaTxEnabledAsync(CancellationToken ct = default)
+            => await ReadRitSwitchAsync(CivProtocol.SubDeltaTxOn, ct) == 1;
+        public Task SetDeltaTxEnabledAsync(bool on, CancellationToken ct = default)
+            => WriteRitSwitchAsync(CivProtocol.SubDeltaTxOn, on, "ΔTX", ct);
+
+        /// <summary>Read a 21-family on/off switch (21 01 / 21 02). -1 on a miss.</summary>
+        private async Task<int> ReadRitSwitchAsync(byte sub, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdRit, sub);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdRit, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.CmdRit
+                || reply.Data.Length < 2 || reply.Data[0] != sub)
+                return -1;
+            return reply.Data[1];
+        }
+
+        /// <summary>Write a 21-family on/off switch (21 01 / 21 02) and expect an ack.</summary>
+        private async Task WriteRitSwitchAsync(byte sub, bool on, string what, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdRit, sub, (byte)(on ? 1 : 0));
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set {What} {State} was not acknowledged", what, on ? "on" : "off");
+        }
+
+        // -- FM repeater tone (CI-V 16 42 / 16 43 / 1B 00 / 1B 01 / 1A 05) -----
+        //
+        // The two on/off switches are ordinary 16-family functions. The tone
+        // frequencies are command 1B, whose three data bytes are BIG-endian BCD
+        // in tenths of a Hz — the opposite order to the frequency commands, so
+        // CivProtocol.EncodeBcd/DecodeBcd (little-endian) do not apply here.
+
+        public async Task<bool> GetRepeaterToneAsync(CancellationToken ct = default)
+            => await ReadFunc16Async(CivProtocol.SubRepeaterTone, ct) == 1;
+        public Task SetRepeaterToneAsync(bool on, CancellationToken ct = default)
+            => WriteFunc16Async(CivProtocol.SubRepeaterTone, on ? 1 : 0, "repeater tone", ct);
+
+        public async Task<bool> GetToneSquelchAsync(CancellationToken ct = default)
+            => await ReadFunc16Async(CivProtocol.SubTsql, ct) == 1;
+        public Task SetToneSquelchAsync(bool on, CancellationToken ct = default)
+            => WriteFunc16Async(CivProtocol.SubTsql, on ? 1 : 0, "tone squelch", ct);
+
+        public Task<int> GetRepeaterToneTenthsHzAsync(CancellationToken ct = default)
+            => ReadToneFrequencyAsync(CivProtocol.SubToneFrequency, ct);
+        public Task SetRepeaterToneTenthsHzAsync(int tenthsHz, CancellationToken ct = default)
+            => WriteToneFrequencyAsync(CivProtocol.SubToneFrequency, tenthsHz, "repeater tone frequency", ct);
+
+        public Task<int> GetToneSquelchTenthsHzAsync(CancellationToken ct = default)
+            => ReadToneFrequencyAsync(CivProtocol.SubTsqlFrequency, ct);
+        public Task SetToneSquelchTenthsHzAsync(int tenthsHz, CancellationToken ct = default)
+            => WriteToneFrequencyAsync(CivProtocol.SubTsqlFrequency, tenthsHz, "tone squelch frequency", ct);
+
+        /// <summary>Read a 1B tone frequency in tenths of a Hz. -1 on a miss.</summary>
+        private async Task<int> ReadToneFrequencyAsync(byte sub, CancellationToken ct)
+        {
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdToneFreq, sub);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdToneFreq, cancellationToken: ct);
+            // Reply body: 1B <sub> 00 <100Hz|10Hz> <1Hz|0.1Hz> → Data = [sub, b0, b1, b2].
+            if (reply == null || reply.Cmd != CivProtocol.CmdToneFreq
+                || reply.Data.Length < 4 || reply.Data[0] != sub)
+                return -1;
+            return CivProtocol.BcdByte(reply.Data[1]) * 10000
+                 + CivProtocol.BcdByte(reply.Data[2]) * 100
+                 + CivProtocol.BcdByte(reply.Data[3]);
+        }
+
+        /// <summary>Write a 1B tone frequency given in tenths of a Hz (885 = 88.5 Hz).</summary>
+        private async Task WriteToneFrequencyAsync(byte sub, int tenthsHz, string what, CancellationToken ct)
+        {
+            int t = Math.Clamp(tenthsHz, 0, 9999);
+            byte b0 = 0x00;                                                   // 10 kHz / 1 kHz digits: no CTCSS tone reaches these
+            byte b1 = (byte)((((t / 1000) % 10) << 4) | ((t / 100) % 10));     // 100 Hz | 10 Hz
+            byte b2 = (byte)((((t / 10) % 10) << 4) | (t % 10));               // 1 Hz | 0.1 Hz
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdToneFreq, sub, b0, b1, b2);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set {What} to {Tenths} (tenths of a Hz) was not acknowledged", what, t);
+        }
+
+        // The radio keeps two FM split offsets, one for HF and one for 6 m, so
+        // which menu item to touch depends on where the operating VFO is tuned.
+        private async Task<byte> FmSplitOffsetItemAsync(CancellationToken ct)
+        {
+            long hz = await GetFrequencyHzAsync(ActiveVfo, ct);
+            return hz >= CivProtocol.SixMetreBandStartHz
+                ? CivProtocol.MenuLoFmSplitOffset6m
+                : CivProtocol.MenuLoFmSplitOffsetHf;
+        }
+
+        public async Task<int> GetFmSplitOffsetHzAsync(CancellationToken ct = default)
+        {
+            byte item = await FmSplitOffsetItemAsync(ct);
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubSetMenu, CivProtocol.MenuHiFmSplitOffset, item);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
+            // Reply body: 1A 05 00 <item> <d0> <d1> <d2> <dir> → Data = [05, 00, item, …].
+            if (reply == null || reply.Cmd != CivProtocol.CmdMenu
+                || reply.Data.Length < 7 || reply.Data[0] != CivProtocol.SubSetMenu
+                || reply.Data[2] != item)
+                return -1;
+            // Three little-endian BCD bytes carry the offset in units of 100 Hz.
+            long magnitude = CivProtocol.DecodeBcd(reply.Data.AsSpan(3, 3)) * 100;
+            return reply.Data[6] == CivProtocol.RitSignMinus ? (int)-magnitude : (int)magnitude;
+        }
+
+        public async Task SetFmSplitOffsetHzAsync(int hz, CancellationToken ct = default)
+        {
+            byte item = await FmSplitOffsetItemAsync(ct);
+            // The 100 Hz digit is fixed at 0, so the offset lands on a whole kHz.
+            int stepped = (int)Math.Round(Math.Clamp(hz, -9_999_000, 9_999_000) / 1000.0) * 1000;
+            var digits = CivProtocol.EncodeBcd(Math.Abs(stepped) / 100, 3);
+            byte dir = stepped < 0 ? CivProtocol.RitSignMinus : CivProtocol.RitSignPlus;
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubSetMenu, CivProtocol.MenuHiFmSplitOffset, item,
+                digits[0], digits[1], digits[2], dir);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] Set FM split offset to {Hz} Hz was not acknowledged", stepped);
+        }
+
         // -- VFO select / exchange / split (Phase 3 block 5) -------------------
 
         public async Task SelectVfoAsync(RadioVfo vfo, CancellationToken cancellationToken = default)
@@ -1769,6 +2122,27 @@ namespace Icom_Web_Control.Services
             bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
             if (!ok)
                 _logger.LogWarning("[CivRadioController] Clear memory channel {Ch} was not acknowledged", channel);
+            return ok;
+        }
+
+        // -- Raw command escape hatch (voice macros only) ----------------------
+        // See IRadioController.SendRawCommandAsync. The body comes from a user's
+        // Custom Command; framing and address stay ours, so a macro chooses the
+        // command but never the frame. Set commands answer FB/FA — a read
+        // command in a macro answers with data instead and is reported as an
+        // unacknowledged send, which is honest: nothing consumes the reply.
+
+        public async Task<bool> SendRawCommandAsync(IReadOnlyList<byte> commandBody, CancellationToken cancellationToken = default)
+        {
+            if (commandBody == null || commandBody.Count == 0) return false;
+
+            var body = commandBody as byte[] ?? commandBody.ToArray();
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
+            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
+            if (!ok)
+                _logger.LogWarning("[CivRadioController] Raw command {Body} was not acknowledged",
+                    CivMacroCodec.Describe(body));
             return ok;
         }
 
@@ -2050,6 +2424,13 @@ namespace Icom_Web_Control.Services
                 {
                     _logger.LogWarning(ex, "[CivRadioController] Radio poll failed");
                 }
+
+                // Scope-status watchdog: while sweeps are flowing this is a no-op
+                // and the sweep path does the announcing. When they stop — or never
+                // start — it keeps the panel's status honest so the card stays
+                // visible and the Scope switch reachable. GitHub #1.
+                if (Environment.TickCount64 - Volatile.Read(ref _lastScopeAnnounceTicks) >= ScopeAnnounceEveryMs)
+                    AnnounceScopeStatus();
 
                 loop++;
                 await DelayQuiet(ScopeAwarePollIntervalMs(), stoppingToken);

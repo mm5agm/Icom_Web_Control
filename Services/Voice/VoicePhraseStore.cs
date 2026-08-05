@@ -88,8 +88,17 @@ namespace Icom_Web_Control.Services.Voice
                 // Version 3 changed SetMode/SetBand to DecomposedCommand and merged
                 // Verbs+Connectors into Triggers for SetFrequency. Version 7 added
                 // the natural "status frequency" / "transmit on" trigger synonyms.
+                // Version 8 replaced the inherited Yaesu ASCII macro payloads
+                // ("NR01;") with CI-V hex ("16 40 01;") — a v7 pack's macros
+                // would be rejected by the validator and unsendable, so it has
+                // to be reset, not carried forward. Version 9 turned the
+                // shipped NR/NB raw-CI-V macros into real semantic intents and
+                // added eight more (notch, RF gain, squelch, TX power, mic
+                // gain, processor, APF) alongside Icom-shaped attenuator and
+                // AGC vocabularies; a v8 pack would still carry the macros,
+                // which now collide word-for-word with the new triggers.
                 // Older files are reset to defaults rather than partially migrated.
-                if (config == null || config.Version < 7)
+                if (config == null || config.Version < 9)
                     return BuildDefaults();
                 return config;
             }
@@ -319,9 +328,52 @@ namespace Icom_Web_Control.Services.Voice
             }
         }
 
+        /// <summary>
+        /// The shared 0–100 level words used by every "say a trigger then a
+        /// number" control (AF gain, RF gain, squelch, TX power, mic gain, and
+        /// the level half of NR/NB/processor). A fresh dictionary per call —
+        /// BuildDefaults hands these straight to the user's editable pack, and
+        /// sharing one instance would make editing one control's numbers
+        /// silently edit them all.
+        /// </summary>
+        private static Dictionary<string, List<string>> LevelVocabulary() => new()
+        {
+            ["0"]   = ["zero"],
+            ["10"]  = ["ten"],
+            ["20"]  = ["twenty"],
+            ["25"]  = ["twenty five"],
+            ["30"]  = ["thirty"],
+            ["40"]  = ["forty"],
+            ["50"]  = ["fifty"],
+            ["60"]  = ["sixty"],
+            ["70"]  = ["seventy"],
+            ["75"]  = ["seventy five"],
+            ["80"]  = ["eighty"],
+            ["90"]  = ["ninety"],
+            ["100"] = ["one hundred", "maximum", "full"],
+        };
+
+        /// <summary>
+        /// A level vocabulary with "off"/"on" prepended, for the controls that
+        /// are a switch and a level in one (NR, NB, speech processor). Saying a
+        /// number turns the function on as well as setting its depth, so the
+        /// operator never has to remember to switch it on first.
+        /// </summary>
+        private static Dictionary<string, List<string>> SwitchedLevelVocabulary(params string[] onWords)
+        {
+            var v = new Dictionary<string, List<string>>
+            {
+                ["off"] = ["off"],
+                ["on"]  = [.. onWords],
+            };
+            foreach (var (key, words) in LevelVocabulary())
+                v[key] = words;
+            return v;
+        }
+
         public static VoicePhrasesConfig BuildDefaults() => new()
         {
-            Version = 7,
+            Version = 9,
             SimpleCommands = new()
             {
                 ["SwapVFO"]          = ["swap v f o", "swap v f os", "swap a and b", "swap a b", "switch v f o", "switch a and b"],
@@ -374,29 +426,41 @@ namespace Icom_Web_Control.Services.Voice
                     ["4"]   = ["four metres"],
                 },
             },
+            // Macro payloads are CI-V command bodies in hex, ';'-separated —
+            // command byte, sub-command byte, data. See CivMacroCodec.
             Macros = new()
             {
-                new() { Name = "Copy A to B",    Phrases = ["copy a to b", "a to b"],         Cat = "AB;",   Category = "Macros" },
-                new() { Name = "Copy B to A",    Phrases = ["copy b to a", "b to a"],         Cat = "BA;",   Category = "Macros" },
-                new() { Name = "Fine step up",   Phrases = ["fine up", "fine step up"],       Cat = "UP;",   Category = "Macros" },
-                new() { Name = "Fine step down", Phrases = ["fine down", "fine step down"],   Cat = "DN;",   Category = "Macros" },
-                new() { Name = "NR on",           Phrases = ["noise reduction on", "n r on"],           Cat = "NR01;", Category = "Noise Reduction" },
-                new() { Name = "NR off",          Phrases = ["noise reduction off", "n r off"],          Cat = "NR00;", Category = "Noise Reduction" },
-                new() { Name = "NB on",           Phrases = ["noise blanker on", "n b on"],              Cat = "NB01;", Category = "Noise Reduction" },
-                new() { Name = "NB off",          Phrases = ["noise blanker off", "n b off"],            Cat = "NB00;", Category = "Noise Reduction" },
+                // Icom has no one-shot "copy A to B": 07 A0 equalizes, i.e.
+                // copies the SELECTED VFO into the other. So each direction
+                // selects its source first, and "copy B to A" hands the
+                // operating VFO back to A afterwards so the macro leaves the
+                // selection exactly as it found it.
+                new() { Name = "Copy A to B",    Phrases = ["copy a to b", "a to b"],         Cat = "07 00;07 A0;",         Category = "Macros" },
+                new() { Name = "Copy B to A",    Phrases = ["copy b to a", "b to a"],         Cat = "07 01;07 A0;07 00;",   Category = "Macros" },
+                // (The NR/NB on/off macros went in v9. Shipping them was against
+                //  the seam's own rule — SendRawCommandAsync exists for macros the
+                //  *user* writes, not for commands the app already has semantic
+                //  members for — and their phrases ("noise reduction on") now
+                //  collide word-for-word with the SetNoiseReduction trigger plus
+                //  its "on" vocabulary, which the grammar could only resolve
+                //  arbitrarily. They are real intents now, not raw bytes.)
                 // (The Yaesu roofing-filter macros were removed for IWC — the
                 //  IC-7300 is a DSP receiver with no switchable roofing filters;
-                //  its IF passband is set via the IF Width / FIL slot controls.)
+                //  its IF passband is set via the IF Width / FIL slot controls.
+                //  The Yaesu "fine step up/down" macros went too: they were the
+                //  mic UP/DN keys, which CI-V has no equivalent of. "Tune up" /
+                //  "tune down" with a 10 Hz step size is the same operation.)
             },
+            // The IC-7300 has one 20 dB pad, switched on or off (CI-V 11) —
+            // not Yaesu's off/6/12/18 dB ladder, which is what this vocabulary
+            // used to offer and what made the intent inert on Icom.
             SetAttenuator = new()
             {
                 Triggers   = ["attenuator", "set attenuator", "a t t"],
                 Vocabulary = new()
                 {
                     ["off"] = ["off"],
-                    ["6"]   = ["six d b"],
-                    ["12"]  = ["twelve d b"],
-                    ["18"]  = ["eighteen d b"],
+                    ["on"]  = ["on", "twenty d b"],
                 },
             },
             SetPreamp = new()
@@ -409,16 +473,17 @@ namespace Icom_Web_Control.Services.Voice
                     ["2"]   = ["two", "amp two"],
                 },
             },
+            // IC-7300 AGC is a three-position time constant (CI-V 16 12 →
+            // 1/2/3). There is no OFF and no AUTO; those two Yaesu positions
+            // were what left this intent inert on Icom.
             SetAgc = new()
             {
                 Triggers   = ["a g c", "set a g c"],
                 Vocabulary = new()
                 {
-                    ["off"]  = ["off"],
                     ["fast"] = ["fast"],
                     ["mid"]  = ["medium", "mid"],
                     ["slow"] = ["slow"],
-                    ["auto"] = ["auto", "automatic"],
                 },
             },
             SetAfGain = new()
@@ -426,6 +491,8 @@ namespace Icom_Web_Control.Services.Voice
                 Triggers   = ["a f gain", "audio gain", "set a f gain"],
                 Vocabulary = new()
                 {
+                    // "mute"/"silent" are AF-gain-only synonyms for zero; the
+                    // rest of the ladder is the shared level vocabulary.
                     ["0"]   = ["zero", "mute", "silent"],
                     ["10"]  = ["ten"],
                     ["20"]  = ["twenty"],
@@ -439,6 +506,64 @@ namespace Icom_Web_Control.Services.Voice
                     ["80"]  = ["eighty"],
                     ["90"]  = ["ninety"],
                     ["100"] = ["one hundred", "maximum", "full"],
+                },
+            },
+            SetNoiseReduction = new()
+            {
+                Triggers   = ["noise reduction", "n r"],
+                Vocabulary = SwitchedLevelVocabulary("on"),
+            },
+            SetNoiseBlanker = new()
+            {
+                Triggers   = ["noise blanker", "n b"],
+                Vocabulary = SwitchedLevelVocabulary("on"),
+            },
+            SetNotch = new()
+            {
+                Triggers   = ["notch", "set notch"],
+                Vocabulary = new()
+                {
+                    ["off"]    = ["off"],
+                    ["auto"]   = ["auto", "automatic"],
+                    ["manual"] = ["manual"],
+                },
+            },
+            SetRfGain = new()
+            {
+                Triggers   = ["r f gain", "set r f gain"],
+                Vocabulary = LevelVocabulary(),
+            },
+            SetSquelch = new()
+            {
+                Triggers   = ["squelch", "set squelch"],
+                Vocabulary = LevelVocabulary(),
+            },
+            SetTxPower = new()
+            {
+                Triggers   = ["transmit power", "t x power", "set power"],
+                Vocabulary = LevelVocabulary(),
+            },
+            SetMicGain = new()
+            {
+                Triggers   = ["mic gain", "microphone gain"],
+                Vocabulary = LevelVocabulary(),
+            },
+            SetProcessor = new()
+            {
+                Triggers   = ["speech processor", "processor", "compressor"],
+                Vocabulary = SwitchedLevelVocabulary("on"),
+            },
+            // APF is CW-only and its positions are widths, not a level — OFF is
+            // simply the fourth position (CI-V 16 32).
+            SetApf = new()
+            {
+                Triggers   = ["a p f", "audio peak filter"],
+                Vocabulary = new()
+                {
+                    ["0"] = ["off"],
+                    ["1"] = ["wide"],
+                    ["2"] = ["medium", "mid"],
+                    ["3"] = ["narrow"],
                 },
             },
             SetNudgeStep = new()

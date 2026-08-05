@@ -2,7 +2,7 @@
 
 **Status:** design agreed, not yet started. Trigger to begin = I have the IC-7300 MkII in hand and say go.
 **Target radio (v1):** Icom **IC-7300 MkII**, CI-V over USB Type-C (`FE FE` … `FD`, default radio address **`0xB6`**, controller `0xE0`).
-**End goal:** full feature parity with YWC *wherever the Icom radio supports the feature* — including **voice control**, which is required (partially-sighted users: Yuri W4YSW, Thomas OZ1JTE, Bill W1WRH).
+**End goal:** full feature parity with YWC *wherever the Icom radio supports the feature* — including **voice control**, which is required — it is how partially-sighted operators drive the app.
 
 This document supersedes the older "clone whole YWC and cut Yaesu code" idea. (Radio target changed from IC-705 to IC-7300 MkII on 2026-07-19 — see the verified-facts section below; the plan is unchanged and if anything simpler.)
 
@@ -115,7 +115,7 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 **Phase 2 — CI-V transport (first real command)**
 - Build `CivFrameBuffer` + `CivBusService` + `ICivClient` + `CivRadioController.GetFrequencyHz` for **read frequency (`03`)** only, wired through the unchanged dispatcher → `RadioStateService` → SignalR path.
 - Real VFO-A frequency on the web page = entire spine proven.
-- **Accessibility win already here:** voice readback ("what's my frequency?") + TTS works the moment `GetFrequencyHz` is real. Put in front of Yuri/Thomas early.
+- **Accessibility win already here:** voice readback ("what's my frequency?") + TTS works the moment `GetFrequencyHz` is real. Worth getting in front of a partially-sighted tester early.
 
 **Phase 3 — additive command roadmap** (one block per commit; each lights up touch + voice + rigctld together)
 1. ✅ Set frequency (`05`) — click-to-tune + keypad + "set frequency…" voice
