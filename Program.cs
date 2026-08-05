@@ -261,6 +261,7 @@ builder.Services.Configure<HostOptions>(opts =>
     opts.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
 
+builder.Services.AddSingleton<CalibrationContributionsStore>();
 builder.Services.AddSingleton<CalibrationStorage>();
 builder.Services.AddSingleton<ICalibrationService, CalibrationService>();
 

@@ -17,13 +17,18 @@ public interface ICalibrationService
     string GetSavePath();
     bool IsDevelopmentMode { get; }
 
-    // Development-only: fold a user-emailed calibration into the shipped default
-    // file for its radio. Callers must gate on IsDevelopmentMode first.
-    CalibrationImportResult ImportEmailedCalibrationIntoDefault(string? emailText);
+    // Development-only: record a user-emailed calibration as a contribution and
+    // re-derive the shipped default for its radio from every contribution held.
+    // Callers must gate on IsDevelopmentMode first.
+    CalibrationImportResult ImportEmailedCalibrationIntoDefault(string? emailText, ContributionMeta? meta = null);
 
-    // Same surgery, but sourced from the calibration this instance already has
-    // loaded — no email body, no clipboard.
-    CalibrationImportResult ImportCurrentCalibrationIntoDefault();
+    // Same, but sourced from the calibration this instance already has loaded —
+    // no email body, no clipboard.
+    CalibrationImportResult ImportCurrentCalibrationIntoDefault(ContributionMeta? meta = null);
+
+    // Re-derive a shipped default from the contributions already on disk,
+    // recording nothing new. Used after excluding a bad contribution.
+    CalibrationImportResult RecomputeDefaultFromContributions(string? model = null);
 }
 
 public class CalibrationService : ICalibrationService
@@ -159,15 +164,19 @@ public class CalibrationService : ICalibrationService
             _storage.GetActivePath(), Summarise(Current));
     }
 
-    public CalibrationImportResult ImportEmailedCalibrationIntoDefault(string? emailText) =>
-        _storage.ImportEmailedCalibrationIntoDefault(emailText);
+    public CalibrationImportResult ImportEmailedCalibrationIntoDefault(
+        string? emailText, ContributionMeta? meta = null) =>
+        _storage.ImportEmailedCalibrationIntoDefault(emailText, meta);
 
     // Re-read from disk first so we promote what is actually saved, not a stale
     // in-memory copy.
-    public CalibrationImportResult ImportCurrentCalibrationIntoDefault()
+    public CalibrationImportResult ImportCurrentCalibrationIntoDefault(ContributionMeta? meta = null)
     {
         Reload();
-        return _storage.ImportCalibrationIntoDefault(Current);
+        return _storage.ImportCalibrationIntoDefault(Current, meta);
     }
+
+    public CalibrationImportResult RecomputeDefaultFromContributions(string? model = null) =>
+        _storage.RecomputeIntoDefault(model);
 }
 

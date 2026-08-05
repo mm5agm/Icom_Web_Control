@@ -173,16 +173,25 @@ Do not put email addresses, real names, or locations in the contributions file. 
 
 ## Implementation
 
-1. `Models/Calibration/CalibrationContributions.cs` — the store's model classes.
-2. `Services/CalibrationContributionsStore.cs` — load/save, `Append`, `Recompute(model)` returning per-meter aggregated vectors plus the spread report. Pure over the store, no file surgery.
-3. `CalibrationStorage.ApplyIntoDefault` — keep the surgery; change the caller so the values written come from `Recompute` rather than straight from the incoming file.
-4. `CalibrationImportResult` — add the spread report and the un-measured list.
-5. `CalibrationController` — add `POST /api/calibration/contributions/recompute`, dev-gated like the others.
-6. Meter Calibration page — prompt for callsign/note on import; render the spread summary. Dev-only, inside the existing `@if (Model.IsDevelopmentMode)`.
-7. Seed `placeholders` for both models from the default files' git history.
-8. Record Colin's own bench calibration as contribution #1 (the 226 / 254 values reverted in `3122f6d` were test mutations, **not** measurements — do not use them).
+**Built 2026-08-05.** Steps 1–7 are done; step 8 stays open on purpose.
 
-Steps 1–3 are the substance; 4–6 are reporting. Steps 7–8 are one-off data entry.
+1. ✅ `Models/Calibration/CalibrationContributions.cs` — the store's model classes.
+2. ✅ `Services/CalibrationContributionsStore.cs` — load/save, `Record`, `Recompute` returning per-meter aggregated vectors plus the spread report. Pure over the store, no file surgery.
+3. ✅ `CalibrationStorage.ApplyIntoDefault` — surgery untouched; the values it writes now come from `Recompute` rather than straight from the incoming file.
+4. ✅ `CalibrationImportResult` — gained `Unmeasured`, `Refused`, `Spread` and `Contributors`.
+5. ✅ `CalibrationController` — `POST /api/calibration/contributions/recompute`, dev-gated like the others.
+6. ✅ Meter Calibration page — callsign/note inputs and a **↻ Recompute from contributions (dev)** button inside the existing `@if (Model.IsDevelopmentMode)`; the spread and refusal detail go to the status tooltip and the console.
+7. ✅ `calibration-contributions/IC-7300.json` and `IC-7300MK2.json` seeded from the default files' git history — the current vectors, plus the pre-carve Yaesu-era ones `calibration.default.json` held at `e214517` (including `TPA`, which no Icom table has) so a user file predating the carve is still recognised as un-measured.
+8. ⬜ **Deliberately still empty.** Colin's bench calibration is not recorded, because there is nothing to record: the 226 / 254 values reverted in `3122f6d` were test mutations, **not** measurements. The shipped tables are still the original hand-typed placeholders, and a recompute against the empty store leaves them byte-identical — which is exactly the property that proves the wiring is right. The first real contribution is the first one that moves a number.
+
+Decisions taken during implementation, beyond what is above:
+
+- **One contribution per callsign per model.** Re-importing an operator's file supersedes their previous numbers instead of appending. Without this, Colin promoting his own bench calibration twice would give himself two votes in the median. Anonymous contributions can't be matched up, so they always append.
+- **Un-measured is decided once, at import**, against the placeholders known then — never re-derived during a recompute. Re-deriving would discard the very contribution that produced the current shipped value the moment that value became a placeholder.
+- **Raw values outside 0–255 are refused**, alongside the non-monotonic check: the CI-V meter range is a byte, so anything else is a transcription error.
+- **The store file is written with scalar arrays collapsed onto one line.** `WriteIndented` alone turns a six-point vector into six lines; this file exists to be read in a git diff.
+
+Verified against the real classes, without hardware: empty store recommends nothing; an ALC-only contributor has their other six meters flagged un-measured; a re-import by the same callsign keeps the contribution count at one; a wild third contributor is outvoted by the median and shows up in the spread report; a non-monotonic vector is refused without affecting other meters; excluding the wild contributor moves the median back.
 
 ## Consequences
 
