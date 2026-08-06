@@ -231,12 +231,20 @@
 <!-- Connection-problem banner. Driven by the ConnectionStatusText SignalR
      property (see site.js): shown when the CI-V link can't come up (e.g. the
      configured serial port isn't present), hidden the moment the radio
-     connects. Not user-dismissible — it clears itself when the problem does. -->
+     connects. Not user-dismissible — it clears itself when the problem does.
+
+     The Ports link is here because this banner is the one moment a user is
+     definitely looking for the COM-port list, and /Ports is otherwise
+     unreachable from the UI — nothing in the navbar points at it (issue #2,
+     where the port list had to be asked for by email). Same tab is safe:
+     site.js is in _Layout, so every page heartbeats and navigating away
+     doesn't start RadioHub's 30-second shutdown countdown. -->
 <div id="connectionProblemBanner" class="alert alert-warning mb-1 py-1 px-3" role="alert"
      aria-live="polite" style="display:none; font-size:0.85rem;">
     <i class="bi bi-plug-fill" aria-hidden="true"></i>
     <strong>Radio not connected.</strong>
     <span id="connectionProblemText"></span>
+    <a asp-page="/Ports" class="alert-link ms-1">Check which COM ports this PC has</a>
 </div>
 
 <div class="row mb-1" style="padding-top: 2px; padding-bottom: 2px;">
