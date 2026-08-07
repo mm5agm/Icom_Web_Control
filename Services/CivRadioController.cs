@@ -2202,6 +2202,19 @@ namespace Icom_Web_Control.Services
             if (reply == null)
                 return false;
 
+            // Never take our own address off the wire. CivBusService drops echo
+            // frames before they get here, so this should be unreachable — but
+            // the cost of being wrong is a silent total failure that looks like
+            // a dead radio (issues #2, #5), so it is worth a second lock on the
+            // one assignment that can cause it. A radio answering as E0 is not
+            // a radio.
+            if (reply.From == CivProtocol.ControllerAddress)
+            {
+                _logger.LogWarning("[CivRadioController] Ignoring identify reply from the controller address " +
+                                   "({Addr:X2}) — this is our own bus echo, not a radio.", reply.From);
+                return false;
+            }
+
             if (reply.From != 0x00)
                 _radioAddress = reply.From;
 
