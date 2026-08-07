@@ -40,9 +40,22 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Release notes
 
-### v1.0.4 (2026-08-05) — pre-release
+### v1.0.4 (2026-08-07) — pre-release
 
-**IWC no longer needs an internet connection.** If your shack PC is online, this release changes nothing you can see and you can safely ignore it. If it is not, this is the one that makes IWC work at all.
+**Two faults that could each stop IWC working completely, on a radio and a PC with nothing wrong with them.** Between them they account for every "it won't connect" report received since launch.
+
+**1. A radio that answered perfectly could be reported as not responding** ([#2](https://github.com/mm5agm/Icom_Web_Control/issues/2), [#5](https://github.com/mm5agm/Icom_Web_Control/issues/5)).
+
+If the radio's **CI-V USB Echo Back** setting was on, IWC could not connect to it at all. The banner said *"Serial port COMx opened, but the radio isn't responding — is it powered on?"* — while the radio sat there in perfect health, and other CAT software talked to it on that very same port.
+
+- **What was happening.** With echo back on, the radio repeats the PC's own commands back to it. IWC asks "is anyone there?" as its first question, and that question alone is broadcast to every address so that both the IC-7300 and the MkII will answer it. The echo of that broadcast came back looking enough like a reply to be mistaken for one — and IWC read the radio's CI-V address out of it, which gave it *the PC's* address instead. From that moment every command was addressed to the computer rather than to the radio. Nothing answered, and IWC reported exactly what it saw.
+- **Fixed properly:** IWC now recognises its own echo and ignores it, so **this release connects whether echo back is on or off** and there is nothing to set.
+- **On v1.0.4-pre1 or earlier?** You do not have to upgrade to get working — switch **CI-V USB Echo Back** off at **MENU → SET → Connectors → CI-V** (the MkII has an (A) and a (B); switch both off) and the version you already have will connect.
+- The **Radio not connected** banner now also links straight to the list of COM ports your PC has, so a wrong port number can be spotted without going near Device Manager. The User Manual explains all three banner messages and what each one actually means (Section 14.2).
+
+*Found because Steve stuck with it for a fortnight and mentioned, almost in passing, that N1MM could see his radio on the same port — which proved the fault was mine and not his. Gerry reported the same symptom independently. Reproduced on the bench by switching that one radio setting on.*
+
+**2. IWC no longer needs an internet connection.** If your shack PC is online, this half of the release changes nothing you can see. If it is not, this is the one that makes IWC work at all.
 
 - **The control panel could open with no meters, no icons and no value that ever changed.** Up to v1.0.3 the page fetched three files — the meter-gauge library, the icon font, and the library that carries live updates from the radio to the browser — from public servers on the internet rather than from your own PC. Without the last of those, the page's script stopped before it started: you got the layout and the buttons, but dead gauges, a frequency that never moved, and empty boxes where the icons should be.
   - This went unnoticed for four releases because it is invisible on any PC that has ever been online. Browsers keep their own copy of those files for a year, so once they had arrived they kept working — including with the network unplugged. Only a PC that had **never** been online saw the failure, which is a perfectly ordinary way to run a shack computer and one I had not thought about.

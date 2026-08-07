@@ -868,6 +868,8 @@ IWC talks to the radio using the CI-V protocol over that single USB serial conne
 
 > **CI-V transceive:** leave the radio's **CI-V Transceive** setting **ON** (the default) so that changes made on the radio's front panel are reported back to IWC and the display stays in sync.
 
+> **CI-V USB Echo Back:** IWC works with this **on or off**, so you can leave it alone. If you are on **v1.0.4-pre1 or earlier**, switch it **OFF** — on those versions echo back stops IWC connecting at all. It is under **MENU → SET → Connectors → CI-V**; the IC-7300 MkII has two entries, **CI-V USB (A) Echo Back** and **(B)**, and the original IC-7300 has one. All of them default to **OFF**. See §14.2 if you are seeing *"port opened, but the radio isn't responding"*.
+
 ---
 
 ### 6.2 Web Server Settings
@@ -1723,11 +1725,31 @@ A **Feature request** template is also available for ideas / improvements rather
 The radio is not answering on CI-V. IWC keeps retrying, so it clears itself the moment the link comes up.
 
 - Check that the radio is powered on.
-- Check the COM port in Settings. Go to **Diagnostics → Ports** to see which ports are available.
+- Check the COM port in Settings. The **Check which COM ports this PC has** link in the "Radio not connected" banner lists every port your PC has and says whether the one you configured is among them; **Diagnostics → Ports** shows the same thing.
 - Check the baud rate in Settings matches the radio's **MENU → SET → Connectors → CI-V → CI-V Baud Rate**.
 - Check the CI-V address in Settings (`B6` for the IC-7300 MkII, `94` for the original IC-7300).
 - Click **Test Connection** in Settings.
 - If IWC knows *why* it cannot connect — a COM port that is not present, for instance — the panel says so and offers a link to Settings instead of spinning.
+
+**"Radio not connected" — what the banner is telling you**
+
+When IWC cannot reach the radio it shows a yellow banner across the top of the main page with the reason. It is worth reading the exact wording, because the three messages mean quite different things:
+
+| The banner says | What it means | What to do |
+|---|---|---|
+| *"Serial port COMx **not found**. Ports available now: …"* | Windows has no such port. The list that follows is what your PC actually has. | Pick one of the listed ports in Settings. If the list is empty or has nothing radio-shaped in it, install Icom's USB driver — the original IC-7300 needs it before Windows creates a port at all. |
+| *"Serial port COMx is present but **could not be opened**"* | The port exists, but something else has it. | Close whatever else is talking to the radio — WSJT-X in direct CAT mode, Ham Radio Deluxe, N1MM, Omni-rig, or a second copy of IWC. See §15.2 on port sharers. |
+| *"Serial port COMx **opened, but the radio isn't responding**"* | The port is fine. The radio is not answering on it. | See the next entry. |
+
+**"Serial port COMx opened, but the radio isn't responding — is it powered on?"**
+
+The port opened cleanly, so the driver, the cable and the port number are all correct. Something is stopping the radio from answering.
+
+- **If you are on v1.0.4-pre1 or earlier, check CI-V USB Echo Back first.** With that setting on, those versions cannot connect *at all* — the radio is answering perfectly and IWC is failing to listen. Switch it off at **MENU → SET → Connectors → CI-V** (the MkII has **CI-V USB (A) Echo Back** and **(B)** — switch both off; the original IC-7300 has one). **v1.0.4-pre2 and later work either way**, so on current versions you can skip this.
+- Check the CI-V address in Settings matches the radio: **`B6`** for the IC-7300 MkII, **`94`** for the original IC-7300 (**MENU → SET → Connectors → CI-V → CI-V Address**).
+- Check the baud rate in Settings matches **CI-V Baud Rate** on the radio. If the radio is set to **Auto**, set both ends to **19200** instead while you are diagnosing.
+- **On the IC-7300 MkII, make sure you are on the right port.** The radio presents *two* USB serial ports and only one of them carries CI-V — the one Windows names **"IC-7300MK2 Serial Port A (CI-V)"**. Port B will open happily and never answer.
+- A quick sanity check: if another program — N1MM, WSJT-X, Ham Radio Deluxe — can talk to the radio on that same port, then the port and radio are definitely fine and the fault is in how IWC is addressing it. Say so in your bug report (§14.1); it narrows things down enormously.
 
 **Start-up panel stays on "Starting spectrum scope, please wait…"**
 
