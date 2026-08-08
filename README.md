@@ -65,6 +65,15 @@ If the radio's **CI-V USB Echo Back** setting was on, IWC could not connect to i
 
 *Thanks to Steve for the screenshot that showed the page stuck on "Transferring data from cdn.jsdelivr.net…" — without it this would still be sitting there.*
 
+**Also in this release**
+
+- **Switching the scope off now gives you the screen space back.** The **Scope** switch stopped the trace but left the whole panel — header, span buttons, Range / Speed / Bright bar, spectrum and waterfall — sitting there as dead space. It now collapses, and everything below it moves up. The switch stays on screen with a reminder beside it, so the way back is never hidden. User Manual, Section 5.4.
+- **A blank spectrum on the original IC-7300 now explains itself.** The original IC-7300 — not the MkII — only sends band scope data when its **CI-V USB Port** is set to **Unlink from [REMOTE]** *and* its **CI-V USB Baud Rate** is **115200**. Below that it refuses the command outright. Since IWC's default is 19200 and the radio's own default is *Auto* (which follows the PC down), a stock IWC talking to a stock IC-7300 gave a spectrum panel that sat on *"Waiting for the radio's band scope…"* for ever, while frequency, mode and every meter worked perfectly — with nothing on screen to suggest why. IWC used to swallow that refusal into a log line.
+  - The panel now says **"The radio refused to send scope data"** and prints the reason underneath, naming the exact radio menu and the rate to set it to. The status badge reads **Scope blocked**.
+  - **Settings warns you before it happens.** Choose **IC-7300** with anything below 115200 and the warning appears next to the Baud Rate box as you pick it, rather than after the fact.
+  - MkII owners are unaffected — the MkII has no such restriction and never sees either message. User Manual, Sections 3, 6.1, 6.3 and 14.2.
+- **The S-meter history strip is now shown by default.** The 30-second strip-chart to the left of the S-meter has been in IWC since the first release, but it shipped hidden behind the **S-hist** button in the toolbar, so almost nobody found it. It is now on when you first run IWC. It plots the signal trace, its peak hold and the noise floor over the last half-minute, which makes QSB, interference spikes and a noise source switching on visible at a glance in a way the needle alone cannot show. The **S-hist** button still hides it, and **if you had already turned it off, it stays off** — the new default only applies where no choice had been made. User Manual, Section 5.2.
+
 ### v1.0.3 (2026-08-05)
 
 **The first full release since v1.0.0.** If you have been staying on full releases — which is what the ⬇ Download link and the in-app update banner give you — this is a large step: everything in the **v1.0.1** and **v1.0.2** pre-release notes below arrives with it. That includes the two operator bug fixes ([#1](https://github.com/mm5agm/Icom_Web_Control/issues/1), [#2](https://github.com/mm5agm/Icom_Web_Control/issues/2)), eleven more voice-controlled functions, region-aware band edges, and working voice macros. Read those two sections as part of this release.
