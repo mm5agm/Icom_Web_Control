@@ -231,12 +231,20 @@
 <!-- Connection-problem banner. Driven by the ConnectionStatusText SignalR
      property (see site.js): shown when the CI-V link can't come up (e.g. the
      configured serial port isn't present), hidden the moment the radio
-     connects. Not user-dismissible — it clears itself when the problem does. -->
+     connects. Not user-dismissible — it clears itself when the problem does.
+
+     The Ports link is here because this banner is the one moment a user is
+     definitely looking for the COM-port list, and /Ports is otherwise
+     unreachable from the UI — nothing in the navbar points at it (issue #2,
+     where the port list had to be asked for by email). Same tab is safe:
+     site.js is in _Layout, so every page heartbeats and navigating away
+     doesn't start RadioHub's 30-second shutdown countdown. -->
 <div id="connectionProblemBanner" class="alert alert-warning mb-1 py-1 px-3" role="alert"
      aria-live="polite" style="display:none; font-size:0.85rem;">
     <i class="bi bi-plug-fill" aria-hidden="true"></i>
     <strong>Radio not connected.</strong>
     <span id="connectionProblemText"></span>
+    <a asp-page="/Ports" class="alert-link ms-1">Check which COM ports this PC has</a>
 </div>
 
 <div class="row mb-1" style="padding-top: 2px; padding-bottom: 2px;">
@@ -366,9 +374,9 @@
                     <!-- Gauges row -->
                     <div class="d-flex justify-content-start align-items-start flex-wrap" style="margin-left: 0; gap: 0; margin-bottom: 0.2rem !important;">
                         <!-- S-Meter rolling history strip — leftmost so the live trace
-                             reads left-to-right toward the S-meter needle. Hidden
-                             until the toolbar's S-hist toggle is on. Sized to match
-                             the meter cells alongside it. Moved from inside the VFO
+                             reads left-to-right toward the S-meter needle. Shown by
+                             default; hide it with the toolbar's S-hist toggle. Sized
+                             to match the meter cells alongside it. Moved from inside the VFO
                              panels in v2.3.9 (Jacek SP3L #34 / Colin's design call).
                              v2.4.0: restored as a VFO A / VFO B pair — dual-receiver
                              radios (FTdx101MP/D) have an independently calibrated
@@ -376,7 +384,7 @@
                              only get the VFO A pair since there's no SUB receiver. -->
                         <div id="sMeterHistoryContainer"
                              class="text-center smeter-history-container"
-                             style="display:none; position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
+                             style="position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
                             <canvas id="sMeterHistoryCanvas"
                                     role="img" aria-hidden="true"
                                     aria-label="S-meter 30-second history — VFO A"
@@ -396,7 +404,7 @@
                             <!-- S-Meter B (SUB) — dual-receiver radios only. -->
                             <div id="sMeterHistoryContainerB"
                                  class="text-center smeter-history-container"
-                                 style="display:none; position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
+                                 style="position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
                                 <canvas id="sMeterHistoryCanvasB"
                                         role="img" aria-hidden="true"
                                         aria-label="S-meter 30-second history — VFO B"
@@ -557,7 +565,13 @@
                  Turning it off stops the radio streaming waveform data (CI-V
                  27 10 / 27 11): the trace goes quiet. Also the operator's
                  control for testing whether the scope stream causes RX noise. -->
-            <div class="d-flex justify-content-end align-items-center mb-2">
+            <div class="d-flex justify-content-end align-items-center mb-2 gap-2">
+                @* Switching the scope off used to leave the whole panel — header,
+                   span buttons, Range/Speed/Bright bar, canvas and waterfall — sitting
+                   there as dead space. The panels collapse now instead; this switch row
+                   is deliberately OUTSIDE #spectrumPanels so the way back on survives
+                   the collapse (GitHub #1 was exactly that trap, in a different form). *@
+                <span id="scopeOffHint" class="small text-muted" style="display:none;">Spectrum hidden — switch Scope on to show it</span>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="scopeEnableSwitch" checked
                            title="Turn the radio's spectrum scope on or off">
@@ -1848,7 +1862,7 @@
         import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";
         import { Ic7300Meters }         from "/js/orchestrators/Ic7300Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
-        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=6";
+        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=7";
         import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, nearestBandForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=8";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
@@ -1910,9 +1924,12 @@
             window.ic7300Meters = new Ic7300Meters(window.meterPanel, window.calibrationEngine);
 
             // ── S-meter history strips ───────────────────────────────────────
-            // Hidden by default. Toggle via the "S-hist" button in the top
+            // Shown by default. Toggle via the "S-hist" button in the top
             // toolbar; visibility persists in localStorage so the choice
-            // survives page reloads. Both A and B strips (when B exists)
+            // survives page reloads. An operator who has already made a
+            // choice keeps it — only an absent key falls back to the default,
+            // so flipping the default doesn't override anyone's "off".
+            // Both A and B strips (when B exists)
             // share the one toggle — independent per-VFO toggles can be
             // added later if wanted, but one button is the smaller change.
             window.sMeterHistory  = new SMeterHistoryPanel('sMeterHistoryCanvas');
@@ -1930,8 +1947,11 @@
                     btn.classList.toggle('active', visible);
                     btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
                 };
-                let visible = false;
-                try { visible = localStorage.getItem(KEY) === '1'; } catch {}
+                let visible = true;
+                try {
+                    const saved = localStorage.getItem(KEY);
+                    if (saved !== null) visible = saved === '1';
+                } catch {}
                 apply(visible);
 
                 btn.addEventListener('click', () => {
@@ -2046,9 +2066,32 @@
                     // restarted and the scope really is on) the worst case is
                     // that the overlay clears at radio-ready, as it used to.
                     try { localStorage.setItem(SCOPE_STATE_KEY, state); } catch { /* private mode */ }
+                    applyScopeCollapsed(!scopeSwitch.checked);
                     fetch(`/api/cat/scope/${state}`, { method: 'POST' })
                         .catch(() => { /* ignore network errors */ });
                 });
+            }
+
+            // Scope off ⇒ collapse the panels and give the space back to the page.
+            // Only #spectrumPanels folds away; the switch row above it stays, so the
+            // operator can always switch the scope back on.
+            //
+            // #spectrumPanels carries Bootstrap's d-flex (display:flex !important), so
+            // a plain style.display='none' is silently ignored — same trap as the
+            // Mono/Multi toggle below. setProperty with priority is what actually wins.
+            function applyScopeCollapsed(off) {
+                const panels = document.getElementById('spectrumPanels');
+                const hint   = document.getElementById('scopeOffHint');
+                if (panels) {
+                    if (off) panels.style.setProperty('display', 'none', 'important');
+                    else     panels.style.removeProperty('display');
+                }
+                if (hint) hint.style.display = off ? '' : 'none';
+                // The Mono/Multi and Stacked/Side toggles control panels that are no
+                // longer on screen; updateContainerVisibility re-reads the switch.
+                updateContainerVisibility();
+                // Coming back: the canvases were laid out at zero width while hidden.
+                if (!off) window.dispatchEvent(new Event('resize'));
             }
 
             // Per-VFO status routing — drives the panel state + small badge in the header.
@@ -2065,6 +2108,10 @@
                     streaming:    ['success',   'Live'],
                     disconnected: ['danger',    'Disconnected'],
                     outofrange:   ['warning',   'Off-screen'],
+                    // The radio answered NG to the waveform-output command, so
+                    // no sweep is ever coming until a radio menu changes. The
+                    // panel overlay carries the reason.
+                    blocked:      ['danger',    'Scope blocked'],
                 };
                 const [colour, text] = labels[status] ?? ['secondary', status];
                 badge.className = `badge bg-${colour} small`;
@@ -2136,9 +2183,11 @@
                 // setProperty with priority='important' to actually win.
                 // For the show case, just remove the inline override and
                 // let d-flex take over.
+                // Scope off collapses the panels, so their layout toggles go too.
+                const scopeOff = !!(scopeSwitch && !scopeSwitch.checked);
                 const toggleEl = document.getElementById('spectrumModeToggle');
                 if (toggleEl) {
-                    if (aConfigured && bConfigured) {
+                    if (aConfigured && bConfigured && !scopeOff) {
                         toggleEl.style.removeProperty('display');
                     } else {
                         toggleEl.style.setProperty('display', 'none', 'important');
@@ -2209,6 +2258,13 @@
             // user's chosen layout from the first frame.
             applyLayout(currentLayout);
 
+            // Apply the remembered scope state to the layout. Deliberately here and
+            // not up beside the switch's own restore: this calls
+            // updateContainerVisibility, which can reach applyMode, and `currentMode`
+            // is a `let` declared further down — calling it earlier would hit the
+            // temporal dead zone.
+            if (scopeSwitch) applyScopeCollapsed(!scopeSwitch.checked);
+
             // Seed the connection-driven visibility from what the connect button
             // already knows. The /api/cat/status fetch that sets it runs in the
             // module body (before DOMContentLoaded) but resolves asynchronously —
@@ -2222,19 +2278,29 @@
             // sending "off". Correct both the switch and the remembered value.
             const markScopeStreaming = () => {
                 markSpectrumReady();
-                if (scopeSwitch && !scopeSwitch.checked) scopeSwitch.checked = true;
+                if (scopeSwitch && !scopeSwitch.checked) {
+                    scopeSwitch.checked = true;
+                    // A stale "off" had the panels collapsed; a live trace has just
+                    // disproved it, so put them back rather than hiding the sweep.
+                    applyScopeCollapsed(false);
+                }
                 if (_scopeLastState !== 'on') {
                     _scopeLastState = 'on';
                     try { localStorage.setItem(SCOPE_STATE_KEY, 'on'); } catch { /* private mode */ }
                 }
             };
 
+            // "blocked" means the radio refused the waveform-output command, so
+            // no sweep will ever arrive. Release the start-up overlay's spectrum
+            // stage rather than making the operator sit out the timeout before
+            // they can read the explanation the panel is already showing.
             spectrumPipeline.onStatusChange('A', status => {
                 sdrState.A = status;
                 spectrumPanelA.setStatus(status);
                 setStatusBadge('A', status);
                 updateContainerVisibility();
                 if (status === 'streaming') markScopeStreaming();
+                else if (status === 'blocked') markSpectrumReady();
             });
             spectrumPipeline.onStatusChange('B', status => {
                 sdrState.B = status;
@@ -2242,6 +2308,7 @@
                 setStatusBadge('B', status);
                 updateContainerVisibility();
                 if (status === 'streaming') markScopeStreaming();
+                else if (status === 'blocked') markSpectrumReady();
             });
             spectrumPipeline.onError('A', detail => spectrumPanelA.setError(detail));
             spectrumPipeline.onError('B', detail => spectrumPanelB.setError(detail));

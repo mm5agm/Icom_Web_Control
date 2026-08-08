@@ -120,6 +120,16 @@ namespace Icom_Web_Control.Services
         // back on. Turning it on again clears it.
         private volatile bool _operatorScopeOff;
 
+        // Set when the radio refuses "scope waveform output" (27 11). The original
+        // IC-7300 — not the MkII — only accepts that command when its CI-V USB Port
+        // is "Unlink from [REMOTE]" *and* its CI-V USB Baud Rate is 115200; below
+        // that it answers NG and never streams a single 27 00 sweep. Until this was
+        // surfaced, the refusal produced one log line and the panel sat on
+        // "Waiting for the radio's band scope…" for ever with nothing to act on
+        // (GitHub #2). Null means "not refused"; otherwise it is the operator-facing
+        // explanation sent alongside the "blocked" status.
+        private volatile string? _scopeOutputBlocked;
+
         // Set by RequestScopeStatusAnnounce (a browser just connected) and cleared
         // by the next sweep, which announces regardless of where the periodic
         // counter happens to be. int rather than bool so Interlocked can
@@ -159,14 +169,26 @@ namespace Icom_Web_Control.Services
             if (!force && Environment.TickCount64 - Volatile.Read(ref _lastSweepTicks) < ScopeStaleMs)
                 return;
 
+            // Order matters. A refusal only means anything while the operator wants
+            // the scope on and the port is open, so it sits below both of those.
+            var blocked = _scopeOutputBlocked;
             string status = !_bus.IsOpen      ? "disconnected"
                           : _operatorScopeOff ? "unconfigured"
+                          : blocked != null   ? "blocked"
                                               : "connecting";
 
             Volatile.Write(ref _lastScopeAnnounceTicks, Environment.TickCount64);
+            // SdrError first: the panel paints its overlay synchronously inside
+            // setStatus, so a detail arriving afterwards would miss the first draw.
+            if (status == "blocked")
+                SendHub("SdrError", new { sdrId = "A", detail = blocked });
             SendHub("SdrStatus", new { sdrId = "A", status });
             if (_pseudoDual)
+            {
+                if (status == "blocked")
+                    SendHub("SdrError", new { sdrId = "B", detail = blocked });
                 SendHub("SdrStatus", new { sdrId = "B", status });
+            }
         }
 
         /// <inheritdoc />
@@ -296,7 +318,8 @@ namespace Icom_Web_Control.Services
             // mode — the radio can power up (or be left) in Fixed mode. Force
             // Center unless the operator deliberately chose Fixed this session.
             await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on", ct);
-            await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", ct);
+            await NoteScopeOutputResultAsync(
+                await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", ct), ct);
             bool center = !_operatorFixedMode;
             await SetScopeModeAsync(center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed,
                 center ? "scope center mode" : "scope fixed mode", ct);
@@ -313,7 +336,9 @@ namespace Icom_Web_Control.Services
             if (enabled)
             {
                 await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on", cancellationToken);
-                await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", cancellationToken);
+                await NoteScopeOutputResultAsync(
+                    await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", cancellationToken),
+                    cancellationToken);
                 bool center = !_operatorFixedMode;
                 await SetScopeModeAsync(center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed,
                     center ? "scope center mode" : "scope fixed mode", cancellationToken);
@@ -366,14 +391,66 @@ namespace Icom_Web_Control.Services
             _logger.LogWarning("[CivRadioController] {What} was not acknowledged", what);
         }
 
+        /// <summary>Outcome of a 27-family scope set. Refused and NoReply are worth
+        /// telling apart: the radio answering NG means it understood and declined,
+        /// which is a settings problem the operator can fix, while silence usually
+        /// means the bus or the port is the problem.</summary>
+        private enum ScopeSetResult { Ok, Refused, NoReply }
+
         /// <summary>Send a 27-family scope set (27 &lt;sub&gt; &lt;val&gt;) and expect an ack.</summary>
-        private async Task SendScopeSetAsync(byte sub, byte val, string what, CancellationToken ct)
+        private async Task<ScopeSetResult> SendScopeSetAsync(byte sub, byte val, string what, CancellationToken ct)
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdScope, sub, val);
+            // TransactAsync completes on AckNg as well as on the expected command
+            // (CivBusService.DispatchFrame), so a refusal arrives as a frame rather
+            // than as a timeout.
             var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
-            if (reply == null || reply.Cmd != CivProtocol.AckOk)
-                _logger.LogWarning("[CivRadioController] {What} was not acknowledged", what);
+            if (reply != null && reply.Cmd == CivProtocol.AckOk)
+                return ScopeSetResult.Ok;
+
+            var result = reply?.Cmd == CivProtocol.AckNg ? ScopeSetResult.Refused : ScopeSetResult.NoReply;
+            _logger.LogWarning("[CivRadioController] {What} was not acknowledged ({Result})", what, result);
+            return result;
+        }
+
+        /// <summary>
+        /// Record — or clear — the reason the radio will not stream scope data, and
+        /// tell the browser. Called with the outcome of the 27 11 (waveform output)
+        /// set, which is the one the original IC-7300 rejects below 115200 baud.
+        /// </summary>
+        private async Task NoteScopeOutputResultAsync(ScopeSetResult result, CancellationToken ct)
+        {
+            if (result == ScopeSetResult.Ok)
+            {
+                if (_scopeOutputBlocked == null) return;
+                _scopeOutputBlocked = null;
+                AnnounceScopeStatus(force: true);
+                return;
+            }
+
+            // A timeout says nothing specific — the existing "connecting" state and
+            // the connection banner already cover a bus that has gone quiet. Only an
+            // explicit NG is worth putting in front of the operator.
+            if (result != ScopeSetResult.Refused) return;
+
+            var settings = await _settings.GetSettingsAsync();
+            // The restriction is the original IC-7300's alone. Prefer what the radio
+            // told us about itself over the configured model, so a mis-set Radio
+            // Model dropdown cannot produce advice for the wrong rig.
+            bool isOriginal = (ModelId ?? settings.RadioModel ?? string.Empty)
+                .Replace("-", "").Replace(" ", "")
+                .Equals("IC7300", StringComparison.OrdinalIgnoreCase);
+
+            _scopeOutputBlocked = isOriginal && settings.BaudRate < 115200
+                ? $"The IC-7300 only sends scope data at 115200 baud — this connection is {settings.BaudRate}. " +
+                  "On the radio set MENU → SET → Connectors → CI-V → CI-V USB Baud Rate to 115200 " +
+                  "(and CI-V USB Port to \"Unlink from [REMOTE]\"), then set Baud Rate to 115200 in Settings."
+                : "The radio refused the scope waveform-output command (CI-V 27 11). " +
+                  "Check CI-V USB Port is \"Unlink from [REMOTE]\" in the radio's Connectors menu.";
+
+            _logger.LogWarning("[CivRadioController] Scope waveform output refused: {Reason}", _scopeOutputBlocked);
+            AnnounceScopeStatus(force: true);
         }
 
         /// <summary>
@@ -2201,6 +2278,19 @@ namespace Icom_Web_Control.Services
             var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadId, cancellationToken: cancellationToken);
             if (reply == null)
                 return false;
+
+            // Never take our own address off the wire. CivBusService drops echo
+            // frames before they get here, so this should be unreachable — but
+            // the cost of being wrong is a silent total failure that looks like
+            // a dead radio (issues #2, #5), so it is worth a second lock on the
+            // one assignment that can cause it. A radio answering as E0 is not
+            // a radio.
+            if (reply.From == CivProtocol.ControllerAddress)
+            {
+                _logger.LogWarning("[CivRadioController] Ignoring identify reply from the controller address " +
+                                   "({Addr:X2}) — this is our own bus echo, not a radio.", reply.From);
+                return false;
+            }
 
             if (reply.From != 0x00)
                 _radioAddress = reply.From;

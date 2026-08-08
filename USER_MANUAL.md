@@ -94,6 +94,10 @@ Icom Web Control — **IWC** for short — is a web-based control panel for the 
 
 > **Windows only.** IWC runs on Windows 10 or 11 (64-bit). There is no Linux or macOS build, and none is planned. The app is hosted by a small WinForms process and uses a Windows serial-port driver to reach the radio. You can still access the browser interface itself from any device on your home network (tablet, phone, Linux laptop) — but the IWC server must be running on a Windows PC.
 
+> **No internet connection needed.** IWC reaches the radio over a serial cable and serves its own web page from your own PC, so the whole of it works on a shack computer that has never been online. Only two things reach out to the internet, and neither is required: the **DX cluster** spot feed (Section 6.5), which is off until you switch it on, and the **update check** that tells you when a new version is available. With no connection the cluster badge simply reads *Disconnected* and the update banner never appears. Everything else — meters, spectrum, tuning, voice control, WSJT-X and the rest — is entirely local.
+>
+> **This was not quite true up to and including v1.0.3.** The page fetched three files — the meter-gauge library, the icon font and the library that carries live updates from the radio to the browser — from public servers on the internet instead of from your PC. Almost nobody noticed, because a browser that had loaded them once kept its own copy for a year afterwards. On a PC that had never been online they never arrived at all, and the page opened with no meters and no value that ever changed. All three now ship inside IWC. **If your shack PC has no internet, use v1.0.4 or later — the v1.0.4 pre-releases carry the fix too.**
+
 Supported radio:
 
 | Model | Power | Receiver | Interface |
@@ -152,7 +156,8 @@ Before the app can communicate with your radio you need to tell it which serial 
 2. Click the **Settings** link in the navigation bar.
 3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver.
 4. Set **Serial Port** to the COM port your radio is connected to. This is the USB serial port the IC-7300 presents when you plug in its USB Type-C cable. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
-5. Set **Baud Rate** to match the radio's **CI-V baud rate**. The IC-7300's default is **19200**. You can verify or change this on the radio under **Menu → Set → Connectors → CI-V → CI-V Baud Rate** (Auto works, but a fixed rate is more reliable).
+5. Set **Baud Rate** to match the radio's **CI-V baud rate**. The IC-7300's default is **19200**. You can verify or change this on the radio under **Menu → Set → Connectors → CI-V → CI-V USB Baud Rate** (Auto works, but a fixed rate is more reliable).
+   **If you have the original IC-7300 — not the MkII — use 115200.** The original model will not send band scope data at any lower rate, so at 19200 everything works except the spectrum display, which stays permanently empty. On the radio set **CI-V USB Port** to **Unlink from [REMOTE]** and **CI-V USB Baud Rate** to **115200**, then set 115200 here as well. Settings shows a warning if you pick a combination that will not work.
 6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East, includes 4m), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
 7. If you run digital modes (FT8, FT4, RTTY, PSK) via USB audio, see the FAQ (§15) for a one-time radio menu change needed on the radio itself — it's not configurable from IWC.
 8. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
@@ -213,7 +218,7 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.3**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.4**) are shown in the top-left corner.
 
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 
@@ -263,7 +268,7 @@ The line shows the current band, mode and frequency, with transmit power appende
 
 ### 5.2 Meters
 
-A scrollable row of meters is displayed above the VFO panels. The leftmost slot is the S-meter (and its optional history strip — see below). To the right of the S-meter come the transmit-related meters. The IC-7300 is a single-receiver radio, so there is one S-meter (VFO A):
+A scrollable row of meters is displayed above the VFO panels. Leftmost is the 30-second S-meter history strip (see below — it can be hidden), then the S-meter itself. To the right of the S-meter come the transmit-related meters. The IC-7300 is a single-receiver radio, so there is one S-meter (VFO A):
 
 | Meter | What it shows |
 |-------|--------------|
@@ -281,7 +286,7 @@ All meters update in real time at approximately 10 times per second. The TX mete
 
 The meter scales are calibrated to show meaningful units rather than raw CI-V values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your radio.
 
-**S-meter history strip.** A small 30-second strip-chart can be shown to the left of the S-meter gauge in the top meter row. Click the **S-hist** button in the top toolbar to toggle it on or off (off by default; the choice is remembered between sessions). The strip shows three things at once:
+**S-meter history strip.** A small 30-second strip-chart sits to the left of the S-meter gauge in the top meter row. It is shown by default; click the **S-hist** button in the top toolbar to hide it, and again to bring it back. The choice is remembered between sessions, so if you have previously turned the strip off it stays off. The strip shows three things at once:
 
 - **Green line** — the actual S-meter trace over the last 30 seconds. Lets you see QSB fading patterns and brief interference spikes that the analog needle barely registered.
 - **Yellow dashed line** — the peak hold for the window, useful for noting a station's actual peak signal during an over without staring at the needle.
@@ -313,9 +318,11 @@ The spectrum comes from the **IC-7300's own built-in band scope**, streamed to t
 
 ![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
 
-**Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for two reasons: to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
+**Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for three reasons: to give the screen space back to the rest of the control panel, to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
 
-The panel itself stays on screen whenever the radio is connected, whether or not sweeps are arriving — it just says what is happening instead ("Band scope is off — switch it on above the panel", or "Waiting for the radio's band scope…"). That keeps the **Scope** switch reachable: it lives above the panel, so a panel that hid itself when nothing was streaming took the only way of switching the scope back on with it.
+**Switching the scope off collapses the panel**, so the spectrum, waterfall, span buttons and the Range / Speed / Bright bar all fold away and everything below them moves up. The switch itself stays put on its own row, with the reminder *"Spectrum hidden — switch Scope on to show it"* beside it, so the way back is always on screen. Your choice is remembered between sessions.
+
+If the scope stops streaming for any other reason — it is off at the radio, or no sweep has arrived yet — the panel stays on screen and says what is happening instead ("Band scope is off — switch it on above the panel", or "Waiting for the radio's band scope…"). Only the switch collapses the panel; nothing the radio does can take the way of switching it back on off the screen.
 
 **Span buttons** — eight buttons in the panel header set the visible bandwidth, from **±2.5k** (narrowest — a single QSO fills the screen) through **±5k**, **±10k**, **±25k**, **±50k**, **±100k**, **±250k** to **±500k** (widest — a 1 MHz-wide view). The figure is the *half*-width either side of centre, matching the way the IC-7300 labels its own scope, so **±500k** shows a megahertz across the screen. Clicking one sets the radio's scope span, so the radio's front panel changes too; equally, changing the span on the radio lights the matching button in IWC, because the active button is re-synced from every incoming sweep.
 
@@ -345,7 +352,7 @@ The three sliders under the panel header shape the display. All three are per-VF
 
 **Scope mode** (top-left of the canvas) — shows the scope mode the radio is actually in, read from the sweep data itself: **CENT**, **FIX**, **SCROLL-C** or **SCROLL-F**. IWC's frequency axis assumes centre mode, so **CENT** is green — everything lines up. Any other mode is shown in amber as a warning that the trace may not match the frequency axis beneath it. **Click the badge to switch the radio between Centre and Fixed**, which is the quick way back to green if the radio was left in Fixed mode.
 
-**Scope status** (right-hand end of the panel header) — **Scope off** (no sweeps; the scope is switched off, or the radio isn't up yet), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, or **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show).
+**Scope status** (right-hand end of the panel header) — **Scope off** (no sweeps; the scope is switched off, or the radio isn't up yet), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show), or **Scope blocked** (red — the radio understood the request for scope data and refused it; the panel prints the reason and what to change, see §14.2).
 
 **DX cluster** (top-right of the canvas) — the cluster connection state: green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.5 for cluster setup and troubleshooting.
 
@@ -855,7 +862,7 @@ Clicking **Restart Now** stops IWC and (when running as the installed exe) autom
 |---------|-------------|
 | Radio Model | **IC-7300 MkII** (100 W, HF + 6m + 4m EU) or **IC-7300** (100 W, HF + 6m). Both are single-receiver with a built-in CI-V band scope. |
 | Serial Port | COM port the IC-7300 presents over its USB Type-C cable (e.g., COM3). Find it in Windows Device Manager or on the **Diagnostics → Ports** page. |
-| Baud Rate | Must match the radio's **CI-V baud rate**. Default: **19200**. Set on the radio under **Menu → Set → Connectors → CI-V → CI-V Baud Rate**. |
+| Baud Rate | Must match the radio's **CI-V baud rate**. Default: **19200**. Set on the radio under **Menu → Set → Connectors → CI-V → CI-V USB Baud Rate**. **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
 
 IWC talks to the radio using the CI-V protocol over that single USB serial connection (controller address `E0`, radio address `B6`). After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success.
@@ -863,6 +870,8 @@ IWC talks to the radio using the CI-V protocol over that single USB serial conne
 > **Running WSJT-X / FT8 via USB audio?** The IC-7300 needs its **USB SEND / audio** menu items set up before it will transmit digital audio from a PC. This is a one-time radio setup — see FAQ §15.
 
 > **CI-V transceive:** leave the radio's **CI-V Transceive** setting **ON** (the default) so that changes made on the radio's front panel are reported back to IWC and the display stays in sync.
+
+> **CI-V USB Echo Back:** IWC works with this **on or off**, so you can leave it alone. If you are on **v1.0.4-pre1 or earlier**, switch it **OFF** — on those versions echo back stops IWC connecting at all. It is under **MENU → SET → Connectors → CI-V**; the IC-7300 MkII has two entries, **CI-V USB (A) Echo Back** and **(B)**, and the original IC-7300 has one. All of them default to **OFF**. See §14.2 if you are seeing *"port opened, but the radio isn't responding"*.
 
 ---
 
@@ -880,7 +889,10 @@ The Settings page also shows the full URL for each detected network interface so
 
 ### 6.3 Spectrum Scope
 
-The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over the CI-V connection. There is **no external SDR, no IF tap, and no extra hardware or drivers** — once the radio is connected the spectrum and waterfall appear on the main page automatically. Span, Range, waterfall Speed and Brightness are all driven from the panel itself; see Section 5.4 for those. This section covers the handful of settings that decide **how many panels you get**.
+The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over the CI-V connection. There is **no external SDR, no IF tap, and no extra hardware or drivers** — once the radio is connected the spectrum and waterfall appear on the main page automatically.
+
+> **Original IC-7300 owners: the scope needs 115200 baud.** The original model only sends scope data when the radio's **CI-V USB Port** is **Unlink from [REMOTE]** and its **CI-V USB Baud Rate** is **115200**, with 115200 also set in Settings (§6.1). At any lower rate the radio refuses, and the panel says so — everything else, including the radio connection itself, carries on working normally. The **IC-7300 MkII has no such restriction** and streams the scope at any baud rate.
+ Span, Range, waterfall Speed and Brightness are all driven from the panel itself; see Section 5.4 for those. This section covers the handful of settings that decide **how many panels you get**.
 
 The radio has one receiver and one scope, so a second panel can only ever be made by time-sharing that one scope. These settings control whether IWC does that, and how far it is allowed to go:
 
@@ -932,6 +944,8 @@ Note: `{CALL}` is a reminder placeholder — the radio's KY command does not per
 Connect to a DX cluster server to overlay live DX spots on the SDR spectrum display. Spots appear as small yellow callsign labels at each spot's frequency on the spectrum panel; clicking a spot tunes VFO A exactly to that frequency. See Section 5.4 for how the overlay behaves on crowded bands.
 
 There is **no default cluster server** — pick one you have access to. The connection is only made when you tick the **Enable** switch below.
+
+This is one of only two parts of IWC that need an **internet connection** (the other is the update check). On a shack PC with no internet, leave the **Enable** switch off — if you switch it on anyway, nothing breaks: the status badge sits at *Disconnected* and IWC keeps retrying quietly in the background. Nothing else in the app is affected.
 
 | Setting | Description |
 |---------|-------------|
@@ -1509,6 +1523,13 @@ For example, the S-meter might have points like:
 
 The gauge interpolates between points to produce smooth readings.
 
+> **Important — where each number comes from.** The gauges and value badges on the calibration page (the needle, the **Power Out X.XW** badge, the S-unit label, and so on) are the app's *output*: it produces them by running the raw value through the **current** calibration curve. They are **not** the numbers you record. To make a calibration point you pair two things:
+>
+> - the **raw value** — read from the **`Raw:`** indicator on the page (the number the radio sends, before any calibration); and
+> - the **true value** — read from the **radio's own meter or display** (or an external reference, such as a wattmeter into a dummy load).
+>
+> Copying the page's own gauge reading back into the table calibrates the app against itself and achieves nothing. Always take the true value from the radio, never from IWC's gauge.
+
 **Editing calibration:**
 
 1. To add a point: click **Add Point**, then enter the raw and display values.
@@ -1554,6 +1575,8 @@ The shipped default is a starting point. Your individual radio may differ by 1�
 
 The power meter on IWC reads the radio's transmitted RF power. To calibrate it, you transmit at known power levels and record the raw values IWC sees.
 
+![The Power panel on the Meter Calibration page. The live Raw indicator (ringed) is the whole number you read while transmitting; the Raw Value column below it is where you type that number, with the known watts going in the Radio Value column alongside.](pictures/Calibration-Power-Annotated.png)
+
 **Before you start:**
 
 - Have a **dummy load** connected — not an antenna, since you'll be transmitting briefly at various power levels.
@@ -1561,13 +1584,17 @@ The power meter on IWC reads the radio's transmitted RF power. To calibrate it, 
 
 **The procedure:**
 
-1. Open the **Meter Calibration** page on IWC. The Power row's Raw indicator updates only during transmit.
+1. Open the **Meter Calibration** page on IWC. The Power row's **Raw** indicator (just above the Raw Value column) updates only during transmit, and is always a **whole number**.
 2. Set the radio's RF Power to a low value (e.g. 5 W) via the radio's RF POWER control or IWC's slider.
 3. Press the PTT or use IWC's TX button briefly — long enough for the meter to stabilise (about a second).
-4. Note the IWC Raw value at that power. Release PTT. Add or edit a row in the calibration table with `raw = <observed>, Radio = <known watts>`.
-5. Increase RF Power to the next test point (e.g. 25 W → 50 W → 100 W → max for your radio).
+4. Note the whole-number **Raw** value IWC shows. Release PTT. In the calibration table, type that number into the **Raw Value** box and the known power into the **Radio Value** box (for example `Raw Value = 83`, `Radio Value = 25`).
+5. Increase RF Power to the next test point (e.g. 10 W → 25 W → 50 W → 100 W for the IC-7300).
 6. Repeat brief transmits at each level and record the raw values.
 7. Click **Save Calibration**.
+
+> **Get the two columns the right way round.** The **Raw Value** is the whole number IWC reports; the **Radio Value** is the watts you set on the rig. Don't put watts in the Raw box.
+>
+> **Every higher power must give a higher Raw.** More output always drives the meter reading up, so your raw numbers must *increase* with the power. If 25 W ever shows a *lower* raw than 10 W, two readings have got crossed — redo that pair. This is the single most common power-calibration mistake, and it makes the gauge read backwards.
 
 For a quick sanity check after saving: transmit at a known power and watch IWC's power gauge — the needle should sit on the correct watts label.
 
@@ -1717,11 +1744,31 @@ A **Feature request** template is also available for ideas / improvements rather
 The radio is not answering on CI-V. IWC keeps retrying, so it clears itself the moment the link comes up.
 
 - Check that the radio is powered on.
-- Check the COM port in Settings. Go to **Diagnostics → Ports** to see which ports are available.
+- Check the COM port in Settings. The **Check which COM ports this PC has** link in the "Radio not connected" banner lists every port your PC has and says whether the one you configured is among them; **Diagnostics → Ports** shows the same thing.
 - Check the baud rate in Settings matches the radio's **MENU → SET → Connectors → CI-V → CI-V Baud Rate**.
 - Check the CI-V address in Settings (`B6` for the IC-7300 MkII, `94` for the original IC-7300).
 - Click **Test Connection** in Settings.
 - If IWC knows *why* it cannot connect — a COM port that is not present, for instance — the panel says so and offers a link to Settings instead of spinning.
+
+**"Radio not connected" — what the banner is telling you**
+
+When IWC cannot reach the radio it shows a yellow banner across the top of the main page with the reason. It is worth reading the exact wording, because the three messages mean quite different things:
+
+| The banner says | What it means | What to do |
+|---|---|---|
+| *"Serial port COMx **not found**. Ports available now: …"* | Windows has no such port. The list that follows is what your PC actually has. | Pick one of the listed ports in Settings. If the list is empty or has nothing radio-shaped in it, install Icom's USB driver — the original IC-7300 needs it before Windows creates a port at all. |
+| *"Serial port COMx is present but **could not be opened**"* | The port exists, but something else has it. | Close whatever else is talking to the radio — WSJT-X in direct CAT mode, Ham Radio Deluxe, N1MM, Omni-rig, or a second copy of IWC. See §15.2 on port sharers. |
+| *"Serial port COMx **opened, but the radio isn't responding**"* | The port is fine. The radio is not answering on it. | See the next entry. |
+
+**"Serial port COMx opened, but the radio isn't responding — is it powered on?"**
+
+The port opened cleanly, so the driver, the cable and the port number are all correct. Something is stopping the radio from answering.
+
+- **If you are on v1.0.4-pre1 or earlier, check CI-V USB Echo Back first.** With that setting on, those versions cannot connect *at all* — the radio is answering perfectly and IWC is failing to listen. Switch it off at **MENU → SET → Connectors → CI-V** (the MkII has **CI-V USB (A) Echo Back** and **(B)** — switch both off; the original IC-7300 has one). **v1.0.4-pre2 and later work either way**, so on current versions you can skip this.
+- Check the CI-V address in Settings matches the radio: **`B6`** for the IC-7300 MkII, **`94`** for the original IC-7300 (**MENU → SET → Connectors → CI-V → CI-V Address**).
+- Check the baud rate in Settings matches **CI-V Baud Rate** on the radio. If the radio is set to **Auto**, set both ends to **19200** instead while you are diagnosing.
+- **On the IC-7300 MkII, make sure you are on the right port.** The radio presents *two* USB serial ports and only one of them carries CI-V — the one Windows names **"IC-7300MK2 Serial Port A (CI-V)"**. Port B will open happily and never answer.
+- A quick sanity check: if another program — N1MM, WSJT-X, Ham Radio Deluxe — can talk to the radio on that same port, then the port and radio are definitely fine and the fault is in how IWC is addressing it. Say so in your bug report (§14.1); it narrows things down enormously.
 
 **Start-up panel stays on "Starting spectrum scope, please wait…"**
 
@@ -1733,11 +1780,27 @@ The radio is talking, but no spectrum sweep has arrived. The panel gives up afte
 
 **Spectrum panel is empty, or says "Waiting for the radio's band scope…"**
 
-The panel is on screen and the radio is connected, but no sweep is arriving. The status badge at the right-hand end of the panel header says the same thing in one word (**Scope off**, **Connecting…**, **Live**).
+The panel is on screen and the radio is connected, but no sweep is arriving. The status badge at the right-hand end of the panel header says the same thing in one word (**Scope off**, **Connecting…**, **Live**, **Scope blocked**).
 
 - Check the **Scope** switch above the panel, and the scope on the radio's own screen.
 - Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate.
 - Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
+
+**Spectrum panel says "The radio refused to send scope data" (badge: Scope blocked)**
+
+The radio understood the command to start sending scope data and declined it. That is not a bus fault — everything else is working — so the panel prints the reason underneath. On the original IC-7300 the reason is almost always the baud rate: the original model only sends scope data when its **CI-V USB Port** is **Unlink from [REMOTE]** and its **CI-V USB Baud Rate** is **115200**. The MkII has no such restriction.
+
+- On the radio: **MENU → SET → Connectors → CI-V**, set **CI-V USB Port** to **Unlink from [REMOTE]** and **CI-V USB Baud Rate** to **115200**.
+- In IWC: **Settings → Radio & CAT → Baud Rate**, set **115200** and save.
+- Restart IWC so it reopens the port at the new rate.
+
+**The page opens, but there are no meters and no value ever changes** (v1.0.3 and earlier)
+
+The layout, the buttons and the band selectors are all there, but the gauges are missing, the frequency never moves, and the icons show as empty boxes. The browser's status bar may sit on "Transferring data from cdn.jsdelivr.net…" while the page loads.
+
+Up to and including v1.0.3, the page fetched three files from public servers on the internet. A PC that had been online at some point kept its own copy of them and worked fine; a PC that had never been online got nothing, and without the library that carries live updates the rest of the page's script stopped before it started. See the note in Section 1.
+
+- **Upgrade to v1.0.4 or later** (its pre-releases carry the fix too). All three files now ship inside IWC and nothing is fetched from the internet. There is no setting to change and no workaround on older versions.
 
 **Frequency display shows 0 or does not update**
 
@@ -1762,6 +1825,7 @@ The panel is on screen and the radio is connected, but no sweep is arriving. The
 
 The scope comes from the radio over CI-V, so there is no SDR, driver or device setting to check — if the rest of the app is talking to the radio, the scope should follow.
 
+- **Original IC-7300 (not the MkII): check the baud rate first.** The original model refuses to send scope data unless the radio's **CI-V USB Port** is **Unlink from [REMOTE]** and its **CI-V USB Baud Rate** is **115200**, with 115200 set in IWC's Settings to match. At IWC's default of 19200 the rest of the app works perfectly and the spectrum never appears. IWC now says so in the panel itself, and warns in Settings the moment you pick the combination.
 - Check the panel's **scope on/off** toggle hasn't been left off. Switching it off is remembered for the rest of the session — IWC won't quietly switch the scope back on under you if the radio drops and reconnects — so it stays off until you switch it back on or restart the app.
 - Confirm the radio itself is connected — if the meters are dead and the frequency isn't tracking the VFO knob, fix the CI-V connection first (see the two entries at the top of this section).
 - The scope shares the CI-V bus with everything else. At the default 19200 baud a sweep takes a noticeable slice of the link, and IWC deliberately slows its meter polling while the scope streams. If the trace is ragged rather than absent, try **115200** on both the radio (**MENU → SET → Connectors → CI-V → CI-V Baud Rate**) and in Settings.

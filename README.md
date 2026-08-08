@@ -2,10 +2,10 @@
 
 ![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
-![Latest release](https://img.shields.io/badge/Download-v1.0.3-brightgreen?style=flat-square)
+![Latest release](https://img.shields.io/badge/Download-v1.0.4-brightgreen?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Icom_Web_Control/latest/Icom_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 
-> **v1.0.3 — current release.** IWC controls an **Icom IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. It has been developed and tested against a single IC-7300 MkII by one operator, so if anything behaves unexpectedly please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
+> **v1.0.4 — current release.** IWC controls an **Icom IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. It has been developed and tested against a single IC-7300 MkII by one operator, so if anything behaves unexpectedly please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
 >
 > **[⬇ Download the latest installer](https://github.com/mm5agm/Icom_Web_Control/releases/latest)**
 
@@ -36,9 +36,43 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Status & plan
 
-**`v1.0.3` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 MkII end-to-end (see the summary at the top), tested against a single radio. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
+**`v1.0.4` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 MkII end-to-end (see the summary at the top), tested against a single radio. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
+
+### v1.0.4 (2026-08-09)
+
+**Two faults that could each stop IWC working completely, on a radio and a PC with nothing wrong with them.** Between them they account for every "it won't connect" report received since launch.
+
+**1. A radio that answered perfectly could be reported as not responding** ([#2](https://github.com/mm5agm/Icom_Web_Control/issues/2), [#5](https://github.com/mm5agm/Icom_Web_Control/issues/5)).
+
+If the radio's **CI-V USB Echo Back** setting was on, IWC could not connect to it at all. The banner said *"Serial port COMx opened, but the radio isn't responding — is it powered on?"* — while the radio sat there in perfect health, and other CAT software talked to it on that very same port.
+
+- **What was happening.** With echo back on, the radio repeats the PC's own commands back to it. IWC asks "is anyone there?" as its first question, and that question alone is broadcast to every address so that both the IC-7300 and the MkII will answer it. The echo of that broadcast came back looking enough like a reply to be mistaken for one — and IWC read the radio's CI-V address out of it, which gave it *the PC's* address instead. From that moment every command was addressed to the computer rather than to the radio. Nothing answered, and IWC reported exactly what it saw.
+- **Fixed properly:** IWC now recognises its own echo and ignores it, so **this release connects whether echo back is on or off** and there is nothing to set.
+- **On v1.0.4-pre1 or earlier?** You do not have to upgrade to get working — switch **CI-V USB Echo Back** off at **MENU → SET → Connectors → CI-V** (the MkII has an (A) and a (B); switch both off) and the version you already have will connect.
+- The **Radio not connected** banner now also links straight to the list of COM ports your PC has, so a wrong port number can be spotted without going near Device Manager. The User Manual explains all three banner messages and what each one actually means (Section 14.2).
+
+*Found because Steve stuck with it for a fortnight and mentioned, almost in passing, that N1MM could see his radio on the same port — which proved the fault was mine and not his. Gerry reported the same symptom independently. Reproduced on the bench by switching that one radio setting on.*
+
+**2. IWC no longer needs an internet connection.** If your shack PC is online, this half of the release changes nothing you can see. If it is not, this is the one that makes IWC work at all.
+
+- **The control panel could open with no meters, no icons and no value that ever changed.** Up to v1.0.3 the page fetched three files — the meter-gauge library, the icon font, and the library that carries live updates from the radio to the browser — from public servers on the internet rather than from your own PC. Without the last of those, the page's script stopped before it started: you got the layout and the buttons, but dead gauges, a frequency that never moved, and empty boxes where the icons should be.
+  - This went unnoticed for four releases because it is invisible on any PC that has ever been online. Browsers keep their own copy of those files for a year, so once they had arrived they kept working — including with the network unplugged. Only a PC that had **never** been online saw the failure, which is a perfectly ordinary way to run a shack computer and one I had not thought about.
+  - All three files now ship inside IWC and are served from your own PC. **Nothing on the page is fetched from the internet any more.**
+- **What still uses the internet, and what happens without it.** Exactly two things, both optional and both already well-behaved offline: the **DX cluster** spot feed, which is off until you switch it on and simply shows *Disconnected* if it cannot reach the server, and the **update check**, which stays silent rather than complaining. Everything else — the radio link, meters, spectrum, voice control, the rigctld bridge for WSJT-X — is local and always was.
+- **Documentation:** the User Manual now says plainly what needs an internet connection and what does not (Section 1), and the symptom above is in Troubleshooting (Section 14.2) for anyone still on an older build.
+
+*Thanks to Steve for the screenshot that showed the page stuck on "Transferring data from cdn.jsdelivr.net…" — without it this would still be sitting there.*
+
+**Also in this release**
+
+- **Switching the scope off now gives you the screen space back.** The **Scope** switch stopped the trace but left the whole panel — header, span buttons, Range / Speed / Bright bar, spectrum and waterfall — sitting there as dead space. It now collapses, and everything below it moves up. The switch stays on screen with a reminder beside it, so the way back is never hidden. User Manual, Section 5.4.
+- **A blank spectrum on the original IC-7300 now explains itself.** The original IC-7300 — not the MkII — only sends band scope data when its **CI-V USB Port** is set to **Unlink from [REMOTE]** *and* its **CI-V USB Baud Rate** is **115200**. Below that it refuses the command outright. Since IWC's default is 19200 and the radio's own default is *Auto* (which follows the PC down), a stock IWC talking to a stock IC-7300 gave a spectrum panel that sat on *"Waiting for the radio's band scope…"* for ever, while frequency, mode and every meter worked perfectly — with nothing on screen to suggest why. IWC used to swallow that refusal into a log line.
+  - The panel now says **"The radio refused to send scope data"** and prints the reason underneath, naming the exact radio menu and the rate to set it to. The status badge reads **Scope blocked**.
+  - **Settings warns you before it happens.** Choose **IC-7300** with anything below 115200 and the warning appears next to the Baud Rate box as you pick it, rather than after the fact.
+  - MkII owners are unaffected — the MkII has no such restriction and never sees either message. User Manual, Sections 3, 6.1, 6.3 and 14.2.
+- **The S-meter history strip is now shown by default.** The 30-second strip-chart to the left of the S-meter has been in IWC since the first release, but it shipped hidden behind the **S-hist** button in the toolbar, so almost nobody found it. It is now on when you first run IWC. It plots the signal trace, its peak hold and the noise floor over the last half-minute, which makes QSB, interference spikes and a noise source switching on visible at a glance in a way the needle alone cannot show. The **S-hist** button still hides it, and **if you had already turned it off, it stays off** — the new default only applies where no choice had been made. User Manual, Section 5.2.
 
 ### v1.0.3 (2026-08-05)
 

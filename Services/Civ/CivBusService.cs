@@ -158,7 +158,33 @@ namespace Icom_Web_Control.Services.Civ
 
         private void OnFrameReceived(object? sender, CivFrame frame)
         {
-            // Drop our own bus echo: those frames are addressed TO the radio.
+            // Drop our own bus echo. Echoes come in two shapes and the To check
+            // below only catches one of them:
+            //
+            //  * Ordinary commands are addressed TO the radio, so their echo has
+            //    To == the radio address and is rejected below.
+            //  * The identify query (19 00) is deliberately addressed to the
+            //    BROADCAST address so a classic IC-7300 at 94 answers as well as
+            //    a MkII at B6 — see CivRadioController.IdentifyAsync. Its echo
+            //    therefore carries To == 00, which the check below has to let
+            //    through, because a radio answering the broadcast is the whole
+            //    point of sending it.
+            //
+            // So the identify echo has to be caught by From instead. No genuine
+            // radio frame is FROM the controller address; only our own bytes
+            // coming back at us are. Left unfiltered it satisfies the pending
+            // 19-command transaction before the radio can reply, IdentifyAsync
+            // reads From off it, and the radio address becomes E0 — after which
+            // every command is addressed to ourselves and nothing ever answers.
+            // The symptom is "port opened, but the radio isn't responding",
+            // reported against radios that were working fine (issues #2, #5).
+            //
+            // Only bites when the radio echoes on the USB path — MENU > SET >
+            // Connectors > CI-V > "CI-V USB (A) Echo Back", which defaults to
+            // OFF. Reproduced on an IC-7300MK2 by switching it ON.
+            if (frame.From == CivProtocol.ControllerAddress)
+                return;
+
             if (frame.To != CivProtocol.ControllerAddress && frame.To != 0x00)
                 return;
 
