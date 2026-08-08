@@ -2,10 +2,10 @@
 
 ![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
-![Latest release](https://img.shields.io/badge/Download-v1.0.3-brightgreen?style=flat-square)
+![Latest release](https://img.shields.io/badge/Download-v1.0.4-brightgreen?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Icom_Web_Control/latest/Icom_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 
-> **v1.0.3 — current release.** IWC controls an **Icom IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. It has been developed and tested against a single IC-7300 MkII by one operator, so if anything behaves unexpectedly please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
+> **v1.0.4 — current release.** IWC controls an **Icom IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. It has been developed and tested against a single IC-7300 MkII by one operator, so if anything behaves unexpectedly please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
 >
 > **[⬇ Download the latest installer](https://github.com/mm5agm/Icom_Web_Control/releases/latest)**
 
@@ -36,11 +36,11 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Status & plan
 
-**`v1.0.3` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 MkII end-to-end (see the summary at the top), tested against a single radio. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
+**`v1.0.4` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 MkII end-to-end (see the summary at the top), tested against a single radio. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
 
-### v1.0.4 (2026-08-07) — pre-release
+### v1.0.4 (2026-08-09)
 
 **Two faults that could each stop IWC working completely, on a radio and a PC with nothing wrong with them.** Between them they account for every "it won't connect" report received since launch.
 
