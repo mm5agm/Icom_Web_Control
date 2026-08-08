@@ -65,6 +65,10 @@ If the radio's **CI-V USB Echo Back** setting was on, IWC could not connect to i
 
 *Thanks to Steve for the screenshot that showed the page stuck on "Transferring data from cdn.jsdelivr.net…" — without it this would still be sitting there.*
 
+**Also in this release**
+
+- **The S-meter history strip is now shown by default.** The 30-second strip-chart to the left of the S-meter has been in IWC since the first release, but it shipped hidden behind the **S-hist** button in the toolbar, so almost nobody found it. It is now on when you first run IWC. It plots the signal trace, its peak hold and the noise floor over the last half-minute, which makes QSB, interference spikes and a noise source switching on visible at a glance in a way the needle alone cannot show. The **S-hist** button still hides it, and **if you had already turned it off, it stays off** — the new default only applies where no choice had been made. User Manual, Section 5.2.
+
 ### v1.0.3 (2026-08-05)
 
 **The first full release since v1.0.0.** If you have been staying on full releases — which is what the ⬇ Download link and the in-app update banner give you — this is a large step: everything in the **v1.0.1** and **v1.0.2** pre-release notes below arrives with it. That includes the two operator bug fixes ([#1](https://github.com/mm5agm/Icom_Web_Control/issues/1), [#2](https://github.com/mm5agm/Icom_Web_Control/issues/2)), eleven more voice-controlled functions, region-aware band edges, and working voice macros. Read those two sections as part of this release.
