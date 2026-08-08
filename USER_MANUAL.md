@@ -267,7 +267,7 @@ The line shows the current band, mode and frequency, with transmit power appende
 
 ### 5.2 Meters
 
-A scrollable row of meters is displayed above the VFO panels. The leftmost slot is the S-meter (and its optional history strip — see below). To the right of the S-meter come the transmit-related meters. The IC-7300 is a single-receiver radio, so there is one S-meter (VFO A):
+A scrollable row of meters is displayed above the VFO panels. Leftmost is the 30-second S-meter history strip (see below — it can be hidden), then the S-meter itself. To the right of the S-meter come the transmit-related meters. The IC-7300 is a single-receiver radio, so there is one S-meter (VFO A):
 
 | Meter | What it shows |
 |-------|--------------|
@@ -285,7 +285,7 @@ All meters update in real time at approximately 10 times per second. The TX mete
 
 The meter scales are calibrated to show meaningful units rather than raw CI-V values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your radio.
 
-**S-meter history strip.** A small 30-second strip-chart can be shown to the left of the S-meter gauge in the top meter row. Click the **S-hist** button in the top toolbar to toggle it on or off (off by default; the choice is remembered between sessions). The strip shows three things at once:
+**S-meter history strip.** A small 30-second strip-chart sits to the left of the S-meter gauge in the top meter row. It is shown by default; click the **S-hist** button in the top toolbar to hide it, and again to bring it back. The choice is remembered between sessions, so if you have previously turned the strip off it stays off. The strip shows three things at once:
 
 - **Green line** — the actual S-meter trace over the last 30 seconds. Lets you see QSB fading patterns and brief interference spikes that the analog needle barely registered.
 - **Yellow dashed line** — the peak hold for the window, useful for noting a station's actual peak signal during an over without staring at the needle.
