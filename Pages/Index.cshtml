@@ -374,9 +374,9 @@
                     <!-- Gauges row -->
                     <div class="d-flex justify-content-start align-items-start flex-wrap" style="margin-left: 0; gap: 0; margin-bottom: 0.2rem !important;">
                         <!-- S-Meter rolling history strip — leftmost so the live trace
-                             reads left-to-right toward the S-meter needle. Hidden
-                             until the toolbar's S-hist toggle is on. Sized to match
-                             the meter cells alongside it. Moved from inside the VFO
+                             reads left-to-right toward the S-meter needle. Shown by
+                             default; hide it with the toolbar's S-hist toggle. Sized
+                             to match the meter cells alongside it. Moved from inside the VFO
                              panels in v2.3.9 (Jacek SP3L #34 / Colin's design call).
                              v2.4.0: restored as a VFO A / VFO B pair — dual-receiver
                              radios (FTdx101MP/D) have an independently calibrated
@@ -384,7 +384,7 @@
                              only get the VFO A pair since there's no SUB receiver. -->
                         <div id="sMeterHistoryContainer"
                              class="text-center smeter-history-container"
-                             style="display:none; position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
+                             style="position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
                             <canvas id="sMeterHistoryCanvas"
                                     role="img" aria-hidden="true"
                                     aria-label="S-meter 30-second history — VFO A"
@@ -404,7 +404,7 @@
                             <!-- S-Meter B (SUB) — dual-receiver radios only. -->
                             <div id="sMeterHistoryContainerB"
                                  class="text-center smeter-history-container"
-                                 style="display:none; position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
+                                 style="position: relative; height: 135px; width: 260px; flex-shrink: 0; margin: 0; padding: 0;">
                                 <canvas id="sMeterHistoryCanvasB"
                                         role="img" aria-hidden="true"
                                         aria-label="S-meter 30-second history — VFO B"
@@ -1918,9 +1918,12 @@
             window.ic7300Meters = new Ic7300Meters(window.meterPanel, window.calibrationEngine);
 
             // ── S-meter history strips ───────────────────────────────────────
-            // Hidden by default. Toggle via the "S-hist" button in the top
+            // Shown by default. Toggle via the "S-hist" button in the top
             // toolbar; visibility persists in localStorage so the choice
-            // survives page reloads. Both A and B strips (when B exists)
+            // survives page reloads. An operator who has already made a
+            // choice keeps it — only an absent key falls back to the default,
+            // so flipping the default doesn't override anyone's "off".
+            // Both A and B strips (when B exists)
             // share the one toggle — independent per-VFO toggles can be
             // added later if wanted, but one button is the smaller change.
             window.sMeterHistory  = new SMeterHistoryPanel('sMeterHistoryCanvas');
@@ -1938,8 +1941,11 @@
                     btn.classList.toggle('active', visible);
                     btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
                 };
-                let visible = false;
-                try { visible = localStorage.getItem(KEY) === '1'; } catch {}
+                let visible = true;
+                try {
+                    const saved = localStorage.getItem(KEY);
+                    if (saved !== null) visible = saved === '1';
+                } catch {}
                 apply(visible);
 
                 btn.addEventListener('click', () => {
