@@ -464,6 +464,11 @@ export class SpectrumPanel {
     /** Store the latest error detail string for display alongside status overlays. */
     setError(detail) {
         this._errorDetail = detail;
+        // "blocked" is a standing condition, not a blip — the operator has to go
+        // and change a radio menu before anything will ever arrive. If we are
+        // already sitting on that overlay, repaint so the reason appears without
+        // waiting for another status announce.
+        if (this._status === 'blocked') this._drawStatusOverlay(this._status);
     }
 
     /**
@@ -1558,27 +1563,55 @@ export class SpectrumPanel {
             disconnected: 'Radio unavailable — retrying every 5 s',
             unconfigured: 'Band scope is off — switch it on above the panel',
             outofrange:   'Watch VFO is off-screen — widen the scope span, or turn on cross-band peek in Settings',
+            blocked:      'The radio refused to send scope data',
         };
 
         const line1 = messages[status] ?? `Scope status: ${status}`;
-        const line2 = status === 'disconnected' && this._errorDetail
+        const detail = (status === 'disconnected' || status === 'blocked') && this._errorDetail
             ? this._errorDetail
             : null;
 
         ctx.fillStyle = '#0a0a14';
         ctx.fillRect(0, 0, W, H);
 
-        ctx.fillStyle = '#8899bb';
         ctx.textAlign = 'center';
 
-        ctx.font = '14px sans-serif';
-        ctx.fillText(line1, W / 2, H / 2 - (line2 ? 10 : 0));
+        // The "blocked" reason is a couple of sentences of instructions (which
+        // radio menu to change, and to what), so it has to wrap. The other
+        // details are short enough that one line has always been fine, and
+        // wrapping them costs nothing.
+        ctx.font = '11px sans-serif';
+        const lines = detail ? this._wrapText(ctx, detail, W - 32) : [];
 
-        if (line2) {
-            ctx.font      = '11px sans-serif';
-            ctx.fillStyle = '#cc6655';
-            ctx.fillText(line2, W / 2, H / 2 + 12);
+        const lineH = 15;
+        // Centre the whole block — heading plus however many wrapped lines.
+        const top = H / 2 - (lines.length * lineH) / 2;
+
+        ctx.fillStyle = '#8899bb';
+        ctx.font = '14px sans-serif';
+        ctx.fillText(line1, W / 2, top);
+
+        ctx.font      = '11px sans-serif';
+        ctx.fillStyle = '#cc6655';
+        lines.forEach((l, i) => ctx.fillText(l, W / 2, top + 18 + i * lineH));
+    }
+
+    /** Greedy word-wrap for overlay text. Returns an array of lines. */
+    _wrapText(ctx, text, maxWidth) {
+        const words = String(text).split(/\s+/).filter(Boolean);
+        const lines = [];
+        let line = '';
+        for (const w of words) {
+            const next = line ? line + ' ' + w : w;
+            if (line && ctx.measureText(next).width > maxWidth) {
+                lines.push(line);
+                line = w;
+            } else {
+                line = next;
+            }
         }
+        if (line) lines.push(line);
+        return lines;
     }
 
     // ── Accessibility ────────────────────────────────────────────────────────

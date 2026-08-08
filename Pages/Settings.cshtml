@@ -1948,11 +1948,52 @@
                                 <option value="115200">115200</option>
                             </select>
                             <div class="form-text">
-                                Select the CI-V baud rate configured in the radio's menu (Set &gt; Connectors &gt; CI-V &gt; CI-V Baud Rate).
-                                <br /><strong>IC-7300 / MkII:</strong> default is 19200; supports up to 115200. Match whatever the radio's CI-V menu is set to (Auto works, but a fixed rate is more reliable).
+                                Select the CI-V baud rate configured in the radio's menu (Set &gt; Connectors &gt; CI-V &gt; CI-V USB Baud Rate).
+                                <br /><strong>IC-7300 MkII:</strong> default is 19200; supports up to 115200. Match whatever the radio's CI-V menu is set to (Auto works, but a fixed rate is more reliable).
+                                <br /><strong>IC-7300 (original):</strong> use <strong>115200</strong>. The original model will not send band scope data at any lower rate.
                             </div>
                             <span asp-validation-for="Settings.BaudRate" class="text-danger"></span>
+                            @* The original IC-7300 only accepts the "scope waveform output" command
+                               (CI-V 27 11) when its CI-V USB Port is "Unlink from [REMOTE]" AND its
+                               CI-V USB Baud Rate is 115200 — see the IC-7300 Advanced Manual, CI-V
+                               Set mode, footnote on "Scope waveform output data". The MkII has no such
+                               restriction. The radio's own default is "Auto", which follows the
+                               controller down to 19200, so the stock IWC + stock radio combination
+                               silently produces a permanently blank spectrum (GitHub #2). Warn at the
+                               moment the operator picks the combination rather than leaving them to
+                               work it out from an empty panel. *@
+                            <div id="ic7300ScopeBaudWarning" class="alert alert-warning mt-2 mb-0 py-2 px-3" style="display:none;" role="status">
+                                <strong>The band scope will not work at this baud rate.</strong>
+                                The original IC-7300 only sends scope data at <strong>115200</strong> baud.
+                                On the radio, set <em>MENU &rarr; SET &rarr; Connectors &rarr; CI-V</em> so that
+                                <em>CI-V USB Port</em> is <strong>Unlink from [REMOTE]</strong> and
+                                <em>CI-V USB Baud Rate</em> is <strong>115200</strong>, then choose 115200 here.
+                                Everything else (frequency, mode, meters) works fine at the lower rates —
+                                only the spectrum display is affected.
+                            </div>
                         </div>
+                        <script>
+                            // Live warning for the IC-7300 (original) + sub-115200 combination.
+                            // Runs on change of either control and once on load, so an existing
+                            // bad setting is called out without the operator touching anything.
+                            (function () {
+                                const model = document.getElementById('Settings_RadioModel');
+                                const baud  = document.getElementById('Settings_BaudRate');
+                                const warn  = document.getElementById('ic7300ScopeBaudWarning');
+                                if (!model || !baud || !warn) return;
+
+                                function refresh() {
+                                    // Match the original only — "IC-7300MK2" must not trip this.
+                                    const isOriginal = (model.value || '').replace(/[-\s]/g, '').toUpperCase() === 'IC7300';
+                                    const rate = parseInt(baud.value, 10) || 0;
+                                    warn.style.display = (isOriginal && rate < 115200) ? '' : 'none';
+                                }
+
+                                model.addEventListener('change', refresh);
+                                baud.addEventListener('change', refresh);
+                                refresh();
+                            })();
+                        </script>
                         <div class="mb-3">
                             <label asp-for="Settings.BandPlan" class="form-label">Band Plan / IARU Region</label>
                             <select asp-for="Settings.BandPlan" class="form-select">

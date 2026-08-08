@@ -565,7 +565,13 @@
                  Turning it off stops the radio streaming waveform data (CI-V
                  27 10 / 27 11): the trace goes quiet. Also the operator's
                  control for testing whether the scope stream causes RX noise. -->
-            <div class="d-flex justify-content-end align-items-center mb-2">
+            <div class="d-flex justify-content-end align-items-center mb-2 gap-2">
+                @* Switching the scope off used to leave the whole panel — header,
+                   span buttons, Range/Speed/Bright bar, canvas and waterfall — sitting
+                   there as dead space. The panels collapse now instead; this switch row
+                   is deliberately OUTSIDE #spectrumPanels so the way back on survives
+                   the collapse (GitHub #1 was exactly that trap, in a different form). *@
+                <span id="scopeOffHint" class="small text-muted" style="display:none;">Spectrum hidden — switch Scope on to show it</span>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="scopeEnableSwitch" checked
                            title="Turn the radio's spectrum scope on or off">
@@ -1856,7 +1862,7 @@
         import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";
         import { Ic7300Meters }         from "/js/orchestrators/Ic7300Meters.js?v=1";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
-        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=6";
+        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=7";
         import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, nearestBandForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=8";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
@@ -2060,9 +2066,32 @@
                     // restarted and the scope really is on) the worst case is
                     // that the overlay clears at radio-ready, as it used to.
                     try { localStorage.setItem(SCOPE_STATE_KEY, state); } catch { /* private mode */ }
+                    applyScopeCollapsed(!scopeSwitch.checked);
                     fetch(`/api/cat/scope/${state}`, { method: 'POST' })
                         .catch(() => { /* ignore network errors */ });
                 });
+            }
+
+            // Scope off ⇒ collapse the panels and give the space back to the page.
+            // Only #spectrumPanels folds away; the switch row above it stays, so the
+            // operator can always switch the scope back on.
+            //
+            // #spectrumPanels carries Bootstrap's d-flex (display:flex !important), so
+            // a plain style.display='none' is silently ignored — same trap as the
+            // Mono/Multi toggle below. setProperty with priority is what actually wins.
+            function applyScopeCollapsed(off) {
+                const panels = document.getElementById('spectrumPanels');
+                const hint   = document.getElementById('scopeOffHint');
+                if (panels) {
+                    if (off) panels.style.setProperty('display', 'none', 'important');
+                    else     panels.style.removeProperty('display');
+                }
+                if (hint) hint.style.display = off ? '' : 'none';
+                // The Mono/Multi and Stacked/Side toggles control panels that are no
+                // longer on screen; updateContainerVisibility re-reads the switch.
+                updateContainerVisibility();
+                // Coming back: the canvases were laid out at zero width while hidden.
+                if (!off) window.dispatchEvent(new Event('resize'));
             }
 
             // Per-VFO status routing — drives the panel state + small badge in the header.
@@ -2079,6 +2108,10 @@
                     streaming:    ['success',   'Live'],
                     disconnected: ['danger',    'Disconnected'],
                     outofrange:   ['warning',   'Off-screen'],
+                    // The radio answered NG to the waveform-output command, so
+                    // no sweep is ever coming until a radio menu changes. The
+                    // panel overlay carries the reason.
+                    blocked:      ['danger',    'Scope blocked'],
                 };
                 const [colour, text] = labels[status] ?? ['secondary', status];
                 badge.className = `badge bg-${colour} small`;
@@ -2150,9 +2183,11 @@
                 // setProperty with priority='important' to actually win.
                 // For the show case, just remove the inline override and
                 // let d-flex take over.
+                // Scope off collapses the panels, so their layout toggles go too.
+                const scopeOff = !!(scopeSwitch && !scopeSwitch.checked);
                 const toggleEl = document.getElementById('spectrumModeToggle');
                 if (toggleEl) {
-                    if (aConfigured && bConfigured) {
+                    if (aConfigured && bConfigured && !scopeOff) {
                         toggleEl.style.removeProperty('display');
                     } else {
                         toggleEl.style.setProperty('display', 'none', 'important');
@@ -2223,6 +2258,13 @@
             // user's chosen layout from the first frame.
             applyLayout(currentLayout);
 
+            // Apply the remembered scope state to the layout. Deliberately here and
+            // not up beside the switch's own restore: this calls
+            // updateContainerVisibility, which can reach applyMode, and `currentMode`
+            // is a `let` declared further down — calling it earlier would hit the
+            // temporal dead zone.
+            if (scopeSwitch) applyScopeCollapsed(!scopeSwitch.checked);
+
             // Seed the connection-driven visibility from what the connect button
             // already knows. The /api/cat/status fetch that sets it runs in the
             // module body (before DOMContentLoaded) but resolves asynchronously —
@@ -2236,19 +2278,29 @@
             // sending "off". Correct both the switch and the remembered value.
             const markScopeStreaming = () => {
                 markSpectrumReady();
-                if (scopeSwitch && !scopeSwitch.checked) scopeSwitch.checked = true;
+                if (scopeSwitch && !scopeSwitch.checked) {
+                    scopeSwitch.checked = true;
+                    // A stale "off" had the panels collapsed; a live trace has just
+                    // disproved it, so put them back rather than hiding the sweep.
+                    applyScopeCollapsed(false);
+                }
                 if (_scopeLastState !== 'on') {
                     _scopeLastState = 'on';
                     try { localStorage.setItem(SCOPE_STATE_KEY, 'on'); } catch { /* private mode */ }
                 }
             };
 
+            // "blocked" means the radio refused the waveform-output command, so
+            // no sweep will ever arrive. Release the start-up overlay's spectrum
+            // stage rather than making the operator sit out the timeout before
+            // they can read the explanation the panel is already showing.
             spectrumPipeline.onStatusChange('A', status => {
                 sdrState.A = status;
                 spectrumPanelA.setStatus(status);
                 setStatusBadge('A', status);
                 updateContainerVisibility();
                 if (status === 'streaming') markScopeStreaming();
+                else if (status === 'blocked') markSpectrumReady();
             });
             spectrumPipeline.onStatusChange('B', status => {
                 sdrState.B = status;
@@ -2256,6 +2308,7 @@
                 setStatusBadge('B', status);
                 updateContainerVisibility();
                 if (status === 'streaming') markScopeStreaming();
+                else if (status === 'blocked') markSpectrumReady();
             });
             spectrumPipeline.onError('A', detail => spectrumPanelA.setError(detail));
             spectrumPipeline.onError('B', detail => spectrumPanelB.setError(detail));
