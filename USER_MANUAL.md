@@ -516,6 +516,29 @@ All of these settings are read from the radio when the app connects.
 
 The IF filter controls (**IF Shape**, the **FIL1 / FIL2 / FIL3** slot selector, and **IF Width**) also sit in this control grid — they are described in [§5.8](#58-if-width-if-shape-filter-slot-and-af-gain).
 
+**RX Tone** — The button at the end of the VFO panel's button row opens the **RX Tone Control** dialog. This is the radio's own *SET > Tone Control > RX* menu group, brought out where you can reach it: the audio filter edges plus the bass and treble shelves. It shapes the **receive audio only** — it does not touch the IF filter, and it has no effect on what you transmit.
+
+Everything in the dialog belongs to the VFO's **current mode**. The radio stores these settings per mode, not per VFO, so the values you see are whatever that mode is set to, and changing them changes them for that mode everywhere. Switch mode with the dialog open and it re-reads for the new mode.
+
+| Control | Range | Notes |
+|---------|-------|-------|
+| HPF | Through, 100 Hz – 2000 Hz | High-pass: cuts the **low** edge of the receive audio. "Through" = no cut. |
+| LPF | 500 Hz – 2400 Hz, Through | Low-pass: cuts the **high** edge. "Through" = no cut. |
+| Bass | −5 to +5 | Low-frequency shelf, 0 = flat. |
+| Treble | −5 to +5 | High-frequency shelf, 0 = flat. |
+
+**Widest** sets both filter edges to Through. **Flat** returns Bass and Treble to 0.
+
+> **Changing HPF or LPF resets Bass and Treble to 0.** That is the radio's own behaviour, not the app's — it treats the filter edges and the shelves as alternative ways of shaping the same audio. The dialog re-reads and shows the new zeros, so set the filter edges first and the shelves afterwards.
+
+Not every mode has every control, and the dialog greys out what does not apply, with a line of text saying so:
+
+- **SSB, AM, FM** — all four controls.
+- **CW and RTTY** — HPF and LPF only. The radio has no Bass or Treble for these modes.
+- **DATA modes (DATA-U / DATA-L)** — none of them. The radio disables RX Tone Control entirely in the data modes, so that the audio reaching WSJT-X and friends is unshaped.
+
+A common use: on a crowded SSB band, set HPF to 300 Hz and LPF to 2400 Hz to tighten the audio around speech, then lift Treble a little for intelligibility. On AM, open both edges to Through and the audio widens out again.
+
 ---
 
 ### 5.8 IF Width, IF Shape, Filter Slot, and AF Gain

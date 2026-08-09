@@ -954,10 +954,10 @@
                         </button>
                         <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
                                 id="rxFilterBtnA" data-a11y-key="controls.rxToneA"
-                                aria-label="VFO A RX Tone Control filter"
-                                title="Open the RX Tone Control (HPF/LPF audio filter) dialog — cut the low and high edges of the receive audio for the current mode"
+                                aria-label="VFO A RX Tone Control"
+                                title="Open the RX Tone Control dialog — HPF/LPF audio filter edges plus Bass and Treble for the current mode"
                                 onclick="window.rxFilter && window.rxFilter.open('A')">
-                            RX Filter
+                            RX Tone
                         </button>
                     </div>
 
@@ -1241,10 +1241,10 @@
                         </button>
                         <button type="button" class="btn btn-secondary btn-sm fw-bold flex-shrink-0"
                                 id="rxFilterBtnB" data-a11y-key="controls.rxToneB"
-                                aria-label="VFO B RX Tone Control filter"
-                                title="Open the RX Tone Control (HPF/LPF audio filter) dialog — cut the low and high edges of the receive audio for the current mode"
+                                aria-label="VFO B RX Tone Control"
+                                title="Open the RX Tone Control dialog — HPF/LPF audio filter edges plus Bass and Treble for the current mode"
                                 onclick="window.rxFilter && window.rxFilter.open('B')">
-                            RX Filter
+                            RX Tone
                         </button>
                     </div>
 
@@ -1626,17 +1626,18 @@
     </dialog>
 }
 
-<!-- RX Tone Control (HPF/LPF audio filter) Dialogs — CI-V 1A 05. Per-mode
-     receive-audio high-pass (low-cut) and low-pass (high-cut) edges; the
-     IC-7300's native equivalent of the Yaesu Audio Filter. One dialog per VFO
-     button; the values shown are for that VFO's *current mode* (the radio
-     stores them per mode, not per VFO). Both edges: HPF Through/100–2000 Hz,
-     LPF 500–2400 Hz/Through. Unavailable in SSB-DATA. -->
+<!-- RX Tone Control Dialogs — CI-V 1A 05. The whole SET > Tone Control > RX
+     menu group for the VFO's *current mode* (the radio stores these per mode,
+     not per VFO): the high-pass (low-cut) and low-pass (high-cut) audio filter
+     edges — the IC-7300's native equivalent of the Yaesu Audio Filter — plus
+     the Bass and Treble shelves. Edges: HPF Through/100–2000 Hz, LPF
+     500–2400 Hz/Through. Shelves: −5…+5, 0 flat, and only in SSB, AM and FM —
+     CW and RTTY have the edges but no shelves. SSB-DATA has neither. -->
 @foreach (var vfo in new[] { "A", "B" })
 {
     <dialog id="rxFilterDialog@(vfo)" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:380px; max-width:520px; position:fixed; margin:0;" aria-labelledby="rxFilterDialogTitle@(vfo)">
         <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; cursor:move;">
-            <strong id="rxFilterDialogTitle@(vfo)">RX Filter — VFO @vfo</strong>
+            <strong id="rxFilterDialogTitle@(vfo)">RX Tone Control — VFO @vfo</strong>
             <button class="btn btn-sm" style="background:#c0392b; color:#fff; border:1px solid #e74c3c; font-weight:bold; font-size:1rem; line-height:1; padding:2px 11px;" onclick="document.getElementById('rxFilterDialog@(vfo)').close()" title="Close" aria-label="Close VFO @vfo RX Filter dialog">✕</button>
         </div>
         <div class="p-3 d-flex flex-column gap-3">
@@ -1662,6 +1663,32 @@
                         id="rxFilterDefaultBtn@(vfo)"
                         title="Reset to the widest filter (HPF Through, LPF Through)"
                         aria-label="Clear RX Filter">Widest</button>
+            </div>
+
+            <hr class="my-0" style="border-color:#444;" />
+
+            <div id="rxToneStatus@(vfo)" class="small text-warning" style="min-height:1.2em;"></div>
+            <p class="small text-muted mb-0" style="color:#bbb !important;">
+                Bass and Treble shelves for the current mode, −5 to +5 with 0 flat.
+                SSB, AM and FM only — CW and RTTY have no Bass or Treble.
+            </p>
+            <div id="rxToneControls@(vfo)">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="mb-0 fw-bold" for="rxBassSelect@(vfo)" style="min-width:64px;">Bass:</label>
+                    <select id="rxBassSelect@(vfo)" class="form-select form-select-sm" style="flex:1;" aria-label="RX Bass level">
+                        <option value="0">0 (flat)</option>
+                    </select>
+                </div>
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <label class="mb-0 fw-bold" for="rxTrebleSelect@(vfo)" style="min-width:64px;">Treble:</label>
+                    <select id="rxTrebleSelect@(vfo)" class="form-select form-select-sm" style="flex:1;" aria-label="RX Treble level">
+                        <option value="0">0 (flat)</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-light"
+                        id="rxToneDefaultBtn@(vfo)"
+                        title="Reset Bass and Treble to 0 (flat)"
+                        aria-label="Reset RX Bass and Treble to flat">Flat</button>
             </div>
         </div>
     </dialog>
@@ -4278,18 +4305,24 @@
             };
         })();
 
-        // --- RX TONE CONTROL (HPF/LPF audio filter) POPOUT ---
-        // The IC-7300's per-mode RX Tone Control: a high-pass (low-cut) and a
-        // low-pass (high-cut) audio edge = CI-V 1A 05 <item> HH LL. The item is
-        // chosen server-side from the VFO's current mode; both edges are Hz with
-        // 0 = "Through" (no cut). Unavailable in SSB-DATA — the server reports
-        // that and we grey the controls. Thin read/write proxy; the radio holds
-        // all state. One dialog per VFO button (either panel can open it).
+        // --- RX TONE CONTROL POPOUT ---
+        // The IC-7300's per-mode RX Tone Control, all of it. Two halves, two
+        // endpoints, because their availability differs:
+        //   rxfilter — HPF (low-cut) and LPF (high-cut) audio edges, in Hz with
+        //              0 = "Through". Every mode but SSB-DATA has them.
+        //   rxtone   — Bass and Treble shelves, −5…+5 with 0 flat. SSB, AM and
+        //              FM only; CW and RTTY have the edges but no shelves.
+        // The menu item behind each is chosen server-side from the VFO's current
+        // mode, and the server reports availability so we can grey the half that
+        // does not apply. Thin read/write proxy; the radio holds all state. One
+        // dialog per VFO button (either panel can open it).
         window.rxFilter = (function () {
             const $ = (id) => document.getElementById(id);
             // HPF: Through, then 100–2000 Hz. LPF: 500–2400 Hz, then Through.
             const HPF_HZ = [0]; for (let h = 100; h <= 2000; h += 100) HPF_HZ.push(h);
             const LPF_HZ = []; for (let h = 500; h <= 2400; h += 100) LPF_HZ.push(h); LPF_HZ.push(0);
+            // Bass/Treble: +5 down to −5, so louder sits at the top of the list.
+            const TONE_LEVELS = []; for (let v = 5; v >= -5; v--) TONE_LEVELS.push(v);
 
             function fillSelect(sel, values) {
                 if (!sel) return;
@@ -4302,6 +4335,17 @@
                 }
             }
 
+            function fillToneSelect(sel) {
+                if (!sel) return;
+                sel.innerHTML = '';
+                for (const v of TONE_LEVELS) {
+                    const o = document.createElement('option');
+                    o.value = String(v);
+                    o.textContent = v === 0 ? '0 (flat)' : (v > 0 ? '+' + v : String(v));
+                    sel.appendChild(o);
+                }
+            }
+
             function makeInstance(vfo) {
                 const dialogId = 'rxFilterDialog' + vfo;
                 const dlg = () => $(dialogId);
@@ -4309,6 +4353,10 @@
                 const controls = () => $('rxFilterControls' + vfo);
                 const hpf = () => $('rxHpfSelect' + vfo);
                 const lpf = () => $('rxLpfSelect' + vfo);
+                const toneStatus = () => $('rxToneStatus' + vfo);
+                const toneControls = () => $('rxToneControls' + vfo);
+                const bass = () => $('rxBassSelect' + vfo);
+                const treble = () => $('rxTrebleSelect' + vfo);
                 let _busy = false;
 
                 async function open() {
@@ -4338,31 +4386,68 @@
                     if (btn) btn.disabled = !on;
                 }
 
+                function setToneEnabled(on) {
+                    const c = toneControls();
+                    if (c) c.style.opacity = on ? '1' : '0.45';
+                    if (bass()) bass().disabled = !on;
+                    if (treble()) treble().disabled = !on;
+                    const btn = $('rxToneDefaultBtn' + vfo);
+                    if (btn) btn.disabled = !on;
+                }
+
+                // Both halves in one pass. They are separate requests because
+                // they are separate menu items with separate availability, and
+                // they run one after the other rather than together because the
+                // server serialises radio access anyway.
                 async function refresh() {
                     if (_busy) return;
                     _busy = true;
                     try {
-                        const resp = await fetch('/api/cat/rxfilter/' + vfo.toLowerCase());
-                        if (!resp.ok) {
-                            status().textContent = 'Failed to read RX filter.';
-                            setEnabled(false);
-                            return;
-                        }
-                        const data = await resp.json();
-                        if (!data.available) {
-                            status().textContent = 'RX Tone Control not available in this mode (e.g. SSB-DATA).';
-                            setEnabled(false);
-                            return;
-                        }
-                        status().textContent = '';
-                        setEnabled(true);
-                        if (hpf()) hpf().value = String(data.hpfHz | 0);
-                        if (lpf()) lpf().value = String(data.lpfHz | 0);
+                        await refreshFilter();
+                        await refreshTone();
                     } catch (e) {
                         console.error(`rxFilter[${vfo}].refresh error:`, e);
                     } finally {
                         _busy = false;
                     }
+                }
+
+                async function refreshFilter() {
+                    const resp = await fetch('/api/cat/rxfilter/' + vfo.toLowerCase());
+                    if (!resp.ok) {
+                        status().textContent = 'Failed to read RX filter.';
+                        setEnabled(false);
+                        return;
+                    }
+                    const data = await resp.json();
+                    if (!data.available) {
+                        status().textContent = 'RX Tone Control not available in this mode (e.g. SSB-DATA).';
+                        setEnabled(false);
+                        return;
+                    }
+                    status().textContent = '';
+                    setEnabled(true);
+                    if (hpf()) hpf().value = String(data.hpfHz | 0);
+                    if (lpf()) lpf().value = String(data.lpfHz | 0);
+                }
+
+                async function refreshTone() {
+                    const resp = await fetch('/api/cat/rxtone/' + vfo.toLowerCase());
+                    if (!resp.ok) {
+                        toneStatus().textContent = 'Failed to read Bass/Treble.';
+                        setToneEnabled(false);
+                        return;
+                    }
+                    const data = await resp.json();
+                    if (!data.available) {
+                        toneStatus().textContent = 'Bass and Treble are not available in this mode.';
+                        setToneEnabled(false);
+                        return;
+                    }
+                    toneStatus().textContent = '';
+                    setToneEnabled(true);
+                    if (bass()) bass().value = String(data.bass | 0);
+                    if (treble()) treble().value = String(data.treble | 0);
                 }
 
                 async function writeBoth() {
@@ -4374,20 +4459,54 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ hpfHz, lpfHz })
                         });
-                        if (!resp.ok) status().textContent = 'Failed to set RX filter.';
+                        if (!resp.ok) {
+                            status().textContent = 'Failed to set RX filter.';
+                            return;
+                        }
+                        // Setting either filter edge makes the radio force Bass
+                        // and Treble back to 0 (Basic Manual p.50). Nothing tells
+                        // us that happened, so re-read the shelves or the dialog
+                        // would keep showing the levels they had a moment ago.
+                        await refreshTone();
                     } catch (e) { console.error(`rxFilter[${vfo}].writeBoth error:`, e); }
+                }
+
+                // Bass and Treble are separate menu items on the radio, so the
+                // server writes two frames; sending both on either change keeps
+                // this end simple and the pair always consistent with the UI.
+                async function writeTone() {
+                    const b = parseInt(bass() ? bass().value : '0', 10) || 0;
+                    const t = parseInt(treble() ? treble().value : '0', 10) || 0;
+                    try {
+                        const resp = await fetch('/api/cat/rxtone/' + vfo.toLowerCase(), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ bass: b, treble: t })
+                        });
+                        if (!resp.ok) toneStatus().textContent = 'Failed to set Bass/Treble.';
+                    } catch (e) { console.error(`rxFilter[${vfo}].writeTone error:`, e); }
                 }
 
                 function wireDom() {
                     fillSelect(hpf(), HPF_HZ);
                     fillSelect(lpf(), LPF_HZ);
+                    fillToneSelect(bass());
+                    fillToneSelect(treble());
                     if (hpf()) hpf().addEventListener('change', writeBoth);
                     if (lpf()) lpf().addEventListener('change', writeBoth);
+                    if (bass()) bass().addEventListener('change', writeTone);
+                    if (treble()) treble().addEventListener('change', writeTone);
                     const btn = $('rxFilterDefaultBtn' + vfo);
                     if (btn) btn.addEventListener('click', async () => {
                         if (hpf()) hpf().value = '0';   // HPF Through
                         if (lpf()) lpf().value = '0';   // LPF Through
                         await writeBoth();
+                    });
+                    const toneBtn = $('rxToneDefaultBtn' + vfo);
+                    if (toneBtn) toneBtn.addEventListener('click', async () => {
+                        if (bass()) bass().value = '0';
+                        if (treble()) treble().value = '0';
+                        await writeTone();
                     });
                 }
 
