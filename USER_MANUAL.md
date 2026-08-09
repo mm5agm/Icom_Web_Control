@@ -1994,7 +1994,7 @@ To transmit voice from your microphone, press the PTT button on the mic itself.
 
 If pressing **Test PTT** or **Tune** in WSJT-X takes ten to twenty seconds before the radio actually transmits — and sometimes seems to stay in transmit afterwards — the delay is almost certainly **not** in IWC.
 
-When this was traced from an operator's logs ([issue #73](https://github.com/mm5agm/Icom_Web_Control/issues/73)), IWC was keying the radio within about 40 *milliseconds* of receiving each PTT command — the wait was happening *before* the command ever reached IWC. WSJT-X talks to IWC's rigctld server over the local loopback address (`127.0.0.1`), and on some Windows machines that loopback path can be bottlenecked by legacy networking.
+When this was traced from an operator's logs — in the sister project, [Yaesu Web Control issue #73](https://github.com/mm5agm/Yaesu_Web_Control/issues/73), which shares IWC's rigctld server — the app was keying the radio within about 40 *milliseconds* of receiving each PTT command, so the wait was happening *before* the command ever reached it. WSJT-X talks to IWC's rigctld server over the local loopback address (`127.0.0.1`), and on some Windows machines that loopback path can be bottlenecked by legacy networking.
 
 The fix that resolved it for that operator: **disable NetBIOS over TCP/IP**. It's a legacy protocol that can slow down local loopback traffic. To disable it:
 
