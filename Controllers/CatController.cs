@@ -2094,5 +2094,82 @@ namespace Icom_Web_Control.Controllers
             finally { _requestSemaphore.Release(); }
         }
 
+        // -- RX TONE CONTROL: Bass/Treble (CI-V 1A 05) ----------------------
+        //
+        // The shelf half of the same menu group as rxfilter above, kept on its
+        // own endpoint because its availability differs: the radio has Bass and
+        // Treble for SSB, AM and FM only, so CW and RTTY report Available ==
+        // false here while still returning edges from rxfilter. Levels are
+        // −5…+5 with 0 flat, exactly as the radio's own menu shows them.
+
+        public class RxToneReadResponse
+        {
+            public bool Available { get; set; }
+            public int Bass { get; set; }
+            public int Treble { get; set; }
+        }
+
+        public class RxToneSetRequest
+        {
+            public int Bass { get; set; }
+            public int Treble { get; set; }
+        }
+
+        [HttpGet("rxtone/{vfo}")]
+        public async Task<IActionResult> ReadRxTone(string vfo)
+        {
+            var v = (vfo ?? "").Trim().ToLowerInvariant();
+            if (v != "a" && v != "b")
+                return BadRequest(new { error = "Invalid VFO (must be 'a' or 'b')" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                var (available, bass, treble) = await _radio.GetRxToneAsync(
+                    v == "b" ? RadioVfo.B : RadioVfo.A, CancellationToken.None);
+                if (!available)
+                    return Ok(new RxToneReadResponse { Available = false });
+                return Ok(new RxToneReadResponse { Available = true, Bass = bass, Treble = treble });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reading RX tone");
+                return StatusCode(500, new { error = "Failed to read RX tone" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
+        [HttpPost("rxtone/{vfo}")]
+        public async Task<IActionResult> SetRxTone(string vfo, [FromBody] RxToneSetRequest request)
+        {
+            var v = (vfo ?? "").Trim().ToLowerInvariant();
+            if (v != "a" && v != "b")
+                return BadRequest(new { error = "Invalid VFO (must be 'a' or 'b')" });
+            if (request == null)
+                return BadRequest(new { error = "Missing body" });
+            if (request.Bass < -5 || request.Bass > 5 || request.Treble < -5 || request.Treble > 5)
+                return BadRequest(new { error = "Bass and Treble are −5 to +5" });
+
+            if (!await _requestSemaphore.WaitAsync(2000))
+                return StatusCode(503, new { error = "Radio busy" });
+            try
+            {
+                if (!_radio.IsConnected)
+                    return StatusCode(503, new { error = "Radio not connected" });
+                await _radio.SetRxToneAsync(
+                    v == "b" ? RadioVfo.B : RadioVfo.A, request.Bass, request.Treble, CancellationToken.None);
+                return Ok(new { vfo = v, bass = request.Bass, treble = request.Treble });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting RX tone");
+                return StatusCode(500, new { error = "Failed to set RX tone" });
+            }
+            finally { _requestSemaphore.Release(); }
+        }
+
     }
 }

@@ -201,6 +201,18 @@ namespace Icom_Web_Control.Services
         /// <summary>Set the RX HPF (low-cut) and LPF (high-cut) edges in Hz for the current mode; 0 = Through. Snaps to the radio's 100 Hz steps (CI-V 1A 05).</summary>
         Task SetRxFilterAsync(RadioVfo vfo, int hpfHz, int lpfHz, CancellationToken cancellationToken = default);
 
+        // -- RX Tone Control: Bass/Treble (CI-V 1A 05) -------------------------
+        // The other half of the same SET > Tone Control > RX menu group: a bass
+        // and a treble shelf, each −5…+5 with 0 flat. Narrower coverage than the
+        // HPF/LPF pair above — the radio has these for SSB, AM and FM only, so
+        // CW, RTTY and SSB-DATA report unavailable rather than a level.
+
+        /// <summary>Read the RX Bass and Treble levels (−5…+5, 0 = flat) for the VFO's current mode (CI-V 1A 05). <c>available</c> is false in CW/RTTY/SSB-DATA or on a miss.</summary>
+        Task<(bool available, int bass, int treble)> GetRxToneAsync(RadioVfo vfo, CancellationToken cancellationToken = default);
+
+        /// <summary>Set the RX Bass and Treble levels (−5…+5, 0 = flat) for the VFO's current mode (CI-V 1A 05). Ignored when the mode has no Bass/Treble.</summary>
+        Task SetRxToneAsync(RadioVfo vfo, int bass, int treble, CancellationToken cancellationToken = default);
+
         /// <summary>Attenuator: the IC-7300's single 20 dB pad, on/off (CI-V 11).</summary>
         Task<bool> GetAttenuatorAsync(CancellationToken cancellationToken = default);
         Task SetAttenuatorAsync(bool on, CancellationToken cancellationToken = default);
