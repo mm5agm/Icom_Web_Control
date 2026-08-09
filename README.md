@@ -2,10 +2,10 @@
 
 ![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
-![Latest release](https://img.shields.io/badge/Download-v1.0.4-brightgreen?style=flat-square)
+![Latest release](https://img.shields.io/badge/Download-v1.0.5-brightgreen?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Icom_Web_Control/latest/Icom_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 
-> **v1.0.4 — current release.** IWC controls the **Icom IC-7300** and **IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. The two radios speak near-identical CI-V and IWC drives both the same way — set the CI-V address to `94` for the original, `B6` for the MkII. Development and testing has been on a single IC-7300 MkII by one operator, so if anything behaves unexpectedly — on either radio — please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
+> **v1.0.5 — current release.** IWC controls the **Icom IC-7300** and **IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. The two radios speak near-identical CI-V and IWC drives both the same way — set the CI-V address to `94` for the original, `B6` for the MkII. Development and testing has been on a single IC-7300 MkII by one operator, so if anything behaves unexpectedly — on either radio — please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
 >
 > **[⬇ Download the latest installer](https://github.com/mm5agm/Icom_Web_Control/releases/latest)**
 
@@ -36,17 +36,19 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Status & plan
 
-**`v1.0.4` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 or IC-7300 MkII end-to-end (see the summary at the top), tested against a single MkII. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
+**`v1.0.5` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 or IC-7300 MkII end-to-end (see the summary at the top), tested against a single MkII. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
 
-### v1.0.5 (unreleased)
+### v1.0.5 (2026-08-09)
 
 - **RX Bass and Treble, alongside the audio filter.** The **RX Filter** button on each VFO panel is now **RX Tone**, and its dialog carries the whole of the radio's *SET > Tone Control > RX* menu: the HPF and LPF edges it already had, plus the **Bass** and **Treble** shelves (−5 to +5, 0 flat) it did not. Everything applies to the VFO's current mode, as it does on the radio. Bass and Treble exist for SSB, AM and FM only — in CW and RTTY the radio has the filter edges but no shelves, and in the DATA modes it disables tone control altogether — so the dialog greys out whatever does not apply and says why. A **Flat** button returns both shelves to 0. User Manual, Section 5.7.
 
 - **The Start Menu entry is now where you would look for it.** It was being filed inside a folder named **MM5AGM**, so it sorted under **M** and searching Start for "Icom" found nothing — the shortcut was there, but effectively hidden. It now sits at the top level as **Icom Web Control**, and upgrading removes the old entry so you are not left with two. The desktop shortcut is unchanged. Also tidied at the same time: the Windows *Apps & features* entry is now written to the 64-bit part of the registry, where a 64-bit-only application belongs. Nothing you can see changes — Windows always showed it — and upgrading cleans up the old one. User Manual, Section 2.
 
 - **The Power slider now follows the radio.** Turn the **RF POWER** knob on the radio's front panel and IWC's slider and label move with it, within about a second. Until now IWC only ever read the power setting back immediately after *it* had set it, so a change made at the radio never reached the app: the slider stayed where IWC had last put it and could disagree with the radio indefinitely — including on a freshly opened page, which showed the last value that computer had sent rather than the radio's actual setting. Opening IWC on a second computer or in another tab now shows the truth straight away. The slider will not move under your hand while you are dragging it. User Manual, Section 5.3.
+
+- **Twin PBT explains what it is for.** The dialog's two sliders had shipped since the first release with no manual entry at all, and its help text described only half of what they do. Moving them in *opposite* directions narrows the receive filter, which is what the old text said; moving them *together*, to the same value, slides the whole passband sideways without narrowing it — an **IF Shift**, and the quickest way to push a strong neighbouring signal out of the passband. The dialog now says both. The manual adds three things the dialog cannot: Twin PBT works in SSB, CW, RTTY and AM but does nothing in FM; the radio remembers the setting per band; and changing the **IF Width** resets both shifts to centre, so set the width first. User Manual, Section 5.7.
 
 ### v1.0.4 (2026-08-09)
 
