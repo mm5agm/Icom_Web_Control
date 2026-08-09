@@ -42,6 +42,8 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ### v1.0.5 (unreleased)
 
+- **The Start Menu entry is now where you would look for it.** It was being filed inside a folder named **MM5AGM**, so it sorted under **M** and searching Start for "Icom" found nothing — the shortcut was there, but effectively hidden. It now sits at the top level as **Icom Web Control**, and upgrading removes the old entry so you are not left with two. The desktop shortcut is unchanged. Also tidied at the same time: the Windows *Apps & features* entry is now written to the 64-bit part of the registry, where a 64-bit-only application belongs. Nothing you can see changes — Windows always showed it — and upgrading cleans up the old one. User Manual, Section 2.
+
 - **The Power slider now follows the radio.** Turn the **RF POWER** knob on the radio's front panel and IWC's slider and label move with it, within about a second. Until now IWC only ever read the power setting back immediately after *it* had set it, so a change made at the radio never reached the app: the slider stayed where IWC had last put it and could disagree with the radio indefinitely — including on a freshly opened page, which showed the last value that computer had sent rather than the radio's actual setting. Opening IWC on a second computer or in another tab now shows the truth straight away. The slider will not move under your hand while you are dragging it. User Manual, Section 5.3.
 
 ### v1.0.4 (2026-08-09)
