@@ -770,8 +770,8 @@ namespace Icom_Web_Control.Services
         // control to OFF. The state setters broadcast only on change, so a
         // steady radio produces no SignalR traffic here.
         private int _rxPollIndex;
-        private const int RxControlCount = 16;
-        private const int RxControlsPerLoop = 2;   // ~1.3 s to sweep all 16
+        private const int RxControlCount = 17;
+        private const int RxControlsPerLoop = 2;   // ~1.3 s to sweep all 17
 
         private async Task PollNextRxControlAsync(CancellationToken ct)
         {
@@ -793,6 +793,17 @@ namespace Icom_Web_Control.Services
                 case 13: { int v = await ReadFunc16Async(CivProtocol.SubIfFilterShape, ct);    if (v >= 0) { _state.IfShapeA = v.ToString(); _state.IfShapeB = _state.IfShapeA; } break; }
                 case 14: { int v = await GetTunerAsync(ct); if (v >= 0) { _state.AtuEnabled = v != CivProtocol.TunerOff; _state.AtuTuning = v == CivProtocol.TunerTune; } break; }
                 case 15: await PollIfWidthAndFilterAsync(ct); break;
+                // RF output power (14 0A). Not an RX control, but it belongs on
+                // this round-robin for the same reason the rest are here: it is
+                // slow-moving and the operator can change it from the front
+                // panel. Until this was added it was only ever read back
+                // immediately after the app itself set it, so turning the
+                // radio's own RF POWER knob left the slider showing whatever it
+                // last sent, and a fresh page load showed the persisted value
+                // rather than the radio's. Percent maps 1:1 to watts on a 100 W
+                // radio, which is the same assumption CatController's slider
+                // endpoint makes.
+                case 16: { int v = await GetRfPowerPercentAsync(ct); if (v >= 0) _state.Power = v; break; }
             }
             _rxPollIndex++;
         }

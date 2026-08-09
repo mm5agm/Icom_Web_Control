@@ -300,7 +300,11 @@ The vertical axis is calibrated in S-units (S1, S5, S9, S9+30, S9+60) using the 
 
 **Power slider** — Sets the IC-7300's transmit power. The IC-7300 puts out up to 100 W (up to 25 W in AM). The slider drives the radio's RF Power setting; the current value is shown to the right of the slider.
 
-The radio is the source of truth for RF Power. On connect, IWC reads the radio's current Power setting via the CI-V `14 0A` command and reflects whatever the radio reports — so if you change Power on the radio's front panel while IWC is closed, the new value appears in IWC when you reopen it.
+The radio is the source of truth for RF Power, and **IWC follows it continuously**. The Power setting is read from the radio (CI-V `14 0A`) about once a second, so turning the radio's own **RF POWER** knob moves the slider and the label in IWC within a second or so — you do not have to touch anything in the app, and a page you left open does not go stale. Opening IWC on a second computer or another browser tab shows the radio's real setting straight away rather than the last value that computer happened to send.
+
+The slider will not move under your hand: while you are actually dragging it, updates from the radio are held back until you let go.
+
+> **Before v1.0.5 this was not true.** IWC only read the Power setting back immediately after *it* had set it, so a change made on the radio's front panel never reached the app — the slider stayed where the app had last put it, and could disagree with the radio indefinitely. If you are on an earlier version, the value shown is what IWC last sent, not necessarily what the radio is set to.
 
 The slider snaps to 5 W steps for ease of dragging, but the numerical label shows the radio's **exact** value. If the radio is set to an odd value like 73 W or 91 W via the front-panel knob, the label reads `73 W` or `91 W` even though the slider visually sits at the nearest 5 W mark. Moving the slider yourself sends the chosen 5 W step to the radio, overwriting the odd value.
 

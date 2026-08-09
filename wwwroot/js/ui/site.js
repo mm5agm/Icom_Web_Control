@@ -1167,7 +1167,15 @@ connection.on("RadioStateUpdate", function (update) {
         const sliderB = document.getElementById('powerSliderB');
         if (sliderB) sliderB.value = update.value;
     }
-    if (update.property === "Power") {
+    // Don't move the slider out from under the operator. Power used to arrive
+    // only as the read-back of a set the app had just made, so taking it
+    // unconditionally was safe; it is now also polled from the radio roughly
+    // every 1.5 s, and a poll landing mid-drag would snap the handle back to
+    // the radio's current value. window.editingPower is already maintained by
+    // the slider's own pointer/focus handlers — it simply had no reader until
+    // now. Guarding the branch rather than returning from the handler, so this
+    // can never swallow a later property.
+    if (update.property === "Power" && !window.editingPower) {
         if (typeof window.updatePowerDisplay === 'function') window.updatePowerDisplay("A", update.value);
         // Update both the per-VFO slider (dual-receiver layout) AND the
         // unified `powerSlider` used on single-receiver radio layouts.
