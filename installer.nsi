@@ -1,6 +1,6 @@
 !define APPNAME "Icom Web Control"
 !define COMPANY "MM5AGM"
-!define VERSION "1.0.4"
+!define VERSION "1.0.5"
 !define INSTALLDIR "$PROGRAMFILES64\${COMPANY}\${APPNAME}"
 Name "${APPNAME} ${VERSION}"
 OutFile "Icom_Web_Control_Setup.exe"
@@ -36,10 +36,29 @@ Section "Install"
         "publish\*"
 
     CreateShortCut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\Icom_Web_Control.exe"
-    CreateDirectory "$SMPROGRAMS\${COMPANY}"
-    CreateShortCut "$SMPROGRAMS\${COMPANY}\${APPNAME}.lnk" "$INSTDIR\Icom_Web_Control.exe"
+
+    ; Start menu entry goes straight into Programs, so that typing "Icom" into
+    ; Start finds it. Up to v1.0.4 the only entry lived in a folder named after
+    ; the publisher, which sorts the app under M for MM5AGM and hides it from
+    ; anyone who searches for it by name -- reported after a v1.0.4 install as
+    ; "no entry in my start menu" when the shortcut was in fact there.
+    CreateShortCut "$SMPROGRAMS\${APPNAME}.lnk" "$INSTDIR\Icom_Web_Control.exe"
+
+    ; Remove the pre-1.0.5 entry so an upgrade leaves exactly one, not two.
+    ; RMDir without /r deletes the folder only if it is now empty, which is
+    ; what we want -- Yaesu Web Control keeps its own shortcut in there.
+    Delete "$SMPROGRAMS\${COMPANY}\${APPNAME}.lnk"
+    RMDir "$SMPROGRAMS\${COMPANY}"
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+    ; NSIS itself is a 32-bit process, so an unqualified HKLM write lands in
+    ; Wow6432Node -- the wrong view for a 64-bit-only app. Windows shows both in
+    ; Apps & features, so this was never visible, but the entry belongs in the
+    ; 64-bit view. Clear the old 32-bit key first or an upgrade leaves two.
+    SetRegView 32
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}"
+    SetRegView 64
 
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "DisplayName" "${APPNAME} ${VERSION}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "UninstallString" "$INSTDIR\Uninstall.exe"
@@ -56,8 +75,16 @@ Section "Uninstall"
     Sleep 1500
 
     Delete "$DESKTOP\${APPNAME}.lnk"
+    Delete "$SMPROGRAMS\${APPNAME}.lnk"
+    ; Pre-1.0.5 location. Still removed here so uninstalling an old install
+    ; leaves nothing behind; the folder itself only goes if it is empty.
     Delete "$SMPROGRAMS\${COMPANY}\${APPNAME}.lnk"
     RMDir "$SMPROGRAMS\${COMPANY}"
     RMDir /r "$INSTDIR"
+    ; Both views: 1.0.5 and later write the 64-bit one, earlier versions the
+    ; 32-bit one, and an uninstaller built by either may run against either.
+    SetRegView 32
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}"
+    SetRegView 64
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}"
 SectionEnd

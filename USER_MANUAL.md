@@ -141,7 +141,8 @@ The application was written for operators who want a large, clean, touchscreen-f
 
 1. Download the installer from the [GitHub Releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 2. Run the installer. .NET 10 is bundled — you do not need to install it separately.
-3. A desktop shortcut and a Start Menu entry are created automatically.
+3. A desktop shortcut and a Start Menu entry are created automatically. Both are called **Icom Web Control**, so typing "icom" into Start finds the app.
+   > **Upgrading from v1.0.4 or earlier?** Those versions filed the Start Menu entry inside a folder named **MM5AGM**, which sorts it under **M** rather than **I** and makes it invisible to anyone searching for "Icom". Installing v1.0.5 moves it out to the top level and removes the old one, so you end up with a single entry where you would expect it. If Windows Search does not find a brand-new shortcut immediately, give it a minute to index.
 4. The first time you run the app, Windows may show a **Smart App Control** or **Unknown Publisher** warning. Click **More info → Run anyway** to proceed. This warning appears because the installer is not signed with a commercial certificate.
 
 ---
@@ -218,7 +219,7 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.4**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.5**) are shown in the top-left corner.
 
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 
@@ -300,7 +301,11 @@ The vertical axis is calibrated in S-units (S1, S5, S9, S9+30, S9+60) using the 
 
 **Power slider** — Sets the IC-7300's transmit power. The IC-7300 puts out up to 100 W (up to 25 W in AM). The slider drives the radio's RF Power setting; the current value is shown to the right of the slider.
 
-The radio is the source of truth for RF Power. On connect, IWC reads the radio's current Power setting via the CI-V `14 0A` command and reflects whatever the radio reports — so if you change Power on the radio's front panel while IWC is closed, the new value appears in IWC when you reopen it.
+The radio is the source of truth for RF Power, and **IWC follows it continuously**. The Power setting is read from the radio (CI-V `14 0A`) about once a second, so turning the radio's own **RF POWER** knob moves the slider and the label in IWC within a second or so — you do not have to touch anything in the app, and a page you left open does not go stale. Opening IWC on a second computer or another browser tab shows the radio's real setting straight away rather than the last value that computer happened to send.
+
+The slider will not move under your hand: while you are actually dragging it, updates from the radio are held back until you let go.
+
+> **Before v1.0.5 this was not true.** IWC only read the Power setting back immediately after *it* had set it, so a change made on the radio's front panel never reached the app — the slider stayed where the app had last put it, and could disagree with the radio indefinitely. If you are on an earlier version, the value shown is what IWC last sent, not necessarily what the radio is set to.
 
 The slider snaps to 5 W steps for ease of dragging, but the numerical label shows the radio's **exact** value. If the radio is set to an odd value like 73 W or 91 W via the front-panel knob, the label reads `73 W` or `91 W` even though the slider visually sits at the nearest 5 W mark. Moving the slider yourself sends the chosen 5 W step to the radio, overwriting the odd value.
 
@@ -511,6 +516,49 @@ All of these settings are read from the radio when the app connects.
 
 The IF filter controls (**IF Shape**, the **FIL1 / FIL2 / FIL3** slot selector, and **IF Width**) also sit in this control grid — they are described in [§5.8](#58-if-width-if-shape-filter-slot-and-af-gain).
 
+**Twin PBT** — The first of the two buttons at the end of the VFO panel's button row opens the **Twin PBT** (Digital Passband Tuning) dialog. This is the radio's `TWIN PBT CLR` pair of knobs, brought out as two sliders.
+
+PBT works on the **IF** passband, not the audio, and it is the strongest interference tool the radio has. Each slider shifts one edge of the passband — **PBT1** the inner, **PBT2** the outer — and the label beside it reads **Centre** at no shift, or a signed offset either side.
+
+Two ways to use it, both worth knowing:
+
+- **Shift the two sliders in *opposite* directions** and the passbands overlap less, so the filter narrows. This is how you squeeze an interfering signal out of one side without retuning.
+- **Set both sliders to the *same* value** and the passband keeps its width but moves bodily. That is an **IF Shift**, and it is how you slide a whole crowded passband off an adjacent carrier.
+
+**Clear PBT** returns both to centre — the same as holding the radio's `TWIN PBT CLR` knob for a second.
+
+Things the radio does that the dialog cannot show you:
+
+- **PBT applies to SSB, CW, RTTY and AM only.** FM has no adjustable IF passband, so the sliders will do nothing there.
+- **The radio memorises PBT per band**, so a setting you leave on 40 m is still there when you come back to it.
+- **Changing IF Width resets both PBT shifts to centre.** That is the radio's behaviour, not the app's. If the dialog happens to be open when you change the width, close and reopen it to see the reset — it reads the radio when it opens.
+- On the radio's own display, a dot **·** appears on the passband indicator whenever PBT is shifting the width.
+
+The sliders are read from the radio each time you open the dialog, not polled continuously, so a change made at the radio's knobs shows up the next time you open it.
+
+**RX Tone** — The second button opens the **RX Tone Control** dialog. This is the radio's own *SET > Tone Control > RX* menu group, brought out where you can reach it: the audio filter edges plus the bass and treble shelves. It shapes the **receive audio only** — it does not touch the IF filter, and it has no effect on what you transmit.
+
+Everything in the dialog belongs to the VFO's **current mode**. The radio stores these settings per mode, not per VFO, so the values you see are whatever that mode is set to, and changing them changes them for that mode everywhere. Switch mode with the dialog open and it re-reads for the new mode.
+
+| Control | Range | Notes |
+|---------|-------|-------|
+| HPF | Through, 100 Hz – 2000 Hz | High-pass: cuts the **low** edge of the receive audio. "Through" = no cut. |
+| LPF | 500 Hz – 2400 Hz, Through | Low-pass: cuts the **high** edge. "Through" = no cut. |
+| Bass | −5 to +5 | Low-frequency shelf, 0 = flat. |
+| Treble | −5 to +5 | High-frequency shelf, 0 = flat. |
+
+**Widest** sets both filter edges to Through. **Flat** returns Bass and Treble to 0.
+
+> **Changing HPF or LPF resets Bass and Treble to 0.** That is the radio's own behaviour, not the app's — it treats the filter edges and the shelves as alternative ways of shaping the same audio. The dialog re-reads and shows the new zeros, so set the filter edges first and the shelves afterwards.
+
+Not every mode has every control, and the dialog greys out what does not apply, with a line of text saying so:
+
+- **SSB, AM, FM** — all four controls.
+- **CW and RTTY** — HPF and LPF only. The radio has no Bass or Treble for these modes.
+- **DATA modes (DATA-U / DATA-L)** — none of them. The radio disables RX Tone Control entirely in the data modes, so that the audio reaching WSJT-X and friends is unshaped.
+
+A common use: on a crowded SSB band, set HPF to 300 Hz and LPF to 2400 Hz to tighten the audio around speech, then lift Treble a little for intelligibility. On AM, open both edges to Through and the audio widens out again.
+
 ---
 
 ### 5.8 IF Width, IF Shape, Filter Slot, and AF Gain
@@ -527,6 +575,8 @@ The dropdown is **mode-aware** — it is rebuilt whenever you change mode and sh
 - **FM** — the IF Width row is hidden. FM has no adjustable IF width on the IC-7300.
 
 The current width is read back from the radio, so the dropdown always reflects the width the radio is actually on. Pick a value and it is sent immediately. If you pick a width the radio can't land on exactly it snaps to the nearest supported step, and the dropdown updates to show what the radio settled on.
+
+> Changing the width **resets Twin PBT to centre** — the radio does this itself. Set the width first, then the PBT shifts, or you will lose them. See Twin PBT in [§5.7](#57-receiver-controls).
 
 **Filter slot (FIL1 / FIL2 / FIL3)** — Selects which of the mode's three filter presets is active. Each slot remembers its own width and shape, so you can set, for example, FIL1 wide for rag-chewing, FIL2 medium, and FIL3 narrow for digging a weak signal out of QRM — then switch between them with a single click. Selecting a slot switches the radio to it, and the IF Width dropdown above updates to show that slot's stored width.
 

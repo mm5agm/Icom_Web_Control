@@ -770,8 +770,8 @@ namespace Icom_Web_Control.Services
         // control to OFF. The state setters broadcast only on change, so a
         // steady radio produces no SignalR traffic here.
         private int _rxPollIndex;
-        private const int RxControlCount = 16;
-        private const int RxControlsPerLoop = 2;   // ~1.3 s to sweep all 16
+        private const int RxControlCount = 17;
+        private const int RxControlsPerLoop = 2;   // ~1.3 s to sweep all 17
 
         private async Task PollNextRxControlAsync(CancellationToken ct)
         {
@@ -793,6 +793,17 @@ namespace Icom_Web_Control.Services
                 case 13: { int v = await ReadFunc16Async(CivProtocol.SubIfFilterShape, ct);    if (v >= 0) { _state.IfShapeA = v.ToString(); _state.IfShapeB = _state.IfShapeA; } break; }
                 case 14: { int v = await GetTunerAsync(ct); if (v >= 0) { _state.AtuEnabled = v != CivProtocol.TunerOff; _state.AtuTuning = v == CivProtocol.TunerTune; } break; }
                 case 15: await PollIfWidthAndFilterAsync(ct); break;
+                // RF output power (14 0A). Not an RX control, but it belongs on
+                // this round-robin for the same reason the rest are here: it is
+                // slow-moving and the operator can change it from the front
+                // panel. Until this was added it was only ever read back
+                // immediately after the app itself set it, so turning the
+                // radio's own RF POWER knob left the slider showing whatever it
+                // last sent, and a fresh page load showed the persisted value
+                // rather than the radio's. Percent maps 1:1 to watts on a 100 W
+                // radio, which is the same assumption CatController's slider
+                // endpoint makes.
+                case 16: { int v = await GetRfPowerPercentAsync(ct); if (v >= 0) _state.Power = v; break; }
             }
             _rxPollIndex++;
         }
@@ -1391,7 +1402,7 @@ namespace Icom_Web_Control.Services
 
         public async Task<(int hpfHz, int lpfHz)> GetRxFilterAsync(RadioVfo vfo, CancellationToken ct = default)
         {
-            byte item = await RxToneItemForVfoAsync(vfo, ct);
+            byte item = (await RxToneItemsForVfoAsync(vfo, ct)).Filter;
             if (item == RxToneUnavailable) return (-1, -1);
 
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
@@ -1409,7 +1420,7 @@ namespace Icom_Web_Control.Services
 
         public async Task SetRxFilterAsync(RadioVfo vfo, int hpfHz, int lpfHz, CancellationToken ct = default)
         {
-            byte item = await RxToneItemForVfoAsync(vfo, ct);
+            byte item = (await RxToneItemsForVfoAsync(vfo, ct)).Filter;
             if (item == RxToneUnavailable)
             {
                 _logger.LogWarning("[CivRadioController] RX Tone Control not available in the current mode — ignored");
@@ -1427,26 +1438,88 @@ namespace Icom_Web_Control.Services
                 _logger.LogWarning("[CivRadioController] Set RX filter HPF {Hpf} / LPF {Lpf} Hz was not acknowledged", hpfHz, lpfHz);
         }
 
+        // -- RX Tone Control: Bass/Treble (CI-V 1A 05 <item>) ------------------
+        //
+        // The same SET > Tone Control > RX menu group as the HPF/LPF pair above,
+        // but each shelf is its own single-byte item, so a read or a write costs
+        // two transactions rather than one. The wire value is BCD 00–10 meaning
+        // −5…+5, hence the constant 5 offset either way.
+        //
+        // Coverage is narrower than HPF/LPF: the radio has Bass/Treble for SSB,
+        // AM and FM only. CW and RTTY have the audio filter but no shelves, and
+        // SSB-DATA has neither — those report unavailable instead of a level.
+        //
+        // BOTH MODELS: items 00 01 – 00 16 are identical on the IC-7300 and the
+        // MkII, so nothing here needs to know which radio it is talking to. That
+        // stops being true at 00 17. The MkII inserts an SSB-D TBW item there and
+        // every later item shifts up by one:
+        //
+        //                        IC-7300      MkII
+        //   SSB-D TBW            (absent)     00 17
+        //   AM TX Bass/Treble    00 17/18     00 18/19
+        //   FM TX Bass/Treble    00 19/20     00 20/21
+        //
+        // So if TX Tone Control is ever built, its item numbers MUST be chosen
+        // per model — writing the MkII's FM TX Treble to an original IC-7300
+        // would land on beep gain limit instead. SSB TX Bass/Treble (00 12/13)
+        // is the same on both.
+
+        /// <summary>The level a Bass/Treble wire code of 0–10 represents: −5…+5.</summary>
+        private const int RxToneLevelOffset = 5;
+
+        public async Task<(bool available, int bass, int treble)> GetRxToneAsync(RadioVfo vfo, CancellationToken ct = default)
+        {
+            var items = await RxToneItemsForVfoAsync(vfo, ct);
+            if (items.Bass == RxToneUnavailable) return (false, 0, 0);
+
+            int b = await ReadSetMenuByteAsync(0x00, items.Bass, ct);
+            int t = await ReadSetMenuByteAsync(0x00, items.Treble, ct);
+            if (b < 0 || t < 0) return (false, 0, 0);
+            return (true, b - RxToneLevelOffset, t - RxToneLevelOffset);
+        }
+
+        public async Task SetRxToneAsync(RadioVfo vfo, int bass, int treble, CancellationToken ct = default)
+        {
+            var items = await RxToneItemsForVfoAsync(vfo, ct);
+            if (items.Bass == RxToneUnavailable)
+            {
+                _logger.LogWarning("[CivRadioController] RX Bass/Treble not available in the current mode — ignored");
+                return;
+            }
+
+            await WriteSetMenuByteAsync(0x00, items.Bass,
+                Math.Clamp(bass, -5, 5) + RxToneLevelOffset, "RX Bass", ct);
+            await WriteSetMenuByteAsync(0x00, items.Treble,
+                Math.Clamp(treble, -5, 5) + RxToneLevelOffset, "RX Treble", ct);
+        }
+
         /// <summary>Sentinel item byte meaning "no RX Tone Control in this mode".</summary>
         private const byte RxToneUnavailable = 0xFF;
 
+        /// <summary>The three 1A 05 RX Tone-Control items for one mode; any may be unavailable.</summary>
+        private readonly record struct RxToneItems(byte Filter, byte Bass, byte Treble);
+
         /// <summary>
         /// Map the requested VFO's current mode to its 1A 05 Tone-Control item
-        /// byte (the literal BCD menu number). SSB-DATA and any unreadable/unknown
-        /// mode yield <see cref="RxToneUnavailable"/>.
+        /// bytes (the literal BCD menu numbers). SSB-DATA and any unreadable or
+        /// unknown mode yield <see cref="RxToneUnavailable"/> throughout; CW and
+        /// RTTY yield an HPF/LPF item but no Bass/Treble, which the radio does
+        /// not have for those modes.
         /// </summary>
-        private async Task<byte> RxToneItemForVfoAsync(RadioVfo vfo, CancellationToken ct)
+        private async Task<RxToneItems> RxToneItemsForVfoAsync(RadioVfo vfo, CancellationToken ct)
         {
+            var none = new RxToneItems(RxToneUnavailable, RxToneUnavailable, RxToneUnavailable);
             var m = await ReadVfoModeRawAsync(SelectorFor(vfo), ct);
-            if (!m.ok) return RxToneUnavailable;
+            if (!m.ok) return none;
             return m.mode switch
             {
-                0x00 or 0x01 => m.data != 0 ? RxToneUnavailable : (byte)0x01, // LSB/USB → SSB (not DATA)
-                0x02 => 0x04,                                                  // AM
-                0x05 => 0x07,                                                  // FM
-                0x03 or 0x07 => 0x10,                                          // CW / CW-R
-                0x04 or 0x08 => 0x11,                                          // RTTY / RTTY-R
-                _ => RxToneUnavailable,
+                // LSB/USB → SSB, but only when it is not the DATA variant.
+                0x00 or 0x01 => m.data != 0 ? none : new RxToneItems(0x01, 0x02, 0x03),
+                0x02 => new RxToneItems(0x04, 0x05, 0x06),                          // AM
+                0x05 => new RxToneItems(0x07, 0x08, 0x09),                          // FM
+                0x03 or 0x07 => new RxToneItems(0x10, RxToneUnavailable, RxToneUnavailable), // CW / CW-R
+                0x04 or 0x08 => new RxToneItems(0x11, RxToneUnavailable, RxToneUnavailable), // RTTY / RTTY-R
+                _ => none,
             };
         }
 

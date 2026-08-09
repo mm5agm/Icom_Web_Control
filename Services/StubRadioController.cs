@@ -247,6 +247,22 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
+        // -- RX Tone Control Bass/Treble (CI-V 1A 05, canned) ------------------
+        // Always "available" here; the real controller reports false in the modes
+        // that have no shelves, and the UI's greying path is exercised by running
+        // against the radio.
+
+        private int _rxBass;     // −5…+5, 0 = flat
+        private int _rxTreble;
+        public Task<(bool available, int bass, int treble)> GetRxToneAsync(RadioVfo vfo, CancellationToken ct = default)
+            => Task.FromResult((true, _rxBass, _rxTreble));
+        public Task SetRxToneAsync(RadioVfo vfo, int bass, int treble, CancellationToken ct = default)
+        {
+            _rxBass = Math.Clamp(bass, -5, 5);
+            _rxTreble = Math.Clamp(treble, -5, 5);
+            return Task.CompletedTask;
+        }
+
         // -- CW keyer (CI-V 17 / 14 0C / 14 09 / 14 0F / 16 47, canned) --------
 
         private int _cwSpeedWpm = 20;
