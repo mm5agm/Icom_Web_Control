@@ -1597,8 +1597,12 @@
         <div class="p-3 d-flex flex-column gap-3">
             <div id="audioFilterStatus@(vfo)" class="small text-warning" style="min-height:1.2em;"></div>
             <p class="small text-muted mb-0" style="color:#bbb !important;">
-                Shift the two passband edges to narrow the receive filter.
-                Centre = no shift; drag toward the ends to cut the low or high side.
+                Move the sliders in <em>opposite</em> directions to narrow the receive
+                filter — each one cuts in from its own side of the passband.
+                Move them <em>together</em>, to the same value, and the passband keeps
+                its width but slides bodily: that is an <strong>IF Shift</strong>, for
+                pushing a whole crowded passband off an adjacent carrier.
+                Centre on both = no shift.
             </p>
             <div id="audioFilterControls@(vfo)">
                 <div class="d-flex align-items-center gap-2 mb-2">
