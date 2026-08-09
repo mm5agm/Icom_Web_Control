@@ -516,7 +516,27 @@ All of these settings are read from the radio when the app connects.
 
 The IF filter controls (**IF Shape**, the **FIL1 / FIL2 / FIL3** slot selector, and **IF Width**) also sit in this control grid — they are described in [§5.8](#58-if-width-if-shape-filter-slot-and-af-gain).
 
-**RX Tone** — The button at the end of the VFO panel's button row opens the **RX Tone Control** dialog. This is the radio's own *SET > Tone Control > RX* menu group, brought out where you can reach it: the audio filter edges plus the bass and treble shelves. It shapes the **receive audio only** — it does not touch the IF filter, and it has no effect on what you transmit.
+**Twin PBT** — The first of the two buttons at the end of the VFO panel's button row opens the **Twin PBT** (Digital Passband Tuning) dialog. This is the radio's `TWIN PBT CLR` pair of knobs, brought out as two sliders.
+
+PBT works on the **IF** passband, not the audio, and it is the strongest interference tool the radio has. Each slider shifts one edge of the passband — **PBT1** the inner, **PBT2** the outer — and the label beside it reads **Centre** at no shift, or a signed offset either side.
+
+Two ways to use it, both worth knowing:
+
+- **Shift the two sliders in *opposite* directions** and the passbands overlap less, so the filter narrows. This is how you squeeze an interfering signal out of one side without retuning.
+- **Set both sliders to the *same* value** and the passband keeps its width but moves bodily. That is an **IF Shift**, and it is how you slide a whole crowded passband off an adjacent carrier.
+
+**Clear PBT** returns both to centre — the same as holding the radio's `TWIN PBT CLR` knob for a second.
+
+Things the radio does that the dialog cannot show you:
+
+- **PBT applies to SSB, CW, RTTY and AM only.** FM has no adjustable IF passband, so the sliders will do nothing there.
+- **The radio memorises PBT per band**, so a setting you leave on 40 m is still there when you come back to it.
+- **Changing IF Width resets both PBT shifts to centre.** That is the radio's behaviour, not the app's. If the dialog happens to be open when you change the width, close and reopen it to see the reset — it reads the radio when it opens.
+- On the radio's own display, a dot **·** appears on the passband indicator whenever PBT is shifting the width.
+
+The sliders are read from the radio each time you open the dialog, not polled continuously, so a change made at the radio's knobs shows up the next time you open it.
+
+**RX Tone** — The second button opens the **RX Tone Control** dialog. This is the radio's own *SET > Tone Control > RX* menu group, brought out where you can reach it: the audio filter edges plus the bass and treble shelves. It shapes the **receive audio only** — it does not touch the IF filter, and it has no effect on what you transmit.
 
 Everything in the dialog belongs to the VFO's **current mode**. The radio stores these settings per mode, not per VFO, so the values you see are whatever that mode is set to, and changing them changes them for that mode everywhere. Switch mode with the dialog open and it re-reads for the new mode.
 
@@ -555,6 +575,8 @@ The dropdown is **mode-aware** — it is rebuilt whenever you change mode and sh
 - **FM** — the IF Width row is hidden. FM has no adjustable IF width on the IC-7300.
 
 The current width is read back from the radio, so the dropdown always reflects the width the radio is actually on. Pick a value and it is sent immediately. If you pick a width the radio can't land on exactly it snaps to the nearest supported step, and the dropdown updates to show what the radio settled on.
+
+> Changing the width **resets Twin PBT to centre** — the radio does this itself. Set the width first, then the PBT shifts, or you will lose them. See Twin PBT in [§5.7](#57-receiver-controls).
 
 **Filter slot (FIL1 / FIL2 / FIL3)** — Selects which of the mode's three filter presets is active. Each slot remembers its own width and shape, so you can set, for example, FIL1 wide for rag-chewing, FIL2 medium, and FIL3 narrow for digging a weak signal out of QRM — then switch between them with a single click. Selecting a slot switches the radio to it, and the IF Width dropdown above updates to show that slot's stored width.
 
