@@ -65,6 +65,7 @@
     - 15.3 [Why was Alexa voice control dropped in favour of the built-in microphone?](#153-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method)
     - 15.4 [What is the TX button for?](#154-what-is-the-tx-button-for-when-i-press-it-the-radio-goes-into-tx-mode-but-theres-no-audio-from-my-microphone)
     - 15.5 [WSJT-X is very slow to key the radio (long PTT / Tune delay)](#155-wsjt-x-is-very-slow-to-key-the-radio-1020-second-delay-on-ptt--tune)
+    - 15.6 [Can I hear the radio from another room?](#156-can-i-hear-the-radio-from-another-room-i-have-iwc-working-downstairs-but-theres-no-sound)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -1993,7 +1994,7 @@ To transmit voice from your microphone, press the PTT button on the mic itself.
 
 If pressing **Test PTT** or **Tune** in WSJT-X takes ten to twenty seconds before the radio actually transmits — and sometimes seems to stay in transmit afterwards — the delay is almost certainly **not** in IWC.
 
-When this was traced from an operator's logs ([issue #73](https://github.com/mm5agm/Icom_Web_Control/issues/73)), IWC was keying the radio within about 40 *milliseconds* of receiving each PTT command — the wait was happening *before* the command ever reached IWC. WSJT-X talks to IWC's rigctld server over the local loopback address (`127.0.0.1`), and on some Windows machines that loopback path can be bottlenecked by legacy networking.
+When this was traced from an operator's logs — in the sister project, [Yaesu Web Control issue #73](https://github.com/mm5agm/Yaesu_Web_Control/issues/73), which shares IWC's rigctld server — the app was keying the radio within about 40 *milliseconds* of receiving each PTT command, so the wait was happening *before* the command ever reached it. WSJT-X talks to IWC's rigctld server over the local loopback address (`127.0.0.1`), and on some Windows machines that loopback path can be bottlenecked by legacy networking.
 
 The fix that resolved it for that operator: **disable NetBIOS over TCP/IP**. It's a legacy protocol that can slow down local loopback traffic. To disable it:
 
@@ -2006,6 +2007,27 @@ The fix that resolved it for that operator: **disable NetBIOS over TCP/IP**. It'
 This is a machine-specific networking quirk rather than an IWC bug, so it won't affect most setups — but if you're seeing long PTT delays with an otherwise-working WSJT-X ↔ IWC link, it's the first thing to try.
 
 As a safety backstop, IWC will force the radio back to receive if a program keys it through rigctld and never sends the matching release, so a stuck transmit can't be left keyed indefinitely — but that's a safety net, not a cure for the delay. The loopback fix above is the real solution.
+
+---
+
+### 15.6 Can I hear the radio from another room? I have IWC working downstairs but there's no sound.
+
+No — and nothing is wrong with your setup.
+
+IWC carries **no radio audio at all**. It is a *control* application: it speaks CI-V to the radio over the USB cable and moves its controls, and that is the whole of what travels over your network. The receive audio never leaves the shack. So on a second computer you get a complete, fully working control panel and complete silence, which is the app behaving as built.
+
+**Is audio coming?** It is being worked on, in the sister application first. IWC has a twin — [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control), the same app for Yaesu radios — and a contributor there is building browser-to-radio audio streaming over the USB connection, receive and transmit. It is in development and not finished, so there is no date for it. If it proves out in YWC, bringing it across to IWC is the obvious next step.
+
+**What gets you sound today.** Two approaches people already use:
+
+| Approach | How it works | Trade-off |
+|---|---|---|
+| **Remote Desktop** | Connect to the shack PC from the other room. Windows carries that PC's sound back down the connection, so you hear the radio and see IWC on the shack machine's screen. | Simplest by far if the shack PC runs Windows — nothing extra to install. You are driving a remote screen rather than using IWC natively in your own browser. |
+| **Audio over IP** (e.g. [Mumble](https://www.mumble.info/)) | A server on the shack PC takes the radio's USB audio input and streams it; a client in the other room plays it. Run IWC in your own browser alongside it. | More to set up, and you are configuring two things rather than one. In exchange you use IWC properly, in the browser, on the machine in front of you. |
+
+For either route, the radio's audio device on the shack PC is the **USB Audio CODEC** input that appears when the IC-7300 is connected — the same device WSJT-X uses (see §15.1).
+
+> **One caution.** IWC has **no password on it**. That is deliberate: it is designed for your own home network. Reaching it from your own house is exactly what it's for, but if you ever want it from *outside* the house, use a VPN back into your own network rather than forwarding port 8080 to the internet.
 
 ---
 
