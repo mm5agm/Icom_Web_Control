@@ -4,11 +4,11 @@ public static class AppVersion
 {
     // Fresh IWC version line — IWC starts its own numbering at 1.0.0, NOT
     // continued from the inherited YWC 2.4.x lineage.
-    public const string Current = "1.0.5";
+    public const string Current = "1.0.6";
 
     /// <summary>Date this version was released, ISO format.
     /// Bump on actual release; current value reflects the planned ship date.</summary>
-    public const string ReleaseDate = "2026-08-09";
+    public const string ReleaseDate = "2026-08-10";
 
     /// <summary>
     /// Firmware version(s) of the developer's bench radio at the time this IWC
