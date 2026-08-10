@@ -1881,6 +1881,17 @@ The scope comes from the radio over CI-V, so there is no SDR, driver or device s
 - Confirm the radio itself is connected — if the meters are dead and the frequency isn't tracking the VFO knob, fix the CI-V connection first (see the two entries at the top of this section).
 - The scope shares the CI-V bus with everything else. At the default 19200 baud a sweep takes a noticeable slice of the link, and IWC deliberately slows its meter polling while the scope streams. If the trace is ragged rather than absent, try **115200** on both the radio (**MENU → SET → Connectors → CI-V → CI-V Baud Rate**) and in Settings.
 
+**Meter needles smear, detach, or shoot past the end of the scale — in Firefox** (v1.0.5 and earlier)
+
+While transmitting, a needle appears to come away from its gauge, is drawn well beyond the end of its arc, or leaves a small red fragment above or to the left of the gauge for a fraction of a second before tidying itself up. It happens repeatedly for as long as you are transmitting and is worst when the readings are moving fastest. Reloading the page does not help.
+
+This affects **Firefox only**. Edge, Chrome and other Chromium-based browsers never showed it. It is purely a drawing fault in the browser — the readings themselves are correct, and nothing is wrong with the radio or the CI-V link.
+
+Up to and including v1.0.5, each needle was animated: told to sweep to its new position over 400 milliseconds. But readings arrive from the radio roughly every 150 milliseconds, so a new sweep began before the previous one had finished — up to three running at once. Chromium discards the frames that have been superseded; Firefox keeps them on the canvas, and the leftovers merge into what looks like one needle running off the end of the dial. On receive, with a steady signal, the needles barely move and the fault does not appear at all.
+
+- **Upgrade to v1.0.6 or later.** The animation has been removed, so needles move straight to each new reading — which at six to seven updates a second looks the same, without the artefacts. There is no setting to change.
+- **Staying on an older version?** Use Edge or Chrome for IWC and the gauges draw cleanly. There is no workaround within Firefox itself.
+
 **Meters appear to show incorrect values**
 
 - The meters use a default calibration that may not exactly match every individual radio. See Section 10 to adjust the calibration.

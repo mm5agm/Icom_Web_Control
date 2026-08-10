@@ -40,6 +40,12 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Release notes
 
+### v1.0.6 (2026-08-10)
+
+- **Meter needles no longer smear or fly off their scale in Firefox** ([#2](https://github.com/mm5agm/Icom_Web_Control/issues/2)). On transmit — the moment the meter readings move fastest — a needle could appear to detach from its gauge, be drawn well past the end of its arc, or leave a small red fragment sitting above or to the left of the gauge for a fraction of a second. It cleared itself and came back, over and over, for as long as you were transmitting. This only ever happened in **Firefox**; Edge, Chrome and the other Chromium browsers were unaffected, which is why it went unnoticed for six releases. **What was happening:** each needle was drawn as a 400 ms sweep to its new position, but fresh readings arrive from the radio every 150 ms or so, so a new sweep started before the last one had finished — up to three overlapping at once. Chromium throws the superseded frames away; Firefox keeps them, and the leftovers smear into a needle that looks like it has run off the end of the dial. **Fixed by removing the animation altogether:** needles now go straight to each new reading. At six to seven updates a second there was nothing left for the animation to smooth, so the meters move exactly as before — just without the wreckage. Nothing to change and nothing to set. User Manual, Section 14.2.
+
+  *Found because Steve (Albergsteve) photographed what he was seeing and stuck with the report until it was reproducible. It needed a Firefox install and a script that churned the meter values as fast as a transmit does — on a quiet receive screen the gauges look perfect.*
+
 ### v1.0.5 (2026-08-09)
 
 - **RX Bass and Treble, alongside the audio filter.** The **RX Filter** button on each VFO panel is now **RX Tone**, and its dialog carries the whole of the radio's *SET > Tone Control > RX* menu: the HPF and LPF edges it already had, plus the **Bass** and **Treble** shelves (−5 to +5, 0 flat) it did not. Everything applies to the VFO's current mode, as it does on the radio. Bass and Treble exist for SSB, AM and FM only — in CW and RTTY the radio has the filter edges but no shelves, and in the DATA modes it disables tone control altogether — so the dialog greys out whatever does not apply and says why. A **Flat** button returns both shelves to 0. User Manual, Section 5.7.
