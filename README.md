@@ -40,7 +40,17 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Release notes
 
-### v1.0.6 (2026-08-10)
+### v1.0.6 — not released yet
+
+> **Want the Firefox fix now?** It is in the pre-release
+> **[v1.0.6-pre1](https://github.com/mm5agm/Icom_Web_Control/releases/tag/v1.0.6-pre1)** —
+> download `Icom_Web_Control_Setup.exe` from that page and install it over the top
+> of your current version. The download button at the top of this page, and IWC's
+> own "a new version is available" banner, both still hand out **v1.0.5**: they
+> deliberately ignore pre-releases, so this build only reaches people who follow the
+> link. It is the v1.0.5 you already have plus the one fix below — but it is a
+> pre-release, so if something is wrong with it please
+> [say so on GitHub](https://github.com/mm5agm/Icom_Web_Control/issues).
 
 - **Meter needles no longer smear or fly off their scale in Firefox** ([#2](https://github.com/mm5agm/Icom_Web_Control/issues/2)). On transmit — the moment the meter readings move fastest — a needle could appear to detach from its gauge, be drawn well past the end of its arc, or leave a small red fragment sitting above or to the left of the gauge for a fraction of a second. It cleared itself and came back, over and over, for as long as you were transmitting. This only ever happened in **Firefox**; Edge, Chrome and the other Chromium browsers were unaffected, which is why it went unnoticed for six releases. **What was happening:** each needle was drawn as a 400 ms sweep to its new position, but fresh readings arrive from the radio every 150 ms or so, so a new sweep started before the last one had finished — up to three overlapping at once. Chromium throws the superseded frames away; Firefox keeps them, and the leftovers smear into a needle that looks like it has run off the end of the dial. **Fixed by removing the animation altogether:** needles now go straight to each new reading. At six to seven updates a second there was nothing left for the animation to smooth, so the meters move exactly as before — just without the wreckage. Nothing to change and nothing to set. User Manual, Section 14.2.
 

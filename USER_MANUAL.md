@@ -1890,6 +1890,7 @@ This affects **Firefox only**. Edge, Chrome and other Chromium-based browsers ne
 Up to and including v1.0.5, each needle was animated: told to sweep to its new position over 400 milliseconds. But readings arrive from the radio roughly every 150 milliseconds, so a new sweep began before the previous one had finished — up to three running at once. Chromium discards the frames that have been superseded; Firefox keeps them on the canvas, and the leftovers merge into what looks like one needle running off the end of the dial. On receive, with a steady signal, the needles barely move and the fault does not appear at all.
 
 - **Upgrade to v1.0.6 or later.** The animation has been removed, so needles move straight to each new reading — which at six to seven updates a second looks the same, without the artefacts. There is no setting to change.
+- **v1.0.6 is not out yet**, but the fix is available now as the pre-release **v1.0.6-pre1**, at https://github.com/mm5agm/Icom_Web_Control/releases/tag/v1.0.6-pre1 — download `Icom_Web_Control_Setup.exe` from that page and install it over your current version. IWC's update banner ignores pre-releases, so it will not offer this build to you; you have to follow the link.
 - **Staying on an older version?** Use Edge or Chrome for IWC and the gauges draw cleanly. There is no workaround within Firefox itself.
 
 **Meters appear to show incorrect values**
