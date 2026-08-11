@@ -1796,7 +1796,7 @@ The radio is not answering on CI-V. IWC keeps retrying, so it clears itself the 
 
 - Check that the radio is powered on.
 - Check the COM port in Settings. The **Check which COM ports this PC has** link in the "Radio not connected" banner lists every port your PC has and says whether the one you configured is among them; **Diagnostics → Ports** shows the same thing.
-- Check the baud rate in Settings matches the radio's **MENU → SET → Connectors → CI-V → CI-V Baud Rate**.
+- Check the baud rate in Settings matches the radio's **MENU → SET → Connectors → CI-V → CI-V USB Baud Rate**. That is the USB port's own setting — the plain **CI-V Baud Rate** below it belongs to the round [REMOTE] socket and has no effect on a USB connection.
 - Check the CI-V address in Settings (`B6` for the IC-7300 MkII, `94` for the original IC-7300).
 - Click **Test Connection** in Settings.
 - If IWC knows *why* it cannot connect — a COM port that is not present, for instance — the panel says so and offers a link to Settings instead of spinning.
@@ -1817,7 +1817,7 @@ The port opened cleanly, so the driver, the cable and the port number are all co
 
 - **If you are on v1.0.4-pre1 or earlier, check CI-V USB Echo Back first.** With that setting on, those versions cannot connect *at all* — the radio is answering perfectly and IWC is failing to listen. Switch it off at **MENU → SET → Connectors → CI-V** (the MkII has **CI-V USB (A) Echo Back** and **(B)** — switch both off; the original IC-7300 has one). **v1.0.4-pre2 and later work either way**, so on current versions you can skip this.
 - Check the CI-V address in Settings matches the radio: **`B6`** for the IC-7300 MkII, **`94`** for the original IC-7300 (**MENU → SET → Connectors → CI-V → CI-V Address**).
-- Check the baud rate in Settings matches **CI-V Baud Rate** on the radio. If the radio is set to **Auto**, set both ends to **19200** instead while you are diagnosing.
+- Check the baud rate in Settings matches **CI-V USB Baud Rate** on the radio — not the plain **CI-V Baud Rate**, which is the [REMOTE] socket's setting. If the radio is set to **Auto**, set both ends to **19200** instead while you are diagnosing.
 - **On the IC-7300 MkII, make sure you are on the right port.** The radio presents *two* USB serial ports and only one of them carries CI-V — the one Windows names **"IC-7300MK2 Serial Port A (CI-V)"**. Port B will open happily and never answer.
 - A quick sanity check: if another program — N1MM, WSJT-X, Ham Radio Deluxe — can talk to the radio on that same port, then the port and radio are definitely fine and the fault is in how IWC is addressing it. Say so in your bug report (§14.1); it narrows things down enormously.
 
@@ -1879,7 +1879,7 @@ The scope comes from the radio over CI-V, so there is no SDR, driver or device s
 - **Original IC-7300 (not the MkII): check the baud rate first.** The original model refuses to send scope data unless the radio's **CI-V USB Port** is **Unlink from [REMOTE]** and its **CI-V USB Baud Rate** is **115200**, with 115200 set in IWC's Settings to match. At IWC's default of 19200 the rest of the app works perfectly and the spectrum never appears. IWC now says so in the panel itself, and warns in Settings the moment you pick the combination.
 - Check the panel's **scope on/off** toggle hasn't been left off. Switching it off is remembered for the rest of the session — IWC won't quietly switch the scope back on under you if the radio drops and reconnects — so it stays off until you switch it back on or restart the app.
 - Confirm the radio itself is connected — if the meters are dead and the frequency isn't tracking the VFO knob, fix the CI-V connection first (see the two entries at the top of this section).
-- The scope shares the CI-V bus with everything else. At the default 19200 baud a sweep takes a noticeable slice of the link, and IWC deliberately slows its meter polling while the scope streams. If the trace is ragged rather than absent, try **115200** on both the radio (**MENU → SET → Connectors → CI-V → CI-V Baud Rate**) and in Settings.
+- The scope shares the CI-V bus with everything else. At the default 19200 baud a sweep takes a noticeable slice of the link, and IWC deliberately slows its meter polling while the scope streams. If the trace is ragged rather than absent, try **115200** on both the radio (**MENU → SET → Connectors → CI-V → CI-V USB Baud Rate**) and in Settings.
 
 **Meter needles smear, detach, or shoot past the end of the scale — in Firefox** (v1.0.5 and earlier)
 
