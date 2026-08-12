@@ -97,9 +97,12 @@ namespace Icom_Web_Control.Services.Voice
 
         private static void ValidateStructural(VoicePhrasesConfig cfg, List<ValidationIssue> issues)
         {
+            // The gate stays at 9, not the current 10: v10 only added the
+            // antenna-tuner commands, and VoicePhraseStore.MigrateToV10 fills
+            // those in on load, so a v9 pack is still a valid import.
             if (cfg.Version < 9)
                 issues.Add(new ValidationIssue(ValidationSeverity.Error, "version",
-                    $"Schema version {cfg.Version} predates the current format (9) and cannot be validated."));
+                    $"Schema version {cfg.Version} predates the supported format (9 or later; current is 10) and cannot be validated."));
 
             cfg.SimpleCommands ??= new();
             cfg.Macros ??= new();

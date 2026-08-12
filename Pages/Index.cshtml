@@ -502,11 +502,21 @@
                                style="width: clamp(80px, 10vw, 150px); height: 18px;"
                                oninput="document.getElementById('procLevelValue').innerText = this.value;"
                                onchange="setProcLevel(this.value);">
-                        <button id="atuBtn"
+                        <button id="atuBtn" data-a11y-key="controls.atu"
                                 class="btn btn-sm ms-2 @(Model.AtuEnabled ? "btn-success" : "btn-outline-secondary")"
                                 aria-label="Antenna tuner — short tap toggles on/off, long press starts auto-tune"
                                 title="Tap to toggle ATU on/off; press and hold to start auto-tune"
                                 style="touch-action: manipulation; user-select: none;">@(Model.AtuEnabled ? "ATU On" : "ATU Off")</button>
+                        @* Auto-tune has its own button as well as the long press. A long
+                           press is undiscoverable (it was advertised in a tooltip only) and
+                           impossible to describe to a screen-reader user, and voice control
+                           here exists for partially-sighted operators. Both routes call the
+                           same toggleAtuTune(). *@
+                        <button id="atuTuneBtn" data-a11y-key="controls.atuTune"
+                                class="btn btn-sm btn-outline-secondary ms-1"
+                                aria-label="Start an antenna tuner auto-tune cycle"
+                                title="Start an auto-tune cycle; press again to stop it early"
+                                onclick="toggleAtuTune()">Tune</button>
                         <button id="monitorOnBtn"
                                 class="btn btn-sm ms-2 @(Model.MonitorOn ? "btn-warning" : "btn-outline-secondary")"
                                 aria-label="TX monitor — currently @(Model.MonitorOn ? "on" : "off")"
@@ -2969,12 +2979,17 @@
         });
 
         // --- ATU ---
-        // Short tap toggles ATU on/off. Press-and-hold (>= 500 ms) starts
-        // the radio's auto-tune cycle (CAT command AC002;). Sending AC002;
-        // a second time stops it — so during a running tune cycle, any
-        // tap on the button also stops it. The Yaesu radios use a single
-        // physical button with the same short/long behaviour, so this
-        // matches the radio's UX exactly.
+        // Two buttons, and #atuBtn also carries the radio's own short/long
+        // gesture because that is what the IC-7300's front-panel TUNER key
+        // does:
+        //   #atuBtn      short tap  -> tuner in line / bypassed (CI-V 1C 01 01/00)
+        //   #atuBtn      long press -> start an auto-tune cycle (1C 01 02)
+        //   #atuTuneBtn  click      -> the same auto-tune cycle, visibly
+        // The separate Tune button is the one that matters for accessibility:
+        // a long press can't be announced by a screen reader and can't be
+        // performed by voice, and it was only ever advertised in a tooltip.
+        // Sending 1C 01 01 during a cycle stops it, so both routes toggle:
+        // start when idle, stop when a cycle is running.
         const ATU_LONG_PRESS_MS = 500;
         let atuPressTimer = null;
         let atuLongFired = false;
@@ -2990,12 +3005,12 @@
                 updateAtuButton(!enabled);
             } catch (e) { console.error('toggleAtu error:', e); }
         }
-        // Yaesu's CAT spec doesn't report tuning-in-progress (AC P2 is
-        // "Fixed at 0" in the manual), so the "Tuning…" UI state is driven
-        // entirely on the client. We mark the button as tuning immediately
-        // after sending AC002;, then auto-clear after a safe upper bound
-        // (typical tune cycles are 2-7 s; 8 s is a reasonable margin) and
-        // GET /api/cat/atu to sync the settled on/off state.
+        // CI-V does report a cycle in progress (1C 01 status 02), and the poll
+        // loop broadcasts it as AtuTuning — but we don't wait for the next poll
+        // to show it: the button goes to "Tuning…" as soon as the request is
+        // away, and an auto-clear timer covers the case where the finished
+        // cycle is missed (typical cycles are 2-7 s; 8 s is a fair margin).
+        // The timer fires GET /api/cat/atu to pick up the settled on/off state.
         const ATU_TUNE_AUTOCLEAR_MS = 8000;
         let atuAutoclearTimer = null;
 
@@ -3031,16 +3046,25 @@
             } catch (e) { console.error('startAtuTune error:', e); }
         }
 
-        // User tapped the button while a tune cycle was running. Send the
-        // AC002; toggle again to stop the radio, cancel the auto-clear
-        // timer, then refresh + clear the UI after a brief settle period.
-        // We don't await fetch() — fire-and-forget so the UI clears quickly
-        // regardless of HTTP latency.
+        // User asked to stop a tune cycle that was already running. POST the
+        // same endpoint again — it toggles, so this sends 1C 01 01 and the
+        // radio drops out of the cycle. Cancel the auto-clear timer, then
+        // refresh + clear the UI after a brief settle period. We don't await
+        // fetch() — fire-and-forget so the UI clears quickly regardless of
+        // HTTP latency.
         async function stopAtuTune() {
             try { fetch('/api/cat/atu/tune', { method: 'POST' }); } catch (e) {}
             clearTimeout(atuAutoclearTimer);
             atuAutoclearTimer = null;
             setTimeout(refreshAtuAfterTune, 500);
+        }
+
+        // The single entry point both the Tune button and the long press use:
+        // start a cycle when idle, stop the one that is running otherwise.
+        function toggleAtuTune() {
+            const btn = document.getElementById('atuBtn');
+            if (btn && btn.dataset.tuning === 'true') stopAtuTune();
+            else startAtuTune();
         }
         function updateAtuButton(enabled) {
             const btn = document.getElementById('atuBtn');
@@ -3052,11 +3076,26 @@
             btn.classList.toggle('btn-outline-secondary', !enabled);
             btn.textContent = enabled ? 'ATU On' : 'ATU Off';
         }
-        // Drives the "Tuning..." visual when the radio reports an auto-tune
-        // cycle in progress (AC P2 = 1). Called from the SignalR AtuTuning
-        // route in site.js.
+        // Drives the "Tuning..." visual when a cycle is running — either
+        // because we just started one, or because the radio reported status
+        // 02 and site.js routed the AtuTuning update here. Both ATU buttons
+        // change: #atuBtn shows the state, #atuTuneBtn offers the way out of
+        // it, and its aria-label changes with it so a screen reader announces
+        // "stop" rather than a button whose meaning silently flipped.
         function updateAtuTuningState(tuning) {
             const btn = document.getElementById('atuBtn');
+            const tuneBtn = document.getElementById('atuTuneBtn');
+            if (tuneBtn) {
+                tuneBtn.classList.toggle('btn-danger', tuning);
+                tuneBtn.classList.toggle('btn-outline-secondary', !tuning);
+                tuneBtn.textContent = tuning ? 'Stop' : 'Tune';
+                tuneBtn.setAttribute('aria-label', tuning
+                    ? 'Stop the antenna tuner auto-tune cycle'
+                    : 'Start an antenna tuner auto-tune cycle');
+                tuneBtn.title = tuning
+                    ? 'Stop the running auto-tune cycle'
+                    : 'Start an auto-tune cycle; press again to stop it early';
+            }
             if (!btn) return;
             if (tuning) {
                 btn.dataset.tuning = 'true';
@@ -3081,7 +3120,10 @@
                 clearTimeout(atuPressTimer);
                 atuPressTimer = setTimeout(() => {
                     atuLongFired = true;
-                    startAtuTune();
+                    // toggleAtuTune, not startAtuTune: a long press during a
+                    // running cycle would otherwise send the stop toggle to
+                    // the radio while leaving the UI claiming "Tuning…".
+                    toggleAtuTune();
                 }, ATU_LONG_PRESS_MS);
             });
             const cancelPress = function() {
@@ -4552,6 +4594,7 @@
         window.toggleAtu        = toggleAtu;
         window.startAtuTune     = startAtuTune;
         window.stopAtuTune      = stopAtuTune;
+        window.toggleAtuTune    = toggleAtuTune;
         window.updateAtuButton  = updateAtuButton;
         window.updateAtuTuningState = updateAtuTuningState;
         window.toggleMonitor    = toggleMonitor;

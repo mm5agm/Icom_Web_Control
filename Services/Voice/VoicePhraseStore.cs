@@ -100,6 +100,14 @@ namespace Icom_Web_Control.Services.Voice
                 // Older files are reset to defaults rather than partially migrated.
                 if (config == null || config.Version < 9)
                     return BuildDefaults();
+                // Version 10 added the antenna-tuner intents. Nothing collides
+                // with them and nothing changed shape, so a v9 pack is carried
+                // forward with the missing commands filled in rather than
+                // reset — a translator's work survives the upgrade, and the
+                // one operator group that cannot reach the tuner any other way
+                // gets the commands without having to re-import anything.
+                if (config.Version < 10)
+                    MigrateToV10(config);
                 return config;
             }
             catch
@@ -371,9 +379,44 @@ namespace Icom_Web_Control.Services.Voice
             return v;
         }
 
+        /// <summary>
+        /// v9 → v10, in place: add the antenna-tuner commands to a pack that
+        /// predates them, leaving everything the user already has alone. On a
+        /// translated pack the new phrases arrive in English — untranslated but
+        /// working, and visible in the editor for whoever translates next,
+        /// which beats a tuner the operator simply cannot reach. A default
+        /// phrase already spoken for by another command is dropped rather than
+        /// duplicated, since two rules matching the same words make the
+        /// grammar ambiguous.
+        /// </summary>
+        private static void MigrateToV10(VoicePhrasesConfig config)
+        {
+            config.SimpleCommands ??= new();
+
+            var taken = new HashSet<string>(
+                config.SimpleCommands.Values
+                    .Where(v => v != null)
+                    .SelectMany(v => v!)
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .Select(p => p.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+
+            var defaults = BuildDefaults().SimpleCommands;
+            foreach (var key in new[] { "AtuOn", "AtuOff", "AtuTune" })
+            {
+                if (config.SimpleCommands.ContainsKey(key)) continue;
+                var phrases = defaults[key].Where(p => !taken.Contains(p)).ToList();
+                if (phrases.Count == 0) continue;
+                config.SimpleCommands[key] = phrases;
+                foreach (var p in phrases) taken.Add(p);
+            }
+
+            config.Version = 10;
+        }
+
         public static VoicePhrasesConfig BuildDefaults() => new()
         {
-            Version = 9,
+            Version = 10,
             SimpleCommands = new()
             {
                 ["SwapVFO"]          = ["swap v f o", "swap v f os", "swap a and b", "swap a b", "switch v f o", "switch a and b"],
@@ -388,6 +431,11 @@ namespace Icom_Web_Control.Services.Voice
                 ["TxOff"]            = ["stop transmitting", "go to receive", "transmit off"],
                 ["SplitOn"]          = ["split on", "enable split", "split transmit"],
                 ["SplitOff"]         = ["split off", "disable split", "simplex"],
+                // No bare "tune" here: it would collide head-on with the
+                // NudgeUp/NudgeDown phrases ("tune up", "tune lower").
+                ["AtuOn"]            = ["tuner on", "antenna tuner on", "a t u on"],
+                ["AtuOff"]           = ["tuner off", "antenna tuner off", "a t u off", "bypass tuner"],
+                ["AtuTune"]          = ["tune antenna", "tune the antenna", "start tuner", "run tuner", "match antenna"],
                 ["Help"]             = ["help", "command help", "what can I say", "list commands"],
                 ["NudgeIfWidthUp"]   = ["filter wider", "wider filter", "increase bandwidth", "i f width up"],
                 ["NudgeIfWidthDown"] = ["filter narrower", "narrower filter", "decrease bandwidth", "i f width down"],
