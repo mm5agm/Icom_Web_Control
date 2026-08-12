@@ -625,6 +625,15 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="250000" data-vfo="A" data-a11y-key="spectrum.spanA500k" aria-label="VFO A span plus or minus 250 kHz" title="VFO A scope span ±250 kHz">±250k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="500000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span plus or minus 500 kHz" title="VFO A scope span ±500 kHz — widest">±500k</button>
                             </div>
+                            @* The scope-mode badge drawn on the canvas is clickable too, but a
+                               click target on a canvas corner is undiscoverable and unreachable
+                               by keyboard or screen reader. This is the same control, labelled.
+                               Disabled until a sweep reports a mode — the radio's mode is not
+                               something we get to assume (GitHub #2).
+                               Deliberately NO data-a11y-key: the aria-label carries the live
+                               mode, and a11y-labels.js would pin an override over it, leaving a
+                               screen reader announcing "Centre" while the radio sits in Fixed. *@
+                            <button type="button" class="btn btn-outline-light btn-sm spectrum-scopemode-btn" data-vfo="A" aria-label="VFO A scope mode, Centre or Fixed — waiting for the radio's scope" title="Centre or Fixed scope mode — waiting for the radio's scope" disabled>Cent/Fix</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="A" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="A" title="Listen to VFO A — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
                             <span class="badge bg-success small spectrum-audio-badge" data-vfo="A" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
@@ -664,6 +673,9 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="250000" data-vfo="B" data-a11y-key="spectrum.spanB500k" aria-label="VFO B span plus or minus 250 kHz" title="VFO B scope span ±250 kHz">±250k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="500000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span plus or minus 500 kHz" title="VFO B scope span ±500 kHz — widest">±500k</button>
                             </div>
+                            @* Same control as VFO A's — the scope mode belongs to the radio, not
+                               to a panel, so both buttons show and set the one setting. *@
+                            <button type="button" class="btn btn-outline-light btn-sm spectrum-scopemode-btn" data-vfo="B" aria-label="VFO B scope mode, Centre or Fixed — waiting for the radio's scope" title="Centre or Fixed scope mode — waiting for the radio's scope" disabled>Cent/Fix</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="B" title="Listen to VFO B — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
                             <span class="badge bg-success small spectrum-audio-badge" data-vfo="B" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
@@ -2449,6 +2461,64 @@
                     }
                 });
             });
+
+            // Centre/Fixed button — the labelled twin of the scope-mode badge
+            // drawn in the corner of the canvas. Both call the same
+            // panel.toggleScopeMode(), so there is one code path to the radio.
+            //
+            // The scope mode belongs to the radio, not to a panel, so a change
+            // relabels BOTH buttons — the watch panel is a crop of the same
+            // single sweep and cannot be in a different mode.
+            (function wireScopeModeButtons() {
+                // Amber for anything that isn't Centre, matching the badge: the
+                // frequency axis is built around Centre mode, so the other modes
+                // carry a caution rather than being wrong outright.
+                const LABELS = {
+                    'CENT':     { text: 'Centre',   next: 'Fixed',  warn: false },
+                    'FIX':      { text: 'Fixed',    next: 'Centre', warn: true  },
+                    'SCROLL-C': { text: 'Scroll-C', next: 'Centre', warn: true  },
+                    'SCROLL-F': { text: 'Scroll-F', next: 'Centre', warn: true  }
+                };
+
+                function relabel(mode) {
+                    const info = LABELS[mode];
+                    document.querySelectorAll('.spectrum-scopemode-btn').forEach(btn => {
+                        const vfo = btn.dataset.vfo === 'B' ? 'VFO B' : 'VFO A';
+                        if (!info) {
+                            // No sweep yet, so no mode to report. Say so rather
+                            // than showing a mode the radio might not be in.
+                            btn.disabled = true;
+                            btn.textContent = 'Cent/Fix';
+                            btn.title = "Centre or Fixed scope mode — waiting for the radio's scope";
+                            btn.setAttribute('aria-label',
+                                vfo + " scope mode, Centre or Fixed — waiting for the radio's scope");
+                            btn.classList.remove('btn-warning');
+                            btn.classList.add('btn-outline-light');
+                            return;
+                        }
+                        btn.disabled = false;
+                        btn.textContent = info.text;
+                        btn.title = 'Scope is in ' + info.text + ' mode — click to switch to ' + info.next
+                                  + (info.warn ? '. The frequency scale is built around Centre, so the trace may not line up exactly.' : '.');
+                        btn.setAttribute('aria-label',
+                            vfo + ' scope mode is ' + info.text + '. Activate to switch to ' + info.next + '.');
+                        btn.classList.toggle('btn-warning', info.warn);
+                        btn.classList.toggle('btn-outline-light', !info.warn);
+                    });
+                }
+
+                document.querySelectorAll('.spectrum-scopemode-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const panel = btn.dataset.vfo === 'B' ? spectrumPanelB : spectrumPanelA;
+                        if (panel) panel.toggleScopeMode();
+                    });
+                });
+
+                // Follow the mode the radio actually reports, not what we asked
+                // for — a refused change must not show as applied.
+                if (spectrumPanelA) spectrumPanelA.onScopeModeChange = relabel;
+                if (spectrumPanelB) spectrumPanelB.onScopeModeChange = relabel;
+            })();
 
             // ── Pseudo-dual "Listen" button + "Listening" badge (Phase 5) ────
             // Each panel gets a Listen button (route audio to that VFO) and a

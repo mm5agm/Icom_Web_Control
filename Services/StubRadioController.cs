@@ -399,8 +399,10 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
-        // Scope mode (CI-V 27 14, canned) — the fake sweep is always "Center",
-        // so just remember the request; the emitted frames stay centred.
+        // Scope mode (CI-V 27 14, canned) — the fake sweep is always centred
+        // geometrically, but the emitted frames DO report the requested mode
+        // (see the "CENT"/"FIX" in the scope loop), so the panel's Centre/Fixed
+        // button and badge can be exercised without a radio.
         private bool _scopeCenter = true;
         private volatile bool _scopeEnabled = true;
 

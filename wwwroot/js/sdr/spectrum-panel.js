@@ -360,7 +360,15 @@ export class SpectrumPanel {
         // badge, read from the 27 00 waveform header. Left undefined until a
         // sweep carrying it arrives, which the badge treats as "nothing to
         // show" rather than guessing a mode.
-        if (mode !== undefined) this._scopeMode = mode;
+        if (mode !== undefined) {
+            const modeChanged = mode !== this._scopeMode;
+            this._scopeMode = mode;
+            // Let the page label its Centre/Fixed button from the mode the radio
+            // is actually in, rather than from what we last asked for.
+            if (modeChanged && typeof this.onScopeModeChange === 'function') {
+                this.onScopeModeChange(mode);
+            }
+        }
 
         // Only scroll the waterfall every Nth frame per _waterfallSpeed;
         // the spectrum trace above it still redraws every frame regardless.
@@ -460,6 +468,34 @@ export class SpectrumPanel {
 
     /** Returns the current hold state (true = frozen, false = streaming live). */
     isHeld() { return !!this._hold; }
+
+    /**
+     * The scope mode the radio last reported ('CENT', 'FIX', 'SCROLL-C',
+     * 'SCROLL-F'), or undefined until a sweep carries one. Undefined means
+     * "not known yet", not "Centre" — don't let a control claim otherwise.
+     */
+    get scopeMode() { return this._scopeMode; }
+
+    /**
+     * Ask the radio for Centre (true) or Fixed (false) scope mode. The panel
+     * doesn't set _scopeMode itself: the badge and any button follow the mode
+     * the next sweep reports, so a refused change never shows as applied.
+     * @param {boolean} center
+     */
+    setScopeMode(center) {
+        fetch(`/api/cat/scopemode/${center ? 'center' : 'fixed'}`, { method: 'POST' })
+            .catch(() => { /* ignore network errors */ });
+    }
+
+    /**
+     * Flip between Centre and Fixed. The single entry point behind both the
+     * corner badge and the panel header's Centre/Fixed button. Anything that
+     * isn't Centre (including the two scroll modes) goes back to Centre, which
+     * is the mode the frequency axis is built around.
+     */
+    toggleScopeMode() {
+        this.setScopeMode(this._scopeMode !== 'CENT' ? true : false);
+    }
 
     /** Store the latest error detail string for display alongside status overlays. */
     setError(detail) {
@@ -701,9 +737,7 @@ export class SpectrumPanel {
         // clicking a green CENT badge flips to Fixed, an amber FIX badge back to
         // Center. The badge only appears once a sweep has reported a mode.
         if (this._isOnScopeModeBadge(x * (W / rect.width), this._canvasYFromEvent(e, canvas))) {
-            const target = (this._scopeMode === 'CENT') ? 'fixed' : 'center';
-            fetch(`/api/cat/scopemode/${target}`, { method: 'POST' })
-                .catch(() => { /* ignore network errors */ });
+            this.toggleScopeMode();
             return;
         }
 
