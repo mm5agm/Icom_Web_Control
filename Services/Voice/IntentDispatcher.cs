@@ -22,9 +22,10 @@ namespace Icom_Web_Control.Services.Voice
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hub;
         // The semantic seam. Every intent that reaches the radio goes through
-        // it: frequency, band, mode, TX, split, VFO-swap, and the whole
-        // receive/transmit control chain (AF/RF gain, squelch, preamp,
-        // attenuator, AGC, NR, NB, notch, APF, TX power, mic gain, processor).
+        // it: frequency, band, mode, TX, split, VFO-swap, the antenna tuner,
+        // and the whole receive/transmit control chain (AF/RF gain, squelch,
+        // preamp, attenuator, AGC, NR, NB, notch, APF, TX power, mic gain,
+        // processor).
         // Two intents remain deliberately inert on Icom, marked TODO(voice-civ)
         // at their handlers:
         //   NudgeIfWidth   — no clean seam equivalent yet (PBT/filter model differs).
@@ -115,6 +116,9 @@ namespace Icom_Web_Control.Services.Voice
                     case "TxOff":             return await TxOffAsync(cancellationToken);
                     case "SplitOn":           return await SplitAsync(true, cancellationToken);
                     case "SplitOff":          return await SplitAsync(false, cancellationToken);
+                    case "AtuOn":             return await AtuAsync(true, cancellationToken);
+                    case "AtuOff":            return await AtuAsync(false, cancellationToken);
+                    case "AtuTune":           return await AtuTuneAsync(cancellationToken);
                     case "Help":              return Help();
                     case "NudgeIfWidth":      return await NudgeIfWidthAsync(parameters, cancellationToken);
                     case "SetAfGain":          return await SetAfGainAsync(parameters, cancellationToken);
@@ -427,6 +431,34 @@ namespace Icom_Web_Control.Services.Voice
             await SetRadioSplit(on, ct);
             _logger.LogInformation("[Voice] Split {State}", on ? "on" : "off");
             return new DispatchResult(true, on ? "Split on" : "Split off");
+        }
+
+        // -- Antenna tuner -------------------------------------------------
+        // The touch UI reaches the tuner through a long press on the ATU
+        // button, which a partially-sighted operator can neither discover nor
+        // perform. These three intents are that operator's only route to it,
+        // so they go through the seam rather than the HTTP endpoints.
+
+        private async Task<DispatchResult> AtuAsync(bool on, CancellationToken ct)
+        {
+            await SetRadioTuner(on ? 1 : 0, ct);
+            _logger.LogInformation("[Voice] ATU {State}", on ? "on" : "off");
+            return new DispatchResult(true, on ? "Antenna tuner on" : "Antenna tuner off");
+        }
+
+        /// <summary>
+        /// Start an auto-tune cycle, or stop the one that is already running.
+        /// CI-V 1C 01 02 starts a cycle and 1C 01 01 stops it and leaves the
+        /// tuner in line, so this is the same toggle the button performs —
+        /// and the spoken phrase says which of the two it did, because the
+        /// operator relying on voice has no red "Tuning…" button to look at.
+        /// </summary>
+        private async Task<DispatchResult> AtuTuneAsync(CancellationToken ct)
+        {
+            bool tuning = _state.AtuTuning;
+            await SetRadioTuner(tuning ? 1 : 2, ct);
+            _logger.LogInformation("[Voice] ATU auto-tune {Action}", tuning ? "stopped" : "started");
+            return new DispatchResult(true, tuning ? "Stopping antenna tuner" : "Tuning antenna");
         }
 
         // -- IF width / AF gain nudges (query → adjust → set) --------------
@@ -806,6 +838,24 @@ namespace Icom_Web_Control.Services.Voice
                 return;
             }
             await _radio.SetSplitAsync(on, ct);
+        }
+
+        /// <summary>
+        /// Set the antenna tuner through the CI-V seam (1C 01), dry-run-aware.
+        /// <paramref name="state"/> is 0 = bypassed, 1 = in line, 2 = start an
+        /// auto-tune cycle. The seam updates RadioStateService itself on the
+        /// real path, so only the dry run sets state here — and it never
+        /// pretends a cycle is running, because nothing was sent to run one.
+        /// </summary>
+        private async Task SetRadioTuner(int state, CancellationToken ct)
+        {
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would set ATU state {State}", state);
+                if (state != 2) _state.AtuEnabled = state == 1;
+                return;
+            }
+            await _radio.SetTunerAsync(state, ct);
         }
 
         /// <summary>Set AF gain (0–255) through the CI-V seam (14 01), dry-run-aware.</summary>

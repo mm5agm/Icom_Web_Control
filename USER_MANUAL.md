@@ -652,12 +652,15 @@ The button updates automatically — if the radio is powered off or stops respon
 
 Click the button to toggle the connection. While connecting, it briefly shows "Connecting…". On reconnect the app re-reads all radio settings so the controls reflect the current radio state. Useful if the radio was powered on after the app started, or after a USB cable was unplugged and re-plugged.
 
-**ATU button** — Controls the IC-7300's internal automatic antenna tuner (CI-V `1C 01`). The button matches the radio's front-panel TUNER button's behaviour: short tap and long press do different things.
+**ATU and Tune buttons** — Control the IC-7300's internal automatic antenna tuner (CI-V `1C 01`).
 
-- **Short tap** toggles the ATU between **ATU On** (green) and **ATU Off** (grey). On = the tuner network is engaged in the signal path; Off = bypassed.
-- **Long press (≥500 ms)** starts the radio's auto-tune cycle. The button turns red and shows **Tuning…** while the radio searches for a low-SWR match — typically 2-7 seconds. When tuning completes the button returns to **ATU On** automatically. Tap the red button during a running tune to stop it early. **Because the tune cycle didn't complete, the ATU is left bypassed (Off)** — the radio doesn't retain partial tuning data, so to find a match you'd need to long-press again for a fresh cycle.
+- **ATU** toggles the tuner between **ATU On** (green) and **ATU Off** (grey). On = the tuner network is engaged in the signal path; Off = bypassed.
+- **Tune** starts the radio's auto-tune cycle. The ATU button turns red and shows **Tuning…** while the radio searches for a low-SWR match — typically 2-7 seconds — and the Tune button becomes **Stop**. Press **Stop** (or the red ATU button) to end the cycle early; the app then re-reads the tuner from the radio, so whatever state the interrupted cycle left behind is what you see. When the cycle finishes on its own the buttons go back to **ATU On** and **Tune**.
+- **Long press the ATU button (≥500 ms)** does the same as the Tune button. This is how the radio's own front-panel TUNER key works, so it is kept for anyone used to it — but it is no longer the only way in. A long press cannot be announced by a screen reader or performed by voice, and for a while the Tune function was advertised in a tooltip alone.
 
-The IC-7300 has a single tuner state (there is no separate per-VFO ATU setting), so the button reflects the same on/off state whichever VFO is active.
+Both are also on voice control: "tuner on", "tuner off", and "tune antenna" to start or stop a cycle — see [§17](#17-voice-control).
+
+The IC-7300 has a single tuner state (there is no separate per-VFO ATU setting), so the buttons reflect the same state whichever VFO is active.
 
 **Mon button** — Toggles the TX monitor (sidetone) on and off. The button is amber when the monitor is active and grey when off. Click to toggle.
 
@@ -2343,6 +2346,8 @@ The commands are split into two groups. The **first table** is fully wired to th
 | Speech processor | "processor off", "speech processor on", "compressor forty" | Off, on, or on at that compression level |
 | Transmit | "key transmitter" / "start transmitting"; "stop transmitting" / "go to receive" | Radio keys up / drops back to receive |
 | Split | "split on" / "enable split"; "split off" / "simplex" | Split operation toggles |
+| Antenna tuner | "tuner on" / "antenna tuner on"; "tuner off" / "bypass tuner" | Puts the internal tuner in line or bypasses it |
+| Auto-tune | "tune antenna" / "start tuner" / "match antenna" | Starts an auto-tune cycle. Say it again while one is running and it stops — the spoken confirmation says which of the two it did ("Tuning antenna" or "Stopping antenna tuner"). Note there is no bare "tune": that word belongs to "tune up" / "tune down" |
 | Custom commands (macros) | "copy a to b" / "copy b to a" | Sends the CI-V command attached to that phrase. Those two ship as defaults; you can add your own for anything in the IC-7300's CI-V command set — see [§17.6](#176-adding-your-own-commands) |
 | Status read-back | "what frequency", "what mode", "what band" | IWC speaks the current value out loud — nothing is sent to the radio |
 | Help | "help", "what can I say" | IWC speaks a short list of the available command categories |
@@ -2365,6 +2370,7 @@ A few notes on phrasing:
 - **Levels come from a fixed list, not any number you like.** The controls that take a 0–100 level — AF gain, RF gain, squelch, NR, NB, TX power, mic gain, processor — recognise **zero, ten, twenty, twenty five, thirty, forty, fifty, sixty, seventy, seventy five, eighty, ninety** and **one hundred** (also "maximum" or "full"). A number that isn't in that list will be fuzzy-matched to the nearest one that is, so listen to the spoken confirmation. The full list per command is in the phrase editor, and you can add or remove values there.
 - **Bands supported:** 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The default frequency picked for each band is roughly the FT8 / digital hangout — adjust with a follow-up "set frequency to …" or "tune up" / "tune down".
 - **"Fine step up" / "fine step down" are gone.** They were shortcuts for the microphone UP/DN keys on the Yaesu radio IWC grew out of, and CI-V has no equivalent command. "Tune up" / "tune down" with the step size set to 10 Hz does the same job. If you are upgrading, your saved phrase pack is replaced by the new defaults the first time you run this version — the noise-reduction and noise-blanker macros it carried are now proper commands with their own phrases, and the two would have competed for the same words. The previous pack is snapshotted into **Show version history** the next time you save.
+- **The antenna-tuner commands were added later, and your saved pack keeps up.** If you already have a phrase pack — including a translated or customised one — the three tuner commands are added to it on first run of this version, in English, with everything you had left untouched. They show up in the phrase editor like any other command, so you can reword or translate them there.
 - **Scots variants** are accepted where they're in the default phrase list — e.g. "tune tae fourteen point zero seven four" works the same as "tune to …". Add your own in the phrase editor (§17.6) for any command you like.
 
 **After every command, IWC speaks a short confirmation** through the PC's default audio output:
