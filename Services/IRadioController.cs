@@ -36,6 +36,26 @@ namespace Icom_Web_Control.Services
     }
 
     /// <summary>
+    /// The outcome of one IF filter-width step, in protocol-free terms.
+    /// <para>
+    /// <see cref="Hz"/> is the width now in effect, or -1 when the mode has no
+    /// adjustable width (FM) or the read failed. <see cref="AtLimit"/> says the
+    /// step was refused because the ladder had run out — the width is correct
+    /// and unchanged, not wrong.
+    /// </para>
+    /// <para>
+    /// The distinction exists because the caller cannot infer it. The ladder is
+    /// uneven, so "the number didn't change" is the *only* signal that a step
+    /// was refused, and a caller comparing before and after would have to read
+    /// the width first — an extra CI-V round trip on a 19200 bus to learn
+    /// something the controller already knew. It matters most to voice: an
+    /// operator who cannot see the control hears the same read-back whether the
+    /// filter moved or not.
+    /// </para>
+    /// </summary>
+    public readonly record struct IfFilterWidthStep(int Hz, bool AtLimit);
+
+    /// <summary>
     /// The semantic seam IWC introduces (the thing YWC lacked — see
     /// docs/design/iwc-clone-split-plan.md). Everything above this line —
     /// touch UI (CatController), voice (IntentDispatcher), Hamlib (RigctldServer),
@@ -184,8 +204,7 @@ namespace Icom_Web_Control.Services
 
         /// <summary>
         /// Move the IF passband width by whole filter steps — positive wider,
-        /// negative narrower — and return the resulting width in Hz, or -1 when
-        /// the mode has no adjustable width (FM) or the read failed.
+        /// negative narrower — and report the width now in effect.
         /// <para>
         /// "One step" is a radio concept; how big a step is in Hz is not. The
         /// IC-7300's ladder is uneven (50 Hz below 500, 100 Hz above, 200 Hz flat
@@ -195,7 +214,7 @@ namespace Icom_Web_Control.Services
         /// Hz should use <see cref="SetIfFilterWidthHzAsync"/> instead.
         /// </para>
         /// </summary>
-        Task<int> NudgeIfFilterWidthAsync(RadioVfo vfo, int steps, CancellationToken cancellationToken = default);
+        Task<IfFilterWidthStep> NudgeIfFilterWidthAsync(RadioVfo vfo, int steps, CancellationToken cancellationToken = default);
 
         /// <summary>Read the selected filter slot: 1=FIL1, 2=FIL2, 3=FIL3 (from the CI-V 26 mode reply). -1 on a miss.</summary>
         Task<int> GetSelectedFilterAsync(RadioVfo vfo, CancellationToken cancellationToken = default);

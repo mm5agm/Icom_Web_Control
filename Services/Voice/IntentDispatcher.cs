@@ -530,8 +530,8 @@ namespace Icom_Web_Control.Services.Voice
                 return new DispatchResult(true, direction > 0 ? "Filter wider" : "Filter narrower");
             }
 
-            var hz = await _radio.NudgeIfFilterWidthAsync(vfo, (int)direction, ct);
-            if (hz < 0)
+            var step = await _radio.NudgeIfFilterWidthAsync(vfo, (int)direction, ct);
+            if (step.Hz < 0)
             {
                 // FM has no adjustable width, and saying so is more use than a
                 // generic failure to an operator who cannot see the greyed-out
@@ -540,13 +540,24 @@ namespace Icom_Web_Control.Services.Voice
                 return new DispatchResult(false, "Filter width can't be changed in this mode", IsReadBack: true);
             }
 
+            if (step.AtLimit)
+            {
+                // Say which end, not just "limit" — the operator asked to go one
+                // way and needs to know they are already there, not merely that
+                // something declined. Same shape as the band-step clamp.
+                _logger.LogInformation("[Voice] NudgeIfWidth {Dir} refused — already at the {End} ({Hz} Hz, VFO {Vfo})",
+                    direction > 0 ? "wider" : "narrower", direction > 0 ? "widest" : "narrowest", step.Hz, CurrentVfo);
+                return new DispatchResult(false,
+                    $"Already at the {(direction > 0 ? "widest" : "narrowest")}, {step.Hz} hertz",
+                    IsReadBack: true);
+            }
+
             _logger.LogInformation("[Voice] NudgeIfWidth {Dir} -> {Hz} Hz (VFO {Vfo})",
-                direction > 0 ? "wider" : "narrower", hz, CurrentVfo);
+                direction > 0 ? "wider" : "narrower", step.Hz, CurrentVfo);
             // Speak the resulting width, not just the direction: it is the only
-            // feedback there is when the on-screen control cannot be seen, and at
-            // the end of the ladder the number simply stops changing.
+            // feedback there is when the on-screen control cannot be seen.
             return new DispatchResult(true,
-                $"{(direction > 0 ? "Filter wider" : "Filter narrower")}, {hz} hertz");
+                $"{(direction > 0 ? "Filter wider" : "Filter narrower")}, {step.Hz} hertz");
         }
 
         private async Task<DispatchResult> SetAfGainAsync(
