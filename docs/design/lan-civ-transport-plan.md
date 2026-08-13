@@ -159,6 +159,31 @@ release that touches the transport. **Not on a schedule and not in CI** — a
 check that cries wolf on every unrelated upstream commit gets ignored, and this
 one only needs to be right on the rare occasions it is consulted.
 
+#### This is a developer tool, and must never become a user-facing one
+
+**Do not add a "check wfview for updates" button to Diagnostics, Settings,
+About, or anywhere else in the app.** The temptation will be real — Diagnostics
+is exactly where it looks like it belongs, and IWC already phones GitHub for its
+own update banner, so the plumbing exists.
+
+The reason is that **a user can do nothing with the answer.** "wfview has
+changed upstream" is not an actionable fact for an operator. Acting on it means
+reading the upstream diff, judging whether it affects the ported artefact at
+all, changing IWC's code if it does, testing it against a radio, and cutting a
+release. Every one of those steps is the developer's, and the last one is how
+the fix reaches users anyway.
+
+So the user-facing mechanism already exists and needs nothing added: **if an
+upstream change matters, it reaches users as an IWC release**, exactly like
+every other fix. Surfacing the raw upstream state to users would only invite
+support questions about a discrepancy they cannot resolve, and would imply IWC
+depends on wfview at runtime — it does not. Nothing is downloaded, linked or
+called; the relationship is a copy taken once, recorded in `PORTED-FROM.md`.
+
+Keeping the check as `scripts/check-wfview-updates.ps1` enforces this by
+construction: the installer bundles `publish\*` only, so `scripts/` is never
+shipped and the tool exists solely in the repository.
+
 If the ported surface really does end up being one lookup table, this whole
 subsection collapses to a single row and a script nobody runs. That is the good
 outcome, not wasted effort: the record is cheap to write and expensive to
