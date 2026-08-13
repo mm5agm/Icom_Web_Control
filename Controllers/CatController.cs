@@ -69,6 +69,26 @@ namespace Icom_Web_Control.Controllers
             return Ok(new { message = $"Scope span ±{hz} Hz set (Receiver {receiver})" });
         }
 
+        // Live band-scope counters for the Diagnostics page, including the
+        // measured sweep rate. Read-only, cheap, and deliberately not on the
+        // SignalR path: it is polled a couple of times a second by one page that
+        // is usually not open, and broadcasting it to every tab would put a
+        // diagnostic on the same bus as the meters it is diagnosing.
+        [HttpGet("scope/diagnostics")]
+        public IActionResult GetScopeDiagnostics()
+        {
+            var s = _radio.GetScopeDiagnostics();
+            return Ok(new
+            {
+                connected = _radio.IsConnected,
+                enabled = s.Enabled,
+                sweepsCompleted = s.SweepsCompleted,
+                sweepsDiscarded = s.SweepsDiscarded,
+                secondsSinceLastSweep = s.SecondsSinceLastSweep,
+                sweepsPerSecond = s.SweepsPerSecond
+            });
+        }
+
         // Set the physical scope mode (CI-V 27 14) from the click-the-badge
         // control on the spectrum panel. {mode} = "center" or "fixed". The
         // IC-7300 has one Main scope, so the receiver isn't relevant — both

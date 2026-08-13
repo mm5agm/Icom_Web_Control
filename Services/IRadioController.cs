@@ -522,7 +522,7 @@ namespace Icom_Web_Control.Services
         /// separate three completely different faults. Default: a controller with
         /// no scope has nothing to report.
         /// </summary>
-        ScopeDiagnostics GetScopeDiagnostics() => new(false, 0, 0, null);
+        ScopeDiagnostics GetScopeDiagnostics() => new(false, 0, 0, null, null);
     }
 
     /// <summary>
@@ -532,9 +532,21 @@ namespace Icom_Web_Control.Services
     /// <param name="SweepsCompleted">Fully-assembled sweeps since app start.</param>
     /// <param name="SweepsDiscarded">Sweeps dropped on a lost or out-of-order segment.</param>
     /// <param name="SecondsSinceLastSweep">Null when no sweep has ever arrived.</param>
+    /// <param name="SweepsPerSecond">
+    /// Measured delivery rate over the last completed sampling window, or null
+    /// when the scope is not currently streaming. This is the number that says
+    /// whether the trace can resolve CW: it is the transport's rate, not the
+    /// radio's — the radio's own display is unaffected by it. ~4/s over USB on
+    /// an IC-7300 MkII, because the radio dribbles each sweep out as 11 CI-V
+    /// segments about 21 ms apart; the [LAN] port sends a sweep in one frame
+    /// and measures ~30/s. Worth showing rather than logging, because "why is
+    /// my waterfall smoother on the radio's own screen" is a recurring
+    /// question and this answers it with a number.
+    /// </param>
     public record ScopeDiagnostics(
         bool Enabled,
         long SweepsCompleted,
         long SweepsDiscarded,
-        double? SecondsSinceLastSweep);
+        double? SecondsSinceLastSweep,
+        double? SweepsPerSecond);
 }

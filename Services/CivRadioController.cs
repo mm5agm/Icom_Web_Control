@@ -77,6 +77,21 @@ namespace Icom_Web_Control.Services
         private long _lastLoggedSweeps;
         private long _lastLoggedDiscards;
 
+        // Measured sweep delivery rate, surfaced on Diagnostics and About. Counted
+        // over a rolling window rather than derived from the poll interval, because
+        // the interval is what we *ask* for and the rate is what the radio and the
+        // cable actually deliver — the whole point of showing it is that the two
+        // differ. Window is long enough to smooth the per-sweep jitter (measured at
+        // sd 3.4 ms over LAN) and short enough to react when the operator changes
+        // span or transport. Only the serial reader thread writes the two window
+        // fields, so they need no interlocking; _sweepsPerSecond is read from
+        // request threads and is exchanged atomically.
+        private const int ScopeRateWindowMs = 3000;
+        private const double ScopeRateStaleSeconds = 2.0;
+        private long _rateWindowStartTicks;
+        private long _rateWindowSweeps;
+        private double _sweepsPerSecond;
+
         // Pseudo-dual receiver (Phase 5, same-band). Cached copy of the setting,
         // refreshed on a slow poll phase so the serial-reader thread (which raises
         // OnUnsolicitedFrame) never has to await the settings store. When on, the
@@ -198,11 +213,20 @@ namespace Icom_Web_Control.Services
         public ScopeDiagnostics GetScopeDiagnostics()
         {
             long last = Volatile.Read(ref _lastSweepTicks);
+            double? age = last == 0 ? null : (Environment.TickCount64 - last) / 1000.0;
+
+            // Report the rate only while sweeps are actually arriving. The last
+            // completed window's figure would otherwise sit on screen unchanged
+            // after the scope was switched off, reading as a live measurement.
+            double rate = Interlocked.CompareExchange(ref _sweepsPerSecond, 0, 0);
+            double? measured = (age is <= ScopeRateStaleSeconds && rate > 0) ? rate : null;
+
             return new ScopeDiagnostics(
                 Enabled: !_operatorScopeOff,
                 SweepsCompleted: _scope.SweepsCompleted,
                 SweepsDiscarded: _scope.SweepsDiscarded,
-                SecondsSinceLastSweep: last == 0 ? null : (Environment.TickCount64 - last) / 1000.0);
+                SecondsSinceLastSweep: age,
+                SweepsPerSecond: measured);
         }
 
         public CivRadioController(
@@ -554,7 +578,9 @@ namespace Icom_Web_Control.Services
 
             // Mark the scope live so the poll loop backs off and lets the sweep
             // frames have the bus (see ScopePollIntervalMs).
-            Volatile.Write(ref _lastSweepTicks, Environment.TickCount64);
+            long sweepTicks = Environment.TickCount64;
+            Volatile.Write(ref _lastSweepTicks, sweepTicks);
+            AccumulateSweepRate(sweepTicks);
 
             // The radio's live scope mode (tracks front-panel changes), carried on
             // every SpectrumUpdate so the panel can label CENT / FIX etc.
@@ -2669,6 +2695,33 @@ namespace Icom_Web_Control.Services
                 // No clients connected yet — the value is also polled via
                 // /api/cat/status/init.
             }
+        }
+
+        /// <summary>
+        /// Count one completed sweep into the rolling rate window and publish the
+        /// rate when the window closes. Serial reader thread only.
+        /// </summary>
+        private void AccumulateSweepRate(long nowTicks)
+        {
+            long elapsed = nowTicks - _rateWindowStartTicks;
+
+            // First sweep, or the stream stopped and started again: open a fresh
+            // window rather than averaging across the gap, which would report a
+            // rate far below the real one for the first window after a restart.
+            if (_rateWindowStartTicks == 0 || elapsed > ScopeRateWindowMs * 4)
+            {
+                _rateWindowStartTicks = nowTicks;
+                _rateWindowSweeps = 0;
+                return;
+            }
+
+            _rateWindowSweeps++;
+            if (elapsed < ScopeRateWindowMs)
+                return;
+
+            Interlocked.Exchange(ref _sweepsPerSecond, _rateWindowSweeps * 1000.0 / elapsed);
+            _rateWindowStartTicks = nowTicks;
+            _rateWindowSweeps = 0;
         }
 
         // Choose the inter-poll delay based on whether the scope is currently
