@@ -6,6 +6,10 @@ using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using Icom_Web_Control.Hubs;
 using Icom_Web_Control.Models;
+// DxSpot lives in the Radio_Web_Control_Core subtree at core/ — it is shared
+// verbatim with Yaesu Web Control, because a cluster spot is the same thing
+// whatever radio you are pointing at it.
+using RadioWebControl.Core.Models;
 
 namespace Icom_Web_Control.Services
 {

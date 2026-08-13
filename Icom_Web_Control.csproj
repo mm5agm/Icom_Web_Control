@@ -26,6 +26,24 @@
     <Content Remove="BenchmarkSuite1\**" />
     <EmbeddedResource Remove="BenchmarkSuite1\**" />
     <None Remove="BenchmarkSuite1\**" />
+    <!-- core/ is the Radio_Web_Control_Core git subtree and is its own .csproj
+         (ProjectReference below). The Web SDK globs **/*.cs, so without this
+         removal every file in there is compiled TWICE — once into
+         RadioWebControl.Core.dll and once straight into this assembly — which
+         surfaces as duplicate-type errors rather than as anything that names
+         the real cause. -->
+    <Compile Remove="core\**" />
+    <Content Remove="core\**" />
+    <EmbeddedResource Remove="core\**" />
+    <None Remove="core\**" />
+  </ItemGroup>
+
+  <!-- Radio-agnostic code shared with Yaesu Web Control. Pulled in as a git
+       subtree, NOT a submodule, so a plain `git clone` of this repository still
+       builds with no extra steps. See core/README.md for the subtree commands
+       and docs/design/shared-core-plan.md for why any of this exists. -->
+  <ItemGroup>
+    <ProjectReference Include="core\RadioWebControl.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
