@@ -214,11 +214,25 @@ Four things worth not rediscovering:
 - **The core repo's `.gitignore` covers `core/bin` and `core/obj` inside both
   applications**, because it comes along with the subtree.
 
-Verified: IWC builds and publishes self-contained win-x64; YWC builds **both**
-TFMs and publishes with the exact CI command; `RadioWebControl.Core.dll` lands
-beside each `.exe`. **Not** verified: an install over an existing install, the
-macOS/Linux host on real macOS or Linux, and anything on a radio — `DxSpot` is a
-cluster DTO and cannot reach CI-V or CAT.
+Verified at build time: IWC builds and publishes self-contained win-x64; YWC
+builds **both** TFMs and publishes with the exact CI command;
+`RadioWebControl.Core.dll` lands beside each `.exe`; and fresh clones of both
+branches straight from GitHub build clean with `core/` populated, which is the
+whole argument for subtree over submodule.
+
+Verified at **run** time, which is the check that matters — a compile proves the
+reference resolves, not that the assembly loads. Both applications were run from
+their phase-1 branches and their DX cluster reached `connected` and returned
+populated spot arrays. Those objects **are** `DxSpot` serialised out of the
+shared assembly, so a failed assembly load could not have produced them; it
+would have thrown `FileNotFoundException: Could not load file or assembly
+'RadioWebControl.Core'` at startup instead. IWC was additionally run against a
+live IC-7300 MkII on COM8 — radio identified, VFO A/B, meters and modes all
+reading normally, zero `ERR`/`FTL` log entries on the day.
+
+**Not** verified: an install over an existing install (deferred to the next real
+release, where it happens anyway) and the macOS/Linux host on real macOS or
+Linux — that one is Fabio's, and is asked for in YWC PR #99.
 
 ---
 
