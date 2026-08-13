@@ -5,9 +5,21 @@ continuation of the Yaesu Web Control (YWC) changelog, even though IWC was
 carved from the YWC codebase. For the shared history prior to the split, see
 the [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) repository.
 
-## [Unreleased]
-
-_Nothing yet._
+> ## The release notes in [README.md](README.md#release-notes) are the record
+>
+> **This file is closed.** It stops at 1.0.3 and is kept only as an archive of
+> the entries that were written here. It is not maintained, and a release does
+> **not** need an entry adding to it.
+>
+> From 1.0.4 onwards, the operator-facing release notes in
+> [README.md](README.md#release-notes) are the single, authoritative account of
+> what changed in each release. That is where the notes were actually being
+> written from 1.0.1 onwards; keeping a second, thinner copy here only produced
+> a file that was silently out of date — and a `[Unreleased]` heading that read
+> "Nothing yet" through three releases.
+>
+> `finish-release.ps1` checks the README entry for the same reason: that is the
+> document a release is blocked on.
 
 ## [1.0.3] - 2026-08-05
 
