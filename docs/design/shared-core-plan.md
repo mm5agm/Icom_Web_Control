@@ -181,12 +181,46 @@ lead on both.
 
 | Phase | Work | Gate |
 |---|---|---|
-| **0** ✅ | Agree the idea with Fabio; agree the repo name and that new shared work lands there | **met 2026-08-13** — agreed by email; repo name still to confirm with him |
-| **1** | Create the core repo; subtree it into both; move **one** trivial file (`Models/DxSpot.cs`) end to end | both apps still build, publish and install |
+| **0** ✅ | Agree the idea with Fabio; agree the repo name and that new shared work lands there | **met 2026-08-13** — agreed by email; repo named **`Radio_Web_Control_Core`** |
+| **1** ✅ | Create the core repo; subtree it into both; move **one** trivial file (`Models/DxSpot.cs`) end to end | **met 2026-08-13** — see below |
 | **2** | Move `AdifParser` + `calibration-engine`, and write the first tests against them there | something fails when deliberately broken |
 | **3** | Migrate the remaining §2 files opportunistically, on touch | no batch, no deadline |
 | **3a** | *If Fabio wants it:* offer the audio layer a home in the core | his call, not a dependency |
 | **5** | Back-port `IRadioController` into YWC | unlocks the 24 middling files; own plan, own note |
+
+### Phase 1, as built — 2026-08-13
+
+**[`mm5agm/Radio_Web_Control_Core`](https://github.com/mm5agm/Radio_Web_Control_Core)**,
+public, GPL-3.0, consumed at `core/` in both applications. IWC PR #29, YWC PR #99.
+
+`Models/DxSpot.cs` moved and nothing else. `Services/DxClusterService.cs` turned
+out to be the **only** C# file in either repository that used the type — every
+other "DxSpot" match is the unrelated `DxSpotAgeMinutes` setting or browser code.
+
+Four things worth not rediscovering:
+
+- **`<Compile Remove="core\**" />` is mandatory in both `.csproj` files.** Both
+  apps use the Web SDK, which globs `**/*.cs`, so without it every file in the
+  subtree compiles twice — once into `RadioWebControl.Core.dll` and once
+  straight into the application — and the error names duplicate types rather
+  than the cause. `Content`, `None` and `EmbeddedResource` are removed alongside
+  it, matching how YWC already excludes `Workers/`.
+- **The core targets `net10.0`, not `net10.0-windows`.** YWC multi-targets for
+  its macOS/Linux CAT-only host; a Windows-only core would have built fine
+  against IWC and broken YWC's second TFM silently. YWC's `ProjectReference` is
+  deliberately *not* conditioned on `TargetFramework` for the same reason.
+- **Neither `installer.nsi` needed changing.** Both take the publish folder
+  wholesale (`File /r "publish\*"`), so a new DLL is picked up on its own.
+- **The core repo's `.gitignore` covers `core/bin` and `core/obj` inside both
+  applications**, because it comes along with the subtree.
+
+Verified: IWC builds and publishes self-contained win-x64; YWC builds **both**
+TFMs and publishes with the exact CI command; `RadioWebControl.Core.dll` lands
+beside each `.exe`. **Not** verified: an install over an existing install, the
+macOS/Linux host on real macOS or Linux, and anything on a radio — `DxSpot` is a
+cluster DTO and cannot reach CI-V or CAT.
+
+---
 
 Related: [`lan-civ-transport-plan.md`](lan-civ-transport-plan.md) — that one is
 IWC-only and below the seam, so it is unaffected by any of this.
