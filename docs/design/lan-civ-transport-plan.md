@@ -95,15 +95,74 @@ passcode obfuscation, token renewal, the 21-byte ping/data packets, and the
 open/close that starts the CI-V stream on 50002 — is **not yet confirmed here**
 and must be taken from wfview (see §3) rather than assumed.
 
-## 3. Licence position — better than expected
+## 3. wfview — the decision, and how to keep track of it
 
-**IWC is GPLv3 and wfview is GPLv3.** The protocol work can therefore be
-*ported*, not reverse-engineered: wfview's `udphandler` / `udpbase` /
-`udpserver` code may be adapted directly, provided the GPL terms are honoured
-and authorship is attributed in the file headers and in `README.md`.
+### Licence: no obstacle either way
 
-This is the single biggest cost reduction available and the plan assumes it.
-Do **not** start by writing a protocol implementation from first principles.
+**IWC is GPLv3 and wfview is GPLv3** (confirmed: IWC's `LICENSE`, and the
+licence shipped in wfview's install). So porting is permitted, provided the GPL
+terms are honoured and authorship is attributed in the file headers and in
+`README.md`. Equally, there is no *incentive* to avoid deriving from it — the
+clean-room dance exists to keep proprietary projects clean, and IWC has nothing
+to protect. Reading wfview and then carefully "writing our own" would incur the
+derivation either way with none of the benefit. So: read it freely, and
+attribute honestly.
+
+### The decision: capture first, port only what capture cannot reveal
+
+**Default to capture.** Watching wfview talk to *this* radio gives ground truth
+for this model and this firmware, which is better evidence than wfview's source —
+source says what it sends, capture says what the radio accepts. It also produced
+the entire §1 measurement and the §5 frame layout for the cost of a tshark run.
+
+**Port only where capture genuinely cannot answer.** Realistically that is one
+thing: the **passcode obfuscation** applied to the network password. It is a
+fixed substitution that cannot be inferred from watching traffic without knowing
+the plaintext, and it will not be guessed. Take it from wfview, with attribution.
+
+The practical consequence is that **the ported surface is expected to be very
+small — plausibly a single lookup table and the function that applies it**,
+rather than the `udpbase` / `udphandler` / `udpserver` trio the earlier draft
+assumed. Everything else — sequence numbers, retransmit, keepalive cadence,
+token renewal, the open/close that starts the CI-V stream — should be readable
+off the wire.
+
+**Do not port speculatively.** Each additional file taken from wfview adds a
+provenance record to maintain (below) and a divergence risk, for code that
+capture would have given us anyway. If a capture leaves something ambiguous,
+read wfview to *understand* it, then decide deliberately whether the answer is a
+fact (write it ourselves) or an artefact (port it and record it).
+
+### Tracking whether wfview has moved
+
+Anything ported is a **copy, not a dependency** — upstream fixes will not arrive
+by themselves. The exposure is small if the decision above holds (a constant
+table does not change, and Icom's protocol is frozen), but "small" is not
+"zero", and the thing that makes it manageable is recording provenance *at the
+time of porting*, when the facts are to hand.
+
+**`Services/Civ/Net/PORTED-FROM.md`** — one row per ported artefact:
+
+| our file | upstream file | upstream commit | upstream version | date | why ported not captured |
+|---|---|---|---|---|---|
+
+Plus the same commit SHA in a header comment on each ported file, so the
+provenance survives the file being moved or renamed.
+
+**`scripts/check-wfview-updates.ps1`** — reads `PORTED-FROM.md`, and for each
+row asks wfview's repository whether the named upstream file has changed since
+the recorded commit. Report only: unchanged, or changed with a link to the diff.
+It must not fetch, merge or modify anything.
+
+Run it when something misbehaves on the network path, and once before any
+release that touches the transport. **Not on a schedule and not in CI** — a
+check that cries wolf on every unrelated upstream commit gets ignored, and this
+one only needs to be right on the rare occasions it is consulted.
+
+If the ported surface really does end up being one lookup table, this whole
+subsection collapses to a single row and a script nobody runs. That is the good
+outcome, not wasted effort: the record is cheap to write and expensive to
+reconstruct later.
 
 ## 4. Where it plugs in
 
@@ -192,9 +251,9 @@ Done 2026-08-13, results in §1 and §5. **Gate passed: 30/sec against 4.1/sec.*
 Keep the technique for the remaining unknowns. Anything still uncertain about
 the handshake (§2) can be resolved the same way — reconnect wfview with tshark
 running and read the login, token-renewal and open/close exchanges straight off
-the wire, rather than inferring them from wfview's source. Ground truth beats
-reading C++, and it sidesteps the derivation question in §3 for the parts that
-turn out to be obvious.
+the wire. **This is the mechanism behind §3's capture-first decision**, and the
+reason the ported surface is expected to be one lookup table rather than a
+subsystem.
 
 Capture recipe, for repeating it:
 
@@ -363,7 +422,7 @@ take before shipping, not after.
 | **B** | `CivEndpoint`, widen `ICivClient.OpenAsync`, `CivNetworkBusService` + the three `Net/` classes | connects, polls, meters live |
 | **C** | §5 assembler fix using the captured offsets | scope draws over LAN |
 | **D** | §7 in full: Settings section, Detect, Test connection, the five-step startup decision, Diagnostics transport readout | **an install that configures nothing behaves identically to today**, and a configured one falls back cleanly with the radio's Ethernet unplugged, the radio switched off, and Network Control turned back off |
-| **E** | `USER_MANUAL.md` §6.1, README release notes, wfview attribution | release rules 13/14 |
+| **E** | `USER_MANUAL.md` §6.1, README release notes, wfview attribution, `PORTED-FROM.md` and `check-wfview-updates.ps1` if anything was ported (§3) | release rules 13/14 |
 
 Related: `iwc-clone-split-plan.md` (this is not one of its phases — it postdates
 the plan), and the `iwc-lan-transport-opportunity` memory note for the raw
