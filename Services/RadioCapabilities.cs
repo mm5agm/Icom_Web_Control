@@ -37,17 +37,11 @@ public static class RadioCapabilities
     // ANT jack, so the per-VFO antenna selector was removed outright rather
     // than gated behind a flag that could only ever answer "no".
 
-    /// <summary>
-    /// Returns the P1 character for a per-VFO command, given the user's (or
-    /// voice command's) targeted receiver ("A" or "B"). On single-receiver
-    /// radios always "0"; on dual-receiver "0" for A, "1" for B.
-    /// Used by IntentDispatcher (voice input) so the routing rule lives in
-    /// exactly one place.
-    /// </summary>
-    public static string VfoP1(bool isSingleReceiver, string receiver) =>
-        isSingleReceiver
-            ? "0"
-            : (receiver.Equals("B", StringComparison.OrdinalIgnoreCase) ? "1" : "0");
+    // There is no VfoP1 either. It returned the P1 *digit* of a Yaesu CAT
+    // command ("AG0;", "SH1;") -- a wire-format detail with no CI-V counterpart.
+    // Its last caller was IntentDispatcher's IF-width nudge, which now goes
+    // through the IRadioController seam like every other intent, so the concept
+    // left with it. VfoIsB below is the CI-V-shaped question worth asking.
 
     /// <summary>
     /// Returns true if the per-VFO state write should target *B (vs *A) for

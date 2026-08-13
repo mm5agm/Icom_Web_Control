@@ -12,8 +12,7 @@ namespace Icom_Web_Control.Services.Voice
     /// the <see cref="IRadioController"/> seam. Voice commands target whichever
     /// VFO's mic button was pressed (v2, per-VFO voice) — see <see cref="_vfo"/>.
     /// The IC-7300 is single-receiver, so the target always collapses to A
-    /// (<see cref="RadioCapabilities.VfoP1"/> /
-    /// <see cref="RadioCapabilities.VfoIsB"/> already enforce this).
+    /// (<see cref="RadioCapabilities.VfoIsB"/> already enforces this).
     /// </summary>
     public sealed class IntentDispatcher
     {
@@ -26,10 +25,10 @@ namespace Icom_Web_Control.Services.Voice
         // and the whole receive/transmit control chain (AF/RF gain, squelch,
         // preamp, attenuator, AGC, NR, NB, notch, APF, TX power, mic gain,
         // processor).
-        // Two intents remain deliberately inert on Icom, marked TODO(voice-civ)
-        // at their handlers:
-        //   NudgeIfWidth   — no clean seam equivalent yet (PBT/filter model differs).
-        //   BandUp/Down    — no seam band-step; would need band-stacking logic.
+        // Every intent now reaches the radio through it. The last two that did
+        // not — BandUp/Down and NudgeIfWidth — were wired up after the carve, and
+        // with them went the legacy Yaesu-CAT SendCommand stub they were the only
+        // callers of. There is no longer any path out of this class but the seam.
         private readonly IRadioController _radio;
 
         public IntentDispatcher(
@@ -63,8 +62,6 @@ namespace Icom_Web_Control.Services.Voice
         /// <summary>The targeted VFO for the in-flight dispatch ("A" or "B"); defaults to "A".</summary>
         private static string CurrentVfo => _vfo.Value ?? "A";
 
-        /// <summary>P1 digit for per-VFO receive-control commands (AG/GT/PA/RA/BU/BD/SH/etc). See <see cref="RadioCapabilities.VfoP1"/>.</summary>
-        private string VfoP1 => RadioCapabilities.VfoP1(_state.IsSingleReceiver, CurrentVfo);
 
         /// <summary>True when the targeted VFO's state should be written to the *B fields. See <see cref="RadioCapabilities.VfoIsB"/>.</summary>
         private bool VfoIsB => RadioCapabilities.VfoIsB(_state.IsSingleReceiver, _state.ActiveVfo, CurrentVfo);
@@ -304,15 +301,69 @@ namespace Icom_Web_Control.Services.Voice
 
         // -- BandUp / BandDown ---------------------------------------------
 
-        private Task<DispatchResult> BandStepAsync(bool up, CancellationToken ct)
+        /// <summary>
+        /// Step to the next amateur band up or down, landing on the same
+        /// band-default frequency "go to &lt;band&gt; metres" would have used.
+        /// <para>
+        /// This is a step through <see cref="BandDefaultsHz"/>, not through the
+        /// radio's band-stacking registers. Band stacking would remember where the
+        /// operator last was on each band, which is nicer — but it is also
+        /// per-register state that voice cannot inspect before committing to it,
+        /// and this intent exists for operators who cannot see where they landed.
+        /// A known, announced frequency beats a remembered one they have to read
+        /// back off the screen. Bands outside the configured band plan are skipped,
+        /// so 4 m does not appear on a Region 2 setup.
+        /// </para>
+        /// </summary>
+        private async Task<DispatchResult> BandStepAsync(bool up, CancellationToken ct)
         {
-            // TODO(voice-civ): no CI-V seam band-step yet. Could map onto the
-            // band-stacking registers (like the HTTP band buttons) later. Until
-            // then this intent is inert on Icom, so report it honestly rather
-            // than falsely confirming. "Go to <band> metres" (SetBand) works today.
-            _logger.LogInformation("[Voice] Band {Dir} recognised but not yet wired to CI-V (VFO {Vfo})", up ? "up" : "down", CurrentVfo);
-            return Task.FromResult(new DispatchResult(false,
-                "Band up and down aren't available yet — say go to, then a band", IsReadBack: true));
+            var phrase = up ? "Band up" : "Band down";
+
+            // Ascending by frequency, so "up" is +1 in this list and metres go down.
+            var ladder = BandDefaultsHz
+                .OrderBy(kv => kv.Value)
+                .Where(kv => _state.GetBandFromFrequency(kv.Value) != BandPlanService.UnknownBand)
+                .ToList();
+            if (ladder.Count == 0)
+            {
+                _logger.LogWarning("[Voice] Band {Dir}: no bands in the configured band plan", up ? "up" : "down");
+                return new DispatchResult(false, phrase);
+            }
+
+            var isB = VfoIsB;
+            var current = isB ? _state.FrequencyB : _state.FrequencyA;
+
+            // Where are we now? Index by the band we are actually in, so tuning
+            // 40 kHz off the band default still steps from the band we can hear.
+            // Off-band (out-of-band listening, or a frequency we have no plan for)
+            // falls back to the nearest band default, which is the only sensible
+            // reading of "one band up" from somewhere that is not a band.
+            var band = _state.GetBandFromFrequency(current);
+            int index = ladder.FindIndex(kv => $"{kv.Key}m" == band);
+            if (index < 0)
+            {
+                index = 0;
+                for (int i = 1; i < ladder.Count; i++)
+                    if (Math.Abs(ladder[i].Value - current) < Math.Abs(ladder[index].Value - current))
+                        index = i;
+            }
+
+            int next = index + (up ? 1 : -1);
+            if (next < 0 || next >= ladder.Count)
+            {
+                // Clamped, not wrapped: 10 m → "band up" landing on 160 m would be
+                // a nasty surprise for an operator who cannot see the dial.
+                var edge = up ? "highest" : "lowest";
+                _logger.LogInformation("[Voice] Band {Dir} refused — already on the {Edge} band ({Band})",
+                    up ? "up" : "down", edge, band);
+                return new DispatchResult(false, $"Already on the {edge} band", IsReadBack: true);
+            }
+
+            var (metres, hz) = (ladder[next].Key, ladder[next].Value);
+            await SetRadioFrequency(isB ? RadioVfo.B : RadioVfo.A, hz, ct);
+            _logger.LogInformation("[Voice] Band {Dir} -> {Metres}m -> {Hz} Hz (VFO {Vfo})",
+                up ? "up" : "down", metres, hz, CurrentVfo);
+            return new DispatchResult(true, $"Move to {metres} metres");
         }
 
         // -- Macro ---------------------------------------------------------
@@ -469,19 +520,33 @@ namespace Icom_Web_Control.Services.Voice
             if (!TryGetLong(args, "direction", out var direction) || (direction != 1 && direction != -1))
                 return new DispatchResult(false, "Filter width");
 
-            // TODO(voice-civ): Yaesu SH filter-width nudge has no clean IC-7300
-            // seam equivalent yet (the Icom passband/filter model differs). Inert
-            // on Icom until a CI-V filter-width path is designed.
-            var p1 = VfoP1;
-            var raw = await SendCommand($"SH{p1};", ct);
-            if (!TryParseIntResponse(raw, "SH", out var current))
-                return new DispatchResult(false, "Filter width");
+            // One step along the radio's own filter ladder. The step sizes are
+            // uneven and mode-dependent (50 Hz below 500, 100 Hz above, 200 Hz flat
+            // in AM), so the seam takes a step count and keeps the table below it.
+            var vfo = VfoIsB ? RadioVfo.B : RadioVfo.A;
+            if (_dryRun.Value)
+            {
+                _logger.LogInformation("[Voice] DRY RUN -- would nudge IF width {Dir}", direction > 0 ? "wider" : "narrower");
+                return new DispatchResult(true, direction > 0 ? "Filter wider" : "Filter narrower");
+            }
 
-            var next = Math.Clamp(current + (int)direction, 0, 40);
-            await SendCommand($"SH{p1}0{next:D2};", ct);
-            if (VfoIsB) _state.IfWidthB = next.ToString(); else _state.IfWidthA = next.ToString();
-            _logger.LogInformation("[Voice] NudgeIfWidth {Dir} -> {Next} (VFO {Vfo})", direction > 0 ? "wider" : "narrower", next, CurrentVfo);
-            return new DispatchResult(true, direction > 0 ? "Filter wider" : "Filter narrower");
+            var hz = await _radio.NudgeIfFilterWidthAsync(vfo, (int)direction, ct);
+            if (hz < 0)
+            {
+                // FM has no adjustable width, and saying so is more use than a
+                // generic failure to an operator who cannot see the greyed-out
+                // control.
+                _logger.LogInformation("[Voice] NudgeIfWidth: no adjustable width in the current mode (VFO {Vfo})", CurrentVfo);
+                return new DispatchResult(false, "Filter width can't be changed in this mode", IsReadBack: true);
+            }
+
+            _logger.LogInformation("[Voice] NudgeIfWidth {Dir} -> {Hz} Hz (VFO {Vfo})",
+                direction > 0 ? "wider" : "narrower", hz, CurrentVfo);
+            // Speak the resulting width, not just the direction: it is the only
+            // feedback there is when the on-screen control cannot be seen, and at
+            // the end of the ladder the number simply stops changing.
+            return new DispatchResult(true,
+                $"{(direction > 0 ? "Filter wider" : "Filter narrower")}, {hz} hertz");
         }
 
         private async Task<DispatchResult> SetAfGainAsync(
@@ -739,32 +804,6 @@ namespace Icom_Web_Control.Services.Voice
             return new DispatchResult(true, phrase);
         }
 
-        // -- CAT send, dry-run-aware ----------------------------------------
-
-        /// <summary>
-        /// Every intent handler routes its CAT traffic through here instead
-        /// of calling _catClient directly, so the §6.5 dry-run flag has a
-        /// single choke point. In dry-run mode a query (bare "XX;") still
-        /// isn't sent -- there's no live radio guaranteed to be present
-        /// during a pack test -- so read-modify-write intents return an
-        /// empty response and report unsuccessful; see DispatchAsync's doc
-        /// comment.
-        /// </summary>
-        private Task<string> SendCommand(string command, CancellationToken ct)
-        {
-            if (_dryRun.Value)
-            {
-                _logger.LogInformation("[Voice] DRY RUN -- would send {Command}", command);
-                return Task.FromResult(string.Empty);
-            }
-            // The Yaesu CAT transport this used to reach was deleted in the IWC
-            // carve. Only NudgeIfWidth still routes here; it needs an
-            // Icom-specific rework of the filter-width model rather than a
-            // straight repoint (see its TODO(voice-civ)), so it stays a no-op.
-            _logger.LogInformation("[Voice] intent not yet on CI-V — dropped legacy CAT send: {Command}", command);
-            return Task.FromResult(string.Empty);
-        }
-
         /// <summary>
         /// Set a VFO's frequency through the CI-V seam, honouring the §6.5
         /// dry-run flag (no radio traffic during a pack test). The seam updates
@@ -931,15 +970,6 @@ namespace Icom_Web_Control.Services.Voice
             {
                 return false;
             }
-        }
-
-        private static bool TryParseIntResponse(string? raw, string prefix, out int value)
-        {
-            value = 0;
-            if (string.IsNullOrWhiteSpace(raw)) return false;
-            var trimmed = raw.Trim().TrimEnd(';');
-            if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
-            return int.TryParse(trimmed.AsSpan(prefix.Length), out value);
         }
 
         // ── Speech-formatting helpers for the spoken confirmation ─────────

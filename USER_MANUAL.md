@@ -2329,15 +2329,14 @@ Voice control is **off by default** — it has to be turned on in Settings befor
 
 Every command below acts on the operating VFO. The phrases are the built-in English (UK) defaults; they're editable (see [§17.6](#176-adding-your-own-commands)), so if your installation has custom phrases, "Settings → Voice Control → Voice Phrases" is the definitive list, not this table.
 
-The commands are split into two groups. The **first table** is fully wired to the IC-7300 over CI-V and works today. The **second table** lists commands the speech engine still *recognises* — they're in the grammar and you can say them — but which aren't yet connected to the IC-7300, so they don't change anything on the radio (see the warning under that table).
-
-**Working now (wired to the IC-7300):**
+Everything in the table is wired to the IC-7300 over CI-V and works today.
 
 | Command family | Say | What happens |
 | --- | --- | --- |
 | Set frequency | "tune to fourteen point zero seven four megahertz", "set frequency to fourteen megahertz" | Tunes to that frequency. Whole MHz, one decimal, or three decimals; "megahertz" is optional |
 | Change band | "go to twenty metres", "switch to forty metres" | Jumps to that band's default (usually FT8) frequency. Bands: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The band name alone works too — a bare "forty metres" is the same as "go to forty metres" |
 | Step up / down | "tune up" / "step up" / "nudge up"; "tune down" / "step down" / "nudge down" | Moves by the configured step size (see Set step size; default 10 kHz) |
+| Band up / down | "band up" / "band down" | Moves one amateur band up or down and lands on that band's default frequency — the same place "go to \<band\> metres" would put you, and the confirmation says which band. It stops at the ends rather than wrapping round: at 10 m "band up" says "Already on the highest band" instead of dropping you on 160 m. Bands your band plan doesn't include are skipped, so 4 m isn't in the sequence outside Region 1 |
 | Set step size | "set step ten kilohertz", "step size one kilohertz" | Sets the step size: 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. The step word alone works too ("ten kilohertz"). Same value as the step dropdown by the mic button — either one updates the other |
 | Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Switches mode |
 | Swap VFOs | "swap V F O", "swap A and B" | Exchanges VFO A and B contents |
@@ -2359,17 +2358,11 @@ The commands are split into two groups. The **first table** is fully wired to th
 | Antenna tuner | "tuner on" / "antenna tuner on"; "tuner off" / "bypass tuner" | Puts the internal tuner in line or bypasses it |
 | Auto-tune | "tune antenna" / "start tuner" / "match antenna" | Starts an auto-tune cycle. Say it again while one is running and it stops — the spoken confirmation says which of the two it did ("Tuning antenna" or "Stopping antenna tuner"). Note there is no bare "tune": that word belongs to "tune up" / "tune down" |
 | Custom commands (macros) | "copy a to b" / "copy b to a" | Sends the CI-V command attached to that phrase. Those two ship as defaults; you can add your own for anything in the IC-7300's CI-V command set — see [§17.6](#176-adding-your-own-commands) |
+| IF filter width | "filter wider" / "filter narrower" | Moves the IF passband one step along the radio's own filter ladder and **speaks the new width in hertz** — "Filter narrower, 2400 hertz". The step size is the radio's, not a fixed number of hertz: 50 Hz below 500 Hz, 100 Hz above it, and 200 Hz in AM. It stops at the ends of the ladder rather than wrapping, so the spoken number simply stops changing. In FM there is no adjustable width and IWC says so |
 | Status read-back | "what frequency", "what mode", "what band" | IWC speaks the current value out loud — nothing is sent to the radio |
 | Help | "help", "what can I say" | IWC speaks a short list of the available command categories |
 
-**Recognised but not yet active on the IC-7300:**
-
-| Command family | Say | Status |
-| --- | --- | --- |
-| Band up / down | "band up" / "band down" | Not yet wired to CI-V. Use "go to \<band\> metres" instead, which works |
-| IF filter width | "filter wider" / "filter narrower" | Not yet wired to CI-V — use the on-screen IF Width control instead |
-
-> ℹ️ **These commands tell you they're not available.** Say one and IWC speaks a short "…isn't available on the IC-7300 yet" message instead of a false "successful" — so you're never misled into thinking the radio changed when it didn't. They'll be wired up in a later build.
+> ℹ️ **Every voice command is now wired to the radio.** Earlier builds had two — band up/down and filter wider/narrower — that the speech engine recognised but that changed nothing on the radio; they spoke an "isn't available yet" message rather than a false confirmation. Both now work, and this section no longer has a second table.
 
 A few notes on phrasing:
 

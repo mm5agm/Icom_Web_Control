@@ -182,6 +182,21 @@ namespace Icom_Web_Control.Services
         /// <summary>Set the IF passband width, snapping <paramref name="hz"/> to the nearest value the current mode supports (CI-V 1A 03).</summary>
         Task SetIfFilterWidthHzAsync(RadioVfo vfo, int hz, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Move the IF passband width by whole filter steps — positive wider,
+        /// negative narrower — and return the resulting width in Hz, or -1 when
+        /// the mode has no adjustable width (FM) or the read failed.
+        /// <para>
+        /// "One step" is a radio concept; how big a step is in Hz is not. The
+        /// IC-7300's ladder is uneven (50 Hz below 500, 100 Hz above, 200 Hz flat
+        /// in AM) and mode-dependent, so a caller that wanted to nudge by Hz would
+        /// have to keep its own copy of that table above the seam. This keeps the
+        /// table in one place, below it. Callers that know the width they want in
+        /// Hz should use <see cref="SetIfFilterWidthHzAsync"/> instead.
+        /// </para>
+        /// </summary>
+        Task<int> NudgeIfFilterWidthAsync(RadioVfo vfo, int steps, CancellationToken cancellationToken = default);
+
         /// <summary>Read the selected filter slot: 1=FIL1, 2=FIL2, 3=FIL3 (from the CI-V 26 mode reply). -1 on a miss.</summary>
         Task<int> GetSelectedFilterAsync(RadioVfo vfo, CancellationToken cancellationToken = default);
 
