@@ -110,9 +110,12 @@ namespace Icom_Web_Control.Services
         private volatile bool _watchZoomIn = true;
         private volatile int _watchCropHalfHz;
 
-        // When the operator manually selects Fixed mode via the panel's scope-mode
-        // badge, remember it so a reconnect's EnableScopeAsync doesn't yank the
-        // scope back to Center under them. Selecting Center again clears it.
+        // When the operator manually selects Fixed mode via the panel's
+        // Centre/Fixed button or scope-mode badge, remember it so a reconnect's
+        // EnableScopeAsync doesn't yank the scope back to Center under them.
+        // Selecting Center again clears it. Mirrored to settings
+        // (ScopeFixedMode) so the choice also survives a restart — in-memory
+        // only, IWC forced Center again at every launch (GitHub #2).
         private volatile bool _operatorFixedMode;
 
         // When the operator turns the scope off (via the panel toggle), remember it
@@ -304,8 +307,9 @@ namespace Icom_Web_Control.Services
         /// Enable the spectrum scope and switch on the waveform output to the
         /// controller. Normally forces Center mode (the assumption the web
         /// SpectrumPanel's axis is built on), but respects a manual Fixed choice
-        /// the operator made via the badge so a reconnect doesn't override it.
-        /// Sent once per connect; best-effort.
+        /// the operator made via the panel's Centre/Fixed button or badge — in
+        /// this run or an earlier one — so neither a reconnect nor a restart
+        /// overrides it. Sent once per connect; best-effort.
         /// </summary>
         private async Task EnableScopeAsync(CancellationToken ct)
         {
@@ -314,9 +318,13 @@ namespace Icom_Web_Control.Services
             if (_operatorScopeOff)
                 return;
 
+            // Pick up a Fixed choice made in an earlier run before asserting a
+            // mode below, so a restart doesn't drag the operator back to Centre.
+            await LoadPersistedScopeModeAsync();
+
             // Switch the scope on and start waveform output first, then assert the
             // mode — the radio can power up (or be left) in Fixed mode. Force
-            // Center unless the operator deliberately chose Fixed this session.
+            // Center unless the operator deliberately chose Fixed.
             await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on", ct);
             await NoteScopeOutputResultAsync(
                 await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", ct), ct);
@@ -359,15 +367,57 @@ namespace Icom_Web_Control.Services
 
         /// <summary>
         /// Set the scope mode (CI-V 27 14) to Center or Fixed. Public entry point
-        /// for the click-the-badge control; delegates to the retrying setter.
+        /// for the panel's Centre/Fixed button and scope-mode badge; delegates to
+        /// the retrying setter.
         /// </summary>
-        public Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default)
+        public async Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default)
         {
             // Remember a manual Fixed choice so a later reconnect respects it
-            // instead of forcing Center (see EnableScopeAsync).
+            // instead of forcing Center (see EnableScopeAsync), and mirror it to
+            // settings so a restart does too.
             _operatorFixedMode = !center;
+            await PersistScopeModeAsync(!center);
             byte mode = center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed;
-            return SetScopeModeAsync(mode, center ? "scope center mode" : "scope fixed mode", cancellationToken);
+            await SetScopeModeAsync(mode, center ? "scope center mode" : "scope fixed mode", cancellationToken);
+        }
+
+        /// <summary>
+        /// Seed <see cref="_operatorFixedMode"/> from the persisted setting.
+        /// Best-effort: a settings-read failure leaves the in-memory choice (and
+        /// therefore Center) as it stands, which is the safe default.
+        /// </summary>
+        private async Task LoadPersistedScopeModeAsync()
+        {
+            try
+            {
+                var settings = await _settings.GetSettingsAsync();
+                _operatorFixedMode = settings.ScopeFixedMode;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[CivRadioController] Could not read the persisted scope mode; assuming Center.");
+            }
+        }
+
+        /// <summary>
+        /// Mirror a Centre/Fixed choice into settings. Best-effort and only when
+        /// the value actually changes — this runs on a button click, and the
+        /// settings file is rewritten whole on every save.
+        /// </summary>
+        private async Task PersistScopeModeAsync(bool fixedMode)
+        {
+            try
+            {
+                var settings = await _settings.GetSettingsAsync();
+                if (settings.ScopeFixedMode == fixedMode)
+                    return;
+                settings.ScopeFixedMode = fixedMode;
+                await _settings.SaveSettingsAsync(settings);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[CivRadioController] Could not persist the scope mode; it will hold for this session only.");
+            }
         }
 
         /// <summary>
