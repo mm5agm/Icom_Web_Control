@@ -1950,8 +1950,13 @@
                                 <option value="115200">115200</option>
                             </select>
                             <div class="form-text">
-                                Select the CI-V baud rate configured in the radio's menu (Set &gt; Connectors &gt; CI-V &gt; CI-V USB Baud Rate).
-                                <br /><strong>IC-7300 MkII:</strong> default is 19200; supports up to 115200. Match whatever the radio's CI-V menu is set to (Auto works, but a fixed rate is more reliable).
+                                The rate IWC uses to open the serial port.
+                                <br /><strong>IC-7300 MkII:</strong> leave this at <strong>19200</strong>. The MkII has no
+                                <em>CI-V USB Baud Rate</em> menu at all &mdash; its <em>CI-V Baud Rate</em> setting governs the
+                                [REMOTE] jack only, not the USB port &mdash; so this box is the only thing that sets the rate,
+                                and there is nothing to match it against on the radio. Raising it will not speed the band scope
+                                up: the radio emits about 4 sweeps per second regardless (measured on a MkII at 19200 and at
+                                115200 &mdash; identical).
                                 <br /><strong>IC-7300 (original):</strong> use <strong>115200</strong>. The original model will not send band scope data at any lower rate.
                             </div>
                             <span asp-validation-for="Settings.BaudRate" class="text-danger"></span>
