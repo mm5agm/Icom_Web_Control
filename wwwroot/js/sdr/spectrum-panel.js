@@ -203,6 +203,14 @@ export class SpectrumPanel {
     // paints its strip into it. Kept as one constant so the two never disagree.
     static AXIS_H = 20;
 
+    // VFO marker colour. Magenta because it is the only hue this panel does not
+    // already spend: the trace, the pinned cursor and the crosshair are all blue
+    // or cyan, the FIX badge and band edges are amber, and the out-of-band shade
+    // is red. A blue marker line is legible on a quiet sweep and lost on a busy
+    // one, which is the opposite of when it is needed.
+    static VFO_MARKER      = 'rgba(255, 60, 170, 0.95)';
+    static VFO_MARKER_TEXT = '#ff9ed8';
+
     _loadWaterfallSpeed() {
         try {
             const v = parseInt(localStorage.getItem('iwc.waterfallSpeed.' + this._vfo), 10);
@@ -923,6 +931,7 @@ export class SpectrumPanel {
         this._drawBandEdges(ctx, W, specH);
         this._drawBandMarkers(ctx, W, specH);
         this._drawSpots(ctx, W, specH);
+        this._drawVfoMarker(ctx, W, specH, spanHz);
         this._drawDxBadge(ctx, W);
         this._drawScopeModeBadge(ctx);
         if (scrollWaterfall || !this._waterfallData) this._scrollWaterfall(ctx, bins, W, specH, wfH);
@@ -945,6 +954,79 @@ export class SpectrumPanel {
                                                 : 'rgba(200, 210, 220, 0.85)';
         ctx.fillRect(cx - gripW / 2,     specH - 3, gripW, gripH);
         ctx.fillRect(cx - gripW / 2,     specH + 1, gripW, gripH);
+        ctx.restore();
+    }
+
+    // ── VFO marker ───────────────────────────────────────────────────────────
+    //
+    // Where the operator is actually listening. Drawn over the top of every
+    // other overlay, because in Fixed mode it is the only thing on the canvas
+    // that says where you are inside the window, and it has to survive a busy
+    // 20 m sweep with band markers and DX spots all over it. In Centre mode it
+    // lands in the middle and is nearly redundant — that is fine.
+    //
+    // The frequency label rides with the line instead of sitting centred at the
+    // top of the canvas. A number printed above the axis is read as pointing at
+    // the frequency beneath it, whatever it was intended as.
+    _drawVfoMarker(ctx, W, specH, spanHz) {
+        if (this._vfoHz <= 0 || spanHz <= 0) return;
+
+        const tickY0 = specH - SpectrumPanel.AXIS_H;
+        const leftHz = this._viewLeftHz(spanHz);
+        const vfoX   = ((this._vfoHz - leftHz) / spanHz) * W;
+        const label  = (this._vfoHz / 1e6).toFixed(6) + ' MHz';
+
+        // Fixed mode can put the VFO outside the window entirely. Park the
+        // readout against the edge it left by, with an arrow, rather than
+        // silently dropping it — "no marker" and "marker off to the left" must
+        // not look the same.
+        const onScreen = vfoX >= 0 && vfoX <= W;
+        const offLeft  = !onScreen && vfoX < 0;
+
+        ctx.save();
+        ctx.font = '12px monospace';
+
+        const text = onScreen ? label
+                   : offLeft  ? '◀ ' + label
+                              : label + ' ▶';
+        const boxH = 17;
+        const boxW = ctx.measureText(text).width + 10;
+
+        if (onScreen) {
+            ctx.strokeStyle = SpectrumPanel.VFO_MARKER;
+            ctx.lineWidth   = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(vfoX, boxH + 1);
+            ctx.lineTo(vfoX, tickY0);
+            ctx.stroke();
+
+            // Arrowhead into the axis strip, so the marker reads as pointing at
+            // one frequency on the scale rather than shading a region.
+            ctx.beginPath();
+            ctx.moveTo(vfoX - 4, tickY0);
+            ctx.lineTo(vfoX,     tickY0 + 6);
+            ctx.lineTo(vfoX + 4, tickY0);
+            ctx.closePath();
+            ctx.fillStyle = SpectrumPanel.VFO_MARKER;
+            ctx.fill();
+        }
+
+        // Clamped so a VFO near either edge still shows its frequency whole.
+        let boxX = onScreen ? vfoX - boxW / 2 : (offLeft ? 2 : W - boxW - 2);
+        boxX = Math.max(2, Math.min(W - boxW - 2, boxX));
+
+        // Same magenta whether the VFO is in the window or off the side of it —
+        // the arrow in the label does that job. One colour, one meaning.
+        ctx.fillStyle = 'rgba(70, 0, 40, 0.88)';
+        ctx.fillRect(boxX, 1, boxW, boxH);
+        ctx.strokeStyle = SpectrumPanel.VFO_MARKER;
+        ctx.lineWidth   = 1;
+        ctx.strokeRect(boxX, 1, boxW, boxH);
+
+        ctx.fillStyle    = SpectrumPanel.VFO_MARKER_TEXT;
+        ctx.textAlign    = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(text, boxX + 5, 14);
         ctx.restore();
     }
 
@@ -1397,15 +1479,13 @@ export class SpectrumPanel {
         // readable at a glance. Confined to the trace area (above the axis strip).
         this._drawDbScale(ctx, W, H, dbMin, dbMax, range, dbStep);
 
-        // VFO frequency readout. Centred text, not a position marker — in Fixed
-        // mode the VFO is wherever the marker line on the axis says it is.
-        if (this._vfoHz > 0) {
-            const label = (this._vfoHz / 1e6).toFixed(6) + ' MHz';
-            ctx.font      = '12px monospace';
-            ctx.fillStyle = '#44aaff';
-            ctx.textAlign = 'center';
-            ctx.fillText(label, W / 2, 14);
-        }
+        // The VFO frequency readout used to be centred here, as plain text that
+        // was never meant to indicate a position. That reasoning does not survive
+        // contact with Fixed mode: a frequency printed at the top of the canvas
+        // sits directly above a point on the axis, so it reads as a label for
+        // that point no matter what it was intended as. On a 14.000–14.350
+        // window it announced "14.075000 MHz" over the 14.175 mark. It now
+        // travels with the marker — see _drawVfoMarker.
     }
 
     // Pick a "nice" dB grid step (5/10/20/25/50/100) that yields roughly half a
@@ -1440,7 +1520,11 @@ export class SpectrumPanel {
             let y = H - ((db - dbMin) / range) * H;
             y = Math.max(12, Math.min(H - 3, y));
 
-            const text = db === dbMax ? `${db} dB` : `${db}`;
+            // Round for display. The "nice" gridline levels are whole numbers,
+            // but dbMin/dbMax are the raw auto-noise-floor endpoints, so the top
+            // and bottom labels were rendering as "-117.75503294890567".
+            const shown = Math.round(db);
+            const text  = db === dbMax ? `${shown} dB` : `${shown}`;
             const tw   = ctx.measureText(text).width;
 
             ctx.fillStyle = 'rgba(6, 8, 16, 0.72)';
@@ -1483,21 +1567,11 @@ export class SpectrumPanel {
         // window's own centre, not the VFO — see _viewCentreHz.
         const leftHz = this._viewLeftHz(spanHz);
 
-        // VFO marker line (drawn first, behind labels), at the VFO's real
-        // position in the window. In Centre mode that is the middle of the
-        // canvas; in Fixed mode it travels as the operator tunes, which is the
-        // whole point of Fixed. Skipped when the VFO is outside the window.
-        if (this._vfoHz > 0 && spanHz > 0) {
-            const vfoX = ((this._vfoHz - leftHz) / spanHz) * W;
-            if (vfoX >= 0 && vfoX <= W) {
-                ctx.strokeStyle = 'rgba(0, 170, 255, 0.4)';
-                ctx.lineWidth   = 1;
-                ctx.beginPath();
-                ctx.moveTo(vfoX, 0);
-                ctx.lineTo(vfoX, tickY0);
-                ctx.stroke();
-            }
-        }
+        // The VFO marker is NOT drawn here. It used to be, and at 40% alpha in
+        // very nearly the trace's own blue it was then painted over by the band
+        // edges, band markers and DX spots that follow this call — invisible on
+        // a busy 20 m sweep, which is exactly where Fixed mode needs it most.
+        // It is drawn last instead: see _drawVfoMarker.
 
         // Choose a "nice" tick interval that gives roughly 6–12 ticks across the span.
         // Candidate steps in Hz: 50k, 100k, 200k, 250k, 500k, 1M, 2M, 5M, 10M
@@ -1520,7 +1594,7 @@ export class SpectrumPanel {
 
             // Tick line
             const isVfo = Math.abs(tickHz - this._vfoHz) < stepHz * 0.01;
-            ctx.strokeStyle = isVfo ? 'rgba(0,170,255,0.8)' : '#334466';
+            ctx.strokeStyle = isVfo ? SpectrumPanel.VFO_MARKER : '#334466';
             ctx.lineWidth   = 1;
             ctx.beginPath();
             ctx.moveTo(x, tickY0);
