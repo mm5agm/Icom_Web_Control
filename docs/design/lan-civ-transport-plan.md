@@ -208,30 +208,106 @@ CI-V, `50001` for control, `50003` for audio.
 
 ## 7. "If the radio is connected" — the selection rule
 
-The request is that LAN be used when it is available. Automatic, but never
-silent:
+### The governing principle: LAN is additive, and off is the default
 
-- **New setting `ConnectionMode`: `Auto` (default) | `Serial` | `Network`.**
-- **Auto** tries the network endpoint *only if a host is configured*, probes it
-  with the §2 are-you-there, and falls back to serial if there is no answer
-  within ~1 second. A configured-but-unreachable radio must not delay startup.
+**A user who never touches the new settings must see no change whatsoever.**
+Same serial port, same baud, same behaviour, same failure messages. Every branch
+below therefore ends at "carry on exactly as today" unless the network path is
+both *configured* and *proven reachable*. LAN is an opt-in improvement for MkII
+owners on a wired network, not a new way for the app to fail for everyone else.
+
+This is not just caution about a new feature. The measurement in §1 came from one
+radio on one LAN (§9), so the network path will ship less tested than the serial
+path no matter how careful the build is.
+
+### The startup decision, in order
+
+Run once, at connect time, before any CI-V is sent:
+
+1. **`ConnectionMode == Serial`** → open the serial port. Done. This is today's
+   code path, untouched, and it is what an unconfigured install gets.
+2. **No `NetworkHost` configured** → serial. Nothing to probe.
+3. **No local IPv4 interface on the same subnet as `NetworkHost`** → serial,
+   logged as *"radio LAN address is not on any network this PC can reach"*.
+   Catches the laptop taken away from the shack, and costs nothing to check.
+4. **Send the §2 "are you there" to `NetworkHost:50001`.** No reply within the
+   budget below → serial, logged as *"no answer from the radio on the network"*.
+   Catches the radio switched off, Ethernet unplugged, or Network Control turned
+   back off — which is easy to do, since it defaults to off and needs a restart
+   to take effect.
+5. **Reply received** → network transport. Log which one won, at Information.
+
+Steps 3 and 4 together are the actual "is the radio connected to a LAN" test.
+A configured host is a statement of intent, not evidence.
+
+**Timing budget: 1 second, once.** A configured-but-unreachable radio must not
+delay start-up, and must not retry in a loop before falling back. Users on a
+laptop that moves between the shack and elsewhere will hit step 3 or 4 routinely
+and it must cost them a second at most.
+
+**`ConnectionMode == Network` is the one mode that does not fall back.** If the
+user has explicitly said network-only, silently using the serial port instead
+hides a fault they asked to be told about. Fail with the reason from step 3 or 4.
+
+### After start-up
+
 - **Never switch transport mid-session.** If the LAN drops, report it and
-  reconnect on the same transport; a silent flip to serial would change the
-  scope's segment shape underneath a running assembler.
+  reconnect on the same transport. A silent flip to serial would change the
+  scope's segment shape underneath a running assembler — 1 frame per sweep
+  versus 11 — and §5 would then be assembling the wrong shape.
 - **Say which transport is live** on Diagnostics and in the connection banner.
   A user who cannot tell whether they are on USB or LAN cannot report a bug
-  about it.
+  about it, and the whole point of the feature is a difference in sweep rate
+  they can see but not attribute.
 
-Discovery to fill the host field: a **Detect** button on Settings that sweeps
-the local /24, keeps hosts whose ARP entry carries OUI `00:90:C7`, and probes
-each with the are-you-there. That is exactly the sequence that found the radio
-on the bench and it took under a minute.
+### The Settings page
+
+A new **Radio connection** section, above the existing serial fields rather than
+replacing them, because the serial fields still apply in `Auto` and `Serial`.
+
+```
+Radio connection
+  Connection      ( ) USB / serial only          <- today's behaviour
+                  (o) Use the network if available, otherwise USB   [default]
+                  ( ) Network only
+
+  --- shown only when a network option is selected ---
+  Radio IP address   [ 192.168.68.55        ]  [ Detect ]
+  Control port       [ 50001 ]
+  Network user ID    [                      ]
+  Network password   [ ********             ]
+
+  [ Test connection ]      Status: not tested
+```
+
+Behaviour:
+
+- **The three radio buttons are `ConnectionMode`.** Worded as outcomes rather
+  than as `Auto`/`Serial`/`Network`, because "Auto" does not tell a user what
+  will happen. The default is the middle one, which for anyone who fills nothing
+  in is identical to today.
+- **The network fields hide entirely** under "USB / serial only", so the page
+  does not grow for users who will never use this.
+- **Detect** sweeps the local /24, keeps hosts whose ARP entry carries OUI
+  `00:90:C7`, probes each with the are-you-there, and fills the address in. That
+  is exactly the sequence that found the radio on the bench and it took under a
+  minute. Offer a list if it finds more than one.
+- **Test connection** runs the full §2 handshake and reports one of: *radio
+  answered*, *no answer* (with the step-3/step-4 reason), *another program is
+  using the radio's network connection* (§9), or *wrong user ID or password*.
+  This matters more than usual — Network Control defaults to off and needs a
+  radio restart, so the most common failure will be a setting on the radio, not
+  in IWC, and the message has to say so.
+- **Saving does not reconnect.** Say so, and say a restart is needed, rather
+  than half-swapping the transport under a live poll loop.
+- The radio's own **Network User ID / password** live in its Set → Network menu,
+  and the manual section for this must say that, because nobody will guess it.
 
 ### Settings to add
 
 | Setting | Default | Notes |
 |---|---|---|
-| `ConnectionMode` | `Auto` | as above |
+| `ConnectionMode` | `Auto` | `Auto` \| `Serial` \| `Network` — default is today's behaviour |
 | `NetworkHost` | `""` | empty = never try the network |
 | `NetworkControlPort` | `50001` | serial/audio ports are learned from the radio |
 | `NetworkUserId` | `""` | radio's Network User ID |
@@ -286,7 +362,7 @@ take before shipping, not after.
 | ~~**A**~~ | ~~§6 spike~~ — **done 2026-08-13 via wfview + tshark** | **passed: 30/sec vs 4.1/sec** |
 | **B** | `CivEndpoint`, widen `ICivClient.OpenAsync`, `CivNetworkBusService` + the three `Net/` classes | connects, polls, meters live |
 | **C** | §5 assembler fix using the captured offsets | scope draws over LAN |
-| **D** | Settings, Detect button, Auto fallback, Diagnostics transport readout | falls back cleanly with the radio's Ethernet unplugged |
+| **D** | §7 in full: Settings section, Detect, Test connection, the five-step startup decision, Diagnostics transport readout | **an install that configures nothing behaves identically to today**, and a configured one falls back cleanly with the radio's Ethernet unplugged, the radio switched off, and Network Control turned back off |
 | **E** | `USER_MANUAL.md` §6.1, README release notes, wfview attribution | release rules 13/14 |
 
 Related: `iwc-clone-split-plan.md` (this is not one of its phases — it postdates
