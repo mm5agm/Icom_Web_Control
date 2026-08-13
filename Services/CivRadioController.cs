@@ -1399,14 +1399,55 @@ namespace Icom_Web_Control.Services
                 _logger.LogWarning("[CivRadioController] IF width not adjustable in the current mode — ignored");
                 return;
             }
-            int code = FilterWidthCodec.HzToCode(group, hz);
+            await WriteIfWidthCodeAsync(vfo, group, FilterWidthCodec.HzToCode(group, hz), ct);
+        }
+
+        public async Task<IfFilterWidthStep> NudgeIfFilterWidthAsync(RadioVfo vfo, int steps, CancellationToken ct = default)
+        {
+            var group = await ReadModeGroupAsync(vfo, ct);
+            if (group == FilterWidthCodec.Group.None)
+            {
+                _logger.LogInformation("[CivRadioController] IF width not adjustable in the current mode — nudge ignored");
+                return new IfFilterWidthStep(-1, false);
+            }
+
+            int code = await ReadMenuByteAsync(CivProtocol.SubIfWidth, ct);
+            if (code < 0)
+            {
+                _logger.LogWarning("[CivRadioController] Could not read the current IF width — nudge ignored");
+                return new IfFilterWidthStep(-1, false);
+            }
+
+            // Clamped, not wrapped: an operator asking for "narrower" at the
+            // bottom of the ladder wants the narrowest, not the widest.
+            int next = Math.Clamp(code + steps, 0, FilterWidthCodec.LastCode(group));
+            if (next == code)
+            {
+                // Already at the end. Nothing is written — the width is right,
+                // the step is what was refused, and the caller is told so it can
+                // say something other than the read-back it just gave.
+                _logger.LogInformation("[CivRadioController] IF width already at the {End} of the {Group} ladder",
+                    steps > 0 ? "top" : "bottom", group);
+                return new IfFilterWidthStep(FilterWidthCodec.CodeToHz(group, code), AtLimit: true);
+            }
+
+            await WriteIfWidthCodeAsync(vfo, group, next, ct);
+            return new IfFilterWidthStep(FilterWidthCodec.CodeToHz(group, next), AtLimit: false);
+        }
+
+        // Shared by the Hz setter and the step nudge. Split out so the nudge does
+        // not have to re-read the mode group it has already read — on a 19200 bus
+        // shared with the scope, one avoided transaction is worth the helper.
+        private async Task WriteIfWidthCodeAsync(
+            RadioVfo vfo, FilterWidthCodec.Group group, int code, CancellationToken ct)
+        {
             byte bcd = (byte)(((code / 10) << 4) | (code % 10));   // one BCD digit-pair; code ≤ 49
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubIfWidth, bcd);
             var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
             {
-                _logger.LogWarning("[CivRadioController] Set IF width {Hz} Hz (code {Code}) was not acknowledged", hz, code);
+                _logger.LogWarning("[CivRadioController] Set IF width code {Code} was not acknowledged", code);
                 return;
             }
             int snapped = FilterWidthCodec.CodeToHz(group, code);
@@ -1662,6 +1703,9 @@ namespace Icom_Web_Control.Services
                 0x02 => Group.Am,                              // AM
                 _ => Group.None,                               // FM (0x05) / unknown
             };
+
+            /// <summary>Highest valid code for the group; -1 if the group has no width.</summary>
+            public static int LastCode(Group g) => (Table(g)?.Length ?? 0) - 1;
 
             /// <summary>Code → Hz for the group; -1 if the code is out of range or the group has no width.</summary>
             public static int CodeToHz(Group g, int code)

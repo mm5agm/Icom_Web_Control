@@ -223,6 +223,20 @@ namespace Icom_Web_Control.Services
             if (vfo == RadioVfo.A) _state.IfWidthA = _ifWidthHz.ToString(); else _state.IfWidthB = _ifWidthHz.ToString();
             return Task.CompletedTask;
         }
+        // Even 100 Hz steps stand in for the radio's uneven ladder — enough for the
+        // UI and the voice read-back to be developable without hardware. The ends
+        // are modelled properly, because "already at the limit" is a spoken
+        // response and it should be exercisable without a radio.
+        public Task<IfFilterWidthStep> NudgeIfFilterWidthAsync(RadioVfo vfo, int steps, CancellationToken ct = default)
+        {
+            var next = Math.Clamp(_ifWidthHz + steps * 100, 50, 10000);
+            if (next == _ifWidthHz) return Task.FromResult(new IfFilterWidthStep(_ifWidthHz, AtLimit: true));
+
+            _ifWidthHz = next;
+            if (vfo == RadioVfo.A) _state.IfWidthA = _ifWidthHz.ToString(); else _state.IfWidthB = _ifWidthHz.ToString();
+            return Task.FromResult(new IfFilterWidthStep(_ifWidthHz, AtLimit: false));
+        }
+
         public Task<int> GetSelectedFilterAsync(RadioVfo vfo, CancellationToken ct = default) => Task.FromResult(_selectedFilter);
         public Task SetSelectedFilterAsync(RadioVfo vfo, int fil, CancellationToken ct = default)
         {
