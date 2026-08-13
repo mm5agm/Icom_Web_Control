@@ -95,15 +95,99 @@ passcode obfuscation, token renewal, the 21-byte ping/data packets, and the
 open/close that starts the CI-V stream on 50002 — is **not yet confirmed here**
 and must be taken from wfview (see §3) rather than assumed.
 
-## 3. Licence position — better than expected
+## 3. wfview — the decision, and how to keep track of it
 
-**IWC is GPLv3 and wfview is GPLv3.** The protocol work can therefore be
-*ported*, not reverse-engineered: wfview's `udphandler` / `udpbase` /
-`udpserver` code may be adapted directly, provided the GPL terms are honoured
-and authorship is attributed in the file headers and in `README.md`.
+### Licence: no obstacle either way
 
-This is the single biggest cost reduction available and the plan assumes it.
-Do **not** start by writing a protocol implementation from first principles.
+**IWC is GPLv3 and wfview is GPLv3** (confirmed: IWC's `LICENSE`, and the
+licence shipped in wfview's install). So porting is permitted, provided the GPL
+terms are honoured and authorship is attributed in the file headers and in
+`README.md`. Equally, there is no *incentive* to avoid deriving from it — the
+clean-room dance exists to keep proprietary projects clean, and IWC has nothing
+to protect. Reading wfview and then carefully "writing our own" would incur the
+derivation either way with none of the benefit. So: read it freely, and
+attribute honestly.
+
+### The decision: capture first, port only what capture cannot reveal
+
+**Default to capture.** Watching wfview talk to *this* radio gives ground truth
+for this model and this firmware, which is better evidence than wfview's source —
+source says what it sends, capture says what the radio accepts. It also produced
+the entire §1 measurement and the §5 frame layout for the cost of a tshark run.
+
+**Port only where capture genuinely cannot answer.** Realistically that is one
+thing: the **passcode obfuscation** applied to the network password. It is a
+fixed substitution that cannot be inferred from watching traffic without knowing
+the plaintext, and it will not be guessed. Take it from wfview, with attribution.
+
+The practical consequence is that **the ported surface is expected to be very
+small — plausibly a single lookup table and the function that applies it**,
+rather than the `udpbase` / `udphandler` / `udpserver` trio the earlier draft
+assumed. Everything else — sequence numbers, retransmit, keepalive cadence,
+token renewal, the open/close that starts the CI-V stream — should be readable
+off the wire.
+
+**Do not port speculatively.** Each additional file taken from wfview adds a
+provenance record to maintain (below) and a divergence risk, for code that
+capture would have given us anyway. If a capture leaves something ambiguous,
+read wfview to *understand* it, then decide deliberately whether the answer is a
+fact (write it ourselves) or an artefact (port it and record it).
+
+### Tracking whether wfview has moved
+
+Anything ported is a **copy, not a dependency** — upstream fixes will not arrive
+by themselves. The exposure is small if the decision above holds (a constant
+table does not change, and Icom's protocol is frozen), but "small" is not
+"zero", and the thing that makes it manageable is recording provenance *at the
+time of porting*, when the facts are to hand.
+
+**`Services/Civ/Net/PORTED-FROM.md`** — one row per ported artefact:
+
+| our file | upstream file | upstream commit | upstream version | date | why ported not captured |
+|---|---|---|---|---|---|
+
+Plus the same commit SHA in a header comment on each ported file, so the
+provenance survives the file being moved or renamed.
+
+**`scripts/check-wfview-updates.ps1`** — reads `PORTED-FROM.md`, and for each
+row asks wfview's repository whether the named upstream file has changed since
+the recorded commit. Report only: unchanged, or changed with a link to the diff.
+It must not fetch, merge or modify anything.
+
+Run it when something misbehaves on the network path, and once before any
+release that touches the transport. **Not on a schedule and not in CI** — a
+check that cries wolf on every unrelated upstream commit gets ignored, and this
+one only needs to be right on the rare occasions it is consulted.
+
+#### This is a developer tool, and must never become a user-facing one
+
+**Do not add a "check wfview for updates" button to Diagnostics, Settings,
+About, or anywhere else in the app.** The temptation will be real — Diagnostics
+is exactly where it looks like it belongs, and IWC already phones GitHub for its
+own update banner, so the plumbing exists.
+
+The reason is that **a user can do nothing with the answer.** "wfview has
+changed upstream" is not an actionable fact for an operator. Acting on it means
+reading the upstream diff, judging whether it affects the ported artefact at
+all, changing IWC's code if it does, testing it against a radio, and cutting a
+release. Every one of those steps is the developer's, and the last one is how
+the fix reaches users anyway.
+
+So the user-facing mechanism already exists and needs nothing added: **if an
+upstream change matters, it reaches users as an IWC release**, exactly like
+every other fix. Surfacing the raw upstream state to users would only invite
+support questions about a discrepancy they cannot resolve, and would imply IWC
+depends on wfview at runtime — it does not. Nothing is downloaded, linked or
+called; the relationship is a copy taken once, recorded in `PORTED-FROM.md`.
+
+Keeping the check as `scripts/check-wfview-updates.ps1` enforces this by
+construction: the installer bundles `publish\*` only, so `scripts/` is never
+shipped and the tool exists solely in the repository.
+
+If the ported surface really does end up being one lookup table, this whole
+subsection collapses to a single row and a script nobody runs. That is the good
+outcome, not wasted effort: the record is cheap to write and expensive to
+reconstruct later.
 
 ## 4. Where it plugs in
 
@@ -192,9 +276,9 @@ Done 2026-08-13, results in §1 and §5. **Gate passed: 30/sec against 4.1/sec.*
 Keep the technique for the remaining unknowns. Anything still uncertain about
 the handshake (§2) can be resolved the same way — reconnect wfview with tshark
 running and read the login, token-renewal and open/close exchanges straight off
-the wire, rather than inferring them from wfview's source. Ground truth beats
-reading C++, and it sidesteps the derivation question in §3 for the parts that
-turn out to be obvious.
+the wire. **This is the mechanism behind §3's capture-first decision**, and the
+reason the ported surface is expected to be one lookup table rather than a
+subsystem.
 
 Capture recipe, for repeating it:
 
@@ -208,30 +292,106 @@ CI-V, `50001` for control, `50003` for audio.
 
 ## 7. "If the radio is connected" — the selection rule
 
-The request is that LAN be used when it is available. Automatic, but never
-silent:
+### The governing principle: LAN is additive, and off is the default
 
-- **New setting `ConnectionMode`: `Auto` (default) | `Serial` | `Network`.**
-- **Auto** tries the network endpoint *only if a host is configured*, probes it
-  with the §2 are-you-there, and falls back to serial if there is no answer
-  within ~1 second. A configured-but-unreachable radio must not delay startup.
+**A user who never touches the new settings must see no change whatsoever.**
+Same serial port, same baud, same behaviour, same failure messages. Every branch
+below therefore ends at "carry on exactly as today" unless the network path is
+both *configured* and *proven reachable*. LAN is an opt-in improvement for MkII
+owners on a wired network, not a new way for the app to fail for everyone else.
+
+This is not just caution about a new feature. The measurement in §1 came from one
+radio on one LAN (§9), so the network path will ship less tested than the serial
+path no matter how careful the build is.
+
+### The startup decision, in order
+
+Run once, at connect time, before any CI-V is sent:
+
+1. **`ConnectionMode == Serial`** → open the serial port. Done. This is today's
+   code path, untouched, and it is what an unconfigured install gets.
+2. **No `NetworkHost` configured** → serial. Nothing to probe.
+3. **No local IPv4 interface on the same subnet as `NetworkHost`** → serial,
+   logged as *"radio LAN address is not on any network this PC can reach"*.
+   Catches the laptop taken away from the shack, and costs nothing to check.
+4. **Send the §2 "are you there" to `NetworkHost:50001`.** No reply within the
+   budget below → serial, logged as *"no answer from the radio on the network"*.
+   Catches the radio switched off, Ethernet unplugged, or Network Control turned
+   back off — which is easy to do, since it defaults to off and needs a restart
+   to take effect.
+5. **Reply received** → network transport. Log which one won, at Information.
+
+Steps 3 and 4 together are the actual "is the radio connected to a LAN" test.
+A configured host is a statement of intent, not evidence.
+
+**Timing budget: 1 second, once.** A configured-but-unreachable radio must not
+delay start-up, and must not retry in a loop before falling back. Users on a
+laptop that moves between the shack and elsewhere will hit step 3 or 4 routinely
+and it must cost them a second at most.
+
+**`ConnectionMode == Network` is the one mode that does not fall back.** If the
+user has explicitly said network-only, silently using the serial port instead
+hides a fault they asked to be told about. Fail with the reason from step 3 or 4.
+
+### After start-up
+
 - **Never switch transport mid-session.** If the LAN drops, report it and
-  reconnect on the same transport; a silent flip to serial would change the
-  scope's segment shape underneath a running assembler.
+  reconnect on the same transport. A silent flip to serial would change the
+  scope's segment shape underneath a running assembler — 1 frame per sweep
+  versus 11 — and §5 would then be assembling the wrong shape.
 - **Say which transport is live** on Diagnostics and in the connection banner.
   A user who cannot tell whether they are on USB or LAN cannot report a bug
-  about it.
+  about it, and the whole point of the feature is a difference in sweep rate
+  they can see but not attribute.
 
-Discovery to fill the host field: a **Detect** button on Settings that sweeps
-the local /24, keeps hosts whose ARP entry carries OUI `00:90:C7`, and probes
-each with the are-you-there. That is exactly the sequence that found the radio
-on the bench and it took under a minute.
+### The Settings page
+
+A new **Radio connection** section, above the existing serial fields rather than
+replacing them, because the serial fields still apply in `Auto` and `Serial`.
+
+```
+Radio connection
+  Connection      ( ) USB / serial only          <- today's behaviour
+                  (o) Use the network if available, otherwise USB   [default]
+                  ( ) Network only
+
+  --- shown only when a network option is selected ---
+  Radio IP address   [ 192.168.68.55        ]  [ Detect ]
+  Control port       [ 50001 ]
+  Network user ID    [                      ]
+  Network password   [ ********             ]
+
+  [ Test connection ]      Status: not tested
+```
+
+Behaviour:
+
+- **The three radio buttons are `ConnectionMode`.** Worded as outcomes rather
+  than as `Auto`/`Serial`/`Network`, because "Auto" does not tell a user what
+  will happen. The default is the middle one, which for anyone who fills nothing
+  in is identical to today.
+- **The network fields hide entirely** under "USB / serial only", so the page
+  does not grow for users who will never use this.
+- **Detect** sweeps the local /24, keeps hosts whose ARP entry carries OUI
+  `00:90:C7`, probes each with the are-you-there, and fills the address in. That
+  is exactly the sequence that found the radio on the bench and it took under a
+  minute. Offer a list if it finds more than one.
+- **Test connection** runs the full §2 handshake and reports one of: *radio
+  answered*, *no answer* (with the step-3/step-4 reason), *another program is
+  using the radio's network connection* (§9), or *wrong user ID or password*.
+  This matters more than usual — Network Control defaults to off and needs a
+  radio restart, so the most common failure will be a setting on the radio, not
+  in IWC, and the message has to say so.
+- **Saving does not reconnect.** Say so, and say a restart is needed, rather
+  than half-swapping the transport under a live poll loop.
+- The radio's own **Network User ID / password** live in its Set → Network menu,
+  and the manual section for this must say that, because nobody will guess it.
 
 ### Settings to add
 
 | Setting | Default | Notes |
 |---|---|---|
-| `ConnectionMode` | `Auto` | as above |
+| `ConnectionMode` | `Auto` | `Auto` \| `Serial` \| `Network` — default is today's behaviour |
 | `NetworkHost` | `""` | empty = never try the network |
 | `NetworkControlPort` | `50001` | serial/audio ports are learned from the radio |
 | `NetworkUserId` | `""` | radio's Network User ID |
@@ -286,8 +446,8 @@ take before shipping, not after.
 | ~~**A**~~ | ~~§6 spike~~ — **done 2026-08-13 via wfview + tshark** | **passed: 30/sec vs 4.1/sec** |
 | **B** | `CivEndpoint`, widen `ICivClient.OpenAsync`, `CivNetworkBusService` + the three `Net/` classes | connects, polls, meters live |
 | **C** | §5 assembler fix using the captured offsets | scope draws over LAN |
-| **D** | Settings, Detect button, Auto fallback, Diagnostics transport readout | falls back cleanly with the radio's Ethernet unplugged |
-| **E** | `USER_MANUAL.md` §6.1, README release notes, wfview attribution | release rules 13/14 |
+| **D** | §7 in full: Settings section, Detect, Test connection, the five-step startup decision, Diagnostics transport readout | **an install that configures nothing behaves identically to today**, and a configured one falls back cleanly with the radio's Ethernet unplugged, the radio switched off, and Network Control turned back off |
+| **E** | `USER_MANUAL.md` §6.1, README release notes, wfview attribution, `PORTED-FROM.md` and `check-wfview-updates.ps1` if anything was ported (§3) | release rules 13/14 |
 
 Related: `iwc-clone-split-plan.md` (this is not one of its phases — it postdates
 the plan), and the `iwc-lan-transport-opportunity` memory note for the raw
