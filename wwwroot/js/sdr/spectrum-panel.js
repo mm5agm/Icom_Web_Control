@@ -232,6 +232,48 @@ export class SpectrumPanel {
         this._saveWaterfallSpeed();
     }
 
+    // ── View geometry ────────────────────────────────────────────────────────
+    //
+    // Every overlay maps Hz→x across the canvas, and they must all agree on
+    // which slice of spectrum the canvas is showing. That slice is NOT always
+    // centred on the VFO:
+    //
+    //   Centre mode  — the radio sweeps around the VFO, so the sweep centre and
+    //                  the VFO are the same number and nothing changes.
+    //   Fixed/scroll — the sweep is a band segment that stays put while the VFO
+    //                  moves inside it. The waveform header carries the segment's
+    //                  own lower/upper edges, which CivScopeAssembler averages
+    //                  into the sweep's centreHz.
+    //
+    // Drawing everything from _vfoHz pinned the VFO to the middle of the canvas
+    // and slid the scale under it, which is exactly what a Fixed-mode operator
+    // sees as "the scope shifts to keep the cursor centred". Read the centre
+    // from the sweep and Fixed mode draws where the radio says it is.
+
+    /**
+     * Centre frequency of the window currently on the canvas, in Hz. Falls back
+     * to the VFO until a sweep has reported a centre.
+     */
+    _viewCentreHz() {
+        return this._lastCentreHz > 0 ? this._lastCentreHz : this._vfoHz;
+    }
+
+    /**
+     * Frequency at the left edge of the canvas, in Hz.
+     * @param {number} [spanHz] Span to use; defaults to the last sweep's.
+     */
+    _viewLeftHz(spanHz = this._lastSpanHz) {
+        return this._viewCentreHz() - spanHz / 2;
+    }
+
+    /**
+     * True when the window tracks the VFO, so tuning re-centres the display.
+     * Fixed and the two scroll modes leave the window where it is.
+     */
+    _viewFollowsVfo() {
+        return this._scopeMode === undefined || this._scopeMode === 'CENT';
+    }
+
     /** Returns the current waterfall speed divisor (1 = full speed). */
     getWaterfallSpeed() { return this._waterfallSpeed; }
 
@@ -675,13 +717,13 @@ export class SpectrumPanel {
 
             if (this._lastBins) this._render();
             // Announce cursor frequency to screen readers via a live region (debounced to 1 s).
-            if (this._lastSpanHz > 0 && this._vfoHz > 0) {
+            if (this._lastSpanHz > 0 && this._viewCentreHz() > 0) {
                 clearTimeout(this._announceTimer);
                 this._announceTimer = setTimeout(() => {
                     const canvas2 = document.getElementById(this._canvasId);
                     if (!canvas2) return;
                     const W = canvas2.width;
-                    const leftHz = this._vfoHz - this._lastSpanHz / 2;
+                    const leftHz = this._viewLeftHz();
                     const cx = this._crosshairX;
                     if (cx == null) return;
                     const freqHz = leftHz + (cx / W) * this._lastSpanHz;
@@ -722,7 +764,7 @@ export class SpectrumPanel {
     }
 
     _onCanvasClick(e) {
-        if (!this._lastBins || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        if (!this._lastBins || this._lastSpanHz <= 0 || this._viewCentreHz() <= 0) return;
 
         const canvas = document.getElementById(this._canvasId);
         // Clicks on the splitter handle are for resizing, not tuning.
@@ -733,9 +775,9 @@ export class SpectrumPanel {
         const W      = canvas.width;
 
         // Clicks on the scope-mode badge toggle the radio between Center and
-        // Fixed rather than tuning. CENT is the mode the panel's axis assumes;
-        // clicking a green CENT badge flips to Fixed, an amber FIX badge back to
-        // Center. The badge only appears once a sweep has reported a mode.
+        // Fixed rather than tuning. Clicking a green CENT badge flips to Fixed,
+        // an amber FIX badge back to Center. The badge only appears once a sweep
+        // has reported a mode.
         if (this._isOnScopeModeBadge(x * (W / rect.width), this._canvasYFromEvent(e, canvas))) {
             this.toggleScopeMode();
             return;
@@ -747,7 +789,7 @@ export class SpectrumPanel {
 
         // Convert canvas-relative x (CSS pixels) to canvas-internal pixels.
         const canvasX = x * (W / rect.width);
-        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
+        const leftHz  = this._viewLeftHz();
         const clickHz = Math.round(leftHz + (canvasX / W) * this._lastSpanHz);
 
         // Shift+click → drop / toggle a persistent cursor at the click freq
@@ -803,7 +845,11 @@ export class SpectrumPanel {
         // would briefly show the wrong frequency until the next mousemove.
         // The next real mousemove resets _crosshairX to wherever the mouse
         // actually is, so this is a one-shot visual fixup, not persistent.
-        this._crosshairX = Math.floor(W / 2);
+        //
+        // Only in Centre mode. A Fixed-mode window does not move when the VFO
+        // does, so the frequency under the mouse is still the one that was
+        // clicked and moving the crosshair would invent an error.
+        if (this._viewFollowsVfo()) this._crosshairX = Math.floor(W / 2);
     }
 
     _onCanvasWheel(e) {
@@ -909,9 +955,9 @@ export class SpectrumPanel {
     // boxed frequency label so it stands out. Shift+click on or very near
     // the existing cursor clears it.
     _drawPinnedCursor(ctx, W, specH) {
-        if (this._pinnedCursorHz == null || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
-        const leftHz = this._vfoHz - this._lastSpanHz / 2;
-        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        if (this._pinnedCursorHz == null || this._lastSpanHz <= 0 || this._viewCentreHz() <= 0) return;
+        const leftHz = this._viewLeftHz();
+        const rightHz = leftHz + this._lastSpanHz;
         if (this._pinnedCursorHz < leftHz || this._pinnedCursorHz > rightHz) return;
 
         const x = ((this._pinnedCursorHz - leftHz) / this._lastSpanHz) * W;
@@ -987,9 +1033,9 @@ export class SpectrumPanel {
     // Drawn between the trace and the axis/edge lines so those render crisp on
     // top. Same edge data as _drawBandEdges.
     _drawOutOfBandShade(ctx, W, specH) {
-        if (this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
-        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
-        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        if (this._lastSpanHz <= 0 || this._viewCentreHz() <= 0) return;
+        const leftHz  = this._viewLeftHz();
+        const rightHz = leftHz + this._lastSpanHz;
         const edges = this._bandEdges ?? SpectrumPanel.BAND_EDGES;
         if (!edges || !edges.length) return;
 
@@ -1033,9 +1079,9 @@ export class SpectrumPanel {
     // where the band ends at 7.200 — but it's never wrong (no transmission
     // is legal beyond these limits in any region).
     _drawBandEdges(ctx, W, specH) {
-        if (this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
-        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
-        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        if (this._lastSpanHz <= 0 || this._viewCentreHz() <= 0) return;
+        const leftHz  = this._viewLeftHz();
+        const rightHz = leftHz + this._lastSpanHz;
 
         // Per-region edges (set by Index.cshtml from BAND_EDGES[region]) take
         // priority over the class-static worldwide envelope. Fall back if no
@@ -1069,10 +1115,10 @@ export class SpectrumPanel {
     // (e.g. FT8 at 14.074 and RTTY at 14.080 are only 6 kHz apart and would
     // collide at any reasonable span).
     _drawBandMarkers(ctx, W, specH) {
-        if (!this._bandPlan || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        if (!this._bandPlan || this._lastSpanHz <= 0 || this._viewCentreHz() <= 0) return;
 
-        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
-        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        const leftHz  = this._viewLeftHz();
+        const rightHz = leftHz + this._lastSpanHz;
 
         // Collect all in-window markers with their pixel x and label width.
         const markers = [];
@@ -1166,9 +1212,15 @@ export class SpectrumPanel {
     // Small badge in the top-left showing the radio's live scope mode
     // (CENT / FIX / SCROLL-C / SCROLL-F), read from the 27 00 waveform header.
     // _scopeMode stays undefined until a sweep carries one, so the badge is
-    // drawn only when a mode is actually known. CENT is the
-    // mode this panel's axis assumes, so it reads neutral/green; any other mode
-    // is amber to warn that the trace may not line up with the frequency axis.
+    // drawn only when a mode is actually known.
+    //
+    // The axis no longer assumes Centre — it is drawn from the window centre the
+    // sweep header reports (see _viewCentreHz) — so amber is no longer a
+    // "the scale may be wrong" caution. Fixed mode was checked against an
+    // IC-7300 MkII on 2026-08-13: on 20 m the radio reported 14.000–14.350 and
+    // the trace, axis, band-plan markers and DX spots all lined up. Amber now
+    // just distinguishes the mode at a glance; the two scroll modes share it
+    // because they decode through the same lower/upper-edge path.
     _drawScopeModeBadge(ctx) {
         const mode = this._scopeMode;
         if (!mode) { this._scopeModeBadgeRect = null; return; }
@@ -1205,10 +1257,10 @@ export class SpectrumPanel {
     // multiple spots fall within ~50 px of each other their labels are
     // staggered vertically so they don't overlap.
     _drawSpots(ctx, W, specH) {
-        if (!this._spots.length || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        if (!this._spots.length || this._lastSpanHz <= 0 || this._viewCentreHz() <= 0) return;
 
-        const leftHz  = this._vfoHz - this._lastSpanHz / 2;
-        const rightHz = this._vfoHz + this._lastSpanHz / 2;
+        const leftHz  = this._viewLeftHz();
+        const rightHz = leftHz + this._lastSpanHz;
         // When the user has ticked "Show only watched callsigns" in the DX
         // Watch popup, hide every spot that isn't flagged isWatched. The flag
         // is set by DxClusterService on the backend, so we just respect it.
@@ -1345,7 +1397,8 @@ export class SpectrumPanel {
         // readable at a glance. Confined to the trace area (above the axis strip).
         this._drawDbScale(ctx, W, H, dbMin, dbMax, range, dbStep);
 
-        // Centre frequency label
+        // VFO frequency readout. Centred text, not a position marker — in Fixed
+        // mode the VFO is wherever the marker line on the axis says it is.
         if (this._vfoHz > 0) {
             const label = (this._vfoHz / 1e6).toFixed(6) + ' MHz';
             ctx.font      = '12px monospace';
@@ -1416,22 +1469,34 @@ export class SpectrumPanel {
         ctx.fillStyle = '#111118';
         ctx.fillRect(0, tickY0, W, axisH);
 
-        // VFO centre marker line (drawn first, behind labels)
-        ctx.strokeStyle = 'rgba(0, 170, 255, 0.4)';
-        ctx.lineWidth   = 1;
-        ctx.beginPath();
-        ctx.moveTo(W / 2, 0);
-        ctx.lineTo(W / 2, tickY0);
-        ctx.stroke();
-
         // Only skip labels when FrequencyA has never been set (C# long default = 0).
         // Any non-zero persisted frequency is treated as valid; FTdx101MP range is 30 kHz–75 MHz.
-        if (this._vfoHz <= 0) {
+        if (this._viewCentreHz() <= 0) {
             ctx.fillStyle = '#667799';
             ctx.font = '10px monospace';
             ctx.textAlign = 'center';
             ctx.fillText('No VFO frequency available', W / 2, labelY);
             return;
+        }
+
+        // First tick at the next multiple of stepHz above the left edge. The
+        // window's own centre, not the VFO — see _viewCentreHz.
+        const leftHz = this._viewLeftHz(spanHz);
+
+        // VFO marker line (drawn first, behind labels), at the VFO's real
+        // position in the window. In Centre mode that is the middle of the
+        // canvas; in Fixed mode it travels as the operator tunes, which is the
+        // whole point of Fixed. Skipped when the VFO is outside the window.
+        if (this._vfoHz > 0 && spanHz > 0) {
+            const vfoX = ((this._vfoHz - leftHz) / spanHz) * W;
+            if (vfoX >= 0 && vfoX <= W) {
+                ctx.strokeStyle = 'rgba(0, 170, 255, 0.4)';
+                ctx.lineWidth   = 1;
+                ctx.beginPath();
+                ctx.moveTo(vfoX, 0);
+                ctx.lineTo(vfoX, tickY0);
+                ctx.stroke();
+            }
         }
 
         // Choose a "nice" tick interval that gives roughly 6–12 ticks across the span.
@@ -1440,8 +1505,6 @@ export class SpectrumPanel {
         const targetTicks = 8;
         const stepHz = steps.find(s => spanHz / s <= targetTicks) ?? steps[steps.length - 1];
 
-        // First tick at the next multiple of stepHz above the left edge
-        const leftHz  = this._vfoHz - spanHz / 2;
         const firstHz = Math.ceil(leftHz / stepHz) * stepHz;
 
         // Frequency-axis tick label font: bumped from 10px → 13px for
@@ -1478,7 +1541,7 @@ export class SpectrumPanel {
     // ── Crosshair overlay ────────────────────────────────────────────────────
 
     _drawCrosshair(ctx, W, specH, spanHz) {
-        if (this._crosshairX === null || this._lastSpanHz <= 0 || this._vfoHz <= 0) return;
+        if (this._crosshairX === null || this._lastSpanHz <= 0 || this._viewCentreHz() <= 0) return;
 
         const x = this._crosshairX;
         const y = this._crosshairY;
@@ -1506,7 +1569,7 @@ export class SpectrumPanel {
         ctx.setLineDash([]);
 
         // Frequency at cursor
-        const leftHz  = this._vfoHz - spanHz / 2;
+        const leftHz  = this._viewLeftHz(spanHz);
         const freqHz  = leftHz + (x / W) * spanHz;
         const label   = (freqHz / 1e6).toFixed(6) + ' MHz';
 

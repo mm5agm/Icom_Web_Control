@@ -399,15 +399,31 @@ namespace Icom_Web_Control.Services
             return Task.CompletedTask;
         }
 
-        // Scope mode (CI-V 27 14, canned) — the fake sweep is always centred
-        // geometrically, but the emitted frames DO report the requested mode
-        // (see the "CENT"/"FIX" in the scope loop), so the panel's Centre/Fixed
-        // button and badge can be exercised without a radio.
+        // Scope mode (CI-V 27 14, canned). The emitted frames report the
+        // requested mode, so the panel's Centre/Fixed button and badge can be
+        // exercised without a radio.
+        //
+        // Fixed mode is modelled properly rather than faked, because the whole
+        // point of Fixed is that the window does NOT move with the VFO: the
+        // centre is latched when Fixed is selected and stays put while the
+        // operator tunes. That is what makes the frontend's Hz→x geometry
+        // testable on the stub — in Centre mode centreHz == the VFO and a panel
+        // that wrongly assumes it looks perfectly correct.
         private bool _scopeCenter = true;
         private volatile bool _scopeEnabled = true;
+        private long _fixedCentreA;
+        private long _fixedCentreB;
 
         public Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default)
         {
+            // Latch on the transition into Fixed so repeated "set Fixed" calls
+            // (EnableScopeAsync asserts the mode on every scope-on) don't drag
+            // the window back onto the VFO.
+            if (_scopeCenter && !center)
+            {
+                _fixedCentreA = _freqA;
+                _fixedCentreB = _freqB;
+            }
             _scopeCenter = center;
             return Task.CompletedTask;
         }
@@ -567,12 +583,17 @@ namespace Icom_Web_Control.Services
                     FillCannedSpectrum(_binsA, phase);
                     FillCannedSpectrum(_binsB, phase * 1.1 + 0.5);
                     string mode = _scopeCenter ? "CENT" : "FIX";
+                    // Centre mode follows the VFO; Fixed mode stays where it was
+                    // latched (falling back to the VFO if Fixed was restored from
+                    // settings before a frequency was known).
+                    long centreA = _scopeCenter ? _freqA : (_fixedCentreA > 0 ? _fixedCentreA : _freqA);
+                    long centreB = _scopeCenter ? _freqB : (_fixedCentreB > 0 ? _fixedCentreB : _freqB);
                     try
                     {
                         await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
-                            new { sdrId = "A", bins = _binsA, centreHz = _freqA, spanHz = _scopeSpanHz * 2, mode }, stoppingToken);
+                            new { sdrId = "A", bins = _binsA, centreHz = centreA, spanHz = _scopeSpanHz * 2, mode }, stoppingToken);
                         await _hubContext.Clients.All.SendAsync("SpectrumUpdate",
-                            new { sdrId = "B", bins = _binsB, centreHz = _freqB, spanHz = _scopeSpanHz * 2, mode }, stoppingToken);
+                            new { sdrId = "B", bins = _binsB, centreHz = centreB, spanHz = _scopeSpanHz * 2, mode }, stoppingToken);
                         bool requested = Interlocked.Exchange(ref _announceScopeStatus, 0) == 1;
                         if (_scopeFrame++ % 6 == 0 || requested)
                         {
