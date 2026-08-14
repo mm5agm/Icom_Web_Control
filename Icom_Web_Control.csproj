@@ -41,7 +41,7 @@
   <!-- Radio-agnostic code shared with Yaesu Web Control. Pulled in as a git
        subtree, NOT a submodule, so a plain `git clone` of this repository still
        builds with no extra steps. See core/README.md for the subtree commands
-       and docs/design/shared-core-plan.md for why any of this exists. -->
+       and core/docs/design/shared-core-plan.md for why any of this exists. -->
   <ItemGroup>
     <ProjectReference Include="core\RadioWebControl.Core.csproj" />
   </ItemGroup>
