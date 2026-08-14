@@ -49,25 +49,69 @@ acting on this — it is a snapshot, and YWC is moving this week.
 ## 2. The boundary draws itself
 
 The 36 identical files are not a random scatter. Every one of them is code that
-**never touches the radio**:
+**never touches the radio** — so every one is eligible for `core/`, and Phase 3
+(see §7) moves them **on touch**: when you next edit one for its own reason, move
+it into `core/` as part of that same, already-tested change. Do **not** batch
+these.
 
-```
-Controllers/   DxClusterController, MemoryBankController
-Models/        DxSpot, VoicePackMetadata, Calibration/{CalibrationFile, MeterCalibration}
-Pages/         Calibrations, Diagnostics, Error, Labels, Memories, UserManual,
-               Calibration/{MeterCalibration, SMeterCalibration}, Shared/_BandButtonsPartial
-Services/      AdifParser, AppMemory, AppStatus, DxClusterService, MemoryService,
-               MemoryBankService, ProcessStatusCacheService, RadioStatePersistenceService,
-               SystemTrayService, IRadioStateService, ISettingsService,
-               Voice/{AudioOutput, VoiceTtsService}
-wwwroot/js/    calibration/calibration-engine, guages/{meter-gauge, smeter-history-panel,
-               update-engine}, ui/{calibration-editor, freq-keyboard},
-               websocket/{ws-connection, ws-update-pipeline}
-```
+This is the live checklist — the single source of truth for what's left. Tick a
+box when a file lands in core; don't scatter "move me" markers across the files
+themselves. **✅ = moved · ☐ = still local, move on next touch.**
+
+**Controllers/**
+- [ ] `DxClusterController`
+- [ ] `MemoryBankController`
+
+**Models/**
+- [x] `DxSpot` — Phase 1
+- [ ] `VoicePackMetadata`
+- [ ] `Calibration/CalibrationFile`
+- [ ] `Calibration/MeterCalibration`
+
+**Pages/**
+- [ ] `Calibrations`
+- [ ] `Diagnostics`
+- [ ] `Error`
+- [ ] `Labels`
+- [ ] `Memories`
+- [ ] `UserManual`
+- [ ] `Calibration/MeterCalibration`
+- [ ] `Calibration/SMeterCalibration`
+- [ ] `Shared/_BandButtonsPartial`
+
+**Services/**
+- [x] `AdifParser` — Phase 2
+- [ ] `AppMemory`
+- [ ] `AppStatus`
+- [ ] `DxClusterService`
+- [ ] `MemoryService`
+- [ ] `MemoryBankService`
+- [ ] `ProcessStatusCacheService`
+- [ ] `RadioStatePersistenceService`
+- [ ] `SystemTrayService`
+- [ ] `IRadioStateService`
+- [ ] `ISettingsService`
+- [ ] `Voice/AudioOutput`
+- [ ] `Voice/VoiceTtsService`
+
+**wwwroot/js/**
+- [x] `calibration/calibration-engine` — Phase 2
+- [ ] `guages/meter-gauge`
+- [ ] `guages/smeter-history-panel`
+- [ ] `guages/update-engine`
+- [ ] `ui/calibration-editor`
+- [ ] `ui/freq-keyboard`
+- [ ] `websocket/ws-connection`
+- [ ] `websocket/ws-update-pipeline`
 
 DX cluster, memories, ADIF, calibration maths, the meter gauges, the SignalR
 transport, the tray icon, text-to-speech. **That is the shared core, and it did
 not need designing — the measurement found it.**
+
+> These 36 all sit *above* the radio seam. The other ~24 "middling" files that
+> *do* touch the radio are **not** on this list — they are gated behind Phase 5
+> (the `IRadioController` back-port, §3), and must not be moved on touch until
+> that lands.
 
 ## 3. The blocker: YWC has no radio seam
 
