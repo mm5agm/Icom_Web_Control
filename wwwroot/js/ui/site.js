@@ -3485,15 +3485,29 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function _isNewer(latest, current) {
-        const parse = v => v.split('.').map(n => parseInt(n, 10) || 0);
-        const a = parse(latest);
-        const b = parse(current);
-        for (let i = 0; i < Math.max(a.length, b.length); i++) {
-            const diff = (a[i] || 0) - (b[i] || 0);
+        // Versions may carry a pre-release suffix ("1.0.6-pre4"). Split it off
+        // before comparing: parseInt reads "6-pre4" as plain 6, which would make
+        // a pre-release compare EQUAL to the full release of the same number, so
+        // a tester sitting on 1.0.6-pre4 would never be told that 1.0.6 itself
+        // had shipped — the one group of users who most need to be moved on.
+        const split = v => {
+            const s = String(v);
+            const i = s.indexOf('-');
+            return {
+                n:   (i < 0 ? s : s.slice(0, i)).split('.').map(x => parseInt(x, 10) || 0),
+                pre: i < 0 ? '' : s.slice(i + 1)
+            };
+        };
+        const a = split(latest);
+        const b = split(current);
+        for (let i = 0; i < Math.max(a.n.length, b.n.length); i++) {
+            const diff = (a.n[i] || 0) - (b.n[i] || 0);
             if (diff > 0) return true;
             if (diff < 0) return false;
         }
-        return false;
+        // Identical numbers: semver's rule — a pre-release sorts below the
+        // release it leads to, so 1.0.6 is an upgrade from 1.0.6-pre4.
+        return a.pre === '' && b.pre !== '';
     }
 
     function _dismiss(version) {

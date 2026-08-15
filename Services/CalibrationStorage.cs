@@ -285,7 +285,7 @@ public class CalibrationStorage
         CalibrationContributionsStore.RememberPlaceholders(store, current);
         var contribution = incoming is null
             ? null
-            : CalibrationContributionsStore.Record(store, incoming, meta, AppVersion.Current);
+            : CalibrationContributionsStore.Record(store, incoming, meta, AppVersion.Display);
         var agg = CalibrationContributionsStore.Recompute(store, current);
 
         var updated = new List<string>();

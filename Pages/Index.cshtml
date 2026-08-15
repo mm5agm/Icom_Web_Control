@@ -1910,17 +1910,25 @@
         window.iwcVoiceNudgeStepHzA = @Model.VoiceNudgeStepHzA;
         window.iwcVoiceNudgeStepHzB = @Model.VoiceNudgeStepHzB;
     </script>
+    @* ?v= is the app version, not a hand-kept number.
+       These used to carry counters that had to be bumped by hand whenever the
+       module changed, and v1.0.6 proved that does not work: spectrum-panel.js
+       gained the Fixed-mode fix and sat on ?v=7 regardless, so upgrading users
+       kept running the old file. Tying the query to the version means every
+       release busts every module once, for free, and there is nothing left to
+       forget. Program.cs also sends no-cache on static files, which is the
+       belt to this pair of braces. *@
     <script type="module">
-        import { MeterPanel }           from "/js/guages/meter-panel.js?v=1";
-        import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";
-        import { Ic7300Meters }         from "/js/orchestrators/Ic7300Meters.js?v=1";
-        import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
-        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=7";
-        import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, nearestBandForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=8";
-        import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
-        import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
-        import { initMemoriesPanel }   from "/js/ui/memories.js?v=10";
-        import { DxSpotsPanel }         from "/js/ui/dx-spots-panel.js?v=1";
+        import { MeterPanel }           from "/js/guages/meter-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { Ic7300Meters }         from "/js/orchestrators/Ic7300Meters.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, nearestBandForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { loadLabels }           from "/js/ui/a11y-labels.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { initMemoriesPanel }   from "/js/ui/memories.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { DxSpotsPanel }         from "/js/ui/dx-spots-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         window.getBandSegmentForHz = segmentForHz;
