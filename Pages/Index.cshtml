@@ -418,25 +418,25 @@
                             </div>
                         }
                         <!-- SWR Meter -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="swrMeterCanvas" role="img" aria-hidden="true" aria-label="SWR meter" data-a11y-key="meters.swr"></canvas>
                             </div>
                         </div>
                         <!-- Power Meter -->
-                        <div class="text-center power-meter-container" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter power-meter-container" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="powerMeterCanvas" role="img" aria-hidden="true" aria-label="Power output meter" data-a11y-key="meters.power"></canvas>
                             </div>
                         </div>
                         <!-- Compression Meter -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="compressionMeterCanvas" role="img" aria-hidden="true" aria-label="Compression meter" data-a11y-key="meters.compression"></canvas>
                             </div>
                         </div>
                         <!-- ALC Meter -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="alcMeterCanvas" role="img" aria-hidden="true" aria-label="ALC meter" data-a11y-key="meters.alc"></canvas>
                             </div>
@@ -444,12 +444,17 @@
                         @* IC-7300 reports Id (drain current) and Vd (PA supply) over CI-V, but
                            has NO temperature meter over CI-V — the inherited PA-temp gauge is dropped. *@
                         <!-- IDD Meter — drain current (CI-V 15 16) -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="iddMeterCanvas" role="img" aria-hidden="true" aria-label="Drain current meter" data-a11y-key="meters.idd"></canvas>
                             </div>
                         </div>
-                        <!-- VDD Meter — PA supply voltage (CI-V 15 15) -->
+                        @* VDD Meter — PA supply voltage (CI-V 15 15).
+                           NOT marked tx-only-meter, unlike the five above it: the
+                           poll loop reads Vd in both states (idle rail on RX,
+                           sagging under load on TX) and never zeroes it, so it is
+                           a live gauge on receive and dimming it would fade a
+                           reading the operator can still use. *@
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="vddMeterCanvas" role="img" aria-hidden="true" aria-label="Amplifier supply voltage meter" data-a11y-key="meters.vdd"></canvas>

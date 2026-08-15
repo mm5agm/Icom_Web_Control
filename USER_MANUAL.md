@@ -286,6 +286,8 @@ The IC-7300 has **no PA temperature meter over CI-V**, so there is no Temp gauge
 
 All meters update in real time at approximately 10 times per second. The TX meters automatically read zero when the radio is receiving; the S-meter is always live and is zeroed while transmitting (it has no meaning on transmit).
 
+**The transmit meters dim when you are not transmitting.** Power, SWR, ALC, Compression and Id fade back to about half strength on receive and come up to full the moment you key the radio, so the meter row is not competing for your attention with five needles that are reading nothing. They stay exactly where they are — dimmed, not hidden — so nothing on the page moves when you transmit, and the gauges remain in the same place for a screen reader and for voice control. The S-meter is unaffected, and so is **Vd**: the radio reports the PA supply voltage on receive as well as transmit, so that gauge stays at full strength throughout.
+
 The meter scales are calibrated to show meaningful units rather than raw CI-V values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your radio.
 
 **S-meter history strip.** A small 30-second strip-chart sits to the left of the S-meter gauge in the top meter row. It is shown by default; click the **S-hist** button in the top toolbar to hide it, and again to bring it back. The choice is remembered between sessions, so if you have previously turned the strip off it stays off. The strip shows three things at once:

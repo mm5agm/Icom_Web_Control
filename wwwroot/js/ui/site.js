@@ -373,6 +373,12 @@ function updateTxIndicators(isTransmitting) {
     if (window.ic7300Meters) {
         window.ic7300Meters.setTransmitting(isTransmitting);
     }
+    // Drives the TX-only meters (SWR, Power, Compression, ALC, Idd, Vdd) between
+    // dimmed and full strength — see .tx-only-meter in site.css for why they are
+    // dimmed rather than hidden. A class on <body> rather than per-element work
+    // because the meters are drawn on canvas: one class toggle is one style
+    // recalculation, where touching six elements on every PTT is six.
+    document.body.classList.toggle('iwc-transmitting', !!isTransmitting);
     if (!isTransmitting) {
         // Force gauges to zero immediately when TX stops
         if (window.meterPanel) {
