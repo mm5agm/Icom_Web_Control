@@ -27,6 +27,35 @@
 .analog-meter-container {
     position: relative;
 }
+/* TX-only meters: dimmed on receive, full strength on transmit.
+   ---------------------------------------------------------------------------
+   SWR, Power, Compression, ALC and Idd only read anything while you are
+   transmitting; on receive they sit at zero and pull the eye for nothing.
+
+   DIMMED, deliberately, rather than hidden. Hiding them (display:none) would
+   collapse the meter row and drop everything below it up the page on every
+   press of PTT, and back down on release — and this app is used by operators
+   who have zoomed in to read it, for whom a page that rearranges itself
+   mid-transmission is far worse than five idle dials. Dimming leaves every
+   gauge exactly where the eye, a screen reader and the voice control expect
+   to find it, and nothing moves.
+
+   Opacity only: no display, visibility or size change, so layout is identical
+   in both states. The default (no body class) is the dimmed one, which is
+   correct for a page that has just loaded on receive. */
+.tx-only-meter {
+    opacity: 0.45;
+    transition: opacity 150ms ease-in-out;
+}
+body.iwc-transmitting .tx-only-meter {
+    opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+    .tx-only-meter {
+        transition: none;
+    }
+}
+
 /* Outline for gauge containers */
 .gauge-outline {
     border: 6px solid magenta !important;
