@@ -21,7 +21,14 @@
    up often enough that it should be readable without knowing to look. *@
 <div class="card mb-2">
     <div class="card-body py-2">
-        <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2">
+        @* The rate sits immediately after the heading, so the panel reads as one
+           phrase: "Band scope delivery  4.1 sweeps/sec". It was previously pushed
+           to the far right by justify-content-between, which put a column of
+           whitespace between the label and the number it belongs to -- easy to
+           read straight past, and worse the wider the window. Steve reported the
+           figure as missing and Colin read the panel out without it; both were
+           looking at a number that was there. *@
+        <div class="d-flex align-items-baseline flex-wrap gap-2">
             <span class="fw-semibold">Band scope delivery</span>
             <span id="diag-scope-rate" class="fs-5 fw-semibold font-monospace">&mdash;</span>
         </div>
