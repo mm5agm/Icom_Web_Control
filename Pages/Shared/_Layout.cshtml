@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Language" content="en">
     <meta name="language" content="en">
-    <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Current">
+    <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Display">
     <title>@(ViewData["Title"]?.ToString() == "Icom Web Control" ? "Icom Web Control" : ViewData["Title"] + " - Icom Web Control")</title>
     <script type="importmap">{}</script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
@@ -27,7 +27,7 @@
     <!-- Calibration engine — exposes window.calibrationEngine for site.js -->
     <!-- v=15: bump this when calibration-engine.js or calibration-tables.js changes -->
     <script type="module">
-        import { calibrateNumeric, calibrateSMeterLabel, calibrateSMeterForGauge, loadFromBackend } from '/js/calibration/calibration-engine.js?v=15';
+        import { calibrateNumeric, calibrateSMeterLabel, calibrateSMeterForGauge, loadFromBackend } from '/js/calibration/calibration-engine.js?v=@Icom_Web_Control.AppVersion.Display';
         // Expose immediately with default tables so site.js never gets undefined.
         window.calibrationEngine = { calibrateNumeric, calibrateSMeterLabel, calibrateSMeterForGauge };
         // S-Meter calibration drives BOTH the gauge needle position (SMETER
@@ -44,7 +44,7 @@
 
     <!-- Meter formatters — exposes window.MeterFormatters for site.js -->
     <script type="module">
-        import { MeterFormatters } from '/js/ui/meter-formatters.js?v=8';
+        import { MeterFormatters } from '/js/ui/meter-formatters.js?v=@Icom_Web_Control.AppVersion.Display';
         window.MeterFormatters = MeterFormatters;
     </script>
 </head>
@@ -59,7 +59,7 @@
     <header class="sticky-top bg-white" @(((string?)ViewData["BodyRole"] == "application") ? Html.Raw("aria-hidden=\"true\"") : Html.Raw(""))>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow" style="padding-top: 0; padding-bottom: 0; margin-bottom: 2px; min-height: 0;">
             <div class="container-fluid px-3">
-                <a class="navbar-brand" asp-area="" asp-page="/Index" data-a11y-key="nav.brand" aria-label="Icom Web Control home">Icom Web Control <small class="text-muted fw-normal" style="font-size: 0.6em;">v@(AppVersion.Current) &copy; @DateTime.Now.Year</small></a>
+                <a class="navbar-brand" asp-area="" asp-page="/Index" data-a11y-key="nav.brand" aria-label="Icom Web Control home">Icom Web Control <small class="text-muted fw-normal" style="font-size: 0.6em;">v@(AppVersion.Display) &copy; @DateTime.Now.Year</small></a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>

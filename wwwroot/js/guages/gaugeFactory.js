@@ -2,7 +2,14 @@
 // Creates gauge instances based on a type string.
 // No layout logic, no DOM queries, no calibration logic.
 
-import { SMeterGauge, PowerGauge, SWRGauge, ALCGauge, CompressionGauge, IDDGauge, VDDGauge } from './gauge.js';
+// ?v=1 is a one-time cache flush, not a counter to maintain.
+// A module imported from inside another module never passes through Razor, so
+// this URL carried no version at all — and gauge.js is where the Firefox meter
+// needle fix lives, which meant that fix could not reach an upgrading browser
+// at any point. Program.cs now sends no-cache on static files so revalidation
+// handles every future change; this query only exists to shift the copies that
+// were already cached before that header existed. Do not bump it.
+import { SMeterGauge, PowerGauge, SWRGauge, ALCGauge, CompressionGauge, IDDGauge, VDDGauge } from './gauge.js?v=1';
 
 // Registry of gauge constructors.
 // Add new meter types here as your UI grows.

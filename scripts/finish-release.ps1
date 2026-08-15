@@ -276,8 +276,33 @@ Re-run with -SkipVersionCheck to release without them.
         }
     }
 
+    # --- pre-release suffix, taken from the tag --------------------------
+    # AppVersion.PreRelease is the one version site in *code* this script
+    # writes, and deliberately so: unlike the numeric core it involves no
+    # judgement -- its value is whatever the tag says, every time. Leaving it
+    # to be bumped by hand would only add a sixth thing to forget, and the
+    # cost of forgetting is high: v1.0.6-pre1, -pre2 and -pre3 all reported
+    # themselves as plain "v1.0.6", so a tester could not tell which build
+    # they were running and neither could we when reading their report.
+    $expectedPre = if ($Version -match '^v?[0-9]+\.[0-9]+\.[0-9]+-(.+)$') { $Matches[1] } else { '' }
+    $avPath = Join-Path $RepoRoot 'Models/AppVersion.cs'
+    $avText = [System.IO.File]::ReadAllText($avPath)
+    $preMatch = [regex]::Match($avText, 'PreRelease\s*=\s*"([^"]*)"')
+    if (-not $preMatch.Success) {
+        $mismatches += "Models/AppVersion.cs -- no PreRelease constant found"
+    }
+    elseif ($preMatch.Groups[1].Value -ne $expectedPre) {
+        $wasPre = $preMatch.Groups[1].Value
+        $g = $preMatch.Groups[1]
+        $avText = $avText.Substring(0, $g.Index) + $expectedPre + $avText.Substring($g.Index + $g.Length)
+        Set-FileTextPreservingEncoding -Path $avPath -Text $avText
+        $shownWas = if ($wasPre -eq '') { '(none)' } else { $wasPre }
+        $shownNow = if ($expectedPre -eq '') { '(none)' } else { $expectedPre }
+        $fixed += "Models/AppVersion.cs: pre-release suffix '$shownWas' -> '$shownNow'"
+    }
+
     if ($fixed.Count -gt 0) {
-        Write-Host "Updated the version in the documentation:" -ForegroundColor Green
+        Write-Host "Updated version strings:" -ForegroundColor Green
         $fixed | ForEach-Object { Write-Host "  $_" -ForegroundColor Green }
         Write-Host "  (these are staged with the rest of the pending changes below)" -ForegroundColor DarkGray
     }
