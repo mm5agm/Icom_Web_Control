@@ -493,10 +493,10 @@ namespace Icom_Web_Control.Services
         private bool _atuEnabled = false;
         public bool AtuEnabled { get => _atuEnabled; set => SetField(ref _atuEnabled, value); }
 
-        // ATU auto-tune cycle currently in progress. Driven by P2 of the AC
-        // command's answer/auto-info — radio sets P2=1 while the matching
-        // network is being adjusted, P2=0 when finished. The UI uses this to
-        // grey/animate the ATU button while a tune is running.
+        // ATU auto-tune cycle currently in progress. Driven by the poll loop's
+        // CI-V 1C 01 read, which answers 02 while the matching network is being
+        // adjusted (00 = bypassed, 01 = in line). The UI uses this to show
+        // "Tuning…" on the ATU button and "Stop" on the Tune button beside it.
         private bool _atuTuning = false;
         public bool AtuTuning { get => _atuTuning; set => SetField(ref _atuTuning, value); }
 

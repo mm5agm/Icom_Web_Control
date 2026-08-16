@@ -20,7 +20,7 @@ namespace Icom_Web_Control.Pages
         }
 
         // Surfaced to the view for the Diagnostics block.
-        public string Version           { get; private set; } = AppVersion.Current;
+        public string Version           { get; private set; } = AppVersion.Display;
         public string ReleaseDate       { get; private set; } = AppVersion.ReleaseDate;
         public string RadioModel        { get; private set; } = "—";
         public string BandPlan          { get; private set; } = "—";
@@ -70,7 +70,13 @@ namespace Icom_Web_Control.Pages
                     : age is null
                         ? $"on, but NO sweep has ever arrived (discarded {scope.SweepsDiscarded})"
                         : $"on, {scope.SweepsCompleted} sweeps / {scope.SweepsDiscarded} discarded, " +
-                          $"last {age:0.0}s ago";
+                          $"last {age:0.0}s ago" +
+                          // The delivery rate belongs in a pasted bug report as much as
+                          // the drop count: "the waterfall misses CW" and "the waterfall
+                          // stutters" look identical in the counts and differ here.
+                          (scope.SweepsPerSecond is { } rate
+                              ? $", {rate:0.0} sweeps/sec"
+                              : "");
             if (s.DxClusterEnabled && !string.IsNullOrWhiteSpace(s.DxClusterHost))
                 DxClusterHost = $"{s.DxClusterHost}:{s.DxClusterPort}";
             if (!string.IsNullOrWhiteSpace(s.DxClusterLoginCallsign))

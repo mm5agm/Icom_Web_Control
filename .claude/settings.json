@@ -5,5 +5,20 @@
       "PowerShell",
       "WebFetch"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "timeout": 30,
+            "statusMessage": "Checking GitHub for new issues and discussions...",
+            "command": "$d = $env:CLAUDE_PROJECT_DIR; if (-not $d) { $d = $PWD.Path }; $s = Join-Path $d 'scripts\\session-status.ps1'; if (Test-Path $s) { & $s }"
+          }
+        ]
+      }
+    ]
   }
 }

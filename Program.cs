@@ -225,7 +225,7 @@ Log.Logger = new LoggerConfiguration()
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"))
     .CreateLogger();
 
-Log.Information("Icom Web Control starting (v{Version})", Icom_Web_Control.AppVersion.Current);
+Log.Information("Icom Web Control starting (v{Version})", Icom_Web_Control.AppVersion.Display);
 
 // Raise the thread-pool floor so cold start doesn't bottleneck on the pool's
 // ~1/sec starvation-recovery thread injection. Startup fires many concurrent
@@ -442,7 +442,31 @@ try
         app.UseHsts();
     }
 
-    app.UseStaticFiles();
+    // Static files must be REVALIDATED, not trusted from cache.
+    //
+    // Without an explicit Cache-Control, ASP.NET Core sends only Last-Modified
+    // and ETag, which leaves the browser free to apply heuristic freshness —
+    // commonly a tenth of the file's age. A file that was already a fortnight
+    // old when the browser cached it therefore stays "fresh" for a day or more,
+    // and the browser will not so much as ask whether it changed.
+    //
+    // Installing a new version over the top replaces the file on disk but does
+    // nothing to that cached copy, so v1.0.6 shipped its two headline fixes —
+    // the Fixed-mode spectrum window and the Firefox meter needles — to users
+    // who carried on running the old JavaScript and saw neither. Ctrl+F5 fixed
+    // it, which is not something an operator should have to know.
+    //
+    // "no-cache" does NOT mean "do not store": the browser keeps the file and
+    // revalidates it, so an unchanged file costs one conditional GET answered
+    // with a 304 and no body. On a localhost or LAN app that is free, and it is
+    // the price of never shipping a fix that fails to arrive.
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = ctx =>
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-cache, must-revalidate";
+        }
+    });
     var picturesPath = System.IO.Path.Combine(app.Environment.ContentRootPath, "pictures");
     if (System.IO.Directory.Exists(picturesPath))
     {

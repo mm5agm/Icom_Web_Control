@@ -26,6 +26,24 @@
     <Content Remove="BenchmarkSuite1\**" />
     <EmbeddedResource Remove="BenchmarkSuite1\**" />
     <None Remove="BenchmarkSuite1\**" />
+    <!-- core/ is the Radio_Web_Control_Core git subtree and is its own .csproj
+         (ProjectReference below). The Web SDK globs **/*.cs, so without this
+         removal every file in there is compiled TWICE — once into
+         RadioWebControl.Core.dll and once straight into this assembly — which
+         surfaces as duplicate-type errors rather than as anything that names
+         the real cause. -->
+    <Compile Remove="core\**" />
+    <Content Remove="core\**" />
+    <EmbeddedResource Remove="core\**" />
+    <None Remove="core\**" />
+  </ItemGroup>
+
+  <!-- Radio-agnostic code shared with Yaesu Web Control. Pulled in as a git
+       subtree, NOT a submodule, so a plain `git clone` of this repository still
+       builds with no extra steps. See core/README.md for the subtree commands
+       and core/docs/design/shared-core-plan.md for why any of this exists. -->
+  <ItemGroup>
+    <ProjectReference Include="core\RadioWebControl.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -81,9 +99,9 @@
   <PropertyGroup>
     <!-- Fresh IWC version line starting at 1.0.0; keep in step with Models/AppVersion.cs.
          AssemblyVersion/FileVersion must stay numeric; Version carries any label. -->
-    <Version>1.0.5</Version>
-    <FileVersion>1.0.5.0</FileVersion>
-    <AssemblyVersion>1.0.5.0</AssemblyVersion>
+    <Version>1.0.6</Version>
+    <FileVersion>1.0.6.0</FileVersion>
+    <AssemblyVersion>1.0.6.0</AssemblyVersion>
     <AssemblyTitle>Icom Web Control</AssemblyTitle>
     <Product>Icom Web Control</Product>
     <Description>Browser-based CI-V controller for Icom HF transceivers</Description>
@@ -121,6 +139,31 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <!-- Shared browser modules from the Radio_Web_Control_Core subtree (core/js).
+       The engine is authored once in core/js and copied into wwwroot at build
+       time; the copies are git-ignored so core/js stays the single source of
+       truth (see core/js/README.md). Runs before AssignTargetPaths so the
+       freshly-copied files are first-class Content THIS build, not next build:
+       EnableDefaultContentItems is false and the wwwroot glob above is evaluated
+       before any target runs, so on a clean checkout the file is absent when the
+       glob is computed and would 404 until a second build. Exclude="@(Content)"
+       drops anything that glob already found on a later build, so we never add a
+       duplicate Content item. -->
+  <Target Name="CopySharedCoreJs" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_SharedCoreJs Include="core\js\**\*.js" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SharedCoreJs)"
+          DestinationFiles="@(_SharedCoreJs->'wwwroot\js\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Include="@(_SharedCoreJs->'wwwroot\js\%(RecursiveDir)%(Filename)%(Extension)')"
+               Exclude="@(Content)">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
 
 </Project>
 

@@ -1,6 +1,16 @@
 # Icom Web Control (IWC) — Clone-and-Split Plan
 
-**Status:** design agreed, not yet started. Trigger to begin = I have the IC-7300 MkII in hand and say go.
+**Status (2026-08-13):** **Phases 0–5 are built and shipped.** IWC v1.0.0 released
+2026-08-01 and the app controls the radio end-to-end. **Phase 6 (CW decode),
+Phase 7 (skins) and Phase 8 (settings backup/restore) are still open**, and their
+sections below are unbuilt design as written.
+
+Everything above the "Phase 5" heading is therefore a **record of what was
+built**, not a proposal. Where the as-built differs from what was planned it is
+noted in place — read those notes before treating any paragraph here as a
+specification. The original status line read *"design agreed, not yet started"*;
+it stayed that way through the whole build, which is what made this document
+look like an untouched plan long after it had been delivered.
 **Target radio (v1):** Icom **IC-7300 MkII**, CI-V over USB Type-C (`FE FE` … `FD`, default radio address **`0xB6`**, controller `0xE0`).
 **End goal:** full feature parity with YWC *wherever the Icom radio supports the feature* — including **voice control**, which is required — it is how partially-sighted operators drive the app.
 
@@ -123,8 +133,8 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 3. ✅ S-meter (`15 02`, big-endian BCD) → existing gauge; poll loop restructured (freq=liveness every loop, S-meter every loop, mode every 3rd), 150 ms interval, SignalR push for smooth needle
 4. ✅ PTT / TX status, power/SWR meters (`1C 00`, `15 11`/`15 12`) — software PTT (web + API + voice), Po/SWR gauges rise on TX / zero on RX; hardware-verified into dummy load
 5. ✅ Band/VFO select, split — VFO-select (`07 00`/`07 01`), exchange (`07 B0`), equalize (`07 A0`), split read/set (`0F`), plus **true per-VFO readout** via `25` (selected/unselected freq) and `26` (selected/unselected mode+DATA+filter in one frame). Note: `25`/`26` address *selected/unselected*, not A/B — track `ActiveVfo` from our own `07` sends (front-panel A/B presses are a known desync). (MM5AGM chose full per-VFO scope over active-VFO-only.)
-6. Scope waveform stream (`27 00`, 475 bins, 11 USB segments reassembled) → existing `SpectrumPanel` — **no SDRplay needed**. (Later: switch the feed to the rear LAN port for a faster, single-segment 490-bin stream — no protocol rewrite, just skip reassembly.)
-7. **Radio power on/off (`18`)** — MM5AGM request. `18 00` = OFF (plain frame); `18 01` = ON but the CI-V circuit is asleep, so it must be prefixed with a baud-dependent burst of wake-up `FE` bytes (**19200 → 25 × `FE`**, 9600 → 13, 4800 → 7) before `FE FE B6 E0 18 01 FD`. **Gotcha:** remote power-on only works if USB stayed enumerated while "off" (soft shutdown via `18 00`/standby) — a front-panel power-off that drops USB removes the COM port, leaving nothing to send `18 01` to. Related menu `01 09` "Power OFF Setting (for Remote Control)". Seam: one `SetPowerAsync(bool)` method + a UI power button (accessibility/remote-op win). Small block; independent of the others.
+6. ✅ Scope waveform stream (`27 00`, 475 bins, 11 USB segments reassembled) → existing `SpectrumPanel` — **no SDRplay needed**. (Later: switch the feed to the rear LAN port for a faster, single-segment 490-bin stream — no protocol rewrite, just skip reassembly. Still open, and now measured: the USB segment pacing caps delivery at ~4 sweeps/sec against ~30 over LAN — see `docs/design/lan-civ-transport-plan.md`.)
+7. ✅ **Radio power on/off (`18`)** — MM5AGM request. `18 00` = OFF (plain frame); `18 01` = ON but the CI-V circuit is asleep, so it must be prefixed with a baud-dependent burst of wake-up `FE` bytes (**19200 → 25 × `FE`**, 9600 → 13, 4800 → 7) before `FE FE B6 E0 18 01 FD`. **Gotcha:** remote power-on only works if USB stayed enumerated while "off" (soft shutdown via `18 00`/standby) — a front-panel power-off that drops USB removes the COM port, leaving nothing to send `18 01` to. Related menu `01 09` "Power OFF Setting (for Remote Control)". Seam: one `SetPowerAsync(bool)` method + a UI power button (accessibility/remote-op win). Small block; independent of the others.
 
 **RF output power set (`14 0A`)** — separate from the read-back Po *meter* (`15 11`). The web power slider sets the radio's 0–100 % RF level via `14 0A` (two big-endian BCD bytes, 0000–0255; watts map 1:1 to percent on the 100 W IC-7300). Replaces the inherited Yaesu `PCnnn;` ASCII command, which is inert on CI-V. Wired through the seam as `Set/GetRfPowerPercentAsync`; hardware-verified 2026-07-26 (set 25/50/75 W, radio read the same value back).
 
@@ -132,10 +142,12 @@ Everything above the seam — `IntentDispatcher` (voice), `CatController` (touch
 
 > **Finding — no PA temperature over CI-V** (2026-07-26, MM5AGM spotted the front-panel bar; verified against `docs/manuals/IC-7300MK2_ENG_CI-V_0.pdf`): the IC-7300 MkII front panel shows a **COOL→HOT** temperature bar graph (blue→red), **but it is display-only — there is no CI-V command to read it.** The `15`-family meter set is exactly S-meter `02`, Po `11`, SWR `12`, ALC `13`, COMP `14`, Vd `15`, Id `16`; the words "temperature", "thermal", "heat", "fan", "cool" appear **nowhere** in the CI-V reference. So the inherited YWC temperature gauge was correctly dropped for this radio, and a *live* temp gauge is **not achievable** over CI-V. Do not re-open without new evidence (e.g. an undocumented command surfaced by probing the real radio).
 
-**Phase 4 — parity & polish**
-- rigctld verification (WSJT-X), settings/diagnostics rebrand.
-- Then work the PORT-LATER list: calibration UI against Icom tables, per-model capabilities.
-- **Control layout / whitespace pass (MM5AGM request, 2026-07-26).** The home page carries a lot of dead whitespace that could be reclaimed by rearranging controls, and several controls that belong together aren't grouped. Rework the layout so related controls sit together and the screen is used efficiently. Specifics called out:
+**Phase 4 — parity & polish** — ✅ built, **except the layout pass**, which was
+deliberately folded into Phase 7 (a skin *is* a layout, so doing the skin
+discharges it; doing both separately would mean laying the page out twice).
+- ✅ rigctld verification (WSJT-X), settings/diagnostics rebrand.
+- ✅ Then work the PORT-LATER list: calibration UI against Icom tables, per-model capabilities.
+- ⏳ **Control layout / whitespace pass (MM5AGM request, 2026-07-26)** — deferred into Phase 7. The home page carries a lot of dead whitespace that could be reclaimed by rearranging controls, and several controls that belong together aren't grouped. Rework the layout so related controls sit together and the screen is used efficiently. Specifics called out:
   - **Group related controls** — e.g. **NR and NB** together (both noise controls); likewise review AGC/Preamp/ATT and the notch cluster for sensible grouping.
   - **Move Bands left**, and **relocate "Save to Mem"** to free up the space the band buttons need.
   - Reclaim the general whitespace across the panel rather than leaving controls sparse.
@@ -149,7 +161,31 @@ After Phase 1 there's a running app with a hole where the protocol goes. Every p
 
 ---
 
-## Phase 5 (future) — "Pseudo-dual-receiver" via single-RX time-slicing
+## Phase 5 ✅ BUILT — "Pseudo-dual-receiver" via single-RX time-slicing
+
+> **As built, and where it differs from the plan below.** Shipped in
+> `CivRadioController` + `Models/ApplicationSettings.cs`
+> (`PseudoDualReceiverEnabled`, `PseudoDualCrossBandEnabled`,
+> `PseudoDualPeekIntervalSeconds`, `PseudoDualWatchSpanMode`), with the operator
+> documentation at USER_MANUAL §11 ("Two panels — the pseudo-dual receiver") and
+> the Settings row at §13.
+>
+> **The same-band case turned out not to need time-slicing at all** — which is
+> the one substantive departure from this design. When both VFOs sit inside one
+> sweep, the Centre-mode sweep feeds the operating VFO's panel and a window
+> *cropped* from that same sweep feeds the other. No retune, no extra CI-V, no
+> scope-mode churn, and the audio VFO never moves. The plan below reasoned about
+> a snapshot-vs-rapid-alternate trade-off that the crop makes moot; it survives
+> only for the **cross-band** case, which shipped as an opt-in
+> (`PseudoDualCrossBandEnabled`) that briefly retunes the receiver and dips audio
+> ~0.4 s per peek, default interval 15 s. A watch VFO outside the sweep and
+> cross-band watch off simply reports `outofrange` — "Off-screen".
+>
+> So the `WatchMode = Snapshot | RapidAlternate` setting proposed below **was
+> never built**, and neither was the LAN dependency it implied. Do not go looking
+> for either. The remaining unbuilt idea from this section that is still worth
+> having is the **accessibility angle** — an audible cue when the silent watch
+> panel sees activity.
 
 **Depends on:** Phase 3 block 6 (scope). Uses primitives from blocks 1–3 (set freq `05`, set mode `06`/`1A 06`, read S-meter `15 02`) and block 6 (scope `27 00`).
 

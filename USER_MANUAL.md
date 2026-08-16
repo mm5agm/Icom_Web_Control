@@ -65,6 +65,7 @@
     - 15.3 [Why was Alexa voice control dropped in favour of the built-in microphone?](#153-why-was-alexa-voice-control-dropped-in-favour-of-the-built-in-microphone-method)
     - 15.4 [What is the TX button for?](#154-what-is-the-tx-button-for-when-i-press-it-the-radio-goes-into-tx-mode-but-theres-no-audio-from-my-microphone)
     - 15.5 [WSJT-X is very slow to key the radio (long PTT / Tune delay)](#155-wsjt-x-is-very-slow-to-key-the-radio-1020-second-delay-on-ptt--tune)
+    - 15.6 [Can I hear the radio from another room?](#156-can-i-hear-the-radio-from-another-room-i-have-iwc-working-downstairs-but-theres-no-sound)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -157,7 +158,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 2. Click the **Settings** link in the navigation bar.
 3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver.
 4. Set **Serial Port** to the COM port your radio is connected to. This is the USB serial port the IC-7300 presents when you plug in its USB Type-C cable. If you are unsure, go to **Diagnostics → Ports** to see a list of available ports, or check Windows Device Manager.
-5. Set **Baud Rate** to match the radio's **CI-V baud rate**. The IC-7300's default is **19200**. You can verify or change this on the radio under **Menu → Set → Connectors → CI-V → CI-V USB Baud Rate** (Auto works, but a fixed rate is more reliable).
+5. Set **Baud Rate**. Leave it at **19200** on the **IC-7300 MkII** — there is nothing on the radio to match it against. The MkII has no **CI-V USB Baud Rate** menu; the **CI-V Baud Rate** item you will find under **Menu → Set → Connectors → CI-V** governs the round **[REMOTE]** socket only, so it has no bearing on a USB connection and its "Auto" default is not a problem. This box alone decides the rate on a MkII.
    **If you have the original IC-7300 — not the MkII — use 115200.** The original model will not send band scope data at any lower rate, so at 19200 everything works except the spectrum display, which stays permanently empty. On the radio set **CI-V USB Port** to **Unlink from [REMOTE]** and **CI-V USB Baud Rate** to **115200**, then set 115200 here as well. Settings shows a warning if you pick a combination that will not work.
 6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East, includes 4m), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
 7. If you run digital modes (FT8, FT4, RTTY, PSK) via USB audio, see the FAQ (§15) for a one-time radio menu change needed on the radio itself — it's not configurable from IWC.
@@ -219,7 +220,7 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.5**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.6**) are shown in the top-left corner.
 
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 
@@ -285,6 +286,8 @@ The IC-7300 has **no PA temperature meter over CI-V**, so there is no Temp gauge
 
 All meters update in real time at approximately 10 times per second. The TX meters automatically read zero when the radio is receiving; the S-meter is always live and is zeroed while transmitting (it has no meaning on transmit).
 
+**The transmit meters dim when you are not transmitting.** Power, SWR, ALC, Compression and Id fade back to about half strength on receive and come up to full the moment you key the radio, so the meter row is not competing for your attention with five needles that are reading nothing. They stay exactly where they are — dimmed, not hidden — so nothing on the page moves when you transmit, and the gauges remain in the same place for a screen reader and for voice control. The S-meter is unaffected, and so is **Vd**: the radio reports the PA supply voltage on receive as well as transmit, so that gauge stays at full strength throughout.
+
 The meter scales are calibrated to show meaningful units rather than raw CI-V values. See Section 10 (Meter Calibration) if you want to adjust the calibration for your radio.
 
 **S-meter history strip.** A small 30-second strip-chart sits to the left of the S-meter gauge in the top meter row. It is shown by default; click the **S-hist** button in the top toolbar to hide it, and again to bring it back. The choice is remembered between sessions, so if you have previously turned the strip off it stays off. The strip shows three things at once:
@@ -339,6 +342,14 @@ If the scope stops streaming for any other reason — it is off at the radio, or
 
 **Resize spectrum vs waterfall** — Hover the horizontal boundary between the spectrum trace (top) and the waterfall (bottom); the cursor becomes a vertical-resize arrow. Drag up to give the spectrum more vertical room — useful when you're hunting weak signals close to the noise floor. Drag down to give the waterfall more history. The ratio is remembered per VFO across browser reloads, so the next time you open IWC the panel is back the way you left it. Two short grey grip-bars at the centre of the boundary mark the handle; they turn cyan while you're dragging.
 
+**Centre / Fixed** — The button beside **Hold** shows which scope mode the radio is in and switches it. In **Centre** mode the frequency you are tuned to stays in the middle of the screen and the band slides past underneath as you tune; in **Fixed** mode the band stays where it is and your marker moves across it, which is the better view for watching a whole segment. The button carries the mode the radio actually reports — change it on the radio's own screen and the button follows — and it stays greyed out reading *Cent/Fix* until the first sweep arrives, because until then IWC does not know which mode you are in.
+
+**Fixed mode turns the button amber.** That is simply how the two modes are told apart at a glance — it is not a warning. IWC draws the display from the window the radio reports in the sweep itself, so in Fixed mode the trace, the frequency scale, the band-plan markers and any DX spots all line up on the band segment the radio is showing, and your VFO marker moves across it as you tune.
+
+**The VFO marker** — a magenta vertical line marks where VFO A is sitting in the window, with the frequency in a boxed label at the top of the trace. In Centre mode it sits in the middle, because that is where the radio puts it; in Fixed mode it travels across the segment as you tune. Magenta is used because everything else on the panel is already spoken for — the trace and the persistent cursor are blue and cyan, the band-plan markers cyan, the DX spots and the Fixed badge amber, the band-edge guard rails red — so the marker stays findable on a busy sweep. If you tune outside the window the radio is showing (easy to do in Fixed mode), the label parks against the nearer edge of the panel with an arrow pointing the way, so you can always see how far off the display you have gone and in which direction.
+
+**IWC asserts a scope mode when it connects**, which is why the radio may go back to Centre when you start the app or reconnect. Whichever mode you last chose *in IWC* — from this button or from the badge on the canvas — is the one it asserts, and that choice is now remembered between sessions. Choosing a mode on the radio's own screen is not remembered, so if you want Fixed to stick, set it from IWC.
+
 **Hold** — Freezes the spectrum and waterfall on the frame that was on screen when you clicked, so you can study a fleeting signal without it scrolling away — or grab a screenshot of a particular moment. Three things show it is frozen: the button turns amber, the status badge changes to a yellow **Hold**, and a small `HOLD` banner appears in the top-left of the canvas. Click **Hold** again to resume live streaming. Hold affects only what is drawn — the radio keeps sweeping, and frequency, mode and meters carry on updating as normal. The state is per panel, so you can freeze one and leave the other running.
 
 **Persistent cursor — bookmark a frequency** — **Shift-click** anywhere on the panel to drop a persistent cyan cursor at that frequency, with the frequency in a small boxed label beside it. It stays put as you tune around with ordinary clicks, so you can mark a station to come back to. To remove it, **Shift-click on or near it** (within about 10 pixels).
@@ -355,7 +366,7 @@ The three sliders under the panel header shape the display. All three are per-VF
 
 #### The three badges
 
-**Scope mode** (top-left of the canvas) — shows the scope mode the radio is actually in, read from the sweep data itself: **CENT**, **FIX**, **SCROLL-C** or **SCROLL-F**. IWC's frequency axis assumes centre mode, so **CENT** is green — everything lines up. Any other mode is shown in amber as a warning that the trace may not match the frequency axis beneath it. **Click the badge to switch the radio between Centre and Fixed**, which is the quick way back to green if the radio was left in Fixed mode.
+**Scope mode** (top-left of the canvas) — shows the scope mode the radio is actually in, read from the sweep data itself: **CENT**, **FIX**, **SCROLL-C** or **SCROLL-F**. **CENT** is green and the other three are amber, so you can see at a glance whether the display is following your VFO or holding a fixed segment; the frequency axis is correct either way. **Clicking the badge switches the radio between Centre and Fixed** — it does exactly what the **Centre / Fixed** button in the panel header does, so use whichever is nearer. The button is the one to reach for with a keyboard or a screen reader.
 
 **Scope status** (right-hand end of the panel header) — **Scope off** (no sweeps; the scope is switched off, or the radio isn't up yet), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show), or **Scope blocked** (red — the radio understood the request for scope data and refused it; the panel prints the reason and what to change, see §14.2).
 
@@ -651,12 +662,15 @@ The button updates automatically — if the radio is powered off or stops respon
 
 Click the button to toggle the connection. While connecting, it briefly shows "Connecting…". On reconnect the app re-reads all radio settings so the controls reflect the current radio state. Useful if the radio was powered on after the app started, or after a USB cable was unplugged and re-plugged.
 
-**ATU button** — Controls the IC-7300's internal automatic antenna tuner (CI-V `1C 01`). The button matches the radio's front-panel TUNER button's behaviour: short tap and long press do different things.
+**ATU and Tune buttons** — Control the IC-7300's internal automatic antenna tuner (CI-V `1C 01`).
 
-- **Short tap** toggles the ATU between **ATU On** (green) and **ATU Off** (grey). On = the tuner network is engaged in the signal path; Off = bypassed.
-- **Long press (≥500 ms)** starts the radio's auto-tune cycle. The button turns red and shows **Tuning…** while the radio searches for a low-SWR match — typically 2-7 seconds. When tuning completes the button returns to **ATU On** automatically. Tap the red button during a running tune to stop it early. **Because the tune cycle didn't complete, the ATU is left bypassed (Off)** — the radio doesn't retain partial tuning data, so to find a match you'd need to long-press again for a fresh cycle.
+- **ATU** toggles the tuner between **ATU On** (green) and **ATU Off** (grey). On = the tuner network is engaged in the signal path; Off = bypassed.
+- **Tune** starts the radio's auto-tune cycle. The ATU button turns red and shows **Tuning…** while the radio searches for a low-SWR match — typically 2-7 seconds — and the Tune button becomes **Stop**. Press **Stop** (or the red ATU button) to end the cycle early; the app then re-reads the tuner from the radio, so whatever state the interrupted cycle left behind is what you see. When the cycle finishes on its own the buttons go back to **ATU On** and **Tune**.
+- **Long press the ATU button (≥500 ms)** does the same as the Tune button. This is how the radio's own front-panel TUNER key works, so it is kept for anyone used to it — but it is no longer the only way in. A long press cannot be announced by a screen reader or performed by voice, and for a while the Tune function was advertised in a tooltip alone.
 
-The IC-7300 has a single tuner state (there is no separate per-VFO ATU setting), so the button reflects the same on/off state whichever VFO is active.
+Both are also on voice control: "tuner on", "tuner off", and "tune antenna" to start or stop a cycle — see [§17](#17-voice-control).
+
+The IC-7300 has a single tuner state (there is no separate per-VFO ATU setting), so the buttons reflect the same state whichever VFO is active.
 
 **Mon button** — Toggles the TX monitor (sidetone) on and off. The button is amber when the monitor is active and grey when off. Click to toggle.
 
@@ -912,7 +926,7 @@ Clicking **Restart Now** stops IWC and (when running as the installed exe) autom
 |---------|-------------|
 | Radio Model | **IC-7300 MkII** (100 W, HF + 6m + 4m EU) or **IC-7300** (100 W, HF + 6m). Both are single-receiver with a built-in CI-V band scope. |
 | Serial Port | COM port the IC-7300 presents over its USB Type-C cable (e.g., COM3). Find it in Windows Device Manager or on the **Diagnostics → Ports** page. |
-| Baud Rate | Must match the radio's **CI-V baud rate**. Default: **19200**. Set on the radio under **Menu → Set → Connectors → CI-V → CI-V USB Baud Rate**. **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
+| Baud Rate | The rate IWC opens the serial port at. Default: **19200**. **IC-7300 MkII:** leave it at 19200 — the MkII has no **CI-V USB Baud Rate** menu, and its **CI-V Baud Rate** item applies to the **[REMOTE]** socket only, so there is nothing to match and raising this will not speed the band scope up (measured: the same ~4 sweeps per second at 19200 and at 115200). **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
 
 IWC talks to the radio using the CI-V protocol over that single USB serial connection (controller address `E0`, radio address `B6`). After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success.
@@ -1665,6 +1679,14 @@ These are lower-priority for most users than the S-Meter and Power calibrations.
 
 Access the Diagnostics page from the navigation bar. It is primarily used when something is not working as expected.
 
+**Band scope delivery** — the panel at the top of the page, always visible. It shows how many spectrum sweeps per second are actually reaching IWC from the radio, measured over the last three seconds, along with the number of sweeps assembled and discarded since the app started.
+
+About **4 sweeps per second is normal over USB**, and there is nothing to fix if that is what you see. The radio does not send a sweep as one block — it splits it into 11 CI-V segments and paces them roughly 21 ms apart, which occupies about 89% of the time between sweeps. The CI-V baud-rate setting makes no difference to this; 19200 and 115200 measure the same.
+
+That figure is the answer to a question operators ask often: **why the radio's own waterfall shows CW when IWC's does not.** The radio draws its scope internally with no cable in the way. IWC gets about four frames a second, and a dot at 20 WPM lasts around 60 ms, so it can fall between sweeps entirely. It is a sampling limit, not smoothing.
+
+A rate well below 4/sec, or a discard count climbing steadily, is worth reporting — that is bus contention rather than the normal pacing.
+
 **COM Ports button** — Opens a list of all serial ports currently detected on your PC. Use this if you are unsure which port the radio is connected to.
 
 **CAT Status JSON button** — Opens a live JSON view of every radio parameter the app knows about. Useful when reporting a bug.
@@ -1765,6 +1787,8 @@ The fastest way to get a bug fixed is a good report. IWC has three features that
 
 That gives me everything needed to reproduce your setup — including a callsign so I know who I'm talking to.
 
+**If you are on a pre-release, the version tells me so.** A pre-release shows its full label — `1.0.6-pre4` rather than just `1.0.6` — in the Diagnostics block, in the title bar and on the system tray icon. Earlier pre-releases did not: pre1, pre2 and pre3 all called themselves "1.0.6", so a report could not say which of the three it came from. Quote the version exactly as it appears.
+
 **Radio firmware versions worth knowing.** Above the Diagnostics block on the About page there's a section titled **Developer's tested radio firmware** that lists my bench radio firmware values. Some IWC behaviours can depend on the radio's firmware version, because Icom has both added CI-V commands and changed the behaviour of existing ones between firmware releases. If you're hitting a CI-V-related bug, comparing your firmware against the listed values quickly tells you whether a firmware difference might be involved. To read your own firmware on an IC-7300 MkII: **MENU → SET → Others → Version Information** on the radio's front panel. Include any firmware mismatch in your bug report.
 
 ![The About page — version + release date at top, Resources section, Diagnostics block with the user's environment summary, and the Copy diagnostics + Report a bug buttons that send everything straight into a GitHub bug-report form](pictures/AboutPage.png)
@@ -1795,7 +1819,7 @@ The radio is not answering on CI-V. IWC keeps retrying, so it clears itself the 
 
 - Check that the radio is powered on.
 - Check the COM port in Settings. The **Check which COM ports this PC has** link in the "Radio not connected" banner lists every port your PC has and says whether the one you configured is among them; **Diagnostics → Ports** shows the same thing.
-- Check the baud rate in Settings matches the radio's **MENU → SET → Connectors → CI-V → CI-V Baud Rate**.
+- Check the baud rate in Settings. On the **original IC-7300** it must match the radio's **MENU → SET → Connectors → CI-V → CI-V USB Baud Rate** — that is the USB port's own setting, and the plain **CI-V Baud Rate** below it belongs to the round [REMOTE] socket and has no effect on a USB connection. The **MkII has no CI-V USB Baud Rate menu at all**, so there is nothing to match: set Settings to **19200** and ignore the radio's **CI-V Baud Rate**, which is the [REMOTE] socket's.
 - Check the CI-V address in Settings (`B6` for the IC-7300 MkII, `94` for the original IC-7300).
 - Click **Test Connection** in Settings.
 - If IWC knows *why* it cannot connect — a COM port that is not present, for instance — the panel says so and offers a link to Settings instead of spinning.
@@ -1816,7 +1840,7 @@ The port opened cleanly, so the driver, the cable and the port number are all co
 
 - **If you are on v1.0.4-pre1 or earlier, check CI-V USB Echo Back first.** With that setting on, those versions cannot connect *at all* — the radio is answering perfectly and IWC is failing to listen. Switch it off at **MENU → SET → Connectors → CI-V** (the MkII has **CI-V USB (A) Echo Back** and **(B)** — switch both off; the original IC-7300 has one). **v1.0.4-pre2 and later work either way**, so on current versions you can skip this.
 - Check the CI-V address in Settings matches the radio: **`B6`** for the IC-7300 MkII, **`94`** for the original IC-7300 (**MENU → SET → Connectors → CI-V → CI-V Address**).
-- Check the baud rate in Settings matches **CI-V Baud Rate** on the radio. If the radio is set to **Auto**, set both ends to **19200** instead while you are diagnosing.
+- Check the baud rate in Settings. On the **original IC-7300** it must match **CI-V USB Baud Rate** on the radio — not the plain **CI-V Baud Rate**, which is the [REMOTE] socket's setting; if that is on **Auto**, set both ends to **19200** while you are diagnosing. On the **MkII** there is no USB baud menu, so just set Settings to **19200**.
 - **On the IC-7300 MkII, make sure you are on the right port.** The radio presents *two* USB serial ports and only one of them carries CI-V — the one Windows names **"IC-7300MK2 Serial Port A (CI-V)"**. Port B will open happily and never answer.
 - A quick sanity check: if another program — N1MM, WSJT-X, Ham Radio Deluxe — can talk to the radio on that same port, then the port and radio are definitely fine and the fault is in how IWC is addressing it. Say so in your bug report (§14.1); it narrows things down enormously.
 
@@ -1833,7 +1857,7 @@ The radio is talking, but no spectrum sweep has arrived. The panel gives up afte
 The panel is on screen and the radio is connected, but no sweep is arriving. The status badge at the right-hand end of the panel header says the same thing in one word (**Scope off**, **Connecting…**, **Live**, **Scope blocked**).
 
 - Check the **Scope** switch above the panel, and the scope on the radio's own screen.
-- Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate.
+- Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate. The **Band scope delivery** panel on the Diagnostics page (§11) shows the same counters live, plus the measured sweeps-per-second.
 - Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
 
 **Spectrum panel says "The radio refused to send scope data" (badge: Scope blocked)**
@@ -1878,7 +1902,21 @@ The scope comes from the radio over CI-V, so there is no SDR, driver or device s
 - **Original IC-7300 (not the MkII): check the baud rate first.** The original model refuses to send scope data unless the radio's **CI-V USB Port** is **Unlink from [REMOTE]** and its **CI-V USB Baud Rate** is **115200**, with 115200 set in IWC's Settings to match. At IWC's default of 19200 the rest of the app works perfectly and the spectrum never appears. IWC now says so in the panel itself, and warns in Settings the moment you pick the combination.
 - Check the panel's **scope on/off** toggle hasn't been left off. Switching it off is remembered for the rest of the session — IWC won't quietly switch the scope back on under you if the radio drops and reconnects — so it stays off until you switch it back on or restart the app.
 - Confirm the radio itself is connected — if the meters are dead and the frequency isn't tracking the VFO knob, fix the CI-V connection first (see the two entries at the top of this section).
-- The scope shares the CI-V bus with everything else. At the default 19200 baud a sweep takes a noticeable slice of the link, and IWC deliberately slows its meter polling while the scope streams. If the trace is ragged rather than absent, try **115200** on both the radio (**MENU → SET → Connectors → CI-V → CI-V Baud Rate**) and in Settings.
+- The scope shares the CI-V bus with everything else. At the default 19200 baud a sweep takes a noticeable slice of the link, and IWC deliberately slows its meter polling while the scope streams. If the trace is ragged rather than absent, a higher rate leaves more headroom: on the **original IC-7300** set **115200** on the radio (**MENU → SET → Connectors → CI-V → CI-V USB Baud Rate**) and in Settings; on the **MkII** just raise **Settings → Baud Rate**, as the radio has no USB baud menu to match.
+
+**Why the trace updates so slowly, and why you cannot read CW on it.** IWC receives about **four sweeps per second** from the radio over CI-V. That is what the radio delivers over its USB port, not a limit IWC imposes and not something the baud rate changes — measured on a MkII, 19200 and 115200 give an identical ~4 sweeps per second. (The radio splits each sweep into eleven CI-V segments on the USB path and paces them out one after another; IWC draws the sweep as soon as the last one lands.) At that rate the display simply cannot show keying: a dot at 20 WPM lasts about 60 milliseconds, and the trace only redraws every 240. The radio's own screen is quicker because it draws the scope internally, with no serial link in the way, and nothing sent down CI-V will ever match it. Turning the averaging down (§5.4) makes the trace livelier but does not add sweeps.
+
+**Meter needles smear, detach, or shoot past the end of the scale — in Firefox** (v1.0.5 and earlier)
+
+While transmitting, a needle appears to come away from its gauge, is drawn well beyond the end of its arc, or leaves a small red fragment above or to the left of the gauge for a fraction of a second before tidying itself up. It happens repeatedly for as long as you are transmitting and is worst when the readings are moving fastest. Reloading the page does not help.
+
+This affects **Firefox only**. Edge, Chrome and other Chromium-based browsers never showed it. It is purely a drawing fault in the browser — the readings themselves are correct, and nothing is wrong with the radio or the CI-V link.
+
+Up to and including v1.0.5, each needle was animated: told to sweep to its new position over 400 milliseconds. But readings arrive from the radio roughly every 150 milliseconds, so a new sweep began before the previous one had finished — up to three running at once. Chromium discards the frames that have been superseded; Firefox keeps them on the canvas, and the leftovers merge into what looks like one needle running off the end of the dial. On receive, with a steady signal, the needles barely move and the fault does not appear at all.
+
+- **Upgrade to v1.0.6 or later.** The animation has been removed, so needles move straight to each new reading — which at six to seven updates a second looks the same, without the artefacts. There is no setting to change.
+- **v1.0.6 is not out yet**, but the fix is available now as the pre-release **v1.0.6-pre1**, at https://github.com/mm5agm/Icom_Web_Control/releases/tag/v1.0.6-pre1 — download `Icom_Web_Control_Setup.exe` from that page and install it over your current version. IWC's update banner ignores pre-releases, so it will not offer this build to you; you have to follow the link.
+- **Staying on an older version?** Use Edge or Chrome for IWC and the gauges draw cleanly. There is no workaround within Firefox itself.
 
 **Meters appear to show incorrect values**
 
@@ -1993,7 +2031,7 @@ To transmit voice from your microphone, press the PTT button on the mic itself.
 
 If pressing **Test PTT** or **Tune** in WSJT-X takes ten to twenty seconds before the radio actually transmits — and sometimes seems to stay in transmit afterwards — the delay is almost certainly **not** in IWC.
 
-When this was traced from an operator's logs ([issue #73](https://github.com/mm5agm/Icom_Web_Control/issues/73)), IWC was keying the radio within about 40 *milliseconds* of receiving each PTT command — the wait was happening *before* the command ever reached IWC. WSJT-X talks to IWC's rigctld server over the local loopback address (`127.0.0.1`), and on some Windows machines that loopback path can be bottlenecked by legacy networking.
+When this was traced from an operator's logs — in the sister project, [Yaesu Web Control issue #73](https://github.com/mm5agm/Yaesu_Web_Control/issues/73), which shares IWC's rigctld server — the app was keying the radio within about 40 *milliseconds* of receiving each PTT command, so the wait was happening *before* the command ever reached it. WSJT-X talks to IWC's rigctld server over the local loopback address (`127.0.0.1`), and on some Windows machines that loopback path can be bottlenecked by legacy networking.
 
 The fix that resolved it for that operator: **disable NetBIOS over TCP/IP**. It's a legacy protocol that can slow down local loopback traffic. To disable it:
 
@@ -2006,6 +2044,27 @@ The fix that resolved it for that operator: **disable NetBIOS over TCP/IP**. It'
 This is a machine-specific networking quirk rather than an IWC bug, so it won't affect most setups — but if you're seeing long PTT delays with an otherwise-working WSJT-X ↔ IWC link, it's the first thing to try.
 
 As a safety backstop, IWC will force the radio back to receive if a program keys it through rigctld and never sends the matching release, so a stuck transmit can't be left keyed indefinitely — but that's a safety net, not a cure for the delay. The loopback fix above is the real solution.
+
+---
+
+### 15.6 Can I hear the radio from another room? I have IWC working downstairs but there's no sound.
+
+No — and nothing is wrong with your setup.
+
+IWC carries **no radio audio at all**. It is a *control* application: it speaks CI-V to the radio over the USB cable and moves its controls, and that is the whole of what travels over your network. The receive audio never leaves the shack. So on a second computer you get a complete, fully working control panel and complete silence, which is the app behaving as built.
+
+**Is audio coming?** It is being worked on, in the sister application first. IWC has a twin — [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control), the same app for Yaesu radios — and a contributor there is building browser-to-radio audio streaming over the USB connection, receive and transmit. It is in development and not finished, so there is no date for it. If it proves out in YWC, bringing it across to IWC is the obvious next step.
+
+**What gets you sound today.** Two approaches people already use:
+
+| Approach | How it works | Trade-off |
+|---|---|---|
+| **Remote Desktop** | Connect to the shack PC from the other room. Windows carries that PC's sound back down the connection, so you hear the radio and see IWC on the shack machine's screen. | Simplest by far if the shack PC runs Windows — nothing extra to install. You are driving a remote screen rather than using IWC natively in your own browser. |
+| **Audio over IP** (e.g. [Mumble](https://www.mumble.info/)) | A server on the shack PC takes the radio's USB audio input and streams it; a client in the other room plays it. Run IWC in your own browser alongside it. | More to set up, and you are configuring two things rather than one. In exchange you use IWC properly, in the browser, on the machine in front of you. |
+
+For either route, the radio's audio device on the shack PC is the **USB Audio CODEC** input that appears when the IC-7300 is connected — the same device WSJT-X uses (see §15.1).
+
+> **One caution.** IWC has **no password on it**. That is deliberate: it is designed for your own home network. Reaching it from your own house is exactly what it's for, but if you ever want it from *outside* the house, use a VPN back into your own network rather than forwarding port 8080 to the internet.
 
 ---
 
@@ -2282,15 +2341,14 @@ Voice control is **off by default** — it has to be turned on in Settings befor
 
 Every command below acts on the operating VFO. The phrases are the built-in English (UK) defaults; they're editable (see [§17.6](#176-adding-your-own-commands)), so if your installation has custom phrases, "Settings → Voice Control → Voice Phrases" is the definitive list, not this table.
 
-The commands are split into two groups. The **first table** is fully wired to the IC-7300 over CI-V and works today. The **second table** lists commands the speech engine still *recognises* — they're in the grammar and you can say them — but which aren't yet connected to the IC-7300, so they don't change anything on the radio (see the warning under that table).
-
-**Working now (wired to the IC-7300):**
+Everything in the table is wired to the IC-7300 over CI-V and works today.
 
 | Command family | Say | What happens |
 | --- | --- | --- |
 | Set frequency | "tune to fourteen point zero seven four megahertz", "set frequency to fourteen megahertz" | Tunes to that frequency. Whole MHz, one decimal, or three decimals; "megahertz" is optional |
 | Change band | "go to twenty metres", "switch to forty metres" | Jumps to that band's default (usually FT8) frequency. Bands: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The band name alone works too — a bare "forty metres" is the same as "go to forty metres" |
 | Step up / down | "tune up" / "step up" / "nudge up"; "tune down" / "step down" / "nudge down" | Moves by the configured step size (see Set step size; default 10 kHz) |
+| Band up / down | "band up" / "band down" | Moves one amateur band up or down and lands on that band's default frequency — the same place "go to \<band\> metres" would put you, and the confirmation says which band. It stops at the ends rather than wrapping round: at 10 m "band up" says "Already on the highest band" instead of dropping you on 160 m. Bands your band plan doesn't include are skipped, so 4 m isn't in the sequence outside Region 1 |
 | Set step size | "set step ten kilohertz", "step size one kilohertz" | Sets the step size: 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. The step word alone works too ("ten kilohertz"). Same value as the step dropdown by the mic button — either one updates the other |
 | Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Switches mode |
 | Swap VFOs | "swap V F O", "swap A and B" | Exchanges VFO A and B contents |
@@ -2309,18 +2367,14 @@ The commands are split into two groups. The **first table** is fully wired to th
 | Speech processor | "processor off", "speech processor on", "compressor forty" | Off, on, or on at that compression level |
 | Transmit | "key transmitter" / "start transmitting"; "stop transmitting" / "go to receive" | Radio keys up / drops back to receive |
 | Split | "split on" / "enable split"; "split off" / "simplex" | Split operation toggles |
+| Antenna tuner | "tuner on" / "antenna tuner on"; "tuner off" / "bypass tuner" | Puts the internal tuner in line or bypasses it |
+| Auto-tune | "tune antenna" / "start tuner" / "match antenna" | Starts an auto-tune cycle. Say it again while one is running and it stops — the spoken confirmation says which of the two it did ("Tuning antenna" or "Stopping antenna tuner"). Note there is no bare "tune": that word belongs to "tune up" / "tune down" |
 | Custom commands (macros) | "copy a to b" / "copy b to a" | Sends the CI-V command attached to that phrase. Those two ship as defaults; you can add your own for anything in the IC-7300's CI-V command set — see [§17.6](#176-adding-your-own-commands) |
+| IF filter width | "filter wider" / "filter narrower" | Moves the IF passband one step along the radio's own filter ladder and **speaks the new width in hertz** — "Filter narrower, 2400 hertz". The step size is the radio's, not a fixed number of hertz: 50 Hz below 500 Hz, 100 Hz above it, and 200 Hz in AM. It stops at the ends of the ladder rather than wrapping, and says so — at the narrowest setting, "filter narrower" answers **"Already at the narrowest, 50 hertz"** instead of repeating the ordinary read-back. In FM there is no adjustable width and IWC says so |
 | Status read-back | "what frequency", "what mode", "what band" | IWC speaks the current value out loud — nothing is sent to the radio |
 | Help | "help", "what can I say" | IWC speaks a short list of the available command categories |
 
-**Recognised but not yet active on the IC-7300:**
-
-| Command family | Say | Status |
-| --- | --- | --- |
-| Band up / down | "band up" / "band down" | Not yet wired to CI-V. Use "go to \<band\> metres" instead, which works |
-| IF filter width | "filter wider" / "filter narrower" | Not yet wired to CI-V — use the on-screen IF Width control instead |
-
-> ℹ️ **These commands tell you they're not available.** Say one and IWC speaks a short "…isn't available on the IC-7300 yet" message instead of a false "successful" — so you're never misled into thinking the radio changed when it didn't. They'll be wired up in a later build.
+> ℹ️ **Every voice command is now wired to the radio.** Earlier builds had two — band up/down and filter wider/narrower — that the speech engine recognised but that changed nothing on the radio; they spoke an "isn't available yet" message rather than a false confirmation. Both now work, and this section no longer has a second table.
 
 A few notes on phrasing:
 
@@ -2331,6 +2385,7 @@ A few notes on phrasing:
 - **Levels come from a fixed list, not any number you like.** The controls that take a 0–100 level — AF gain, RF gain, squelch, NR, NB, TX power, mic gain, processor — recognise **zero, ten, twenty, twenty five, thirty, forty, fifty, sixty, seventy, seventy five, eighty, ninety** and **one hundred** (also "maximum" or "full"). A number that isn't in that list will be fuzzy-matched to the nearest one that is, so listen to the spoken confirmation. The full list per command is in the phrase editor, and you can add or remove values there.
 - **Bands supported:** 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The default frequency picked for each band is roughly the FT8 / digital hangout — adjust with a follow-up "set frequency to …" or "tune up" / "tune down".
 - **"Fine step up" / "fine step down" are gone.** They were shortcuts for the microphone UP/DN keys on the Yaesu radio IWC grew out of, and CI-V has no equivalent command. "Tune up" / "tune down" with the step size set to 10 Hz does the same job. If you are upgrading, your saved phrase pack is replaced by the new defaults the first time you run this version — the noise-reduction and noise-blanker macros it carried are now proper commands with their own phrases, and the two would have competed for the same words. The previous pack is snapshotted into **Show version history** the next time you save.
+- **The antenna-tuner commands were added later, and your saved pack keeps up.** If you already have a phrase pack — including a translated or customised one — the three tuner commands are added to it on first run of this version, in English, with everything you had left untouched. They show up in the phrase editor like any other command, so you can reword or translate them there.
 - **Scots variants** are accepted where they're in the default phrase list — e.g. "tune tae fourteen point zero seven four" works the same as "tune to …". Add your own in the phrase editor (§17.6) for any command you like.
 
 **After every command, IWC speaks a short confirmation** through the PC's default audio output:

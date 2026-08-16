@@ -129,6 +129,15 @@
         public int SdrWaterfallBrightDbA { get; set; } = 0;
         public int SdrWaterfallBrightDbB { get; set; } = 0;
 
+        // Scope mode (CI-V 27 14): false = Centre, true = Fixed. IWC asserts a
+        // mode on every connect and every scope-on, because the panel's
+        // frequency axis is built around Centre; without this the operator's
+        // choice of Fixed was in-memory only, so it survived a reconnect but not
+        // a restart and the app silently pulled them back to Centre (GitHub #2).
+        // Written by CivRadioController.SetScopeModeAsync, i.e. by the panel's
+        // Centre/Fixed button and its scope-mode badge — not from Settings.
+        public bool ScopeFixedMode { get; set; } = false;
+
         // ── Pseudo-dual receiver (Phase 5) ────────────────────────────────
         // The IC-7300 MkII has ONE receiver. This feature *presents* a second
         // VFO's spectrum ("watch" panel) alongside the primary you actually

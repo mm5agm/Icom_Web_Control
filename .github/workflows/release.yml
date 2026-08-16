@@ -4,6 +4,17 @@ on:
   release:
     types: [created]
 
+  # Build every pull request into develop, so a PR arrives with a real signal
+  # instead of "no checks". Added after shared-core phase 1 (#29) merged clean
+  # and broke the sibling repo's build: nothing had run, because until now the
+  # only ways in were a release and a manual dispatch.
+  #
+  # Nothing is published on this path. Both upload steps below are guarded by
+  # event name, so a PR run publishes the app, builds the NSIS installer and
+  # verifies it exists — then throws it away.
+  pull_request:
+    branches: [develop]
+
   workflow_dispatch:
     inputs:
       tag:

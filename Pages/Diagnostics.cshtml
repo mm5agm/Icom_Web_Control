@@ -16,6 +16,34 @@
             aria-expanded="false" aria-controls="diag-voice-panel">Voice Control Log</button>
 </div>
 
+@* Band scope delivery. Not behind a toggle: the sweep rate is the answer to
+   "why can the radio's own waterfall show CW when IWC's cannot", which comes
+   up often enough that it should be readable without knowing to look. *@
+<div class="card mb-2">
+    <div class="card-body py-2">
+        @* The rate sits immediately after the heading, so the panel reads as one
+           phrase: "Band scope delivery  4.1 sweeps/sec". It was previously pushed
+           to the far right by justify-content-between, which put a column of
+           whitespace between the label and the number it belongs to -- easy to
+           read straight past, and worse the wider the window. Steve reported the
+           figure as missing and Colin read the panel out without it; both were
+           looking at a number that was there. *@
+        <div class="d-flex align-items-baseline flex-wrap gap-2">
+            <span class="fw-semibold">Band scope delivery</span>
+            <span id="diag-scope-rate" class="fs-5 fw-semibold font-monospace">&mdash;</span>
+        </div>
+        <div id="diag-scope-detail" class="small text-muted">Waiting for the radio&hellip;</div>
+        <div class="small text-muted mt-1">
+            Sweeps per second as they arrive over the cable, measured over the last
+            three seconds &mdash; not the rate the radio draws its own display at.
+            About <strong>4/sec</strong> is normal over USB: the radio splits each
+            sweep into 11 CI-V segments and paces them roughly 21&nbsp;ms apart, and
+            the baud-rate setting does not change that. A dot at 20&nbsp;WPM lasts
+            around 60&nbsp;ms, so at 4/sec it can fall between sweeps entirely.
+        </div>
+    </div>
+</div>
+
 <div id="diag-ports-panel" class="card mb-2" hidden>
     <div class="card-body py-2 d-flex align-items-start gap-3 flex-wrap">
         <div class="flex-grow-1">
@@ -544,6 +572,72 @@
 
 
     refreshIndicator();
+
+
+    // ── Band scope delivery ───────────────────────────────────────────────────
+    //
+    // Polled rather than pushed over SignalR: only this page wants it, and the
+    // hub already carries the meter traffic this figure is partly measuring.
+    // Two-second cadence matches the server's three-second measurement window
+    // closely enough to look live without polling for values that cannot have
+    // changed. Paused while the tab is hidden.
+    const scopeRate   = document.getElementById('diag-scope-rate');
+    const scopeDetail = document.getElementById('diag-scope-detail');
+    let   scopeTimer  = null;
+
+    async function refreshScope() {
+        try {
+            const r = await fetch('/api/cat/scope/diagnostics');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const s = await r.json();
+
+            if (!s.connected) {
+                scopeRate.textContent = '—';
+                scopeDetail.textContent = 'Radio not connected.';
+                return;
+            }
+            if (!s.enabled) {
+                scopeRate.textContent = '—';
+                scopeDetail.textContent = 'Scope switched off.';
+                return;
+            }
+
+            scopeRate.textContent = (s.sweepsPerSecond == null)
+                ? '—'
+                : s.sweepsPerSecond.toFixed(1) + ' sweeps/sec';
+
+            const parts = [`${s.sweepsCompleted} sweeps assembled`,
+                           `${s.sweepsDiscarded} discarded`];
+            if (s.secondsSinceLastSweep == null) {
+                parts.push('no sweep has ever arrived');
+            } else {
+                parts.push(`last ${s.secondsSinceLastSweep.toFixed(1)}s ago`);
+            }
+            if (s.sweepsPerSecond == null && s.secondsSinceLastSweep != null) {
+                parts.push('not streaming');
+            }
+            scopeDetail.textContent = parts.join(' · ');
+        } catch (e) {
+            scopeRate.textContent = '—';
+            scopeDetail.textContent = 'Could not read scope diagnostics: ' + e.message;
+        }
+    }
+
+    function startScopePolling() {
+        if (scopeTimer !== null) return;
+        refreshScope();
+        scopeTimer = setInterval(refreshScope, 2000);
+    }
+    function stopScopePolling() {
+        if (scopeTimer === null) return;
+        clearInterval(scopeTimer);
+        scopeTimer = null;
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) stopScopePolling(); else startScopePolling();
+    });
+    startScopePolling();
 
 })();
 </script>

@@ -418,25 +418,25 @@
                             </div>
                         }
                         <!-- SWR Meter -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="swrMeterCanvas" role="img" aria-hidden="true" aria-label="SWR meter" data-a11y-key="meters.swr"></canvas>
                             </div>
                         </div>
                         <!-- Power Meter -->
-                        <div class="text-center power-meter-container" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter power-meter-container" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="powerMeterCanvas" role="img" aria-hidden="true" aria-label="Power output meter" data-a11y-key="meters.power"></canvas>
                             </div>
                         </div>
                         <!-- Compression Meter -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="compressionMeterCanvas" role="img" aria-hidden="true" aria-label="Compression meter" data-a11y-key="meters.compression"></canvas>
                             </div>
                         </div>
                         <!-- ALC Meter -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="alcMeterCanvas" role="img" aria-hidden="true" aria-label="ALC meter" data-a11y-key="meters.alc"></canvas>
                             </div>
@@ -444,12 +444,17 @@
                         @* IC-7300 reports Id (drain current) and Vd (PA supply) over CI-V, but
                            has NO temperature meter over CI-V — the inherited PA-temp gauge is dropped. *@
                         <!-- IDD Meter — drain current (CI-V 15 16) -->
-                        <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
+                        <div class="text-center tx-only-meter" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="iddMeterCanvas" role="img" aria-hidden="true" aria-label="Drain current meter" data-a11y-key="meters.idd"></canvas>
                             </div>
                         </div>
-                        <!-- VDD Meter — PA supply voltage (CI-V 15 15) -->
+                        @* VDD Meter — PA supply voltage (CI-V 15 15).
+                           NOT marked tx-only-meter, unlike the five above it: the
+                           poll loop reads Vd in both states (idle rail on RX,
+                           sagging under load on TX) and never zeroes it, so it is
+                           a live gauge on receive and dimming it would fade a
+                           reading the operator can still use. *@
                         <div class="text-center" style="position: relative; height: 135px; min-width: 165px; margin: 0; padding: 0;">
                             <div class="analog-meter-container">
                                 <canvas id="vddMeterCanvas" role="img" aria-hidden="true" aria-label="Amplifier supply voltage meter" data-a11y-key="meters.vdd"></canvas>
@@ -502,11 +507,21 @@
                                style="width: clamp(80px, 10vw, 150px); height: 18px;"
                                oninput="document.getElementById('procLevelValue').innerText = this.value;"
                                onchange="setProcLevel(this.value);">
-                        <button id="atuBtn"
+                        <button id="atuBtn" data-a11y-key="controls.atu"
                                 class="btn btn-sm ms-2 @(Model.AtuEnabled ? "btn-success" : "btn-outline-secondary")"
                                 aria-label="Antenna tuner — short tap toggles on/off, long press starts auto-tune"
                                 title="Tap to toggle ATU on/off; press and hold to start auto-tune"
                                 style="touch-action: manipulation; user-select: none;">@(Model.AtuEnabled ? "ATU On" : "ATU Off")</button>
+                        @* Auto-tune has its own button as well as the long press. A long
+                           press is undiscoverable (it was advertised in a tooltip only) and
+                           impossible to describe to a screen-reader user, and voice control
+                           here exists for partially-sighted operators. Both routes call the
+                           same toggleAtuTune(). *@
+                        <button id="atuTuneBtn" data-a11y-key="controls.atuTune"
+                                class="btn btn-sm btn-outline-secondary ms-1"
+                                aria-label="Start an antenna tuner auto-tune cycle"
+                                title="Start an auto-tune cycle; press again to stop it early"
+                                onclick="toggleAtuTune()">Tune</button>
                         <button id="monitorOnBtn"
                                 class="btn btn-sm ms-2 @(Model.MonitorOn ? "btn-warning" : "btn-outline-secondary")"
                                 aria-label="TX monitor — currently @(Model.MonitorOn ? "on" : "off")"
@@ -615,6 +630,15 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="250000" data-vfo="A" data-a11y-key="spectrum.spanA500k" aria-label="VFO A span plus or minus 250 kHz" title="VFO A scope span ±250 kHz">±250k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="500000" data-vfo="A" data-a11y-key="spectrum.spanA1m" aria-label="VFO A span plus or minus 500 kHz" title="VFO A scope span ±500 kHz — widest">±500k</button>
                             </div>
+                            @* The scope-mode badge drawn on the canvas is clickable too, but a
+                               click target on a canvas corner is undiscoverable and unreachable
+                               by keyboard or screen reader. This is the same control, labelled.
+                               Disabled until a sweep reports a mode — the radio's mode is not
+                               something we get to assume (GitHub #2).
+                               Deliberately NO data-a11y-key: the aria-label carries the live
+                               mode, and a11y-labels.js would pin an override over it, leaving a
+                               screen reader announcing "Centre" while the radio sits in Fixed. *@
+                            <button type="button" class="btn btn-outline-light btn-sm spectrum-scopemode-btn" data-vfo="A" aria-label="VFO A scope mode, Centre or Fixed — waiting for the radio's scope" title="Centre or Fixed scope mode — waiting for the radio's scope" disabled>Cent/Fix</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="A" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="A" title="Listen to VFO A — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
                             <span class="badge bg-success small spectrum-audio-badge" data-vfo="A" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
@@ -654,6 +678,9 @@
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="250000" data-vfo="B" data-a11y-key="spectrum.spanB500k" aria-label="VFO B span plus or minus 250 kHz" title="VFO B scope span ±250 kHz">±250k</button>
                                 <button type="button" class="btn btn-outline-light btn-sm span-btn" data-hz="500000" data-vfo="B" data-a11y-key="spectrum.spanB1m" aria-label="VFO B span plus or minus 500 kHz" title="VFO B scope span ±500 kHz — widest">±500k</button>
                             </div>
+                            @* Same control as VFO A's — the scope mode belongs to the radio, not
+                               to a panel, so both buttons show and set the one setting. *@
+                            <button type="button" class="btn btn-outline-light btn-sm spectrum-scopemode-btn" data-vfo="B" aria-label="VFO B scope mode, Centre or Fixed — waiting for the radio's scope" title="Centre or Fixed scope mode — waiting for the radio's scope" disabled>Cent/Fix</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="B" title="Listen to VFO B — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
                             <span class="badge bg-success small spectrum-audio-badge" data-vfo="B" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
@@ -1888,17 +1915,25 @@
         window.iwcVoiceNudgeStepHzA = @Model.VoiceNudgeStepHzA;
         window.iwcVoiceNudgeStepHzB = @Model.VoiceNudgeStepHzB;
     </script>
+    @* ?v= is the app version, not a hand-kept number.
+       These used to carry counters that had to be bumped by hand whenever the
+       module changed, and v1.0.6 proved that does not work: spectrum-panel.js
+       gained the Fixed-mode fix and sat on ?v=7 regardless, so upgrading users
+       kept running the old file. Tying the query to the version means every
+       release busts every module once, for free, and there is nothing left to
+       forget. Program.cs also sends no-cache on static files, which is the
+       belt to this pair of braces. *@
     <script type="module">
-        import { MeterPanel }           from "/js/guages/meter-panel.js?v=1";
-        import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=1";
-        import { Ic7300Meters }         from "/js/orchestrators/Ic7300Meters.js?v=1";
-        import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=1";
-        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=7";
-        import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, nearestBandForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=8";
-        import { loadLabels }           from "/js/ui/a11y-labels.js?v=1";
-        import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=14";
-        import { initMemoriesPanel }   from "/js/ui/memories.js?v=10";
-        import { DxSpotsPanel }         from "/js/ui/dx-spots-panel.js?v=1";
+        import { MeterPanel }           from "/js/guages/meter-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { Ic7300Meters }         from "/js/orchestrators/Ic7300Meters.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, nearestBandForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { loadLabels }           from "/js/ui/a11y-labels.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { initMemoriesPanel }   from "/js/ui/memories.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { DxSpotsPanel }         from "/js/ui/dx-spots-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         window.getBandSegmentForHz = segmentForHz;
@@ -2440,6 +2475,64 @@
                 });
             });
 
+            // Centre/Fixed button — the labelled twin of the scope-mode badge
+            // drawn in the corner of the canvas. Both call the same
+            // panel.toggleScopeMode(), so there is one code path to the radio.
+            //
+            // The scope mode belongs to the radio, not to a panel, so a change
+            // relabels BOTH buttons — the watch panel is a crop of the same
+            // single sweep and cannot be in a different mode.
+            (function wireScopeModeButtons() {
+                // Amber for anything that isn't Centre, matching the badge: the
+                // frequency axis is built around Centre mode, so the other modes
+                // carry a caution rather than being wrong outright.
+                const LABELS = {
+                    'CENT':     { text: 'Centre',   next: 'Fixed',  warn: false },
+                    'FIX':      { text: 'Fixed',    next: 'Centre', warn: true  },
+                    'SCROLL-C': { text: 'Scroll-C', next: 'Centre', warn: true  },
+                    'SCROLL-F': { text: 'Scroll-F', next: 'Centre', warn: true  }
+                };
+
+                function relabel(mode) {
+                    const info = LABELS[mode];
+                    document.querySelectorAll('.spectrum-scopemode-btn').forEach(btn => {
+                        const vfo = btn.dataset.vfo === 'B' ? 'VFO B' : 'VFO A';
+                        if (!info) {
+                            // No sweep yet, so no mode to report. Say so rather
+                            // than showing a mode the radio might not be in.
+                            btn.disabled = true;
+                            btn.textContent = 'Cent/Fix';
+                            btn.title = "Centre or Fixed scope mode — waiting for the radio's scope";
+                            btn.setAttribute('aria-label',
+                                vfo + " scope mode, Centre or Fixed — waiting for the radio's scope");
+                            btn.classList.remove('btn-warning');
+                            btn.classList.add('btn-outline-light');
+                            return;
+                        }
+                        btn.disabled = false;
+                        btn.textContent = info.text;
+                        btn.title = 'Scope is in ' + info.text + ' mode — click to switch to ' + info.next
+                                  + (info.warn ? '. The frequency scale is built around Centre, so the trace may not line up exactly.' : '.');
+                        btn.setAttribute('aria-label',
+                            vfo + ' scope mode is ' + info.text + '. Activate to switch to ' + info.next + '.');
+                        btn.classList.toggle('btn-warning', info.warn);
+                        btn.classList.toggle('btn-outline-light', !info.warn);
+                    });
+                }
+
+                document.querySelectorAll('.spectrum-scopemode-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const panel = btn.dataset.vfo === 'B' ? spectrumPanelB : spectrumPanelA;
+                        if (panel) panel.toggleScopeMode();
+                    });
+                });
+
+                // Follow the mode the radio actually reports, not what we asked
+                // for — a refused change must not show as applied.
+                if (spectrumPanelA) spectrumPanelA.onScopeModeChange = relabel;
+                if (spectrumPanelB) spectrumPanelB.onScopeModeChange = relabel;
+            })();
+
             // ── Pseudo-dual "Listen" button + "Listening" badge (Phase 5) ────
             // Each panel gets a Listen button (route audio to that VFO) and a
             // "Listening" badge (this VFO currently has the audio). Only active
@@ -2969,12 +3062,17 @@
         });
 
         // --- ATU ---
-        // Short tap toggles ATU on/off. Press-and-hold (>= 500 ms) starts
-        // the radio's auto-tune cycle (CAT command AC002;). Sending AC002;
-        // a second time stops it — so during a running tune cycle, any
-        // tap on the button also stops it. The Yaesu radios use a single
-        // physical button with the same short/long behaviour, so this
-        // matches the radio's UX exactly.
+        // Two buttons, and #atuBtn also carries the radio's own short/long
+        // gesture because that is what the IC-7300's front-panel TUNER key
+        // does:
+        //   #atuBtn      short tap  -> tuner in line / bypassed (CI-V 1C 01 01/00)
+        //   #atuBtn      long press -> start an auto-tune cycle (1C 01 02)
+        //   #atuTuneBtn  click      -> the same auto-tune cycle, visibly
+        // The separate Tune button is the one that matters for accessibility:
+        // a long press can't be announced by a screen reader and can't be
+        // performed by voice, and it was only ever advertised in a tooltip.
+        // Sending 1C 01 01 during a cycle stops it, so both routes toggle:
+        // start when idle, stop when a cycle is running.
         const ATU_LONG_PRESS_MS = 500;
         let atuPressTimer = null;
         let atuLongFired = false;
@@ -2990,12 +3088,12 @@
                 updateAtuButton(!enabled);
             } catch (e) { console.error('toggleAtu error:', e); }
         }
-        // Yaesu's CAT spec doesn't report tuning-in-progress (AC P2 is
-        // "Fixed at 0" in the manual), so the "Tuning…" UI state is driven
-        // entirely on the client. We mark the button as tuning immediately
-        // after sending AC002;, then auto-clear after a safe upper bound
-        // (typical tune cycles are 2-7 s; 8 s is a reasonable margin) and
-        // GET /api/cat/atu to sync the settled on/off state.
+        // CI-V does report a cycle in progress (1C 01 status 02), and the poll
+        // loop broadcasts it as AtuTuning — but we don't wait for the next poll
+        // to show it: the button goes to "Tuning…" as soon as the request is
+        // away, and an auto-clear timer covers the case where the finished
+        // cycle is missed (typical cycles are 2-7 s; 8 s is a fair margin).
+        // The timer fires GET /api/cat/atu to pick up the settled on/off state.
         const ATU_TUNE_AUTOCLEAR_MS = 8000;
         let atuAutoclearTimer = null;
 
@@ -3031,16 +3129,25 @@
             } catch (e) { console.error('startAtuTune error:', e); }
         }
 
-        // User tapped the button while a tune cycle was running. Send the
-        // AC002; toggle again to stop the radio, cancel the auto-clear
-        // timer, then refresh + clear the UI after a brief settle period.
-        // We don't await fetch() — fire-and-forget so the UI clears quickly
-        // regardless of HTTP latency.
+        // User asked to stop a tune cycle that was already running. POST the
+        // same endpoint again — it toggles, so this sends 1C 01 01 and the
+        // radio drops out of the cycle. Cancel the auto-clear timer, then
+        // refresh + clear the UI after a brief settle period. We don't await
+        // fetch() — fire-and-forget so the UI clears quickly regardless of
+        // HTTP latency.
         async function stopAtuTune() {
             try { fetch('/api/cat/atu/tune', { method: 'POST' }); } catch (e) {}
             clearTimeout(atuAutoclearTimer);
             atuAutoclearTimer = null;
             setTimeout(refreshAtuAfterTune, 500);
+        }
+
+        // The single entry point both the Tune button and the long press use:
+        // start a cycle when idle, stop the one that is running otherwise.
+        function toggleAtuTune() {
+            const btn = document.getElementById('atuBtn');
+            if (btn && btn.dataset.tuning === 'true') stopAtuTune();
+            else startAtuTune();
         }
         function updateAtuButton(enabled) {
             const btn = document.getElementById('atuBtn');
@@ -3052,11 +3159,26 @@
             btn.classList.toggle('btn-outline-secondary', !enabled);
             btn.textContent = enabled ? 'ATU On' : 'ATU Off';
         }
-        // Drives the "Tuning..." visual when the radio reports an auto-tune
-        // cycle in progress (AC P2 = 1). Called from the SignalR AtuTuning
-        // route in site.js.
+        // Drives the "Tuning..." visual when a cycle is running — either
+        // because we just started one, or because the radio reported status
+        // 02 and site.js routed the AtuTuning update here. Both ATU buttons
+        // change: #atuBtn shows the state, #atuTuneBtn offers the way out of
+        // it, and its aria-label changes with it so a screen reader announces
+        // "stop" rather than a button whose meaning silently flipped.
         function updateAtuTuningState(tuning) {
             const btn = document.getElementById('atuBtn');
+            const tuneBtn = document.getElementById('atuTuneBtn');
+            if (tuneBtn) {
+                tuneBtn.classList.toggle('btn-danger', tuning);
+                tuneBtn.classList.toggle('btn-outline-secondary', !tuning);
+                tuneBtn.textContent = tuning ? 'Stop' : 'Tune';
+                tuneBtn.setAttribute('aria-label', tuning
+                    ? 'Stop the antenna tuner auto-tune cycle'
+                    : 'Start an antenna tuner auto-tune cycle');
+                tuneBtn.title = tuning
+                    ? 'Stop the running auto-tune cycle'
+                    : 'Start an auto-tune cycle; press again to stop it early';
+            }
             if (!btn) return;
             if (tuning) {
                 btn.dataset.tuning = 'true';
@@ -3081,7 +3203,10 @@
                 clearTimeout(atuPressTimer);
                 atuPressTimer = setTimeout(() => {
                     atuLongFired = true;
-                    startAtuTune();
+                    // toggleAtuTune, not startAtuTune: a long press during a
+                    // running cycle would otherwise send the stop toggle to
+                    // the radio while leaving the UI claiming "Tuning…".
+                    toggleAtuTune();
                 }, ATU_LONG_PRESS_MS);
             });
             const cancelPress = function() {
@@ -4552,6 +4677,7 @@
         window.toggleAtu        = toggleAtu;
         window.startAtuTune     = startAtuTune;
         window.stopAtuTune      = stopAtuTune;
+        window.toggleAtuTune    = toggleAtuTune;
         window.updateAtuButton  = updateAtuButton;
         window.updateAtuTuningState = updateAtuTuningState;
         window.toggleMonitor    = toggleMonitor;

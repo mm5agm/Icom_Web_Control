@@ -77,6 +77,21 @@ namespace Icom_Web_Control.Services
         private long _lastLoggedSweeps;
         private long _lastLoggedDiscards;
 
+        // Measured sweep delivery rate, surfaced on Diagnostics and About. Counted
+        // over a rolling window rather than derived from the poll interval, because
+        // the interval is what we *ask* for and the rate is what the radio and the
+        // cable actually deliver — the whole point of showing it is that the two
+        // differ. Window is long enough to smooth the per-sweep jitter (measured at
+        // sd 3.4 ms over LAN) and short enough to react when the operator changes
+        // span or transport. Only the serial reader thread writes the two window
+        // fields, so they need no interlocking; _sweepsPerSecond is read from
+        // request threads and is exchanged atomically.
+        private const int ScopeRateWindowMs = 3000;
+        private const double ScopeRateStaleSeconds = 2.0;
+        private long _rateWindowStartTicks;
+        private long _rateWindowSweeps;
+        private double _sweepsPerSecond;
+
         // Pseudo-dual receiver (Phase 5, same-band). Cached copy of the setting,
         // refreshed on a slow poll phase so the serial-reader thread (which raises
         // OnUnsolicitedFrame) never has to await the settings store. When on, the
@@ -110,9 +125,12 @@ namespace Icom_Web_Control.Services
         private volatile bool _watchZoomIn = true;
         private volatile int _watchCropHalfHz;
 
-        // When the operator manually selects Fixed mode via the panel's scope-mode
-        // badge, remember it so a reconnect's EnableScopeAsync doesn't yank the
-        // scope back to Center under them. Selecting Center again clears it.
+        // When the operator manually selects Fixed mode via the panel's
+        // Centre/Fixed button or scope-mode badge, remember it so a reconnect's
+        // EnableScopeAsync doesn't yank the scope back to Center under them.
+        // Selecting Center again clears it. Mirrored to settings
+        // (ScopeFixedMode) so the choice also survives a restart — in-memory
+        // only, IWC forced Center again at every launch (GitHub #2).
         private volatile bool _operatorFixedMode;
 
         // When the operator turns the scope off (via the panel toggle), remember it
@@ -195,11 +213,20 @@ namespace Icom_Web_Control.Services
         public ScopeDiagnostics GetScopeDiagnostics()
         {
             long last = Volatile.Read(ref _lastSweepTicks);
+            double? age = last == 0 ? null : (Environment.TickCount64 - last) / 1000.0;
+
+            // Report the rate only while sweeps are actually arriving. The last
+            // completed window's figure would otherwise sit on screen unchanged
+            // after the scope was switched off, reading as a live measurement.
+            double rate = Interlocked.CompareExchange(ref _sweepsPerSecond, 0, 0);
+            double? measured = (age is <= ScopeRateStaleSeconds && rate > 0) ? rate : null;
+
             return new ScopeDiagnostics(
                 Enabled: !_operatorScopeOff,
                 SweepsCompleted: _scope.SweepsCompleted,
                 SweepsDiscarded: _scope.SweepsDiscarded,
-                SecondsSinceLastSweep: last == 0 ? null : (Environment.TickCount64 - last) / 1000.0);
+                SecondsSinceLastSweep: age,
+                SweepsPerSecond: measured);
         }
 
         public CivRadioController(
@@ -304,8 +331,9 @@ namespace Icom_Web_Control.Services
         /// Enable the spectrum scope and switch on the waveform output to the
         /// controller. Normally forces Center mode (the assumption the web
         /// SpectrumPanel's axis is built on), but respects a manual Fixed choice
-        /// the operator made via the badge so a reconnect doesn't override it.
-        /// Sent once per connect; best-effort.
+        /// the operator made via the panel's Centre/Fixed button or badge — in
+        /// this run or an earlier one — so neither a reconnect nor a restart
+        /// overrides it. Sent once per connect; best-effort.
         /// </summary>
         private async Task EnableScopeAsync(CancellationToken ct)
         {
@@ -314,9 +342,13 @@ namespace Icom_Web_Control.Services
             if (_operatorScopeOff)
                 return;
 
+            // Pick up a Fixed choice made in an earlier run before asserting a
+            // mode below, so a restart doesn't drag the operator back to Centre.
+            await LoadPersistedScopeModeAsync();
+
             // Switch the scope on and start waveform output first, then assert the
             // mode — the radio can power up (or be left) in Fixed mode. Force
-            // Center unless the operator deliberately chose Fixed this session.
+            // Center unless the operator deliberately chose Fixed.
             await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on", ct);
             await NoteScopeOutputResultAsync(
                 await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output", ct), ct);
@@ -359,15 +391,57 @@ namespace Icom_Web_Control.Services
 
         /// <summary>
         /// Set the scope mode (CI-V 27 14) to Center or Fixed. Public entry point
-        /// for the click-the-badge control; delegates to the retrying setter.
+        /// for the panel's Centre/Fixed button and scope-mode badge; delegates to
+        /// the retrying setter.
         /// </summary>
-        public Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default)
+        public async Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default)
         {
             // Remember a manual Fixed choice so a later reconnect respects it
-            // instead of forcing Center (see EnableScopeAsync).
+            // instead of forcing Center (see EnableScopeAsync), and mirror it to
+            // settings so a restart does too.
             _operatorFixedMode = !center;
+            await PersistScopeModeAsync(!center);
             byte mode = center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed;
-            return SetScopeModeAsync(mode, center ? "scope center mode" : "scope fixed mode", cancellationToken);
+            await SetScopeModeAsync(mode, center ? "scope center mode" : "scope fixed mode", cancellationToken);
+        }
+
+        /// <summary>
+        /// Seed <see cref="_operatorFixedMode"/> from the persisted setting.
+        /// Best-effort: a settings-read failure leaves the in-memory choice (and
+        /// therefore Center) as it stands, which is the safe default.
+        /// </summary>
+        private async Task LoadPersistedScopeModeAsync()
+        {
+            try
+            {
+                var settings = await _settings.GetSettingsAsync();
+                _operatorFixedMode = settings.ScopeFixedMode;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[CivRadioController] Could not read the persisted scope mode; assuming Center.");
+            }
+        }
+
+        /// <summary>
+        /// Mirror a Centre/Fixed choice into settings. Best-effort and only when
+        /// the value actually changes — this runs on a button click, and the
+        /// settings file is rewritten whole on every save.
+        /// </summary>
+        private async Task PersistScopeModeAsync(bool fixedMode)
+        {
+            try
+            {
+                var settings = await _settings.GetSettingsAsync();
+                if (settings.ScopeFixedMode == fixedMode)
+                    return;
+                settings.ScopeFixedMode = fixedMode;
+                await _settings.SaveSettingsAsync(settings);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[CivRadioController] Could not persist the scope mode; it will hold for this session only.");
+            }
         }
 
         /// <summary>
@@ -504,7 +578,9 @@ namespace Icom_Web_Control.Services
 
             // Mark the scope live so the poll loop backs off and lets the sweep
             // frames have the bus (see ScopePollIntervalMs).
-            Volatile.Write(ref _lastSweepTicks, Environment.TickCount64);
+            long sweepTicks = Environment.TickCount64;
+            Volatile.Write(ref _lastSweepTicks, sweepTicks);
+            AccumulateSweepRate(sweepTicks);
 
             // The radio's live scope mode (tracks front-panel changes), carried on
             // every SpectrumUpdate so the panel can label CENT / FIX etc.
@@ -1323,14 +1399,55 @@ namespace Icom_Web_Control.Services
                 _logger.LogWarning("[CivRadioController] IF width not adjustable in the current mode — ignored");
                 return;
             }
-            int code = FilterWidthCodec.HzToCode(group, hz);
+            await WriteIfWidthCodeAsync(vfo, group, FilterWidthCodec.HzToCode(group, hz), ct);
+        }
+
+        public async Task<IfFilterWidthStep> NudgeIfFilterWidthAsync(RadioVfo vfo, int steps, CancellationToken ct = default)
+        {
+            var group = await ReadModeGroupAsync(vfo, ct);
+            if (group == FilterWidthCodec.Group.None)
+            {
+                _logger.LogInformation("[CivRadioController] IF width not adjustable in the current mode — nudge ignored");
+                return new IfFilterWidthStep(-1, false);
+            }
+
+            int code = await ReadMenuByteAsync(CivProtocol.SubIfWidth, ct);
+            if (code < 0)
+            {
+                _logger.LogWarning("[CivRadioController] Could not read the current IF width — nudge ignored");
+                return new IfFilterWidthStep(-1, false);
+            }
+
+            // Clamped, not wrapped: an operator asking for "narrower" at the
+            // bottom of the ladder wants the narrowest, not the widest.
+            int next = Math.Clamp(code + steps, 0, FilterWidthCodec.LastCode(group));
+            if (next == code)
+            {
+                // Already at the end. Nothing is written — the width is right,
+                // the step is what was refused, and the caller is told so it can
+                // say something other than the read-back it just gave.
+                _logger.LogInformation("[CivRadioController] IF width already at the {End} of the {Group} ladder",
+                    steps > 0 ? "top" : "bottom", group);
+                return new IfFilterWidthStep(FilterWidthCodec.CodeToHz(group, code), AtLimit: true);
+            }
+
+            await WriteIfWidthCodeAsync(vfo, group, next, ct);
+            return new IfFilterWidthStep(FilterWidthCodec.CodeToHz(group, next), AtLimit: false);
+        }
+
+        // Shared by the Hz setter and the step nudge. Split out so the nudge does
+        // not have to re-read the mode group it has already read — on a 19200 bus
+        // shared with the scope, one avoided transaction is worth the helper.
+        private async Task WriteIfWidthCodeAsync(
+            RadioVfo vfo, FilterWidthCodec.Group group, int code, CancellationToken ct)
+        {
             byte bcd = (byte)(((code / 10) << 4) | (code % 10));   // one BCD digit-pair; code ≤ 49
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubIfWidth, bcd);
             var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
             {
-                _logger.LogWarning("[CivRadioController] Set IF width {Hz} Hz (code {Code}) was not acknowledged", hz, code);
+                _logger.LogWarning("[CivRadioController] Set IF width code {Code} was not acknowledged", code);
                 return;
             }
             int snapped = FilterWidthCodec.CodeToHz(group, code);
@@ -1586,6 +1703,9 @@ namespace Icom_Web_Control.Services
                 0x02 => Group.Am,                              // AM
                 _ => Group.None,                               // FM (0x05) / unknown
             };
+
+            /// <summary>Highest valid code for the group; -1 if the group has no width.</summary>
+            public static int LastCode(Group g) => (Table(g)?.Length ?? 0) - 1;
 
             /// <summary>Code → Hz for the group; -1 if the code is out of range or the group has no width.</summary>
             public static int CodeToHz(Group g, int code)
@@ -2619,6 +2739,33 @@ namespace Icom_Web_Control.Services
                 // No clients connected yet — the value is also polled via
                 // /api/cat/status/init.
             }
+        }
+
+        /// <summary>
+        /// Count one completed sweep into the rolling rate window and publish the
+        /// rate when the window closes. Serial reader thread only.
+        /// </summary>
+        private void AccumulateSweepRate(long nowTicks)
+        {
+            long elapsed = nowTicks - _rateWindowStartTicks;
+
+            // First sweep, or the stream stopped and started again: open a fresh
+            // window rather than averaging across the gap, which would report a
+            // rate far below the real one for the first window after a restart.
+            if (_rateWindowStartTicks == 0 || elapsed > ScopeRateWindowMs * 4)
+            {
+                _rateWindowStartTicks = nowTicks;
+                _rateWindowSweeps = 0;
+                return;
+            }
+
+            _rateWindowSweeps++;
+            if (elapsed < ScopeRateWindowMs)
+                return;
+
+            Interlocked.Exchange(ref _sweepsPerSecond, _rateWindowSweeps * 1000.0 / elapsed);
+            _rateWindowStartTicks = nowTicks;
+            _rateWindowSweeps = 0;
         }
 
         // Choose the inter-poll delay based on whether the scope is currently

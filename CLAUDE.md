@@ -347,7 +347,9 @@ the `site.js` header and several FTdx10/FTdx101 anecdotes, plus the inherited
 the wire are deliberate; the comments are simply unswept.
 
 `Services/RadioCapabilities.cs` is **live**, not dead — `Index.cshtml` reads
-`IsSingleReceiver` from it, and `IntentDispatcher` routes per-VFO commands
-through `VfoP1` / `VfoIsB` (`CatController` uses `VfoIsB` for the mode setter).
+`IsSingleReceiver` from it, and `IntentDispatcher` and `CatController` both
+route per-VFO writes through `VfoIsB`. (`VfoP1` is gone: it returned the P1
+*digit* of a Yaesu CAT command, and its last caller was the IF-width voice
+nudge, which now goes through the seam.)
 Every method returns the same answer for both supported models; that is
 deliberate, so the assumption is stated in one place.

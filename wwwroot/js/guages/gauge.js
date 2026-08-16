@@ -1,5 +1,21 @@
 // gauge.js - Base and derived classes for all meter gauges
 // Requires: canvas-gauge library loaded globally (RadialGauge)
+//
+// Why the needles are not animated
+// --------------------------------
+// Every gauge here used to carry `animationDuration: 400`. The poll loop
+// pushes meter values roughly every 150 ms, and update-engine.js assigns
+// `gauge.value` on each one, so each update restarted a 400 ms needle
+// animation that had no chance of finishing -- up to three overlapping at
+// a time. Blink discards the superseded needle draws; Gecko does not, so in
+// Firefox the leftovers smear into needles that appear to run past the end
+// of their arc, plus stray fragments above and left of the gauge. It shows
+// up on transmit, because that is when the values churn fastest.
+// Reported by Albergsteve on issue #2 and reproduced under the stub
+// controller in Firefox (clean in Chromium; clean in both once animation is
+// off). At 6-7 updates/sec the animation was smoothing data that already
+// arrives smoothly, so it buys nothing -- hence `animation: false` rather
+// than a shorter duration.
 
 class Gauge {
     static defaultWidth = 220;
@@ -173,8 +189,7 @@ class SMeterGauge extends Gauge {
             needleCircleInner: true,
             colorNeedleCircleInner: "#dc3545",
             colorNeedleCircleInnerEnd: "#dc3545",
-            animationDuration: 400,
-            animationRule: "linear",
+            animation: false,   // see "Why the needles are not animated" at the top of this file
             value: 0,
             // Title label under the gauge, matching SWR / Power / Temp etc.
             // Added in v2.3.9 when the S-meter moved into the top meter row
@@ -241,8 +256,7 @@ class PowerGauge extends Gauge {
             needleCircleInner: true,
             colorNeedleCircleInner: "#dc3545",
             colorNeedleCircleInnerEnd: "#dc3545",
-            animationDuration: 400,
-            animationRule: "linear",
+            animation: false,   // see "Why the needles are not animated" at the top of this file
             value: 0,
             gaugeTitleShow: true,
             gaugeTitle: 'Power Out',
@@ -310,8 +324,7 @@ class SWRGauge extends Gauge {
             needleCircleInner: true,
             colorNeedleCircleInner: "#dc3545",
             colorNeedleCircleInnerEnd: "#dc3545",
-            animationDuration: 400,
-            animationRule: "linear",
+            animation: false,   // see "Why the needles are not animated" at the top of this file
             value: 0,
             gaugeTitleShow: true,
             gaugeTitle: 'SWR',
@@ -369,8 +382,7 @@ class ALCGauge extends Gauge {
             needleCircleInner: true,
             colorNeedleCircleInner: "#dc3545",
             colorNeedleCircleInnerEnd: "#dc3545",
-            animationDuration: 400,
-            animationRule: "linear",
+            animation: false,   // see "Why the needles are not animated" at the top of this file
             value: 0,
             gaugeTitleShow: true,
             gaugeTitle: 'ALC',
@@ -429,8 +441,7 @@ class CompressionGauge extends Gauge {
             needleCircleInner: true,
             colorNeedleCircleInner: "#dc3545",
             colorNeedleCircleInnerEnd: "#dc3545",
-            animationDuration: 400,
-            animationRule: "linear",
+            animation: false,   // see "Why the needles are not animated" at the top of this file
             value: 0,
             gaugeTitleShow: true,
             gaugeTitle: 'Compression',
@@ -489,8 +500,7 @@ class IDDGauge extends Gauge {
             needleCircleInner: true,
             colorNeedleCircleInner: "#dc3545",
             colorNeedleCircleInnerEnd: "#dc3545",
-            animationDuration: 400,
-            animationRule: "linear",
+            animation: false,   // see "Why the needles are not animated" at the top of this file
             value: 0,
             gaugeTitleShow: true,
             gaugeTitle: 'IDD',
@@ -549,8 +559,7 @@ class VDDGauge extends Gauge {
             needleCircleInner: true,
             colorNeedleCircleInner: "#dc3545",
             colorNeedleCircleInnerEnd: "#dc3545",
-            animationDuration: 400,
-            animationRule: "linear",
+            animation: false,   // see "Why the needles are not animated" at the top of this file
             value: 13.8,
             gaugeTitleShow: true,
             gaugeTitle: 'VDD',
