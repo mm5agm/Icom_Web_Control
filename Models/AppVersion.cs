@@ -20,7 +20,7 @@ public static class AppVersion
     /// as plain "v1.0.6": a tester could not tell which build they were running,
     /// and neither could we when reading their bug report.
     /// </summary>
-    public const string PreRelease = "pre4";
+    public const string PreRelease = "";
 
     /// <summary>
     /// What the user is shown, and the only version string that should appear in
@@ -31,7 +31,7 @@ public static class AppVersion
 
     /// <summary>Date this version was released, ISO format.
     /// Bump on actual release; current value reflects the planned ship date.</summary>
-    public const string ReleaseDate = "2026-08-10";
+    public const string ReleaseDate = "2026-08-16";
 
     /// <summary>
     /// Firmware version(s) of the developer's bench radio at the time this IWC
