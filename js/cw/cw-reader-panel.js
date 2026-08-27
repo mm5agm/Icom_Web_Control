@@ -28,6 +28,10 @@ const POLL_MS      = 500;
 const LS_KEY       = 'cwReaderPanel';
 const MAX_RENDERED = 20000;   // characters kept in the pane
 
+import { cwPhasor }   from './cw-phasor.js';
+import { cwSpectrum } from './cw-spectrum.js';
+import { renderInto } from './cw-tokens.js';
+
 export class CwReaderPanel {
     constructor() {
         this._dialog   = null;
@@ -61,6 +65,15 @@ export class CwReaderPanel {
 
         this._startBtn?.addEventListener('click', () => this._toggleRunning());
         this._clearBtn?.addEventListener('click', () => this._clear());
+
+        // The tuning figure. Off by default: it is a thing you reach for while
+        // hunting for a signal, not something to leave spinning all session.
+        this._phasorBox = document.getElementById('cwPhasorBox');
+        this._phasorTgl = document.getElementById('cwPhasorToggle');
+        this._phasorTgl?.addEventListener('change', () => {
+            this._applyPhasor();
+            this._saveSettings();
+        });
 
         // Stopping the decoder when the dialog closes would throw away the
         // operator's copy mid-QSO if they closed it by accident. The decoder
@@ -120,15 +133,36 @@ export class CwReaderPanel {
     // ── Polling ─────────────────────────────────────────────────────────────
 
     _startPolling() {
+        // Re-apply here rather than only on the toggle, so a panel reopened
+        // with the figure remembered comes back with it running.
+        this._applyPhasor();
         if (this._timer) return;
         this._poll();
         this._timer = setInterval(() => this._poll(), POLL_MS);
     }
 
     _stopPolling() {
+        cwPhasor.stop();
+        cwSpectrum.stop();
         if (!this._timer) return;
         clearInterval(this._timer);
         this._timer = null;
+    }
+
+    /// Show or hide the tuning aids, and start or stop their polling with them.
+    ///
+    /// Both live behind the one switch because they answer the two halves of
+    /// the same question and in a fixed order: the spectrum shows where a
+    /// signal is in the passband, and the phasor shows whether you have landed
+    /// on it. Splitting them into two toggles would ask the operator to know
+    /// which half of the problem they have before they have looked.
+    _applyPhasor() {
+        const on = !!this._phasorTgl?.checked;
+        if (this._phasorBox) this._phasorBox.style.display = on ? '' : 'none';
+
+        if (!on) { cwPhasor.stop(); cwSpectrum.stop(); return; }
+        if (cwSpectrum.attach('cwSpectrumCanvas', 'cwSpectrumInfo')) cwSpectrum.start();
+        if (cwPhasor.attach('cwPhasorCanvas', 'cwPhasorInfo')) cwPhasor.start();
     }
 
     async _poll() {
@@ -161,7 +195,10 @@ export class CwReaderPanel {
                 this._text = this._text.slice(this._text.length - MAX_RENDERED);
             }
             if (this._out) {
-                this._out.textContent = this._text;
+                // Re-render the whole buffer rather than appending: which
+                // callsigns count as confirmed depends on how often they have
+                // appeared, so new copy can change the markup of old copy.
+                renderInto(this._out, this._text);
                 if (this._autoScrl?.checked) this._out.scrollTop = this._out.scrollHeight;
             }
         }
@@ -251,12 +288,18 @@ export class CwReaderPanel {
             : 'filter unknown');
         bits.push(`search +/-${Math.round(snap.searchWindowHz)} Hz`);
 
-        // Speed is left out when nothing is readable. It is the reading that
-        // misleads most: with the detector chattering it rails at the maximum
-        // and reports a locked 60 wpm, which looks like a very fast operator
-        // rather than a decoder with nothing to decode.
-        const readable = snap.readability !== 'Chatter' && snap.readability !== 'Jumbled';
-        if (snap.wordsPerMinute && readable) bits.push(`${snap.wordsPerMinute.toFixed(0)} wpm${snap.isLocked ? '' : ' (unlocked)'}`);
+        // Speed is left out unless the reader says the estimate is worth
+        // reporting. It is the reading that misleads most: with the detector
+        // chattering it rails at the maximum, which looks like a very fast
+        // operator rather than a decoder with nothing to decode.
+        //
+        // isLocked is the whole test now. It used to be paired with a
+        // readability check here because isLocked only counted marks and would
+        // happily lock onto noise; it now carries the readability condition
+        // itself, with a hold so the speed does not blink off across QSB. The
+        // check that was here also let Unknown through, so a quiet band showed
+        // a speed for the first few seconds of every session.
+        if (snap.wordsPerMinute && snap.isLocked) bits.push(`${snap.wordsPerMinute.toFixed(0)} wpm`);
         if (Number.isFinite(snap.snrDb)) bits.push(`SNR ${snap.snrDb.toFixed(0)} dB`);
         if (snap.droppedFrames)  bits.push(`${snap.droppedFrames} frames dropped`);
 
@@ -274,6 +317,9 @@ export class CwReaderPanel {
             const raw = localStorage.getItem(LS_KEY);
             if (!raw) return;
             const s = JSON.parse(raw);
+            if (this._phasorTgl && typeof s.phasor === 'boolean') {
+                this._phasorTgl.checked = s.phasor;
+            }
             if (this._autoScrl && typeof s.autoScroll === 'boolean') {
                 this._autoScrl.checked = s.autoScroll;
             }
@@ -292,6 +338,7 @@ export class CwReaderPanel {
             const rect = this._dialog?.getBoundingClientRect();
             localStorage.setItem(LS_KEY, JSON.stringify({
                 autoScroll: this._autoScrl ? this._autoScrl.checked : true,
+                phasor:     this._phasorTgl ? this._phasorTgl.checked : false,
                 left: rect ? Math.round(rect.left) : undefined,
                 top:  rect ? Math.round(rect.top)  : undefined,
             }));

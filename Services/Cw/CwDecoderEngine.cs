@@ -87,6 +87,53 @@ namespace RadioWebControl.Core.Services.Cw
     }
 
     /// <summary>
+    /// One point of the tuning figure. See CwToneSample.PhasorI for what the
+    /// pair means and why it is referenced to the configured pitch.
+    /// </summary>
+    public readonly struct CwPhasorPoint
+    {
+        public double I { get; init; }
+        public double Q { get; init; }
+
+        /// <summary>
+        /// Carried so the display can tell a real trace from the gap between
+        /// characters, where the figure collapses to the middle and would
+        /// otherwise draw a line through the origin on every key-up.
+        /// </summary>
+        public bool KeyDown { get; init; }
+    }
+
+    /// <summary>
+    /// One frame of the passband spectrum, for the tuning display. See
+    /// <see cref="CwDecoderEngine.Spectrum"/>.
+    /// </summary>
+    public readonly struct CwSpectrumFrame
+    {
+        /// <summary>Centre frequency of the first bin in <see cref="Db"/>.</summary>
+        public double FirstHz { get; init; }
+
+        /// <summary>Spacing between bins, in Hz.</summary>
+        public double BinHz { get; init; }
+
+        /// <summary>
+        /// One value per bin, in dB above the median of this span. Empty until
+        /// the first FFT frame has been gathered. Relative, not absolute:
+        /// nothing upstream of the reader has a calibrated level.
+        /// </summary>
+        public double[] Db { get; init; }
+
+        /// <summary>Where the operator asked to listen - the marker on the display.</summary>
+        public double PitchHz { get; init; }
+
+        /// <summary>Where the reader believes the tone actually is.</summary>
+        public double ToneHz { get; init; }
+
+        public double Confidence { get; init; }
+
+        public bool SignalPresent { get; init; }
+    }
+
+    /// <summary>
     /// The decoder, assembled: audio in, characters out.
     ///
     /// It owns a <see cref="CwToneDetector"/> (tone tracking and an adaptive
@@ -119,6 +166,16 @@ namespace RadioWebControl.Core.Services.Cw
         private double _badSinceSeconds = double.NaN;
         private double _nowSeconds;
 
+        // Phasor points for the tuning aid, kept in a ring the UI drains at its
+        // own pace. Sized for a couple of seconds at the hop rate, which is far
+        // more than the display needs but leaves room for a browser tab that
+        // stops polling for a moment. Points that age out are simply lost -
+        // this is an instrument, not a record, and a tuning aid showing two
+        // seconds of history is showing more than an operator can read.
+        private const int PhasorRing = 512;
+        private readonly CwPhasorPoint[] _phasor = new CwPhasorPoint[PhasorRing];
+        private long _phasorSeq;
+
         public CwDecoderEngine(CwDecoderOptions? options = null)
         {
             _opt = options ?? new CwDecoderOptions();
@@ -136,6 +193,65 @@ namespace RadioWebControl.Core.Services.Cw
 
         /// <summary>Raised for each run of newly decoded characters.</summary>
         public event Action<string>? TextDecoded;
+
+        /// <summary>
+        /// Phasor points produced since <paramref name="since"/>, oldest first,
+        /// for the tuning aid. Pass 0 the first time and the returned cursor
+        /// after that.
+        ///
+        /// A caller that falls more than the ring behind silently skips what it
+        /// missed rather than replaying stale points, because a tuning display
+        /// drawing two-second-old audio is worse than one that jumps.
+        /// </summary>
+        public CwPhasorPoint[] PhasorSince(long since, out long cursor)
+        {
+            lock (_gate)
+            {
+                cursor = _phasorSeq;
+                long oldest = Math.Max(0, _phasorSeq - PhasorRing);
+                long from   = Math.Clamp(since, oldest, _phasorSeq);
+
+                int n = (int)(_phasorSeq - from);
+                if (n <= 0) return Array.Empty<CwPhasorPoint>();
+
+                var outp = new CwPhasorPoint[n];
+                for (int k = 0; k < n; k++)
+                    outp[k] = _phasor[(int)((from + k) % PhasorRing)];
+                return outp;
+            }
+        }
+
+        /// <summary>
+        /// The passband as the reader sees it, for the tuning display: one
+        /// value per FFT bin in dB above the span's own median, plus where the
+        /// span starts and how wide a bin is.
+        ///
+        /// This is the finding aid the phasor is not. The phasor answers "am I
+        /// on the tone" once you are near it; the spectrum answers "where is
+        /// the tone", which is the question you have when the reader is quiet
+        /// and you cannot tell whether the band is empty or the dial is off.
+        /// Drawn with a marker at the operator's pitch, the gap between the
+        /// marker and the peak is the tuning error, read directly.
+        /// </summary>
+        public CwSpectrumFrame Spectrum()
+        {
+            lock (_gate)
+            {
+                var db = new double[_tone.SpectrumBins];
+                int n  = _tone.CopySpectrum(db, out double firstHz, out double binHz);
+
+                return new CwSpectrumFrame
+                {
+                    FirstHz = firstHz,
+                    BinHz   = binHz,
+                    Db      = n == db.Length ? db : db.AsSpan(0, n).ToArray(),
+                    PitchHz = _opt.PitchHz,
+                    ToneHz  = _tone.ToneHz,
+                    Confidence    = _tone.Confidence,
+                    SignalPresent = _signalPresent,
+                };
+            }
+        }
 
         public double WordsPerMinute => _elements.WordsPerMinute;
         public double ToneHz         => _tone.ToneHz;
@@ -185,6 +301,14 @@ namespace RadioWebControl.Core.Services.Cw
                 {
                     var produced = _elements.Push(s);
                     if (produced.Length > 0) sb.Append(produced);
+
+                    _phasor[(int)(_phasorSeq % PhasorRing)] = new CwPhasorPoint
+                    {
+                        I = s.PhasorI,
+                        Q = s.PhasorQ,
+                        KeyDown = s.KeyDown,
+                    };
+                    _phasorSeq++;
                 }
 
                 var last = _samples[^1];
