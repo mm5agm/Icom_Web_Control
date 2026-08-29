@@ -69,6 +69,17 @@ so `core/js/cw/x.js` is served at `/js/cw/x.js` with **no csproj change**. That
 target also writes the `.gitignore` for what it generated, so the copies never
 need a hand-written ignore rule either.
 
+**Moving a JS file *into* `core/js/` can silently delete someone's work.** The
+moment it moves, its old `wwwroot/js/...` path becomes a generated, gitignored
+build artefact. Any branch still modifying that path then merges as
+**modify/delete** - and resolving that as a delete, which is the tempting
+reading now that the path is generated, drops the branch's change with no
+conflict marker, no build error and nothing in the diff to notice. Before
+moving a file into `core/js/`, run `gh pr list` and check for open PRs
+touching it; if there are any, fold their changes into the `core/` copy first
+and say so in the commit. This happened on 2026-08-27 in the other app, with
+`audio-playback.js` and PR #112.
+
 C# under `core/` is excluded from this project's compile globs
 (`<Compile Remove="core\**" />` and friends) and consumed as a project
 reference. That exclusion is mandatory - the Web SDK globs `**/*.cs`.
