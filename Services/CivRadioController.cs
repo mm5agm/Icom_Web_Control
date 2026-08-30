@@ -63,6 +63,12 @@ namespace Icom_Web_Control.Services
         private readonly CivScopeAssembler _scope = new();
         private int _scopeBroadcasts;
 
+        // Averages the first few seconds of scope trace and logs the numbers
+        // once, so the shape of the trace and the level of the centre bin are
+        // on record. The panel's Low/High/Gain sliders make the display itself
+        // useless as evidence. See ScopeProbe.cs.
+        private readonly ScopeProbe _scopeProbe = new();
+
         // TickCount64 of the last completed sweep, written on the serial-reader
         // thread and read by the poll loop to decide whether the scope is live.
         // While it is, the loop paces itself with ScopePollIntervalMs so solicited
@@ -575,6 +581,10 @@ namespace Icom_Web_Control.Services
             var sweep = _scope.Add(frame);
             if (sweep == null)
                 return;
+
+            if (_scopeProbe.Add(sweep))
+                foreach (string line in _scopeProbe.Format())
+                    _logger.LogInformation("[CivRadioController] {Line}", line);
 
             // Mark the scope live so the poll loop backs off and lets the sweep
             // frames have the bus (see ScopePollIntervalMs).

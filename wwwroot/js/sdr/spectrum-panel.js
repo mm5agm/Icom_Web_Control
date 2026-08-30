@@ -246,8 +246,14 @@ export class SpectrumPanel {
     // which slice of spectrum the canvas is showing. That slice is NOT always
     // centred on the VFO:
     //
-    //   Centre mode  — the radio sweeps around the VFO, so the sweep centre and
-    //                  the VFO are the same number and nothing changes.
+    //   Centre mode  — the radio sweeps around the VFO but does NOT centre on
+    //                  it. In SSB it centres on the passband, a fixed 1.5 kHz
+    //                  off the carrier: measured 2026-08-30 as VFO-1500 on 40m
+    //                  LSB and VFO+1500 on 20m DATA-U. The two readings had IF
+    //                  widths of 3600 and 500 Hz, so the offset is the
+    //                  sideband's carrier point and not half the filter. The
+    //                  VFO marker is drawn at its true offset, which is why it
+    //                  does not sit dead centre in SSB - correct, not a bug.
     //   Fixed/scroll — the sweep is a band segment that stays put while the VFO
     //                  moves inside it. The waveform header carries the segment's
     //                  own lower/upper edges, which CivScopeAssembler averages

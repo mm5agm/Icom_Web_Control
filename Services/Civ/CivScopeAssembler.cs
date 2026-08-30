@@ -6,9 +6,23 @@ namespace Icom_Web_Control.Services.Civ
     /// <summary>
     /// A completed spectrum-scope sweep: the full trace as dBFS-like bins across
     /// the span, plus the centre frequency and total span width the radio
-    /// reported for the frame. The SpectrumPanel actually centres its axis on
-    /// the live VFO frequency, so <see cref="SpanHz"/> is the field that matters
-    /// on the wire; <see cref="CentreHz"/> is carried for completeness.
+    /// reported for the frame.
+    ///
+    /// <see cref="CentreHz"/> is not decoration - the SpectrumPanel builds its
+    /// whole frequency axis from it, and it is not the VFO. Even in Center mode
+    /// the IC-7300 centres on the passband rather than on the suppressed
+    /// carrier, a fixed 1.5 kHz off (measured 2026-08-30):
+    ///
+    ///   40m LSB     VFO 7,174,000   sweep centre 7,172,500   IF width 3600
+    ///   20m DATA-U  VFO 14,190,000  sweep centre 14,191,500  IF width 500
+    ///
+    /// Below the carrier in LSB, above it in USB, and the same 1500 Hz at both
+    /// filter widths - so it is the sideband's carrier point, not half the
+    /// filter. Centring the axis on the VFO instead would mislabel every bin by
+    /// that much, about 3.6 bins at a 200 kHz span. The radio's number is the
+    /// right one: used as the centre, the strongest bin on 40m landed on
+    /// exactly 7,250.0 kHz, a real broadcast channel, which it does not if the
+    /// VFO is used instead.
     /// </summary>
     public sealed class ScopeSweep
     {
