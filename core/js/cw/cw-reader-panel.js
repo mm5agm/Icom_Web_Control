@@ -45,6 +45,7 @@ export class CwReaderPanel {
         this._cursor   = 0;
         this._running  = false;
         this._text     = '';
+        this._readerMode = false;
     }
 
     // ── Lifecycle ───────────────────────────────────────────────────────────
@@ -66,6 +67,15 @@ export class CwReaderPanel {
 
         this._startBtn?.addEventListener('click', () => this._toggleRunning());
         this._clearBtn?.addEventListener('click', () => this._clear());
+
+        // Reader Mode sets the radio up for decoding and remembers what to put
+        // back. The button is optional: the host page may not offer it, and an
+        // app whose radio cannot be driven this way simply omits it.
+        this._modeBtn = document.getElementById('cwReaderModeBtn');
+        if (this._modeBtn) {
+            this._modeBtn.addEventListener('click', () => this._toggleReaderMode());
+            this._refreshReaderMode();
+        }
 
         // The tuning figure. Off by default: it is a thing you reach for while
         // hunting for a signal, not something to leave spinning all session.
@@ -101,6 +111,14 @@ export class CwReaderPanel {
 
     async _toggleRunning() {
         try {
+            // Stopping the decoder puts the radio back. The plan says the
+            // restore happens when the reader closes, but closing the dialog
+            // deliberately leaves the decoder running - so Stop, not close, is
+            // the moment the operator has actually finished reading. Closing
+            // the panel and finding the filter had silently re-opened to 2.4
+            // kHz mid-QSO would be the worse surprise of the two.
+            if (this._running && this._readerMode) await this._setReaderMode(false);
+
             const res = await fetch(this._running ? '/api/cw/stop' : '/api/cw/start', { method: 'POST' });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
@@ -129,6 +147,60 @@ export class CwReaderPanel {
         } catch (e) {
             this._showError(e.message);
         }
+    }
+
+    // ── Reader Mode ─────────────────────────────────────────────────────────
+    //
+    // What the operator feeds the decoder matters more than the decoding: a
+    // 2.4 kHz filter full of adjacent signals defeats any decoder there is.
+    // The server holds the previous settings, not this panel, so the restore
+    // survives a page reload - which is the whole reason it is not three fetch
+    // calls from here.
+
+    async _toggleReaderMode() {
+        await this._setReaderMode(!this._readerMode);
+    }
+
+    async _setReaderMode(on) {
+        if (!this._modeBtn) return;
+        this._modeBtn.disabled = true;
+        try {
+            const res = await fetch(`/api/cw/readermode/${on ? 'on' : 'off'}`, { method: 'POST' });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) { this._showError(body.error || `HTTP ${res.status}`); return; }
+            this._applyReaderMode(body);
+        } catch (e) {
+            this._showError(e.message);
+        } finally {
+            this._modeBtn.disabled = false;
+        }
+    }
+
+    async _refreshReaderMode() {
+        try {
+            const res = await fetch('/api/cw/readermode');
+            if (res.ok) this._applyReaderMode(await res.json());
+        } catch { /* the button just stays as it is */ }
+    }
+
+    _applyReaderMode(status) {
+        this._readerMode = !!status.on;
+        if (!this._modeBtn) return;
+
+        this._modeBtn.textContent = this._readerMode ? 'Reader Mode ON' : 'Reader Mode';
+        this._modeBtn.classList.toggle('btn-warning', this._readerMode);
+        this._modeBtn.classList.toggle('btn-outline-info', !this._readerMode);
+        this._modeBtn.setAttribute('aria-pressed', String(this._readerMode));
+
+        // Naming what will be put back is what makes the button safe to press.
+        // An operator who has spent a while getting their filters right will
+        // not hand them to a button that does not say what it is holding.
+        const width = status.ifWidthHz ? `${status.ifWidthHz} Hz` : `code ${status.ifWidthCode ?? '?'}`;
+        this._modeBtn.title = this._readerMode
+            ? `${status.mode ?? 'CW'}, ${width}, APF ${status.apfOn ? 'on' : 'off'}. `
+              + `Press again to restore ${status.restoresMode ?? 'your mode'}`
+              + `${status.restoresWidth ? ` and IF width code ${status.restoresWidth}` : ''}.`
+            : 'Set CW mode, a narrow filter and APF for decoding. Your current settings are put back when you stop.';
     }
 
     // ── Polling ─────────────────────────────────────────────────────────────
@@ -218,17 +290,25 @@ export class CwReaderPanel {
     // The host app may publish `window.radioFeatureSetup`; if it has not, or
     // it does not provide this particular pop-out, the text stands on its own
     // and nothing here changes.
-    _setStatus(text, setupKind) {
+    _setStatus(text, setupKind, level) {
         if (!this._status) return;
 
         // Rebuilt on every poll tick, this would replace the button between a
         // mousedown and its mouseup and the click would never land. Nothing
         // here changes while the message does not, so leave the node alone.
-        const sig = setupKind + '|' + text;
+        const sig = level + '|' + setupKind + '|' + text;
         if (this._statusSig === sig) return;
         this._statusSig = sig;
 
         this._status.textContent = text;
+
+        // Running commentary and 'your radio audio is not working' were being
+        // drawn identically - small, dim and monospaced - and the operator
+        // read straight past the one that mattered. The host app styles
+        // `.cwr-problem`; it is the host's business because only the host
+        // knows its own palette.
+        const problem = level === 'problem';
+        this._status.classList.toggle('cwr-problem', problem);
 
         const setup = (typeof window !== 'undefined') ? window.radioFeatureSetup : null;
         if (!setupKind || !setup || typeof setup.open !== 'function') return;
@@ -236,7 +316,7 @@ export class CwReaderPanel {
 
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'btn btn-sm btn-outline-primary ms-2';
+        btn.className = 'btn btn-sm ms-2 ' + (problem ? 'btn-warning' : 'btn-outline-primary');
         btn.textContent = 'Set it up';
         btn.addEventListener('click', () => setup.open(setupKind));
         this._status.appendChild(btn);
@@ -262,7 +342,7 @@ export class CwReaderPanel {
         // operator hunting through Settings the first time.
         if (snap.captureError) {
             this._setStatus('Running, but the radio audio could not be opened. '
-                + snap.captureError, 'cw-audio');
+                + snap.captureError, 'cw-audio', 'problem');
             return;
         }
 
@@ -271,7 +351,7 @@ export class CwReaderPanel {
         if (!snap.audioDevicesOpen) {
             this._setStatus('Running, but the radio audio device is not open. '
                 + 'Stop and start the reader; if it keeps happening, check the '
-                + 'radio is still connected.', 'cw-audio');
+                + 'radio is still connected.', 'cw-audio', 'problem');
             return;
         }
 
@@ -312,7 +392,21 @@ export class CwReaderPanel {
         bits.push(snap.filterWidthHz
             ? `filter ${snap.filterWidthHz} Hz`
             : 'filter unknown');
-        bits.push(`search +/-${Math.round(snap.searchWindowHz)} Hz`);
+        // The window is sized from the filter width, but only over part of
+        // the range: it is half the width clamped to 100..500 Hz. So a 2.4 kHz
+        // SSB filter implies +/-1200 and receives +/-500, and a 100 Hz CW
+        // filter implies +/-50 and receives +/-100. Printing the width and the
+        // window side by side without saying that reads as though the width
+        // set the window, and an operator who widens the filter to help the
+        // reader find a station is then owed an explanation of why nothing
+        // changed. Above the clamp a wider window would only offer more wrong
+        // tones to lock onto - that regime is what multi-signal decode is for.
+        const win  = Math.round(snap.searchWindowHz);
+        const half = snap.filterWidthHz ? snap.filterWidthHz / 2 : null;
+        let note = '';
+        if (half !== null && half > win + 1)      note = ' (clamped)';
+        else if (half !== null && half < win - 1) note = ' (wider than the filter)';
+        bits.push(`search +/-${win} Hz${note}`);
 
         // Speed is left out unless the reader says the estimate is worth
         // reporting. It is the reading that misleads most: with the detector
@@ -333,7 +427,7 @@ export class CwReaderPanel {
     }
 
     _showError(message) {
-        this._setStatus(`Error: ${message}`);
+        this._setStatus(`Error: ${message}`, null, 'problem');
     }
 
     // ── Settings ────────────────────────────────────────────────────────────
