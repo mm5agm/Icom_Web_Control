@@ -1085,7 +1085,7 @@ If the connection drops, the app reconnects automatically after 15 seconds. Disa
 
 ---
 
-### 6.6 Backup &amp; Restore
+### 6.6 Backup & Restore
 
 At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete IWC user data as a **single zip file**. This rolls up everything you've customised across the app into one file:
 
