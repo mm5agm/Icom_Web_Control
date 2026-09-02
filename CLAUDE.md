@@ -248,6 +248,13 @@ WsjtxUdpService (IHostedService)     — WSJT-X UDP status/QSO feed
 DxClusterService (IHostedService)    — cluster telnet feed → DX spot overlay
 VoiceControlService (IHostedService) — SAPI recognition → IntentDispatcher
 SystemTrayService (IHostedService)
+
+CW reader — four singletons, no hosted service (nothing runs until the
+operator presses Start):
+  WaveInCwAudioSource   — one WinMM recording device → 480-sample frames
+  CwReaderService       — drives Core's CwDecoderEngine, holds the text
+  CwReaderModeService   — saves/applies/restores mode + IF width + APF
+  CwQsoLogService       — suggests a QSO from the copy, writes iwc-log.adi
 ```
 
 There is **no SDR subsystem**. The spectrum comes from the radio's own scope
@@ -304,6 +311,62 @@ reconnects (`_operatorScopeOff`) so the app never switches it back on unasked.
 
 ---
 
+### CW reader — the decoder is shared, the capture and the radio are not
+
+`core/Services/Cw/` (`CwDecoderEngine`, `CwToneDetector`, `CwElementDecoder`,
+`CwZeroIn`, `CwQsoFields`, `CwTranscriptWriter`, `MorseTable`) and
+`core/js/cw/` are shared with YWC and were reused **unchanged** — not one line
+had to move to serve a second brand of radio. What is IWC-local is only the
+wiring:
+
+- **`Services/Cw/WaveInCwAudioSource`** — IWC has no audio subsystem at all
+  (no `Services/Audio/`, no Remote Audio), so the reader opens a WinMM
+  recording device directly via NAudio, which is already referenced for the
+  voice output. Three non-obvious details: devices are stored **by name, not
+  index** (WinMM renumbers on any USB plug/unplug); WinMM truncates names at
+  **31 characters** (`MAXPNAMELEN`), hence the truncated-name fallback in
+  `CwAudioDevices.IndexFor`; and a WinMM buffer is **not** a multiple of 480
+  samples, so the carry buffer is load-bearing — without it the remainder is
+  dropped from every buffer, a steady silent loss that looks exactly like a
+  decoder that cannot copy. The bounded channel uses the
+  `Channel.CreateBounded(options, itemDropped)` overload for the same reason:
+  `DropOldest` discards silently, so that callback is the only way the status
+  line can ever say frames were lost.
+- **`Services/Cw/CwReaderModeService`** — CW mode, a narrow filter, APF, and
+  the restore. **It contains no lookup table**, because
+  `IRadioController.SetIfFilterWidthHzAsync` takes Hz and snaps internally,
+  and `RadioStateService.CwPitch` is already Hz. YWC's equivalent is a page of
+  per-model `SH` codes. **This is the proof that `YaesuIfWidth` could never
+  have moved into `core/`:** the two radios do not have different numbers,
+  one has numbers and the other has a formula. Order is mode → width → APF and
+  is not cosmetic (both width and APF are per-mode). APF asks for **MID (2),
+  not NAR** — NAR is ~80 Hz on SHARP and a 20 wpm dit's keying sidebands run
+  to roughly ±17 Hz.
+- **`POST /api/cw/zin`** — software zero-in. The IC-7300 has no `ZI`
+  equivalent, so `CwZeroIn` computes the offset (in `core/` precisely so both
+  apps agree about the sign) and the controller sets the frequency. Reads the
+  VFO back rather than trusting the cache.
+- **The reader UI** is the shared Core panel hosted from `Pages/Index.cshtml`;
+  the dialog markup and the ZIN button are IWC-local.
+
+**Reader Mode state lives on the server, deliberately.** Three fetch calls from
+the browser work right up until the operator reloads the page, at which point
+the record of what their filter used to be is gone with the tab and they are
+left at 250 Hz with APF ringing and nothing to press. `CwReaderModeService`
+**must stay a singleton** for the same reason.
+
+**The tie-break differs from YWC's on purpose.** YWC breaks an exact width tie
+wider; `FilterWidthCodec.HzToCode` here scans ascending keeping the first
+match, so it breaks a tie narrower. It only bites at 275 Hz, and the Icom CW
+ladder is 50 Hz steps to 500 Hz so every offered width is an exact rung.
+Do not "fix" it — it would move the CI-V API's snapping and the width nudge
+with it.
+
+**Reader Mode and ZIN are protocol-level and have never seen an antenna.**
+They write mode, `SH`-equivalent width, APF and frequency to the operator's
+radio. A green build says nothing about them. See
+`docs/design/cw-reader-plan.md` §4.17 in YWC for what has to be checked.
+
 ## Frontend Architecture
 
 ### Module map (`wwwroot/js/`)
@@ -337,6 +400,11 @@ ui/
   site.js, meter-formatters.js, band-plan.js, a11y-labels.js, voice-control.js,
   memories.js, dx-spots-panel.js, freq-keyboard.js, calibration-editor.js,
   ic7300-if-width.js
+
+cw/                       — GENERATED. Lives in core/js/cw/ and is copied here
+  cw-reader-panel.js         by the CopySharedCoreJs target. Edit the core/ copy;
+  cw-qso-form.js             the wwwroot one is a gitignored build artefact.
+  cw-spectrum.js, cw-phasor.js, cw-tokens.js
 ```
 
 ### Value flow (strict — never bypass or reorder)

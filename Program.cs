@@ -407,6 +407,17 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoicePhraseStore>(
 builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoiceControlService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.Services.Voice.VoiceControlService>());
 
+// CW reader. Singletons, all four: one recording device, one decoder, one
+// piece of decoded text however many browser tabs are open. Reader Mode in
+// particular has to be a singleton or the record of what the operator's filter
+// used to be would be per-request, which is the same bug as keeping it in the
+// browser tab. Nothing here starts until the operator presses Start - the
+// device is not opened at boot.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.WaveInCwAudioSource>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwQsoLogService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>();
+
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and
 // the file sink captures Information+ globally so we can read what happened

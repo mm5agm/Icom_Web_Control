@@ -192,6 +192,34 @@
         // CW keyer message memories M1-M5 (sent via KY command)
         public List<string> CwMessages { get; set; } = new() { "CQ CQ DE {CALL}", "TU 73", "QRZ?", "UR 5NN", "DE {CALL}" };
 
+        // ── CW Reader ─────────────────────────────────────────────────────
+        // The WinMM recording device the reader listens to - normally the
+        // radio's own USB codec. Stored by name rather than index because
+        // WinMM renumbers its devices whenever anything is plugged in or
+        // removed, and an index that has quietly come to mean a different
+        // device is how an operator ends up decoding their webcam microphone.
+        // Nullable to avoid the implicit [Required] that <Nullable>enable</Nullable>
+        // puts on a non-nullable string, which would block saving it empty.
+        public string? CwAudioDeviceName { get; set; } = "";
+
+        // Reader Mode's target IF width, in Hz. The reader decodes far better
+        // through a narrow filter than through a wide one full of adjacent
+        // signals, and 250 Hz is narrow enough to help without being so narrow
+        // that a slightly mistuned signal falls outside it. Configurable
+        // because the right answer depends on the operator's ear as much as on
+        // the radio: someone who tunes precisely may prefer 100, and someone
+        // working a crowded band by ear may want 400. The controller snaps the
+        // request to the nearest width the radio actually has.
+        public int CwReaderFilterHz { get; set; } = 250;
+
+        // Whether Reader Mode also switches the audio peak filter on. APF
+        // narrows further still, in the audio domain, and it is the single
+        // biggest improvement available to a decoder on a weak signal. Left
+        // switchable because APF rings, and an operator listening as well as
+        // reading may not want it. When on, Reader Mode asks for MID rather
+        // than NAR - see CwReaderModeService for why.
+        public bool CwReaderUseApf { get; set; } = true;
+
         // Per-band IF Width/Shift/Mode memory — keyed by band name (e.g. "20m")
         public Dictionary<string, BandProfile> BandProfilesA { get; set; } = new();
         public Dictionary<string, BandProfile> BandProfilesB { get; set; } = new();

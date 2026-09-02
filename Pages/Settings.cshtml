@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model Icom_Web_Control.Pages.SettingsModel
 
 <style>
@@ -2250,6 +2250,74 @@
                                    placeholder="Message @(i+1)" />
                         </div>
                     }
+        </div>
+    </details>
+
+    <!-- CW Reader -->
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-soundwave" aria-hidden="true"></i>&nbsp;CW Reader</summary>
+        <div class="section-body">
+            <p class="text-muted small mb-3">
+                The CW reader decodes the received Morse to text. It listens to the radio's
+                audio through a Windows recording device - normally the IC-7300's own USB
+                codec - and it opens that device <em>shared</em>, so your logging or
+                digital-mode software can keep using it at the same time.
+            </p>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="cwAudioDeviceName">Audio input device</label>
+                    <select id="cwAudioDeviceName" name="Settings.CwAudioDeviceName"
+                            class="form-select form-select-sm">
+                        <option value="">(none - the reader will not start)</option>
+                        @foreach (var name in Model.CwAudioDeviceNames)
+                        {
+                            <option value="@name" selected="@(string.Equals(Model.Settings.CwAudioDeviceName, name, StringComparison.OrdinalIgnoreCase))">@name</option>
+                        }
+                    </select>
+                    <div class="form-text">
+                        Saved by name rather than by position in the list, because Windows
+                        renumbers recording devices whenever anything USB is plugged in or
+                        removed. If the radio is unplugged the reader says the device is
+                        missing instead of quietly decoding your webcam microphone.
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" for="cwReaderFilterHz">Reader Mode filter width</label>
+                    <select id="cwReaderFilterHz" name="Settings.CwReaderFilterHz" class="form-select form-select-sm">
+                        @foreach (var hz in new[] { 50, 100, 150, 200, 250, 300, 400, 500 })
+                        {
+                            <option value="@hz" selected="@(Model.Settings.CwReaderFilterHz == hz)">@hz Hz</option>
+                        }
+                    </select>
+                    <div class="form-text">
+                        Every width offered here is one the radio actually has - its CW filter
+                        ladder runs in 50 Hz steps up to 500 Hz.
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" id="cwReaderUseApf"
+                               name="Settings.CwReaderUseApf" value="true"
+                               @(Model.Settings.CwReaderUseApf ? "checked" : "") />
+                        <input type="hidden" name="Settings.CwReaderUseApf" value="false" />
+                        <label class="form-check-label" for="cwReaderUseApf">Switch APF on as well</label>
+                    </div>
+                    <div class="form-text">
+                        The audio peak filter narrows further still and is the biggest single
+                        improvement available on a weak signal. Turn it off if you are listening
+                        as well as reading and dislike the ringing.
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-muted small mt-3 mb-0">
+                Reader Mode - the button in the reader panel - sets CW mode, that filter width
+                and APF in one click, and puts back exactly what you had when you switch it off.
+                What a decoder is fed matters more than how it decodes.
+            </p>
         </div>
     </details>
 

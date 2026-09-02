@@ -33,6 +33,7 @@
    - 6.4 [CW Memory Messages](#64-cw-memory-messages-m1m5)
    - 6.5 [DX Cluster](#65-dx-cluster)
    - 6.6 [Backup &amp; Restore](#66-backup--restore)
+   - 6.7 [CW Reader](#67-cw-reader)
 7. [Application Setup](#7-application-setup)
    - 7.1 [External App Buttons](#71-external-app-buttons)
    - 7.2 [WSJT-X UDP Settings](#72-wsjt-x-udp-settings)
@@ -82,6 +83,15 @@
     - 17.5 [Privacy](#175-privacy)
     - 17.6 [Adding your own commands](#176-adding-your-own-commands)
     - 17.7 [More languages](#177-more-languages)
+18. [CW Reader](#18-cw-reader)
+    - 18.1 [What to expect from a machine reading Morse](#181-what-to-expect-from-a-machine-reading-morse)
+    - 18.2 [Choosing the audio device](#182-choosing-the-audio-device)
+    - 18.3 [Starting it](#183-starting-it)
+    - 18.4 [Reader Mode](#184-reader-mode)
+    - 18.5 [ZIN - zero in on the signal](#185-zin---zero-in-on-the-signal)
+    - 18.6 [Transcripts](#186-transcripts)
+    - 18.7 [Logging a QSO](#187-logging-a-qso)
+    - 18.8 [Troubleshooting](#188-troubleshooting)
 
 ---
 
@@ -724,7 +734,7 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 | Control | Description |
 |---------|-------------|
 | Speed | Keyer speed in WPM (4–60) |
-| ZIN | CW Auto Zero In. One click asks the radio to nudge the VFO so the received CW signal sits exactly at your configured CW pitch (set via the Pitch control). Much faster than chasing the signal with the VFO knob. **Also available as a per-VFO ZIN button in each VFO panel's header** — handy for Search-and-Pounce operating when you don't want to open the popout for every signal. |
+| *(no ZIN here)* | The IC-7300 has no CI-V command to zero-beat a signal for you — that is a Yaesu feature, and earlier versions of this manual described it here in error. IWC works the correction out itself instead, from the tone the CW reader is hearing, and offers it as the **ZIN** button in the CW Reader panel (see [§18.5](#185-zin---zero-in-on-the-signal)). |
 | Break-in | **Off** (keyer only), **Semi** (semi break-in), or **Full** (QSK full break-in) |
 | Delay | Semi break-in delay (0–2500 ms) — only relevant in Semi mode |
 | Pitch | CW sidetone pitch frequency (300–1050 Hz in 10 Hz steps). Also sets the CW receive offset so the radio zero-beats at this tone. Read from the radio on connect. |
@@ -1109,6 +1119,28 @@ Click **Import full backup…**, pick a previously exported zip, and confirm the
 - **Experimenting safely** — export before trying something risky; import the file to revert if it goes wrong.
 
 The files inside the zip are plain JSON; you can extract and inspect or hand-edit them if needed. They live at `%APPDATA%\MM5AGM\Icom Web Control\` and are also accessible directly without going through the export.
+
+---
+
+### 6.7 CW Reader
+
+Three settings, all of them for the CW Reader described in [Section 18](#18-cw-reader).
+
+| Setting | What it does |
+|---|---|
+| **Audio input device** | The Windows recording device the reader listens to — normally the IC-7300's own USB codec. Nothing decodes until this is set. |
+| **Reader Mode filter width** | The IF width the **Reader Mode** button asks for. 250 Hz by default. |
+| **Switch APF on as well** | Whether Reader Mode also turns the audio peak filter on. |
+
+**About the device list.** The reader opens the device *shared*, so your logging or digital-mode software can keep using the same codec at the same time — you do not have to choose between them.
+
+Your choice is stored by **name** rather than by its position in the list, because Windows renumbers recording devices whenever anything USB is plugged in or unplugged. Stored by position, an unrelated USB device appearing one morning would silently point the reader at something else entirely. Stored by name, if the radio is switched off the reader tells you the device is missing instead.
+
+For the same reason, if the device you picked is not present when you open the Settings page it still appears in the list and stays selected. Saving the page with the radio switched off will not quietly clear it.
+
+Windows itself truncates recording device names to 31 characters, so a long name may look cut off here. That is the name Windows gives us, not something IWC has shortened.
+
+**About the filter widths.** Every width offered — 50 to 500 Hz — is one the IC-7300 actually has: its CW filter ladder runs in 50 Hz steps to 500 Hz, then in 100 Hz steps above that. Whatever you pick is what you get.
 
 ---
 
@@ -2482,6 +2514,161 @@ Only **English (UK)** ships as the built-in default, but the language pack syste
 3. **Switching locale takes effect immediately** — no restart needed, unlike the initial enable toggle.
 
 The **Voice Phrases editor** itself currently only edits the **en-GB** pack in place; editing an *installed non-English pack* through the same in-app grid isn't wired up yet — for now, translate by hand-editing that culture's JSON file directly, or ask a fluent speaker to export their pack after editing it locally. If you'd like a particular language prioritised for a built-in default, or want the editor to support editing other locales directly, please open a GitHub discussion or issue and mention it.
+
+---
+
+## 18. CW Reader
+
+The **CW Read** button on the main control panel opens a reader that listens to the radio's receive audio and prints the Morse it hears as text. It also offers a **Reader Mode** button that sets the radio up for decoding and puts your settings back afterwards, a **ZIN** button that tunes the signal onto your pitch, a transcript of everything it decoded, and a form that turns a contact into a line in an ADIF log.
+
+Nothing here transmits. The reader only listens.
+
+The decoder itself is shared with my Yaesu app, so the two read Morse identically — what differs is only how each radio is asked for a narrow filter.
+
+### 18.1 What to expect from a machine reading Morse
+
+I want to be straight about this before describing the controls, because it is the thing that surprises people.
+
+On a strong, clean, machine-sent signal the reader is close to perfect. On a marginal one it prints plausible-looking rubbish that looks exactly the same as good copy — the same confident letters, the same spacing. It has no way of knowing the difference, and neither has the screen. My own measurements have had it report full confidence on nearly six hundred characters of complete junk.
+
+That is why the **status line** under the text matters as much as the text. It tells you which of the two you are looking at:
+
+| What it says | What it means |
+|---|---|
+| `signal` / `no signal` | Whether there is a keyed tone in the passband at all. |
+| `nothing readable - the tone is breaking up, not keying` | Something is there but it is not Morse — QSB, splatter, a chopped-up signal. The reader deliberately prints nothing rather than guessing. |
+| `nothing readable - more than one signal in the passband` | Two or more stations are inside your filter. Narrow it, or move. |
+| `tone 612 Hz` / `pitch 600 Hz` | The note it is tracking, and the CW pitch you have the radio set to. |
+| `off pitch - tune +120 Hz` | The signal is not on your pitch. Tune, or press **ZIN** (§18.5). This is worth watching: a station that reads as very weak is often just sitting on the skirt of a narrow filter. |
+| `filter 500 Hz` / `filter unknown` | The IF width the radio reported. Unknown means the reader is using a default search window rather than your passband — usually because the radio is in AM or FM. |
+| `search +/-250 Hz` | How far either side of your pitch it will hunt for a tone. It is half the filter width, clamped to between 100 and 500 Hz — so widening a 2.4 kHz filter further will **not** widen the search, and narrowing below 200 Hz will not narrow it. |
+| `22 wpm` | Only shown once it has genuinely locked onto the keying. If it is absent, it does not know. |
+| `SNR 14 dB` | Signal-to-noise in the audio passband. |
+| `N frames dropped` | The PC could not keep up with the audio. See §18.8. |
+
+Colour in the decoded text marks what *looks like* QSO traffic — procedural signals (`CQ`, `DE`, `73`), signal reports, and callsigns, with a callsign heard more than once shown brighter than one heard only once. Nothing is hidden and nothing is corrected: the colour is a hint about what the reader thinks it saw, laid over exactly what it decoded.
+
+### 18.2 Choosing the audio device
+
+The reader opens a Windows recording device directly — normally the radio's own USB codec, the same device WSJT-X or Fldigi use. Pick it under **Settings → CW Reader** ([§6.7](#67-cw-reader)) before you start.
+
+It is opened **shared**, so your logging or digital-mode software can hold the same device at the same time. You do not have to close WSJT-X to read CW.
+
+If no device is chosen, or the one you chose has been unplugged, the reader says so in words on the status line rather than sitting there printing nothing.
+
+### 18.3 Starting it
+
+1. Open the panel with **CW Read**.
+2. Put the radio in CW and tune the station in — or press **Reader Mode** and let IWC do the filter part (see below).
+3. Press **Start**.
+
+Set your CW pitch in the CW Keyer panel ([§5.12](#512-cw-keyer-panel)) and tune the station onto it. The reader decodes at the pitch you are using, because that is the tone you have tuned the signal to — hunting for a note you are not listening to is not much use to either of you.
+
+| Control | What it does |
+|---|---|
+| **Start / Stop** | Runs the decoder. Stop also restores your radio settings if Reader Mode is on. |
+| **Clear** | Empties the on-screen text. The transcript file on disk is not touched. |
+| **Reader Mode** | Sets the radio up for decoding — see §18.4. |
+| **ZIN** | Tunes the signal onto your CW pitch — see §18.5. |
+| **Log QSO** | Opens the log form — see §18.7. |
+| **Follow** | Keeps the newest text in view. Turn it off to scroll back through an over without being dragged to the bottom. |
+| **Tune** | Shows a tuning display beside the text: a passband spectrum with a marker at your pitch, and an X-Y figure that stops turning when you are exactly zero-beat. Handy if you would rather tune by eye than by ear. |
+
+### 18.4 Reader Mode
+
+**Reader Mode** is one button that sets the radio the way the decoder wants it, and remembers what you had so it can put it back:
+
+- **CW mode** — if the radio is already on CW-U or CW-L it stays on the one you were using.
+- **A narrow IF filter** — 250 Hz by default, configurable in [§6.7](#67-cw-reader).
+- **APF on**, at MID width, unless you have turned that off in settings.
+
+Press it again, or press **Stop**, and your mode, filter width and APF go back exactly as they were.
+
+This matters more than any amount of tinkering with the decoding itself. What a decoder is fed is most of the result, and a 2.4 kHz passband full of adjacent signals will defeat any decoder there is.
+
+Three details worth knowing:
+
+- **APF is set to MID, not NAR.** On SHARP, NAR is about 80 Hz wide. Morse keying puts real energy either side of the tone — at 20 wpm a dit is 60 ms, so the sidebands run to roughly ±17 Hz, and faster sending spreads them further. A filter that narrow starts rounding the very edges the decoder is timing. MID keeps nearly all of the rejection without doing that.
+- **It restores on Stop, not when you close the panel.** Closing the reader deliberately leaves it running — you can put the panel away and come back to it. Stop is when you have actually finished reading, so that is when the radio goes back to how you had it. A filter that quietly re-opened to 2.4 kHz in the middle of a QSO would be the worse surprise.
+- **It survives a page reload.** IWC remembers your previous settings on the PC running it, not in the browser tab, so if you reload the page — or open IWC in a second browser — the button still knows what to put back. That is the whole reason it is a server-side feature rather than three quick commands from the page.
+
+Reader Mode only touches VFO A.
+
+### 18.5 ZIN - zero in on the signal
+
+**ZIN** moves the VFO so that the tone the reader is hearing lands on your configured CW pitch. It is the same idea as the Yaesu's ZI button, but the IC-7300 has no CI-V command for it, so IWC works the correction out from the decoded tone and sets the frequency itself.
+
+It refuses more often than it acts, and that is deliberate. It will tell you:
+
+| Reply | What it means |
+|---|---|
+| `Moved +120 Hz.` | It tuned the radio by that much. |
+| `Already on pitch.` | You are within 25 Hz. Below that it is the tone tracker's own jitter, not mistuning. |
+| `Not sure enough of the tone to move the VFO. Tune closer by hand.` | It is either unsure what note it is hearing, or the correction is bigger than it is willing to make blind. Both usually mean it has locked onto the wrong signal, and moving the VFO would take the station you *were* listening to out of the filter. |
+| `The reader is not running.` / `The radio is not connected.` | As they say. |
+
+So ZIN is for finishing the job once you have the station roughly tuned, not for finding it. Tune by ear or by the spectrum first, then let ZIN put it exactly on pitch — which is worth doing, because a signal on the skirt of a 250 Hz filter reads as far weaker than it is.
+
+ZIN only moves VFO A.
+
+### 18.6 Transcripts
+
+Every session writes a plain-text transcript, so nothing you decoded is lost because you did not think to save it at the time.
+
+They go in `%APPDATA%\MM5AGM\Icom Web Control\CW Transcripts\`.
+
+Files are named for when the session started — `cw-20260902-143000.txt` — with a header line recording the frequency, mode and pitch, and each line stamped with the time it began. A session that decodes nothing leaves no file at all, so the folder does not fill up with empties.
+
+The text is written as it arrives rather than held until you close the reader, because the thing a transcript most needs to survive is a crash, and a crash happens while something is arriving. You can open a transcript in a text editor while the reader is still running.
+
+Transcripts are never deleted automatically. They are small — a long session is a few kilobytes — but they are yours to tidy up.
+
+### 18.7 Logging a QSO
+
+**Log QSO** opens a short form under the decoded text and appends a confirmed contact to `%APPDATA%\MM5AGM\Icom Web Control\iwc-log.adi`.
+
+Log4OM and GridTracker both watch ADIF files, so this reaches those programs with nothing else to set up (see [§9.3](#93-log4om) and [§9.4](#94-gridtracker)).
+
+One rule shapes the whole form, and it follows directly from §18.1:
+
+> **A field the radio or the clock knows is filled in. A field the *decoder* thinks it knows is offered, and left empty until you pick it.**
+
+So the frequency, band, mode and UTC time are simply shown as a line of facts — they come from the rig and the system clock, and they will be written whatever you do. The callsign, report, name and QTH come from the copy, and the copy can be confidently wrong. Those boxes start **empty**, with suggestions beside them as buttons. Each button carries the reason it was suggested — *follows DE*, *sent 3 times* — on its face, so you can weigh it. One click fills the box.
+
+That costs you a single click when the copy was good, and saves you a wrong log entry when it was not. A callsign silently pre-filled from junk is worse than an empty box, because you have no reason to look twice at a field that already has something in it.
+
+| Field | Where it comes from |
+|---|---|
+| Callsign | Suggested from the copy. Required — the form will not save without one. |
+| RST rcvd | Suggested from the copy. `5NN` and `599` are both recognised. |
+| RST sent | Pre-filled with `599`, because it is what you decided, not something in the copy. |
+| Name, QTH | Suggested from the copy. |
+| Comment | Yours to type. |
+| Frequency, band, mode, time, your callsign | From the radio, the clock and your DX cluster login callsign. Shown on the facts line. |
+
+**Re-read copy** asks the reader again. This is worth a button of its own — you usually open the form when the other station starts sending their details, and the name and QTH arrive after that.
+
+After a save the QSO fields clear but **RST sent** and the facts line stay, ready for the next contact on the same frequency.
+
+If a suggestion box says *nothing in the copy*, that is a result rather than a failure: the reader found no candidate it was willing to put its name to, and you should type the field yourself.
+
+### 18.8 Troubleshooting
+
+| Symptom | What to try |
+|---|---|
+| `No CW audio device has been chosen` | Pick the radio's USB codec under **Settings → CW Reader** ([§6.7](#67-cw-reader)). |
+| `The chosen CW audio device is not present` | The radio is switched off or unplugged, or Windows has renamed the device. Plug it back in, or pick it again. |
+| Nothing prints, but the status line looks healthy | Read the status line properly — `nothing readable` means the reader is deliberately refusing to guess. `no signal` means there is no keyed tone in the passband. |
+| Status shows `off pitch - tune ±N Hz` | The station is not on your CW pitch. Tune, or press **ZIN** (§18.5). |
+| ZIN says it is not sure enough to move | Get the signal closer by hand first. ZIN finishes the tuning; it does not find the station. |
+| Text is confident but wrong | That is the normal failure mode on a marginal signal. Narrow the filter (**Reader Mode**), and check the SNR and `wpm` readings before trusting a callsign. |
+| `filter unknown` | The radio is in a mode with no IF width — FM. Go to CW. |
+| Widening the filter did not widen the search | It is clamped to ±500 Hz. See the `search` row in §18.1. |
+| `N frames dropped` | The PC could not keep up with the audio. Close other panels — particularly the spectrum display — and any other heavy software. |
+| Reader Mode did not restore my filter | Press it again, or press **Stop**; if a command failed part way it will retry. Reader Mode only touches VFO A. |
+| The log file is not where I expected | The exact path is shown in the form's status line after a save. |
+
+The reader decodes from the receive audio, so anything you can hear is something it can be given — but equally, if you cannot hear it, neither can it.
 
 ---
 
