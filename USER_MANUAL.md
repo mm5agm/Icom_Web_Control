@@ -1132,7 +1132,9 @@ Three settings, all of them for the CW Reader described in [Section 18](#18-cw-r
 | **Reader Mode filter width** | The IF width the **Reader Mode** button asks for. 250 Hz by default. |
 | **Switch APF on as well** | Whether Reader Mode also turns the audio peak filter on. |
 
-**About the device list.** The reader opens the device *shared*, so your logging or digital-mode software can keep using the same codec at the same time — you do not have to choose between them.
+**About the device list.** The reader opens the device *shared*, so your logging or digital-mode software can keep using the same codec at the same time — you do not have to choose between them. This is tested, not assumed: two programs holding the same USB codec at once both kept receiving audio.
+
+**Names in the list may look cut off.** The Windows interface IWC uses to enumerate recording devices reports at most 31 characters of a name, so a long one arrives already truncated — `Digital Audio Interface (USB Au` rather than the full name Windows itself shows you. That is Windows, not a display bug here, and picking the truncated entry works normally.
 
 Your choice is stored by **name** rather than by its position in the list, because Windows renumbers recording devices whenever anything USB is plugged in or unplugged. Stored by position, an unrelated USB device appearing one morning would silently point the reader at something else entirely. Stored by name, if the radio is switched off the reader tells you the device is missing instead.
 
@@ -2552,7 +2554,7 @@ Colour in the decoded text marks what *looks like* QSO traffic — procedural si
 
 The reader opens a Windows recording device directly — normally the radio's own USB codec, the same device WSJT-X or Fldigi use. Pick it under **Settings → CW Reader** ([§6.7](#67-cw-reader)) before you start.
 
-It is opened **shared**, so your logging or digital-mode software can hold the same device at the same time. You do not have to close WSJT-X to read CW.
+It is opened **shared**, so your logging or digital-mode software can hold the same device at the same time. You do not have to close WSJT-X to read CW. I have tested this directly rather than assuming it: two separate programs opened the same USB codec at once and both received audio throughout.
 
 If no device is chosen, or the one you chose has been unplugged, the reader says so in words on the status line rather than sitting there printing nothing.
 
