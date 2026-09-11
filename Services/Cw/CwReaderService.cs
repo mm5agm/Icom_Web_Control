@@ -39,6 +39,7 @@ namespace Icom_Web_Control.Services.Cw
         private const int MaxTextLength = 8000;
 
         private readonly WaveInCwAudioSource _source;
+        private readonly IRadioController _radio;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
         private readonly ILogger<CwReaderService> _logger;
@@ -58,11 +59,13 @@ namespace Icom_Web_Control.Services.Cw
 
         public CwReaderService(
             WaveInCwAudioSource source,
+            IRadioController radio,
             RadioStateService state,
             ISettingsService settings,
             ILogger<CwReaderService> logger)
         {
             _source = source;
+            _radio = radio;
             _state = state;
             _settings = settings;
             _logger = logger;
@@ -73,6 +76,10 @@ namespace Icom_Web_Control.Services.Cw
         public async Task StartAsync(CancellationToken ct = default)
         {
             if (IsRunning) return;
+
+            // Before the engine is built and before the state handler is
+            // subscribed, so the write below cannot trigger a rebuild.
+            await RefreshPitchFromRadioAsync(ct);
 
             lock (_gate)
             {
@@ -333,6 +340,41 @@ namespace Icom_Web_Control.Services.Cw
         /// building a detector around 0 Hz would find nothing at all.
         /// </summary>
         private double PitchHzFromRadio() => Math.Clamp(_state.CwPitch, 300, 900);
+
+        /// <summary>
+        /// Ask the radio for its pitch rather than trusting the cache.
+        ///
+        /// <see cref="RadioStateService.CwPitch"/> starts at 600 and is written
+        /// only by the app's own pitch control - it is not on the poll, and
+        /// connecting does not read it. An operator who set 700 Hz on the front
+        /// panel and never opened the keyer dialog here would otherwise get a
+        /// detector centred 100 Hz off their filter, and a zero-in that pulls
+        /// the signal towards the filter edge instead of the middle. At 800 Hz
+        /// and a 250 Hz filter it would pull it out of the passband entirely,
+        /// which on the bench is indistinguishable from the sign being wrong.
+        ///
+        /// A failed read keeps the cached value and says so in the log; the
+        /// reader still starts, because a decoder built around a guess is more
+        /// use than no decoder.
+        /// </summary>
+        private async Task RefreshPitchFromRadioAsync(CancellationToken ct)
+        {
+            if (!_radio.IsConnected) return;
+            try
+            {
+                int hz = await _radio.GetCwPitchHzAsync(ct);
+                if (hz is >= 300 and <= 900)
+                    _state.CwPitch = hz;
+                else
+                    _logger.LogWarning("CW pitch read returned {Hz}; keeping cached {Cached} Hz",
+                                       hz, _state.CwPitch);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not read the CW pitch; keeping cached {Cached} Hz",
+                                   _state.CwPitch);
+            }
+        }
 
         /// <summary>
         /// Which way a tuning correction has to go. On the reversed sideband
