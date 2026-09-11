@@ -377,20 +377,27 @@ namespace Icom_Web_Control.Services.Cw
         }
 
         /// <summary>
-        /// Which way a tuning correction has to go. On the reversed sideband
-        /// the audio tone moves opposite to the dial, so the offset the reader
-        /// suggests has to be negated or it sends the operator the wrong way.
+        /// Which way a tuning correction has to go. <see cref="CwZeroIn"/>
+        /// assumes the tone falls as the dial goes up, which is true when the
+        /// BFO sits below the signal; when it sits above, the tone follows the
+        /// dial and the offset has to be negated or zero-in chases the signal
+        /// away from the pitch.
         ///
-        /// IWC's display vocabulary is the same as the Yaesu side's: CI-V
-        /// mode 0x03 is shown as "CW-U" and 0x07 (the radio's CW-R) as "CW-L".
+        /// <b>Icom's normal CW is the "above" case, whatever the display says.</b>
+        /// IWC inherited YWC's vocabulary and shows CI-V mode 0x03 as "CW-U"
+        /// and 0x07 (the radio's CW-R) as "CW-L", but those suffixes are names,
+        /// not physics: the IC-7300 puts its CW-normal BFO on the high side, the
+        /// opposite of Yaesu's CW-U. Measured on the MkII on 2026-09-11 in mode
+        /// 0x03 - two ZIN presses six seconds apart moved the VFO by -45 and
+        /// the tone by -46 Hz, then -47 and -45, tone tracking dial 1:1 in the
+        /// same direction - so 0x03 is the lower-sideband case here. The name
+        /// is left alone because it is on the wire to rigctld and in every
+        /// stored memory; the sign is what has to be right.
         ///
-        /// <b>Unverified against the radio.</b> The sign has to be checked on
-        /// the bench in both CW-U and CW-L: getting it backwards does not look
-        /// like a wrong number, it looks like zero-in running away from the
-        /// signal.
+        /// CW-R ("CW-L") is therefore the plain case, still to be bench-checked.
         /// </summary>
         private static bool IsLowerSideband(string? mode) =>
-            mode is "CW-L" or "CW-R";
+            mode is "CW-U" or "CW";
 
         /// <summary>
         /// Null when the radio has not said, which is a real answer rather
