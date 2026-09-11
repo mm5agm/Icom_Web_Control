@@ -2276,6 +2276,15 @@
                         }
                     </select>
                     <div class="form-text">
+                        <strong>Pick the entry Windows calls "Microphone (&hellip; USB Audio
+                        Device)", not "Line (&hellip; USB AUDIO CODEC)".</strong> The IC-7300's
+                        codec shows up as both; the radio's receive audio arrives on the
+                        "Microphone" one and the "Line" one is silent. Names are cut off at
+                        31 characters - that is Windows, not a fault. If in doubt,
+                        <code>mmsys.cpl</code> &rarr; Recording shows a moving level bar on
+                        the live one.
+                    </div>
+                    <div class="form-text">
                         Saved by name rather than by position in the list, because Windows
                         renumbers recording devices whenever anything USB is plugged in or
                         removed. If the radio is unplugged the reader says the device is

@@ -1851,6 +1851,14 @@ namespace Icom_Web_Control.Controllers
                 var pitch  = await _radio.GetCwPitchHzAsync(CancellationToken.None);
                 var delay  = await _radio.GetCwBreakInDelayDotsAsync(CancellationToken.None);
                 var breakIn = await _radio.GetCwBreakInAsync(CancellationToken.None);
+
+                // Keep the cache honest while we have the numbers. Nothing
+                // polls these, and the CW reader builds its detector from
+                // CwPitch, so a value that only ever came from our own slider
+                // would be wrong for anyone who set the pitch on the radio.
+                if (speed >= 0) _radioStateService.CwSpeed = speed;
+                if (pitch >= 0) _radioStateService.CwPitch = pitch;
+
                 return Ok(new CwStateResponse
                 {
                     SpeedWpm  = speed  < 0 ? _radioStateService.CwSpeed : speed,

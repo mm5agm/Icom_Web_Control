@@ -9,6 +9,16 @@
 
 import { modeForHz } from '../ui/band-plan.js';
 
+/** True when a and b are the same mode on opposite sidebands, for the pairs
+ *  where that is an operator's choice rather than the band plan's: CW-U/CW-L
+ *  and RTTY-L/RTTY-U. */
+function sameModeReversed(a, b) {
+    const base = m => (m === 'CW-U' || m === 'CW-L') ? 'CW'
+                    : (m === 'RTTY-L' || m === 'RTTY-U') ? 'RTTY'
+                    : null;
+    return a !== b && base(a) !== null && base(a) === base(b);
+}
+
 export class SpectrumPanel {
 
     /**
@@ -847,8 +857,18 @@ export class SpectrumPanel {
         // jumping from 14.074 (FT8) to 14.284 (SSB) to also flip the radio to
         // USB rather than leave it stuck in DATA-U. window.setMode is defined
         // by site.js and uses the same CAT path the mode buttons use.
-        const targetMode = modeForHz(targetHz);
-        if (targetMode && window.setMode) {
+        //
+        // But not between a mode and its reverse. An operator in CW-R (the app
+        // shows it as CW-L) has chosen that side to dodge QRM, and the band
+        // plan cannot know it; clicking the next signal must not kick them
+        // back to CW normal. Found on the CW reader bench on 2026-09-11, when
+        // every CW-R zero-in test turned out to have run in CW-U because the
+        // click that tuned the signal had reset the mode first. Same for
+        // RTTY-R. The USB/LSB and DATA flips are left alone - they are what
+        // the follow is for.
+        const targetMode  = modeForHz(targetHz);
+        const currentMode = document.getElementById(`modeSelect${this._vfo}`)?.value || '';
+        if (targetMode && window.setMode && !sameModeReversed(currentMode, targetMode)) {
             try { window.setMode(this._vfo, targetMode); } catch { /* ignore */ }
         }
 

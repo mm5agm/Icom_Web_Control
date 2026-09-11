@@ -39,6 +39,7 @@ namespace Icom_Web_Control.Services.Cw
         private const int MaxTextLength = 8000;
 
         private readonly WaveInCwAudioSource _source;
+        private readonly IRadioController _radio;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
         private readonly ILogger<CwReaderService> _logger;
@@ -58,11 +59,13 @@ namespace Icom_Web_Control.Services.Cw
 
         public CwReaderService(
             WaveInCwAudioSource source,
+            IRadioController radio,
             RadioStateService state,
             ISettingsService settings,
             ILogger<CwReaderService> logger)
         {
             _source = source;
+            _radio = radio;
             _state = state;
             _settings = settings;
             _logger = logger;
@@ -73,6 +76,10 @@ namespace Icom_Web_Control.Services.Cw
         public async Task StartAsync(CancellationToken ct = default)
         {
             if (IsRunning) return;
+
+            // Before the engine is built and before the state handler is
+            // subscribed, so the write below cannot trigger a rebuild.
+            await RefreshPitchFromRadioAsync(ct);
 
             lock (_gate)
             {
@@ -335,20 +342,63 @@ namespace Icom_Web_Control.Services.Cw
         private double PitchHzFromRadio() => Math.Clamp(_state.CwPitch, 300, 900);
 
         /// <summary>
-        /// Which way a tuning correction has to go. On the reversed sideband
-        /// the audio tone moves opposite to the dial, so the offset the reader
-        /// suggests has to be negated or it sends the operator the wrong way.
+        /// Ask the radio for its pitch rather than trusting the cache.
         ///
-        /// IWC's display vocabulary is the same as the Yaesu side's: CI-V
-        /// mode 0x03 is shown as "CW-U" and 0x07 (the radio's CW-R) as "CW-L".
+        /// <see cref="RadioStateService.CwPitch"/> starts at 600 and is written
+        /// only by the app's own pitch control - it is not on the poll, and
+        /// connecting does not read it. An operator who set 700 Hz on the front
+        /// panel and never opened the keyer dialog here would otherwise get a
+        /// detector centred 100 Hz off their filter, and a zero-in that pulls
+        /// the signal towards the filter edge instead of the middle. At 800 Hz
+        /// and a 250 Hz filter it would pull it out of the passband entirely,
+        /// which on the bench is indistinguishable from the sign being wrong.
         ///
-        /// <b>Unverified against the radio.</b> The sign has to be checked on
-        /// the bench in both CW-U and CW-L: getting it backwards does not look
-        /// like a wrong number, it looks like zero-in running away from the
-        /// signal.
+        /// A failed read keeps the cached value and says so in the log; the
+        /// reader still starts, because a decoder built around a guess is more
+        /// use than no decoder.
+        /// </summary>
+        private async Task RefreshPitchFromRadioAsync(CancellationToken ct)
+        {
+            if (!_radio.IsConnected) return;
+            try
+            {
+                int hz = await _radio.GetCwPitchHzAsync(ct);
+                if (hz is >= 300 and <= 900)
+                    _state.CwPitch = hz;
+                else
+                    _logger.LogWarning("CW pitch read returned {Hz}; keeping cached {Cached} Hz",
+                                       hz, _state.CwPitch);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not read the CW pitch; keeping cached {Cached} Hz",
+                                   _state.CwPitch);
+            }
+        }
+
+        /// <summary>
+        /// Which way a tuning correction has to go. <see cref="CwZeroIn"/>
+        /// assumes the tone falls as the dial goes up, which is true when the
+        /// BFO sits below the signal; when it sits above, the tone follows the
+        /// dial and the offset has to be negated or zero-in chases the signal
+        /// away from the pitch.
+        ///
+        /// <b>Icom's normal CW is the "above" case, whatever the display says.</b>
+        /// IWC inherited YWC's vocabulary and shows CI-V mode 0x03 as "CW-U"
+        /// and 0x07 (the radio's CW-R) as "CW-L", but those suffixes are names,
+        /// not physics: the IC-7300 puts its CW-normal BFO on the high side, the
+        /// opposite of Yaesu's CW-U. Measured on the MkII on 2026-09-11 in mode
+        /// 0x03 - two ZIN presses six seconds apart moved the VFO by -45 and
+        /// the tone by -46 Hz, then -47 and -45, tone tracking dial 1:1 in the
+        /// same direction - so 0x03 is the lower-sideband case here. The name
+        /// is left alone because it is on the wire to rigctld and in every
+        /// stored memory; the sign is what has to be right.
+        ///
+        /// CW-R ("CW-L") is the plain case; bench-checked the same day, ZIN
+        /// landing on pitch from above and below in both modes.
         /// </summary>
         private static bool IsLowerSideband(string? mode) =>
-            mode is "CW-L" or "CW-R";
+            mode is "CW-U" or "CW";
 
         /// <summary>
         /// Null when the radio has not said, which is a real answer rather

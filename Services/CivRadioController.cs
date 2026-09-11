@@ -1103,10 +1103,14 @@ namespace Icom_Web_Control.Services
 
         // CI-V base-mode byte (+ DATA flag) → the display strings already spoken
         // by RadioStateService, the web mode dropdown, voice, and rigctld. The
-        // "-U"/"-L" suffix follows the existing UI vocabulary — CW normal is the
-        // USB side ("CW-U"), CW-R the LSB side ("CW-L"); RTTY normal is the LSB
-        // side ("RTTY-L"), RTTY-R the USB side. Data variants: USB-D→"DATA-U",
-        // LSB-D→"DATA-L", FM-D→"DATA-FM".
+        // "-U"/"-L" suffix follows the existing UI vocabulary — CW normal is
+        // shown as "CW-U" and CW-R as "CW-L"; RTTY normal as "RTTY-L", RTTY-R
+        // as "RTTY-U". Data variants: USB-D→"DATA-U", LSB-D→"DATA-L",
+        // FM-D→"DATA-FM". The CW suffixes are names, not sidebands: on the
+        // IC-7300 the CW-normal BFO sits above the signal, so the tone follows
+        // the dial - the opposite of Yaesu's CW-U. Anything that needs the
+        // physics (CwReaderService.IsLowerSideband) must not read it off the
+        // name.
         private static string NameForMode(byte baseByte, bool data) => baseByte switch
         {
             0x00 => data ? "DATA-L" : "LSB",

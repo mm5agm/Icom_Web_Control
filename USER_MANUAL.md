@@ -1128,9 +1128,11 @@ Three settings, all of them for the CW Reader described in [Section 18](#18-cw-r
 
 | Setting | What it does |
 |---|---|
-| **Audio input device** | The Windows recording device the reader listens to — normally the IC-7300's own USB codec. Nothing decodes until this is set. |
+| **Audio input device** | The Windows recording device the reader listens to — normally the IC-7300's own USB codec. Nothing decodes until this is set. **Pick the entry called "Microphone (… USB Audio Device)", not "Line (… USB AUDIO CODEC)"** — see below. |
 | **Reader Mode filter width** | The IF width the **Reader Mode** button asks for. 250 Hz by default. |
 | **Switch APF on as well** | Whether Reader Mode also turns the audio peak filter on. |
+
+**The codec appears twice, and one of them is silent.** The IC-7300's USB codec shows up as two recording endpoints: one Windows labels **"Microphone (… USB Audio Device)"** and one it labels **"Line (… USB AUDIO CODEC)"**. The radio's receive audio arrives on the **"Microphone"** one; the "Line" one carries nothing. Pick "Line" and the reader opens it happily, reports no error, and shows `no signal` against a band you can plainly hear — it is listening to digital silence. There is no physical microphone involved; "Microphone" is just the generic name Windows gives that endpoint. If in doubt, `Win+R` → `mmsys.cpl` → **Recording** shows a moving green level bar beside the live one. The playback side has the same duplicate-endpoint trap, which is why WSJT-X can key the radio and make no power — see [§15.1](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode).
 
 **About the device list.** The reader opens the device *shared*, so your logging or digital-mode software can keep using the same codec at the same time — you do not have to choose between them. This is tested, not assumed: two programs holding the same USB codec at once both kept receiving audio.
 
@@ -2593,6 +2595,8 @@ Three details worth knowing:
 - **APF is set to MID, not NAR.** On SHARP, NAR is about 80 Hz wide. Morse keying puts real energy either side of the tone — at 20 wpm a dit is 60 ms, so the sidebands run to roughly ±17 Hz, and faster sending spreads them further. A filter that narrow starts rounding the very edges the decoder is timing. MID keeps nearly all of the rejection without doing that.
 - **It restores on Stop, not when you close the panel.** Closing the reader deliberately leaves it running — you can put the panel away and come back to it. Stop is when you have actually finished reading, so that is when the radio goes back to how you had it. A filter that quietly re-opened to 2.4 kHz in the middle of a QSO would be the worse surprise.
 - **It survives a page reload.** IWC remembers your previous settings on the PC running it, not in the browser tab, so if you reload the page — or open IWC in a second browser — the button still knows what to put back. That is the whole reason it is a server-side feature rather than three quick commands from the page.
+- **It does not survive quitting IWC.** The remembered settings live in the running app, so if you close IWC (or it restarts) while Reader Mode is on, the radio stays on the narrow filter with APF on, and the next IWC will not know what to put back. Press **Stop** before you quit, or put the filter and APF back on the radio yourself. The radio's own filter slot keeps the width Reader Mode wrote until you change it.
+- **Starting from a non-CW mode.** From FM, SSB or DATA, Reader Mode switches to CW and puts your mode back on Stop, but the 250 Hz it wrote into the selected CW filter slot stays there - it has no earlier CW width to restore. If that slot was something other than 250 Hz, set it again by hand.
 
 Reader Mode only touches VFO A.
 
@@ -2658,8 +2662,9 @@ If a suggestion box says *nothing in the copy*, that is a result rather than a f
 
 | Symptom | What to try |
 |---|---|
-| `No CW audio device has been chosen` | Pick the radio's USB codec under **Settings → CW Reader** ([§6.7](#67-cw-reader)). |
+| `No CW audio device has been chosen` | Pick the radio's USB codec under **Settings → CW Reader** ([§6.7](#67-cw-reader)), then press **Stop** and **Start** — the reader stays running after a failed start so it can show you this message, and Start alone will not retry. |
 | `The chosen CW audio device is not present` | The radio is switched off or unplugged, or Windows has renamed the device. Plug it back in, or pick it again. |
+| `no signal` against a band you can hear, SNR stuck under 10 dB | You have picked the **"Line"** endpoint of the radio's codec, which is silent. Pick **"Microphone (… USB Audio Device)"** instead ([§6.7](#67-cw-reader)), then Stop and Start. |
 | Nothing prints, but the status line looks healthy | Read the status line properly — `nothing readable` means the reader is deliberately refusing to guess. `no signal` means there is no keyed tone in the passband. |
 | Status shows `off pitch - tune ±N Hz` | The station is not on your CW pitch. Tune, or press **ZIN** (§18.5). |
 | ZIN says it is not sure enough to move | Get the signal closer by hand first. ZIN finishes the tuning; it does not find the station. |

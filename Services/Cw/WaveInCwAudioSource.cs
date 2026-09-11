@@ -142,10 +142,10 @@ namespace Icom_Web_Control.Services.Cw
             {
                 throw new InvalidOperationException(string.IsNullOrWhiteSpace(deviceName)
                     ? "No CW audio device has been chosen. Pick the radio's USB "
-                      + "codec under Settings, CW Reader."
+                      + "codec under Settings, CW Reader, then press Stop and Start."
                     : $"The chosen CW audio device (\"{deviceName}\") is not "
                       + "present. Plug it back in, or pick another under "
-                      + "Settings, CW Reader.");
+                      + "Settings, CW Reader, then press Stop and Start.");
             }
 
             _wave = new WaveInEvent
