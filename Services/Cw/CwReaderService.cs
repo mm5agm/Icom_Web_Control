@@ -394,7 +394,8 @@ namespace Icom_Web_Control.Services.Cw
         /// is left alone because it is on the wire to rigctld and in every
         /// stored memory; the sign is what has to be right.
         ///
-        /// CW-R ("CW-L") is therefore the plain case, still to be bench-checked.
+        /// CW-R ("CW-L") is the plain case; bench-checked the same day, ZIN
+        /// landing on pitch from above and below in both modes.
         /// </summary>
         private static bool IsLowerSideband(string? mode) =>
             mode is "CW-U" or "CW";
