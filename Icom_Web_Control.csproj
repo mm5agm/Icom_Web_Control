@@ -177,6 +177,31 @@
     </ItemGroup>
   </Target>
 
+  <!-- Same pattern as CopySharedCoreJs above, for the shared stylesheets. The
+       comments there apply here word for word: BeforeTargets="AssignTargetPaths"
+       so the copies are Content THIS build rather than 404-ing until the second,
+       Exclude="@(Content)" so a later build does not add a duplicate item, and a
+       generated .gitignore per destination directory so nobody hand-maintains
+       one. -->
+  <Target Name="CopySharedCoreCss" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_SharedCoreCss Include="core\css\**\*.css" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SharedCoreCss)"
+          DestinationFiles="@(_SharedCoreCss->'wwwroot\css\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <WriteLinesToFile File="wwwroot\css\%(_SharedCoreCss.RecursiveDir).gitignore"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true"
+                      Lines="# Generated at build time from the Radio_Web_Control_Core subtree.;# core/css is the single source of truth - see core/css/README.md.;# Edit these in core/css and push the subtree. Never edit the copy here.;.gitignore;@(_SharedCoreCss-&gt;'%(Filename)%(Extension)')" />
+    <ItemGroup>
+      <Content Include="@(_SharedCoreCss->'wwwroot\css\%(RecursiveDir)%(Filename)%(Extension)')"
+               Exclude="@(Content)">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
 </Project>
 
 

@@ -260,6 +260,23 @@
         // so users with mouse wheels see the uncluttered default layout.
         public bool ShowFrequencyArrowButtons { get; set; } = false;
 
+        // ── Appearance ───────────────────────────────────────
+        // Which page layout the main page uses. "Classic" is the fixed
+        // arrangement this app has always had; "Workspace" moves the same
+        // panels into a grid the operator arranges and the browser remembers.
+        //
+        // Classic is the default and stays the default: Workspace is opt-in,
+        // and the stylesheet behind it is scoped entirely to the
+        // data-layout="workspace" attribute, so with this set to Classic not
+        // one of its rules can match. An operator who never opens Settings
+        // sees the page they saw yesterday.
+        //
+        // The arrangement itself is NOT stored here. It lives in the
+        // browser's localStorage, because a layout is a statement about a
+        // screen: the shack monitor and the tablet on the bench cannot share
+        // one. This setting only records which of the two modes to open in.
+        public string UiLayout { get; set; } = "Classic";
+
         // Browser key that toggles TX (transmit). Empty / null = disabled.
         // Stored as a KeyboardEvent.key value such as "t" or "F8", except
         // Space which is stored as the token "Space" (a lone " " cannot

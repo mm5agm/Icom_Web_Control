@@ -27,6 +27,12 @@ two repositories.
   UI layer over `createAudioSession` and does touch app-specific markup and
   settings. Same split as the calibration engine and its tables: the shared
   half knows the shape, the app half knows the specifics.
+- `layout/` — the workspace layout engine: `layout-grid.js` (rectangles on a
+  column grid), `layout-model.js` (which panels exist and where they sit),
+  `layout-store.js` (per-device persistence) and `workspace.js` (the DOM half).
+  The application supplies a catalogue of its own panels and marks its own
+  sections with `data-panel`; the engine knows nothing else about the page.
+  See `layout/README.md`, and `../css/layout-workspace.css` for the chrome.
 
 The per-radio numbers it works on are **not** here: each app keeps its own
 `wwwroot/js/calibration/calibration-tables.js`, which the engine imports as a
