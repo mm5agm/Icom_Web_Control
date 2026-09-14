@@ -18,9 +18,14 @@ import { createWorkspace } from '/js/layout/workspace.js';
  * What this station can show.
  *
  * `w`/`h` are in grid cells: 12 columns on a wide screen, and a cell is 40px
- * tall. The heights are the Classic heights rounded up, because a panel that
- * is too short scrolls its contents, which is awkward, while one that is too
- * tall only wastes space the operator can reclaim by dragging.
+ * tall. The heights are a starting guess only: the engine measures each
+ * panel the first time a default is laid out and gives it the rows its
+ * content really needs, which depends on the radio (how many meters it has)
+ * and cannot be known here. The spectrum is the exception: its canvas is
+ * sized by script (spectrum-panel.js, from a ResizeObserver) after the
+ * engine has measured, so measuring it reads a canvas that is not yet its
+ * real height. It says `fills` and keeps its h — 10 rows holds the 280px
+ * canvas plus its controls.
  *
  * `essential` is the escape route. The toolbar holds Connect and Radio Power
  * and VFO A holds the frequency and the band buttons; a layout persists, so
@@ -44,7 +49,7 @@ function buildCatalogue() {
         },
         {
             id: 'spectrum', title: 'Spectrum', group: 'Displays',
-            w: 12, h: 11, minW: 3, minH: 4, essential: false, available: true
+            w: 12, h: 10, minW: 3, minH: 4, essential: false, available: true, fills: true
         },
         {
             id: 'vfo-a', title: 'VFO A', group: 'Controls',

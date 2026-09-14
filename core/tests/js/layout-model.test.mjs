@@ -105,17 +105,38 @@ test('normaliseCatalogue drops duplicate ids, keeping the first', () => {
  * defaultLayout
  * ------------------------------------------------------------------ */
 
-test('defaultLayout stacks every available panel full width', () => {
+test('defaultLayout lays panels out at catalogue size, in catalogue order', () => {
     const layout = defaultLayout(normaliseCatalogue(catalogue()), 12);
     assert.equal(layout.version, LAYOUT_VERSION);
-    // Full width and catalogue order on purpose: it is as close as a grid gets
-    // to the page the operator already has, so the first thing they see when
-    // they switch to Workspace is recognisable rather than a puzzle.
-    for (const p of layout.panels) { assert.equal(p.w, 12); assert.equal(p.col, 0); }
+    // Catalogue order and catalogue size on purpose: the application chose
+    // those to mirror the page the operator already has, so the first thing
+    // they see when they switch to Workspace is recognisable, not a puzzle.
     assert.deepEqual(ids(layout), ['receiver', 'meters', 'spectrum', 'memories', 'cw-keyer']);
-    // Stacked without gaps or overlaps.
-    let row = 0;
-    for (const p of layout.panels) { assert.equal(p.row, row); row += p.h; }
+    assert.deepEqual(layout.panels.map(p => [p.col, p.row, p.w, p.h]), [
+        [0, 0, 12, 10],   // receiver
+        [0, 10, 12, 4],   // meters
+        [0, 14, 12, 8],   // spectrum
+        [0, 22, 6, 6],    // memories  — the two half-width panels sit
+        [6, 22, 6, 5],    //  cw-keyer    beside each other, not stacked
+    ]);
+});
+
+test('defaultLayout wraps to a new row below the tallest panel on the last one', () => {
+    // Two receivers at w:6 belong beside each other — that is the whole
+    // reason the catalogue says 6 and not 12 — and the next full-width panel
+    // drops below the taller of the pair, not the shorter.
+    const cat = normaliseCatalogue([
+        { id: 'vfo-a', title: 'VFO A', group: 'Radio', w: 6, h: 10, minW: 4, minH: 6 },
+        { id: 'vfo-b', title: 'VFO B', group: 'Radio', w: 6, h: 12, minW: 4, minH: 6 },
+        { id: 'meters', title: 'Meters', group: 'Radio', w: 12, h: 4, minW: 3, minH: 3 },
+    ]);
+    const layout = defaultLayout(cat, 12);
+    assert.deepEqual(layout.panels.map(p => [p.col, p.row, p.w]), [[0, 0, 6], [6, 0, 6], [0, 12, 12]]);
+
+    // A one-column grid (a phone) cannot put anything beside anything, and
+    // must stack in order like the classic page's collapsed columns.
+    const narrow = defaultLayout(cat, 1);
+    assert.deepEqual(narrow.panels.map(p => [p.col, p.row, p.w]), [[0, 0, 1], [0, 10, 1], [0, 22, 1]]);
 });
 
 test('defaultLayout omits what this station cannot show', () => {

@@ -38,7 +38,7 @@ import {
     normaliseCatalogue, defaultLayout, reconcile, applyPreset, LAYOUT_VERSION
 } from './layout-model.js';
 import {
-    movePanel, resizePanel, reflow, findSlot, gridRows, normaliseRect
+    movePanel, resizePanel, reflow, findSlot, gridRows, normaliseRect, readingOrder
 } from './layout-grid.js';
 import { createLayoutStore, DEFAULT_LAYOUT_NAME } from './layout-store.js';
 
@@ -388,6 +388,56 @@ export function createWorkspace(opts) {
         render();
     }
 
+    /**
+     * Give each panel the rows its content actually needs.
+     *
+     * A catalogue h is a guess made without the page in front of it: how
+     * tall the meter block really is depends on which meters this radio
+     * has, and a receiver card on what is in it. So a panel the operator has
+     * not sized themselves — every panel of a fresh default, or one just
+     * switched on from the rail — is measured once after it is rendered and
+     * given the rows it needs, shrinking as readily as growing. A panel whose
+     * content stretches to whatever it is given (a spectrum canvas) has no
+     * natural height to measure and keeps its catalogue size.
+     *
+     * Must run after render(): it reads the rendered shells.
+     *
+     * @param {(p: object) => boolean} [which]  which panels to fit; all by default
+     */
+    function fitToContent(which = () => true) {
+        let changed = false;
+        const panels = layout.panels.map(p => {
+            const spec = panelSpec(p.id);
+            const entry = shells.get(p.id);
+            if (!spec || spec.fills || !entry || !which(p)) { return p; }
+            const content = entry.body.firstElementChild;
+            if (!content) { return p; }
+            const px = v => parseFloat(v) || 0;
+            const bodyStyle = getComputedStyle(entry.body);
+            const contentStyle = getComputedStyle(content);
+            const chrome = entry.shell.offsetHeight - entry.body.offsetHeight
+                + px(bodyStyle.paddingTop) + px(bodyStyle.paddingBottom);
+            // offsetHeight leaves the element's own margins out, and the
+            // body scrolls if they do not fit, so they count. When the body
+            // is already overflowing its scrollHeight is the exact figure.
+            let inner = content.offsetHeight + px(contentStyle.marginTop) + px(contentStyle.marginBottom);
+            if (entry.body.scrollHeight > entry.body.clientHeight) {
+                inner = Math.max(inner, entry.body.scrollHeight
+                    - px(bodyStyle.paddingTop) - px(bodyStyle.paddingBottom));
+            }
+            const need = chrome + inner;
+            // A panel spanning h rows is h cells and h-1 gaps tall.
+            const h = Math.max(spec.minH, Math.ceil((need + gap) / (cellHeight + gap)));
+            if (h === p.h) { return p; }
+            changed = true;
+            return { ...p, h };
+        });
+        if (!changed) { return false; }
+        layout = { ...layout, panels: reflow(panels, columns) };
+        render();
+        return true;
+    }
+
     function persist() {
         const hidden = catalogue
             .filter(s => s.available && !layout.panels.some(p => p.id === s.id))
@@ -402,6 +452,17 @@ export function createWorkspace(opts) {
         if (!spec) { return; }
         const slot = findSlot(layout.panels, Math.min(columns, spec.w), spec.h, columns);
         apply([...layout.panels, { id, ...slot }]);
+        if (fitToContent(p => p.id === id)) {
+            // The slot was chosen for the catalogue height. Now the real one
+            // is known, a gap it did not fit before — beside the other
+            // receiver, say — may take it; a lower slot is never moved to.
+            const fitted = layout.panels.find(p => p.id === id);
+            const others = layout.panels.filter(p => p.id !== id);
+            const better = findSlot(others, fitted.w, fitted.h, columns);
+            if (better.row < fitted.row || (better.row === fitted.row && better.col < fitted.col)) {
+                apply([...others, { ...fitted, ...better }].sort(readingOrder));
+            }
+        }
         persist();
     }
 
@@ -412,23 +473,47 @@ export function createWorkspace(opts) {
         persist();
     }
 
+    /** Load a named layout. Returns what was stored, or null when the
+     *  catalogue default had to stand in. */
     function load(name) {
         const stored = store.load(name);
         const base = stored
             ? reconcile(stored, catalogue, columns)
             : defaultLayout(catalogue, columns);
         layout = { ...base, panels: reflow(base.panels, columns), columns };
+        return stored;
+    }
+
+    /**
+     * After a layout is rendered, decide whether its heights can be trusted.
+     *
+     * Heights are the operator's only when they come from a layout they
+     * saved at this column count. A catalogue default is a guess, so it is
+     * fitted and the fitted result saved as the starting point. A stored
+     * layout reflowed to a different column count — the wide arrangement on
+     * a tablet — has heights measured for other widths, so it is fitted too,
+     * but only the view: the stored arrangement is left as they built it.
+     */
+    function settle(stored) {
+        if (!stored) {
+            if (fitToContent()) { persist(); }
+        } else if (stored.columns !== columns) {
+            fitToContent();
+        }
     }
 
     function onResize() {
         const next = columnsForWidth(window.innerWidth);
         if (next === columns) { return; }
         columns = next;
-        // Reflowed, not saved. A layout the operator built on the wide screen
-        // must still be there when they come back to it, so a narrow visit
-        // is allowed to rearrange the view but never the stored arrangement.
-        layout = { ...layout, columns, panels: reflow(layout.panels, columns) };
+        // Reflowed from the stored arrangement, not from whatever the view
+        // had become, and not saved. A layout the operator built on the
+        // wide screen must still be there when they come back to it, so a
+        // narrow visit is allowed to rearrange the view but never the
+        // stored arrangement.
+        const stored = load(store.currentName());
         render();
+        settle(stored);
     }
 
     return {
@@ -439,9 +524,10 @@ export function createWorkspace(opts) {
             if (mounted) { return; }
             columns = columnsForWidth(window.innerWidth);
             store.setCurrentName(name || store.currentName());
-            load(store.currentName());
+            const stored = load(store.currentName());
             container.hidden = false;
             render();
+            settle(stored);
             window.addEventListener('resize', onResize);
             window.addEventListener('pointermove', onPointerMove);
             window.addEventListener('pointerup', onPointerUp);
@@ -477,8 +563,9 @@ export function createWorkspace(opts) {
         /** Switch to a named saved layout. */
         switchTo(name) {
             store.setCurrentName(name);
-            load(name);
+            const stored = load(name);
             render();
+            settle(stored);
         },
 
         /** Save the current arrangement under a name. */
@@ -497,6 +584,7 @@ export function createWorkspace(opts) {
             const next = applyPreset(preset, catalogue, columns);
             layout = { ...next, panels: reflow(next.panels, columns) };
             render();
+            fitToContent();
             persist();
             return true;
         },
@@ -506,6 +594,14 @@ export function createWorkspace(opts) {
             const base = defaultLayout(catalogue, columns);
             layout = { ...base, panels: reflow(base.panels, columns) };
             render();
+            fitToContent();
+            persist();
+        },
+
+        /** Re-measure every panel and give it the rows its content needs. */
+        fit() {
+            if (!mounted) { return; }
+            fitToContent();
             persist();
         },
 

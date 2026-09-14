@@ -50,7 +50,8 @@ function byId(panels, id) {
 }
 
 // A stack of three full-width panels in a 12-column grid: the shape both
-// applications start from, because defaultLayout() builds exactly this.
+// applications start from on a narrow screen, and the simplest one to reason
+// about collisions in.
 function stack() {
     return [
         { id: 'a', col: 0, row: 0, w: 12, h: 4 },

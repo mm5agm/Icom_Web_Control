@@ -24,7 +24,9 @@
  *     w: 6, h: 8,                   // default size in grid cells
  *     minW: 4, minH: 4,             // optional floors
  *     essential: true,              // cannot be switched off (see below)
- *     available: true               // this station can show it at all
+ *     available: true,              // this station can show it at all
+ *     fills: true                   // content stretches to any height (a
+ *                                   // canvas), so never size it to content
  *   }
  *
  * WHY `essential` EXISTS
@@ -63,7 +65,8 @@ export function normalisePanel(entry) {
         essential: entry.essential === true,
         // Absent means available: a catalogue that forgets the flag should
         // show the panel, not silently withhold it.
-        available: entry.available !== false
+        available: entry.available !== false,
+        fills: entry.fills === true
     };
 }
 
@@ -82,22 +85,27 @@ export function normaliseCatalogue(entries) {
 
 /**
  * The layout an application falls back to: every available panel, in
- * catalogue order, stacked full-width down the page.
+ * catalogue order, at its catalogue size, packed left to right along a row
+ * and wrapping to a fresh row when the next one does not fit.
  *
- * Full width and catalogue order on purpose — it is as close as a grid gets
- * to the page the operator already has, so the first thing they see when they
- * switch to Workspace is recognisable rather than a puzzle.
+ * Catalogue order and catalogue widths on purpose — the application chose
+ * those to mirror the page the operator already has (two receivers side by
+ * side, the meters full width), so the first thing they see when they switch
+ * to Workspace is recognisable rather than a puzzle. Narrow the grid and the
+ * same rule stacks everything, which is what the classic page does too.
  */
 export function defaultLayout(catalogue, columns) {
     const cols = Math.max(1, Math.floor(columns) || 1);
-    let row = 0;
+    let row = 0, col = 0, rowH = 0;
     const panels = [];
     for (const p of catalogue) {
         if (!p.available) { continue; }
         const w = Math.min(cols, Math.max(p.minW, p.w));
         const h = Math.max(p.minH, p.h);
-        panels.push({ id: p.id, col: 0, row, w: cols, h });
-        row += h;
+        if (col + w > cols) { row += rowH; col = 0; rowH = 0; }
+        panels.push({ id: p.id, col, row, w, h });
+        col += w;
+        rowH = Math.max(rowH, h);
     }
     return { version: LAYOUT_VERSION, columns: cols, panels };
 }

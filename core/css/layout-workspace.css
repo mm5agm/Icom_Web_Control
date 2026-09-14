@@ -74,6 +74,29 @@
     padding: 0.4rem;
 }
 
+/* The adopted element arrives wearing the classes it had on the classic
+   page — a Bootstrap .row with its negative gutters and an mt-3, or a
+   .col-lg-6 that is half the width of whatever it is in. Inside a panel the
+   panel is the layout, so the element fills the body and its old margins
+   go. !important because Bootstrap's spacing utilities are, and mt-3 would
+   otherwise win. */
+[data-layout="workspace"] .rwc-panel-body > [data-panel] {
+    flex: 0 0 auto;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+}
+
+/* A panel the operator has switched off is returned to where it came from
+   on the Classic page, and that is the last place it should be seen: below
+   the grid, in Classic's own arrangement, next to nothing. While the
+   workspace is on, a panel is visible only as a tile. This also covers the
+   moment before the engine mounts, so the Classic page never flashes first.
+   !important because a panel may carry its own display utility. */
+[data-layout="workspace"] :not(.rwc-panel-body) > [data-panel] {
+    display: none !important;
+}
+
 /* ------------------------------------------------------------------ *
  * Controls in the header
  *
