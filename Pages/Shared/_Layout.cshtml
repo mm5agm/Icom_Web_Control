@@ -1,8 +1,30 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+@* data-layout is what core/css/layout-workspace.css is scoped to. Every rule
+   in that sheet begins with [data-layout="workspace"], so on every page that
+   does not set this - which is every page but Index, and Index itself unless
+   the view is Workspace - not one of its selectors can match. Rendered here
+   from the Settings default so the page never paints Classic and rearranges
+   itself a frame later; the tiny script in <head> then applies this
+   browser's own remembered choice (the View selector on the main page,
+   localStorage "iwc.view") before anything is painted. *@
+<html lang="en"@(((string?)ViewData["UiLayout"] == "Workspace") ? Html.Raw(" data-layout=\"workspace\"") : Html.Raw(""))>
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    @if (ViewData["UiLayout"] is string)
+    {
+        @* Only the page that offers a choice of view (Index sets ViewData["UiLayout"]).
+           Inline and first so it runs before the first paint. *@
+        <script>
+            (function () {
+                try {
+                    var v = localStorage.getItem('iwc.view');
+                    if (v === 'Workspace') { document.documentElement.setAttribute('data-layout', 'workspace'); }
+                    else if (v === 'Classic') { document.documentElement.removeAttribute('data-layout'); }
+                } catch (e) { /* private browsing or blocked storage: the Settings default stands */ }
+            })();
+        </script>
+    }
     <meta http-equiv="Content-Language" content="en">
     <meta name="language" content="en">
     <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Display">
@@ -11,6 +33,10 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/Icom_Web_Control.styles.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/gauge-debug.css" />
+    @* Copied out of core/css at build time by CopySharedCoreCss - never edit
+       the wwwroot copy. Loaded on every page because it is inert without the
+       data-layout attribute above. *@
+    <link rel="stylesheet" href="~/css/layout-workspace.css" asp-append-version="true" />
     @* Bootstrap Icons, Canvas Gauges and SignalR (further down) are served from
        wwwroot/lib, not from a CDN. IWC runs on a shack PC that may never have an
        internet connection: fetched from jsdelivr/cdnjs these three worked only

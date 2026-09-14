@@ -1,0 +1,248 @@
+/*
+ * layout-workspace.css — chrome for the dockable-panel workspace.
+ * Shared by Icom Web Control and Yaesu Web Control.
+ *
+ * Every rule here is scoped to `[data-layout="workspace"]`, the attribute the
+ * application sets on <html> when the operator has chosen the Workspace
+ * layout. Without that attribute not one selector in this file matches, so
+ * the Classic page is not "believed unchanged" — it is unreachable from here.
+ * That is the same argument the theme sheets make, and it is what makes both
+ * safe to ship behind a setting.
+ *
+ * Colours come from the theme tokens (core/css/theme-tokens.css) with
+ * fallbacks to the Bootstrap defaults, so this sheet works whether or not the
+ * application has adopted themes. The fallbacks are the literal values
+ * Bootstrap 5.3 uses, not approximations.
+ */
+
+[data-layout="workspace"] .rwc-workspace {
+    /* The grid itself is sized by workspace.js, which knows the column count
+       and the cell height. This only supplies what is not geometry. */
+    position: relative;
+    padding: 0.5rem;
+}
+
+/* ------------------------------------------------------------------ *
+ * The panel shell
+ * ------------------------------------------------------------------ */
+
+[data-layout="workspace"] .rwc-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;   /* without this a wide child stops the grid track shrinking */
+    min-height: 0;
+    overflow: hidden;
+    background: var(--rwc-panel, #ffffff);
+    border: 1px solid var(--rwc-border, #dee2e6);
+    border-radius: var(--rwc-panel-radius, 0.375rem);
+    box-shadow: var(--rwc-panel-shadow, none);
+}
+
+[data-layout="workspace"] .rwc-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.4rem;
+    background: var(--rwc-panel-header, #f8f9fa);
+    border-bottom: 1px solid var(--rwc-border, #dee2e6);
+    /* The header must not shrink when the body wants more room, or the move
+       handle disappears exactly when the operator needs it to fix the panel
+       that is too big. */
+    flex: 0 0 auto;
+}
+
+[data-layout="workspace"] .rwc-panel-title {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--rwc-caption, #6c757d);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+[data-layout="workspace"] .rwc-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Panels hold canvases and tables that have their own ideas about size.
+       Scrolling the body rather than clipping it means a panel the operator
+       has made too small is awkward, not broken. */
+    overflow: auto;
+    padding: 0.4rem;
+}
+
+/* The adopted element arrives wearing the classes it had on the classic
+   page — a Bootstrap .row with its negative gutters and an mt-3, or a
+   .col-lg-6 that is half the width of whatever it is in. Inside a panel the
+   panel is the layout, so the element fills the body and its old margins
+   go. !important because Bootstrap's spacing utilities are, and mt-3 would
+   otherwise win. */
+[data-layout="workspace"] .rwc-panel-body > [data-panel] {
+    flex: 0 0 auto;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+}
+
+/* A panel the operator has switched off is returned to where it came from
+   on the Classic page, and that is the last place it should be seen: below
+   the grid, in Classic's own arrangement, next to nothing. While the
+   workspace is on, a panel is visible only as a tile. This also covers the
+   moment before the engine mounts, so the Classic page never flashes first.
+   !important because a panel may carry its own display utility. */
+[data-layout="workspace"] :not(.rwc-panel-body) > [data-panel] {
+    display: none !important;
+}
+
+/* ------------------------------------------------------------------ *
+ * Controls in the header
+ *
+ * Both buttons meet the 44px target-size floor when the Instrument theme is
+ * active (--rwc-target-min is 44px there) and fall back to a still-usable
+ * 32px in Classic, which is what the rest of Classic's toolbar uses. A theme
+ * that sets the token larger is honoured automatically.
+ * ------------------------------------------------------------------ */
+
+[data-layout="workspace"] .rwc-panel-handle,
+[data-layout="workspace"] .rwc-panel-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--rwc-target-min, 32px);
+    min-height: var(--rwc-target-min, 32px);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--rwc-muted, #6c757d);
+    line-height: 1;
+    flex: 0 0 auto;
+}
+
+[data-layout="workspace"] .rwc-panel-handle {
+    cursor: grab;
+    /* touch-action is the difference between a drag and the browser deciding
+       the operator meant to scroll the page. Without it, panel dragging on a
+       tablet does nothing at all and looks like a broken feature. */
+    touch-action: none;
+}
+
+[data-layout="workspace"] .rwc-panel-handle:active { cursor: grabbing; }
+
+[data-layout="workspace"] .rwc-panel-handle:hover,
+[data-layout="workspace"] .rwc-panel-close:hover {
+    background: var(--rwc-control, #e9ecef);
+    color: var(--rwc-text, #212529);
+}
+
+[data-layout="workspace"] .rwc-panel-handle:focus-visible,
+[data-layout="workspace"] .rwc-panel-close:focus-visible,
+[data-layout="workspace"] .rwc-rail-item input:focus-visible {
+    outline: var(--rwc-focus-ring-width, 2px) solid var(--rwc-focus-ring, #0d6efd);
+    outline-offset: var(--rwc-focus-ring-offset, 2px);
+}
+
+/* ------------------------------------------------------------------ *
+ * The resize grip
+ *
+ * Deliberately not focusable: resizing is Shift+arrows on the move handle,
+ * which is reachable without a pointer. A second tab stop doing the same job
+ * would lengthen the tab sequence through every panel on the page for no
+ * capability gained — and the tab sequence is what an operator using
+ * head-tracking actually walks.
+ * ------------------------------------------------------------------ */
+
+[data-layout="workspace"] .rwc-panel-resize {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    cursor: nwse-resize;
+    touch-action: none;
+    /* A corner wedge drawn in the border colour, so it reads as part of the
+       frame rather than as content. */
+    background: linear-gradient(
+        135deg,
+        transparent 0 50%,
+        var(--rwc-border-control, #adb5bd) 50% 100%
+    );
+    opacity: 0.6;
+}
+
+[data-layout="workspace"] .rwc-panel { position: relative; }
+[data-layout="workspace"] .rwc-panel-resize:hover { opacity: 1; }
+
+[data-layout="workspace"] .rwc-panel-dragging {
+    /* Raised and slightly translucent so the operator can see what is
+       underneath the panel they are placing. */
+    z-index: 5;
+    opacity: 0.92;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ------------------------------------------------------------------ *
+ * The rail — what this station can show
+ * ------------------------------------------------------------------ */
+
+[data-layout="workspace"] .rwc-rail-group { margin-bottom: 0.75rem; }
+
+[data-layout="workspace"] .rwc-rail-heading {
+    margin: 0 0 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--rwc-caption, #6c757d);
+}
+
+[data-layout="workspace"] .rwc-rail-item { margin-bottom: 0.15rem; }
+
+[data-layout="workspace"] .rwc-rail-item .form-check-label {
+    font-size: 0.85rem;
+    color: var(--rwc-text, #212529);
+}
+
+[data-layout="workspace"] .rwc-rail-item input:disabled + .form-check-label {
+    /* An essential panel's switch is disabled; the label says why on hover,
+       and the colour says it is not a normal choice. */
+    color: var(--rwc-muted, #6c757d);
+}
+
+/* ------------------------------------------------------------------ *
+ * Reduced motion
+ *
+ * There is no animation in this sheet to switch off, which is the point:
+ * a panel that slides into place while the operator is still dragging is an
+ * invitation to overshoot. Stated explicitly so nobody adds one later without
+ * noticing the decision.
+ * ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+    [data-layout="workspace"] .rwc-panel {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+/* ------------------------------------------------------------------ *
+ * Print
+ *
+ * A printed workspace is a screenshot of a layout, and the chrome is not
+ * part of what the operator wanted on paper.
+ * ------------------------------------------------------------------ */
+
+@media print {
+    [data-layout="workspace"] .rwc-panel-handle,
+    [data-layout="workspace"] .rwc-panel-close,
+    [data-layout="workspace"] .rwc-panel-resize {
+        display: none !important;
+    }
+    [data-layout="workspace"] .rwc-panel {
+        break-inside: avoid;
+        box-shadow: none;
+    }
+}

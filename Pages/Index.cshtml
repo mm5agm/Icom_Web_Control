@@ -247,7 +247,60 @@
     <a asp-page="/Ports" class="alert-link ms-1">Check which COM ports this PC has</a>
 </div>
 
-<div class="row mb-1" style="padding-top: 2px; padding-bottom: 2px;">
+@* ----------------------------------------------------------------------
+   View selector and the Workspace layout.
+
+   The main page has more than one GUI, so the choice between them is made
+   HERE, on the main page, and remembered by this browser (localStorage
+   "iwc.view"). Settings > Appearance only supplies the default for a
+   browser that has never chosen. Classic is today's page, untouched; every
+   other view has its own name, and the selector lists them all.
+
+   The Panels / preset / reset controls belong to Workspace and are hidden
+   in Classic, so a Classic page shows one small selector and nothing else
+   it did not show before. The grid below starts empty: workspace.js MOVES
+   the sections marked data-panel further down this page into it, rather
+   than building a second copy of them, so every id, handler, SignalR update
+   and aria attribute on those controls keeps working untouched.
+   See core/js/layout/README.md.
+   ---------------------------------------------------------------------- *@
+<div class="d-flex align-items-center gap-2 flex-wrap mb-1" id="workspaceBar">
+    <label class="form-label small mb-0" for="uiViewSelect">View</label>
+    <select class="form-select form-select-sm w-auto" id="uiViewSelect"
+            title="Which GUI this page uses. Remembered by this browser; Settings > Appearance sets the default for a browser that has not chosen.">
+        <option value="Classic" selected="@(Model.UiLayout != "Workspace")">Classic</option>
+        <option value="Workspace" selected="@(Model.UiLayout == "Workspace")">Workspace</option>
+    </select>
+    <span class="d-flex align-items-center gap-2 flex-wrap" id="workspaceTools" hidden>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="workspacePanelsBtn"
+                data-bs-toggle="collapse" data-bs-target="#workspaceRail"
+                aria-expanded="false" aria-controls="workspaceRail">
+            <i class="bi bi-layout-sidebar" aria-hidden="true"></i> Panels
+        </button>
+        <label class="visually-hidden" for="workspacePresetSelect">Layout preset</label>
+        <select class="form-select form-select-sm w-auto" id="workspacePresetSelect">
+            <option value="">Preset&hellip;</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="workspaceResetBtn"
+                title="Put every panel back to the default arrangement">
+            Reset layout
+        </button>
+    </span>
+</div>
+<div class="collapse mb-2" id="workspaceRail">
+    <div class="card card-body py-2">
+        <p class="form-text mt-0 mb-2">
+            Which panels this page shows. Move a panel by dragging the handle in its
+            title bar, or from the keyboard: Tab to the handle, then arrow keys to move
+            and Shift+arrows to resize. Panels marked &ldquo;Always shown&rdquo; cannot be
+            switched off &mdash; they are the way back to the radio.
+        </p>
+        <div id="workspaceRailList" class="d-flex flex-wrap gap-4"></div>
+    </div>
+</div>
+<div id="workspaceGrid" class="rwc-workspace" hidden></div>
+
+<div class="row mb-1" data-panel="toolbar" style="padding-top: 2px; padding-bottom: 2px;">
         @if (Model.ShowApp1Button)
         {
             <div class="col-auto">
@@ -367,7 +420,7 @@
     <!-- (Status line moved inside each VFO panel — see #vfoAStatusLine / #vfoBStatusLine) -->
 
     <!-- Power and SWR Meters -->
-    <div class="row mt-3">
+    <div class="row mt-3" data-panel="meters">
         <div class="col-12">
             <div class="card border-secondary">
                 <div class="card-body py-2">
@@ -578,7 +631,7 @@
          Each panel has its own canvas. Mono A / Mono B / Multi toggle below
          hides/shows individual panels. Outer container hides itself when no
          SDR is configured for either VFO. -->
-    <div id="spectrumContainer" class="row mt-3" style="display:none;">
+    <div id="spectrumContainer" class="row mt-3" data-panel="spectrum" style="display:none;">
         <div class="col-12">
             <!-- Scope on/off — always available while the spectrum is shown.
                  Turning it off stops the radio streaming waveform data (CI-V
@@ -712,7 +765,7 @@
 
     <div class="row g-3 flex-wrap" id="vfoRow" data-radio-model="@Model.RadioModel" data-single-receiver="@(isSingleReceiver ? "true" : "false")">
         <!-- VFO A Panel -->
-        <div class="col-lg-6 col-12" id="vfoACol">
+        <div class="col-lg-6 col-12" id="vfoACol" data-panel="vfo-a">
             <div class="card border-primary h-100 receiver-card">
                 <div class="card-header bg-primary text-white py-1">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
@@ -1001,7 +1054,7 @@
                         </div>
                     </div>
                     <!-- VFO B Panel -->
-        <div class="col-lg-6 col-12" id="vfoBCol">
+        <div class="col-lg-6 col-12" id="vfoBCol" data-panel="vfo-b">
             <div class="card border-success h-100 receiver-card">
                 <div class="card-header bg-success text-white py-1">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
@@ -1289,7 +1342,7 @@
                         </div>
                     </div>
 <!-- Clarifier (RIT/XIT) strip -->
-<div class="row mt-2" id="clarifierRow">
+<div class="row mt-2" id="clarifierRow" data-panel="clarifier">
     <div class="col-12">
         <div class="card border-secondary">
             <div class="card-body py-2 px-3">
@@ -4938,4 +4991,10 @@
         applyVisibility(getVisible());
     })();
     </script>
+
+    @* Last in the section on purpose. The workspace MOVES the live panel
+       elements rather than rebuilding them, so everything above has already
+       found what it needs by id and keeps working; running it earlier would
+       only mean the canvases size themselves twice. *@
+    <script type="module" src="~/js/ui/workspace-boot.js" asp-append-version="true"></script>
 }

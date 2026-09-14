@@ -107,6 +107,12 @@ namespace Icom_Web_Control.Pages
             // error - the same trap the DX cluster fields above are dodging.
             ModelState.Remove("Settings.CwAudioDeviceName");
 
+            // The layout radio group posts a value on every save, so this is
+            // belt and braces - but a stale cached copy of an older Settings
+            // page would not post one, and the implicit [Required] would then
+            // block the whole save with nothing on screen to say why.
+            ModelState.Remove("Settings.UiLayout");
+
             if (!ModelState.IsValid)
             {
                 // Log every ModelState error so we can see exactly which
@@ -202,6 +208,11 @@ namespace Icom_Web_Control.Pages
                 // Space cannot round-trip as a lone " " through HTML form posts —
                 // store the KeyboardEvent.code token "Space" (and migrate legacy " ").
                 current.TxToggleKey = NormalizeTxToggleKey(Settings.TxToggleKey);
+
+                // Appearance. Anything unrecognised falls back to Classic:
+                // the failure mode of a bad value has to be the page that has
+                // always worked, never a half-applied experimental layout.
+                current.UiLayout = Settings.UiLayout is "Workspace" ? "Workspace" : "Classic";
 
                 // Voice Control (v1)
                 current.VoiceControlEnabled = Settings.VoiceControlEnabled;

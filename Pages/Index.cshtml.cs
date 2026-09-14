@@ -121,6 +121,14 @@ namespace Icom_Web_Control.Pages
         // "Hidden" (no B span buttons). See ApplicationSettings.PseudoDualWatchSpanMode.
         public string PseudoDualWatchSpanMode { get; set; } = "ZoomIn";
 
+        // "Classic" or "Workspace" — the DEFAULT view for this page. Classic
+        // is the default and the fallback for anything unrecognised, because
+        // the failure mode of a bad value has to be the page that has always
+        // worked. A browser that has chosen a view from the selector on the
+        // main page keeps its own choice (localStorage "iwc.view") over this.
+        // See ApplicationSettings.UiLayout.
+        public string UiLayout { get; set; } = "Classic";
+
         public RadioStateService RadioState => _radioStateService;
 
         public RadioStateViewModel State { get; set; } = new RadioStateViewModel();
@@ -172,6 +180,14 @@ namespace Icom_Web_Control.Pages
             PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
+            UiLayout = settings.UiLayout is "Workspace" ? "Workspace" : "Classic";
+            // The <html> element carries the attribute the workspace stylesheet
+            // is scoped to, and _Layout is what renders <html>. Setting it here
+            // rather than from script means the page never paints Classic first
+            // and rearranges itself a frame later. Its presence also tells
+            // _Layout to emit the head script that applies the browser's own
+            // remembered view over this default.
+            ViewData["UiLayout"] = UiLayout;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;
 
             // Load persisted MIC Gain, PROC, and other TX controls

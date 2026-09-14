@@ -247,6 +247,54 @@
         </div>
     </details>
 
+    <!-- Appearance section -->
+    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-grid-1x2" aria-hidden="true"></i>&nbsp;Appearance</summary>
+        <div class="section-body">
+            <fieldset class="mb-2">
+                <legend class="form-label fw-semibold fs-6">Main page view (default)</legend>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="Settings.UiLayout"
+                           id="uiLayoutClassic" value="Classic"
+                           checked="@(Model.Settings.UiLayout != "Workspace")" />
+                    <label class="form-check-label" for="uiLayoutClassic">
+                        <strong>Classic</strong> &mdash; the fixed arrangement IWC has always had
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="Settings.UiLayout"
+                           id="uiLayoutWorkspace" value="Workspace"
+                           checked="@(Model.Settings.UiLayout == "Workspace")" />
+                    <label class="form-check-label" for="uiLayoutWorkspace">
+                        <strong>Workspace</strong> &mdash; arrange the panels yourself
+                    </label>
+                </div>
+            </fieldset>
+            <div class="form-text">
+                This is the view a browser opens in until it picks one for itself: the
+                <strong>View</strong> selector at the top of the main page switches between them,
+                and that browser remembers its choice.
+            </div>
+            <div class="form-text">
+                Workspace puts the same panels &mdash; the toolbar, the meters, the spectrum, each
+                VFO, the clarifier &mdash; into a grid you can move and resize, and hides the ones
+                you never look at. Drag a panel by the handle in its title bar, or move it from the
+                keyboard: Tab to the handle, then arrow keys to move and Shift+arrows to resize.
+            </div>
+            <div class="form-text">
+                The arrangement is remembered <strong>by this browser on this machine</strong>, not
+                in your settings file &mdash; a layout built for the shack monitor would be the
+                wrong layout on a tablet. Switching back to Classic leaves it saved, so you lose
+                nothing by trying Workspace and changing your mind.
+            </div>
+            <div class="form-text text-warning">
+                New in this release, and the panels still hold their Classic-sized contents, so a
+                small panel will scroll rather than shrink. Classic is unchanged and stays the
+                default.
+            </div>
+        </div>
+    </details>
+
     <!-- Accessibility section -->
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
         <summary><i class="bi bi-universal-access" aria-hidden="true"></i>&nbsp;Accessibility</summary>
