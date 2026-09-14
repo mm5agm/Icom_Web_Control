@@ -248,18 +248,30 @@
 </div>
 
 @* ----------------------------------------------------------------------
-   Workspace layout (opt-in, Settings > Appearance).
+   View selector and the Workspace layout.
 
-   Rendered ONLY when the operator has chosen it, so a Classic page carries
-   none of this markup at all. The grid below starts empty: workspace.js MOVES
-   the sections marked data-panel further down this page into it, rather than
-   building a second copy of them, so every id, handler, SignalR update and
-   aria attribute on those controls keeps working untouched.
+   The main page has more than one GUI, so the choice between them is made
+   HERE, on the main page, and remembered by this browser (localStorage
+   "iwc.view"). Settings > Appearance only supplies the default for a
+   browser that has never chosen. Classic is today's page, untouched; every
+   other view has its own name, and the selector lists them all.
+
+   The Panels / preset / reset controls belong to Workspace and are hidden
+   in Classic, so a Classic page shows one small selector and nothing else
+   it did not show before. The grid below starts empty: workspace.js MOVES
+   the sections marked data-panel further down this page into it, rather
+   than building a second copy of them, so every id, handler, SignalR update
+   and aria attribute on those controls keeps working untouched.
    See core/js/layout/README.md.
    ---------------------------------------------------------------------- *@
-@if (Model.UiLayout == "Workspace")
-{
-    <div class="d-flex align-items-center gap-2 flex-wrap mb-1" id="workspaceBar">
+<div class="d-flex align-items-center gap-2 flex-wrap mb-1" id="workspaceBar">
+    <label class="form-label small mb-0" for="uiViewSelect">View</label>
+    <select class="form-select form-select-sm w-auto" id="uiViewSelect"
+            title="Which GUI this page uses. Remembered by this browser; Settings > Appearance sets the default for a browser that has not chosen.">
+        <option value="Classic" selected="@(Model.UiLayout != "Workspace")">Classic</option>
+        <option value="Workspace" selected="@(Model.UiLayout == "Workspace")">Workspace</option>
+    </select>
+    <span class="d-flex align-items-center gap-2 flex-wrap" id="workspaceTools" hidden>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="workspacePanelsBtn"
                 data-bs-toggle="collapse" data-bs-target="#workspaceRail"
                 aria-expanded="false" aria-controls="workspaceRail">
@@ -273,24 +285,20 @@
                 title="Put every panel back to the default arrangement">
             Reset layout
         </button>
-        <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="workspaceModeBtn"
-                title="Switch this page between the arranged Workspace and the fixed Classic layout. Settings > Appearance decides which one it opens in.">
-            Classic view
-        </button>
+    </span>
+</div>
+<div class="collapse mb-2" id="workspaceRail">
+    <div class="card card-body py-2">
+        <p class="form-text mt-0 mb-2">
+            Which panels this page shows. Move a panel by dragging the handle in its
+            title bar, or from the keyboard: Tab to the handle, then arrow keys to move
+            and Shift+arrows to resize. Panels marked &ldquo;Always shown&rdquo; cannot be
+            switched off &mdash; they are the way back to the radio.
+        </p>
+        <div id="workspaceRailList" class="d-flex flex-wrap gap-4"></div>
     </div>
-    <div class="collapse mb-2" id="workspaceRail">
-        <div class="card card-body py-2">
-            <p class="form-text mt-0 mb-2">
-                Which panels this page shows. Move a panel by dragging the handle in its
-                title bar, or from the keyboard: Tab to the handle, then arrow keys to move
-                and Shift+arrows to resize. Panels marked &ldquo;Always shown&rdquo; cannot be
-                switched off &mdash; they are the way back to the radio.
-            </p>
-            <div id="workspaceRailList" class="d-flex flex-wrap gap-4"></div>
-        </div>
-    </div>
-    <div id="workspaceGrid" class="rwc-workspace" hidden></div>
-}
+</div>
+<div id="workspaceGrid" class="rwc-workspace" hidden></div>
 
 <div class="row mb-1" data-panel="toolbar" style="padding-top: 2px; padding-bottom: 2px;">
         @if (Model.ShowApp1Button)
@@ -4984,12 +4992,9 @@
     })();
     </script>
 
-@if (Model.UiLayout == "Workspace")
-{
     @* Last in the section on purpose. The workspace MOVES the live panel
        elements rather than rebuilding them, so everything above has already
        found what it needs by id and keeps working; running it earlier would
        only mean the canvases size themselves twice. *@
     <script type="module" src="~/js/ui/workspace-boot.js" asp-append-version="true"></script>
-}
 }

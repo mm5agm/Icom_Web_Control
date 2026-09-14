@@ -2,13 +2,29 @@
 @* data-layout is what core/css/layout-workspace.css is scoped to. Every rule
    in that sheet begins with [data-layout="workspace"], so on every page that
    does not set this - which is every page but Index, and Index itself unless
-   the operator has chosen Workspace in Settings - not one of its selectors can
-   match. Rendered here rather than set from script so the page never paints
-   Classic and rearranges itself a frame later. *@
+   the view is Workspace - not one of its selectors can match. Rendered here
+   from the Settings default so the page never paints Classic and rearranges
+   itself a frame later; the tiny script in <head> then applies this
+   browser's own remembered choice (the View selector on the main page,
+   localStorage "iwc.view") before anything is painted. *@
 <html lang="en"@(((string?)ViewData["UiLayout"] == "Workspace") ? Html.Raw(" data-layout=\"workspace\"") : Html.Raw(""))>
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    @if (ViewData["UiLayout"] is string)
+    {
+        @* Only the page that offers a choice of view (Index sets ViewData["UiLayout"]).
+           Inline and first so it runs before the first paint. *@
+        <script>
+            (function () {
+                try {
+                    var v = localStorage.getItem('iwc.view');
+                    if (v === 'Workspace') { document.documentElement.setAttribute('data-layout', 'workspace'); }
+                    else if (v === 'Classic') { document.documentElement.removeAttribute('data-layout'); }
+                } catch (e) { /* private browsing or blocked storage: the Settings default stands */ }
+            })();
+        </script>
+    }
     <meta http-equiv="Content-Language" content="en">
     <meta name="language" content="en">
     <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Display">

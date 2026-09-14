@@ -96,7 +96,8 @@ export function initWorkspace() {
         gap: 8
     });
 
-    const modeBtn = document.getElementById('workspaceModeBtn');
+    const viewSelect = document.getElementById('uiViewSelect');
+    const tools = document.getElementById('workspaceTools');
     const presetSelect = document.getElementById('workspacePresetSelect');
     const resetBtn = document.getElementById('workspaceResetBtn');
     const panelsBtn = document.getElementById('workspacePanelsBtn');
@@ -107,16 +108,12 @@ export function initWorkspace() {
         // The attribute is what core/css/layout-workspace.css is scoped to,
         // so setting it is what makes the sheet apply at all. _Layout has
         // already rendered it for the first paint; this keeps the two in step
-        // when the operator toggles.
+        // when the operator switches view.
         document.documentElement.setAttribute('data-layout', 'workspace');
         workspace.mount();
         inWorkspace = true;
-        if (modeBtn) {
-            modeBtn.textContent = 'Classic view';
-        }
-        if (presetSelect) { presetSelect.disabled = false; }
-        if (resetBtn) { resetBtn.disabled = false; }
-        if (panelsBtn) { panelsBtn.disabled = false; }
+        if (viewSelect) { viewSelect.value = 'Workspace'; }
+        if (tools) { tools.hidden = false; }
     }
 
     function leave() {
@@ -127,20 +124,38 @@ export function initWorkspace() {
         workspace.unmount();
         document.documentElement.removeAttribute('data-layout');
         inWorkspace = false;
-        if (modeBtn) {
-            modeBtn.textContent = 'Workspace view';
-        }
-        // The rail and the presets act on a grid that is no longer there.
-        if (presetSelect) { presetSelect.disabled = true; }
-        if (resetBtn) { resetBtn.disabled = true; }
-        if (panelsBtn) { panelsBtn.disabled = true; }
+        if (viewSelect) { viewSelect.value = 'Classic'; }
+        // The rail and the presets act on a grid that is no longer there, and
+        // a Classic page should show nothing it did not show before.
+        if (tools) { tools.hidden = true; }
         const railPanel = document.getElementById('workspaceRail');
         if (railPanel) { railPanel.classList.remove('show'); }
         if (panelsBtn) { panelsBtn.setAttribute('aria-expanded', 'false'); }
     }
 
-    modeBtn?.addEventListener('click', () => {
-        if (inWorkspace) { leave(); } else { enter(); }
+    // The View selector is the one place the choice is made, and this
+    // browser remembers it. Settings > Appearance is only the default for a
+    // browser that has never chosen, which is what the <select> was rendered
+    // with; a remembered choice beats it, and the head script in _Layout
+    // has already put the html attribute in step with it before first paint.
+    const VIEW_KEY = 'iwc.view';
+    function rememberedView() {
+        try {
+            const v = localStorage.getItem(VIEW_KEY);
+            return (v === 'Workspace' || v === 'Classic') ? v : null;
+        } catch {
+            return null;
+        }
+    }
+    function rememberView(v) {
+        try { localStorage.setItem(VIEW_KEY, v); } catch { /* private browsing: the choice lasts this page load */ }
+    }
+
+    viewSelect?.addEventListener('change', () => {
+        const v = viewSelect.value === 'Workspace' ? 'Workspace' : 'Classic';
+        rememberView(v);
+        if (v === 'Workspace') { if (!inWorkspace) { enter(); } }
+        else if (inWorkspace) { leave(); }
     });
 
     if (presetSelect) {
@@ -163,7 +178,8 @@ export function initWorkspace() {
 
     resetBtn?.addEventListener('click', () => { workspace.reset(); });
 
-    enter();
+    const startIn = rememberedView() || (viewSelect ? viewSelect.value : 'Classic');
+    if (startIn === 'Workspace') { enter(); } else { leave(); }
 
     // Handy from the console while this is new, and the only global it adds.
     window.iwcWorkspace = workspace;
