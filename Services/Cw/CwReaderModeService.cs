@@ -42,6 +42,15 @@ namespace Icom_Web_Control.Services.Cw
         /// </summary>
         private const int ApfMid = 2;
 
+        /// <summary>
+        /// The AGC Reader Mode asks for: 2, MID (16 12: 1 FAST, 2 MID, 3 SLOW).
+        /// FAST recovers between the elements of a strong signal and the
+        /// decoder reads the pumping as gaps; MID is never wrong for CW. NB and
+        /// NR are left alone on purpose - an operator has them on for a reason,
+        /// and each is one more thing to put back.
+        /// </summary>
+        private const int AgcMid = 2;
+
         private readonly IRadioController _radio;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
@@ -69,7 +78,8 @@ namespace Icom_Web_Control.Services.Cw
         /// <summary>What the radio was set to before Reader Mode touched it.</summary>
         /// <param name="IfWidthHz">-1 when the radio did not report one - FM has none.</param>
         /// <param name="ApfWidth">0-3, where 0 is off.</param>
-        private sealed record Saved(string? Mode, int IfWidthHz, int ApfWidth);
+        /// <param name="Agc">1-3 (FAST/MID/SLOW); -1 when the radio did not report it.</param>
+        private sealed record Saved(string? Mode, int IfWidthHz, int ApfWidth, int Agc);
 
         public bool IsOn => _saved is not null;
 
@@ -96,20 +106,24 @@ namespace Icom_Web_Control.Services.Cw
                 string mode  = await _radio.GetModeAsync(RadioVfo.A, ct);
                 int    width = await _radio.GetIfFilterWidthHzAsync(RadioVfo.A, ct);
                 int    apf   = await _radio.GetApfAsync(ct);
+                int    agc   = await _radio.GetAgcAsync(ct);
 
                 _saved = new Saved(string.IsNullOrWhiteSpace(mode) ? _state.ModeA : mode,
                                    width,
-                                   apf < 0 ? 0 : apf);
+                                   apf < 0 ? 0 : apf,
+                                   agc < 0 ? -1 : agc);
 
                 _logger.LogInformation(
-                    "Reader Mode on: saving mode {Mode}, IF width {Width}, APF {Apf}",
+                    "Reader Mode on: saving mode {Mode}, IF width {Width}, APF {Apf}, AGC {Agc}",
                     _saved.Mode,
                     _saved.IfWidthHz < 0 ? "unknown" : _saved.IfWidthHz + " Hz",
-                    _saved.ApfWidth);
+                    _saved.ApfWidth,
+                    _saved.Agc < 0 ? "unknown" : _saved.Agc.ToString());
 
                 await ApplyAsync(mode:     IsCw(_saved.Mode) ? _saved.Mode : "CW-U",
                                  widthHz:  filterHz ?? settings.CwReaderFilterHz,
                                  apfWidth: settings.CwReaderUseApf ? ApfMid : 0,
+                                 agc:      AgcMid,
                                  ct: ct);
 
                 return Describe("Reader Mode on.");
@@ -135,14 +149,15 @@ namespace Icom_Web_Control.Services.Cw
                 await ApplyAsync(mode:     saved.Mode,
                                  widthHz:  saved.IfWidthHz > 0 ? saved.IfWidthHz : null,
                                  apfWidth: saved.ApfWidth,
+                                 agc:      saved.Agc > 0 ? saved.Agc : null,
                                  ct: ct);
 
                 // Cleared last. If a write threw half way through, the operator
                 // still has a button that will try the restore again, which is
                 // more use than a service that believes it already has.
                 _saved = null;
-                _logger.LogInformation("Reader Mode off: restored mode {Mode}, IF width {Width} Hz",
-                                       saved.Mode, saved.IfWidthHz);
+                _logger.LogInformation("Reader Mode off: restored mode {Mode}, IF width {Width} Hz, AGC {Agc}",
+                                       saved.Mode, saved.IfWidthHz, saved.Agc);
 
                 return Describe("Reader Mode off. Your settings are back.");
             }
@@ -154,12 +169,15 @@ namespace Icom_Web_Control.Services.Cw
         // ---- the radio ----------------------------------------------------
 
         /// <summary>
-        /// Mode, then width, then APF - and the order is not cosmetic.
+        /// Mode, then width, then APF, then AGC - and the order is not cosmetic.
         ///
         /// The width applies to the mode the radio is in, so sending it first
-        /// would set a width for the mode the radio is about to leave. APF goes
-        /// last for the same reason: it is a per-mode setting, and a mode change
-        /// after it would put the radio's own stored value back over ours.
+        /// would set a width for the mode the radio is about to leave. APF and
+        /// AGC go after for the same reason: both are per-mode settings, and a
+        /// mode change after them would put the radio's own stored value back
+        /// over ours. On the way out that is also what makes the restore
+        /// right: the saved AGC was read in the saved mode, and is written
+        /// back once that mode is back.
         ///
         /// <para>
         /// The width is requested in Hz and the controller snaps it to the
@@ -174,7 +192,7 @@ namespace Icom_Web_Control.Services.Cw
         /// making for a tie nobody has hit.
         /// </para>
         /// </summary>
-        private async Task ApplyAsync(string? mode, int? widthHz, int apfWidth, CancellationToken ct)
+        private async Task ApplyAsync(string? mode, int? widthHz, int apfWidth, int? agc, CancellationToken ct)
         {
             if (!string.IsNullOrWhiteSpace(mode))
             {
@@ -206,6 +224,13 @@ namespace Icom_Web_Control.Services.Cw
             _state.ApfWidthB = apfWidth;
             _state.ApfOnA = apfWidth != 0;
             _state.ApfOnB = apfWidth != 0;
+
+            if (agc is { } a)
+            {
+                await _radio.SetAgcAsync(a, ct);
+                _state.AgcA = a.ToString();
+                _state.AgcB = _state.AgcA;
+            }
         }
 
         private static bool IsCw(string? mode) => mode is "CW-U" or "CW-L";
@@ -220,6 +245,7 @@ namespace Icom_Web_Control.Services.Cw
             RestoresMode  = _saved?.Mode,
             RestoresWidth = _saved is null || _saved.IfWidthHz <= 0 ? null : _saved.IfWidthHz,
             RestoresApf   = _saved?.ApfWidth,
+            RestoresAgc   = _saved is null || _saved.Agc <= 0 ? null : _saved.Agc,
         };
     }
 
@@ -243,5 +269,8 @@ namespace Icom_Web_Control.Services.Cw
         public string? RestoresMode { get; init; }
         public int? RestoresWidth { get; init; }
         public int? RestoresApf { get; init; }
+
+        /// <summary>The AGC (1 FAST, 2 MID, 3 SLOW) Off will put back; null when the radio never reported it.</summary>
+        public int? RestoresAgc { get; init; }
     }
 }

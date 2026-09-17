@@ -712,8 +712,11 @@ namespace Icom_Web_Control.Services
             var newBandA = GetBandFromFrequency(FrequencyA);
             var newBandB = GetBandFromFrequency(FrequencyB);
 
-            _logger.LogInformation("[UpdateBandFromFrequency] FreqA={FreqA} -> BandA={OldBandA} -> {NewBandA}, FreqB={FreqB} -> BandB={OldBandB} -> {NewBandB}",
-                FrequencyA, BandA, newBandA, FrequencyB, BandB, newBandB);
+            // Runs on every poll (~6/s), so only a band change is worth a line at
+            // Information — the unchanged case was half of a day's log.
+            if (newBandA != BandA || newBandB != BandB)
+                _logger.LogInformation("[UpdateBandFromFrequency] FreqA={FreqA} -> BandA={OldBandA} -> {NewBandA}, FreqB={FreqB} -> BandB={OldBandB} -> {NewBandB}",
+                    FrequencyA, BandA, newBandA, FrequencyB, BandB, newBandB);
 
             BandA = newBandA;
             BandB = newBandB;

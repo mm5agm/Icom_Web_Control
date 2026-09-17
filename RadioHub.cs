@@ -18,6 +18,12 @@ namespace Icom_Web_Control.Hubs
         // Connections that have sent at least one heartbeat (i.e. the main page tab)
         private static readonly ConcurrentDictionary<string, DateTime> _heartbeats = new();
 
+        // Which spectrum panels each main-page tab currently has on screen, as
+        // reported by SpectrumPanels(). The cross-band peek borrows the receiver
+        // (and dips the audio) to fill the watch panel, so it needs to know when
+        // nobody can see that panel — "VFO A only", scope collapsed, no browser.
+        private static readonly ConcurrentDictionary<string, (bool A, bool B)> _spectrumPanels = new();
+
         // Grace-period shutdown: starts when all heartbeating clients disconnect,
         // cancelled if any client reconnects within the window.
         private static readonly TimeSpan ShutdownGrace = TimeSpan.FromSeconds(30);
@@ -63,6 +69,7 @@ namespace Icom_Web_Control.Hubs
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             _connections.TryRemove(Context.ConnectionId, out _);
+            _spectrumPanels.TryRemove(Context.ConnectionId, out _);
             bool wasHeartbeating = _heartbeats.TryRemove(Context.ConnectionId, out _);
 
             await base.OnDisconnectedAsync(exception);
@@ -82,6 +89,33 @@ namespace Icom_Web_Control.Hubs
         {
             _heartbeats[Context.ConnectionId] = DateTime.UtcNow;
             return Task.CompletedTask;
+        }
+
+        // Called by the main page whenever its spectrum layout changes, and
+        // again every few seconds so a reconnected connection (new id) is
+        // re-registered without the page having to notice the reconnect.
+        public Task SpectrumPanels(bool a, bool b)
+        {
+            var now = (a, b);
+            if (!_spectrumPanels.TryGetValue(Context.ConnectionId, out var was) || was != now)
+            {
+                _spectrumPanels[Context.ConnectionId] = now;
+                // Logged on change only. The id is the SignalR connection, so a
+                // second tab or another machine shows up as a second line — the
+                // peek runs if ANY of them wants the watch panel.
+                _logger.LogInformation("[RadioHub] Spectrum panels wanted by {Id}: A={A} B={B} ({N} browser(s) reporting)",
+                    Context.ConnectionId[..8], a, b, _spectrumPanels.Count);
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>True if any connected browser is showing the spectrum panel for <paramref name="sdrId"/> ("A" or "B").</summary>
+        public static bool AnyClientShowsSpectrumPanel(string sdrId)
+        {
+            bool wantB = sdrId == "B";
+            foreach (var (_, p) in _spectrumPanels)
+                if (wantB ? p.B : p.A) return true;
+            return false;
         }
 
         // ── Shutdown helpers ──────────────────────────────────────────────────

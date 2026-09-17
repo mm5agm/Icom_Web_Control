@@ -345,9 +345,9 @@ namespace Icom_Web_Control.Controllers
         [HttpGet("status")]
         public async Task<IActionResult> GetStatus()
         {
-            // Log what we're returning for debugging
-            _logger.LogInformation("[API] GetStatus called");
-            _logger.LogInformation("[API Status] Returning: FreqA={FreqA}, BandA={BandA}, FreqB={FreqB}, BandB={BandB}",
+            // Every tab polls this about once a second, so it stays at Debug.
+            _logger.LogDebug("[API] GetStatus called");
+            _logger.LogDebug("[API Status] Returning: FreqA={FreqA}, BandA={BandA}, FreqB={FreqB}, BandB={BandB}",
                 _radioStateService.FrequencyA, _radioStateService.BandA,
                 _radioStateService.FrequencyB, _radioStateService.BandB);
 
