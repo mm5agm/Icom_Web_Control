@@ -30,6 +30,96 @@ Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ---
 
+---
+
+## Shared code lives in Radio_Web_Control_Core. This is a hard rule.
+
+`core/` is a **git subtree** of
+[Radio_Web_Control_Core](https://github.com/mm5agm/Radio_Web_Control_Core),
+shared with Yaesu Web Control. It is not a vendored copy and it is not a snapshot.
+
+**If code is radio-agnostic, it belongs in `core/`.** Not in this repo's own
+tree "for now", not "until it settles", not "until the other app needs it".
+The exception is code that genuinely cannot be shared - see the table.
+
+This rule exists because it was broken. The whole CW decoder - six services and
+five test files - was authored inside `core/` and then sat in one branch of one
+repo for weeks with no second copy anywhere, and the reader panel was written
+straight into `wwwroot/js/ui/` where the other app could never see it. Nobody
+decided that; it just never got pushed.
+
+### Does it belong in core?
+
+| goes in `core/` | stays in this repo |
+|---|---|
+| Signal processing, decoders, DSP | CAT / CI-V framing and addressing |
+| Data models exchanged with other tools (ADIF, DX spots) | Anything reading a radio-specific register or code |
+| Pure algorithms with no radio in them | Per-radio lookup tables and calibration numbers |
+| Browser modules that only talk to an HTTP API | Anything touching this app's DI, hubs or Razor pages |
+| Tests for all of the above | Tests for this app's own wiring |
+
+The seam is the radio. `CwDecoderEngine` takes samples and a pitch, so it is
+core. `YaesuIfWidth` maps a Yaesu SH code to Hz, so it is not - and Icom's
+widths are a formula rather than a table, which is the proof that it never
+could have been.
+
+A shared browser module goes in `core/js/<area>/`. The `CopySharedCoreJs`
+target copies `core\js\**\*.js` into `wwwroot\js\` preserving the subdirectory,
+so `core/js/cw/x.js` is served at `/js/cw/x.js` with **no csproj change**. That
+target also writes the `.gitignore` for what it generated, so the copies never
+need a hand-written ignore rule either.
+
+**Moving a JS file *into* `core/js/` can silently delete someone's work.** The
+moment it moves, its old `wwwroot/js/...` path becomes a generated, gitignored
+build artefact. Any branch still modifying that path then merges as
+**modify/delete** - and resolving that as a delete, which is the tempting
+reading now that the path is generated, drops the branch's change with no
+conflict marker, no build error and nothing in the diff to notice. Before
+moving a file into `core/js/`, run `gh pr list` and check for open PRs
+touching it; if there are any, fold their changes into the `core/` copy first
+and say so in the commit. This happened on 2026-08-27 in the other app, with
+`audio-playback.js` and PR #112.
+
+C# under `core/` is excluded from this project's compile globs
+(`<Compile Remove="core\**" />` and friends) and consumed as a project
+reference. That exclusion is mandatory - the Web SDK globs `**/*.cs`.
+
+### The workflow, and the step that gets forgotten
+
+Authoring happens **inside `core/` in whichever app you are working in**. The
+push up to Radio_Web_Control_Core is a **separate command**, and it is the one
+that gets missed.
+
+```powershell
+./scripts/core-sync.ps1 -Check   # is anything owed upstream?
+./scripts/core-sync.ps1 -Push    # send core/ commits up (pulls first)
+./scripts/core-sync.ps1 -Pull    # bring the sibling's core work down
+```
+
+`-Push` refuses on a dirty tree, because `git subtree split` only sees
+committed content and would silently leave uncommitted `core/` work behind.
+The split walks the whole repo history and prints nothing for a couple of
+minutes; it is not hung.
+
+### Claude: your standing instructions
+
+1. Before writing any new file, ask whether it is radio-agnostic. If it is, it
+   goes under `core/`. Say so at the time rather than moving it later.
+2. **Run `./scripts/core-sync.ps1 -Check` at the end of any session in which
+   anything under `core/` changed.** Do not wait to be asked. The point of this
+   rule is that Colin does not have to remember it.
+3. If `-Check` reports work owed upstream, **push it without asking.** Colin
+   gave standing authorisation for this on 2026-08-26, in as many words:
+   *"I want ALL shared code to be in Radio_Web_Control_Core without me having
+   to remember to specifically ask for that to happen."*
+4. **This authorisation is narrow.** It covers pushing `core/` to
+   Radio_Web_Control_Core and nothing else. Pushing this repo to its own
+   origin, tagging, releasing and opening PRs all still need Colin's explicit
+   word, as before.
+5. After a successful `-Push`, run `-Pull` in Yaesu Web Control so both carry the
+   same core. A push that only one app has is half a job.
+
+
 ## Architecture Rules
 
 Before making changes, read `.claude/rules.md` and `.claude/project-overview.md`.
@@ -158,6 +248,13 @@ WsjtxUdpService (IHostedService)     — WSJT-X UDP status/QSO feed
 DxClusterService (IHostedService)    — cluster telnet feed → DX spot overlay
 VoiceControlService (IHostedService) — SAPI recognition → IntentDispatcher
 SystemTrayService (IHostedService)
+
+CW reader — four singletons, no hosted service (nothing runs until the
+operator presses Start):
+  WaveInCwAudioSource   — one WinMM recording device → 480-sample frames
+  CwReaderService       — drives Core's CwDecoderEngine, holds the text
+  CwReaderModeService   — saves/applies/restores mode + IF width + APF
+  CwQsoLogService       — suggests a QSO from the copy, writes iwc-log.adi
 ```
 
 There is **no SDR subsystem**. The spectrum comes from the radio's own scope
@@ -214,6 +311,62 @@ reconnects (`_operatorScopeOff`) so the app never switches it back on unasked.
 
 ---
 
+### CW reader — the decoder is shared, the capture and the radio are not
+
+`core/Services/Cw/` (`CwDecoderEngine`, `CwToneDetector`, `CwElementDecoder`,
+`CwZeroIn`, `CwQsoFields`, `CwTranscriptWriter`, `MorseTable`) and
+`core/js/cw/` are shared with YWC and were reused **unchanged** — not one line
+had to move to serve a second brand of radio. What is IWC-local is only the
+wiring:
+
+- **`Services/Cw/WaveInCwAudioSource`** — IWC has no audio subsystem at all
+  (no `Services/Audio/`, no Remote Audio), so the reader opens a WinMM
+  recording device directly via NAudio, which is already referenced for the
+  voice output. Three non-obvious details: devices are stored **by name, not
+  index** (WinMM renumbers on any USB plug/unplug); WinMM truncates names at
+  **31 characters** (`MAXPNAMELEN`), hence the truncated-name fallback in
+  `CwAudioDevices.IndexFor`; and a WinMM buffer is **not** a multiple of 480
+  samples, so the carry buffer is load-bearing — without it the remainder is
+  dropped from every buffer, a steady silent loss that looks exactly like a
+  decoder that cannot copy. The bounded channel uses the
+  `Channel.CreateBounded(options, itemDropped)` overload for the same reason:
+  `DropOldest` discards silently, so that callback is the only way the status
+  line can ever say frames were lost.
+- **`Services/Cw/CwReaderModeService`** — CW mode, a narrow filter, APF, and
+  the restore. **It contains no lookup table**, because
+  `IRadioController.SetIfFilterWidthHzAsync` takes Hz and snaps internally,
+  and `RadioStateService.CwPitch` is already Hz. YWC's equivalent is a page of
+  per-model `SH` codes. **This is the proof that `YaesuIfWidth` could never
+  have moved into `core/`:** the two radios do not have different numbers,
+  one has numbers and the other has a formula. Order is mode → width → APF and
+  is not cosmetic (both width and APF are per-mode). APF asks for **MID (2),
+  not NAR** — NAR is ~80 Hz on SHARP and a 20 wpm dit's keying sidebands run
+  to roughly ±17 Hz.
+- **`POST /api/cw/zin`** — software zero-in. The IC-7300 has no `ZI`
+  equivalent, so `CwZeroIn` computes the offset (in `core/` precisely so both
+  apps agree about the sign) and the controller sets the frequency. Reads the
+  VFO back rather than trusting the cache.
+- **The reader UI** is the shared Core panel hosted from `Pages/Index.cshtml`;
+  the dialog markup and the ZIN button are IWC-local.
+
+**Reader Mode state lives on the server, deliberately.** Three fetch calls from
+the browser work right up until the operator reloads the page, at which point
+the record of what their filter used to be is gone with the tab and they are
+left at 250 Hz with APF ringing and nothing to press. `CwReaderModeService`
+**must stay a singleton** for the same reason.
+
+**The tie-break differs from YWC's on purpose.** YWC breaks an exact width tie
+wider; `FilterWidthCodec.HzToCode` here scans ascending keeping the first
+match, so it breaks a tie narrower. It only bites at 275 Hz, and the Icom CW
+ladder is 50 Hz steps to 500 Hz so every offered width is an exact rung.
+Do not "fix" it — it would move the CI-V API's snapping and the width nudge
+with it.
+
+**Reader Mode and ZIN are protocol-level and have never seen an antenna.**
+They write mode, `SH`-equivalent width, APF and frequency to the operator's
+radio. A green build says nothing about them. See
+`docs/design/cw-reader-plan.md` §4.17 in YWC for what has to be checked.
+
 ## Frontend Architecture
 
 ### Module map (`wwwroot/js/`)
@@ -247,6 +400,11 @@ ui/
   site.js, meter-formatters.js, band-plan.js, a11y-labels.js, voice-control.js,
   memories.js, dx-spots-panel.js, freq-keyboard.js, calibration-editor.js,
   ic7300-if-width.js
+
+cw/                       — GENERATED. Lives in core/js/cw/ and is copied here
+  cw-reader-panel.js         by the CopySharedCoreJs target. Edit the core/ copy;
+  cw-qso-form.js             the wwwroot one is a gitignored build artefact.
+  cw-spectrum.js, cw-phasor.js, cw-tokens.js
 ```
 
 ### Value flow (strict — never bypass or reorder)

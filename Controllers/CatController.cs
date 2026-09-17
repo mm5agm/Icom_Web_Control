@@ -345,9 +345,9 @@ namespace Icom_Web_Control.Controllers
         [HttpGet("status")]
         public async Task<IActionResult> GetStatus()
         {
-            // Log what we're returning for debugging
-            _logger.LogInformation("[API] GetStatus called");
-            _logger.LogInformation("[API Status] Returning: FreqA={FreqA}, BandA={BandA}, FreqB={FreqB}, BandB={BandB}",
+            // Every tab polls this about once a second, so it stays at Debug.
+            _logger.LogDebug("[API] GetStatus called");
+            _logger.LogDebug("[API Status] Returning: FreqA={FreqA}, BandA={BandA}, FreqB={FreqB}, BandB={BandB}",
                 _radioStateService.FrequencyA, _radioStateService.BandA,
                 _radioStateService.FrequencyB, _radioStateService.BandB);
 
@@ -1851,6 +1851,14 @@ namespace Icom_Web_Control.Controllers
                 var pitch  = await _radio.GetCwPitchHzAsync(CancellationToken.None);
                 var delay  = await _radio.GetCwBreakInDelayDotsAsync(CancellationToken.None);
                 var breakIn = await _radio.GetCwBreakInAsync(CancellationToken.None);
+
+                // Keep the cache honest while we have the numbers. Nothing
+                // polls these, and the CW reader builds its detector from
+                // CwPitch, so a value that only ever came from our own slider
+                // would be wrong for anyone who set the pitch on the radio.
+                if (speed >= 0) _radioStateService.CwSpeed = speed;
+                if (pitch >= 0) _radioStateService.CwPitch = pitch;
+
                 return Ok(new CwStateResponse
                 {
                     SpeedWpm  = speed  < 0 ? _radioStateService.CwSpeed : speed,

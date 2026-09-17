@@ -9,7 +9,7 @@ public static class AppVersion
     // way: finish-release.ps1 checks it against the same three-part number in
     // installer.nsi and the csproj, and those two cannot carry a suffix at all
     // (NSIS and AssemblyVersion both want X.Y.Z). Put the suffix in PreRelease.
-    public const string Current = "1.0.6";
+    public const string Current = "1.1.0";
 
     /// <summary>
     /// Pre-release suffix without the leading hyphen ("pre4"), or empty for a
@@ -31,7 +31,7 @@ public static class AppVersion
 
     /// <summary>Date this version was released, ISO format.
     /// Bump on actual release; current value reflects the planned ship date.</summary>
-    public const string ReleaseDate = "2026-08-16";
+    public const string ReleaseDate = "2026-09-17";
 
     /// <summary>
     /// Firmware version(s) of the developer's bench radio at the time this IWC

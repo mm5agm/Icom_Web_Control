@@ -100,7 +100,7 @@ Write-Host ("[2/3] installer.nsi   -> VERSION={0}" -f $semver) -ForegroundColor 
 # Leaves the Downloads badge (which references the installer asset URL) for
 # any future per-release-asset bumps the user wants to make.
 $rm = Read-Utf8 $readmePath
-$rm = Replace-OrFail $rm 'Latest%20release-v\d+\.\d+\.\d+-' "Latest%20release-$vtag-" 'README Latest-release badge'
+$rm = Replace-OrFail $rm 'Download-v\d+\.\d+\.\d+-' "Download-$vtag-" 'README Download badge'
 Write-Utf8NoBom $readmePath $rm
 Write-Host ("[3/3] README.md       -> Latest-release badge={0}" -f $vtag) -ForegroundColor Green
 

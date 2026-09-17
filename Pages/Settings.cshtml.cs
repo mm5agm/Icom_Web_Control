@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
@@ -57,6 +57,16 @@ namespace Icom_Web_Control.Pages
 
         public List<string> NetworkAddresses { get; set; } = new();
 
+        /// <summary>
+        /// The Windows recording devices the CW reader could listen to.
+        ///
+        /// Enumerated on the server rather than fetched by the browser so the
+        /// stored choice can be re-offered even when the device is not present
+        /// - the radio being switched off while the operator edits an unrelated
+        /// setting must not silently clear their device on the next save.
+        /// </summary>
+        public List<string> CwAudioDeviceNames { get; set; } = new();
+
         public SettingsModel(
             ISettingsService settingsService,
             ILogger<SettingsModel> logger,
@@ -79,6 +89,7 @@ namespace Icom_Web_Control.Pages
             Settings.BandPlan = Settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             Settings.TxToggleKey = NormalizeTxToggleKey(Settings.TxToggleKey);
             NetworkAddresses = GetLocalIPAddresses();
+            CwAudioDeviceNames = BuildCwAudioDeviceNames(Settings.CwAudioDeviceName);
             return Page();
         }
 
@@ -90,6 +101,11 @@ namespace Icom_Web_Control.Pages
             ModelState.Remove("Settings.DxClusterPostLoginCommands");
             // Accessibility TX shortcut is optional — empty = disabled.
             ModelState.Remove("Settings.TxToggleKey");
+            // "no device chosen" is a legitimate saved value, and without this
+            // the implicit [Required] that <Nullable>enable</Nullable> puts on
+            // a non-nullable string blocks the whole save with no visible
+            // error - the same trap the DX cluster fields above are dodging.
+            ModelState.Remove("Settings.CwAudioDeviceName");
 
             if (!ModelState.IsValid)
             {
@@ -106,6 +122,7 @@ namespace Icom_Web_Control.Pages
                 }
                 StatusMessage = "❌ Settings not saved — see console log for validation errors.";
                 NetworkAddresses = GetLocalIPAddresses();
+                CwAudioDeviceNames = BuildCwAudioDeviceNames(Settings.CwAudioDeviceName);
                 return Page();
             }
 
@@ -115,6 +132,7 @@ namespace Icom_Web_Control.Pages
                 ModelState.AddModelError("Settings.SerialPort",
                     "Serial port must start with 'COM' (e.g., COM3, COM4).");
                 NetworkAddresses = GetLocalIPAddresses();
+                CwAudioDeviceNames = BuildCwAudioDeviceNames(Settings.CwAudioDeviceName);
                 return Page();
             }
 
@@ -162,6 +180,14 @@ namespace Icom_Web_Control.Pages
                 current.InstalledRoofingFilters = new List<string>();
                 if (Settings.CwMessages != null && Settings.CwMessages.Count == 5)
                     current.CwMessages = Settings.CwMessages;
+
+                // CW reader. The width is clamped rather than validated so a
+                // hand-edited settings file cannot ask for something the
+                // filter ladder has no rung anywhere near; the controller
+                // snaps within that range anyway.
+                current.CwAudioDeviceName = (Settings.CwAudioDeviceName ?? "").Trim();
+                current.CwReaderFilterHz  = Math.Clamp(Settings.CwReaderFilterHz, 50, 1000);
+                current.CwReaderUseApf    = Settings.CwReaderUseApf;
 
                 // DX cluster settings — copy through. Normalise callsign to upper case.
                 current.DxClusterEnabled         = Settings.DxClusterEnabled;
@@ -255,6 +281,7 @@ namespace Icom_Web_Control.Pages
                 StatusMessage = "❌ Error saving settings. Please try again.";
                 ModelState.AddModelError(string.Empty, "An error occurred while saving settings.");
                 NetworkAddresses = GetLocalIPAddresses();
+                CwAudioDeviceNames = BuildCwAudioDeviceNames(Settings.CwAudioDeviceName);
                 return Page();
             }
 
@@ -325,6 +352,25 @@ namespace Icom_Web_Control.Pages
             // closed cleanly via RadioInitializationService.StopAsync.
             _lifetime.StopApplication();
             return new EmptyResult();
+        }
+
+        /// <summary>
+        /// Every recording device WinMM reports, plus the stored choice if it
+        /// is not among them. The absent one is kept in the list because the
+        /// dropdown is what gets posted back: drop it and an operator who
+        /// saves anything on this page while the radio is unplugged loses the
+        /// device they picked, and the reader then fails with "no CW audio
+        /// device has been chosen" for a reason they never did.
+        /// </summary>
+        private static List<string> BuildCwAudioDeviceNames(string? stored)
+        {
+            var names = Services.Cw.CwAudioDevices.List().Select(d => d.Name).ToList();
+            if (!string.IsNullOrWhiteSpace(stored) &&
+                !names.Contains(stored, StringComparer.OrdinalIgnoreCase))
+            {
+                names.Add(stored);
+            }
+            return names;
         }
 
         private List<string> GetLocalIPAddresses()

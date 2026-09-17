@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -256,7 +256,15 @@ namespace Icom_Web_Control.Services.Voice
                 return;
             }
 
-            if (_micStream == null || _boundMicIndex != index)
+            // A bound stream whose device has gone quiet underneath it (Windows
+            // re-initialised the endpoint: an enhancement toggled, the mic
+            // re-plugged) is replaced, not reused — SAPI would otherwise sit on
+            // a Read that never returns and every PTT would hear nothing.
+            bool dead = _micStream != null && _micStream.IsDead;
+            if (dead)
+                _logger.LogWarning("[Voice] Microphone '{Name}' stopped delivering audio — reopening it", _configuredMicName);
+
+            if (_micStream == null || _boundMicIndex != index || dead)
             {
                 DisposeMicStream();
                 var stream = new MicrophoneStream(index, _logger);
@@ -290,7 +298,7 @@ namespace Icom_Web_Control.Services.Voice
                 return;
             }
 
-            if (_micStream == null || _boundMicIndex != index)
+            if (_micStream == null || _boundMicIndex != index || _micStream.IsDead)
                 EnsureAudioInput();          // fresh bind -> already clean
             else
                 _micStream.DiscardBuffered();
@@ -576,6 +584,20 @@ namespace Icom_Web_Control.Services.Voice
                 }
 
                 var engine = new SpeechRecognitionEngine(cultureInfo);
+
+                // How long a pause SAPI will sit through before it decides the
+                // phrase is over. The default for an *ambiguous* pause - what it
+                // has heard so far could be a whole phrase or the start of a
+                // longer one - is 500 ms, and "set frequency ... [breath] ...
+                // one four" is exactly that: the operator pauses to line up the
+                // number, SAPI gives up waiting, and the nearest complete phrase
+                // to "set frequency" is "status frequency", which is what fired
+                // (conf 0.87-0.96, before PTT was even released). Push-to-talk
+                // bounds the wait anyway - releasing PTT finalises whatever is
+                // pending - so a long ambiguous timeout costs nothing on a short
+                // command and gives a long one room to breathe.
+                engine.EndSilenceTimeoutAmbiguous = TimeSpan.FromMilliseconds(1500);
+
                 engine.SpeechRecognized += OnSpeechRecognized;
                 engine.SpeechRecognitionRejected += OnSpeechRejected;
                 engine.RecognizeCompleted += OnRecognizeCompleted;

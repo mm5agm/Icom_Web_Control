@@ -23,6 +23,33 @@ on:
         type: string
 
 jobs:
+  # The core tests, and the only CI that runs them from this repo.
+  #
+  # core/ is a git subtree of Radio_Web_Control_Core and has no test project of
+  # its own here beyond that one, so this is both this repo's unit-test signal
+  # and half of the shared library's. It matches the `test` job in Yaesu Web
+  # Control's workflow, so the same required check can be set on develop in
+  # both repos.
+  #
+  # ubuntu, not windows-latest like the build below: core must target net10.0
+  # and never net10.0-windows, and a Linux runner is what proves it.
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run unit tests
+        run: dotnet test core/tests/RadioWebControl.Core.Tests/RadioWebControl.Core.Tests.csproj --configuration Release --verbosity normal
+
   build:
     runs-on: windows-latest
     permissions:

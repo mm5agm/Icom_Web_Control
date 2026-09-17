@@ -547,6 +547,14 @@
                                 title="Open CW keyer controls panel"
                                 onclick="openCwDialog()">CW</button>
                         <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="CW reader - decode received Morse to text"
+                                title="Open the CW reader - decodes the received Morse to text"
+                                onclick="window.cwReaderPanel && window.cwReaderPanel.toggle()">CW Read</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="CW send - type text and send it as Morse"
+                                title="Open CW send - type a line, press Enter, the radio keys it"
+                                onclick="window.cwSendPanel && window.cwSendPanel.toggle()">CW Send</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="FM repeater controls"
                                 title="Open FM repeater controls panel"
                                 onclick="document.getElementById('fmDialog').show()">FM Rep</button>
@@ -1516,9 +1524,9 @@
         <div class="fw-bold small" style="color:#aaa;">Memory Keyer</div>
         @for (int mi = 0; mi < 5; mi++) {
         <div class="d-flex align-items-center gap-1">
-            <button class="btn btn-sm btn-outline-info flex-shrink-0"
+            <button class="btn btn-sm btn-outline-info flex-shrink-0 cw-mem-btn"
                     onclick="sendCwMessage(@mi)"
-                    title="Send CW message M@(mi+1)"
+                    title="Send CW message M@(mi+1)" data-title="Send CW message M@(mi+1)"
                     aria-label="Send CW memory @(mi+1)">M@(mi+1)</button>
             <input type="text" id="cwMsg@(mi)" value="@(Model.CwMessages.Count > mi ? Model.CwMessages[mi] : "")"
                    class="form-control form-control-sm" maxlength="24"
@@ -1530,6 +1538,103 @@
             <button class="btn btn-sm btn-primary flex-grow-1" onclick="saveCwMessages()" title="Save CW message memories" aria-label="Save CW memory messages to settings">Save Messages</button>
             <button class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="stopCw()" title="Stop keying the current CW message (CI-V 17 FF)" aria-label="Stop CW keying">Stop</button>
         </div>
+    </div>
+</dialog>
+
+<!-- CW Send panel - type a line, the radio keys it (CI-V 17, 30 characters
+     a piece; 17 FF stops it). Non-modal and draggable like the reader, so
+     the operator reads in one panel and answers in the other. -->
+<style>
+    #cwSendDialog .cws-header { cursor:move; }
+    /* A definite width so lines wrap instead of stretching the panel to
+       the longest one; the corner drags to resize, and a size the operator
+       has set is kept (dlgSize_cwSendDialog) - see makeResizable. */
+    #cwSendDialog { width:560px; min-width:420px; min-height:220px; max-height:95vh; resize:both; overflow:auto; }
+    /* Fixed, not the non-modal default of absolute: a dialog in the page
+       flow scrolls with it, so the drag maths (viewport coordinates) and a
+       size change could walk the header off the top with nothing left to
+       grip. Fixed keeps it in the viewport, and _clampDlg keeps the header
+       reachable. Starts centred; a drag replaces this with px. */
+    #cwSendDialog { position:fixed; margin:0; left:50%; top:8vh; transform:translateX(-50%); }
+    #cwSendDialog[open] { display:flex; flex-direction:column; }
+    #cwSendDialog .cws-header { flex:0 0 auto; }
+    #cwSendDialog .cws-body { flex:1 1 auto; min-height:0; }
+    #cwSendDialog.user-sized #cwSendLog { max-height:none; flex:1 1 auto; min-height:4rem; }
+    #cwSendInput {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 1.05rem;
+        text-transform: uppercase;
+        background: #111; border-color: #444; color: #dfe;
+    }
+    #cwSendInput:focus { background: #111; color: #dfe; border-color: #6aa; box-shadow: none; }
+    #cwSendLog {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        min-height: 6rem;
+        max-height: 30vh;
+        overflow-y: auto;
+        position: relative;   /* offsetTop of a character is then within the log */
+        background: #111;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 6px 10px;
+        color: #dfe;
+    }
+    #cwSendLog .cws-line { display:flex; gap:0.6rem; align-items:baseline; }
+    #cwSendLog .cws-time { color:#778; font-size:0.75rem; flex:0 0 auto; }
+    #cwSendLog .cws-text { flex:1 1 auto; white-space:pre-wrap; word-break:break-word; }
+    #cwSendLog .cws-tag  { color:#9ab; font-size:0.75rem; flex:0 0 auto; }
+    #cwSendLog .cws-line[data-state="queued"]  .cws-text { color:#9ab; }
+    #cwSendLog .cws-line[data-state="sending"] .cws-text { color:#ffd24a; }
+    #cwSendLog .cws-line[data-state="sending"] .cws-tag  { color:#ffd24a; }
+    #cwSendLog .cws-line[data-state="sent"]    .cws-tag  { color:#9d9; }
+    #cwSendLog .cws-line[data-state="monitor"] .cws-tag  { color:#8fd0ff; }
+    #cwSendLog .cws-line[data-state="dropped"] .cws-text { color:#778; text-decoration:line-through; }
+    #cwSendLog .cws-line[data-state="dropped"] .cws-ch.cws-done { color:#bbb; text-decoration:none; }
+    #cwSendLog .cws-line[data-state="error"]   .cws-tag  { color:#ff6b6b; }
+    #cwSendLog .cws-ch.cws-done { color:#eee; }
+    #cwSendLog .cws-ch.cws-cur  { background:#ffd24a; color:#111; border-radius:2px; }
+    #cwSendStatus { font-size: 0.8rem; color:#9ab; min-height:1.2em; }
+    #cwSendStatus.cws-problem { color:#ffd23f; font-weight:600; }
+    #cwSendBanner {
+        font-size: 0.9rem; font-weight: 600; color: #ffd23f;
+        background: rgba(255, 210, 63, 0.10);
+        border-left: 3px solid #ffd23f;
+        padding: 0.4rem 0.6rem; border-radius: 0.25rem;
+    }
+</style>
+<dialog id="cwSendDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; max-width:95vw;" aria-labelledby="cwSendTitle">
+    <div class="cws-header d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
+        <strong id="cwSendTitle">CW Send</strong>
+        <div class="d-flex align-items-center gap-2">
+            <button id="cwSendStopBtn" class="btn btn-sm btn-outline-warning" type="button"
+                    title="Stop keying now (CI-V 17 FF) and drop anything still queued">Stop</button>
+            <button id="cwSendClearBtn" class="btn btn-sm btn-outline-light" type="button" title="Clear the sent-lines log">Clear log</button>
+            <button class="btn btn-sm iwc-dialog-close"
+                    onclick="document.getElementById('cwSendDialog').close()"
+                    aria-label="Close CW send panel">&#10005;</button>
+        </div>
+    </div>
+    <div class="cws-body p-2 d-flex flex-column gap-2">
+        <div id="cwSendBanner" role="status" aria-live="polite" hidden></div>
+        <div id="cwSendLog" role="log" aria-live="polite" aria-label="CW lines sent"></div>
+        <div class="input-group">
+            <input type="text" id="cwSendInput" class="form-control"
+                   autocomplete="off" spellcheck="false" autocapitalize="characters"
+                   placeholder="Type here and press Enter to send"
+                   aria-label="CW text to send - Enter sends, Escape stops"
+                   title="A-Z 0-9 space and / ? . - , : ' ( ) = + &quot; @@ ^ - Enter sends the line, Escape stops the keying (or clears the box when nothing is sending)">
+            <button id="cwSendClearInputBtn" class="btn btn-outline-light" type="button"
+                    title="Empty the text box without sending it" aria-label="Clear the text box">Clear</button>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" for="cwSendSpeedSlider">Speed WPM: <span id="cwSendSpeedValue">@Model.CwSpeed</span></label>
+            <input type="range" id="cwSendSpeedSlider" min="6" max="48" step="1" value="@Model.CwSpeed"
+                   style="flex:1; height:18px;"
+                   aria-label="CW keyer speed" title="CW keyer speed in WPM - the same control as in the CW keyer panel">
+        </div>
+        <div id="cwSendStatus" role="status" aria-live="polite"></div>
     </div>
 </dialog>
 
@@ -1923,6 +2028,152 @@
        release busts every module once, for free, and there is nothing left to
        forget. Program.cs also sends no-cache on static files, which is the
        belt to this pair of braces. *@
+<!-- CW Reader panel - server-side Morse decode of the receive audio.
+     Non-modal and draggable, like DX Spots: the operator has to be able to
+     work the station while the text is on screen. -->
+<style>
+    #cwReaderDialog .cwr-header { cursor:move; }
+    #cwReaderOut {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 1.05rem;
+        line-height: 1.5;
+        letter-spacing: 0.02em;
+        white-space: pre-wrap;
+        word-break: break-word;
+        min-height: 9rem;
+        max-height: 40vh;
+        overflow-y: auto;
+        background: #111;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 8px 10px;
+        color: #dfe;
+    }
+    /* Tokens that have the shape of QSO traffic. Colour is the only change -
+       nothing is added, removed or reordered - and it means "this looks like
+       something an operator sends", not "this is right". A callsign seen only
+       once is dimmed rather than hidden, because garble finds callsign shape
+       by chance and the first sighting of a real call looks identical. */
+    #cwReaderDialog .cw-tok-proc { color:#8fd0ff; }
+    #cwReaderDialog .cw-tok-rst  { color:#c9a6ff; }
+    #cwReaderDialog .cw-tok-call { color:#ffd24a; font-weight:600; }
+    #cwReaderDialog .cw-tok-call1 { color:#a08a3c; }
+    .cwr-legend { font-size: 0.72rem; color:#89a; }
+    #cwReaderStatus { font-family: ui-monospace, Consolas, monospace; font-size: 0.78rem; color:#9ab; }
+    /* A problem the operator has to act on must not be drawn like the running
+       tone/SNR commentary. Same dim monospace at 0.78rem meant 'your radio
+       audio could not be opened' was read straight past. */
+    #cwReaderStatus.cwr-problem {
+        font-family: inherit;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #ffd23f;
+        background: rgba(255, 210, 63, 0.10);
+        border-left: 3px solid #ffd23f;
+        padding: 0.5rem 0.6rem;
+        border-radius: 0.25rem;
+    }
+
+    /* QSO log form. The module builds its own DOM; the palette is the host
+       app's business, so the classes are styled here. */
+    .cwq { border-top: 1px solid #444; margin-top: 0.6rem; padding-top: 0.6rem; }
+    .cwq-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+    .cwq-head-btns { display: flex; align-items: center; gap: 0.4rem; }
+    .cwq-grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.35rem 0.6rem;
+        align-items: start;
+    }
+    .cwq-label { font-size: 0.85rem; color: #cde; padding-top: 0.3rem; white-space: nowrap; }
+    .cwq-input { background: #111; border-color: #444; color: #dfe; }
+    .cwq-input:focus { background: #111; color: #dfe; border-color: #6aa; box-shadow: none; }
+    .cwq-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem; }
+    /* A chip is a suggestion, so it is drawn as something to consider, not as
+       an answer already given: outlined and quiet until it is chosen. */
+    .cwq-chip {
+        display: inline-flex; align-items: baseline; gap: 0.35rem;
+        background: transparent; color: #ffd24a;
+        border: 1px solid #6a5a20; border-radius: 999px;
+        padding: 0.1rem 0.55rem; font-size: 0.85rem; line-height: 1.4; cursor: pointer;
+    }
+    .cwq-chip:hover { border-color: #ffd24a; }
+    .cwq-chip-on { background: rgba(255, 210, 74, 0.15); border-color: #ffd24a; }
+    .cwq-why { font-size: 0.7rem; color: #9ab; }
+    .cwq-none { font-size: 0.72rem; color: #778; font-style: italic; }
+    .cwq-facts {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 0.72rem; color: #9ab; margin-top: 0.5rem;
+    }
+    .cwq-status { font-size: 0.85rem; color: #9d9; margin-top: 0.35rem; min-height: 1.2rem; }
+    .cwq-status.cwq-problem { color: #ffd23f; font-weight: 600; }
+</style>
+<dialog id="cwReaderDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:620px; max-width:95vw;" aria-labelledby="cwReaderTitle">
+    <div class="cwr-header d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
+        <strong id="cwReaderTitle">CW Reader</strong>
+        <div class="d-flex align-items-center gap-2">
+            <button id="cwReaderStartBtn" class="btn btn-sm btn-success" type="button">Start</button>
+            <button id="cwReaderClearBtn" class="btn btn-sm btn-outline-secondary" type="button">Clear</button>
+            <button id="cwReaderModeBtn" class="btn btn-sm btn-outline-info" type="button" aria-pressed="false"
+                    title="Set CW mode, a narrow filter and APF for decoding. Your current settings are put back when you stop.">Reader Mode</button>
+            <button id="cwZinBtn" class="btn btn-sm btn-outline-light" type="button"
+                    title="Zero in - move the VFO so the tone you are copying lands on your CW pitch">ZIN</button>
+            <button id="cwReaderLogBtn" class="btn btn-sm btn-outline-warning" type="button"
+                    title="Log this contact to iwc-log.adi, using what the copy suggests">Log QSO</button>
+            <div class="form-check form-switch mb-0" style="cursor:default;">
+                <input class="form-check-input" type="checkbox" id="cwReaderAutoScroll" checked>
+                <label class="form-check-label small" for="cwReaderAutoScroll">Follow</label>
+            </div>
+            <div class="form-check form-switch mb-0" style="cursor:default;">
+                <input class="form-check-input" type="checkbox" id="cwPhasorToggle">
+                <label class="form-check-label small" for="cwPhasorToggle"
+                       title="X-Y tuning figure: tune until it stops turning">Tune</label>
+            </div>
+            <button class="btn btn-sm iwc-dialog-close"
+                    onclick="document.getElementById('cwReaderDialog').close()"
+                    aria-label="Close CW reader panel">&#10005;</button>
+        </div>
+    </div>
+    <div class="p-2">
+        <div class="d-flex gap-2 align-items-start">
+            <div class="flex-grow-1" style="min-width:0;">
+                <div id="cwReaderOut" role="log" aria-live="polite" aria-label="Decoded CW text"></div>
+                <div class="cwr-legend mt-1">
+                    Colour marks what <em>looks like</em> QSO traffic, and nothing is hidden or corrected:
+                    <span class="cw-tok-proc">CQ DE 73</span>,
+                    <span class="cw-tok-rst">5NN</span>,
+                    <span class="cw-tok-call">a call heard more than once</span>,
+                    <span class="cw-tok-call1">a call heard once</span>.
+                </div>
+            </div>
+            <div id="cwPhasorBox" style="display:none; flex:0 0 auto; width:200px;">
+                <canvas id="cwSpectrumCanvas" width="200" height="90"
+                        style="width:200px; height:90px; display:block; border:1px solid #444; border-radius:6px;"
+                        aria-label="CW passband spectrum with a marker at the wanted pitch"></canvas>
+                <div id="cwSpectrumInfo" class="mb-1"
+                     style="font-family:ui-monospace,Consolas,monospace; font-size:0.72rem; color:#9ab;">
+                    Waiting.
+                </div>
+                <canvas id="cwPhasorCanvas" width="200" height="200"
+                        style="width:200px; display:block; border:1px solid #444; border-radius:6px;"
+                        aria-label="CW tuning phasor"></canvas>
+                <div id="cwPhasorInfo" class="mt-1"
+                     style="font-family:ui-monospace,Consolas,monospace; font-size:0.72rem; color:#9ab;">
+                    Waiting.
+                </div>
+            </div>
+        </div>
+        <div id="cwReaderStatus" class="mt-2 px-1">Stopped.</div>
+        <div class="text-muted small px-1 mt-1">
+            A machine reading Morse out of noise. On a strong clean signal it is close to
+            perfect; on a marginal one it prints plausible-looking rubbish that looks no
+            different. The line above tells you which you are looking at.
+        </div>
+        <div id="cwZinStatus" class="small text-muted px-1 mb-1" role="status" aria-live="polite"></div>
+        <div id="cwQsoForm" class="px-1"></div>
+    </div>
+</dialog>
+
     <script type="module">
         import { MeterPanel }           from "/js/guages/meter-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { SMeterHistoryPanel }   from "/js/guages/smeter-history-panel.js?v=@Icom_Web_Control.AppVersion.Display";
@@ -1934,6 +2185,9 @@
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=@Icom_Web_Control.AppVersion.Display";
         import { initMemoriesPanel }   from "/js/ui/memories.js?v=@Icom_Web_Control.AppVersion.Display";
         import { DxSpotsPanel }         from "/js/ui/dx-spots-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { CwReaderPanel }        from "/js/cw/cw-reader-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { CwQsoForm }            from "/js/cw/cw-qso-form.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { CwSendPanel }          from "/js/ui/cw-send-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         window.getBandSegmentForHz = segmentForHz;
@@ -2158,7 +2412,39 @@
                 updateContainerVisibility();
                 // Coming back: the canvases were laid out at zero width while hidden.
                 if (!off) window.dispatchEvent(new Event('resize'));
+                reportSpectrumPanels();
             }
+
+            // Tell the server which spectrum panels the operator wants. The
+            // cross-band peek borrows the receiver (and dips the audio) every few
+            // seconds to fill the watch panel; with "VFO A" only or the scope
+            // collapsed that sweep goes nowhere, and the radio was still hopping
+            // bands — so the server pauses the peek until a browser wants the
+            // panel again. This reports the CHOICE (Mono/Multi + scope switch),
+            // not what is drawn: panel B is only drawn once a sweep has reached
+            // it, and on a cross-band pair that sweep comes from the peek — report
+            // the drawn state and neither side ever goes first, the strip with
+            // the Both/Stacked buttons never appears. It is THIS tab's choice
+            // (`currentMode`, a `let` declared further down but initialised
+            // long before anything calls this), never localStorage: that key is
+            // shared by every tab and each rewrites it with its own choice on
+            // every status change, so a tab on "VFO A" read "Both" whenever
+            // another tab wrote last and the reports flapped every few seconds.
+            // A tab that is not on screen (another tab in front, minimised)
+            // wants nothing — the operator cannot see its panels either.
+            // Re-sent every 5 s as well: automatic reconnect gives the connection
+            // a new id, and the hub's record is per connection.
+            function reportSpectrumPanels() {
+                const conn = window.signalRConnection;
+                if (!conn || conn.state !== 'Connected') return;
+                const visible = document.visibilityState === 'visible';
+                const scopeOn = visible && !(scopeSwitch && !scopeSwitch.checked);
+                const wantA = scopeOn && (currentMode === 'A' || currentMode === 'Multi');
+                const wantB = scopeOn && (currentMode === 'B' || currentMode === 'Multi');
+                conn.invoke('SpectrumPanels', wantA, wantB).catch(() => { /* reconnecting */ });
+            }
+            setInterval(reportSpectrumPanels, 5000);
+            document.addEventListener('visibilitychange', reportSpectrumPanels);
 
             // Per-VFO status routing — drives the panel state + small badge in the header.
             function setStatusBadge(vfo, status) {
@@ -2271,6 +2557,7 @@
                     // Both configured — honour the active mode.
                     applyMode(currentMode);
                 }
+                reportSpectrumPanels();
             }
 
             // Mono/Multi toggle — persisted in localStorage so the user's
@@ -2289,6 +2576,7 @@
                 });
                 // Trigger canvas resize since the layout just changed.
                 window.dispatchEvent(new Event('resize'));
+                reportSpectrumPanels();
             }
             document.querySelectorAll('.spectrum-mode-btn').forEach(b => {
                 b.addEventListener('click', () => applyMode(b.dataset.mode));
@@ -2385,6 +2673,50 @@
             window.dxSpotsPanel = new DxSpotsPanel();
             window.dxSpotsPanel.init();
             window.dxSpotsPanel.setVfoFrequency(@Model.RadioState.FrequencyA);
+
+            // The CW reader is independent of the SDR and of the cluster. It
+            // opens the radio's USB codec as an ordinary recording device, so
+            // it needs nothing else in the app to be running - and it is opened
+            // shared, so a logging or digital-mode program can hold the same
+            // device at the same time.
+            window.cwReaderPanel = new CwReaderPanel();
+            window.cwReaderPanel.init();
+
+            // Typed CW goes straight out as CI-V 17; the panel only cuts the
+            // line into 30-character pieces and paces them.
+            window.cwSendPanel = new CwSendPanel();
+            window.cwSendPanel.init();
+
+            // The log form is separate from the reader and starts closed. The
+            // operator opens it when a QSO is worth keeping, and it asks the
+            // server what is in the copy at that moment - so opening it late
+            // in the contact gets the name and QTH that arrived after the
+            // callsign, which opening it early would not.
+            window.cwQsoForm = new CwQsoForm();
+            window.cwQsoForm.init('cwQsoForm');
+            document.getElementById('cwReaderLogBtn')
+                ?.addEventListener('click', () => window.cwQsoForm.toggle());
+
+            // Software zero-in. The IC-7300 has no ZI command, so the server
+            // works the offset out from the tone the reader is tracking and
+            // sets the frequency itself. It refuses far more often than it
+            // acts - the reply says which, and it is shown rather than
+            // swallowed, because a button that silently does nothing is
+            // indistinguishable from one that is broken.
+            document.getElementById('cwZinBtn')?.addEventListener('click', async (ev) => {
+                const btn  = ev.currentTarget;
+                const out  = document.getElementById('cwZinStatus');
+                btn.disabled = true;
+                try {
+                    const r = await fetch('/api/cw/zin', { method: 'POST' });
+                    const j = await r.json().catch(() => ({}));
+                    if (out) out.textContent = j.message || j.error || 'Zero-in failed.';
+                } catch (e) {
+                    if (out) out.textContent = 'Zero-in failed: ' + e;
+                } finally {
+                    btn.disabled = false;
+                }
+            });
 
             spectrumPipeline.onFrequencyA(hz => {
                 spectrumPanelA.setVfoFrequency(hz);
@@ -3432,6 +3764,25 @@
             try { localStorage.setItem('dlgPos_' + dialog.id, JSON.stringify({ left: dialog.style.left, top: dialog.style.top })); } catch {}
         }
 
+        // Keep a position:fixed dialog's header on screen: the whole header
+        // bar below the sticky navbar (a show() dialog is not in the top
+        // layer, so the navbar paints over it) and above the viewport
+        // bottom, with a margin to spare, and at least a hand's width of it
+        // inside left and right. Dialogs positioned absolute are left alone
+        // - their left/top are page coordinates and the viewport is the
+        // wrong yardstick once the page has scrolled.
+        function _clampDlg(dialog, left, top) {
+            if (getComputedStyle(dialog).position !== 'fixed') return { left, top };
+            const w = dialog.offsetWidth || 200, grip = 120, margin = 12;
+            const head = (dialog.querySelector('div') || {}).offsetHeight || 44;
+            const nav = document.querySelector('header.sticky-top, header.fixed-top');
+            const topMin = (nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0) + margin;
+            return {
+                left: Math.min(Math.max(left, grip - w), window.innerWidth - grip),
+                top:  Math.min(Math.max(top, topMin), Math.max(topMin, window.innerHeight - head - margin)),
+            };
+        }
+
         function makeDraggable(dialog, handle) {
             handle.style.cursor = 'grab';
             handle.addEventListener('mousedown', e => {
@@ -3441,8 +3792,9 @@
                 let origLeft = r.left, origTop = r.top;
                 dialog.style.transform = 'none';
                 function onMove(e) {
-                    dialog.style.left = (origLeft + e.clientX - startX) + 'px';
-                    dialog.style.top  = (origTop  + e.clientY - startY) + 'px';
+                    const p = _clampDlg(dialog, origLeft + e.clientX - startX, origTop + e.clientY - startY);
+                    dialog.style.left = p.left + 'px';
+                    dialog.style.top  = p.top + 'px';
                 }
                 function onUp() {
                     document.removeEventListener('mousemove', onMove);
@@ -3462,8 +3814,9 @@
                 let origLeft = r.left, origTop = r.top;
                 dialog.style.transform = 'none';
                 function onMove(e) {
-                    dialog.style.left = (origLeft + e.touches[0].clientX - startX) + 'px';
-                    dialog.style.top  = (origTop  + e.touches[0].clientY - startY) + 'px';
+                    const p = _clampDlg(dialog, origLeft + e.touches[0].clientX - startX, origTop + e.touches[0].clientY - startY);
+                    dialog.style.left = p.left + 'px';
+                    dialog.style.top  = p.top + 'px';
                     e.preventDefault();
                 }
                 function onEnd() {
@@ -3476,15 +3829,49 @@
             }, { passive: true });
         }
 
-        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'voiceHelpDialog', 'audioFilterDialogA', 'audioFilterDialogB', 'rxFilterDialogA', 'rxFilterDialogB', 'utcClockInfoDialog'].forEach(id => {
+        // Dialogs whose CSS says resize:both. The browser writes the dragged
+        // size as inline width/height; that is what is saved and put back,
+        // and its presence flips the dialog into user-sized layout, where
+        // the text area fills the height instead of capping at its own max.
+        function makeResizable(dialog) {
+            const key = 'dlgSize_' + dialog.id;
+            const apply = () => dialog.classList.toggle('user-sized', !!(dialog.style.width || dialog.style.height));
+            try {
+                const saved = JSON.parse(localStorage.getItem(key) || 'null');
+                if (saved && saved.width) { dialog.style.width = saved.width; dialog.style.height = saved.height || ''; }
+            } catch { /* ignore */ }
+            apply();
+            let timer = null;
+            new ResizeObserver(() => {
+                if (!dialog.open) return;
+                apply();
+                if (!dialog.style.width && !dialog.style.height) return;
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    try { localStorage.setItem(key, JSON.stringify({ width: dialog.style.width, height: dialog.style.height })); } catch { /* ignore */ }
+                }, 250);
+            }).observe(dialog);
+        }
+        ['cwSendDialog'].forEach(id => {
+            const dlg = document.getElementById(id);
+            if (dlg) makeResizable(dlg);
+        });
+
+        // cwReaderDialog is not here: the shared reader panel (core/js/cw)
+        // has its own drag and position memory, and a second handler on the
+        // same header fights it.
+        ['voxDialog', 'cwDialog', 'cwSendDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'voiceHelpDialog', 'audioFilterDialogA', 'audioFilterDialogB', 'rxFilterDialogA', 'rxFilterDialogB', 'utcClockInfoDialog'].forEach(id => {
             const dlg = document.getElementById(id);
             if (!dlg) return;
             makeDraggable(dlg, dlg.querySelector('div'));
             try {
                 const saved = JSON.parse(localStorage.getItem('dlgPos_' + id) || 'null');
                 if (saved && saved.left && saved.top) {
-                    dlg.style.left = saved.left;
-                    dlg.style.top  = saved.top;
+                    // A position saved on a bigger window, or with the
+                    // header dragged off the top, comes back on screen.
+                    const p = _clampDlg(dlg, parseFloat(saved.left) || 0, parseFloat(saved.top) || 0);
+                    dlg.style.left = p.left + 'px';
+                    dlg.style.top  = p.top + 'px';
                     dlg.style.transform = 'none';
                 }
             } catch {}
@@ -4248,16 +4635,27 @@
             catch (e) { console.error('setCwPitch error:', e); }
         }
         async function setCwSpeed(v) {
+            // The CW Send panel has the same slider; keep it in step.
+            window.cwSendPanel?.setSpeed(v);
             try { await fetch('/api/cat/cw/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed: parseInt(v) }) }); }
             catch (e) { console.error('setCwSpeed error:', e); }
         }
         async function setCwBreakIn(v) {
+            window.cwSendPanel?.setBreakIn(v);
             try { await fetch('/api/cat/cw/breakin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: v }) }); }
             catch (e) { console.error('setCwBreakIn error:', e); }
         }
         async function setCwBreakInDelay(v) {
             try { await fetch('/api/cat/cw/breakindelay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dots: parseFloat(v) }) }); }
             catch (e) { console.error('setCwBreakInDelay error:', e); }
+        }
+        // The CW Send panel marks the M1-M5 buttons busy while a typed line
+        // is going out, so a press here does not land on top of it.
+        function cwMemButtonsBusy(busy) {
+            document.querySelectorAll('#cwDialog .cw-mem-btn').forEach(b => {
+                b.disabled = busy;
+                b.title = busy ? 'CW Send is keying a line - wait for it to finish' : b.dataset.title;
+            });
         }
         async function sendCwMessage(index) {
             const input = document.getElementById(`cwMsg${index}`);
@@ -4705,6 +5103,7 @@
         window.setCwSpeed      = setCwSpeed;
         window.openCwDialog    = openCwDialog;
         window.stopCw          = stopCw;
+        window.cwMemButtonsBusy = cwMemButtonsBusy;
         window.setCwBreakIn    = setCwBreakIn;
         window.setCwBreakInDelay = setCwBreakInDelay;
         window.sendCwMessage   = sendCwMessage;
