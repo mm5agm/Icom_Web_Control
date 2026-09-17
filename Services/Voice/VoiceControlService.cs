@@ -576,6 +576,20 @@ namespace Icom_Web_Control.Services.Voice
                 }
 
                 var engine = new SpeechRecognitionEngine(cultureInfo);
+
+                // How long a pause SAPI will sit through before it decides the
+                // phrase is over. The default for an *ambiguous* pause - what it
+                // has heard so far could be a whole phrase or the start of a
+                // longer one - is 500 ms, and "set frequency ... [breath] ...
+                // one four" is exactly that: the operator pauses to line up the
+                // number, SAPI gives up waiting, and the nearest complete phrase
+                // to "set frequency" is "status frequency", which is what fired
+                // (conf 0.87-0.96, before PTT was even released). Push-to-talk
+                // bounds the wait anyway - releasing PTT finalises whatever is
+                // pending - so a long ambiguous timeout costs nothing on a short
+                // command and gives a long one room to breathe.
+                engine.EndSilenceTimeoutAmbiguous = TimeSpan.FromMilliseconds(1500);
+
                 engine.SpeechRecognized += OnSpeechRecognized;
                 engine.SpeechRecognitionRejected += OnSpeechRejected;
                 engine.RecognizeCompleted += OnRecognizeCompleted;
