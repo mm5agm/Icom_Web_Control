@@ -270,7 +270,8 @@ namespace Icom_Web_Control.Services.Voice
             if (_logger != null && DateTime.UtcNow >= _nextLevelLog)
             {
                 _nextLevelLog = DateTime.UtcNow.AddSeconds(1);
-                _logger.LogInformation("[Voice] Mic capture: peak={Peak}/32767, gain={Gain:F1}x (applied {Applied:F1}x), captured={Cap}B read={Read}B",
+                // Once a second for as long as the mic is open — Debug only.
+                _logger.LogDebug("[Voice] Mic capture: peak={Peak}/32767, gain={Gain:F1}x (applied {Applied:F1}x), captured={Cap}B read={Read}B",
                     _peakSinceLog, _gain, applied, _totalCaptured, _totalRead);
                 _peakSinceLog = 0;
             }

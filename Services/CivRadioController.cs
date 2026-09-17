@@ -650,7 +650,7 @@ namespace Icom_Web_Control.Services
                 // to the ordinary routing below.
                 long peekHz = peek == "B" ? _state.FrequencyB : _state.FrequencyA;
                 bool onWatchBand = sweep.SpanHz > 0 && Math.Abs(sweep.CentreHz - peekHz) <= sweep.SpanHz / 2;
-                _logger.LogInformation("[CivRadioController] Peek sweep centre={Centre} Hz span={Span} Hz watch={Watch} Hz -> {Where}",
+                _logger.LogDebug("[CivRadioController] Peek sweep centre={Centre} Hz span={Span} Hz watch={Watch} Hz -> {Where}",
                     sweep.CentreHz, sweep.SpanHz, peekHz, onWatchBand ? "panel " + peek : "primary (not on the watch band)");
                 if (onWatchBand)
                 {
