@@ -432,7 +432,7 @@ Both choices are remembered in your browser.
 
 - **Zoom in independently** (default) — B's buttons crop its own view tighter in software, leaving VFO A and the radio alone.
 - **Share one span** — B's buttons drive the one physical span exactly as A's do, and both panels' buttons light up together.
-- **Hide** — B has no span buttons at all; only VFO A controls the shared span. (This is the setting in the screenshot above.)
+- **Hide** — B has no span buttons at all; only VFO A controls the shared span.
 
 ---
 
@@ -2547,6 +2547,8 @@ Nothing here transmits. The reader only listens.
 
 The decoder itself is shared with my Yaesu app, so the two read Morse identically — what differs is only how each radio is asked for a narrow filter.
 
+![The CW Reader panel: Stop, Clear, Reader Mode ON, ZIN and Log QSO across the top with the Follow and Tune switches; decoded text on the left with callsigns, CQ and 5NN picked out in colour; the tone-finder spectrum and the phasor circle on the right; the signal line along the bottom reading tone 679 Hz, pitch 700 Hz, filter 250 Hz, 24 wpm, SNR 15 dB](pictures/CW-Reader.png)
+
 ### 18.1 What to expect from a machine reading Morse
 
 I want to be straight about this before describing the controls, because it is the thing that surprises people.
@@ -2704,6 +2706,8 @@ The reader decodes from the receive audio, so anything you can hear is something
 The **CW Send** button on the main control panel opens the other half of the CW Reader: a box you type into, and the radio keys what you typed. Read in one panel, answer in the other. It needs nothing beyond the CI-V connection — no key, no keyer interface, no extra audio.
 
 > **Note:** like the CW Keyer panel, this is wired to real CI-V commands and has not been used on air by a CW operator. What is said below about break-in and about the gap between pieces is what the CI-V reference and the memory keyer's behaviour lead me to expect, not something I have measured. Feedback from CW operators is especially welcome.
+
+![The CW Send panel: Stop, Clear log and close across the top; the log showing one line tagged sent and a second line part-way through with the character under the key highlighted; the type-here box and Clear button below; the Speed slider at 23 wpm; and the status line reading Sending](pictures/CW-Send.png)
 
 ### 19.1 Sending a line
 
