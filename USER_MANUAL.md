@@ -107,7 +107,7 @@
 
 ## 1. Introduction
 
-Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 MkII HF/50 MHz transceiver.
+Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 and IC-7300 MkII HF/50 MHz transceivers.
 
 > **Windows only.** IWC runs on Windows 10 or 11 (64-bit). There is no Linux or macOS build, and none is planned. The app is hosted by a small WinForms process and uses a Windows serial-port driver to reach the radio. You can still access the browser interface itself from any device on your home network (tablet, phone, Linux laptop) — but the IWC server must be running on a Windows PC.
 
@@ -117,11 +117,14 @@ Icom Web Control — **IWC** for short — is a web-based control panel for the 
 
 Supported radio:
 
-| Model | Power | Receiver | Interface |
-|-------|-------|----------|-----------|
-| IC-7300 MkII | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-C |
+| Model | Power | Receiver | Interface | CI-V address |
+|-------|-------|----------|-----------|--------------|
+| IC-7300 MkII | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-C | `B6` (default) |
+| IC-7300 (original) | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-B | `94` |
 
-IWC connects to the IC-7300 MkII over its CI-V computer-control interface, carried on the radio's single USB Type-C cable. No extra hardware is required — the spectrum scope, meters, and all controls come over that one connection.
+The MkII is the radio IWC is developed and bench-tested on. The original IC-7300 speaks near-identical CI-V and has been confirmed working by an owner; it needs two settings the MkII does not — the scope only streams with **CI-V USB Port** unlinked from **[REMOTE]** and the USB baud rate at **115200** (see [§3](#3-first-time-setup) and [§6.1](#61-radio-connection)).
+
+IWC connects to the radio over its CI-V computer-control interface, carried on the radio's single USB cable. No extra hardware is required — the spectrum scope, meters, and all controls come over that one connection.
 
 The app runs as a small application on your shack PC and is accessed through any web browser — on the same PC, a tablet, or any device on your home network.
 
@@ -137,14 +140,18 @@ The application was written for operators who want a large, clean, touchscreen-f
 - **IF passband width** control with a FIL1 / FIL2 / FIL3 filter-slot selector — pick any width the radio supports for the current mode, straight from the app
 - Full receive controls: AGC, Preamp, Attenuator, NR, NB, Auto Notch, Manual Notch, **RF Gain**, **Squelch** (FM mode)
 - CW keyer with speed, break-in, delay, **sidetone pitch**, and five programmable memory messages
+- **CW Reader** — decodes the Morse you are hearing into text, with a one-press **Reader Mode** that sets the radio up for decoding and restores it afterwards, a **ZIN** zero-beat button and a **Log QSO** form that writes ADIF ([§18](#18-cw-reader))
+- **CW Send** — type a line and the radio keys it over CI-V, with Stop, at the keyer's own speed ([§19](#19-cw-send))
 - TX monitor on/off toggle and level control
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Real-time spectrum display and waterfall using the **IC-7300's built-in band scope**, delivered over CI-V — no external SDR or IF tap needed
+- **Pseudo-dual receiver** — an optional second spectrum panel for VFO B, cropped from the same sweep when both VFOs share a band, or refreshed by a brief cross-band peek when they do not ([§5.4](#54-spectrum-display))
 - **DX cluster spots** overlaid on the spectrum — click a callsign to QSY straight to that frequency; user-selectable cluster server with live connection-status badge
 - **DX watch list** — get a popup alert and a beep when watched callsigns or prefixes appear in the cluster feed (e.g. `P29*` for a DXpedition); persisted across app restarts
 - **TX timeout warning** — visible red banner + audible tone if TX has been on too long (configurable threshold), as a safety net against open mics, stuck PTTs and VOX false-triggers
 - **Per-VFO status line** inside each VFO panel — at-a-glance summary of band, mode, frequency, power and split state, banner-coloured to match the receiver
 - **Voice announcements** — optional spoken cues for band/mode/TX changes, DX alerts and TX timeout, using your browser's built-in text-to-speech (handy for partially sighted operators)
+- **Voice control** — press-and-hold a mic button and say "band up", "set frequency to fourteen point zero seven four", "filter narrower" and a couple of dozen other commands; recognised locally by Windows, nothing leaves the PC, and the phrase list is yours to edit ([§17](#17-voice-control))
 - Integration with WSJT-X, JTAlert, and Log4OM
 - Built-in rigctld server so WSJT-X can control the radio through the app
 - Four IARU band plans: Region 1 (Europe, Africa, Middle East), Region 2 (Americas), Region 3 (Asia-Pacific), and Japan (JARL)
@@ -236,7 +243,7 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.0.6**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.1.0**) are shown in the top-left corner.
 
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
 

@@ -2,10 +2,10 @@
 
 ![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
-![Latest release](https://img.shields.io/badge/Download-v1.0.6-brightgreen?style=flat-square)
+![Latest release](https://img.shields.io/badge/Download-v1.1.0-brightgreen?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Icom_Web_Control/latest/Icom_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 
-> **v1.0.6 — current release.** IWC controls the **Icom IC-7300** and **IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, and a rigctld bridge for WSJT-X. The two radios speak near-identical CI-V and IWC drives both the same way — set the CI-V address to `94` for the original, `B6` for the MkII. Development and bench testing has been on a single IC-7300 MkII, and an owner of the original IC-7300 has confirmed v1.0.6 working on his radio. That is still only two radios between them, so if anything behaves unexpectedly — on either — please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
+> **v1.1.0 — current release.** IWC controls the **Icom IC-7300** and **IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, a CW reader and sender, and a rigctld bridge for WSJT-X. The two radios speak near-identical CI-V and IWC drives both the same way — set the CI-V address to `94` for the original, `B6` for the MkII. Development and bench testing has been on a single IC-7300 MkII, and an owner of the original IC-7300 has confirmed v1.0.6 working on his radio. That is still only two radios between them, so if anything behaves unexpectedly — on either — please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
 >
 > **[⬇ Download the latest installer](https://github.com/mm5agm/Icom_Web_Control/releases/latest)**
 
@@ -36,9 +36,40 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Status & plan
 
-**`v1.0.6` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 or IC-7300 MkII end-to-end (see the summary at the top), bench-tested against a single MkII and confirmed by an owner on an original IC-7300. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
+**`v1.1.0` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 or IC-7300 MkII end-to-end (see the summary at the top), bench-tested against a single MkII and confirmed by an owner on an original IC-7300. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
+
+### v1.1.0 (2026-09-17)
+
+> **Upgrading from v1.0.6?** Download `Icom_Web_Control_Setup.exe` and install it
+> over the top — nothing to uninstall first, and your settings, memories,
+> calibration and voice phrases are all kept. This is the first release with the
+> **CW Reader** and **CW Send** panels, so the version number moves to 1.1.
+
+- **IWC now reads Morse.** A **CW Read** button on the main panel opens a reader that listens to the radio's own USB audio and prints what it hears as text, with a small spectrum and a tuning phasor so you can see the tone you are decoding. **Reader Mode** sets the radio up for it in one press — CW, a 250 Hz filter, the audio peak filter and AGC MID — and puts every one of those back when you leave it. **ZIN** zero-beats the signal for you; the IC-7300 has no CI-V command for that, so IWC measures the tone and moves the VFO itself. Confirmed contacts go to a **Log QSO** form that appends to an ADIF file Log4OM and GridTracker already watch. The decoder is the one my Yaesu app uses, unchanged — only the radio wiring is new — and the manual has a frank section on what a machine can and cannot copy ([§18](USER_MANUAL.md#18-cw-reader)).
+
+  *Two bench findings are worth recording. Icom's "CW" is the lower-sideband case whatever the display name says, which decided the sign of the zero-in correction; and the reader now asks the radio for its sidetone pitch when it starts rather than trusting a cached 600 Hz, because a pitch set on the front panel had it building the detector around the wrong tone.*
+
+- **And sends it.** **CW Send** is the other half: a box you type into, and the radio keys what you typed over CI-V, in 30-character pieces on word boundaries. **Stop** cuts in even mid-piece. Speed and break-in are the keyer's own and follow the radio's knob and BK-IN button, and the panel says "sidetone only" when break-in is off so you know nothing is going out. Like the keyer panel it has not yet been used on air by a CW operator — see the note in [§19](USER_MANUAL.md#19-cw-send).
+
+- **Clicking a signal on the spectrum no longer knocks CW-R back to CW.** The click follows the band plan's mode, which is right for taking DATA-U to phone or phone to CW, but it also reset a reverse-sideband choice you had made to dodge QRM. The CW and RTTY reverse pairs are now left alone.
+
+- **The two-panel spectrum stopped hopping when you only wanted one.** With the pseudo-dual receiver's cross-band peek on, the radio kept borrowing the receiver every 15 seconds to refresh VFO B's panel even after you had chosen **VFO A** only. The peek now runs only while a browser is actually showing the VFO B panel, and each tab reports its own choice, so several open tabs cannot argue about it.
+
+- **"Band up" said "successful" and did nothing.** If a voice or button command landed during one of those borrows, it was applied to VFO B and undone when the receiver was handed back. Commands are now held for the fraction of a second the borrow lasts and then applied to your own VFO.
+
+- **VFO B's panel showed your own band's trace between peeks.** A sweep the radio had already started before it retuned was being credited to VFO B along with the real one, so B sat on a stale 20 m trace with one big spike until the next peek. Only sweeps that really are on B's band reach B now.
+
+- **Voice control hears you properly again.** The microphone gain control was setting itself from the *previous* 50 ms of audio, so the first loud syllable of every command went in clipped and the recogniser's confidence sat at 0.2–0.5 — right on the reject threshold. Gain now follows a peak envelope with a limiter behind it; the same microphone now scores 0.7–0.97. Separately, "set frequency to …" was being cut off at the breath after "frequency" and returned as the shorter "status frequency"; the engine now waits 1.5 s for the rest.
+
+- **Windows resetting the microphone no longer kills voice control until a restart.** Toggling Voice Clarity, a sample-rate change or re-plugging the mic all re-initialise the device underneath the app, and every PTT after that heard nothing. IWC now notices on the next press and reopens the microphone itself. The manual's voice section has been brought up to date at the same time — it still described the Windows default-device dance from before IWC had its own **Microphone** and **Announcement speaker** pickers.
+
+- **The log file is a fraction of the size.** Three messages — the band recalculation on every poll and a pair logged for every status fetch from every open tab — were 86 % of a 120,000-line day. A day's log was running to 17 MB; it should now be a couple of megabytes of things that actually happened. Seven days are kept, as before.
+
+- **Draggable panels can no longer be dragged off the screen.** The CW Reader and CW Send headers are clamped to the viewport, below the navigation bar and above the bottom edge, so the grab handle is always reachable.
+
+- **Under the hood:** the shared core's 131 tests now run on every pull request into `develop`, on Linux, which is also what proves the shared code has nothing Windows-only in it. The scope trace was measured over 40-sweep averages on two bands to check it does not carry the permanent centre spike the Yaesu app had (it does not, and could not — these are the radio's own bins), and two comments that claimed the sweep centre equals the VFO were corrected: in SSB the radio centres on the passband, 1.5 kHz off the carrier.
 
 ### v1.0.6 (2026-08-16)
 
