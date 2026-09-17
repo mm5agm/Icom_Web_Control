@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -121,6 +121,18 @@ namespace Icom_Web_Control.Services
         private volatile int _peekIntervalMs = 15000;
         private volatile string? _peekWatchId;
         private long _peekLastTicks;
+        private bool _peekHeldForPanel;
+
+        // While the peek has the receiver on the watch VFO, every command that
+        // addresses "the displayed VFO" (05 frequency, 06 mode, 07 select, the
+        // per-mode filter and RX controls — nearly all of them) would land on
+        // the wrong VFO. It happened: a voice "band up" arrived during a borrow,
+        // the radio ACKed 05 into VFO B, the peek restored VFO A untouched, and
+        // the operator was told "successful" with the band unchanged. The peek
+        // holds this gate for the whole borrow and every other transaction
+        // waits behind it (at most ~PeekWindowMs plus two selects). The peek's
+        // own selects go straight to the bus, so they must never take the gate.
+        private readonly SemaphoreSlim _peekGate = new(1, 1);
 
         // Watch-panel span (Phase 5). The single scope has one span, so the watch
         // panel is a crop of that sweep; "ZoomIn" mode lets the operator narrow the
@@ -462,7 +474,7 @@ namespace Icom_Web_Control.Services
                 CivProtocol.CmdScope, CivProtocol.SubScopeMode, CivProtocol.ScopeMain, mode);
             for (int attempt = 1; attempt <= 3; attempt++)
             {
-                var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+                var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
                 if (reply != null && reply.Cmd == CivProtocol.AckOk)
                     return;
                 if (attempt < 3)
@@ -485,7 +497,7 @@ namespace Icom_Web_Control.Services
             // TransactAsync completes on AckNg as well as on the expected command
             // (CivBusService.DispatchFrame), so a refusal arrives as a frame rather
             // than as a timeout.
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply != null && reply.Cmd == CivProtocol.AckOk)
                 return ScopeSetResult.Ok;
 
@@ -552,7 +564,7 @@ namespace Icom_Web_Control.Services
             var bcd = CivProtocol.EncodeBcd((long)spanHz * 100, 5);
             Array.Copy(bcd, 0, body, 2, 5);
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] scope span ±{SpanHz} Hz was not acknowledged", spanHz);
         }
@@ -783,9 +795,30 @@ namespace Icom_Web_Control.Services
             RadioVfo watch = active == RadioVfo.A ? RadioVfo.B : RadioVfo.A;
             string watchId = active == RadioVfo.A ? "B" : "A";
 
+            // Nobody is looking at the watch panel (the operator picked "VFO A"
+            // only, or the scope is collapsed, or no browser is open) — then the
+            // sweep would be thrown away and the audio dip is pure cost. The
+            // browsers report what they show over the hub; hold off until one of
+            // them shows this panel again. Logged on the transitions only.
+            bool wanted = RadioHub.AnyClientShowsSpectrumPanel(watchId);
+            if (wanted == _peekHeldForPanel)
+            {
+                _peekHeldForPanel = !wanted;
+                _logger.LogInformation(wanted
+                    ? "[CivRadioController] Cross-band peek resumed: watch panel {Id} is on screen again"
+                    : "[CivRadioController] Cross-band peek paused: watch panel {Id} is not on screen in any browser", watchId);
+            }
+            if (!wanted)
+            {
+                _peekLastTicks = now;
+                return;
+            }
+
             // Borrow the receiver. Route arriving sweeps to the watch panel via
             // _peekWatchId; send the selects over the bus directly so the persistent
-            // ActiveVfo / "listening" badge never flips.
+            // ActiveVfo / "listening" badge never flips. Hold _peekGate throughout
+            // so no other command can be applied to the borrowed VFO.
+            await _peekGate.WaitAsync(ct);
             _peekWatchId = watchId;
             try
             {
@@ -796,11 +829,38 @@ namespace Icom_Web_Control.Services
             {
                 // Always hand the receiver back — leaving it on the watch VFO would
                 // strand the audio there — and retry, since a dropped select is far
-                // worse here than elsewhere. Clear the peek tag only once restored.
-                for (int i = 0; i < 3 && !await RawSelectVfoAsync(active, ct); i++)
-                    await DelayQuiet(30, ct);
-                _peekWatchId = null;
-                _peekLastTicks = Environment.TickCount64;
+                // worse here than elsewhere. Clear the peek tag only once restored,
+                // and release the gate only after that.
+                try
+                {
+                    for (int i = 0; i < 3 && !await RawSelectVfoAsync(active, ct); i++)
+                        await DelayQuiet(30, ct);
+                }
+                finally
+                {
+                    _peekWatchId = null;
+                    _peekLastTicks = Environment.TickCount64;
+                    _peekGate.Release();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Every transaction the controller makes goes through here rather than
+        /// straight to the bus, so a cross-band peek can hold the receiver on the
+        /// watch VFO without any command from voice, the browser, rigctld or CW
+        /// Send slipping in and being applied to it. Same signature as the bus.
+        /// </summary>
+        private async Task<CivFrame?> TransactAsync(byte[] frame, byte expectedCmd, int timeoutMs = 500, CancellationToken cancellationToken = default)
+        {
+            await _peekGate.WaitAsync(cancellationToken);
+            try
+            {
+                return await _bus.TransactAsync(frame, expectedCmd, timeoutMs, cancellationToken);
+            }
+            finally
+            {
+                _peekGate.Release();
             }
         }
 
@@ -814,6 +874,7 @@ namespace Icom_Web_Control.Services
             byte v = vfo == RadioVfo.B ? CivProtocol.VfoSelectB : CivProtocol.VfoSelectA;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSelectVfo, v);
+            // Straight to the bus: the peek is holding _peekGate while it calls this.
             var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             return reply != null && reply.Cmd == CivProtocol.AckOk;
         }
@@ -935,7 +996,7 @@ namespace Icom_Web_Control.Services
         private async Task<int> ReadAttenuatorRawAsync(CancellationToken ct)
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdAttenuator);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdAttenuator, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdAttenuator, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.CmdAttenuator || reply.Data.Length < 1)
                 return -1;
             return reply.Data[0];
@@ -959,7 +1020,7 @@ namespace Icom_Web_Control.Services
         private async Task<long> ReadOperatingFrequencyAsync(CancellationToken cancellationToken)
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdReadFrequency);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadFrequency, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdReadFrequency, cancellationToken: cancellationToken);
             if (reply == null || reply.Cmd != CivProtocol.CmdReadFrequency || reply.Data.Length < 5)
                 return -1;
             return CivProtocol.DecodeBcd(reply.Data.AsSpan(0, 5));
@@ -973,7 +1034,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdVfoFrequency, sel);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdVfoFrequency, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdVfoFrequency, cancellationToken: cancellationToken);
             // Reply body: 25 <sel> <5 BCD> → Data = [sel, b0..b4].
             if (reply == null || reply.Cmd != CivProtocol.CmdVfoFrequency
                 || reply.Data.Length < 6 || reply.Data[0] != sel)
@@ -1002,7 +1063,7 @@ namespace Icom_Web_Control.Services
             }
 
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply != null && reply.Cmd == CivProtocol.AckOk)
             {
                 if (vfo == RadioVfo.A) _state.FrequencyA = frequencyHz;
@@ -1075,7 +1136,7 @@ namespace Icom_Web_Control.Services
             byte dataByte = target.Data ? (byte)0x01 : (byte)0x00;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdVfoMode, sel, target.BaseByte, dataByte, filter);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
             {
                 _logger.LogWarning("[CivRadioController] Set mode '{Mode}' (26) was not acknowledged", mode);
@@ -1096,7 +1157,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdVfoMode, sel);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdVfoMode, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdVfoMode, cancellationToken: cancellationToken);
             // Reply body: 26 <sel> <mode> <data> <filter> → Data = [sel, mode, data, filter].
             if (reply == null || reply.Cmd != CivProtocol.CmdVfoMode
                 || reply.Data.Length < 4 || reply.Data[0] != sel)
@@ -1172,7 +1233,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdReadMeter, sub);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadMeter, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdReadMeter, cancellationToken: cancellationToken);
             // Reply body is 15 <sub> <d1> <d2>: Data = [sub, d1, d2].
             if (reply == null || reply.Cmd != CivProtocol.CmdReadMeter
                 || reply.Data.Length < 3 || reply.Data[0] != sub)
@@ -1194,7 +1255,7 @@ namespace Icom_Web_Control.Services
             byte v = transmit ? (byte)0x01 : (byte)0x00;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdTransmit, CivProtocol.SubTxStatus, v);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply != null && reply.Cmd == CivProtocol.AckOk)
                 _state.IsTransmitting = transmit;
             else
@@ -1211,7 +1272,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdTransmit, CivProtocol.SubTxStatus);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdTransmit, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdTransmit, cancellationToken: cancellationToken);
             // Reply body is 1C 00 <status>: Data = [00, status].
             if (reply != null && reply.Cmd == CivProtocol.CmdTransmit
                 && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubTxStatus)
@@ -1230,7 +1291,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdTransmit, CivProtocol.SubTuner);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdTransmit, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdTransmit, cancellationToken: cancellationToken);
             // Reply body is 1C 01 <status>: Data = [01, status].
             if (reply != null && reply.Cmd == CivProtocol.CmdTransmit
                 && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubTuner)
@@ -1244,7 +1305,7 @@ namespace Icom_Web_Control.Services
             byte v = (byte)state;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdTransmit, CivProtocol.SubTuner, v);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply != null && reply.Cmd == CivProtocol.AckOk)
             {
                 // 00=OFF, 01=ON, 02=start tuning. A tuning cycle leaves the tuner
@@ -1269,7 +1330,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSetLevel, CivProtocol.SubRfPower);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdSetLevel, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdSetLevel, cancellationToken: cancellationToken);
             // Reply body is 14 0A <d1> <d2>: Data = [0A, d1, d2].
             if (reply == null || reply.Cmd != CivProtocol.CmdSetLevel
                 || reply.Data.Length < 3 || reply.Data[0] != CivProtocol.SubRfPower)
@@ -1290,7 +1351,7 @@ namespace Icom_Web_Control.Services
             byte d2 = (byte)(((rem / 10) << 4) | (rem % 10)); // packed BCD of the low two digits
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSetLevel, CivProtocol.SubRfPower, d1, d2);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set RF power {Percent}% (level {Level}) was not acknowledged",
                     percent, level);
@@ -1329,7 +1390,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSetLevel, sub);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdSetLevel, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdSetLevel, cancellationToken: cancellationToken);
             // Reply body is 14 <sub> <d1> <d2>: Data = [sub, d1, d2].
             if (reply == null || reply.Cmd != CivProtocol.CmdSetLevel
                 || reply.Data.Length < 3 || reply.Data[0] != sub)
@@ -1349,7 +1410,7 @@ namespace Icom_Web_Control.Services
             byte d2 = (byte)(((rem / 10) << 4) | (rem % 10)); // packed BCD of the low two digits
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSetLevel, sub, d1, d2);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set {What} to {Level} was not acknowledged", what, level);
         }
@@ -1465,7 +1526,7 @@ namespace Icom_Web_Control.Services
             byte bcd = (byte)(((code / 10) << 4) | (code % 10));   // one BCD digit-pair; code ≤ 49
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubIfWidth, bcd);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
             {
                 _logger.LogWarning("[CivRadioController] Set IF width code {Code} was not acknowledged", code);
@@ -1500,7 +1561,7 @@ namespace Icom_Web_Control.Services
             // Re-send command 26 with mode/data preserved, only the filter byte changed.
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdVfoMode, sel, cur.mode, cur.data, (byte)fil);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
             {
                 _logger.LogWarning("[CivRadioController] Select filter FIL{Fil} (26) was not acknowledged", fil);
@@ -1521,7 +1582,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, sub);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.CmdMenu
                 || reply.Data.Length < 2 || reply.Data[0] != sub)
                 return -1;
@@ -1545,7 +1606,7 @@ namespace Icom_Web_Control.Services
 
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubRxTone, 0x00, item);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
             // Reply body: 1A 05 00 <item> HH LL → Data = [05, 00, item, HH, LL].
             if (reply == null || reply.Cmd != CivProtocol.CmdMenu
                 || reply.Data.Length < 5 || reply.Data[0] != CivProtocol.SubRxTone
@@ -1571,7 +1632,7 @@ namespace Icom_Web_Control.Services
             byte ll = (byte)(((lpfCode / 10) << 4) | (lpfCode % 10));   // BCD, code ≤ 25
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubRxTone, 0x00, item, hh, ll);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set RX filter HPF {Hpf} / LPF {Lpf} Hz was not acknowledged", hpfHz, lpfHz);
         }
@@ -1755,7 +1816,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSetFunc, sub);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdSetFunc, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdSetFunc, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.CmdSetFunc
                 || reply.Data.Length < 2 || reply.Data[0] != sub)
                 return -1;
@@ -1767,7 +1828,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSetFunc, sub, (byte)value);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set {What} to {Value} was not acknowledged", what, value);
         }
@@ -1775,7 +1836,7 @@ namespace Icom_Web_Control.Services
         public async Task<bool> GetAttenuatorAsync(CancellationToken ct = default)
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdAttenuator);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdAttenuator, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdAttenuator, cancellationToken: ct);
             // Reply body: 11 <val> → Data = [val]; 0x20 = 20 dB on.
             if (reply == null || reply.Cmd != CivProtocol.CmdAttenuator || reply.Data.Length < 1)
                 return false;
@@ -1787,7 +1848,7 @@ namespace Icom_Web_Control.Services
             byte val = on ? CivProtocol.AttOn20dB : CivProtocol.AttOff;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdAttenuator, val);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set attenuator {State} was not acknowledged", on ? "20 dB" : "off");
         }
@@ -1822,7 +1883,7 @@ namespace Icom_Web_Control.Services
             body[0] = CivProtocol.CmdCwSend;
             for (int i = 0; i < clean.Length; i++) body[i + 1] = (byte)clean[i];
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] CW send '{Msg}' was not acknowledged", clean);
             return clean;
@@ -1833,7 +1894,7 @@ namespace Icom_Web_Control.Services
             // 17 FF aborts a message already keying.
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdCwSend, CivProtocol.CwStop);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] CW stop (17 FF) was not acknowledged");
         }
@@ -1985,7 +2046,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
             // Reply body: 1A 05 hi lo <val> → Data = [05, hi, lo, val].
             if (reply == null || reply.Cmd != CivProtocol.CmdMenu
                 || reply.Data.Length < 4 || reply.Data[0] != CivProtocol.SubSetMenu
@@ -2001,7 +2062,7 @@ namespace Icom_Web_Control.Services
             byte packed = (byte)(((v / 10) << 4) | (v % 10));
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo, packed);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set {What} to {Value} was not acknowledged", what, value);
         }
@@ -2017,7 +2078,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdRit, CivProtocol.SubRitFrequency);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdRit, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdRit, cancellationToken: ct);
             // Reply body: 21 00 <d0> <d1> <sign> → Data = [00, d0, d1, sign].
             if (reply == null || reply.Cmd != CivProtocol.CmdRit
                 || reply.Data.Length < 4 || reply.Data[0] != CivProtocol.SubRitFrequency)
@@ -2034,7 +2095,7 @@ namespace Icom_Web_Control.Services
             byte sign = stepped < 0 ? CivProtocol.RitSignMinus : CivProtocol.RitSignPlus;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdRit, CivProtocol.SubRitFrequency, digits[0], digits[1], sign);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set RIT offset to {Hz} Hz was not acknowledged", stepped);
         }
@@ -2054,7 +2115,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdRit, sub);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdRit, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdRit, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.CmdRit
                 || reply.Data.Length < 2 || reply.Data[0] != sub)
                 return -1;
@@ -2066,7 +2127,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdRit, sub, (byte)(on ? 1 : 0));
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set {What} {State} was not acknowledged", what, on ? "on" : "off");
         }
@@ -2103,7 +2164,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdToneFreq, sub);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdToneFreq, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdToneFreq, cancellationToken: ct);
             // Reply body: 1B <sub> 00 <100Hz|10Hz> <1Hz|0.1Hz> → Data = [sub, b0, b1, b2].
             if (reply == null || reply.Cmd != CivProtocol.CmdToneFreq
                 || reply.Data.Length < 4 || reply.Data[0] != sub)
@@ -2122,7 +2183,7 @@ namespace Icom_Web_Control.Services
             byte b2 = (byte)((((t / 10) % 10) << 4) | (t % 10));               // 1 Hz | 0.1 Hz
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdToneFreq, sub, b0, b1, b2);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set {What} to {Tenths} (tenths of a Hz) was not acknowledged", what, t);
         }
@@ -2142,7 +2203,7 @@ namespace Icom_Web_Control.Services
             byte item = await FmSplitOffsetItemAsync(ct);
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubSetMenu, CivProtocol.MenuHiFmSplitOffset, item);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: ct);
             // Reply body: 1A 05 00 <item> <d0> <d1> <d2> <dir> → Data = [05, 00, item, …].
             if (reply == null || reply.Cmd != CivProtocol.CmdMenu
                 || reply.Data.Length < 7 || reply.Data[0] != CivProtocol.SubSetMenu
@@ -2163,7 +2224,7 @@ namespace Icom_Web_Control.Services
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubSetMenu, CivProtocol.MenuHiFmSplitOffset, item,
                 digits[0], digits[1], digits[2], dir);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             if (reply == null || reply.Cmd != CivProtocol.AckOk)
                 _logger.LogWarning("[CivRadioController] Set FM split offset to {Hz} Hz was not acknowledged", stepped);
         }
@@ -2178,7 +2239,7 @@ namespace Icom_Web_Control.Services
             byte v = vfo == RadioVfo.B ? CivProtocol.VfoSelectB : CivProtocol.VfoSelectA;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSelectVfo, v);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply != null && reply.Cmd == CivProtocol.AckOk)
                 _state.ActiveVfo = vfo == RadioVfo.B ? 1 : 0;
             else
@@ -2192,7 +2253,7 @@ namespace Icom_Web_Control.Services
             // poll re-reads both within a couple of loops regardless.
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSelectVfo, CivProtocol.VfoExchange);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply != null && reply.Cmd == CivProtocol.AckOk)
             {
                 (_state.FrequencyA, _state.FrequencyB) = (_state.FrequencyB, _state.FrequencyA);
@@ -2210,7 +2271,7 @@ namespace Icom_Web_Control.Services
             // selected VFO's contents). Mirror selected → other in cache.
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSelectVfo, CivProtocol.VfoEqualize);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply != null && reply.Cmd == CivProtocol.AckOk)
             {
                 if (ActiveVfo == RadioVfo.A) { _state.FrequencyB = _state.FrequencyA; _state.ModeB = _state.ModeA; }
@@ -2226,7 +2287,7 @@ namespace Icom_Web_Control.Services
         {
             // Command 0F with no data reads split; reply 0F <00=off|01=on>.
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdSplit);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdSplit, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdSplit, cancellationToken: cancellationToken);
             if (reply != null && reply.Cmd == CivProtocol.CmdSplit && reply.Data.Length >= 1)
                 return reply.Data[0] != 0;
             return _state.SplitMode > 0; // keep last known on a miss
@@ -2237,7 +2298,7 @@ namespace Icom_Web_Control.Services
             byte v = on ? CivProtocol.SplitOn : CivProtocol.SplitOff;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdSplit, v);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             if (reply != null && reply.Cmd == CivProtocol.AckOk)
             {
                 // Preserve a UI-set quick-split (2); only sync the on/off axis.
@@ -2267,7 +2328,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdPower, CivProtocol.PowerOff);
-            await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
             _state.RadioPowerOn = false;
             _logger.LogInformation("[CivRadioController] Power OFF (18 00) sent");
         }
@@ -2326,7 +2387,7 @@ namespace Icom_Web_Control.Services
 
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubMemoryChannel, 0x00, chLo);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdMenu, cancellationToken: cancellationToken);
 
             // Reply body: 1A 00 <chHi> <chLo> [<content…>] → Data = [00, chHi, chLo, …].
             if (reply == null || reply.Cmd != CivProtocol.CmdMenu
@@ -2395,7 +2456,7 @@ namespace Icom_Web_Control.Services
             body.AddRange(EncodeName(memory.Name));
 
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body.ToArray());
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
             if (!ok)
                 _logger.LogWarning("[CivRadioController] Write memory channel {Ch} was not acknowledged", memory.Channel);
@@ -2409,7 +2470,7 @@ namespace Icom_Web_Control.Services
 
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdMenu, CivProtocol.SubMemoryChannel, 0x00, chLo, 0xFF);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
             if (!ok)
                 _logger.LogWarning("[CivRadioController] Clear memory channel {Ch} was not acknowledged", channel);
@@ -2429,7 +2490,7 @@ namespace Icom_Web_Control.Services
 
             var body = commandBody as byte[] ?? commandBody.ToArray();
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, body);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
             bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
             if (!ok)
                 _logger.LogWarning("[CivRadioController] Raw command {Body} was not acknowledged",
@@ -2489,7 +2550,7 @@ namespace Icom_Web_Control.Services
         {
             var frame = CivProtocol.BuildFrame(CivProtocol.BroadcastAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdReadId, CivProtocol.SubReadId);
-            var reply = await _bus.TransactAsync(frame, CivProtocol.CmdReadId, cancellationToken: cancellationToken);
+            var reply = await TransactAsync(frame, CivProtocol.CmdReadId, cancellationToken: cancellationToken);
             if (reply == null)
                 return false;
 

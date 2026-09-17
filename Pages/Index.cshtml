@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Icom_Web_Control.Pages.IndexModel
 @{
     ViewData["Title"]     = "Icom Web Control";
@@ -2412,7 +2412,32 @@
                 updateContainerVisibility();
                 // Coming back: the canvases were laid out at zero width while hidden.
                 if (!off) window.dispatchEvent(new Event('resize'));
+                reportSpectrumPanels();
             }
+
+            // Tell the server which spectrum panels the operator wants. The
+            // cross-band peek borrows the receiver (and dips the audio) every few
+            // seconds to fill the watch panel; with "VFO A" only or the scope
+            // collapsed that sweep goes nowhere, and the radio was still hopping
+            // bands — so the server pauses the peek until a browser wants the
+            // panel again. This reports the CHOICE (Mono/Multi + scope switch),
+            // not what is drawn: panel B is only drawn once a sweep has reached
+            // it, and on a cross-band pair that sweep comes from the peek — report
+            // the drawn state and neither side ever goes first, the strip with
+            // the Both/Stacked buttons never appears. Reads localStorage rather
+            // than `currentMode`, which is a `let` declared further down.
+            // Re-sent every 5 s as well: automatic reconnect gives the connection
+            // a new id, and the hub's record is per connection.
+            function reportSpectrumPanels() {
+                const conn = window.signalRConnection;
+                if (!conn || conn.state !== 'Connected') return;
+                const scopeOn = !(scopeSwitch && !scopeSwitch.checked);
+                const mode = localStorage.getItem('iwc.spectrumMode') || 'Multi';
+                const wantA = scopeOn && (mode === 'A' || mode === 'Multi');
+                const wantB = scopeOn && (mode === 'B' || mode === 'Multi');
+                conn.invoke('SpectrumPanels', wantA, wantB).catch(() => { /* reconnecting */ });
+            }
+            setInterval(reportSpectrumPanels, 5000);
 
             // Per-VFO status routing — drives the panel state + small badge in the header.
             function setStatusBadge(vfo, status) {
@@ -2525,6 +2550,7 @@
                     // Both configured — honour the active mode.
                     applyMode(currentMode);
                 }
+                reportSpectrumPanels();
             }
 
             // Mono/Multi toggle — persisted in localStorage so the user's
@@ -2543,6 +2569,7 @@
                 });
                 // Trigger canvas resize since the layout just changed.
                 window.dispatchEvent(new Event('resize'));
+                reportSpectrumPanels();
             }
             document.querySelectorAll('.spectrum-mode-btn').forEach(b => {
                 b.addEventListener('click', () => applyMode(b.dataset.mode));
