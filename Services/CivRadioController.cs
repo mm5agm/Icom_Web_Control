@@ -856,7 +856,7 @@ namespace Icom_Web_Control.Services
         // control to OFF. The state setters broadcast only on change, so a
         // steady radio produces no SignalR traffic here.
         private int _rxPollIndex;
-        private const int RxControlCount = 17;
+        private const int RxControlCount = 18;
         private const int RxControlsPerLoop = 2;   // ~1.3 s to sweep all 17
 
         private async Task PollNextRxControlAsync(CancellationToken ct)
@@ -890,6 +890,10 @@ namespace Icom_Web_Control.Services
                 // radio, which is the same assumption CatController's slider
                 // endpoint makes.
                 case 16: { int v = await GetRfPowerPercentAsync(ct); if (v >= 0) _state.Power = v; break; }
+                // CW break-in (16 47): decides whether a keyed message goes to
+                // the antenna or only to the sidetone, so the CW panels show
+                // which. Slow-moving, front-panel changeable - same reasons.
+                case 17: { int v = await GetCwBreakInAsync(ct); if (v >= 0) _state.CwBreakIn = v.ToString(); break; }
             }
             _rxPollIndex++;
         }
@@ -1024,6 +1028,9 @@ namespace Icom_Web_Control.Services
         {
             if (vfo == RadioVfo.A) _state.FrequencyA = hz; else _state.FrequencyB = hz;
         }
+
+        private static bool IsCwMode(string? mode)
+            => mode != null && mode.StartsWith("CW", StringComparison.OrdinalIgnoreCase);
 
         private void SetVfoMode(RadioVfo vfo, string mode)
         {
@@ -2665,6 +2672,17 @@ namespace Icom_Web_Control.Services
                         var modeName = await GetModeAsync(other, stoppingToken);
                         if (!string.IsNullOrEmpty(modeName) && !modeName.StartsWith('?'))
                             SetVfoMode(other, modeName);
+                    }
+                    // Keyer speed (14 0C) on the mode stagger's spare phase, and
+                    // only in CW: the CW Send panel paces its 30-character
+                    // pieces from this number, so a KEY SPEED turned at the
+                    // front panel has to reach the page within about half a
+                    // second or the next piece goes out early. Outside CW the
+                    // number cannot matter and the bus is left alone.
+                    else if (loop % ModePollEveryNLoops == 2 && IsCwMode(active == RadioVfo.A ? _state.ModeA : _state.ModeB))
+                    {
+                        int wpm = await GetCwSpeedWpmAsync(stoppingToken);
+                        if (wpm > 0) _state.CwSpeed = wpm; // broadcasts on change
                     }
 
                     // Split state (command 0F) — slow-moving; refresh a few times

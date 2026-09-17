@@ -1435,6 +1435,34 @@ connection.on("RadioStateUpdate", function (update) {
         }
     }
 
+    // --- CW KEYER (front-panel changes, pushed by the poll loop) ---
+    // Speed drives the CW Send panel's pacing, so it has to follow the
+    // radio's KEY SPEED; break-in decides whether a line is transmitted or
+    // only heard, and the panel's banner says which. A slider being dragged
+    // is left alone - its change event writes the radio a moment later.
+    if (update.property === "CwSpeed") {
+        const n = parseInt(update.value, 10);
+        if (Number.isFinite(n)) {
+            const a = document.activeElement;
+            const dragging = a && (a.id === 'cwSpeedSlider' || a.id === 'cwSendSpeedSlider');
+            if (!dragging) {
+                if (window.cwSendPanel) window.cwSendPanel.setSpeed(n);
+                else {
+                    const sl = document.getElementById('cwSpeedSlider'), lb = document.getElementById('cwSpeedValue');
+                    if (sl) sl.value = n;
+                    if (lb) lb.textContent = n;
+                }
+            }
+        }
+    }
+    if (update.property === "CwBreakIn") {
+        if (window.cwSendPanel) window.cwSendPanel.setBreakIn(update.value);
+        else {
+            const bk = document.getElementById('cwBreakInSelect');
+            if (bk && update.value != null) bk.value = String(update.value);
+        }
+    }
+
     // --- ATU ---
     if (update.property === "AtuEnabled") {
         const enabled = update.value === true || update.value === 'true';

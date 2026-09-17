@@ -547,6 +547,14 @@
                                 title="Open CW keyer controls panel"
                                 onclick="openCwDialog()">CW</button>
                         <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="CW reader - decode received Morse to text"
+                                title="Open the CW reader - decodes the received Morse to text"
+                                onclick="window.cwReaderPanel && window.cwReaderPanel.toggle()">CW Read</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
+                                aria-label="CW send - type text and send it as Morse"
+                                title="Open CW send - type a line, press Enter, the radio keys it"
+                                onclick="window.cwSendPanel && window.cwSendPanel.toggle()">CW Send</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="FM repeater controls"
                                 title="Open FM repeater controls panel"
                                 onclick="document.getElementById('fmDialog').show()">FM Rep</button>
@@ -558,10 +566,6 @@
                                 aria-label="DX spots — list of cluster spots on current band"
                                 title="Open DX spots list — see callsigns spotted on the current band"
                                 onclick="window.dxSpotsPanel && window.dxSpotsPanel.toggle()">DX Spots</button>
-                        <button class="btn btn-sm ms-1 btn-outline-secondary"
-                                aria-label="CW reader - decode received Morse to text"
-                                title="Open the CW reader - decodes the received Morse to text"
-                                onclick="window.cwReaderPanel && window.cwReaderPanel.toggle()">CW Read</button>
                         <button id="voiceBtn"
                                 class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="Voice announcements settings"
@@ -1520,9 +1524,9 @@
         <div class="fw-bold small" style="color:#aaa;">Memory Keyer</div>
         @for (int mi = 0; mi < 5; mi++) {
         <div class="d-flex align-items-center gap-1">
-            <button class="btn btn-sm btn-outline-info flex-shrink-0"
+            <button class="btn btn-sm btn-outline-info flex-shrink-0 cw-mem-btn"
                     onclick="sendCwMessage(@mi)"
-                    title="Send CW message M@(mi+1)"
+                    title="Send CW message M@(mi+1)" data-title="Send CW message M@(mi+1)"
                     aria-label="Send CW memory @(mi+1)">M@(mi+1)</button>
             <input type="text" id="cwMsg@(mi)" value="@(Model.CwMessages.Count > mi ? Model.CwMessages[mi] : "")"
                    class="form-control form-control-sm" maxlength="24"
@@ -1534,6 +1538,103 @@
             <button class="btn btn-sm btn-primary flex-grow-1" onclick="saveCwMessages()" title="Save CW message memories" aria-label="Save CW memory messages to settings">Save Messages</button>
             <button class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="stopCw()" title="Stop keying the current CW message (CI-V 17 FF)" aria-label="Stop CW keying">Stop</button>
         </div>
+    </div>
+</dialog>
+
+<!-- CW Send panel - type a line, the radio keys it (CI-V 17, 30 characters
+     a piece; 17 FF stops it). Non-modal and draggable like the reader, so
+     the operator reads in one panel and answers in the other. -->
+<style>
+    #cwSendDialog .cws-header { cursor:move; }
+    /* A definite width so lines wrap instead of stretching the panel to
+       the longest one; the corner drags to resize, and a size the operator
+       has set is kept (dlgSize_cwSendDialog) - see makeResizable. */
+    #cwSendDialog { width:560px; min-width:420px; min-height:220px; max-height:95vh; resize:both; overflow:auto; }
+    /* Fixed, not the non-modal default of absolute: a dialog in the page
+       flow scrolls with it, so the drag maths (viewport coordinates) and a
+       size change could walk the header off the top with nothing left to
+       grip. Fixed keeps it in the viewport, and _clampDlg keeps the header
+       reachable. Starts centred; a drag replaces this with px. */
+    #cwSendDialog { position:fixed; margin:0; left:50%; top:8vh; transform:translateX(-50%); }
+    #cwSendDialog[open] { display:flex; flex-direction:column; }
+    #cwSendDialog .cws-header { flex:0 0 auto; }
+    #cwSendDialog .cws-body { flex:1 1 auto; min-height:0; }
+    #cwSendDialog.user-sized #cwSendLog { max-height:none; flex:1 1 auto; min-height:4rem; }
+    #cwSendInput {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 1.05rem;
+        text-transform: uppercase;
+        background: #111; border-color: #444; color: #dfe;
+    }
+    #cwSendInput:focus { background: #111; color: #dfe; border-color: #6aa; box-shadow: none; }
+    #cwSendLog {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        min-height: 6rem;
+        max-height: 30vh;
+        overflow-y: auto;
+        position: relative;   /* offsetTop of a character is then within the log */
+        background: #111;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 6px 10px;
+        color: #dfe;
+    }
+    #cwSendLog .cws-line { display:flex; gap:0.6rem; align-items:baseline; }
+    #cwSendLog .cws-time { color:#778; font-size:0.75rem; flex:0 0 auto; }
+    #cwSendLog .cws-text { flex:1 1 auto; white-space:pre-wrap; word-break:break-word; }
+    #cwSendLog .cws-tag  { color:#9ab; font-size:0.75rem; flex:0 0 auto; }
+    #cwSendLog .cws-line[data-state="queued"]  .cws-text { color:#9ab; }
+    #cwSendLog .cws-line[data-state="sending"] .cws-text { color:#ffd24a; }
+    #cwSendLog .cws-line[data-state="sending"] .cws-tag  { color:#ffd24a; }
+    #cwSendLog .cws-line[data-state="sent"]    .cws-tag  { color:#9d9; }
+    #cwSendLog .cws-line[data-state="monitor"] .cws-tag  { color:#8fd0ff; }
+    #cwSendLog .cws-line[data-state="dropped"] .cws-text { color:#778; text-decoration:line-through; }
+    #cwSendLog .cws-line[data-state="dropped"] .cws-ch.cws-done { color:#bbb; text-decoration:none; }
+    #cwSendLog .cws-line[data-state="error"]   .cws-tag  { color:#ff6b6b; }
+    #cwSendLog .cws-ch.cws-done { color:#eee; }
+    #cwSendLog .cws-ch.cws-cur  { background:#ffd24a; color:#111; border-radius:2px; }
+    #cwSendStatus { font-size: 0.8rem; color:#9ab; min-height:1.2em; }
+    #cwSendStatus.cws-problem { color:#ffd23f; font-weight:600; }
+    #cwSendBanner {
+        font-size: 0.9rem; font-weight: 600; color: #ffd23f;
+        background: rgba(255, 210, 63, 0.10);
+        border-left: 3px solid #ffd23f;
+        padding: 0.4rem 0.6rem; border-radius: 0.25rem;
+    }
+</style>
+<dialog id="cwSendDialog" style="border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; max-width:95vw;" aria-labelledby="cwSendTitle">
+    <div class="cws-header d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
+        <strong id="cwSendTitle">CW Send</strong>
+        <div class="d-flex align-items-center gap-2">
+            <button id="cwSendStopBtn" class="btn btn-sm btn-outline-warning" type="button"
+                    title="Stop keying now (CI-V 17 FF) and drop anything still queued">Stop</button>
+            <button id="cwSendClearBtn" class="btn btn-sm btn-outline-light" type="button" title="Clear the sent-lines log">Clear log</button>
+            <button class="btn btn-sm iwc-dialog-close"
+                    onclick="document.getElementById('cwSendDialog').close()"
+                    aria-label="Close CW send panel">&#10005;</button>
+        </div>
+    </div>
+    <div class="cws-body p-2 d-flex flex-column gap-2">
+        <div id="cwSendBanner" role="status" aria-live="polite" hidden></div>
+        <div id="cwSendLog" role="log" aria-live="polite" aria-label="CW lines sent"></div>
+        <div class="input-group">
+            <input type="text" id="cwSendInput" class="form-control"
+                   autocomplete="off" spellcheck="false" autocapitalize="characters"
+                   placeholder="Type here and press Enter to send"
+                   aria-label="CW text to send - Enter sends, Escape stops"
+                   title="A-Z 0-9 space and / ? . - , : ' ( ) = + &quot; @@ ^ - Enter sends the line, Escape stops the keying (or clears the box when nothing is sending)">
+            <button id="cwSendClearInputBtn" class="btn btn-outline-light" type="button"
+                    title="Empty the text box without sending it" aria-label="Clear the text box">Clear</button>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="mb-0 text-nowrap" for="cwSendSpeedSlider">Speed WPM: <span id="cwSendSpeedValue">@Model.CwSpeed</span></label>
+            <input type="range" id="cwSendSpeedSlider" min="6" max="48" step="1" value="@Model.CwSpeed"
+                   style="flex:1; height:18px;"
+                   aria-label="CW keyer speed" title="CW keyer speed in WPM - the same control as in the CW keyer panel">
+        </div>
+        <div id="cwSendStatus" role="status" aria-live="polite"></div>
     </div>
 </dialog>
 
@@ -2086,6 +2187,7 @@
         import { DxSpotsPanel }         from "/js/ui/dx-spots-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwReaderPanel }        from "/js/cw/cw-reader-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwQsoForm }            from "/js/cw/cw-qso-form.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { CwSendPanel }          from "/js/ui/cw-send-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         window.bandPlanData = BAND_PLANS;
         window.getBandSegments = getSegments;
         window.getBandSegmentForHz = segmentForHz;
@@ -2545,6 +2647,11 @@
             // device at the same time.
             window.cwReaderPanel = new CwReaderPanel();
             window.cwReaderPanel.init();
+
+            // Typed CW goes straight out as CI-V 17; the panel only cuts the
+            // line into 30-character pieces and paces them.
+            window.cwSendPanel = new CwSendPanel();
+            window.cwSendPanel.init();
 
             // The log form is separate from the reader and starts closed. The
             // operator opens it when a QSO is worth keeping, and it asks the
@@ -3623,6 +3730,25 @@
             try { localStorage.setItem('dlgPos_' + dialog.id, JSON.stringify({ left: dialog.style.left, top: dialog.style.top })); } catch {}
         }
 
+        // Keep a position:fixed dialog's header on screen: the whole header
+        // bar below the sticky navbar (a show() dialog is not in the top
+        // layer, so the navbar paints over it) and above the viewport
+        // bottom, with a margin to spare, and at least a hand's width of it
+        // inside left and right. Dialogs positioned absolute are left alone
+        // - their left/top are page coordinates and the viewport is the
+        // wrong yardstick once the page has scrolled.
+        function _clampDlg(dialog, left, top) {
+            if (getComputedStyle(dialog).position !== 'fixed') return { left, top };
+            const w = dialog.offsetWidth || 200, grip = 120, margin = 12;
+            const head = (dialog.querySelector('div') || {}).offsetHeight || 44;
+            const nav = document.querySelector('header.sticky-top, header.fixed-top');
+            const topMin = (nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0) + margin;
+            return {
+                left: Math.min(Math.max(left, grip - w), window.innerWidth - grip),
+                top:  Math.min(Math.max(top, topMin), Math.max(topMin, window.innerHeight - head - margin)),
+            };
+        }
+
         function makeDraggable(dialog, handle) {
             handle.style.cursor = 'grab';
             handle.addEventListener('mousedown', e => {
@@ -3632,8 +3758,9 @@
                 let origLeft = r.left, origTop = r.top;
                 dialog.style.transform = 'none';
                 function onMove(e) {
-                    dialog.style.left = (origLeft + e.clientX - startX) + 'px';
-                    dialog.style.top  = (origTop  + e.clientY - startY) + 'px';
+                    const p = _clampDlg(dialog, origLeft + e.clientX - startX, origTop + e.clientY - startY);
+                    dialog.style.left = p.left + 'px';
+                    dialog.style.top  = p.top + 'px';
                 }
                 function onUp() {
                     document.removeEventListener('mousemove', onMove);
@@ -3653,8 +3780,9 @@
                 let origLeft = r.left, origTop = r.top;
                 dialog.style.transform = 'none';
                 function onMove(e) {
-                    dialog.style.left = (origLeft + e.touches[0].clientX - startX) + 'px';
-                    dialog.style.top  = (origTop  + e.touches[0].clientY - startY) + 'px';
+                    const p = _clampDlg(dialog, origLeft + e.touches[0].clientX - startX, origTop + e.touches[0].clientY - startY);
+                    dialog.style.left = p.left + 'px';
+                    dialog.style.top  = p.top + 'px';
                     e.preventDefault();
                 }
                 function onEnd() {
@@ -3667,15 +3795,49 @@
             }, { passive: true });
         }
 
-        ['voxDialog', 'cwDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'voiceHelpDialog', 'audioFilterDialogA', 'audioFilterDialogB', 'rxFilterDialogA', 'rxFilterDialogB', 'utcClockInfoDialog'].forEach(id => {
+        // Dialogs whose CSS says resize:both. The browser writes the dragged
+        // size as inline width/height; that is what is saved and put back,
+        // and its presence flips the dialog into user-sized layout, where
+        // the text area fills the height instead of capping at its own max.
+        function makeResizable(dialog) {
+            const key = 'dlgSize_' + dialog.id;
+            const apply = () => dialog.classList.toggle('user-sized', !!(dialog.style.width || dialog.style.height));
+            try {
+                const saved = JSON.parse(localStorage.getItem(key) || 'null');
+                if (saved && saved.width) { dialog.style.width = saved.width; dialog.style.height = saved.height || ''; }
+            } catch { /* ignore */ }
+            apply();
+            let timer = null;
+            new ResizeObserver(() => {
+                if (!dialog.open) return;
+                apply();
+                if (!dialog.style.width && !dialog.style.height) return;
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    try { localStorage.setItem(key, JSON.stringify({ width: dialog.style.width, height: dialog.style.height })); } catch { /* ignore */ }
+                }, 250);
+            }).observe(dialog);
+        }
+        ['cwSendDialog'].forEach(id => {
+            const dlg = document.getElementById(id);
+            if (dlg) makeResizable(dlg);
+        });
+
+        // cwReaderDialog is not here: the shared reader panel (core/js/cw)
+        // has its own drag and position memory, and a second handler on the
+        // same header fights it.
+        ['voxDialog', 'cwDialog', 'cwSendDialog', 'fmDialog', 'dxWatchDialog', 'voiceDialog', 'voiceHelpDialog', 'audioFilterDialogA', 'audioFilterDialogB', 'rxFilterDialogA', 'rxFilterDialogB', 'utcClockInfoDialog'].forEach(id => {
             const dlg = document.getElementById(id);
             if (!dlg) return;
             makeDraggable(dlg, dlg.querySelector('div'));
             try {
                 const saved = JSON.parse(localStorage.getItem('dlgPos_' + id) || 'null');
                 if (saved && saved.left && saved.top) {
-                    dlg.style.left = saved.left;
-                    dlg.style.top  = saved.top;
+                    // A position saved on a bigger window, or with the
+                    // header dragged off the top, comes back on screen.
+                    const p = _clampDlg(dlg, parseFloat(saved.left) || 0, parseFloat(saved.top) || 0);
+                    dlg.style.left = p.left + 'px';
+                    dlg.style.top  = p.top + 'px';
                     dlg.style.transform = 'none';
                 }
             } catch {}
@@ -4439,16 +4601,27 @@
             catch (e) { console.error('setCwPitch error:', e); }
         }
         async function setCwSpeed(v) {
+            // The CW Send panel has the same slider; keep it in step.
+            window.cwSendPanel?.setSpeed(v);
             try { await fetch('/api/cat/cw/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed: parseInt(v) }) }); }
             catch (e) { console.error('setCwSpeed error:', e); }
         }
         async function setCwBreakIn(v) {
+            window.cwSendPanel?.setBreakIn(v);
             try { await fetch('/api/cat/cw/breakin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: v }) }); }
             catch (e) { console.error('setCwBreakIn error:', e); }
         }
         async function setCwBreakInDelay(v) {
             try { await fetch('/api/cat/cw/breakindelay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dots: parseFloat(v) }) }); }
             catch (e) { console.error('setCwBreakInDelay error:', e); }
+        }
+        // The CW Send panel marks the M1-M5 buttons busy while a typed line
+        // is going out, so a press here does not land on top of it.
+        function cwMemButtonsBusy(busy) {
+            document.querySelectorAll('#cwDialog .cw-mem-btn').forEach(b => {
+                b.disabled = busy;
+                b.title = busy ? 'CW Send is keying a line - wait for it to finish' : b.dataset.title;
+            });
         }
         async function sendCwMessage(index) {
             const input = document.getElementById(`cwMsg${index}`);
@@ -4896,6 +5069,7 @@
         window.setCwSpeed      = setCwSpeed;
         window.openCwDialog    = openCwDialog;
         window.stopCw          = stopCw;
+        window.cwMemButtonsBusy = cwMemButtonsBusy;
         window.setCwBreakIn    = setCwBreakIn;
         window.setCwBreakInDelay = setCwBreakInDelay;
         window.sendCwMessage   = sendCwMessage;

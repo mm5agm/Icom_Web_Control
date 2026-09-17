@@ -92,6 +92,12 @@
     - 18.6 [Transcripts](#186-transcripts)
     - 18.7 [Logging a QSO](#187-logging-a-qso)
     - 18.8 [Troubleshooting](#188-troubleshooting)
+19. [CW Send](#19-cw-send)
+    - 19.1 [Sending a line](#191-sending-a-line)
+    - 19.2 [What the radio is actually doing](#192-what-the-radio-is-actually-doing)
+    - 19.3 [Stopping](#193-stopping)
+    - 19.4 [The panel](#194-the-panel)
+    - 19.5 [Troubleshooting](#195-troubleshooting)
 
 ---
 
@@ -694,9 +700,11 @@ Click **Dismiss** on the banner to silence it without stopping TX (useful for a 
 
 **CW button** — Opens the **CW Keyer** panel. See Section 5.12.
 
+**CW Read** and **CW Send buttons** — sit beside it: the reader that decodes what you hear ([§18](#18-cw-reader)) and the box that keys what you type ([§19](#19-cw-send)).
+
 **FM Rep button** — Opens the **FM Repeater** panel. See Section 5.13.
 
-All three panels can be open at the same time and can be dragged anywhere on screen by their title bar.
+All of these panels can be open at the same time and can be dragged anywhere on screen by their title bar.
 
 ![VOX, CW Keyer and FM Repeater panels open simultaneously](pictures/Screen%20popups.png)
 
@@ -733,12 +741,15 @@ Click the **CW** button to open the CW Keyer pop-up panel.
 
 | Control | Description |
 |---------|-------------|
-| Speed | Keyer speed in WPM (4–60) |
+| Speed | Keyer speed in WPM (6–48) |
 | *(no ZIN here)* | The IC-7300 has no CI-V command to zero-beat a signal for you — that is a Yaesu feature, and earlier versions of this manual described it here in error. IWC works the correction out itself instead, from the tone the CW reader is hearing, and offers it as the **ZIN** button in the CW Reader panel (see [§18.5](#185-zin---zero-in-on-the-signal)). |
 | Break-in | **Off** (keyer only), **Semi** (semi break-in), or **Full** (QSK full break-in) |
 | Delay | Semi break-in delay (0–2500 ms) — only relevant in Semi mode |
 | Pitch | CW sidetone pitch frequency (300–1050 Hz in 10 Hz steps). Also sets the CW receive offset so the radio zero-beats at this tone. Read from the radio on connect. |
 | M1–M5 buttons | Sends the corresponding stored CW memory message |
+| Stop | Halts a message part way through (CI-V `17 FF`) |
+
+To send text you type rather than a stored message, use the **CW Send** panel ([§19](#19-cw-send)). Its **Speed** slider is the same setting as this one, and the M1–M5 buttons are unavailable while it is keying a line.
 
 **CW memory messages** are configured on the **Settings** page (see Section 6.4). Each message can be up to 24 characters. Use `{CALL}` as a placeholder — it is sent literally (the radio does not expand it; configure your callsign in the message text directly for CW use).
 
@@ -2585,17 +2596,19 @@ Set your CW pitch in the CW Keyer panel ([§5.12](#512-cw-keyer-panel)) and tune
 - **CW mode** — if the radio is already on CW-U or CW-L it stays on the one you were using.
 - **A narrow IF filter** — 250 Hz by default, configurable in [§6.7](#67-cw-reader).
 - **APF on**, at MID width, unless you have turned that off in settings.
+- **AGC MID.** FAST recovers between the elements of a strong signal, and the decoder reads the pumping as gaps; SLOW smears a weak one. MID is the setting that is never wrong for CW.
 
-Press it again, or press **Stop**, and your mode, filter width and APF go back exactly as they were.
+Press it again, or press **Stop**, and your mode, filter width, APF and AGC go back exactly as they were.
 
 This matters more than any amount of tinkering with the decoding itself. What a decoder is fed is most of the result, and a 2.4 kHz passband full of adjacent signals will defeat any decoder there is.
 
 Three details worth knowing:
 
 - **APF is set to MID, not NAR.** On SHARP, NAR is about 80 Hz wide. Morse keying puts real energy either side of the tone — at 20 wpm a dit is 60 ms, so the sidebands run to roughly ±17 Hz, and faster sending spreads them further. A filter that narrow starts rounding the very edges the decoder is timing. MID keeps nearly all of the rejection without doing that.
+- **It leaves NB and NR alone.** If you have them on, you have them on for a reason, and each would be one more thing to put back. Turn them off yourself if the decoder is struggling — both chop the timing the decoder relies on.
 - **It restores on Stop, not when you close the panel.** Closing the reader deliberately leaves it running — you can put the panel away and come back to it. Stop is when you have actually finished reading, so that is when the radio goes back to how you had it. A filter that quietly re-opened to 2.4 kHz in the middle of a QSO would be the worse surprise.
 - **It survives a page reload.** IWC remembers your previous settings on the PC running it, not in the browser tab, so if you reload the page — or open IWC in a second browser — the button still knows what to put back. That is the whole reason it is a server-side feature rather than three quick commands from the page.
-- **It does not survive quitting IWC.** The remembered settings live in the running app, so if you close IWC (or it restarts) while Reader Mode is on, the radio stays on the narrow filter with APF on, and the next IWC will not know what to put back. Press **Stop** before you quit, or put the filter and APF back on the radio yourself. The radio's own filter slot keeps the width Reader Mode wrote until you change it.
+- **It does not survive quitting IWC.** The remembered settings live in the running app, so if you close IWC (or it restarts) while Reader Mode is on, the radio stays on the narrow filter with APF on and AGC MID, and the next IWC will not know what to put back. Press **Stop** before you quit, or put the filter, APF and AGC back on the radio yourself. The radio's own filter slot keeps the width Reader Mode wrote until you change it.
 - **Starting from a non-CW mode.** From FM, SSB or DATA, Reader Mode switches to CW and puts your mode back on Stop, but the 250 Hz it wrote into the selected CW filter slot stays there - it has no earlier CW width to restore. If that slot was something other than 250 Hz, set it again by hand.
 
 Reader Mode only touches VFO A.
@@ -2676,6 +2689,56 @@ If a suggestion box says *nothing in the copy*, that is a result rather than a f
 | The log file is not where I expected | The exact path is shown in the form's status line after a save. |
 
 The reader decodes from the receive audio, so anything you can hear is something it can be given — but equally, if you cannot hear it, neither can it.
+
+---
+
+## 19. CW Send
+
+The **CW Send** button on the main control panel opens the other half of the CW Reader: a box you type into, and the radio keys what you typed. Read in one panel, answer in the other. It needs nothing beyond the CI-V connection — no key, no keyer interface, no extra audio.
+
+> **Note:** like the CW Keyer panel, this is wired to real CI-V commands and has not been used on air by a CW operator. What is said below about break-in and about the gap between pieces is what the CI-V reference and the memory keyer's behaviour lead me to expect, not something I have measured. Feedback from CW operators is especially welcome.
+
+### 19.1 Sending a line
+
+Type into the box and press **Enter**. Nothing leaves the radio until you press Enter, so you can type ahead, correct yourself, and paste. Each line you send appears in the log above the box with the time, and a tag on the right that follows it through: **queued**, **sending part 2 of 3**, then **sent** — or **sidetone only** if break-in was off (see below).
+
+You can press Enter again while a line is still going out; the next line is queued and starts as soon as the first finishes, and the status line says how many are waiting.
+
+The keyer takes **A–Z, 0–9, space, and `/ ? . - , : ' ( ) = + " @ ^`**. Anything else is dropped before sending, and lower case is sent as upper. `^` is the IC-7300's prosign join: `^AR` keys AR as one character, `^SK` likewise. A line with nothing sendable in it is refused with a message rather than silently keying nothing. The **Speed** slider sets the radio's keyer speed (6–48 wpm) and is the same setting as the one on the CW Keyer panel — move either and the other follows.
+
+**Break-in decides whether it goes out**, exactly as it does for M1–M5 ([§5.12](#512-cw-keyer-panel)). With Break-in **Semi** or **Full** the line is transmitted. With Break-in **Off** the radio plays it to the sidetone and no RF leaves the set — a yellow banner across the top of the panel says so while that is the case, and each line is tagged **sidetone only** rather than **sent**. That is the practice mode: hear your own sending without transmitting a thing.
+
+### 19.2 What the radio is actually doing
+
+The IC-7300 has a CI-V command that keys text directly (`17`), up to 30 characters at a time. CW Send cuts your line into pieces of up to 30 characters at word boundaries and sends them one after another, each when the previous one has had time to finish.
+
+Two things follow from that:
+
+**There may be a short gap between pieces.** The radio does not report when a piece has finished, so the panel works it out from the standard Morse timing at the keyer speed — a dot is one unit, a dash three, three between letters, seven between words, and a unit is 1200 ÷ wpm milliseconds — and sends the next piece a fraction of a second after that. A line of a sentence or two is at most two or three pieces, and the pause between them is small.
+
+**The highlight follows the keying.** As a piece plays, the character being sent is lit in the log and the ones already gone turn white. It runs on the same textbook timing from the moment the command went, so it is a display of where the radio should be, not a measurement of where it is. The log scrolls itself so the character under the key stays in view.
+
+### 19.3 Stopping
+
+**Stop** (or **Escape** with the cursor in the box) stops the radio at once — the IC-7300 has a real stop command (`17 FF`), unlike a Yaesu — and drops everything that has not started. Queued lines are tagged **not sent**; a line part way through is tagged **stopped in part 2 of 3**, and the characters that were never keyed stay struck through.
+
+**Escape** with nothing sending simply empties the box (as does the **Clear** button beside it) — handy after a paste that was never meant for the keyer. **Clear log** empties the sent-lines log.
+
+### 19.4 The panel
+
+The panel is non-modal: it can stay open while you work the rest of the page, and the CW Reader can be open beside it. Drag the title bar to move it; drag the bottom-right corner to resize it, and the log grows to fill whatever height you give it. Both are remembered between sessions. Close it with **×**; a line already going out finishes on its own.
+
+Opening the panel reads the keyer speed and break-in setting from the radio, so a change made on the front panel since the page loaded is not sent at the wrong speed.
+
+### 19.5 Troubleshooting
+
+| Symptom | What to try |
+|---|---|
+| Lines are tagged **sidetone only** and nothing is transmitted | Break-in is **Off**. Set it to **Semi** or **Full** on the CW Keyer panel ([§5.12](#512-cw-keyer-panel)). The yellow banner on the panel says the same. |
+| I can't hear the sending | With break-in off the radio plays to the sidetone, so turn the radio's **MONI** level up. |
+| The gap between pieces is long, or the next piece starts before the last has finished | The wait between pieces is worked out from the keyer speed, so a slider that disagrees with the radio gets it wrong. Close and reopen the panel to re-read the speed from the radio, or nudge the **Speed** slider and it is written to the radio. |
+| A line is tagged **failed** | The radio did not take the command — the status line has the reason. Check the connection on the Diagnostics page; a line that failed part way through is abandoned rather than sent with a hole in it. |
+| Characters missing from what was sent | Only the characters listed in [§19.1](#191-sending-a-line) are keyed. The rest are dropped before the line is sent. |
 
 ---
 
