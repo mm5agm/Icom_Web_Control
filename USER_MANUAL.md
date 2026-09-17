@@ -1843,7 +1843,19 @@ That gives me everything needed to reproduce your setup — including a callsign
 
 **If you are on a pre-release, the version tells me so.** A pre-release shows its full label — `1.0.6-pre4` rather than just `1.0.6` — in the Diagnostics block, in the title bar and on the system tray icon. Earlier pre-releases did not: pre1, pre2 and pre3 all called themselves "1.0.6", so a report could not say which of the three it came from. Quote the version exactly as it appears.
 
-**Radio firmware versions worth knowing.** Above the Diagnostics block on the About page there's a section titled **Developer's tested radio firmware** that lists my bench radio firmware values. Some IWC behaviours can depend on the radio's firmware version, because Icom has both added CI-V commands and changed the behaviour of existing ones between firmware releases. If you're hitting a CI-V-related bug, comparing your firmware against the listed values quickly tells you whether a firmware difference might be involved. To read your own firmware on an IC-7300 MkII: **MENU → SET → Others → Version Information** on the radio's front panel. Include any firmware mismatch in your bug report.
+**Radio firmware versions worth knowing.** Above the Diagnostics block on the About page there's a section titled **Developer's tested radio firmware** that lists my bench radio firmware values. Some IWC behaviours can depend on the radio's firmware version, because Icom has both added CI-V commands and changed the behaviour of existing ones between firmware releases. If you're hitting a CI-V-related bug, comparing your firmware against the listed values quickly tells you whether a firmware difference might be involved. To read your own firmware on an IC-7300 MkII: **MENU → SET → Others → Information → Version** on the radio's front panel. Include any firmware mismatch in your bug report.
+
+This is what my radio was on when v1.1.0 was released (the About page always shows the values for the version you are running):
+
+| Component | Developer's IC-7300 MkII |
+|---|---|
+| Main CPU | 1.02 |
+| Front CPU | 1.01 |
+| DSP Program | 1.01 |
+| DSP Data | 1.00 |
+| FPGA | 1.01 |
+
+If yours is behind, updating the radio is the first thing to try — the firmware is on Icom's support site (IC-7300MK2 → Firmware) and goes in via the SD card; back your settings up to the card first, and check the CI-V address afterwards. If yours is *ahead* of this table, say so in the report: it means Icom has released something I have not tested against yet.
 
 ![The About page — version + release date at top, Resources section, Diagnostics block with the user's environment summary, and the Copy diagnostics + Report a bug buttons that send everything straight into a GitHub bug-report form](pictures/AboutPage.png)
 
