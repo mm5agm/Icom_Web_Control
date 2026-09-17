@@ -2424,20 +2424,27 @@
             // not what is drawn: panel B is only drawn once a sweep has reached
             // it, and on a cross-band pair that sweep comes from the peek — report
             // the drawn state and neither side ever goes first, the strip with
-            // the Both/Stacked buttons never appears. Reads localStorage rather
-            // than `currentMode`, which is a `let` declared further down.
+            // the Both/Stacked buttons never appears. It is THIS tab's choice
+            // (`currentMode`, a `let` declared further down but initialised
+            // long before anything calls this), never localStorage: that key is
+            // shared by every tab and each rewrites it with its own choice on
+            // every status change, so a tab on "VFO A" read "Both" whenever
+            // another tab wrote last and the reports flapped every few seconds.
+            // A tab that is not on screen (another tab in front, minimised)
+            // wants nothing — the operator cannot see its panels either.
             // Re-sent every 5 s as well: automatic reconnect gives the connection
             // a new id, and the hub's record is per connection.
             function reportSpectrumPanels() {
                 const conn = window.signalRConnection;
                 if (!conn || conn.state !== 'Connected') return;
-                const scopeOn = !(scopeSwitch && !scopeSwitch.checked);
-                const mode = localStorage.getItem('iwc.spectrumMode') || 'Multi';
-                const wantA = scopeOn && (mode === 'A' || mode === 'Multi');
-                const wantB = scopeOn && (mode === 'B' || mode === 'Multi');
+                const visible = document.visibilityState === 'visible';
+                const scopeOn = visible && !(scopeSwitch && !scopeSwitch.checked);
+                const wantA = scopeOn && (currentMode === 'A' || currentMode === 'Multi');
+                const wantB = scopeOn && (currentMode === 'B' || currentMode === 'Multi');
                 conn.invoke('SpectrumPanels', wantA, wantB).catch(() => { /* reconnecting */ });
             }
             setInterval(reportSpectrumPanels, 5000);
+            document.addEventListener('visibilitychange', reportSpectrumPanels);
 
             // Per-VFO status routing — drives the panel state + small badge in the header.
             function setStatusBadge(vfo, status) {

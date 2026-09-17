@@ -96,7 +96,16 @@ namespace Icom_Web_Control.Hubs
         // re-registered without the page having to notice the reconnect.
         public Task SpectrumPanels(bool a, bool b)
         {
-            _spectrumPanels[Context.ConnectionId] = (a, b);
+            var now = (a, b);
+            if (!_spectrumPanels.TryGetValue(Context.ConnectionId, out var was) || was != now)
+            {
+                _spectrumPanels[Context.ConnectionId] = now;
+                // Logged on change only. The id is the SignalR connection, so a
+                // second tab or another machine shows up as a second line — the
+                // peek runs if ANY of them wants the watch panel.
+                _logger.LogInformation("[RadioHub] Spectrum panels wanted by {Id}: A={A} B={B} ({N} browser(s) reporting)",
+                    Context.ConnectionId[..8], a, b, _spectrumPanels.Count);
+            }
             return Task.CompletedTask;
         }
 

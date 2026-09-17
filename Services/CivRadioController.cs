@@ -121,7 +121,7 @@ namespace Icom_Web_Control.Services
         private volatile int _peekIntervalMs = 15000;
         private volatile string? _peekWatchId;
         private long _peekLastTicks;
-        private bool _peekHeldForPanel;
+        private volatile bool _peekHeldForPanel; // written on the poll thread, read on the reader thread
 
         // While the peek has the receiver on the watch VFO, every command that
         // addresses "the displayed VFO" (05 frequency, 06 mode, 07 select, the
@@ -640,17 +640,32 @@ namespace Icom_Web_Control.Services
             string? peek = _peekWatchId;
             if (peek != null)
             {
-                if (announce)
-                    SendHub("SdrStatus", new { sdrId = peek, status = "streaming" });
-                SendHub("SpectrumUpdate", new
+                // Trust the header, not the clock. A sweep completing inside the
+                // borrow window can still be centred on the operating VFO — the
+                // one in flight when the select went out, or the first one after
+                // the hand-back — and shown on the watch panel it is the wrong
+                // band under the right labels: a frozen trace with a spike that
+                // is not there. Only a sweep the radio says is centred on the
+                // watch VFO goes to the watch panel; anything else falls through
+                // to the ordinary routing below.
+                long peekHz = peek == "B" ? _state.FrequencyB : _state.FrequencyA;
+                bool onWatchBand = sweep.SpanHz > 0 && Math.Abs(sweep.CentreHz - peekHz) <= sweep.SpanHz / 2;
+                _logger.LogInformation("[CivRadioController] Peek sweep centre={Centre} Hz span={Span} Hz watch={Watch} Hz -> {Where}",
+                    sweep.CentreHz, sweep.SpanHz, peekHz, onWatchBand ? "panel " + peek : "primary (not on the watch band)");
+                if (onWatchBand)
                 {
-                    sdrId = peek,
-                    bins = sweep.BinsDb,
-                    centreHz = sweep.CentreHz,
-                    spanHz = sweep.SpanHz,
-                    mode,
-                });
-                return;
+                    if (announce)
+                        SendHub("SdrStatus", new { sdrId = peek, status = "streaming" });
+                    SendHub("SpectrumUpdate", new
+                    {
+                        sdrId = peek,
+                        bins = sweep.BinsDb,
+                        centreHz = sweep.CentreHz,
+                        spanHz = sweep.SpanHz,
+                        mode,
+                    });
+                    return;
+                }
             }
 
             // Pseudo-dual receiver (Phase 5, same-band): the Center-mode sweep is
@@ -725,8 +740,13 @@ namespace Icom_Web_Control.Services
                 // Cross-band peek fills this panel by borrowing the receiver every
                 // few seconds; between borrows keep the last peeked trace frozen
                 // rather than wiping it with an "off-screen" overlay. Only when
-                // peek is off do we tell the panel the watch VFO is unreachable.
-                if (!_crossBandPeek && (announce || _watchInRange))
+                // peek is off — or paused because no browser is showing the
+                // panel — do we tell the panel the watch VFO is unreachable. The
+                // paused case matters: the page only offers the Both/Stacked
+                // strip once panel B has SOME status, and with "VFO A" remembered
+                // the peek never runs, so without this the operator could never
+                // get back to Both. A resumed peek's first sweep makes it live.
+                if ((!_crossBandPeek || _peekHeldForPanel) && (announce || _watchInRange))
                     SendHub("SdrStatus", new { sdrId = watchId, status = "outofrange" });
                 _watchInRange = false;
                 return;
@@ -807,6 +827,11 @@ namespace Icom_Web_Control.Services
                 _logger.LogInformation(wanted
                     ? "[CivRadioController] Cross-band peek resumed: watch panel {Id} is on screen again"
                     : "[CivRadioController] Cross-band peek paused: watch panel {Id} is not on screen in any browser", watchId);
+                // Pausing: the frozen last trace would otherwise sit there looking
+                // live; say "off-screen" so the panel (and the Both button) stay
+                // offered. Resuming: the next borrowed sweep announces itself.
+                if (!wanted)
+                    SendHub("SdrStatus", new { sdrId = watchId, status = "outofrange" });
             }
             if (!wanted)
             {
