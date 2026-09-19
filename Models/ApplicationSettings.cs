@@ -16,6 +16,16 @@
         // know 8080 always clashes on their machine (e.g. Plex, Jenkins).
         public int HttpPort { get; set; } = 8080;
 
+        // When true (the default, and until now the only behaviour), the host
+        // exits about 30 seconds after the last browser tab disconnects, so
+        // closing the last tab closes the app. Set false to keep the process
+        // running with no browser connected — which is what you want when
+        // something other than a browser is the reason it is up: WSJT-X or
+        // Log4OM on the rigctld bridge, a DX cluster feed left running, or a
+        // shack PC you drive over RDP and would rather not have to restart.
+        // Quit it from the system tray instead.
+        public bool AutoShutdownWhenNoBrowsers { get; set; } = true;
+
         public string RadioModel { get; set; } = "IC-7300MK2"; // Icom single-receiver HF+6m(+4m EU)
 
 

@@ -2055,6 +2055,20 @@
                             </div>
                             <span asp-validation-for="Settings.HttpPort" class="text-danger"></span>
                         </div>
+                        <div class="mb-3 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" asp-for="Settings.AutoShutdownWhenNoBrowsers" />
+                            <label class="form-check-label" asp-for="Settings.AutoShutdownWhenNoBrowsers">
+                                Automatically exit when no browser is connected
+                            </label>
+                            <div class="form-text">
+                                When enabled (default), the app waits 30 seconds after the last browser tab
+                                closes, then exits — so closing the last tab closes the app.
+                                Turn this off to keep it running with no browser open, which is what you want
+                                when something else is the reason it is up: WSJT-X or Log4OM on the rigctld
+                                bridge, or a DX cluster feed. Quit it from the system tray instead.
+                                This takes effect straight away; no restart needed.
+                            </div>
+                        </div>
                         <div class="alert alert-warning" role="alert">
                             <i class="bi bi-exclamation-triangle-fill"></i>
                             <strong>Important:</strong> Save Settings and Restart the application after changing web server settings.
