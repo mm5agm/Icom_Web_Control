@@ -42,7 +42,7 @@ public static class AppVersion
     /// be why my behaviour differs".
     ///
     /// Find your own value:
-    ///   IC-7300 MkII: MENU -> SET -> Others -> Version Information (front panel).
+    ///   IC-7300 MkII: MENU -> SET -> Others -> Information -> Version (front panel).
     /// Update this dictionary whenever the bench radio's firmware moves.
     /// </summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> TestedFirmware =
