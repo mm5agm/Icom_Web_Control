@@ -196,6 +196,24 @@ anything is wrong. Prefer it to the raw commands: run by hand, the merge can
 conflict and leave `main` unmerged while the tag and release go out anyway,
 which is exactly how v1.0.3 first shipped v1.0.0's code.
 
+**Install the hooks in every clone.** `.githooks/pre-push` refuses to push
+`main` anything that is neither a release merge (a commit whose subject is
+`Release vX.Y.Z`, which is what `finish-release.ps1` makes) nor a
+documentation-only change (`README.md`, `USER_MANUAL.md`, `docs/`,
+`pictures/`, which is how manual and README corrections have always reached
+`main` between releases). That guard was missing on 2026-09-19, when a
+mistyped `cd` ran this repo's docs merge in YWC instead and pushed 31
+unreleased commits to that repo's `main` -- branch protection permitted it,
+because the push was a fast-forward, and then refused the force-push that
+would have undone it. Hooks are not cloned, so each working copy needs it
+switched on once:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+Override with `git push --no-verify` when you genuinely mean it.
+
 ---
 
 ## Backend Architecture
