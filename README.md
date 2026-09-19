@@ -19,6 +19,31 @@ If something has been biting you and a pre-release says it is fixed, or you want
 
 **Pre-releases never nag you.** IWC's in-app update banner only ever announces a full release, so if you don't go looking for a pre-release you will never be told one exists. Trying one is always a deliberate trip to the releases page. (GitHub's own **Watch → Releases** notifications are a separate thing and *do* include pre-releases — see [Staying informed about updates](#staying-informed-about-updates) below.)
 
+## ✨ Added since the last release
+
+**v1.1.0 is the current release**, and it is the first with the Morse pair:
+
+- **CW Reader** — a **CW Read** button opens a reader that listens to the radio's own USB audio and prints what it hears as text, with a small spectrum and a tuning phasor. **Reader Mode** sets the radio up in one press and puts everything back when you leave; **ZIN** zero-beats the signal; confirmed contacts go to a **Log QSO** form that appends to an ADIF file. The decoder is the one my Yaesu app uses, unchanged. [§18](USER_MANUAL.md#18-cw-reader).
+- **CW Send** — type a line, press Enter, and the radio keys it over CI-V. **Stop** cuts in mid-piece; speed and break-in are the keyer's own. Not yet used on air by a CW operator. [§19](USER_MANUAL.md#19-cw-send).
+
+Everything else in v1.1.0 is a fix, listed below. Full detail in the [v1.1.0 notes](#v110-2026-09-17).
+
+## 🔧 Fixed since the last release
+
+One line per fix, newest first, with the build that has it. A pre-release installs exactly like a release and carries everything before it; each one is written up under [Release notes](#release-notes). *Not yet in a build* means the fix is in the code and will be in the next pre-release or release.
+
+| Fixed | Issue | In build |
+|---|---|---|
+| *Nothing since v1.1.0 yet — documentation only: the manual's CW sections rewritten for a beginner, and the original IC-7300 put first.* | | |
+| Clicking a signal on the spectrum knocked CW-R back to CW (and RTTY-R to RTTY). | — | v1.1.0 |
+| The two-panel spectrum kept borrowing the receiver for VFO B's panel even with **VFO A** only chosen. | — | v1.1.0 |
+| "Band up" said "successful" and did nothing if it landed during a cross-band peek. | — | v1.1.0 |
+| VFO B's panel showed your own band's trace between peeks. | — | v1.1.0 |
+| Voice control clipped the first syllable of every command; confidence now 0.7–0.97, and "set frequency to …" is no longer cut off after "frequency". | — | v1.1.0 |
+| Windows resetting the microphone killed voice control until a restart. | — | v1.1.0 |
+| The log file was 17 MB a day; now a couple of megabytes. | — | v1.1.0 |
+| Draggable panels could be dragged off the screen. | — | v1.1.0 |
+
 ## What this is
 
 IWC is a web-based control panel and panadapter for Icom transceivers, cloned from YWC and re-fitted for Icom's CI-V protocol. The plumbing YWC already got right — the real-time SignalR pipeline, the meter gauges, the spectrum display, the settings and rigctld bridge, and the voice control — is being kept; the Yaesu CAT layer is being replaced with a fresh CI-V layer behind a clean radio-control seam.
