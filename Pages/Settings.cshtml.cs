@@ -55,6 +55,15 @@ namespace Icom_Web_Control.Pages
         [TempData]
         public string? RestartRequiredReason { get; set; }
 
+        /// <summary>
+        /// False while the CI-V port is not open. The Radio &amp; CAT section
+        /// opens itself in that state, because the "port not found" banner
+        /// on the main page sends people here to fix exactly that, and a
+        /// collapsed section under a read-only summary looks like a page
+        /// that cannot be edited (#43).
+        /// </summary>
+        public bool RadioConnected => _radio.IsConnected;
+
         public List<string> NetworkAddresses { get; set; } = new();
 
         /// <summary>

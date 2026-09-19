@@ -1732,7 +1732,7 @@ async function pollInitStatus() {
             if (detail) {
                 const safe = detail.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 statusText.innerHTML = safe +
-                    " <a href='/Settings' class='text-white text-decoration-underline'>Open Settings</a>";
+                    " <a href='/Settings#radio-cat' class='text-white text-decoration-underline'>Open Settings</a>";
             } else {
                 statusText.innerText = "Initializing radio, please wait...";
             }

@@ -130,8 +130,9 @@
         </div>
         <div class="col-lg-6">
             <div class="card h-100">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">Current Configuration</h4>
+                    <a href="#radio-cat" class="btn btn-sm btn-outline-primary" id="changeRadioSettingsLink">Change</a>
                 </div>
                 <div class="card-body">
                     <dl class="row mb-0">
@@ -1913,8 +1914,10 @@
         </script>
     </details>
 
-    <!-- Radio & CAT -->
-    <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
+    <!-- Radio & CAT. Open when the radio is not connected: that is the
+         state the main page's "port not found" banner sends people here
+         from, and the fields they need must not be hidden (#43). -->
+    <details class="settings-section" id="radio-cat" @(ViewContext.ModelState.IsValid && Model.RadioConnected ? "" : "open")>
         <summary><i class="bi bi-broadcast" aria-hidden="true"></i>&nbsp;Radio &amp; CAT</summary>
         <div class="section-body">
                 <h5 class="mb-3">Radio Connection</h5>
@@ -2756,6 +2759,25 @@
             }, true);
 
             renderCurrentKey();
+        })();
+    </script>
+    <script>
+        // A link to a section by its id (the main page's "port not found"
+        // banner points at #radio-cat, and so does the Change button on the
+        // Current Configuration card) must open that section as well as
+        // scroll to it. Browsers scroll to a closed <details> but leave it
+        // closed, which is the "I cannot change anything" page from #43.
+        (function () {
+            function revealHashSection() {
+                var id = (location.hash || '').slice(1);
+                if (!id) return;
+                var section = document.getElementById(id);
+                if (!section || section.tagName !== 'DETAILS') return;
+                section.open = true;
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            window.addEventListener('hashchange', revealHashSection);
+            revealHashSection();
         })();
     </script>
 }
