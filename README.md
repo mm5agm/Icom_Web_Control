@@ -28,12 +28,18 @@ If something has been biting you and a pre-release says it is fixed, or you want
 
 Everything else in v1.1.0 is a fix, listed below. Full detail in the [v1.1.0 notes](#v110-2026-09-17).
 
+Since v1.1.0, not yet in a build:
+
+- **Put your memories in the order you want** - on the Memories page, click the **Label**, **Frequency** or **Mode** heading to sort the list, or use the row buttons to move one memory to the top, up or down, then Save. The order is the order of the Mem panel tiles and the order **Export to Radio** writes them, so it is how you choose which 99 go to the radio. [§8.1](USER_MANUAL.md#81-memories-editor).
+
 ## 🔧 Fixed since the last release
 
 One line per fix, newest first, with the build that has it. A pre-release installs exactly like a release and carries everything before it; each one is written up under [Release notes](#release-notes). *Not yet in a build* means the fix is in the code and will be in the next pre-release or release.
 
 | Fixed | Issue | In build |
 |---|---|---|
+| Loading a memory bank kept only label, frequency, mode and clarifier, and silently dropped the IF width, NB, NR, AGC, power and notes that Save to Mem had captured. Banks now load every field; a bank saved by an older version still has them in the file and gets them back on its next load. | — | *Not yet in a build* |
+| Every Save on the Memories page renumbered the memories from 1, so after deleting or moving a row the Mem panel tiles below it pointed at the wrong memory until the panel happened to reload. Ids are now kept across Save. | — | *Not yet in a build* |
 | The Settings page hid the Radio Model and Serial Port fields under a collapsed heading beneath a read-only summary, so a new user sent there by the "port not found" banner could not see anything to change. Radio & CAT now opens itself while the radio is not connected, the banner link lands on it, and the summary card has a Change button. | [#43](https://github.com/mm5agm/Icom_Web_Control/issues/43) | *Not yet in a build* |
 | Clicking a signal on the spectrum knocked CW-R back to CW (and RTTY-R to RTTY). | — | v1.1.0 |
 | The two-panel spectrum kept borrowing the receiver for VFO B's panel even with **VFO A** only chosen. | — | v1.1.0 |

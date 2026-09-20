@@ -1273,6 +1273,13 @@ The editor shows all your saved memories in a table. For each memory you can edi
 
 Click **Save** to save all changes. Click **Add Memory** to append a blank row. Click the **trash** icon on any row to delete that memory.
 
+**Putting the list in order.** The order of the rows in the editor is the order everywhere else: the Mem panel tiles on the main page, and the order memories go to the radio (§8.4 - **Export to Radio** writes the first 99 in list order, so if your list is longer than the radio this is how you choose which 99 it gets). Two ways to change it:
+
+- Click the **Label**, **Frequency** or **Mode** column heading to sort the whole list by that column; click it again to reverse the sort. Sorting by Mode keeps each mode's memories in frequency order.
+- The three buttons at the right of each row move that memory **to the top**, **up one** or **down one**.
+
+Either way the row numbers change as you go and the message above the table says what you did - and reminds you that the new order is only kept when you press **Save**. Reload without saving and the list goes back to how it was.
+
 The **Pop Out** button opens the Memories page in a new browser tab — useful if you want to edit memories on a second monitor while the main control panel is open in the first.
 
 **Save to Mem button** — When you click "Save to Mem" on a VFO panel, the app captures the **full live state** of that VFO at the moment you clicked it: frequency, mode, IF width, NB/NR/AGC, and power. The memory is added with the applicable advanced fields populated. Edit the label later from the Memories page.
@@ -1331,6 +1338,8 @@ If a record has no frequency it's skipped silently — most loggers always inclu
 
 > **Warning:** Export to Radio (Replace) overwrites all 99 radio memory channels. Make sure you have imported or backed up anything you want to keep first.
 
+The radio has only 99 channels and the app can hold more, so if your list is longer than the radio, **Export to Radio** writes the first 99 in list order and stops. To choose which 99 go, put them at the top of the list first - sort by a column heading or use the row buttons (§8.1) - and press **Save** before you export.
+
 ---
 
 ### 8.5 Memory Banks
@@ -1347,6 +1356,8 @@ The **Memory Banks** bar appears at the top of the Memories page.
 4. If a bank with that name already exists, you are asked to confirm overwrite.
 
 The bank is saved immediately. Your current working memories are unchanged.
+
+A bank holds every field of every memory, advanced fields included. Before the fix on 2026-09-20 loading a bank kept only label, frequency, mode and the clarifier settings, so the IF width, NB, NR, AGC, power and notes captured by **Save to Mem** were quietly dropped every time a bank was loaded. A bank saved with an older version still has those fields in the file - they were saved, just not loaded - so loading it again with the current version brings them back.
 
 **Loading a bank:**
 
