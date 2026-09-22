@@ -159,7 +159,10 @@ namespace Icom_Web_Control.Controllers
         /// Patterns matched: lines containing "[Voice]" or "[IntentDispatcher]".
         /// Lines are returned newest-last to read like a normal log file.
         /// </summary>
-        private static readonly long[] _validNudgeSteps = [10, 100, 1_000, 10_000, 100_000];
+        // 1 Hz added with the settable spectrum wheel step (ported from YWC #168).
+        // The IC-7300 takes a 1 Hz frequency write over CI-V; whether the radio
+        // honours it exactly is a bench question, not one a build answers.
+        private static readonly long[] _validNudgeSteps = [1, 10, 100, 1_000, 10_000, 100_000];
 
         /// <summary>
         /// Updates the voice nudge step size without a full Settings round-trip.

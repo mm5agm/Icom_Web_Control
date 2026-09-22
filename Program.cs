@@ -289,6 +289,7 @@ builder.Services.AddSingleton<RadioStateService>();
 // retained in the tree (unregistered) as a no-hardware fallback for reference.
 // See docs/design/iwc-clone-split-plan.md.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Civ.ICivClient, Icom_Web_Control.Services.Civ.CivBusService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Civ.RadioFinder>();
 
 // No-hardware preview mode: set IWC_USE_STUB_RADIO=1 to back the seam with the
 // canned StubRadioController instead of the real CI-V link. Lets the pseudo-dual

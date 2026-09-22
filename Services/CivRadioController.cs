@@ -49,6 +49,12 @@ namespace Icom_Web_Control.Services
 
         private readonly RadioStateService _state;
         private readonly ICivClient _bus;
+        private readonly RadioFinder _finder;
+
+        // True while FindRadioAsync has the serial ports: the reconnect loop
+        // must not open the configured port under the probe, or one of them
+        // reads "in use" and the answer is wrong either way.
+        private volatile bool _findInProgress;
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly ILogger<CivRadioController> _logger;
@@ -252,12 +258,14 @@ namespace Icom_Web_Control.Services
             ICivClient bus,
             ISettingsService settings,
             IHubContext<RadioHub> hubContext,
+            RadioFinder finder,
             ILogger<CivRadioController> logger)
         {
             _state = state;
             _bus = bus;
             _settings = settings;
             _hubContext = hubContext;
+            _finder = finder;
             _logger = logger;
 
             // The radio pushes 27 00 scope frames unsolicited (they never match a
@@ -277,6 +285,33 @@ namespace Icom_Web_Control.Services
             var port = settings.SerialPort;
             var baud = settings.BaudRate;
 
+            // No port chosen yet — a fresh install (the default is blank so a
+            // new user is told to choose, rather than handed the port the app
+            // was developed on; issue #43). If the PC has exactly one serial
+            // port there is nothing to choose, so take it and save it; with
+            // none or several, say what is there and where to pick.
+            if (string.IsNullOrWhiteSpace(port))
+            {
+                var present = System.IO.Ports.SerialPort.GetPortNames();
+                if (present.Length == 1)
+                {
+                    port = present[0];
+                    settings.SerialPort = port;
+                    await _settings.SaveSettingsAsync(settings);
+                    _logger.LogInformation("[CivRadioController] No serial port configured and {Port} is the only one present — using and saving it", port);
+                }
+                else
+                {
+                    var list = present.Length > 0
+                        ? string.Join(", ", present.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+                        : "none";
+                    _state.ConnectionStatusText =
+                        $"No serial port has been chosen yet. Ports available now: {list}. " +
+                        "Open Settings → Radio & CAT and press Find my radio, or choose the port from the list.";
+                    return false;
+                }
+            }
+
             _logger.LogInformation("[CivRadioController] Connecting to {Port} @ {Baud} 8N1…", port, baud);
             if (!await _bus.OpenAsync(port, baud))
             {
@@ -293,7 +328,7 @@ namespace Icom_Web_Control.Services
                         : "none";
                     _state.ConnectionStatusText =
                         $"Serial port {port} not found. Ports available now: {list}. " +
-                        "Check the radio is on and the USB cable is connected, then set the correct port in Settings.";
+                        "Check the radio is on and the USB cable is connected, then choose the correct port in Settings → Radio & CAT (or press Find my radio there).";
                 }
                 else
                 {
@@ -2613,6 +2648,38 @@ namespace Icom_Web_Control.Services
             _ => $"Icom({idByte:X2})",
         };
 
+        public async Task<RadioDiscovery> FindRadioAsync(CancellationToken cancellationToken = default)
+        {
+            // Connected already: the answer is the live link. Probing would
+            // mean closing it, and the operator pressing Find on a working
+            // radio is far more likely checking than lost.
+            if (_bus.IsOpen && _state.IsConnected)
+            {
+                var settings = await _settings.GetSettingsAsync();
+                return new RadioDiscovery(true, settings.SerialPort, settings.BaudRate,
+                    ModelId ?? settings.RadioModel, Array.Empty<string>(), Array.Empty<string>());
+            }
+
+            _findInProgress = true;
+            try
+            {
+                // A connect attempt may hold the configured port for up to a
+                // second (open, ID, frequency read, close). Give it that long
+                // to let go before the probe reports the port as busy.
+                for (int i = 0; i < 8 && _bus.IsOpen; i++)
+                    await Task.Delay(250, cancellationToken);
+                if (_bus.IsOpen)
+                    await _bus.CloseAsync();
+
+                var r = await _finder.FindAsync(null, cancellationToken);
+                return new RadioDiscovery(r.Found, r.Port, r.Baud, r.Model, r.PortsProbed, r.PortsBusy);
+            }
+            finally
+            {
+                _findInProgress = false;
+            }
+        }
+
         // -- Hosted poll loop ---------------------------------------------------
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -2625,6 +2692,12 @@ namespace Icom_Web_Control.Services
             {
                 if (!_bus.IsOpen)
                 {
+                    if (_findInProgress)
+                    {
+                        await DelayQuiet(250, stoppingToken);
+                        continue;
+                    }
+
                     bool ok;
                     try
                     {

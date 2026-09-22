@@ -1,3 +1,4 @@
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -557,7 +558,35 @@ namespace Icom_Web_Control.Services
         /// no scope has nothing to report.
         /// </summary>
         ScopeDiagnostics GetScopeDiagnostics() => new(false, 0, 0, null, null);
+
+        /// <summary>
+        /// Look for a radio on the PC's serial ports without knowing which port
+        /// or rate it is on: the "Find my radio" button in Settings (issue #43).
+        /// Reports where one answered so the operator can save that; it never
+        /// changes settings itself. A controller that is already connected
+        /// reports the live link rather than probing under itself. Default: a
+        /// controller with no hardware has nothing to look for.
+        /// </summary>
+        Task<RadioDiscovery> FindRadioAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(new RadioDiscovery(false, null, 0, null, Array.Empty<string>(), Array.Empty<string>()));
     }
+
+    /// <summary>
+    /// Result of <see cref="IRadioController.FindRadioAsync"/>.
+    /// </summary>
+    /// <param name="Found">A radio answered.</param>
+    /// <param name="Port">The serial port it answered on, in Settings' spelling ("COM3").</param>
+    /// <param name="Baud">The rate it answered at.</param>
+    /// <param name="Model">The Settings <c>RadioModel</c> value for what answered ("IC-7300", "IC-7300MK2").</param>
+    /// <param name="PortsProbed">Ports that were opened and stayed silent — or, when found, the ones tried before it.</param>
+    /// <param name="PortsBusy">Ports another program (or this one) holds open, so they could not be tried.</param>
+    public record RadioDiscovery(
+        bool Found,
+        string? Port,
+        int Baud,
+        string? Model,
+        IReadOnlyList<string> PortsProbed,
+        IReadOnlyList<string> PortsBusy);
 
     /// <summary>
     /// Snapshot of the band scope's state, for diagnostics only.

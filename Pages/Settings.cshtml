@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Icom_Web_Control.Pages.SettingsModel
 
 <style>
@@ -142,7 +142,16 @@
                             <span class="badge bg-info">100W</span>
                         </dd>
                         <dt class="col-sm-4">Serial Port:</dt>
-                        <dd class="col-sm-8"><code>@Model.Settings.SerialPort</code></dd>
+                        <dd class="col-sm-8">
+                            @if (string.IsNullOrEmpty(Model.Settings.SerialPort))
+                            {
+                                <span class="text-danger">not chosen yet &mdash; <a href="#radio-cat">choose one or press Find my radio</a></span>
+                            }
+                            else
+                            {
+                                <code>@Model.Settings.SerialPort</code>
+                            }
+                        </dd>
                         <dt class="col-sm-4">Baud Rate:</dt>
                         <dd class="col-sm-8"><code>@Model.Settings.BaudRate</code></dd>
                         <dt class="col-sm-4">Network Interface:</dt>
@@ -1923,7 +1932,7 @@
                 <h5 class="mb-3">Radio Connection</h5>
                         <div class="mb-3">
                             <label asp-for="Settings.RadioModel" class="form-label">Radio Model</label>
-                            <select asp-for="Settings.RadioModel" class="form-select">
+                            <select asp-for="Settings.RadioModel" class="form-select" style="max-width: 20rem;">
                                 <option value="IC-7300MK2">IC-7300 MkII</option>
                                 <option value="IC-7300">IC-7300</option>
                             </select>
@@ -1932,19 +1941,67 @@
                                 <strong>IC-7300:</strong> 100W output, single receiver, HF + 6m, built-in real-time scope over CI-V
                             </div>
                             <span asp-validation-for="Settings.RadioModel" class="text-danger"></span>
+                            @* The original IC-7300 needs four menu items set that the MkII does
+                               not have or does not need, and the order matters: the USB baud item
+                               is only offered once the USB port is unlinked from [REMOTE]. The
+                               item that IS always offered — plain "CI-V Baud Rate", with only
+                               4800/9600/19200/Auto — belongs to the round [REMOTE] socket, and is
+                               the one a first-time user finds and changes instead (#43). Shown
+                               whenever the original is selected, and by Find my radio when one
+                               answers. *@
+                            <div id="ic7300MenuChecklist" class="alert alert-info mt-2 mb-0 py-2 px-3" style="display:none;" role="status">
+                                <strong>Original IC-7300: set these on the radio, in this order.</strong>
+                                All are under <em>MENU &rarr; SET &rarr; Connectors &rarr; CI-V</em> unless stated.
+                                <ol class="mb-1 mt-1 ps-3">
+                                    <li><em>CI-V USB Port</em> &rarr; <strong>Unlink from [REMOTE]</strong>.</li>
+                                    <li><em>CI-V USB Baud Rate</em> &rarr; <strong>115200</strong>. This item only becomes
+                                        settable after step 1. If the only choices you see are 4800 / 9600 / 19200 / Auto,
+                                        you are looking at <em>CI-V Baud Rate</em> &mdash; that one is the round [REMOTE]
+                                        socket on the back and has no effect on USB. Leave it alone and go back to step 1.</li>
+                                    <li><em>CI-V USB Echo Back</em> &rarr; <strong>OFF</strong> (the default).</li>
+                                    <li><em>USB Serial Function</em> &rarr; <strong>CI-V</strong> (the default).</li>
+                                    <li><em>Connectors &rarr; USB SEND</em> and <em>USB Keying (CW)</em> &rarr; <strong>OFF</strong>
+                                        unless another program keys the radio through them.</li>
+                                </ol>
+                                Then set <strong>115200</strong> in Baud Rate below and save. Steps 1&ndash;2 only affect the band
+                                scope: at any lower rate the radio connects and every control works, but the spectrum stays blank.
+                                Also install Icom&rsquo;s USB driver from their support site before plugging the radio in; without it
+                                Windows creates no COM port at all.
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label asp-for="Settings.SerialPort" class="form-label">Serial Port</label>
-                            <input asp-for="Settings.SerialPort" class="form-control" placeholder="COM3" required />
-                            <div class="form-text">
-                                Enter the COM port where your radio is connected (e.g., COM3, COM4).
-                                <br /><strong>Tip:</strong> Check Device Manager to find the correct port.
+                            <label for="serialPortSelect" class="form-label">Serial Port</label>
+                            @* The list is the PC's ports right now (/api/ports), so the operator
+                               picks rather than types. Find my radio asks the seam to probe every
+                               port at every rate for an Icom answering the CI-V ID request, then
+                               fills Model, Port and Baud in — nothing is saved until Save Settings.
+                               The bound input stays as the value the form posts; it is only shown
+                               for "Other…", so a port the list cannot see can still be typed. *@
+                            <div class="input-group" style="max-width: 34rem;">
+                                <select id="serialPortSelect" class="form-select" style="max-width: 12rem;" aria-describedby="serialPortHelp">
+                                    <option value="@Model.Settings.SerialPort">@(string.IsNullOrEmpty(Model.Settings.SerialPort) ? "— choose a port —" : Model.Settings.SerialPort)</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-secondary" id="serialPortRefresh" title="Refresh the list of ports">
+                                    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" id="findRadioBtn">
+                                    <i class="bi bi-search" aria-hidden="true"></i> Find my radio
+                                </button>
+                            </div>
+                            <input asp-for="Settings.SerialPort" class="form-control mt-2" style="max-width: 12rem;" placeholder="COM3" autocomplete="off" hidden />
+                            <div id="findRadioResult" class="mt-2 mb-0" role="status" aria-live="polite" style="display:none;"></div>
+                            <div class="form-text" id="serialPortHelp">
+                                The list shows every COM port this PC has right now. Not sure which is the radio?
+                                Switch the radio on, check the USB cable at both ends, and press <strong>Find my radio</strong>:
+                                it tries each port at each speed until an Icom answers, and fills in the model, port and baud rate for you.
+                                <br />If the radio&rsquo;s port is missing from the list, Windows has not created one: on the
+                                <strong>original IC-7300</strong> that means Icom&rsquo;s USB driver is not installed; on either radio, try another USB socket or cable.
                             </div>
                             <span asp-validation-for="Settings.SerialPort" class="text-danger"></span>
                         </div>
                         <div class="mb-3">
                             <label asp-for="Settings.BaudRate" class="form-label">Baud Rate</label>
-                            <select asp-for="Settings.BaudRate" class="form-select">
+                            <select asp-for="Settings.BaudRate" class="form-select" style="max-width: 12rem;">
                                 <option value="4800">4800</option>
                                 <option value="9600">9600</option>
                                 <option value="19200">19200 (Default)</option>
@@ -1976,10 +2033,10 @@
                                 <strong>The band scope will not work at this baud rate.</strong>
                                 The original IC-7300 only sends scope data at <strong>115200</strong> baud.
                                 On the radio, set <em>MENU &rarr; SET &rarr; Connectors &rarr; CI-V</em> so that
-                                <em>CI-V USB Port</em> is <strong>Unlink from [REMOTE]</strong> and
-                                <em>CI-V USB Baud Rate</em> is <strong>115200</strong>, then choose 115200 here.
-                                Everything else (frequency, mode, meters) works fine at the lower rates —
-                                only the spectrum display is affected.
+                                <em>CI-V USB Port</em> is <strong>Unlink from [REMOTE]</strong> first, and then
+                                <em>CI-V USB Baud Rate</em> (which only appears once it is unlinked) is <strong>115200</strong>;
+                                then choose 115200 here. Everything else (frequency, mode, meters) works fine at the lower
+                                rates &mdash; only the spectrum display is affected.
                             </div>
                         </div>
                         <script>
@@ -1992,16 +2049,124 @@
                                 const warn  = document.getElementById('ic7300ScopeBaudWarning');
                                 if (!model || !baud || !warn) return;
 
+                                const checklist = document.getElementById('ic7300MenuChecklist');
+
                                 function refresh() {
                                     // Match the original only — "IC-7300MK2" must not trip this.
                                     const isOriginal = (model.value || '').replace(/[-\s]/g, '').toUpperCase() === 'IC7300';
                                     const rate = parseInt(baud.value, 10) || 0;
                                     warn.style.display = (isOriginal && rate < 115200) ? '' : 'none';
+                                    if (checklist) checklist.style.display = isOriginal ? '' : 'none';
                                 }
 
                                 model.addEventListener('change', refresh);
                                 baud.addEventListener('change', refresh);
                                 refresh();
+                            })();
+
+                            // Serial-port list and Find my radio (#43).
+                            (function () {
+                                const select  = document.getElementById('serialPortSelect');
+                                const input   = document.getElementById('Settings_SerialPort');
+                                const refresh = document.getElementById('serialPortRefresh');
+                                const findBtn = document.getElementById('findRadioBtn');
+                                const result  = document.getElementById('findRadioResult');
+                                const model   = document.getElementById('Settings_RadioModel');
+                                const baud    = document.getElementById('Settings_BaudRate');
+                                if (!select || !input || !refresh || !findBtn || !result) return;
+
+                                const OTHER = '__other__';
+
+                                function fillList(ports, chosen) {
+                                    select.innerHTML = '';
+                                    const add = (value, text) => {
+                                        const o = document.createElement('option');
+                                        o.value = value; o.textContent = text;
+                                        select.appendChild(o);
+                                        return o;
+                                    };
+                                    if (!chosen) add('', '— choose a port —');
+                                    ports.forEach(p => add(p, p));
+                                    if (chosen && !ports.includes(chosen)) add(chosen, chosen + ' (not present now)');
+                                    add(OTHER, 'Other…');
+                                    select.value = chosen || '';
+                                    input.hidden = true;
+                                }
+
+                                async function loadPorts(chosen) {
+                                    try {
+                                        const r = await fetch('/api/ports', { cache: 'no-store' });
+                                        const d = await r.json();
+                                        fillList(d.ports || [], chosen);
+                                    } catch (e) {
+                                        // Leave the current option; the operator can still type via Other…
+                                    }
+                                }
+
+                                select.addEventListener('change', () => {
+                                    if (select.value === OTHER) {
+                                        input.hidden = false;
+                                        input.value = '';
+                                        input.focus();
+                                    } else {
+                                        input.hidden = true;
+                                        input.value = select.value;
+                                    }
+                                });
+                                refresh.addEventListener('click', () => loadPorts(input.value.trim()));
+
+                                function show(kind, html) {
+                                    result.className = 'alert alert-' + kind + ' mt-2 mb-0 py-2 px-3';
+                                    result.innerHTML = html;
+                                    result.style.display = '';
+                                }
+
+                                findBtn.addEventListener('click', async () => {
+                                    const originalHTML = findBtn.innerHTML;
+                                    findBtn.disabled = true;
+                                    findBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Looking… (up to about 10 s)';
+                                    show('secondary', 'Trying each COM port at each speed until an Icom answers…');
+                                    try {
+                                        const r = await fetch('/api/cat/find-radio', { method: 'POST' });
+                                        const d = await r.json();
+                                        if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+                                        if (d.found) {
+                                            const name = d.model === 'IC-7300MK2' ? 'IC-7300 MkII'
+                                                       : d.model === 'IC-7300' ? 'IC-7300 (original)' : d.model;
+                                            if (model && [...model.options].some(o => o.value === d.model)) model.value = d.model;
+                                            if (baud && [...baud.options].some(o => o.value === String(d.baud))) baud.value = String(d.baud);
+                                            await loadPorts(d.port);
+                                            input.value = d.port;
+                                            if (model) model.dispatchEvent(new Event('change'));
+                                            let msg = '<strong>Found an ' + name + ' on ' + d.port + ' at ' + d.baud + ' baud.</strong> ' +
+                                                      'Model, port and baud rate have been filled in &mdash; press <strong>Save Settings</strong> at the bottom of the page.';
+                                            if (d.model === 'IC-7300' && d.baud < 115200) {
+                                                msg += '<br />Your radio is talking at ' + d.baud + ', which connects but leaves the band scope blank. ' +
+                                                       'For the scope, work through the list above (Unlink first, then 115200), press Find my radio again, and save.';
+                                            }
+                                            show('success', msg);
+                                        } else {
+                                            const probed = (d.portsProbed || []);
+                                            const busy = (d.portsBusy || []);
+                                            let msg = '<strong>No radio answered.</strong> ';
+                                            if (probed.length === 0 && busy.length === 0) {
+                                                msg += 'This PC has no COM ports at all. Check the USB cable at both ends; on the original IC-7300, install Icom&rsquo;s USB driver first.';
+                                            } else {
+                                                if (probed.length) msg += 'Tried ' + probed.join(', ') + ' at every speed. ';
+                                                if (busy.length) msg += busy.join(', ') + (busy.length > 1 ? ' are' : ' is') + ' in use by another program (WSJT-X, another CAT app?) and could not be tried. ';
+                                                msg += 'Check the radio is switched on and the USB cable is in at both ends, close any other program that talks to the radio, then try again.';
+                                            }
+                                            show('warning', msg);
+                                        }
+                                    } catch (e) {
+                                        show('danger', 'Find my radio failed: ' + e.message);
+                                    } finally {
+                                        findBtn.disabled = false;
+                                        findBtn.innerHTML = originalHTML;
+                                    }
+                                });
+
+                                loadPorts(input.value.trim());
                             })();
                         </script>
                         <div class="mb-3">
