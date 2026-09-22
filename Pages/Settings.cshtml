@@ -1932,7 +1932,7 @@
                 <h5 class="mb-3">Radio Connection</h5>
                         <div class="mb-3">
                             <label asp-for="Settings.RadioModel" class="form-label">Radio Model</label>
-                            <select asp-for="Settings.RadioModel" class="form-select">
+                            <select asp-for="Settings.RadioModel" class="form-select" style="max-width: 20rem;">
                                 <option value="IC-7300MK2">IC-7300 MkII</option>
                                 <option value="IC-7300">IC-7300</option>
                             </select>
@@ -1977,8 +1977,8 @@
                                fills Model, Port and Baud in — nothing is saved until Save Settings.
                                The bound input stays as the value the form posts; it is only shown
                                for "Other…", so a port the list cannot see can still be typed. *@
-                            <div class="input-group">
-                                <select id="serialPortSelect" class="form-select" aria-describedby="serialPortHelp">
+                            <div class="input-group" style="max-width: 34rem;">
+                                <select id="serialPortSelect" class="form-select" style="max-width: 12rem;" aria-describedby="serialPortHelp">
                                     <option value="@Model.Settings.SerialPort">@(string.IsNullOrEmpty(Model.Settings.SerialPort) ? "— choose a port —" : Model.Settings.SerialPort)</option>
                                 </select>
                                 <button type="button" class="btn btn-outline-secondary" id="serialPortRefresh" title="Refresh the list of ports">
@@ -1988,7 +1988,7 @@
                                     <i class="bi bi-search" aria-hidden="true"></i> Find my radio
                                 </button>
                             </div>
-                            <input asp-for="Settings.SerialPort" class="form-control mt-2" placeholder="COM3" autocomplete="off" hidden />
+                            <input asp-for="Settings.SerialPort" class="form-control mt-2" style="max-width: 12rem;" placeholder="COM3" autocomplete="off" hidden />
                             <div id="findRadioResult" class="mt-2 mb-0" role="status" aria-live="polite" style="display:none;"></div>
                             <div class="form-text" id="serialPortHelp">
                                 The list shows every COM port this PC has right now. Not sure which is the radio?
@@ -2001,7 +2001,7 @@
                         </div>
                         <div class="mb-3">
                             <label asp-for="Settings.BaudRate" class="form-label">Baud Rate</label>
-                            <select asp-for="Settings.BaudRate" class="form-select">
+                            <select asp-for="Settings.BaudRate" class="form-select" style="max-width: 12rem;">
                                 <option value="4800">4800</option>
                                 <option value="9600">9600</option>
                                 <option value="19200">19200 (Default)</option>
