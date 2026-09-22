@@ -233,18 +233,19 @@
      configured serial port isn't present), hidden the moment the radio
      connects. Not user-dismissible — it clears itself when the problem does.
 
-     The Ports link is here because this banner is the one moment a user is
-     definitely looking for the COM-port list, and /Ports is otherwise
-     unreachable from the UI — nothing in the navbar points at it (issue #2,
-     where the port list had to be asked for by email). Same tab is safe:
-     site.js is in _Layout, so every page heartbeats and navigating away
-     doesn't start RadioHub's 30-second shutdown countdown. -->
+     The link goes to Settings → Radio & CAT, which lists the PC's COM ports
+     and has the Find my radio button (#43) — this banner is the one moment
+     a user is definitely looking for both. It used to point at /Ports, a
+     bare list added when the port list had to be asked for by email (#2);
+     that page still exists and Diagnostics → COM Ports shows the same list.
+     Same tab is safe: site.js is in _Layout, so every page heartbeats and
+     navigating away doesn't start RadioHub's 30-second shutdown countdown. -->
 <div id="connectionProblemBanner" class="alert alert-warning mb-1 py-1 px-3" role="alert"
      aria-live="polite" style="display:none; font-size:0.85rem;">
     <i class="bi bi-plug-fill" aria-hidden="true"></i>
     <strong>Radio not connected.</strong>
     <span id="connectionProblemText"></span>
-    <a asp-page="/Ports" class="alert-link ms-1">Check which COM ports this PC has</a>
+    <a asp-page="/Settings" asp-fragment="radio-cat" class="alert-link ms-1">Open Settings to choose the port or find the radio</a>
 </div>
 
 <div class="row mb-1" style="padding-top: 2px; padding-bottom: 2px;">

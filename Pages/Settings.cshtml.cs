@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
@@ -116,6 +116,18 @@ namespace Icom_Web_Control.Pages
             // error - the same trap the DX cluster fields above are dodging.
             ModelState.Remove("Settings.CwAudioDeviceName");
 
+            // An unchosen port is the fresh-install state (the default is blank
+            // rather than the port this app was developed on — #43). It is still
+            // not savable, but the implicit [Required] above would report it as
+            // "The SerialPort field is required", which says nothing about what
+            // to do; replace it with the instruction.
+            if (string.IsNullOrWhiteSpace(Settings.SerialPort))
+            {
+                ModelState.Remove("Settings.SerialPort");
+                ModelState.AddModelError("Settings.SerialPort",
+                    "Choose the COM port your radio is connected to, or press Find my radio.");
+            }
+
             if (!ModelState.IsValid)
             {
                 // Log every ModelState error so we can see exactly which
@@ -129,7 +141,9 @@ namespace Icom_Web_Control.Pages
                             key, err.ErrorMessage);
                     }
                 }
-                StatusMessage = "❌ Settings not saved — see console log for validation errors.";
+                StatusMessage = ModelState.TryGetValue("Settings.SerialPort", out var portEntry) && portEntry.Errors.Count > 0
+                    ? "❌ Settings not saved — " + portEntry.Errors[0].ErrorMessage
+                    : "❌ Settings not saved — see console log for validation errors.";
                 NetworkAddresses = GetLocalIPAddresses();
                 CwAudioDeviceNames = BuildCwAudioDeviceNames(Settings.CwAudioDeviceName);
                 return Page();

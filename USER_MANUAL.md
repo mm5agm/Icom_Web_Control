@@ -186,20 +186,29 @@ Before the app can communicate with your radio you need to tell it which serial 
 1. Open a browser and go to **http://localhost:8080**. If port 8080 was already in use on your PC (e.g. Plex, Jenkins, MiniTool ShadowMaker), IWC will have automatically picked the next free port from 8081–8089. **Hover over the IWC tray icon** down by the Windows clock to see the actual URL — or simply double-click the tray icon to have IWC open the right URL in your default browser.
 2. Click the **Settings** link in the navigation bar.
 3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver.
-4. Set **Serial Port** to the COM port your radio is connected to — the USB serial port the radio presents when you plug its USB cable in. **On the MkII that is the USB Type-C socket, and Windows creates the port by itself. On the original IC-7300 it is the USB Type-B socket, and you must install Icom's USB driver first** — until you do, Windows creates no port at all and there will be nothing here to choose. The driver is on Icom's support site under the radio's downloads. If you are unsure which port is which, go to **Diagnostics → Ports** for a list, or check Windows Device Manager.
+4. Set **Serial Port**. The box is a list of every COM port your PC has at that moment, so you choose rather than type. **If you don't know which one is the radio, switch the radio on and press "Find my radio"** — IWC tries each port at each speed until an Icom answers, then fills in the Radio Model, Serial Port and Baud Rate for you, and tells you what it found. It takes a couple of seconds, longer if the radio is on an unusual speed. Nothing is saved until you press **Save Settings**, so it is safe to press as often as you like.
+
+   The port is the USB serial port the radio presents when you plug its USB cable in. **On the MkII that is the USB Type-C socket, and Windows creates the port by itself. On the original IC-7300 it is the USB Type-B socket, and you must install Icom's USB driver first** — until you do, Windows creates no port at all, so the list will not have it and Find my radio cannot see it either. The driver is on Icom's support site under the radio's downloads. **Diagnostics → COM Ports** shows the same list if you want to check it elsewhere.
 5. Set **Baud Rate** — and this is the one place the two radios genuinely differ, so follow the row for the model you picked in step 3. Settings shows a warning if you choose a combination that will not work.
 
    | Your radio | In IWC's Settings | On the radio itself |
    |---|---|---|
    | **IC-7300 MkII** | **19200** | Nothing to change. The MkII has no **CI-V USB Baud Rate** menu, and the **CI-V Baud Rate** item under **Menu → Set → Connectors → CI-V** governs the round **[REMOTE]** socket only — leave it on "Auto". IWC's box alone decides the rate. |
-   | **IC-7300 (original)** | **115200** | **Menu → Set → Connectors → CI-V**: set **CI-V USB Port** to **Unlink from [REMOTE]** and **CI-V USB Baud Rate** to **115200**. |
+   | **IC-7300 (original)** | **115200** | **Menu → Set → Connectors → CI-V**: set **CI-V USB Port** to **Unlink from [REMOTE]** *first*, then **CI-V USB Baud Rate** to **115200**. The order matters — see the warning below. |
+
+   > **If the only speeds you are offered are 4800, 9600, 19200 and Auto, you are in the wrong menu item.** That one is **CI-V Baud Rate**, which belongs to the round **[REMOTE]** socket on the back panel and has no effect on a USB connection. Leave it alone. The item you want is **CI-V USB Baud Rate**, and it only becomes settable once **CI-V USB Port** is set to **Unlink from [REMOTE]** — which is why that has to be done first. This has caught a first-time user, who quite reasonably concluded their radio did not offer 115200 at all.
 
    **Why the original needs 115200:** it will not send band scope data at any lower rate. At 19200 everything else works perfectly — the radio connects, the meters move, the controls respond — and only the spectrum display stays permanently empty, which makes it look like a missing feature rather than a setting. Two owners have hit this independently, so if you have the original model, set 115200 now and save yourself the hunt. See [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently) for everything else that differs.
 6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East, includes 4m), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
 7. If you run digital modes (FT8, FT4, RTTY, PSK) via USB audio, see the FAQ (§15) for a one-time radio menu change needed on the radio itself — it's not configurable from IWC.
 8. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
 
-If you see a red cross, double-check the COM port number and baud rate, then try again.
+If you see a red cross, check in this order — it is roughly how often each one is to blame:
+
+1. **The USB cable, at both ends.** A cable that has worked its way out of the radio looks exactly like every other fault. This is the single commonest cause.
+2. **The radio is switched on.**
+3. **The COM port.** Press **Find my radio**: if it finds the radio, the port was wrong and it has just been corrected for you. If it reports that a port is *in use by another program*, close whatever else talks to the radio (WSJT-X, Log4OM, another CAT program) and press it again — two programs cannot share one COM port.
+4. **The baud rate**, if you have the original IC-7300 and set it by hand — Find my radio reports the speed the radio actually answered at.
 
 **Optional — extras you can set up later in Settings:**
 
@@ -965,11 +974,12 @@ Clicking **Restart Now** stops IWC and (when running as the installed exe) autom
 | Setting | Description |
 |---------|-------------|
 | Radio Model | **IC-7300 MkII** (100 W, HF + 6m + 4m EU) or **IC-7300** (100 W, HF + 6m). Both are single-receiver with a built-in CI-V band scope. |
-| Serial Port | COM port the IC-7300 presents over its USB Type-C cable (e.g., COM3). Find it in Windows Device Manager or on the **Diagnostics → Ports** page. |
-| Baud Rate | The rate IWC opens the serial port at. Default: **19200**. **IC-7300 MkII:** leave it at 19200 — the MkII has no **CI-V USB Baud Rate** menu, and its **CI-V Baud Rate** item applies to the **[REMOTE]** socket only, so there is nothing to match and raising this will not speed the band scope up (measured: the same ~4 sweeps per second at 19200 and at 115200). **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
+| Serial Port | COM port the IC-7300 presents over its USB cable (Type-C on the MkII, Type-B on the original). The box lists every port your PC has right now; **Refresh** re-reads the list if you plug the radio in while the page is open, and **Other…** lets you type a port the list cannot see. If you don't know which port is the radio, press **Find my radio** (below). **Diagnostics → COM Ports** shows the same list. |
+| Find my radio | Asks IWC to look for the radio instead of you. It opens each COM port in turn and asks any Icom on it to identify itself, at 19200 first, then 115200, then the remaining speeds; the first radio that answers wins, and its model, port and baud rate are filled into this page for you to **Save**. Nothing is saved or changed on the radio. If a port is held open by another program (WSJT-X, Log4OM, another CAT program) it says so rather than guessing — close that program and press it again. A radio that is switched off, or whose USB cable is out, cannot answer and will not be found. |
+| Baud Rate | The rate IWC opens the serial port at. Default: **19200**. If you used **Find my radio**, this is already the rate the radio answered at. **IC-7300 MkII:** leave it at 19200 — the MkII has no **CI-V USB Baud Rate** menu, and its **CI-V Baud Rate** item applies to the **[REMOTE]** socket only, so there is nothing to match and raising this will not speed the band scope up (measured: the same ~4 sweeps per second at 19200 and at 115200). **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
 
-IWC talks to the radio using the CI-V protocol over that single USB serial connection. It identifies itself as controller `E0`, and works out the radio's own CI-V address at connect rather than assuming one — so `B6` (the MkII's default), `94` (the original IC-7300's) and any address you have set by hand all work with nothing to configure. After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success.
+IWC talks to the radio using the CI-V protocol over that single USB serial connection. It identifies itself as controller `E0`, and works out the radio's own CI-V address at connect rather than assuming one — so `B6` (the MkII's default), `94` (the original IC-7300's) and any address you have set by hand all work with nothing to configure. After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success. On a fresh installation the serial port is deliberately left blank until you choose one — IWC will not guess a port number for you, except on a PC that has exactly one COM port, where it takes that one and saves it.
 
 > **Running WSJT-X / FT8 via USB audio?** The IC-7300 needs its **USB SEND / audio** menu items set up before it will transmit digital audio from a PC. This is a one-time radio setup — see FAQ §15.
 
@@ -1906,9 +1916,10 @@ A **Feature request** template is also available for ideas / improvements rather
 
 The radio is not answering on CI-V. IWC keeps retrying, so it clears itself the moment the link comes up.
 
+- **Check the USB cable at both ends.** A cable that has worked loose at the radio is the commonest cause of all, and it looks identical to every other fault.
 - Check that the radio is powered on.
-- Check the COM port in Settings. The **Check which COM ports this PC has** link in the "Radio not connected" banner lists every port your PC has and says whether the one you configured is among them; **Diagnostics → Ports** shows the same thing.
-- Check the baud rate in Settings. On the **original IC-7300** it must match the radio's **MENU → SET → Connectors → CI-V → CI-V USB Baud Rate** — that is the USB port's own setting, and the plain **CI-V Baud Rate** below it belongs to the round [REMOTE] socket and has no effect on a USB connection. The **MkII has no CI-V USB Baud Rate menu at all**, so there is nothing to match: set Settings to **19200** and ignore the radio's **CI-V Baud Rate**, which is the [REMOTE] socket's.
+- Check the COM port in Settings. The **Open Settings to choose the port or find the radio** link in the "Radio not connected" banner takes you straight to the port list; **Find my radio** there will locate the radio and correct the port and speed for you. **Diagnostics → COM Ports** shows the same list.
+- Check the baud rate in Settings. On the **original IC-7300** it must match the radio's **MENU → SET → Connectors → CI-V → CI-V USB Baud Rate** — that is the USB port's own setting, and the plain **CI-V Baud Rate** below it belongs to the round [REMOTE] socket and has no effect on a USB connection. (If that item offers you only 4800/9600/19200/Auto, it *is* the [REMOTE] one — see [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).) Easier: press **Find my radio**, which reports the speed the radio actually answered at. The **MkII has no CI-V USB Baud Rate menu at all**, so there is nothing to match: set Settings to **19200** and ignore the radio's **CI-V Baud Rate**, which is the [REMOTE] socket's.
 - **The CI-V address is not something to check** — IWC detects it, by asking on the CI-V broadcast address at connect and using whichever address replies. It works on `B6` (the MkII's default), `94` (the original IC-7300's) or any address you have set yourself, and there is no box for it in Settings.
 - Click **Test Connection** in Settings.
 - If IWC knows *why* it cannot connect — a COM port that is not present, for instance — the panel says so and offers a link to Settings instead of spinning.
@@ -2157,16 +2168,27 @@ For either route, the radio's audio device on the shack PC is the **USB Audio CO
 
 ### 15.7 I have the original IC-7300, not the MkII — what do I need to set differently?
 
-Four things, and they are all one-off. IWC supports both radios, and the whole of the rest of this manual applies to yours unchanged — the spectrum, CW, memories, voice control, WSJT-X and rigctld all behave identically. It is only getting connected that differs.
+A handful of things, and they are all one-off. IWC supports both radios, and the whole of the rest of this manual applies to yours unchanged — the spectrum, CW, memories, voice control, WSJT-X and rigctld all behave identically. It is only getting connected that differs.
+
+Settings shows this same list on the page the moment you choose **IC-7300** as your radio model, so you do not have to work from the manual with the radio in front of you.
 
 | | What to set | Where |
 |---|---|---|
-| **1. USB driver** | Install Icom's USB driver **before** plugging the radio in. The MkII does not need it; yours does. Until it is installed Windows creates no COM port at all, so IWC's port list will be empty or will not show the radio. | Icom's support site, under the IC-7300's downloads |
-| **2. Serial port** | The port that appears once the driver is in and the **USB Type-B** cable is connected. | IWC **Settings → Serial Port**; **Diagnostics → Ports** lists what your PC has |
-| **3. CI-V USB Port** | **Unlink from [REMOTE]**. | **Menu → Set → Connectors → CI-V** |
-| **4. Baud rate** | **115200**, set in *both* places so they match. Note it is **CI-V USB Baud Rate** you want — the plain **CI-V Baud Rate** below it belongs to the round **[REMOTE]** socket and has no effect on a USB connection. | IWC **Settings → Baud Rate**; radio **Menu → Set → Connectors → CI-V → CI-V USB Baud Rate** |
+| **1. USB driver** | Install Icom's USB driver **before** plugging the radio in. The MkII does not need it; yours does. Until it is installed Windows creates no COM port at all, so IWC's port list will not show the radio and **Find my radio** cannot see it either. | Icom's support site, under the IC-7300's downloads |
+| **2. Serial port** | The port that appears once the driver is in and the **USB Type-B** cable is connected. Easiest is to press **Find my radio** and let IWC fill it in. | IWC **Settings → Radio & CAT → Serial Port** |
+| **3. CI-V USB Port** | **Unlink from [REMOTE]**. Do this **before** item 4 — see below. | **Menu → Set → Connectors → CI-V** |
+| **4. CI-V USB Baud Rate** | **115200**, and **115200** in IWC too so they match. | radio **Menu → Set → Connectors → CI-V → CI-V USB Baud Rate**; IWC **Settings → Baud Rate** |
+| **5. CI-V USB Echo Back** | **OFF** — which is the factory setting, so this is only worth checking if you have been through these menus before. With it ON the radio sends your own commands back at you and IWC can mistake the echo for a reply. | **Menu → Set → Connectors → CI-V** |
+| **6. USB Serial Function** | **CI-V** — again the factory setting. If it has been changed to one of the other options, the port exists but nothing on it answers. | **Menu → Set → Connectors → CI-V** |
+| **7. USB SEND / USB Keying (CW)** | Leave **OFF** unless another program keys the radio through those lines. IWC never asserts DTR or RTS, deliberately — on this radio they can be wired to PTT, and opening a port should never put a transmitter on the air. | **Menu → Set → Connectors → USB SEND/Keying** |
+
+> **The trap in item 4, and why item 3 comes first.** The **CI-V USB Baud Rate** item only becomes settable once **CI-V USB Port** is **Unlink from [REMOTE]**. Until then the only baud item you can get at is the plain **CI-V Baud Rate** — which offers just 4800, 9600, 19200 and Auto, belongs to the round **[REMOTE]** socket on the back, and does nothing at all for a USB connection. If you are looking at a list without 115200 in it, you are in that item: leave it as you found it, go and unlink the USB port, and come back.
+>
+> **Auto is not enough.** The USB item's factory setting is **Auto**, which follows whatever speed the PC opens the port at. That is why the radio connects perfectly on IWC's default of 19200 with nothing changed on the radio — and also why the band scope stays blank, because the *scope* is the one thing the original model will not send below 115200. Both ends have to be at 115200 explicitly.
 
 **Items 3 and 4 are only about the spectrum scope, and that is exactly what makes them worth doing up front.** The original IC-7300 refuses to send band scope data unless both are right. Get them wrong and IWC still connects, the meters still move, every control still works — and the spectrum display simply never appears, which looks far more like a missing feature than a setting. Two owners found this independently before it was documented, which is why it is called out here rather than left in troubleshooting. IWC now warns you in Settings the moment you pick a combination that disables the scope, and the spectrum panel prints the reason rather than staying blank.
+
+**Digital modes.** If you run FT8, FT4, RTTY or PSK through the radio's USB audio, there is one more radio-side item — **DATA MOD**, set to **USB** — and it is covered in [§15.1](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode). It has nothing to do with getting IWC connected, and it applies to the MkII equally.
 
 **You do not need to set a CI-V address anywhere.** Your radio's default is `94` where the MkII's is `B6`, but IWC never assumes either: at connect it asks for the radio's identity on the CI-V *broadcast* address and then uses whatever address answers. So the address is detected, not configured — there is no box for it in Settings, and IWC will find your radio even if you have changed its address from the factory default. If you see *"port opened, but the radio isn't responding"*, the address is not the reason; see [§14.2](#142-common-problems).
 
