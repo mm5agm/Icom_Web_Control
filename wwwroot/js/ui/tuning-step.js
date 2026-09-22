@@ -91,10 +91,42 @@ async function syncVoiceNudgeStep(vfo, stepHz) {
     } catch { /* voice not present on this host */ }
 }
 
+/**
+ * Bring the voice nudge step into line with the wheel step once, at load.
+ *
+ * The two controls are set up by different mechanisms at different moments.
+ * voice-control.js is a classic script, so it runs during parse and fills its
+ * dropdown from the server's saved setting; this module is deferred, so it
+ * restores the wheel step from localStorage afterwards. Nothing reconciled the
+ * two, and they have different defaults -- 10 kHz for the voice nudge, 1 kHz
+ * for the wheel -- so a page load could perfectly well show 1 Hz on the Step
+ * box and 10 kHz on the voice dropdown, with no way for the operator to tell
+ * which one "tune up" was going to use. Reported by Colin on 2026-09-22.
+ *
+ * The wheel's value wins, for the reason given at the top of this file: it is
+ * the one the operator last chose on this machine, and unlike the server
+ * setting it is per-browser, so it is the one that matches what they are
+ * looking at. Nothing is sent when the two already agree, so the usual load
+ * costs no request at all.
+ */
+function reconcileVoiceNudgeStepOnLoad() {
+    for (const vfo of ['A', 'B']) {
+        // Server-rendered by Index.cshtml. Absent on any other page, which is
+        // not an error -- there is simply no voice dropdown there to reconcile.
+        const serverHz = Number(window['iwcVoiceNudgeStepHz' + vfo]);
+        if (!Number.isFinite(serverHz) || serverHz <= 0) continue;
+
+        const wheelHz = tuningStep.get(vfo);
+        if (wheelHz !== serverHz) syncVoiceNudgeStep(vfo, wheelHz);
+    }
+}
+
 // Guarded for the same reason the store is: a second copy of this module must
 // not add a second announcement and a second voice POST for every change.
 if (!window.iwcTuningStepWired) {
     window.iwcTuningStepWired = true;
+
+    reconcileVoiceNudgeStepOnLoad();
 
     tuningStep.subscribe((vfo, stepHz, meta) => {
         if (meta.silent !== true) {

@@ -983,6 +983,44 @@ function updateMicGainLabel(mode) {
     }
 }
 
+// While a VFO is "editing", the frequency display shows the operator's
+// in-progress value instead of what the radio reports, so an update arriving
+// mid-edit can't yank the digits back. Something has to end that, and there
+// are two ways it ends, not one:
+//
+//   1. The radio reports back the frequency this display sent. The edit landed.
+//   2. The radio goes somewhere this display never sent it -- the spectrum
+//      mouse wheel, the radio's own dial, or another CAT program on the port.
+//
+// Only (1) existed, so (2) left the display frozen while the rig tuned away
+// under it, until the operator happened to click somewhere else on the page.
+// Colin hit this on 2026-09-22 bench-testing the ported tuning step: the
+// spectrum wheel moved the IC-7300 and IWC's digits sat still. YWC had the
+// identical defect and the identical cause -- see its 7d1533e2.
+//
+// Called before the display update so a change takes effect on the very
+// broadcast that revealed it, not the next one.
+function reconcileFrequencyEditing(receiver, valueHz) {
+    const s = window.radioControl && window.radioControl._state;
+    if (!s || !s.editing[receiver]) return;
+
+    // Mid-edit: localFreq is only non-null between a digit step and the
+    // settling send, and the operator's value wins for that moment.
+    if (s.localFreq[receiver] !== null && s.localFreq[receiver] !== undefined) return;
+
+    if (valueHz === s.lastSentFreq[receiver]) { s.editing[receiver] = false; return; }
+
+    // Somebody else moved the radio. Wait out our own write first: an update
+    // already in flight when we sent carries the OLD frequency, and acting on
+    // it would show the pre-edit value for a moment before ours settles --
+    // the flip-back this editing flag exists to prevent.
+    const SETTLE_MS = 1500;
+    if (Date.now() - ((s._lastFreqSend && s._lastFreqSend[receiver]) || 0) > SETTLE_MS) {
+        s.editing[receiver]      = false;
+        s.lastSentFreq[receiver] = null;
+    }
+}
+
 // First SignalR RadioStateUpdate handler (outer scope).
 // Handles ModeA/B, FrequencyA/B, PowerA/B updates pushed from the backend.
 connection.on("RadioStateUpdate", function (update) {
@@ -1125,6 +1163,7 @@ connection.on("RadioStateUpdate", function (update) {
         // updateBandButton alone. Re-apply it whenever the frequency moves.
         lastVfoHz.A = update.value;
         try { applyBandOutOfBand('A'); } catch (e) { console.error('applyBandOutOfBand A error:', e); }
+        try { reconcileFrequencyEditing('A', update.value); } catch (e) { console.error('reconcileFrequencyEditing A error:', e); }
         try { updateFrequencyDisplay('A', update.value); } catch (e) { console.error('updateFrequencyDisplay A error:', e); }
         // Feed the DX Spots panel's band filter from the main update stream —
         // the SDR-era spectrum pipeline that used to do this is dormant on the
@@ -1140,6 +1179,7 @@ connection.on("RadioStateUpdate", function (update) {
         try { state.lastBackendFreq.B = update.value; } catch (_) { /* state lives in IIFE scope only */ }
         lastVfoHz.B = update.value;
         try { applyBandOutOfBand('B'); } catch (e) { console.error('applyBandOutOfBand B error:', e); }
+        try { reconcileFrequencyEditing('B', update.value); } catch (e) { console.error('reconcileFrequencyEditing B error:', e); }
         try { updateFrequencyDisplay('B', update.value); } catch (e) { console.error('updateFrequencyDisplay B error:', e); }
         try { window.dispatchEvent(new CustomEvent('radioFrequencyUpdate', { detail: { receiver: 'B', hz: update.value } })); }
         catch (e) { console.error('radioFrequencyUpdate dispatch error:', e); }
@@ -2231,6 +2271,10 @@ window.setApf = setApf;
         localFreq: { A: null, B: null },
         selectedIdx: { A: null, B: null },
         lastSentFreq: { A: null, B: null },
+        // When this display last wrote to the radio. reconcileFrequencyEditing
+        // waits this out before believing an update it did not send -- see the
+        // SETTLE_MS note there.
+        _lastFreqSend: { A: 0, B: 0 },
         lastBackendFreq: { A: null, B: null },
         lastBand: { A: null, B: null },
         lastMode: { A: null, B: null },
@@ -2397,10 +2441,11 @@ window.setApf = setApf;
                     state.lastSentFreq[receiver] = newFreq;
                 }
                 state.localFreq[receiver] = null;
-                // IMPORTANT: keep state.editing=true here. The polling tick
-                // at ~500 ms will reset it to false once it sees the radio
-                // confirm data.vfoA.frequency === state.lastSentFreq.A (see
-                // the reset block in fetchRadioStatus). If we clear editing
+                // IMPORTANT: keep state.editing=true here.
+                // reconcileFrequencyEditing clears it -- on the SignalR update
+                // or the polling tick, whichever arrives first -- once the
+                // radio reports back the value we sent, or once the radio
+                // moves somewhere we did not send it. If we clear editing
                 // now, the very next polling tick re-renders the display
                 // with whatever frequency the radio is still reporting --
                 // typically the OLD value, because we just sent the new one
@@ -2448,8 +2493,16 @@ window.setApf = setApf;
             state.selectedIdx[receiver] = digits.indexOf(e.target);
             if (state.selectedIdx[receiver] !== -1) {
                 digits[state.selectedIdx[receiver]].classList.add('selected');
-                state.editing[receiver] = true;
-                state.localFreq[receiver] = parseInt(digits.map(d => d.textContent).join(''));
+                // Selecting a digit is NOT an edit. It used to set editing +
+                // localFreq here, which froze the display on the value as it
+                // was at the moment of the click: updateFrequencyDisplay shows
+                // localFreq while editing, and editing only cleared when the
+                // radio reported a frequency THIS display had sent. So after
+                // clicking a digit to set the wheel step, wheeling the spectrum
+                // moved the radio while IWC sat still -- reported by Colin on
+                // 2026-09-22. stepSelectedDigit sets both the moment the
+                // operator actually changes the value, which is the point at
+                // which the display must stop following the radio.
                 latchTuningStepFromDigit(state.selectedIdx[receiver], digits.length);
             }
             // Explicitly focus the display so the very next ArrowUp/Down
@@ -2628,6 +2681,7 @@ window.setApf = setApf;
     }
 
     async function setFrequency(receiver, freqHz) {
+        state._lastFreqSend[receiver] = Date.now();
         try {
             const response = await fetch(`/api/cat/frequency/${receiver.toLowerCase()}`, {
                 method: 'POST',
@@ -2835,12 +2889,12 @@ window.setApf = setApf;
             // time would be unusable. Selection is cleared explicitly when
             // the user clicks outside the display (see the document.click
             // handler inside initializeDigitInteraction).
-            if (state.editing.A && state.lastSentFreq.A !== null && state.localFreq.A === null && data.vfoA.frequency === state.lastSentFreq.A) {
-                state.editing.A = false;
-            }
-            if (state.editing.B && state.lastSentFreq.B !== null && state.localFreq.B === null && data.vfoB.frequency === state.lastSentFreq.B) {
-                state.editing.B = false;
-            }
+            // One rule for ending editing mode, shared with the SignalR path:
+            // our own value coming back, OR the radio having moved somewhere we
+            // never sent it. This used to test only the first, which is half of
+            // why the wheel left the digits frozen.
+            reconcileFrequencyEditing('A', data.vfoA.frequency);
+            reconcileFrequencyEditing('B', data.vfoB.frequency);
 
             if (!state.editing.A) {
                 updateFrequencyDisplay('A', data.vfoA.frequency);
