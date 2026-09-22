@@ -990,6 +990,16 @@ Clicking **Restart Now** stops IWC and (when running as the installed exe) autom
 
 ### 6.1 Radio Connection
 
+![Settings → Radio Connection with IC-7300 MkII chosen: the Radio Model dropdown, the Serial Port dropdown with its Refresh and Find my radio buttons, and the Baud Rate box set to 19200](pictures/Settings_Radio_Connection_7300MK2.png)
+
+*With **IC-7300 MkII** chosen — three fields, and nothing to set on the radio.*
+
+**Choose IC-7300 instead, and the page tells you what the original model needs:**
+
+![The same section with IC-7300 chosen: a blue five-step checklist of the radio's own CI-V menu items appears above the Serial Port field, and a yellow warning below the Baud Rate box explains that the band scope needs 115200](pictures/Settings_Radio_Connection_7300.png)
+
+*The blue checklist and the yellow band-scope warning appear for the original model only, because it is the only one that needs them. The steps are in the order the radio will let you do them — see [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).*
+
 | Setting | Description |
 |---------|-------------|
 | Radio Model | **IC-7300 MkII** (100 W, HF + 6m + 4m EU) or **IC-7300** (100 W, HF + 6m). Both are single-receiver with a built-in CI-V band scope. |
@@ -2189,7 +2199,7 @@ For either route, the radio's audio device on the shack PC is the **USB Audio CO
 
 A handful of things, and they are all one-off. IWC supports both radios, and the whole of the rest of this manual applies to yours unchanged — the spectrum, CW, memories, voice control, WSJT-X and rigctld all behave identically. It is only getting connected that differs.
 
-Settings shows this same list on the page the moment you choose **IC-7300** as your radio model, so you do not have to work from the manual with the radio in front of you.
+Settings shows this same list on the page the moment you choose **IC-7300** as your radio model, so you do not have to work from the manual with the radio in front of you — there is a picture of it in [§6.1](#61-radio-connection).
 
 | | What to set | Where |
 |---|---|---|
