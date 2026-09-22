@@ -374,7 +374,7 @@ The slider snaps to 5 W steps for ease of dragging, but the numerical label show
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over CI-V — there is no external SDR and nothing extra to plug in. It shows a real-time spectrum and scrolling waterfall of the band around the current VFO A frequency, and appears automatically once the radio is connected.
 
-![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
+![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright / Step bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
 
 **Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for three reasons: to give the screen space back to the rest of the control panel, to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
 
@@ -455,7 +455,7 @@ By default IWC shows **one** spectrum panel, for VFO A. The IC-7300 has a single
 
 Switching on **Enable pseudo-dual receiver** in **Settings → Spectrum Display** adds a second panel for VFO B — a *watch* panel — by time-sharing the one scope between them. On the **same band** both panels update live and your audio is never interrupted, because the single sweep covers both frequencies. Watching a **different** band is only possible by briefly borrowing the receiver, so it is off unless you also tick **Allow cross-band watch**; with that on, IWC retunes for a moment every few seconds (interval configurable, default 15 s) and your listening audio dips for about 0.4 s per peek. With cross-band watch off, a watch panel pointed at another band simply shows **Off-screen**. The peek only runs while a browser is actually showing the watch panel: choose **VFO A** (or **VFO B**) alone in the spectrum strip, or switch the scope off, and the retuning stops until you go back to **Both**. Commands you send during a peek — a voice **Band up**, a click on the spectrum, a memory recall — are held for the fraction of a second the receiver is borrowed and then applied to your own VFO, never to the one being watched.
 
-![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel](pictures/Spectrum_Scope_Both.png)
+![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel, each with its own tuning step: 1 Hz on A, 1 kHz on B](pictures/Spectrum_Scope_Both.png)
 
 **Listen / Listening** — with two panels up, the one you are hearing carries a green **Listening** badge and the other carries a **Listen** button. Click **Listen** to move the radio's audio to that VFO; the badge and button swap over. The badge follows the radio, so switching VFOs on the front panel moves it too.
 
