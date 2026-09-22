@@ -20,7 +20,7 @@ public static class AppVersion
     /// as plain "v1.0.6": a tester could not tell which build they were running,
     /// and neither could we when reading their bug report.
     /// </summary>
-    public const string PreRelease = "";
+    public const string PreRelease = "pre1";
 
     /// <summary>
     /// What the user is shown, and the only version string that should appear in
