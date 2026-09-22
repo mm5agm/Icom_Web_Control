@@ -664,6 +664,18 @@
                         <label class="text-nowrap mb-0 ms-2" title="Brighten the waterfall — lifts weak signals up the colour scale. Does not affect the spectrum trace above it.">Bright</label>
                         <input type="range" class="form-range spectrum-bright-slider" data-vfo="A" data-server-bright="@Model.SdrWaterfallBrightDbA" min="0" max="60" step="1" value="0" aria-label="VFO A waterfall brightness" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-bright-label" data-vfo="A" style="min-width:3.5em; text-align:right;">Off</span>
+                        <label class="text-nowrap mb-0 ms-2" for="spectrumStepSelectA" title="Tuning step - how far one mouse-wheel notch on the spectrum moves VFO A. Also set by clicking a digit on the VFO A frequency display, by right-clicking the spectrum, or by voice. The radio accepts 1 Hz over CI-V even where its own dial will not go below 10 Hz.">Step</label>
+                        <select class="form-select form-select-sm spectrum-step-select" data-vfo="A" id="spectrumStepSelectA"
+                                style="width:auto;" title="Tuning step - how far one mouse-wheel notch on the spectrum moves VFO A. Also set by clicking a digit on the VFO A frequency display, by right-clicking the spectrum, or by voice. The radio accepts 1 Hz over CI-V even where its own dial will not go below 10 Hz."
+                                aria-label="VFO A tuning step - how far one mouse-wheel notch on the spectrum moves the dial">
+                            <option value="1">1 Hz</option>
+                            <option value="10">10 Hz</option>
+                            <option value="100">100 Hz</option>
+                            <option value="1000">1 kHz</option>
+                            <option value="10000">10 kHz</option>
+                            <option value="100000">100 kHz</option>
+                            <option value="1000000">1 MHz</option>
+                        </select>
                     </div>
                     <div class="card-body p-0">
                         <canvas id="spectrumCanvasA" role="img" aria-hidden="true" aria-label="RF spectrum display VFO A" style="display:block; width:100%;"></canvas>
@@ -706,6 +718,18 @@
                         <label class="text-nowrap mb-0 ms-2" title="Brighten the waterfall — lifts weak signals up the colour scale. Does not affect the spectrum trace above it.">Bright</label>
                         <input type="range" class="form-range spectrum-bright-slider" data-vfo="B" data-server-bright="@Model.SdrWaterfallBrightDbB" min="0" max="60" step="1" value="0" aria-label="VFO B waterfall brightness" style="flex:0 0 70px; width:70px;">
                         <span class="text-monospace spectrum-bright-label" data-vfo="B" style="min-width:3.5em; text-align:right;">Off</span>
+                        <label class="text-nowrap mb-0 ms-2" for="spectrumStepSelectB" title="Tuning step - how far one mouse-wheel notch on the spectrum moves VFO B. Also set by clicking a digit on the VFO B frequency display, by right-clicking the spectrum, or by voice. The radio accepts 1 Hz over CI-V even where its own dial will not go below 10 Hz.">Step</label>
+                        <select class="form-select form-select-sm spectrum-step-select" data-vfo="B" id="spectrumStepSelectB"
+                                style="width:auto;" title="Tuning step - how far one mouse-wheel notch on the spectrum moves VFO B. Also set by clicking a digit on the VFO B frequency display, by right-clicking the spectrum, or by voice. The radio accepts 1 Hz over CI-V even where its own dial will not go below 10 Hz."
+                                aria-label="VFO B tuning step - how far one mouse-wheel notch on the spectrum moves the dial">
+                            <option value="1">1 Hz</option>
+                            <option value="10">10 Hz</option>
+                            <option value="100">100 Hz</option>
+                            <option value="1000">1 kHz</option>
+                            <option value="10000">10 kHz</option>
+                            <option value="100000">100 kHz</option>
+                            <option value="1000000">1 MHz</option>
+                        </select>
                     </div>
                     <div class="card-body p-0">
                         <canvas id="spectrumCanvasB" role="img" aria-hidden="true" aria-label="RF spectrum display VFO B" style="display:block; width:100%;"></canvas>
@@ -786,6 +810,7 @@
                                         style="width:auto; font-size:1.4rem; font-weight:600; padding:0.4rem 2.4rem 0.4rem 0.6rem;"
                                         title="Voice nudge step size — how far 'tune up'/'tune down' moves VFO A"
                                         aria-label="VFO A voice nudge step size">
+                                    <option value="1">1 Hz</option>
                                     <option value="10">10 Hz</option>
                                     <option value="100">100 Hz</option>
                                     <option value="1000">1 kHz</option>
@@ -1072,6 +1097,7 @@
                                             style="width:auto; font-size:1.4rem; font-weight:600; padding:0.4rem 2.4rem 0.4rem 0.6rem;"
                                             title="Voice nudge step size — how far 'tune up'/'tune down' moves VFO B"
                                             aria-label="VFO B voice nudge step size">
+                                        <option value="1">1 Hz</option>
                                         <option value="10">10 Hz</option>
                                         <option value="100">100 Hz</option>
                                         <option value="1000">1 kHz</option>
@@ -2181,6 +2207,7 @@
         import { Ic7300Meters }         from "/js/orchestrators/Ic7300Meters.js?v=@Icom_Web_Control.AppVersion.Display";
         import { SdrSpectrumPipeline }  from "/js/sdr/sdr-spectrum-pipeline.js?v=@Icom_Web_Control.AppVersion.Display";
         import { SpectrumPanel }        from "/js/sdr/spectrum-panel.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { tuningStep }           from "/js/ui/tuning-step.js?v=@Icom_Web_Control.AppVersion.Display";
         import { BAND_PLANS, BAND_EDGES, getSegments, segmentForHz, nearestBandForHz, loadBandPlanFromServer } from "/js/ui/band-plan.js?v=@Icom_Web_Control.AppVersion.Display";
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=@Icom_Web_Control.AppVersion.Display";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=@Icom_Web_Control.AppVersion.Display";
@@ -3029,6 +3056,30 @@
                     panel.setWaterfallBrightness(db);
                     persistSpectrumDisplay(vfo, { bright: db });
                 });
+            });
+
+            // Tuning step — how far one mouse-wheel notch on the spectrum moves
+            // the dial (ported from YWC, Bruce VK2RT's discussion #168: the old
+            // 1 kHz was hard-coded, and RTTY needs 1 Hz). The select is one of
+            // four views of the same per-VFO number; the others are the frequency
+            // display's selected digit, the spectrum's right-click menu, and the
+            // voice nudge step. The store owns the value and persists it, so the
+            // select is initialised FROM the store rather than from the markup's
+            // first <option> — otherwise a reload would silently reset it to 1 Hz.
+            ['A', 'B'].forEach(vfo => {
+                const select = document.querySelector(`.spectrum-step-select[data-vfo="${vfo}"]`);
+                if (!select) return;
+
+                select.value = String(tuningStep.get(vfo));
+                select.addEventListener('change', () => {
+                    tuningStep.set(vfo, parseInt(select.value, 10));
+                });
+            });
+
+            // Keep every view in step with the store, whichever one changed it.
+            tuningStep.subscribe((vfo, stepHz) => {
+                const select = document.querySelector(`.spectrum-step-select[data-vfo="${vfo}"]`);
+                if (select && select.value !== String(stepHz)) select.value = String(stepHz);
             });
 
             // Span selector — set the IC-7300's scope span (CI-V 27 15). data-hz

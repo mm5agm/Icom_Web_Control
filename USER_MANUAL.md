@@ -68,6 +68,7 @@
     - 15.5 [WSJT-X is very slow to key the radio (long PTT / Tune delay)](#155-wsjt-x-is-very-slow-to-key-the-radio-1020-second-delay-on-ptt--tune)
     - 15.6 [Can I hear the radio from another room?](#156-can-i-hear-the-radio-from-another-room-i-have-iwc-working-downstairs-but-theres-no-sound)
     - 15.7 [I have the original IC-7300, not the MkII — what do I need to set differently?](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently)
+    - 15.8 [I set a 1 Hz tuning step and the radio's display doesn't change](#158-i-set-a-1-hz-tuning-step-and-the-radios-display-doesnt-change)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -372,7 +373,7 @@ The spectrum comes from the **IC-7300's own built-in band scope**, streamed to t
 
 **Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for three reasons: to give the screen space back to the rest of the control panel, to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
 
-**Switching the scope off collapses the panel**, so the spectrum, waterfall, span buttons and the Range / Speed / Bright bar all fold away and everything below them moves up. The switch itself stays put on its own row, with the reminder *"Spectrum hidden — switch Scope on to show it"* beside it, so the way back is always on screen. Your choice is remembered between sessions.
+**Switching the scope off collapses the panel**, so the spectrum, waterfall, span buttons and the Range / Speed / Bright / Step bar all fold away and everything below them moves up. The switch itself stays put on its own row, with the reminder *"Spectrum hidden — switch Scope on to show it"* beside it, so the way back is always on screen. Your choice is remembered between sessions.
 
 If the scope stops streaming for any other reason — it is off at the radio, or no sweep has arrived yet — the panel stays on screen and says what is happening instead ("Band scope is off — switch it on above the panel", or "Waiting for the radio's band scope…"). Only the switch collapses the panel; nothing the radio does can take the way of switching it back on off the screen.
 
@@ -380,7 +381,16 @@ If the scope stops streaming for any other reason — it is off at the radio, or
 
 **Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
 
-**Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune VFO A up or down in 1 kHz steps.
+**Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune that panel's VFO up or down by one **tuning step**. The step starts at 1 kHz and is remembered per VFO across browser reloads. Four things set it, and they all set the same thing:
+
+- **The Step box** on the spectrum's control bar, beside Bright — anything from 1 Hz to 1 MHz.
+- **Right-click on the spectrum** for the same list as a pop-up menu, with the current step ticked. Escape or a click elsewhere closes it, and the arrow keys, Home and End move through it.
+- **Click a digit in the frequency display** — the digit you pick becomes the wheel step, so clicking the 100 Hz digit gives you a 100 Hz wheel. This is usually the quickest route, because you are already pointing at the digit you want to work in.
+- **The Voice Nudge Step Size** for that VFO, from its dropdown or by voice. The wheel and the voice nudge share one step per VFO, so changing either moves the other.
+
+Every change is announced to screen readers. 1 Hz is offered everywhere, including the voice nudge — 1 kHz is far too coarse for chasing RTTY, and no use at all for zero-beating CW. The feature came from Yaesu Web Control, where Bruce VK2RT [asked for it](https://github.com/mm5agm/Yaesu_Web_Control/discussions/168).
+
+**A 1 Hz step works, but the radio's own display will not show it.** The IC-7300's front panel normally reads seven digits, down to 10 Hz, so a 1 Hz step moves IWC's frequency display and leaves the radio's looking untouched. The radio has taken the command — IWC reads the frequency back from the rig rather than assuming it, so the eighth digit on screen is the VFO's real setting. To see that digit on the radio too, **touch the Hz digits on the radio's screen and hold for one second** to turn on its **1 Hz step Fine Tuning function**; hold them again to turn it back off. On the **original IC-7300** that function is offered in SSB, CW and RTTY only; the **MkII** sets no such restriction.
 
 **Frequency crosshair** — Move the mouse over the spectrum to see the exact RF frequency at the cursor position displayed above the waterfall.
 
@@ -398,15 +408,17 @@ If the scope stops streaming for any other reason — it is off at the radio, or
 
 **Persistent cursor — bookmark a frequency** — **Shift-click** anywhere on the panel to drop a persistent cyan cursor at that frequency, with the frequency in a small boxed label beside it. It stays put as you tune around with ordinary clicks, so you can mark a station to come back to. To remove it, **Shift-click on or near it** (within about 10 pixels).
 
-#### The Range / Speed / Bright bar
+#### The Range / Speed / Bright / Step bar
 
-The three sliders under the panel header shape the display. All three are per-VFO and are saved **on the server**, not just in your browser, so they follow you to a phone or tablet as well as surviving a reload.
+The three sliders under the panel header shape the display. All three are per-VFO and are saved **on the server**, not just in your browser, so they follow you to a phone or tablet as well as surviving a reload. The **Step** box at the end of the bar is not a display control — it sets how far the mouse wheel tunes, and it is kept in your browser rather than on the server.
 
 **Range** — the height of the vertical scale, in dB (5–140). This is a gain control for the trace: a *smaller* Range makes peaks taller, a *larger* one flattens everything out. It does **not** move the noise floor. IWC measures the noise floor on every sweep and pins it just above the bottom edge of the panel automatically, so the noise stays where you put it no matter how you set Range, and no matter how far you zoom the span in or out. Wind Range down until weak signals stand clear of the grass, and up again if strong signals are running off the top.
 
 **Speed** — how fast the waterfall scrolls, from **Full** down to **1/128**. Drag it left if signal trails are scrolling past faster than you can read them. The spectrum trace above the waterfall keeps updating live regardless of this setting.
 
 **Bright** — lifts the waterfall's colour mapping by up to 60 dB, bringing weak signals further up the colour scale so they show as blue-green rather than near-black. **Off** (0) is the unmodified mapping. Like Speed, it affects only the waterfall; the spectrum trace above it is untouched. The change applies to new rows as they scroll in — the history already on screen keeps the colours it was drawn with.
+
+**Step** — how far one mouse-wheel notch over this panel moves the dial, from 1 Hz to 1 MHz. It is the same number as the right-click menu, the selected digit on the frequency display and that VFO's voice nudge step; see **Mouse wheel to tune** above.
 
 #### The three badges
 
@@ -506,6 +518,8 @@ The frequency display shows the current VFO frequency in MHz to 1 Hz resolution 
 3. Carry-over is automatic — for example, scrolling 9 → 0 on the kHz digit also increments the 10 kHz digit.
 4. The new frequency is sent to the radio approximately 200 ms after you stop scrolling.
 5. Click anywhere outside the frequency display to deselect.
+
+**Clicking a digit also sets the spectrum wheel step.** Whichever digit you select becomes the step the mouse wheel uses over that VFO's spectrum panel — click the 10 Hz digit and the spectrum tunes in 10 Hz. The step is latched when you click, so it survives deselecting. See [§5.4](#54-spectrum-display) for the other three ways to set it.
 
 **On a tablet or phone**, tap a digit to select it, then use the **▲** and **▼** buttons that appear below the display to adjust it.
 
@@ -1807,7 +1821,8 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 |---|---|
 | **F** | Enter full-screen mode |
 | **Esc** | Exit full-screen mode |
-| Mouse wheel (on spectrum) | Tune VFO A up or down in 1 kHz steps |
+| Mouse wheel (on spectrum) | Tune that panel's VFO by the current tuning step (1 kHz until you change it — see §5.4) |
+| Right-click (on spectrum) | Open the tuning-step menu, 1 Hz to 1 MHz, current step ticked |
 | Click on spectrum | Tune VFO A to the clicked frequency |
 | **Tab** (in band buttons) | Move focus into the band button group |
 | **← / →** (in band buttons) | Move to the previous/next band and switch immediately |
@@ -1824,7 +1839,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 | Input | Action | What happens |
 |---|---|---|
-| **Click** a digit | Select | That digit highlights yellow. The next step / arrow / button action acts on it. |
+| **Click** a digit | Select | That digit highlights yellow. The next step / arrow / button action acts on it, and that digit also becomes the spectrum mouse-wheel tuning step for this VFO (§5.4). |
 | **Mouse wheel** over a digit | Select + step | Wheels up = +1, wheels down = −1 on the digit under the cursor. |
 | **Tab** into the freq display | Focus the display | A blue outline appears around the whole display. Now the keyboard keys below act on it. |
 | **ArrowUp** / **ArrowDown** | Step selected digit by ±1 | If no digit is currently highlighted, the first press just highlights the kHz digit (4th from the right) — a second press then steps it. This avoids accidentally changing a digit you can't see is selected. |
@@ -2198,6 +2213,18 @@ Once those four are done there is nothing further to do differently, and nothing
 
 ---
 
+### 15.8 I set a 1 Hz tuning step and the radio's display doesn't change
+
+Nothing is wrong. The IC-7300's front panel normally shows seven digits — megahertz down to **10 Hz** — so a 1 Hz change has nowhere to appear on it. IWC's own frequency display shows eight, which is why the two look out of step.
+
+The radio really has moved. IWC does not assume the frequency it just sent; it reads the VFO back from the radio several times a second, so the eighth digit on screen is what the rig is actually on. Tune 1 Hz at a time on a steady carrier and you can hear the beat note shift while the radio's display sits still.
+
+**To make the radio show it,** touch the **Hz digits** on the radio's own screen and hold for about a second. That turns on the **1 Hz step Fine Tuning function** and the eighth digit appears; holding them again turns it off. On the **original IC-7300** this is available in SSB, CW and RTTY only — in AM and FM there is no Fine Tuning to turn on, though IWC can still set the frequency to the hertz. The **MkII** places no restriction on it.
+
+It is worth turning on whenever you are zero-beating CW or chasing a drifting RTTY signal, which is what the 1 Hz step is there for in the first place ([§5.4](#54-spectrum-display)).
+
+---
+
 ## 16. Accessibility and Screen Readers
 
 ### 16.1 Making Everything Bigger
@@ -2454,6 +2481,8 @@ If you can't use a mouse wheel — head-tracking input, on-screen keyboard users
 - **ArrowLeft / ArrowRight** move the selection cursor sideways.
 - **Home / End** jump the selection to the **leftmost** (most significant — tens of MHz) or **rightmost** (least significant — Hz) digit.
 - The first arrow press when nothing is selected just highlights the kHz digit — a second press then steps it. This protects against an accidental ArrowUp changing the radio without you realising a digit was selected.
+
+**The spectrum's tuning step is keyboard-reachable too.** The mouse wheel over a spectrum panel tunes by a settable step ([§5.4](#54-spectrum-display)), and while right-clicking the spectrum is one way to pick that step, it is not the only one: the **Step** box on the spectrum's control bar, beside Bright, is an ordinary dropdown you can Tab to and change from the keyboard. Selecting a digit in the frequency display sets the same step, so if you tune by ArrowUp / ArrowDown you are setting it as you go.
 - Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown). Press and hold to repeat that step every 500 ms until released.
 - Clicking outside the display deselects.
 
@@ -2479,7 +2508,7 @@ Everything in the table is wired to the IC-7300 over CI-V and works today.
 | Change band | "go to twenty metres", "switch to forty metres" | Jumps to that band's default (usually FT8) frequency. Bands: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The band name alone works too — a bare "forty metres" is the same as "go to forty metres" |
 | Step up / down | "tune up" / "step up" / "nudge up"; "tune down" / "step down" / "nudge down" | Moves by the configured step size (see Set step size; default 10 kHz) |
 | Band up / down | "band up" / "band down" | Moves one amateur band up or down and lands on that band's default frequency — the same place "go to \<band\> metres" would put you, and the confirmation says which band. It stops at the ends rather than wrapping round: at 10 m "band up" says "Already on the highest band" instead of dropping you on 160 m. Bands your band plan doesn't include are skipped, so 4 m isn't in the sequence outside Region 1 |
-| Set step size | "set step ten kilohertz", "step size one kilohertz" | Sets the step size: 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. The step word alone works too ("ten kilohertz"). Same value as the step dropdown by the mic button — either one updates the other |
+| Set step size | "set step ten kilohertz", "step size one hertz" | Sets the step size: 1 Hz, 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. The step word alone works too ("ten kilohertz"). Same value as the step dropdown by the mic button — either one updates the other, and it is the same step the spectrum mouse wheel uses ([§5.4](#54-spectrum-display)) |
 | Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Switches mode |
 | Swap VFOs | "swap V F O", "swap A and B" | Exchanges VFO A and B contents |
 | Set preamp | "set preamp off", "preamp one" (also two) | Preamp off / amp 1 / amp 2 (IC-7300 has two preamp stages) |
@@ -2577,7 +2606,7 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 - The raw log file lives at `%APPDATA%\MM5AGM\Icom Web Control\logs\iwc-YYYYMMDD.log` if you ever need the unfiltered version (e.g. CAT command traffic, SDR worker status, etc.), but the Diagnostics page is the right tool for voice-specific issues.
 
 **"Tune up" doesn't seem to do much.**
-- The step size is shown (and changeable) in the dropdown next to the mic button, default **10 kHz**. If it's set small (e.g. 10 Hz) the movement can be easy to miss. Change it with the dropdown or by voice: "set step ten kilohertz".
+- The step size is shown (and changeable) in the dropdown next to the mic button, default **10 kHz**. If it's set small (e.g. 1 Hz or 10 Hz) the movement can be easy to miss. Change it with the dropdown or by voice: "set step ten kilohertz". This is the same per-VFO step the spectrum mouse wheel uses ([§5.4](#54-spectrum-display)), so setting it here changes the wheel too.
 - If you need bigger jumps use "set frequency to …" or "go to … metres" instead.
 
 **Speech engine works for a while then stops responding.**
