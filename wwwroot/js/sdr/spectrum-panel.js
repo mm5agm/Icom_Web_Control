@@ -573,6 +573,59 @@ export class SpectrumPanel {
         // already sitting on that overlay, repaint so the reason appears without
         // waiting for another status announce.
         if (this._status === 'blocked') this._drawStatusOverlay(this._status);
+        this._syncBlockedNotice();
+    }
+
+    /**
+     * Mirror a "blocked" reason into real DOM text below the panel.
+     *
+     * The overlay drawn by _drawStatusOverlay is the only other place this
+     * sentence appears, and canvas text is pixels: it cannot be selected,
+     * cannot be copied into a bug report, and a screen reader gets nothing from
+     * it at all. That last point decides it — several of the operators this app
+     * is built for are partially sighted, and "the radio refused, here is the
+     * menu to change" is precisely the message they most need and were the only
+     * ones not getting (GitHub #47).
+     *
+     * Only "blocked" is mirrored. The other overlay states are transient or
+     * self-evident from the badge; this one is a standing condition that needs
+     * the operator to walk to the radio, so it earns permanent text.
+     */
+    _syncBlockedNotice() {
+        const container = document.getElementById(this._containerId);
+        if (!container) return;
+
+        const id = `${this._canvasId}-blocked-notice`;
+        let el = document.getElementById(id);
+        const show = this._status === 'blocked' && this._errorDetail;
+
+        if (!show) {
+            el?.remove();
+            return;
+        }
+
+        if (!el) {
+            el = document.createElement('div');
+            el.id = id;
+            el.className = 'alert alert-warning py-2 px-3 mt-2 mb-0 small';
+            // status, not alert: it is already on screen as an overlay and as a
+            // badge, so an assertive interruption would be the third telling.
+            el.setAttribute('role', 'status');
+            const canvas = document.getElementById(this._canvasId);
+            const anchor = canvas?.parentElement;
+            if (anchor && anchor.parentElement) anchor.insertAdjacentElement('afterend', el);
+            else container.appendChild(el);
+        }
+
+        const heading = `Band scope ${this._vfo}: the radio refused to send scope data.`;
+        if (el.dataset.detail !== this._errorDetail) {
+            el.dataset.detail = this._errorDetail;
+            el.textContent = '';
+            const strong = document.createElement('strong');
+            strong.textContent = heading;
+            el.appendChild(strong);
+            el.appendChild(document.createTextNode(' ' + this._errorDetail));
+        }
     }
 
     /**
@@ -670,6 +723,7 @@ export class SpectrumPanel {
         // the last word on which panels belong on screen.
         container.style.display = '';
         this._drawStatusOverlay(status);
+        this._syncBlockedNotice();
     }
 
     // ── Initialisation ───────────────────────────────────────────────────────

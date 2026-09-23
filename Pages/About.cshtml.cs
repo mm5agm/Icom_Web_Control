@@ -63,20 +63,23 @@ namespace Icom_Web_Control.Pages
             // Report the scope's real state instead (GitHub #1).
             var scope = _radio.GetScopeDiagnostics();
             var age = scope.SecondsSinceLastSweep;
-            BandScope = !IsConnected
-                ? "radio not connected"
-                : !scope.Enabled
-                    ? "switched off by the operator"
-                    : age is null
-                        ? $"on, but NO sweep has ever arrived (discarded {scope.SweepsDiscarded})"
-                        : $"on, {scope.SweepsCompleted} sweeps / {scope.SweepsDiscarded} discarded, " +
-                          $"last {age:0.0}s ago" +
-                          // The delivery rate belongs in a pasted bug report as much as
-                          // the drop count: "the waterfall misses CW" and "the waterfall
-                          // stutters" look identical in the counts and differ here.
-                          (scope.SweepsPerSecond is { } rate
-                              ? $", {rate:0.0} sweeps/sec"
-                              : "");
+            // A refusal sits above the counters, not below them. When the radio
+            // has declined to stream, every counter is zero and the generic
+            // "no sweep has ever arrived" is true but useless — it was the whole
+            // content of #47, whose cause the app already knew and could name.
+            // Flat rather than nested: at five branches the staircase indentation
+            // this used to carry put the last arm off the right of the screen.
+            BandScope =
+                !IsConnected                    ? "radio not connected"
+              : !scope.Enabled                  ? "switched off by the operator"
+              : scope.BlockedReason is { } why  ? $"BLOCKED by the radio — {why}"
+              : age is null                     ? $"on, but NO sweep has ever arrived (discarded {scope.SweepsDiscarded})"
+              : $"on, {scope.SweepsCompleted} sweeps / {scope.SweepsDiscarded} discarded, " +
+                $"last {age:0.0}s ago" +
+                // The delivery rate belongs in a pasted bug report as much as
+                // the drop count: "the waterfall misses CW" and "the waterfall
+                // stutters" look identical in the counts and differ here.
+                (scope.SweepsPerSecond is { } rate ? $", {rate:0.0} sweeps/sec" : "");
             if (s.DxClusterEnabled && !string.IsNullOrWhiteSpace(s.DxClusterHost))
                 DxClusterHost = $"{s.DxClusterHost}:{s.DxClusterPort}";
             if (!string.IsNullOrWhiteSpace(s.DxClusterLoginCallsign))

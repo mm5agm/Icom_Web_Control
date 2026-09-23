@@ -1787,6 +1787,8 @@ Access the Diagnostics page from the navigation bar. It is primarily used when s
 
 **Band scope delivery** — the panel at the top of the page, always visible. It shows how many spectrum sweeps per second are actually reaching IWC from the radio, measured over the last three seconds, along with the number of sweeps assembled and discarded since the app started.
 
+If the radio has *refused* to send scope data, the panel reads **Blocked** instead of a rate and prints the reason in place of the counters — which in that state are all zero and tell you nothing. On the original IC-7300 that reason is nearly always the baud rate; see §15.7.
+
 About **4 sweeps per second is normal over USB**, and there is nothing to fix if that is what you see. The radio does not send a sweep as one block — it splits it into 11 CI-V segments and paces them roughly 21 ms apart, which occupies about 89% of the time between sweeps. The CI-V baud-rate setting makes no difference to this; 19200 and 115200 measure the same.
 
 That figure is the answer to a question operators ask often: **why the radio's own waterfall shows CW when IWC's does not.** The radio draws its scope internally with no cable in the way. IWC gets about four frames a second, and a dot at 20 WPM lasts around 60 ms, so it can fall between sweeps entirely. It is a sampling limit, not smoothing.
@@ -1977,7 +1979,7 @@ The radio is talking, but no spectrum sweep has arrived. The panel gives up afte
 The panel is on screen and the radio is connected, but no sweep is arriving. The status badge at the right-hand end of the panel header says the same thing in one word (**Scope off**, **Connecting…**, **Live**, **Scope blocked**).
 
 - Check the **Scope** switch above the panel, and the scope on the radio's own screen.
-- Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate. The **Band scope delivery** panel on the Diagnostics page (§11) shows the same counters live, plus the measured sweeps-per-second.
+- Open **About** and read the **Band scope** line in the Diagnostics block. If it begins **"BLOCKED by the radio"** the rest of the line tells you exactly which radio setting is refusing and what to change it to — do that and nothing else here applies. "on, but NO sweep has ever arrived" means the radio is not sending scope data and has not said why; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate. The **Band scope delivery** panel on the Diagnostics page (§11) shows the same counters live, plus the measured sweeps-per-second.
 - Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
 
 **Spectrum panel says "The radio refused to send scope data" (badge: Scope blocked)**
