@@ -96,6 +96,19 @@
         background: #e74c3c; color: #fff; border-color: #ff6b5a;
     }
 
+    /* Action buttons inside a dark pop-out, for exactly the reason the close
+       button above needed fixing: btn-outline-secondary on #222 is near-black
+       on near-black and the label vanishes. Same fix, without the red - these
+       are ordinary actions, not a close. */
+    .iwc-dialog-btn {
+        background: #333; color: #eee; border: 1px solid #666;
+        font-size: 0.8rem; line-height: 1.2; padding: 2px 8px;
+    }
+    .iwc-dialog-btn:hover, .iwc-dialog-btn:focus {
+        background: #444; color: #fff; border-color: #8ab;
+    }
+    .iwc-dialog-btn:disabled { color: #888; border-color: #444; }
+
     /* Voice command help popup (right-click a mic button). */
     #voiceHelpBody .vh-intro   { color: #bbb; font-size: 0.85rem; margin-bottom: 0.75rem; }
     #voiceHelpBody .vh-group   { margin-bottom: 0.85rem; }
@@ -2238,7 +2251,7 @@
                over CI-V (1A 05 00 39 / 00 40). The shared tuner hides this
                button by itself if the backend has no /api/rtty/radio-tones, so
                it costs YWC nothing until YWC implements one. *@
-            <button type="button" id="rttyTunerFromRadio" class="btn btn-sm btn-outline-secondary"
+            <button type="button" id="rttyTunerFromRadio" class="btn btn-sm iwc-dialog-btn"
                     title="Read Mark and Shift from the radio's own RTTY menu (FSK modes)">From radio</button>
         </div>
         <canvas id="rttyTunerCanvas" width="320" height="320"
