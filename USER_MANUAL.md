@@ -105,6 +105,12 @@
     - 19.5 [Stopping](#195-stopping)
     - 19.6 [The panel](#196-the-panel)
     - 19.7 [Troubleshooting](#197-troubleshooting)
+20. [RTTY Tuner](#20-rtty-tuner)
+    - 20.1 [What the figure is telling you](#201-what-the-figure-is-telling-you)
+    - 20.2 [Mark, Shift and Rev](#202-mark-shift-and-rev)
+    - 20.3 [Your first session, step by step](#203-your-first-session-step-by-step)
+    - 20.4 [Running it alongside the CW Reader](#204-running-it-alongside-the-cw-reader)
+    - 20.5 [Troubleshooting](#205-troubleshooting)
 
 ---
 
@@ -149,6 +155,7 @@ The application was written for operators who want a large, clean, touchscreen-f
 - CW keyer with speed, break-in, delay, **sidetone pitch**, and five programmable memory messages
 - **CW Reader** — decodes the Morse you are hearing into text, with a one-press **Reader Mode** that sets the radio up for decoding and restores it afterwards, a **ZIN** zero-beat button and a **Log QSO** form that writes ADIF ([§18](#18-cw-reader))
 - **CW Send** — type a line and the radio keys it over CI-V, with Stop, at the keyer's own speed ([§19](#19-cw-send))
+- **RTTY Tuner** — the classic crossed-ellipse tuning scope, drawn from the radio's receive audio, for putting a RTTY signal exactly on its tones ([§20](#20-rtty-tuner))
 - TX monitor on/off toggle and level control
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Real-time spectrum display and waterfall using the **IC-7300's built-in band scope**, delivered over CI-V — no external SDR or IF tap needed
@@ -2998,6 +3005,77 @@ Opening the panel reads the keyer speed and break-in setting from the radio, so 
 | A line is tagged **failed** | The radio did not take the command — the status line has the reason. Check the connection on the Diagnostics page; a line that failed part way through is abandoned rather than sent with a hole in it. |
 | Characters missing from what was sent | Only the characters listed in [§19.1](#191-sending-a-line) are keyed. The rest are dropped before the line is sent. |
 | Nobody comes back to my CQ | Check you are actually transmitting — the banner and the **sent** tag both tell you. Then check the radio: power, antenna, and whether the ATU has tuned on that band. |
+
+---
+
+## 20. RTTY Tuner
+
+The **RTTY Tune** button on the main control panel opens a crossed-ellipse tuning scope — the figure that RTTY operators have tuned by since the days of mechanical teleprinters. It listens to the radio's receive audio, picks out the two RTTY tones, and draws one against the other. When the signal is exactly on frequency the figure is a clean upright cross. When it is not, the arms lean and open out.
+
+Nothing here transmits, and nothing here touches the radio. The tuner only listens and draws; moving the signal onto its tones is done with your dial, as it always was.
+
+It does **not** decode RTTY into text. It is a tuning aid, and its job is to get the signal sitting exactly where a decoder — the radio's own, or software such as MMTTY or fldigi — can read it.
+
+The scope itself is shared with my Yaesu app, so the two draw an identical figure from identical audio. What differs is only where the audio comes from.
+
+### 20.1 What the figure is telling you
+
+Two narrow filters listen to the receive audio, one parked on the **mark** tone and one on the **space** tone. Mark drives the figure sideways and space drives it up, so each tone draws its own line:
+
+| What you see | What it means |
+|---|---|
+| **A clean upright cross** | On tune. Both tones are landing squarely in their filters. This is what you are aiming for. |
+| **Arms leaning over** | Off tune. The whole figure tilts towards the side that is too strong. Tune towards upright. |
+| **Arms opening into a fat X or an ellipse** | Still off tune, and far enough out that the tones are catching the skirts of the wrong filters. Keep going the same way the lean is pointing. |
+| **One strong line and one weak one** | Only one tone is arriving. Either the shift is wrong ([§20.2](#202-mark-shift-and-rev)), or you are tuned so far off that only one tone is inside the filter. |
+| **A blur with no shape** | No RTTY there — noise, an SSB signal, or the wrong audio device. Check the line under the figure is showing a signal level at all. |
+
+The line under the figure reports what the two filters are actually hearing, in dB, along with the overall input level. It is the quickest way to tell "nothing is arriving" from "something is arriving and it is not RTTY".
+
+### 20.2 Mark, Shift and Rev
+
+Three controls, and for ordinary amateur RTTY you will not touch any of them.
+
+**Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. If you change the radio's RTTY MARK menu, change this to match — the tuner cannot read that menu over CI-V, so it has to be told.
+
+**Shift** — how far apart the two tones are. **170 Hz** is standard amateur RTTY. The others (200, 425, 450, 850) are there for commercial and utility stations, which is most of what you will find outside the amateur bands.
+
+**Rev** — which side of mark the space tone sits on. Leave it **unticked** for normal RTTY and tick it when the other station has their tones reversed, or when you have put the radio into **RTTY-R**.
+
+> **Which way round is it on this radio?** With the IC-7300 in plain **RTTY**, the space tone arrives **above** mark in the audio — 2125 and 2295 Hz at the standard 170 Hz shift — which is what **Rev unticked** expects. That is not guesswork: it was measured on an IC-7300 MkII by tuning a steady carrier, sweeping the tuner's own mark filter to find it at 2125 Hz, then moving the dial up 500 Hz and watching the tone move up 500 Hz with it. Audio that rises as the dial rises is the lower-sideband case, and it puts space above mark.
+>
+> The same measurement settled something else worth knowing: **in RTTY the dial reads the mark frequency.** Put the dial on a station's mark and you are on it.
+>
+> If you are running AFSK instead — DATA-L, DATA-U, LSB or USB, where your software makes the tones and the radio is just an SSB transceiver — the same 2125 / 2295 defaults apply, because that is what RTTY software uses. The radio's RTTY MARK menu plays no part there.
+
+### 20.3 Your first session, step by step
+
+1. **Set the audio device first.** The tuner uses the CW Reader's audio-device setting on the Settings page — there is only one, and on a USB-connected IC-7300 it is the radio's own USB codec. If the CW Reader works, so will this. See [§18.3](#183-choosing-the-audio-device).
+2. **Put the radio in RTTY** and tune roughly onto a signal. RTTY lives just below the FT8 frequencies on most bands — 14.080–14.099 on 20m is the usual hunting ground.
+3. **Narrow the filter.** RTTY wants something like 300–500 Hz. A 2.4 kHz SSB filter puts half the band into the tuner at once and the figure will never settle.
+4. **Press RTTY Tune.** The figure starts drawing within a second or so.
+5. **Tune slowly** — 10 Hz steps are about right — until the cross stands upright. On a strong signal this is unmistakable; on a weak one, aim for the most upright you can get and the most equal arm lengths.
+6. **Close the dialog when you are done.** The tuner lets go of the audio device a couple of seconds later, and it also stops on its own if the page stops asking it for sweeps.
+
+The dialog can be dragged by its title bar, like the other panels.
+
+### 20.4 Running it alongside the CW Reader
+
+Both can be open and running at the same time, on the same audio device. This is worth saying because it did not come free: IWC opens one recording device, and until the tuner arrived the CW Reader owned it outright — whoever stopped last would have closed it under the other one, leaving a reader that looked perfectly healthy and simply never decoded another letter. The device is now shared properly and stays open until the last panel using it has finished with it.
+
+In practice you will rarely want both, since the radio can only be in one mode. It matters when you are switching back and forth across a band.
+
+### 20.5 Troubleshooting
+
+| Symptom | What to try |
+|---|---|
+| The figure never appears and the status line mentions the audio device | The recording device could not be opened. Check the CW Reader's audio-device setting on the Settings page ([§18.3](#183-choosing-the-audio-device)); the same causes and cures apply to both panels. |
+| A blur with no shape, and the input level is near silence | Nothing is reaching the sound card. Check the radio's USB audio output level, and that Windows has not muted or switched the input. |
+| A blur with a healthy input level | There is audio, but it is not RTTY at those tones. Check you are actually on a RTTY signal, then check **Shift** matches it. |
+| Only one arm draws | The shift is wrong, or you are tuned far enough off that only one tone is in the filter. Try the other shifts; 170 is standard amateur, the rest are utility stations. |
+| It only crosses with **Rev** ticked, on a plain amateur RTTY signal | That station is sending reversed — common enough, and exactly what Rev is for. If *every* signal needs Rev, check the radio is in **RTTY** and not **RTTY-R**. |
+| The figure is restless and will not settle on a strong signal | The IF filter is too wide and a neighbour is getting in. Narrow it to 300–500 Hz ([§5.8](#58-if-width-if-shape-filter-slot-and-af-gain)). |
+| It stops by itself after a while | It stops when nothing is asking it for sweeps — a minimised or backgrounded tab will do it. Bring the page back to the front and press **RTTY Tune** again. |
 
 ---
 
