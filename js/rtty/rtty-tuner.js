@@ -25,6 +25,7 @@ const POINTS     = 500;    // about 21 ms at 24,000 points a second: one sweep
 const PERSIST    = 6;      // sweeps kept on screen, oldest dimmest
 const QUIET_DB   = -80;    // below this in both filters there is nothing to draw
 const CHUNK      = 5;      // points per stroke: half a cycle of 2 kHz at 24,000 points a second
+const RADIO_MS   = 4000;  // how often to re-read the radio's RTTY menu while open
 
 // How much of what the receiver passes lands in the two tone filters, in dB.
 // RTTY on tune puts nearly all of it there; noise, or a signal off to one side,
@@ -54,6 +55,8 @@ export class RttyTuner {
         this._last     = null;
         this._settings = { ...DEFAULT_RTTY_SETTINGS };
         this._radioProbed = false;
+        this._radioTimer   = null;
+        this._radioApplied = null;   // {markHz, shiftHz} we last took FROM the radio
     }
 
     init() {
@@ -77,15 +80,13 @@ export class RttyTuner {
         this._shiftEl?.addEventListener('change', changed);
         this._revEl?.addEventListener('change', changed);
 
-        // Optional, and hidden unless the host app answers for it. The probe
-        // waits for the first open: init() runs on every page load, and this
-        // costs the host a round trip to the radio on a bus it is sharing with
-        // the band scope. Nobody who never opens the tuner should pay it.
-
         // The audio is held only while the dialog is open. Closing it by any
         // route - the X, Escape, or the page's own code - lets the host go.
+        // The radio sync goes with it: it costs CI-V traffic and there is
+        // nothing to keep in step with once the figure is gone.
         this._dialog.addEventListener('close', () => {
             this._stopPolling();
+            this._stopRadioSync();
             this._send('stop');
         });
 
@@ -105,17 +106,29 @@ export class RttyTuner {
         this._resize();
         if (this._radioEl && !this._radioProbed) {
             this._radioProbed = true;
-            this._radioEl.addEventListener('click', () => this._fromRadio());
-            this._probeRadioTones();
+            this._radioEl.addEventListener('click', () => this._syncFromRadio(true));
         }
         this._send('start');
         this._startPolling();
+        this._startRadioSync();
     }
 
     // ── Settings ────────────────────────────────────────────────────────────
 
     // Shared with click-to-tune, which reads them for AFSK modes.
-    _loadSettings() { this._settings = loadRttySettings(); }
+    _loadSettings() {
+        this._settings = loadRttySettings();
+
+        // Storage does not record whether the saved tones were typed or taken
+        // from the radio, and on a reload that is exactly what the sync needs
+        // to know. Assume the keyboard unless they are still the factory pair:
+        // guessing the other way throws a typed setting away once per reload,
+        // and not throwing it away is the whole point of _radioApplied. The
+        // cost of guessing this way is one press of From radio.
+        const untouched = this._settings.markHz  === DEFAULT_RTTY_SETTINGS.markHz
+                       && this._settings.shiftHz === DEFAULT_RTTY_SETTINGS.shiftHz;
+        this._radioApplied = untouched ? { ...this._settings } : null;
+    }
 
     _saveSettings() { saveRttySettings(this._settings); }
 
@@ -156,46 +169,84 @@ export class RttyTuner {
     // ── Mark and shift from the radio ───────────────────────────────────────
     //
     // Optional in both directions. The host page need not provide the button,
-    // and an app whose backend has no /api/rtty/radio-tones hides it on the
-    // first probe rather than offering something that will always fail - so
-    // this is safe to ship before every app implements the endpoint.
+    // and an app whose backend has no /api/rtty/radio-tones stops asking after
+    // the first 404 - so this is safe to ship before every app implements the
+    // endpoint.
     //
-    // Never automatic. The radio's menu describes its own FSK decoder, and in
-    // an AFSK mode the tones belong to the operator's software instead; an
-    // on-open sync would quietly overwrite what they had typed with numbers
-    // that do not apply to what they are doing. Offer, do not impose.
+    // The tuner follows the radio while the dialog is open, re-reading every
+    // few seconds, because the alternative was worse: change the radio's RTTY
+    // Shift Width, look at the tuner, and it sits there on the old number
+    // looking broken. There is no CI-V event for a SET-menu change, so polling
+    // is the only way to notice. Two reads every four seconds, only while the
+    // dialog is open.
+    //
+    // But it only ever overwrites values it put there itself. That is what
+    // _radioApplied is for. The radio's menu describes its own FSK decoder and
+    // is often simply wrong for what you are listening to - a utility station
+    // on 450 Hz shift while the menu says 170 is the ordinary case, not an
+    // exotic one - so the moment the operator types something different, the
+    // sync backs off and leaves it alone until they ask again. Follow, but
+    // never argue.
 
-    async _probeRadioTones() {
-        try {
-            const res = await fetch('/api/rtty/radio-tones');
-            if (res.status === 404) this._radioEl.hidden = true;
-        } catch {
-            // Leave it showing: a transient failure is not a missing feature,
-            // and pressing it will say what went wrong.
-        }
+    _startRadioSync() {
+        if (!this._radioEl || this._radioTimer) return;
+        this._syncFromRadio(false);
+        this._radioTimer = setInterval(() => this._syncFromRadio(false), RADIO_MS);
     }
 
-    async _fromRadio() {
+    _stopRadioSync() {
+        if (this._radioTimer) { clearInterval(this._radioTimer); this._radioTimer = null; }
+    }
+
+    // manual: the operator pressed the button, so say what happened either way
+    // and apply even in an AFSK mode, where they may well have a reason.
+    async _syncFromRadio(manual) {
         try {
             const res = await fetch('/api/rtty/radio-tones');
-            if (!res.ok) { this._setStatus(`Radio settings: HTTP ${res.status}`); return; }
+            if (res.status === 404) {          // this app cannot answer: stop asking
+                if (this._radioEl) this._radioEl.hidden = true;
+                this._stopRadioSync();
+                return;
+            }
+            if (!res.ok) { if (manual) this._setStatus(`Radio settings: HTTP ${res.status}`); return; }
             const r = await res.json();
-            if (!r.ok) { this._setStatus(r.reason || 'The radio did not answer.'); return; }
+            if (!r.ok) { if (manual) this._setStatus(r.reason || 'The radio did not answer.'); return; }
+
+            const mark  = Number.isFinite(r.markHz) ? Math.round(r.markHz) : null;
+            const shift = SHIFTS.includes(r.shiftHz) ? r.shiftHz : null;
+            if (mark === null && shift === null) return;
+
+            if (!manual) {
+                // Not while they are typing a mark, and not in an AFSK mode,
+                // where the tones belong to their software and this menu is
+                // describing something else entirely.
+                if (!r.fsk) return;
+                if (document.activeElement === this._markEl) return;
+                // Only replace what we ourselves last took from the radio.
+                // Anything else on screen is the operator's, including on a
+                // fresh page where we do not know - see _loadSettings.
+                const a = this._radioApplied;
+                if (!a || a.markHz !== this._settings.markHz || a.shiftHz !== this._settings.shiftHz) return;
+            }
 
             const before = { ...this._settings };
-            if (Number.isFinite(r.markHz)) this._settings.markHz = Math.round(r.markHz);
-            if (SHIFTS.includes(r.shiftHz)) this._settings.shiftHz = r.shiftHz;
+            if (mark  !== null) this._settings.markHz  = mark;
+            if (shift !== null) this._settings.shiftHz = shift;
+            this._radioApplied = { markHz: this._settings.markHz, shiftHz: this._settings.shiftHz };
+
+            const same = before.markHz === this._settings.markHz
+                      && before.shiftHz === this._settings.shiftHz;
+            if (same && !manual) return;       // nothing to do, and nothing to say
+
             this._showSettings();
             this._saveSettings();
             this._send('start');
 
-            const same = before.markHz === this._settings.markHz
-                      && before.shiftHz === this._settings.shiftHz;
             const read = `Radio: mark ${this._settings.markHz} Hz, shift ${this._settings.shiftHz} Hz`;
             this._setStatus(r.note ? `${read}. ${r.note}`
                                    : same ? `${read} - already matching.` : `${read}.`);
         } catch {
-            this._setStatus('Cannot reach the server.');
+            if (manual) this._setStatus('Cannot reach the server.');
         }
     }
 
