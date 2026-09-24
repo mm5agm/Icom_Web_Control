@@ -1,4 +1,4 @@
-﻿namespace Icom_Web_Control.Models
+namespace Icom_Web_Control.Models
 {
     public class ApplicationSettings
     {
@@ -185,8 +185,9 @@
         // Opt-in panel that grabs frames from a USB webcam or HDMI capture
         // dongle and serves them as MJPEG. Off by default. Same six fields,
         // same names and defaults, as Yaesu Web Control: the video layer reads
-        // them through IVideoSettingsSource, so keeping the shape identical is
-        // what would let Services/Video move to core one day.
+        // them through IVideoSettingsSource. Keeping the shape identical is what
+        // would make moving Services/Video to core a rename -- but that move is
+        // Fabio's call, not ours. See CLAUDE.md, "standing exception".
         public bool VideoDisplayEnabled { get; set; } = false;
 
         /// <summary>

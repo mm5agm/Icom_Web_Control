@@ -63,6 +63,25 @@ core. `YaesuIfWidth` maps a Yaesu SH code to Hz, so it is not - and Icom's
 widths are a formula rather than a table, which is the proof that it never
 could have been.
 
+### The one standing exception: `Services/Video/`
+
+**`Services/Video/` passes every test above and still does not move to `core/`
+yet.** It is the Radio Display capture stack - UVC/HDMI dongle to MJPEG - and
+there is no radio anywhere in it, so the rule as written says "core", and the
+comments in `Program.cs`, `Icom_Web_Control.csproj` and
+`Models/ApplicationSettings.cs` all say it was kept file-for-file with YWC's
+copy precisely so that it could move one day. Read on its own, every one of
+those is an invitation to move it. Do not take it.
+
+**Fabio wrote it, in Yaesu Web Control, and it does not move into the shared
+repo until he approves.** That is not a technical reservation - the code is
+ready - it is whose work it is. Colin said so on 2026-09-24. Keeping it
+file-for-file identical to YWC's is still right, because it is what makes the
+move a rename on the day the answer is yes; it is not itself the permission.
+
+Until then: fix bugs in it here, keep it byte-comparable with YWC's, and do not
+create a second divergent copy.
+
 A shared browser module goes in `core/js/<area>/`. The `CopySharedCoreJs`
 target copies `core\js\**\*.js` into `wwwroot\js\` preserving the subdirectory,
 so `core/js/cw/x.js` is served at `/js/cw/x.js` with **no csproj change**. That

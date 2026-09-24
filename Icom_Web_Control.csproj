@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -61,7 +61,8 @@
     <Compile Remove="Services\SerialPortCatClient.cs" />
     <!-- Radio Display, macOS-only pieces (AVFoundation open, CoreGraphics JPEG).
          Kept in the tree so Services/Video stays file-for-file with YWC's,
-         which is what will let it move to core later; never compiled here. -->
+         which is what would make the move to core a rename on the day Fabio
+         approves it (CLAUDE.md, "standing exception"); never compiled here. -->
     <Compile Remove="Services\Video\MacAvFoundationCapture.cs" />
     <Compile Remove="Services\Video\MacJpegEncoder.cs" />
   </ItemGroup>
