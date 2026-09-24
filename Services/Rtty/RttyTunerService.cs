@@ -38,13 +38,16 @@ namespace Icom_Web_Control.Services.Rtty
     /// same answer YWC's rule gives for the same display strings, but it is
     /// reached from this radio's behaviour rather than borrowed from that one.
     ///
-    /// <b>This has not been measured on an IC-7300.</b> It is an inference from
-    /// the CW case, and it is the one thing in this file a green build says
-    /// nothing about. If the figure tunes to a cross with Reverse ticked when
-    /// the radio is in plain RTTY, the inference is backwards and
-    /// <see cref="TonesFor"/> is where to fix it - one line, and nothing else
-    /// in the stack depends on which way it goes. See
-    /// docs/design/rtty-port-plan.md.</para>
+    /// <b>Measured on the bench, 2026-09-24, and the inference holds.</b> A
+    /// broadcast carrier on 13710 kHz was tuned in RTTY normal with a 2700 Hz
+    /// IF, and this scope's own mark filter was swept across the audio to find
+    /// it: it peaked at 2125 Hz, which is also the radio's default RTTY mark
+    /// pitch, so the dial in RTTY reads the mark frequency. Moving the dial UP
+    /// 500 Hz moved the tone UP to 2600-2650 Hz. Audio rising with the dial is
+    /// the lower-sideband case, so a tone lower in RF does arrive higher in the
+    /// audio, and space - 170 Hz below mark on the air - does land above mark.
+    /// RTTY normal therefore behaves exactly as CW normal does on this radio.
+    /// <see cref="TonesFor"/> is right as written.</para>
     ///
     /// <para>Anything that is not an FSK mode - DATA-L, DATA-U, LSB, USB - is
     /// AFSK, where the software makes the tones and the radio is a plain SSB
@@ -98,8 +101,9 @@ namespace Icom_Web_Control.Services.Rtty
 
         /// <summary>
         /// Where the mark and space filters go, in audio Hz. Pure and static,
-        /// so the rule can be exercised without a radio - which is all that can
-        /// be done about it until someone puts a signal through it.
+        /// so the rule can be exercised without a radio - though the rule
+        /// itself has now been checked against one: see the bench note on the
+        /// class.
         /// </summary>
         /// <param name="mode">The display mode string, e.g. "RTTY-L".</param>
         public static (double MarkHz, double SpaceHz) TonesFor(string? mode, double markHz, int shiftHz, bool reverse)
