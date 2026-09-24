@@ -57,6 +57,24 @@ namespace Icom_Web_Control.Services
     public readonly record struct IfFilterWidthStep(int Hz, bool AtLimit);
 
     /// <summary>
+    /// The radio's own RTTY tone settings, in Hz: where it puts the mark tone
+    /// in the receive audio and how far the space tone is from it.
+    ///
+    /// <para>These belong to <b>FSK</b> - the radio's built-in RTTY mode. In an
+    /// AFSK mode (DATA-L, DATA-U, LSB, USB) the tones are made by the
+    /// operator's software and the radio knows nothing about them, so these
+    /// values say nothing useful and the caller should not apply them.</para>
+    ///
+    /// <para><b>The radio may not be using what it reports.</b> On the IC-7300,
+    /// when its own internal RTTY decoder is running the radio forces 2125 Hz
+    /// and 170 Hz whatever the SET menu says (Basic manual, SET &gt; Function).
+    /// What this reads is the menu, so it is the operator's stated intent
+    /// rather than a guaranteed measurement of the audio. Offer it, do not
+    /// apply it silently.</para>
+    /// </summary>
+    public readonly record struct RttyToneSettings(int MarkHz, int ShiftHz);
+
+    /// <summary>
     /// The semantic seam IWC introduces (the thing YWC lacked — see
     /// docs/design/iwc-clone-split-plan.md). Everything above this line —
     /// touch UI (CatController), voice (IntentDispatcher), Hamlib (RigctldServer),
@@ -287,6 +305,24 @@ namespace Icom_Web_Control.Services
 
         /// <summary>Set the break-in mode (0=OFF, 1=SEMI, 2=FULL; CI-V 16 47).</summary>
         Task SetCwBreakInAsync(int mode, CancellationToken cancellationToken = default);
+
+        // -- RTTY (FSK) tones --------------------------------------------------
+
+        /// <summary>
+        /// Read the radio's RTTY mark pitch and shift width, in Hz, so the RTTY
+        /// tuner can offer to match them rather than making the operator copy
+        /// two menu items across by hand.
+        ///
+        /// <para>Read-only, and deliberately so. Writing them would move the
+        /// radio's own decoder and its FSK transmit tones to suit a receive-side
+        /// tuning aid, which is the wrong way round: the radio is the authority
+        /// here and the scope follows it.</para>
+        ///
+        /// <para>Null when the radio cannot be asked - not connected, or it did
+        /// not answer. See <see cref="RttyToneSettings"/> for the two caveats
+        /// that come with the answer.</para>
+        /// </summary>
+        Task<RttyToneSettings?> GetRttyToneSettingsAsync(CancellationToken cancellationToken = default);
 
         // -- TX audio chain: mic, speech compressor, monitor (CI-V 14 / 16) ----
         // Percentages, not raw 0–255: these are the units the sliders and the

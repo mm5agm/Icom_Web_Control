@@ -41,9 +41,10 @@ export class RttyTuner {
             canvas:  'rttyTunerCanvas',
             info:    'rttyTunerInfo',
             status:  'rttyTunerStatus',
-            mark:    'rttyTunerMark',
-            shift:   'rttyTunerShift',
-            reverse: 'rttyTunerReverse',
+            mark:      'rttyTunerMark',
+            shift:     'rttyTunerShift',
+            reverse:   'rttyTunerReverse',
+            fromRadio: 'rttyTunerFromRadio',
         }, ids);
 
         this._timer    = null;
@@ -52,6 +53,7 @@ export class RttyTuner {
         this._scale    = 1e-4;     // decaying peak, so the figure fills the face
         this._last     = null;
         this._settings = { ...DEFAULT_RTTY_SETTINGS };
+        this._radioProbed = false;
     }
 
     init() {
@@ -63,6 +65,7 @@ export class RttyTuner {
         this._markEl  = $('mark');
         this._shiftEl = $('shift');
         this._revEl   = $('reverse');
+        this._radioEl = $('fromRadio');
         if (!this._dialog || !this._canvas) return false;
 
         this._ctx = this._canvas.getContext('2d');
@@ -73,6 +76,11 @@ export class RttyTuner {
         this._markEl?.addEventListener('change', changed);
         this._shiftEl?.addEventListener('change', changed);
         this._revEl?.addEventListener('change', changed);
+
+        // Optional, and hidden unless the host app answers for it. The probe
+        // waits for the first open: init() runs on every page load, and this
+        // costs the host a round trip to the radio on a bus it is sharing with
+        // the band scope. Nobody who never opens the tuner should pay it.
 
         // The audio is held only while the dialog is open. Closing it by any
         // route - the X, Escape, or the page's own code - lets the host go.
@@ -95,6 +103,11 @@ export class RttyTuner {
         // Non-modal: the operator tunes the VFO while watching the figure.
         this._dialog.show();
         this._resize();
+        if (this._radioEl && !this._radioProbed) {
+            this._radioProbed = true;
+            this._radioEl.addEventListener('click', () => this._fromRadio());
+            this._probeRadioTones();
+        }
         this._send('start');
         this._startPolling();
     }
@@ -136,7 +149,53 @@ export class RttyTuner {
             }
             if (what === 'start') this._sweeps.length = 0;
         } catch {
-            this._setStatus('Cannot reach Yaesu Web Control.');
+            this._setStatus('Cannot reach the server.');
+        }
+    }
+
+    // ── Mark and shift from the radio ───────────────────────────────────────
+    //
+    // Optional in both directions. The host page need not provide the button,
+    // and an app whose backend has no /api/rtty/radio-tones hides it on the
+    // first probe rather than offering something that will always fail - so
+    // this is safe to ship before every app implements the endpoint.
+    //
+    // Never automatic. The radio's menu describes its own FSK decoder, and in
+    // an AFSK mode the tones belong to the operator's software instead; an
+    // on-open sync would quietly overwrite what they had typed with numbers
+    // that do not apply to what they are doing. Offer, do not impose.
+
+    async _probeRadioTones() {
+        try {
+            const res = await fetch('/api/rtty/radio-tones');
+            if (res.status === 404) this._radioEl.hidden = true;
+        } catch {
+            // Leave it showing: a transient failure is not a missing feature,
+            // and pressing it will say what went wrong.
+        }
+    }
+
+    async _fromRadio() {
+        try {
+            const res = await fetch('/api/rtty/radio-tones');
+            if (!res.ok) { this._setStatus(`Radio settings: HTTP ${res.status}`); return; }
+            const r = await res.json();
+            if (!r.ok) { this._setStatus(r.reason || 'The radio did not answer.'); return; }
+
+            const before = { ...this._settings };
+            if (Number.isFinite(r.markHz)) this._settings.markHz = Math.round(r.markHz);
+            if (SHIFTS.includes(r.shiftHz)) this._settings.shiftHz = r.shiftHz;
+            this._showSettings();
+            this._saveSettings();
+            this._send('start');
+
+            const same = before.markHz === this._settings.markHz
+                      && before.shiftHz === this._settings.shiftHz;
+            const read = `Radio: mark ${this._settings.markHz} Hz, shift ${this._settings.shiftHz} Hz`;
+            this._setStatus(r.note ? `${read}. ${r.note}`
+                                   : same ? `${read} - already matching.` : `${read}.`);
+        } catch {
+            this._setStatus('Cannot reach the server.');
         }
     }
 

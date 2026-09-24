@@ -268,6 +268,11 @@ namespace Icom_Web_Control.Services
 
         private int _rxBass;     // −5…+5, 0 = flat
         private int _rxTreble;
+        // The radio's RTTY menu defaults, so the tuner's "From radio" button
+        // does something visible with no hardware attached.
+        public Task<RttyToneSettings?> GetRttyToneSettingsAsync(CancellationToken ct = default)
+            => Task.FromResult<RttyToneSettings?>(new RttyToneSettings(2125, 170));
+
         public Task<(bool available, int bass, int treble)> GetRxToneAsync(RadioVfo vfo, CancellationToken ct = default)
             => Task.FromResult((true, _rxBass, _rxTreble));
         public Task SetRxToneAsync(RadioVfo vfo, int bass, int treble, CancellationToken ct = default)

@@ -2232,8 +2232,14 @@
             <div class="form-check mb-0">
                 <input class="form-check-input" type="checkbox" id="rttyTunerReverse">
                 <label class="form-check-label" for="rttyTunerReverse"
-                       title="Space on the other side of mark: reversed tones, or RTTY-R on the radio">Rev</label>
+                       title="The other station is sending reversed. The radio's own RTTY/RTTY-R setting is followed automatically - this is on top of it.">Rev</label>
             </div>
+            @* Reads SET > Function > RTTY Mark Frequency and RTTY Shift Width
+               over CI-V (1A 05 00 39 / 00 40). The shared tuner hides this
+               button by itself if the backend has no /api/rtty/radio-tones, so
+               it costs YWC nothing until YWC implements one. *@
+            <button type="button" id="rttyTunerFromRadio" class="btn btn-sm btn-outline-secondary"
+                    title="Read Mark and Shift from the radio's own RTTY menu (FSK modes)">From radio</button>
         </div>
         <canvas id="rttyTunerCanvas" width="320" height="320"
                 style="width:100%; display:block; border:1px solid #444; border-radius:6px;"
@@ -2253,7 +2259,17 @@
         </div>
         @* Two questions this dialog reliably prompts, answered where they are
            asked. Both caught Colin out on 2026-09-24 with his own radio in
-           front of him. The speed one needs care: the natural assumption is
+           front of him.
+
+           The Rev note is a correction: an earlier draft of this text said to
+           tick Rev when the radio is in RTTY-R. That is wrong and it is the
+           expensive kind of wrong, because it gets the tones exactly backwards
+           while sounding right. RttyTunerService.TonesFor already derives
+           space-above from the mode string and the service subscribes to mode
+           changes, so the radio's own RTTY/RTTY-R setting is handled; Rev is
+           the separate flip for a station transmitting reversed.
+
+           The speed one needs care: the natural assumption is
            that a radio with a built-in RTTY decoder must have a speed
            dropdown somewhere, and therefore a CI-V command behind it. It has
            neither - checked against all three MkII manuals. SET > Function
@@ -2264,9 +2280,12 @@
            The other trap is that the Settings page does have a "Baud Rate",
            and it is the CI-V serial port - a different thing entirely. *@
         <div class="small mt-1" style="color:#9ab;">
-            Tick <strong>Rev</strong> when the radio is in reverse &mdash; its own screen
-            says <strong>RTTY-R</strong> where IWC's mode dropdown says
-            <strong>RTTY-U</strong>. Same mode, two naming conventions.
+            <strong>Rev</strong> is for when the <em>other station</em> is sending
+            reversed. You do not tick it for <strong>RTTY-R</strong> &mdash; the tuner
+            reads the radio's mode and already allows for it, so ticking Rev as well
+            puts the tones back the wrong way round. (The radio's screen says
+            <strong>RTTY-R</strong> where IWC's mode dropdown says
+            <strong>RTTY-U</strong>: same mode, two naming conventions.)
         </div>
         <div class="small mt-1" style="color:#9ab;">
             <strong>There is no speed setting &mdash; anywhere.</strong> The radio's

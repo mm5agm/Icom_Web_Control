@@ -3056,18 +3056,35 @@ Three controls, and for ordinary amateur RTTY you will not touch any of them.
 > the CI-V serial port between the PC and the radio ([§6.1](#61-radio-connection)).
 > Different thing entirely, and changing it will not affect RTTY.
 
-**Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. The radio offers 1275, 1615 and 2125 Hz in **SET > Function > RTTY Mark Frequency**; if you change it there, change it here to match. The tuner does not yet read that menu for you, so for now the two are kept in step by hand.
+**Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. The radio offers 1275, 1615 and 2125 Hz in **SET > Function > RTTY Mark Frequency**. You do not have to copy it across by hand — press **From radio** and the tuner reads that menu, and the shift, over CI-V and fills both boxes in.
 
 **Shift** — how far apart the two tones are. **170 Hz** is standard amateur RTTY. The others (200, 425, 450, 850) are there for commercial and utility stations, which is most of what you will find outside the amateur bands. The tuner offers more shifts than the radio's own decoder does — the IC-7300 stops at 170, 200 and 425 in **SET > Function > RTTY Shift Width** — because the tuner also has to serve AFSK, where your software picks the tones and the radio's menu plays no part.
 
-**Rev** — which side of mark the space tone sits on. Leave it **unticked** for normal RTTY and tick it when the other station has their tones reversed, or when you have put the radio into the reverse mode.
+**Rev** — for when **the other station** is sending reversed. Leave it unticked otherwise.
 
-> **A name to watch out for.** The two RTTY modes are called different things on the radio and in this app, and you will have both in front of you:
+#### The **From radio** button
+
+Reads **SET > Function > RTTY Mark Frequency** and **RTTY Shift Width** off the radio and puts them in the Mark and Shift boxes, so the tuner and the radio agree without you reading two menus off the front panel. It tells you what it read, and says so when the two already match.
+
+It is a button rather than something that happens automatically, for two reasons worth knowing:
+
+- **It only describes FSK.** Those menu items belong to the radio's own RTTY mode. If you are running AFSK — DATA-L, DATA-U, LSB or USB, with MMTTY or fldigi making the tones — the radio's menu has nothing to do with what is arriving, and pressing the button would replace your software's settings with numbers that do not apply. IWC says so rather than refusing: press it in an AFSK mode and it reports the radio's values along with a note that you are not in FSK.
+- **It reads the menu, not the air.** When the radio's *own* decoder is running (**MENU » RTTY DECODE**) it uses 2125 Hz and 170 Hz whatever the menu says — that is in Icom's manual, not a quirk of IWC. So on the rare setup with the menu set to something else, the button reports the menu and the radio is actually using the standard pair. Both are worth knowing; neither is worth guessing on your behalf.
+
+**Rev is not read from the radio**, and that is deliberate. The obvious candidate, **RTTY Keying Polarity** in the same menu, is not the same thing at all: it sets whether a key closure from an external terminal unit means mark or space, which is a *transmit* setting. Which way up a received signal is depends on the mode, and the tuner already follows that.
+
+> **Rev is not the RTTY-R switch, and ticking it for RTTY-R will break your copy.** The tuner reads the radio's mode for itself and works out which side of mark the space tone lands on, so putting the radio into RTTY-R is already allowed for. Tick Rev on top of that and you have reversed it twice, which puts the filters back exactly the wrong way round on a normal signal. Rev is the extra flip, for a station whose own tones are the wrong way up — common enough, and the reason the box is there.
+>
+> So: change mode on the radio and leave Rev alone; reach for Rev only when a signal will not resolve and you suspect the station rather than your own setup.
+>
+> **A name to watch out for**, since you will have both in front of you:
 >
 > | The radio's screen | IWC's mode dropdown | What it is |
 > |---|---|---|
-> | **RTTY** | **RTTY-L** | Normal. Rev unticked. |
-> | **RTTY-R** | **RTTY-U** | Reverse. Rev ticked. |
+> | **RTTY** | **RTTY-L** | Normal |
+> | **RTTY-R** | **RTTY-U** | Reverse |
+>
+> Both are handled for you. The table is here so that a disagreement between the two displays does not look like a fault.
 >
 > Nothing is wrong when they disagree — they are the same mode under two naming conventions, and CW does exactly the same thing (the radio's **CW-R** is IWC's **CW-L**). The suffixes are names rather than a statement about which sideband you are on; see [§18.1](#181-if-cw-is-new-to-you) for the CW version of the same caution. If you are ever unsure which you are in, the radio's own display is the one to believe.
 
@@ -3102,7 +3119,8 @@ In practice you will rarely want both, since the radio can only be in one mode. 
 | A blur with no shape, and the input level is near silence | Nothing is reaching the sound card. Check the radio's USB audio output level, and that Windows has not muted or switched the input. |
 | A blur with a healthy input level | There is audio, but it is not RTTY at those tones. Check you are actually on a RTTY signal, then check **Shift** matches it. |
 | Only one arm draws | The shift is wrong, or you are tuned far enough off that only one tone is in the filter. Try the other shifts; 170 is standard amateur, the rest are utility stations. |
-| It only crosses with **Rev** ticked, on a plain amateur RTTY signal | That station is sending reversed — common enough, and exactly what Rev is for. If *every* signal needs Rev, check the radio is in **RTTY** and not **RTTY-R**. |
+| It only crosses with **Rev** ticked, on a plain amateur RTTY signal | That station is sending reversed — common enough, and exactly what Rev is for. |
+| *Every* signal needs **Rev**, including ones you know are normal | Something has been reversed twice. Untick Rev and change the radio's mode instead (**RTTY** ↔ **RTTY-R**) — the tuner follows the mode by itself, so Rev is not how you tell it about the radio. |
 | The figure is restless and will not settle on a strong signal | The IF filter is too wide and a neighbour is getting in. Narrow it to 300–500 Hz ([§5.8](#58-if-width-if-shape-filter-slot-and-af-gain)). |
 | It stops by itself after a while | It stops when nothing is asking it for sweeps — a minimised or backgrounded tab will do it. Bring the page back to the front and press **RTTY Tune** again. |
 

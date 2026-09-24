@@ -2127,6 +2127,54 @@ namespace Icom_Web_Control.Services
                 _logger.LogWarning("[CivRadioController] Set {What} to {Value} was not acknowledged", what, value);
         }
 
+        // -- RTTY (FSK) tones (CI-V 1A 05 00 39 / 00 40) -----------------------
+        //
+        // Two SET-menu items, each a one-byte index rather than a value:
+        //   00 39  RTTY Mark Frequency   00=1275, 01=1615, 02=2125 Hz
+        //   00 40  RTTY Shift Width      00=170,  01=200,  02=425 Hz
+        //
+        // There is deliberately no third read here. The neighbouring item,
+        // 00 41 RTTY Keying Polarity, looks like the reverse switch and is not:
+        // the Basic manual defines it as "Key open/close = Mark/Space" versus
+        // "= Space/Mark", so it is the polarity of the FSK KEYING LINE from an
+        // external terminal unit on transmit. Which side of mark the space tone
+        // lands on in the RECEIVE audio is decided by the mode - RTTY vs RTTY-R
+        // - and RttyTunerService.TonesFor already reads that from the mode
+        // string. Wiring 00 41 to the tuner's Rev box would be reading a
+        // transmit setting to answer a receive question, and on a station that
+        // keys reversed it would get the answer backwards.
+        //
+        // There is also no RTTY speed here, because the radio has none: its
+        // decoder is fixed at 45.45 baud and the CI-V set has no command for it.
+
+        private static int RttyMarkHzFromCode(int code) => code switch
+        {
+            0 => 1275,
+            1 => 1615,
+            _ => 2125,
+        };
+
+        private static int RttyShiftHzFromCode(int code) => code switch
+        {
+            0 => 170,
+            1 => 200,
+            _ => 425,
+        };
+
+        /// <inheritdoc />
+        public async Task<RttyToneSettings?> GetRttyToneSettingsAsync(CancellationToken cancellationToken = default)
+        {
+            if (!IsConnected) return null;
+            int mark  = await ReadSetMenuByteAsync(0x00, 0x39, cancellationToken);
+            int shift = await ReadSetMenuByteAsync(0x00, 0x40, cancellationToken);
+            if (mark < 0 || shift < 0)
+            {
+                _logger.LogDebug("[CivRadioController] RTTY tone menu read failed (mark {Mark}, shift {Shift})", mark, shift);
+                return null;
+            }
+            return new RttyToneSettings(RttyMarkHzFromCode(mark), RttyShiftHzFromCode(shift));
+        }
+
         // -- RIT / ΔTX (CI-V 21) -----------------------------------------------
         //
         // One offset, two switches. The offset's wire form is two little-endian

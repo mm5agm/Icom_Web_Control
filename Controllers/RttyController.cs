@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Icom_Web_Control.Services;
 using Icom_Web_Control.Services.Rtty;
 
 namespace Icom_Web_Control.Controllers
@@ -17,11 +18,18 @@ namespace Icom_Web_Control.Controllers
     public class RttyController : ControllerBase
     {
         private readonly RttyTunerService _tuner;
+        private readonly IRadioController _radio;
+        private readonly RadioStateService _state;
         private readonly ILogger<RttyController> _logger;
 
-        public RttyController(RttyTunerService tuner, ILogger<RttyController> logger)
+        public RttyController(RttyTunerService tuner,
+                              IRadioController radio,
+                              RadioStateService state,
+                              ILogger<RttyController> logger)
         {
             _tuner = tuner;
+            _radio = radio;
+            _state = state;
             _logger = logger;
         }
 
@@ -65,5 +73,48 @@ namespace Icom_Web_Control.Controllers
         [HttpGet("tuner")]
         public IActionResult Tuner([FromQuery] int points = 500)
             => Ok(_tuner.Frame(Math.Clamp(points, 0, RadioWebControl.Core.Services.Rtty.RttyTuningScope.RingPoints)));
+
+        /// <summary>
+        /// The radio's own RTTY mark and shift, for the tuner's "From radio"
+        /// button. Always 200 with an <c>ok</c> flag rather than a 404 on a
+        /// miss, because the shared tuner uses the shape of this reply to
+        /// decide whether to show the button at all: a 404 means "this app
+        /// cannot do it, hide the button", and ok:false means "it can, but not
+        /// right now" - which is a message, not a missing feature.
+        /// </summary>
+        [HttpGet("radio-tones")]
+        public async Task<IActionResult> RadioTones()
+        {
+            try
+            {
+                var t = await _radio.GetRttyToneSettingsAsync(HttpContext.RequestAborted);
+                if (t is not { } tones)
+                    return Ok(new { ok = false, reason = "The radio did not answer." });
+
+                // FSK only. In an AFSK mode the tones are the operator's
+                // software's and the radio's menu is not describing them, so
+                // say so rather than handing over numbers that do not apply.
+                var mode = _state.ModeA ?? "";
+                bool fsk = mode.StartsWith("RTTY", StringComparison.OrdinalIgnoreCase);
+
+                return Ok(new
+                {
+                    ok       = true,
+                    markHz   = tones.MarkHz,
+                    shiftHz  = tones.ShiftHz,
+                    mode,
+                    fsk,
+                    note     = fsk
+                        ? null
+                        : $"These are the radio's FSK settings; it is in {mode}, "
+                          + "where your software makes the tones."
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read the radio's RTTY tone settings");
+                return Ok(new { ok = false, reason = ex.Message });
+            }
+        }
     }
 }
