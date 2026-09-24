@@ -10,6 +10,11 @@
     <Platforms>x64</Platforms>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
+    <!-- Services/Video is shared with Yaesu Web Control, which multi-targets
+         and guards its Mac/Linux capture paths with #if !WINDOWS. This project
+         is Windows-only, so define the symbol here and the files compile
+         unchanged. -->
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
 
     <!-- Disable automatic content inclusion so we can manage wwwroot ourselves -->
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
@@ -54,6 +59,11 @@
     <Compile Remove="Services\IRigStateService.cs" />
     <Compile Remove="Services\RigStateService.cs" />
     <Compile Remove="Services\SerialPortCatClient.cs" />
+    <!-- Radio Display, macOS-only pieces (AVFoundation open, CoreGraphics JPEG).
+         Kept in the tree so Services/Video stays file-for-file with YWC's,
+         which is what will let it move to core later; never compiled here. -->
+    <Compile Remove="Services\Video\MacAvFoundationCapture.cs" />
+    <Compile Remove="Services\Video\MacJpegEncoder.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -84,6 +94,11 @@
          and feed SAPI via SetInputToAudioStream. See Services/Voice/
          MicrophoneCapture.cs. WinMM subset keeps WASAPI/MediaFoundation out. -->
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+    <!-- OpenCvSharp: Radio Display (Services/Video). Opens the HDMI-to-USB
+         capture dongle as a UVC camera and decodes frames for the MJPEG
+         stream. Same versions as Yaesu Web Control; Windows runtime only. -->
+    <PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
   </ItemGroup>
 
   <!-- Voice control grammar files shipped alongside the exe so
