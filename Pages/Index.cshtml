@@ -2252,21 +2252,34 @@
             the Settings page. Both can run at once.
         </div>
         @* Two questions this dialog reliably prompts, answered where they are
-           asked. The naming one caught Colin out on 2026-09-24 with his own
-           radio in front of him, and "where is the baud rate" is the other:
-           there isn't one here, and the Settings page item of that name is the
-           CI-V serial port, which is a different thing entirely. *@
+           asked. Both caught Colin out on 2026-09-24 with his own radio in
+           front of him. The speed one needs care: the natural assumption is
+           that a radio with a built-in RTTY decoder must have a speed
+           dropdown somewhere, and therefore a CI-V command behind it. It has
+           neither - checked against all three MkII manuals. SET > Function
+           carries exactly two RTTY items (Mark Frequency, Shift Width), the
+           RTTY DECODE SET screen carries none, and the CI-V reference's
+           1A 05 block has 00 39 / 00 40 / 00 41 for mark, shift and keying
+           polarity and nothing for speed. The decoder is fixed at 45.45 baud.
+           The other trap is that the Settings page does have a "Baud Rate",
+           and it is the CI-V serial port - a different thing entirely. *@
         <div class="small mt-1" style="color:#9ab;">
             Tick <strong>Rev</strong> when the radio is in reverse &mdash; its own screen
             says <strong>RTTY-R</strong> where IWC's mode dropdown says
             <strong>RTTY-U</strong>. Same mode, two naming conventions.
         </div>
         <div class="small mt-1" style="color:#9ab;">
-            <strong>No speed setting here.</strong> RTTY speed (45.45 baud) is the
-            decoder's business &mdash; the tuner only needs to know where the two tones
-            sit. The radio's built-in decoder (<em>MENU &rarr; RTTY DECODE</em>) handles
-            speed itself. <em>Baud Rate</em> on the Settings page is the CI-V serial
-            port and has nothing to do with RTTY.
+            <strong>There is no speed setting &mdash; anywhere.</strong> The radio's
+            own decoder (<em>MENU &rarr; RTTY DECODE</em>) is fixed at <strong>45.45
+            baud</strong>, which is what amateur RTTY uses, and it offers no way to
+            change that: <em>SET &rarr; Function</em> has only Mark Frequency and Shift
+            Width, and there is no CI-V command for speed either. The tuner does not
+            care about speed at all &mdash; it is two filters, and it only needs to know
+            where the two tones sit. Speed is the decoder's business, so for anything
+            that is not 45.45 baud you need PC software.
+            <br>
+            <em>Baud Rate</em> on the Settings page is the CI-V serial port, and has
+            nothing to do with RTTY.
         </div>
     </div>
 </dialog>

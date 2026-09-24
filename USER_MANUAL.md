@@ -3038,6 +3038,24 @@ The line under the figure reports what the two filters are actually hearing, in 
 
 Three controls, and for ordinary amateur RTTY you will not touch any of them.
 
+> **There is no speed setting, and you have not missed it.** RTTY has a speed as
+> well as a shift — amateur RTTY is **45.45 baud**, and utility stations often
+> run 50 or 75 — so it is a fair question where you set it. The answer is
+> nowhere. The tuner does not need it: it is two narrow filters listening for two
+> tones, and tones do not care how fast they are being keyed. The figure crosses
+> just as cleanly on a 75-baud utility signal as on amateur RTTY.
+>
+> The radio does not offer it either. The IC-7300's built-in decoder is fixed at
+> 45.45 baud. **SET > Function** has exactly two RTTY items, Mark Frequency and
+> Shift Width; the **RTTY DECODE SET** screen has none; and there is no CI-V
+> command for speed, so no software could set it even if you wanted to. If you
+> need to decode anything other than 45.45 baud you need PC software — MMTTY and
+> fldigi both do it — and you can still tune it with this scope first.
+>
+> If you went looking on the Settings page and found **Baud Rate** there, that is
+> the CI-V serial port between the PC and the radio ([§6.1](#61-radio-connection)).
+> Different thing entirely, and changing it will not affect RTTY.
+
 **Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. The radio offers 1275, 1615 and 2125 Hz in **SET > Function > RTTY Mark Frequency**; if you change it there, change it here to match. The tuner does not yet read that menu for you, so for now the two are kept in step by hand.
 
 **Shift** — how far apart the two tones are. **170 Hz** is standard amateur RTTY. The others (200, 425, 450, 850) are there for commercial and utility stations, which is most of what you will find outside the amateur bands. The tuner offers more shifts than the radio's own decoder does — the IC-7300 stops at 170, 200 and 425 in **SET > Function > RTTY Shift Width** — because the tuner also has to serve AFSK, where your software picks the tones and the radio's menu plays no part.
