@@ -192,13 +192,25 @@ namespace Icom_Web_Control.Services
 
         // Scope waveform-output watchdog. The radio can stop sending 27 00 while
         // the app still believes the scope is on: it was streaming, the port is
-        // open, nothing was switched off, and then the sweeps simply stop. Seen
-        // twice on 2026-09-24 on a MkII, both times within seconds of the operator
-        // working the radio's own SET menu — which is exactly what the RTTY
-        // tuner's "follow the radio" feature asks them to do. Before this, there
+        // open, nothing was switched off, and then the sweeps simply stop.
+        //
+        // The everyday cause is now known, confirmed on a MkII on 2026-09-24
+        // over four deliberate tries: **the radio stops waveform output while
+        // its own SET menu is open on the front panel**, and resumes a moment
+        // after it closes (it closes itself after a few idle seconds). That is
+        // benign, and it matters here only because the RTTY tuner's
+        // follow-the-radio feature invites the operator into that menu. A nudge
+        // sent while the menu is up achieves nothing — the radio acknowledges it
+        // and goes on sending nothing — which is why the first two nudges of a
+        // run are ordinary events rather than warnings.
+        //
+        // What is not benign, and is what this exists for, is that twice the
+        // same day the stream did *not* come back: sweeps stopped and stayed
+        // stopped for six minutes with enabled true and zero discards, until
+        // 27 10 01 / 27 11 01 sent by hand restored it instantly. Why that
+        // sticks sometimes and not others is still unknown. Before this there
         // was no way back short of the operator finding the Scope switch and
-        // toggling it; 27 10 01 / 27 11 01 by hand restored the stream instantly
-        // every time, which is all this does on their behalf.
+        // toggling it.
         //
         // Only ever after a sweep has been seen this run. A scope that has never
         // streamed is the different fault of GitHub #2 / #47 — a refusal, or a
@@ -286,10 +298,17 @@ namespace Icom_Web_Control.Services
 
             Volatile.Write(ref _lastScopeReassertTicks, now);
             long n = Interlocked.Increment(ref _scopeReasserts);
-            Interlocked.Increment(ref _reassertsSinceSweep);
-            _logger.LogWarning(
-                "[CivRadioController] No scope sweep for {Age:F1}s with the scope on — re-asserting 27 10/27 11 (nudge #{Count})",
-                (now - lastSweep) / 1000.0, n);
+            int sinceSweep = Interlocked.Increment(ref _reassertsSinceSweep);
+
+            // The first nudge of a silence is routine — an open SET menu looks
+            // exactly like this and is over in seconds. Only a silence that
+            // survives being nudged is worth a warning.
+            const string Message =
+                "[CivRadioController] No scope sweep for {Age:F1}s with the scope on — re-asserting 27 10/27 11 (nudge #{Count}, {Since} since the last sweep)";
+            if (sinceSweep <= 1)
+                _logger.LogInformation(Message, (now - lastSweep) / 1000.0, n, sinceSweep);
+            else
+                _logger.LogWarning(Message, (now - lastSweep) / 1000.0, n, sinceSweep);
 
             await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on (watchdog)", ct);
             await NoteScopeOutputResultAsync(

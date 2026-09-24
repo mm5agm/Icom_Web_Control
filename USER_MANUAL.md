@@ -2012,6 +2012,24 @@ The panel is on screen and the radio is connected, but no sweep is arriving. The
 - Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate. The **Band scope delivery** panel on the Diagnostics page (§11) shows the same counters live, plus the measured sweeps-per-second.
 - Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
 
+**The spectrum freezes while you are using the radio's own menus**
+
+Expected, and not a fault. **The IC-7300 stops sending scope data while its SET
+menu is open on the front panel**, and starts again a moment after you leave it
+— which the radio does by itself after a few idle seconds if you touch nothing.
+The trace picks up where it left off. Measured on a MkII on 2026-09-24, four
+times over.
+
+It matters more than it sounds because the RTTY Tuner ([§20](#20-rtty-tuner))
+invites you into exactly that menu to set Mark and Shift. If you would rather
+not lose the trace at all, set the tones from the tuner instead — it writes them
+to the radio for you, with no trip to the front panel.
+
+IWC also watches for this. If the sweeps do not come back within about eight
+seconds it quietly re-sends the two commands that start them, which is what
+brings the trace back on the rare occasion the radio does not restart the stream
+by itself. You should never see that happen; it is in the log if you go looking.
+
 **Spectrum panel says "The radio refused to send scope data" (badge: Scope blocked)**
 
 The radio understood the command to start sending scope data and declined it. That is not a bus fault — everything else is working — so the panel prints the reason underneath. On the original IC-7300 the reason is almost always the baud rate: the original model only sends scope data when its **CI-V USB Port** is **Unlink from [REMOTE]** and its **CI-V USB Baud Rate** is **115200**. The MkII has no such restriction.
@@ -3156,6 +3174,7 @@ In practice you will rarely want both, since the radio can only be in one mode. 
 | *Every* signal needs **Rev**, including ones you know are normal | Something has been reversed twice. Untick Rev and change the radio's mode instead (**RTTY** ↔ **RTTY-R**) — the tuner follows the mode by itself, so Rev is not how you tell it about the radio. |
 | The figure is restless and will not settle on a strong signal | The IF filter is too wide and a neighbour is getting in. Narrow it to 300–500 Hz ([§5.8](#58-if-width-if-shape-filter-slot-and-af-gain)). |
 | It stops by itself after a while | It stops when nothing is asking it for sweeps — a minimised or backgrounded tab will do it. Bring the page back to the front and press **RTTY Tune** again. |
+| The *spectrum* freezes while you are setting the tones on the radio | Expected. The radio stops sending scope data while its SET menu is open, and resumes a moment after you leave it — see [§14.2](#142-common-problems). Setting Mark and Shift here instead writes them to the radio without the trip to the front panel. |
 
 ---
 
