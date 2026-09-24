@@ -57,6 +57,8 @@ export class RttyTuner {
         this._radioProbed = false;
         this._radioTimer   = null;
         this._radioApplied = null;   // {markHz, shiftHz} we last took FROM the radio
+        this._want    = null;        // settings we have POSTed but not yet seen come back
+        this._wantAt  = 0;
     }
 
     init() {
@@ -149,6 +151,14 @@ export class RttyTuner {
     // ── Host ────────────────────────────────────────────────────────────────
 
     async _send(what) {
+        // Remember what we are asking for BEFORE the request goes out. Frames
+        // arriving in the meantime still describe the old filters, and
+        // _adoptServerSettings must not mistake one of them for somebody else
+        // overruling us - see there.
+        if (what === 'start') {
+            this._want   = { markHz: this._settings.markHz, shiftHz: this._settings.shiftHz, reverse: !!this._settings.reverse };
+            this._wantAt = Date.now();
+        }
         try {
             const res = await fetch(`/api/rtty/tuner/${what}`, {
                 method: 'POST',
@@ -286,15 +296,42 @@ export class RttyTuner {
     // using, or the dialog says 170 while the filters sit at 450. Not while
     // the operator is typing a mark, and not saved: this page's own choice
     // is still what it starts with next time.
+    //
+    // This runs twenty times a second, which is what makes the gate below
+    // load-bearing rather than tidy. Changing Shift in the dialog POSTs a
+    // start and returns; several frames then arrive before the host has
+    // re-toned, every one of them still saying 170. Without the gate the
+    // first of them put 170 straight back into the dropdown - so the
+    // operator's choice visibly sprang back and the change "did not work" -
+    // and the pair then chased each other, saving to localStorage
+    // synchronously on every frame until the page stopped painting.
     _adoptServerSettings(f) {
         if (!f.running) return;
         const s = this._settings;
         if (document.activeElement === this._markEl) return;
+
+        // Our own start is still in flight. Ignore frames until one comes back
+        // carrying what we asked for - or until it is plain the host is not
+        // going to (it rejects a mark+shift that will not fit the audio), so a
+        // refused setting cannot wedge this shut.
+        if (this._want) {
+            const w = this._want;
+            const arrived = Math.round(f.markHz) === w.markHz
+                         && f.shiftHz === w.shiftHz
+                         && !!f.reverse === w.reverse;
+            if (!arrived && Date.now() - this._wantAt < 3000) return;
+            this._want = null;
+        }
+
         let changed = false;
         if (SHIFTS.includes(f.shiftHz) && f.shiftHz !== s.shiftHz) { s.shiftHz = f.shiftHz; changed = true; }
         if (typeof f.reverse === 'boolean' && f.reverse !== s.reverse) { s.reverse = f.reverse; changed = true; }
         if (Number.isFinite(f.markHz) && Math.round(f.markHz) !== s.markHz) { s.markHz = Math.round(f.markHz); changed = true; }
-        if (changed) { this._showSettings(); this._saveSettings(); }
+
+        // Whatever arrived here is another tab's doing, not ours and not the
+        // radio's, so the radio sync backs off from it exactly as it does from
+        // a typed value. Deliberately not saved, per the note above.
+        if (changed) { this._showSettings(); this._radioApplied = null; }
     }
 
     _push(f) {
