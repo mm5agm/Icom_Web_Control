@@ -26,6 +26,8 @@ const PERSIST    = 6;      // sweeps kept on screen, oldest dimmest
 const QUIET_DB   = -80;    // below this in both filters there is nothing to draw
 const CHUNK      = 5;      // points per stroke: half a cycle of 2 kHz at 24,000 points a second
 const RADIO_MS   = 4000;  // how often to re-read the radio's RTTY menu while open
+const FETCH_MS   = 2000;   // a frame request that takes longer than this is abandoned
+const RESTART_MS = 3000;   // at most one automatic restart this often
 
 // How much of what the receiver passes lands in the two tone filters, in dB.
 // RTTY on tune puts nearly all of it there; noise, or a signal off to one side,
@@ -63,6 +65,7 @@ export class RttyTuner {
         this._pushBusy    = false;   // a radio-tones write is outstanding
         this._pushPending = null;    // the newest tones to write once it finishes
         this._statusHold  = 0;       // Date.now() until which _draw must not overwrite
+        this._restartAt   = 0;       // Date.now() of the last automatic restart
     }
 
     init() {
@@ -105,6 +108,15 @@ export class RttyTuner {
             this._stopPolling();
             this._stopRadioSync();
             this._send('stop');
+        });
+
+        // A tab in the background gets its timers slowed or frozen by the
+        // browser, the host stops the tuner after 15 s without a poll, and
+        // the figure used to sit on "Stopped." until the dialog was reopened.
+        // Coming back to the tab starts it again at once; _poll covers the
+        // cases this event does not see.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && this._dialog.open) this._restart();
         });
 
         if (window.ResizeObserver) {
@@ -363,14 +375,32 @@ export class RttyTuner {
         this._draw();
     }
 
+    // Start the host again after it stopped without being asked to - see the
+    // visibilitychange handler in init. Rate-limited, so a host that cannot
+    // start (no audio device, say) is not asked twenty times a second.
+    _restart() {
+        const now = Date.now();
+        if (now - this._restartAt < RESTART_MS) return;
+        this._restartAt = now;
+        this._send('start');
+    }
+
     async _poll() {
         // A slow reply must not stack requests behind it: skip a frame instead.
+        // But a reply that never comes must not stop the polling for good,
+        // which is what _inFlight alone did: hence the abort.
         if (this._inFlight) return;
         this._inFlight = true;
+        const abort = new AbortController();
+        const bail  = setTimeout(() => abort.abort(), FETCH_MS);
         try {
-            const res = await fetch(`/api/rtty/tuner?points=${POINTS}`);
+            const res = await fetch(`/api/rtty/tuner?points=${POINTS}`, { signal: abort.signal });
             if (!res.ok) return;
             const f = await res.json();
+            // The dialog is open and still polling, so a stopped host was not
+            // our doing: the page went quiet long enough for the host's idle
+            // stop, or the app restarted underneath it.
+            if (!f.running && this._dialog?.open) this._restart();
             this._last = f;
             this._adoptServerSettings(f);
             this._push(f);
@@ -378,6 +408,7 @@ export class RttyTuner {
         } catch {
             // One dropped frame in twenty. Not worth saying.
         } finally {
+            clearTimeout(bail);
             this._inFlight = false;
         }
     }
@@ -385,8 +416,9 @@ export class RttyTuner {
     // There is one tuner on the server, so another tab or browser changing
     // its settings changes them for this one too. Show what it is really
     // using, or the dialog says 170 while the filters sit at 450. Not while
-    // the operator is typing a mark, and not saved: this page's own choice
-    // is still what it starts with next time.
+    // the operator is typing a mark. Saved, because click-to-tune reads the
+    // saved settings at click time: unsaved, a DATA-L click in this tab
+    // would put the tones where the dialog no longer says they are.
     //
     // This runs twenty times a second, which is what makes the gate below
     // load-bearing rather than tidy. Changing Shift in the dialog POSTs a
@@ -395,7 +427,8 @@ export class RttyTuner {
     // first of them put 170 straight back into the dropdown - so the
     // operator's choice visibly sprang back and the change "did not work" -
     // and the pair then chased each other, saving to localStorage
-    // synchronously on every frame until the page stopped painting.
+    // synchronously on every frame until the page stopped painting. With the
+    // gate, a save happens only when the settings really have changed.
     _adoptServerSettings(f) {
         if (!f.running) return;
         const s = this._settings;
@@ -421,8 +454,8 @@ export class RttyTuner {
 
         // Whatever arrived here is another tab's doing, not ours and not the
         // radio's, so the radio sync backs off from it exactly as it does from
-        // a typed value. Deliberately not saved, per the note above.
-        if (changed) { this._showSettings(); this._radioApplied = null; }
+        // a typed value. Saved, per the note above.
+        if (changed) { this._showSettings(); this._saveSettings(); this._radioApplied = null; }
     }
 
     _push(f) {
