@@ -190,6 +190,27 @@ namespace Icom_Web_Control.Services
         private const int ScopeStaleMs = 2000;          // no sweep this long ⇒ not streaming
         private const int ScopeAnnounceEveryMs = 5000;  // watchdog re-announce cadence
 
+        // Scope waveform-output watchdog. The radio can stop sending 27 00 while
+        // the app still believes the scope is on: it was streaming, the port is
+        // open, nothing was switched off, and then the sweeps simply stop. Seen
+        // twice on 2026-09-24 on a MkII, both times within seconds of the operator
+        // working the radio's own SET menu — which is exactly what the RTTY
+        // tuner's "follow the radio" feature asks them to do. Before this, there
+        // was no way back short of the operator finding the Scope switch and
+        // toggling it; 27 10 01 / 27 11 01 by hand restored the stream instantly
+        // every time, which is all this does on their behalf.
+        //
+        // Only ever after a sweep has been seen this run. A scope that has never
+        // streamed is the different fault of GitHub #2 / #47 — a refusal, or a
+        // band with no scope — and re-sending the same two commands every few
+        // seconds would bury that in the log rather than fix it.
+        private long _lastScopeReassertTicks;
+        private long _scopeReasserts;
+        private int _reassertsSinceSweep;
+        private const int ScopeSilentBeforeReassertMs = 8000;   // silence this long ⇒ nudge it
+        private const int ScopeReassertEveryMs = 15000;         // and no more often than this
+        private const int ScopeReassertAttempts = 3;            // and give up after this many
+
         /// <inheritdoc />
         public void RequestScopeStatusAnnounce()
         {
@@ -231,6 +252,48 @@ namespace Icom_Web_Control.Services
                     SendHub("SdrError", new { sdrId = "B", detail = blocked });
                 SendHub("SdrStatus", new { sdrId = "B", status });
             }
+        }
+
+        /// <summary>
+        /// Re-assert scope on + waveform output when the radio has gone quiet
+        /// under us. See <see cref="_lastScopeReassertTicks"/> for why.
+        /// </summary>
+        private async Task MaybeReassertScopeOutputAsync(CancellationToken ct)
+        {
+            if (_operatorScopeOff || !_bus.IsOpen || _scopeOutputBlocked != null)
+                return;
+            // Not while transmitting — the radio has its own reasons to stop the
+            // trace there, and a SET write mid-transmission is worth avoiding.
+            if (_state.IsTransmitting)
+                return;
+
+            long now = Environment.TickCount64;
+            long lastSweep = Volatile.Read(ref _lastSweepTicks);
+            if (lastSweep == 0)                                      // never streamed: not ours
+                return;
+            if (now - lastSweep < ScopeSilentBeforeReassertMs)
+                return;
+            if (now - Volatile.Read(ref _lastScopeReassertTicks) < ScopeReassertEveryMs)
+                return;
+            // Three tries, then leave it alone until a sweep proves the stream
+            // is back. Some silences are not a stuck stream and never will be:
+            // a band the scope will not run on answers every nudge politely and
+            // goes on sending nothing (GitHub #47). Nudging that for ever would
+            // put a CI-V write on the bus every fifteen seconds and bury the
+            // real diagnosis in the log.
+            if (Volatile.Read(ref _reassertsSinceSweep) >= ScopeReassertAttempts)
+                return;
+
+            Volatile.Write(ref _lastScopeReassertTicks, now);
+            long n = Interlocked.Increment(ref _scopeReasserts);
+            Interlocked.Increment(ref _reassertsSinceSweep);
+            _logger.LogWarning(
+                "[CivRadioController] No scope sweep for {Age:F1}s with the scope on — re-asserting 27 10/27 11 (nudge #{Count})",
+                (now - lastSweep) / 1000.0, n);
+
+            await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on (watchdog)", ct);
+            await NoteScopeOutputResultAsync(
+                await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output (watchdog)", ct), ct);
         }
 
         /// <inheritdoc />
@@ -637,6 +700,8 @@ namespace Icom_Web_Control.Services
             // frames have the bus (see ScopePollIntervalMs).
             long sweepTicks = Environment.TickCount64;
             Volatile.Write(ref _lastSweepTicks, sweepTicks);
+            // The stream is alive, so the watchdog's budget is refilled.
+            Volatile.Write(ref _reassertsSinceSweep, 0);
             AccumulateSweepRate(sweepTicks);
 
             // The radio's live scope mode (tracks front-panel changes), carried on
@@ -2992,6 +3057,11 @@ namespace Icom_Web_Control.Services
                 if (Environment.TickCount64 - Volatile.Read(ref _lastScopeAnnounceTicks) >= ScopeAnnounceEveryMs)
                     AnnounceScopeStatus();
 
+                // …and the stream itself, which the status watchdog above can only
+                // report on, never restart.
+                try { await MaybeReassertScopeOutputAsync(stoppingToken); }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+                catch (Exception ex) { _logger.LogWarning(ex, "[CivRadioController] Scope re-assert failed"); }
 
                 loop++;
                 await DelayQuiet(ScopeAwarePollIntervalMs(), stoppingToken);
