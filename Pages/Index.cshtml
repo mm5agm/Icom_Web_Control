@@ -2251,6 +2251,23 @@
             The tuner listens to the same audio device as the CW Reader, set on
             the Settings page. Both can run at once.
         </div>
+        @* Two questions this dialog reliably prompts, answered where they are
+           asked. The naming one caught Colin out on 2026-09-24 with his own
+           radio in front of him, and "where is the baud rate" is the other:
+           there isn't one here, and the Settings page item of that name is the
+           CI-V serial port, which is a different thing entirely. *@
+        <div class="small mt-1" style="color:#9ab;">
+            Tick <strong>Rev</strong> when the radio is in reverse &mdash; its own screen
+            says <strong>RTTY-R</strong> where IWC's mode dropdown says
+            <strong>RTTY-U</strong>. Same mode, two naming conventions.
+        </div>
+        <div class="small mt-1" style="color:#9ab;">
+            <strong>No speed setting here.</strong> RTTY speed (45.45 baud) is the
+            decoder's business &mdash; the tuner only needs to know where the two tones
+            sit. The radio's built-in decoder (<em>MENU &rarr; RTTY DECODE</em>) handles
+            speed itself. <em>Baud Rate</em> on the Settings page is the CI-V serial
+            port and has nothing to do with RTTY.
+        </div>
     </div>
 </dialog>
 
