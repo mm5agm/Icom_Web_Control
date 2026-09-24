@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Icom_Web_Control.Pages.SettingsModel
 
 <style>
@@ -2330,6 +2330,33 @@
                 and APF in one click, and puts back exactly what you had when you switch it off.
                 What a decoder is fed matters more than how it decodes.
             </p>
+        </div>
+    </details>
+
+    <!-- Radio Display (USB UVC / HDMI capture → MJPEG) -->
+    <details class="settings-section" id="radioDisplaySection" @(ViewContext.ModelState.IsValid ? "" : "open")>
+        <summary><i class="bi bi-display" aria-hidden="true"></i>&nbsp;Radio Display</summary>
+        <div class="section-body">
+            <p class="text-muted">
+                Show the radio's own touch screen in the browser. The IC-7300 MkII mirrors its
+                display on the <strong>[HDMI]</strong> port; connect that to an HDMI-to-USB capture
+                dongle, plug the dongle into this PC, and it appears here as a camera. Device,
+                capture size, frame rate and image quality are chosen on the main page's
+                <strong>Radio Display</strong> panel (or its pop-out window). The stream starts
+                only when you click <strong>Start</strong> (or tick <strong>Auto</strong>). Off by default.
+            </p>
+            <p class="text-muted small">
+                On the radio, <strong>MENU → SET → Display → External Display</strong> must be
+                <strong>ON</strong> (the default). Leave <strong>Audio Output</strong> there
+                <strong>OFF</strong>: the dongle counts as an HDMI display, and with it ON the
+                radio mutes its own speaker. Icom does not guarantee operation with HDMI
+                adapters or capture devices — treat the capture chain as your own accessory.
+                See the user manual §20.
+            </p>
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" asp-for="Settings.VideoDisplayEnabled" id="videoDisplayEnabled" />
+                <label class="form-check-label" asp-for="Settings.VideoDisplayEnabled">Enable radio display</label>
+            </div>
         </div>
     </details>
 

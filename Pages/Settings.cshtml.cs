@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
@@ -231,6 +231,12 @@ namespace Icom_Web_Control.Pages
                     Settings.PseudoDualWatchSpanMode is "ZoomIn" or "Shared" or "Hidden"
                         ? Settings.PseudoDualWatchSpanMode
                         : "ZoomIn";
+
+                // Radio Display. Only the on/off switch lives on this page;
+                // device, size, fps and quality are chosen on the panel itself
+                // and saved through /api/video, so they are deliberately not
+                // copied here — a stale form post must not undo them.
+                current.VideoDisplayEnabled = Settings.VideoDisplayEnabled;
 
                 await _settingsService.SaveSettingsAsync(current);
 

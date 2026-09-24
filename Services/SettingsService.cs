@@ -22,6 +22,9 @@ namespace Icom_Web_Control.Services
             _logger.LogInformation("SettingsService initialized. File path: {Path}", _settingsFilePath);
         }
 
+        public ApplicationSettings GetCachedSettings() =>
+            _cachedSettings ?? new ApplicationSettings();
+
         public async Task<ApplicationSettings> GetSettingsAsync()
         {
             await _semaphore.WaitAsync();

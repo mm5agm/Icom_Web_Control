@@ -1322,3 +1322,60 @@ fieldset.calibration-card {
     font-size: 0.7rem;
     color: #aaa;
 }
+
+/* ── Radio Display (HDMI capture → MJPEG) ────────────────────────────────
+   Ported from Yaesu Web Control's site.css; the docked scope-column rules
+   (.controls-docked, #radioDisplayScopeDialog) are Yaesu-only and omitted. */
+.radio-display-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9a9a9a;
+    font-size: 0.95rem;
+    text-align: center;
+    padding: 1.25rem;
+    pointer-events: none;
+    user-select: none;
+}
+.radio-display-placeholder .bi {
+    vertical-align: -0.08em;
+}
+.radio-display-placeholder[hidden] {
+    display: none !important;
+}
+
+.radio-display-body {
+    position: relative;
+}
+.radio-display-video-pane {
+    position: relative;
+    text-align: center;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+}
+.card:fullscreen {
+    display: flex;
+    flex-direction: column;
+}
+.card:fullscreen .radio-display-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+}
+.card:fullscreen .radio-display-video-pane {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+}
+.card:fullscreen #radioDisplayImg {
+    object-position: center center;
+}

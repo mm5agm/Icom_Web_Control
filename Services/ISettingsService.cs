@@ -7,6 +7,11 @@ namespace Icom_Web_Control.Services
         Task<ApplicationSettings> GetSettingsAsync();
         Task SaveSettingsAsync(ApplicationSettings settings);
 
+        /// <summary>In-memory snapshot, never touching disk. Empty defaults until the
+        /// first GetSettingsAsync has loaded the file. For callers on threads that
+        /// must not block on IO (the Radio Display capture loop).</summary>
+        ApplicationSettings GetCachedSettings();
+
         /// <summary>Absolute path to the user settings file on disk.</summary>
         string GetSettingsFilePath();
 

@@ -34,6 +34,7 @@
    - 6.5 [DX Cluster](#65-dx-cluster)
    - 6.6 [Backup &amp; Restore](#66-backup--restore)
    - 6.7 [CW Reader](#67-cw-reader)
+   - 6.8 [Radio Display](#68-radio-display)
 7. [Application Setup](#7-application-setup)
    - 7.1 [External App Buttons](#71-external-app-buttons)
    - 7.2 [WSJT-X UDP Settings](#72-wsjt-x-udp-settings)
@@ -104,6 +105,13 @@
     - 19.5 [Stopping](#195-stopping)
     - 19.6 [The panel](#196-the-panel)
     - 19.7 [Troubleshooting](#197-troubleshooting)
+20. [Radio Display](#20-radio-display)
+    - 20.1 [What you need](#201-what-you-need)
+    - 20.2 [Set the radio up first](#202-set-the-radio-up-first)
+    - 20.3 [The panel](#203-the-panel)
+    - 20.4 [Capture size, and why bigger is not better](#204-capture-size-and-why-bigger-is-not-better)
+    - 20.5 [If the dongle is unplugged](#205-if-the-dongle-is-unplugged)
+    - 20.6 [Troubleshooting](#206-troubleshooting)
 
 ---
 
@@ -1175,6 +1183,18 @@ For the same reason, if the device you picked is not present when you open the S
 Windows itself truncates recording device names to 31 characters, so a long name may look cut off here. That is the name Windows gives us, not something IWC has shortened.
 
 **About the filter widths.** Every width offered — 50 to 500 Hz — is one the IC-7300 actually has: its CW filter ladder runs in 50 Hz steps to 500 Hz, then in 100 Hz steps above that. Whatever you pick is what you get.
+
+---
+
+### 6.8 Radio Display
+
+One switch. **Enable Radio Display** turns the feature on; everything else — which capture device, the capture size, frame rate, image quality and **Start / Stop** — is on the **Radio Display** panel on the main page, because those are things you change while looking at the picture, not settings you decide once. Full setup is in [Section 20](#20-radio-display).
+
+| Setting | What it does |
+|---|---|
+| **Enable Radio Display** | Off by default. When off, the capture device is never opened and the panel is not shown on the main page. |
+
+Before switching it on, check the radio: **MENU » SET > Display > External Display** must have **External Display** set to ON (the factory default) and **Audio Output** set to OFF (also the default). If Audio Output is ON and a capture dongle is plugged in, the radio thinks it has an HDMI speaker and **mutes its own** — see [§20.2](#202-set-the-radio-up-first).
 
 ---
 
@@ -2943,6 +2963,114 @@ Opening the panel reads the keyer speed and break-in setting from the radio, so 
 | A line is tagged **failed** | The radio did not take the command — the status line has the reason. Check the connection on the Diagnostics page; a line that failed part way through is abandoned rather than sent with a hole in it. |
 | Characters missing from what was sent | Only the characters listed in [§19.1](#191-sending-a-line) are keyed. The rest are dropped before the line is sent. |
 | Nobody comes back to my CQ | Check you are actually transmitting — the banner and the **sent** tag both tell you. Then check the radio: power, antenna, and whether the ATU has tuned on that band. |
+
+---
+
+## 20. Radio Display
+
+Radio Display puts the radio's own screen in the browser. The IC-7300 MkII has an **[HDMI] port** on the back that mirrors its touch screen; plug that into an HDMI-to-USB capture dongle, plug the dongle into the PC running IWC, and the picture is streamed to every browser that is looking at the app — the one on the desk, and the one on the tablet in the other room. It is the answer to everything the app does not show you: the radio's menus, its own scope and waterfall, the meter it is drawing, the message it has just put up.
+
+**This feature is Fabio Valente's (CR7CDC) work, not mine.** He designed and wrote it for [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control), where the Yaesu radios' DVI-D output does the same job. It is carried over here essentially unchanged; the only thing the Icom version needed was to be told the picture is 16:9. If it is useful to you, he is the one to thank.
+
+Two things it is **not**. It is one-way: clicking on the picture does nothing, because the dongle only captures. And it is not the app's own spectrum scope — that is drawn from data the radio sends over CI-V ([§5](#5-main-control-panel)) and works with no dongle at all. Radio Display is the radio's screen, pixels and all, and the two can be on the page together.
+
+![The Radio Display panel on the main page showing the IC-7300 MkII's screen](pictures/Radio_Display.png)
+
+### 20.1 What you need
+
+```text
+IC-7300 MkII [HDMI] port
+        │  ordinary HDMI cable
+        ▼
+HDMI → USB capture dongle (UVC — "USB Video Class", which is nearly all of them)
+        │  USB
+        ▼
+PC running Icom Web Control
+        │
+        ▼
+Any browser on the network (the panel on the main page, or the pop-out window)
+```
+
+- **An HDMI cable.** Nothing special. The MkII has a real HDMI port, so none of the DVI-D adapter caution that the Yaesu radios need applies here.
+- **An HDMI-to-USB capture dongle.** The cheap ones sold for capturing a games console or a second camera into OBS. The one on my bench is <https://www.amazon.co.uk/dp/B0C4STMPS2?th=1>; it is the same one I use for the Yaesu, and it shows up in Windows as "USB Video". Anything that Windows sees as a camera without a driver disc will do. Look for one that advertises **MJPEG** output — the dongle compresses the picture itself, and the app can pass those frames straight through with almost no CPU.
+
+Icom's own position, from the Basic manual: *"Icom does not guarantee the operation of all external displays or speakers, or the connection with user supplied HDMI conversion adapters, HDMI compatible recorders, and so on."* A capture dongle is exactly that. Mine works; yours very probably will; but if the radio and a particular dongle do not get on, Icom will not be interested.
+
+### 20.2 Set the radio up first
+
+Three items, all under **MENU » SET > Display > External Display**:
+
+| Item | Set it to | Factory default |
+|---|---|---|
+| **External Display** | ON | ON |
+| **External Display Resolution** | 1280x720 | 1280x720 |
+| **Audio Output** | **OFF** | OFF |
+
+If you have never been into that menu, the defaults are already right and there is nothing to do. The one to be careful of is **Audio Output**. With it ON, the radio sends its receive audio and beeps *down the HDMI cable* instead of to its own speaker — and, as the manual puts it, *"when the item is set to ON and an external display or speaker is connected, the internal speaker is automatically muted."* A capture dongle counts as connected. Switch that on by mistake and the radio goes silent the moment the dongle is plugged in, with the picture still perfectly fine, which is a confusing fault to chase. Leave it OFF; IWC does not capture audio from the dongle anyway.
+
+The same page of the manual notes that while headphones are plugged in "the internal speaker, [EXT-SP] jack, and [HDMI] port are deactivated". In context that is the audio path — but if the picture ever drops when you plug headphones in, that line is where to look.
+
+**1280×720 is what the radio sends**, and as far as the manual says it is the only resolution it offers. It is a 16:9 picture, which matters for the next section.
+
+### 20.3 The panel
+
+1. **Settings → Radio Display → Enable Radio Display**, then Save ([§6.8](#68-radio-display)).
+2. Back on the main page, a **Radio Display** card appears above the VFO row. Pick the capture device from the list — it is named whatever Windows calls the dongle, typically **USB Video**. If your PC has a webcam that will be in the list too; do not pick it.
+3. Click **▶ Start**. The stream does not open until you do, so a leftover device selection can never grab the dongle behind your back. Tick **Auto** if you would rather it started as soon as the page loads with a device selected — that choice is stored in the browser, per browser.
+
+The rest of the bar, left to right:
+
+| Control | What it does |
+|---|---|
+| **Badge** | Idle / Streaming / Disconnected. While streaming it shows the capture mode and rate — `1280×720 @ 15fps` — which is also the quickest way to see what **Auto size** chose. |
+| **↻** | Refresh the device list — after plugging the dongle in, or moving it to another USB socket. |
+| **Capture size** | **Auto size** picks the dongle's best 16:9 mode, which on every dongle I have seen is 1280×720 — the radio's own resolution, with no scaling at either end. Leave it there unless [§20.4](#204-capture-size-and-why-bigger-is-not-better) gives you a reason not to. The list only offers the MJPEG modes the dongle actually advertises. Changing it restarts the capture, so the picture drops for a second or two. |
+| **15 / 30 / 60 fps** | How often the picture updates. **15** is plenty for menus and meters and is the default; the radio's waterfall looks smoother at 30. Rates the dongle cannot do are hidden. |
+| **Low / Medium / Max** | Image quality. **Max** passes the dongle's own JPEG frames straight through — least CPU, best picture. **Low** and **Medium** recompress every frame: a smaller stream for a slow Wi-Fi link, at the cost of CPU on the PC. |
+| **▶ / ■** | Start and stop the stream. Stopping lets the app release the dongle a couple of seconds later. |
+| **Auto** | Start automatically when the panel opens with a device selected. |
+| **Fit / Fill** | **Fit** shows the whole screen with black bars if the pane is the wrong shape. **Fill** covers the pane and may crop the edges. On the main page Fill is capped to the picture's own 16:9 shape, so it never crops the screen down to a header strip; in the pop-out window it is a true fill. |
+| **Fullscreen** | The card fills the monitor. `Esc` comes back. |
+| **Pop out** | Opens the display in its own window and closes the card on the main page; a running stream carries on in the new window. Drag it to a second monitor and you have the radio's screen beside the app's. The pop-out has a **Reattach** button that brings the stream back to the main page and closes itself. |
+| **Close** | Stops the stream and hides the card. A small **Show Radio Display** button takes its place; the choice is remembered in the browser. |
+
+Every browser looking at the app sees the same stream — the dongle is opened once on the PC and the picture is fanned out to whoever asks. The capture stays open while at least one browser is viewing and is released a couple of seconds after the last one goes, so popping out or closing does not tear the USB device down mid-handover, and an idle app costs no capture CPU.
+
+### 20.4 Capture size, and why bigger is not better
+
+The radio sends **1280 pixels across**. Every capture mode larger than that — 1920×1080 is the usual offer — is the dongle's own scaler inventing pixels. No extra detail exists to recover, the picture is softer for the interpolation, and the frames are roughly twice the size on the network. Fabio measured this on the Yaesu side by comparing the frequency content of native and upscaled captures: the native capture carried real detail to the limit; the upscaled one had lost more than 25 dB of it. Nothing about that changes when the source is 1280 wide instead of 800.
+
+So **Auto** is the best picture *and* the smallest stream, which is unusual enough to say out loud. The dropdown exists for two reasons:
+
+- **The picture is squashed.** If Auto has picked a **4:3** mode (800×600 or 1024×768 — you can tell because everything looks too tall and circles are ovals), choose **1280×720** by name. This should not happen, because the app prefers 16:9 modes for the Icom, but a dongle with no 16:9 MJPEG mode would force it.
+- **You want to see for yourself.** Switch to 1920×1080, look at the text, switch back.
+
+**Max width.** There is one video setting that is not on the panel: `VideoMaxWidth` in `appsettings.user.json` in the user data folder (**Open user data folder** on the tray icon menu, [§4](#4-starting-the-application)); edit it with the app closed. Frames wider than it are scaled down on the PC before they are sent. It defaults to **1280** here, so the radio's frames go out as they arrive. If you are watching over a slow link, set it to **800** and the stream drops to 800×450 at about 40 % of the bytes — legible, but the small text on the radio's screen goes soft. (Yaesu Web Control defaults to 800 because a Yaesu panel is 800 wide; that is the one number the two apps disagree on.)
+
+### 20.5 If the dongle is unplugged
+
+The badge goes to **Disconnected** and stays there. The app does **not** try to reopen "camera number 1" on its own, because after a replug Windows may have given that number to something else — on a laptop, the built-in webcam. Nor do **Auto** or reloading the page restart it; only you can.
+
+Recovery is three clicks: **↻** to refresh the device list, check the dongle is back in it, **▶ Start**.
+
+The device you picked is stored by the index Windows gives it, which is what the capture API offers. If the dongle comes back with a different index — a different USB socket, or another camera plugged in since — pick it again from the list.
+
+### 20.6 Troubleshooting
+
+| Symptom | What to try |
+|---|---|
+| No Radio Display card on the main page | Enable it in Settings ([§6.8](#68-radio-display)). If it is enabled, look for the small **Show Radio Display** button above the VFO row — the card was closed. |
+| The device list is empty, or only shows a webcam | Plug the dongle in, click **↻**. If it is still missing, open the Windows **Camera** app — if that cannot see it either, it is the dongle, the cable or the USB socket, not IWC. |
+| Picture is black, the badge says Streaming | The radio is not sending. Check **External Display** is ON ([§20.2](#202-set-the-radio-up-first)), the HDMI cable is in the radio's **[HDMI]** port, and the radio is switched on. |
+| Badge says **Disconnected** | The dongle went away or another program has it open exclusively. Close OBS or whatever else has it, then [§20.5](#205-if-the-dongle-is-unplugged). |
+| The radio went quiet when I plugged the dongle in | **Audio Output** is ON in the External Display menu. Set it OFF ([§20.2](#202-set-the-radio-up-first)). |
+| Picture looks squashed — too tall, circles are ovals | A 4:3 capture mode. Pick **1280×720** from the Capture size dropdown ([§20.4](#204-capture-size-and-why-bigger-is-not-better)). |
+| The picture is soft | Someone has chosen 1920×1080. Put the capture size back to **Auto**. |
+| Frame rate stuck well below what I asked for | A dongle on a USB 2 socket, or an uncompressed (non-MJPEG) mode. Try a different socket; check the dongle advertises MJPEG. |
+| Picture freezes for a second when changing size or FPS | Normal — the capture reopens with the new mode. |
+| Text in the pop-out is hard to read on a tablet | Fullscreen it, or use **Fit** — Fill crops rather than shrinks. |
+
+OCR of the radio's screen, capturing the dongle's audio, and WebRTC are not in this version. Nothing you click on the picture reaches the radio; use the app's own controls for that.
 
 ---
 

@@ -181,6 +181,52 @@
         // Default "ZoomIn" so the panels feel independent out of the box.
         public string PseudoDualWatchSpanMode { get; set; } = "ZoomIn";
 
+        // ── Radio Display (USB UVC / HDMI capture → MJPEG) ────────────────
+        // Opt-in panel that grabs frames from a USB webcam or HDMI capture
+        // dongle and serves them as MJPEG. Off by default. Same six fields,
+        // same names and defaults, as Yaesu Web Control: the video layer reads
+        // them through IVideoSettingsSource, so keeping the shape identical is
+        // what would let Services/Video move to core one day.
+        public bool VideoDisplayEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Capture device key from <c>/api/video/devices</c>
+        /// (<c>index:N</c>, or macOS <c>uid:…</c>). Empty = no device selected.
+        /// </summary>
+        public string? VideoCaptureDeviceKey { get; set; } = "";
+
+        /// <summary>
+        /// Downscale frames wider than this before JPEG encode. 0 = no downscale.
+        /// Default 1280: the IC-7300 MkII sends its HDMI mirror at 1280×720,
+        /// so a 1280×720 capture passes through untouched. YWC defaults to
+        /// 800 because a Yaesu panel is 800 wide; the encoder clamps to
+        /// 800–1280 either way. Drop to 800 for a slow link (800×450, about
+        /// 40% of the bytes, softer text).
+        /// </summary>
+        public int VideoMaxWidth { get; set; } = 1280;
+
+        /// <summary>
+        /// Capture size for the Radio Display, as <c>"WxH"</c>. Empty (the
+        /// default) means automatic — the ranked pin pick, which is right for
+        /// almost everyone. An explicit value pins the capture to that MJPEG
+        /// mode and becomes the encode width, overriding
+        /// <see cref="VideoMaxWidth"/>. A value the current device does not
+        /// offer falls back to automatic rather than failing to open.
+        /// </summary>
+        public string? VideoCaptureSize { get; set; } = "";
+
+        /// <summary>
+        /// Target encode rate. Allowed: 15, 30, 60 (Radio Display panel).
+        /// Rates above the capture device's advertised maximum are hidden.
+        /// </summary>
+        public int VideoTargetFps { get; set; } = 15;
+
+        /// <summary>
+        /// JPEG quality. Allowed: 40, 65, 85 (Low / Medium / Max on the Radio Display panel).
+        /// Default 85 (Max): keep the capture JPEG. Low/Medium recompress.
+        /// </summary>
+        public int VideoJpegQuality { get; set; } = 85;
+
         // Optional user override for the SDRplay API install directory
         // (the folder that contains the x64\sdrplay_api.dll subfolder).
         // Leave blank for auto-detect: SdrplayDllResolver tries the app

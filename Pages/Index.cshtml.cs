@@ -121,6 +121,10 @@ namespace Icom_Web_Control.Pages
         // "Hidden" (no B span buttons). See ApplicationSettings.PseudoDualWatchSpanMode.
         public string PseudoDualWatchSpanMode { get; set; } = "ZoomIn";
 
+        /// <summary>Settings → Radio Display switch. The panel markup is always
+        /// rendered; the JS hides it while /api/video/status says disabled.</summary>
+        public bool VideoDisplayEnabled { get; set; } = false;
+
         public RadioStateService RadioState => _radioStateService;
 
         public RadioStateViewModel State { get; set; } = new RadioStateViewModel();
@@ -170,6 +174,7 @@ namespace Icom_Web_Control.Pages
             VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
             PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
             PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
+            VideoDisplayEnabled = settings.VideoDisplayEnabled;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;

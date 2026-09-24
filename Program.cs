@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -425,6 +425,17 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.WaveInCwAudioSource>(
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwQsoLogService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>();
+
+// Radio Display: the IC-7300's HDMI output through a USB capture dongle,
+// served as MJPEG at /api/video/stream. Nothing opens the dongle until a
+// browser asks for the stream. Services/Video is IWC-local for now but
+// written so it could move to Radio_Web_Control_Core: the only thing it
+// knows about this app is IVideoSettingsSource, which the adapter below
+// implements over ApplicationSettings.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Video.IVideoSettingsSource,
+                              Icom_Web_Control.Services.ApplicationVideoSettingsSource>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Video.VideoSessionManager>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Video.VideoCaptureService>();
 
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and
