@@ -3014,7 +3014,9 @@ The **RTTY Tune** button on the main control panel opens a crossed-ellipse tunin
 
 Nothing here transmits, and nothing here touches the radio. The tuner only listens and draws; moving the signal onto its tones is done with your dial, as it always was.
 
-It does **not** decode RTTY into text. It is a tuning aid, and its job is to get the signal sitting exactly where a decoder — the radio's own, or software such as MMTTY or fldigi — can read it.
+It does **not** decode RTTY into text. It is a tuning aid, and its job is to get the signal sitting exactly where a decoder can read it.
+
+You have a decoder already: **the IC-7300 decodes RTTY by itself**, with no PC and no software. Press **MENU » RTTY DECODE** on the radio and the decoded text appears on its screen, along with the radio's own tuning indicator and a waterfall. It will also log what it copies to the SD card, and it can send from eight stored messages. So the usual reason to open this tuner is to get a signal onto its tones from the browser — without having to lean over and watch the radio's own display while you do it. PC software such as MMTTY or fldigi is tuned exactly the same way.
 
 The scope itself is shared with my Yaesu app, so the two draw an identical figure from identical audio. What differs is only where the audio comes from.
 
@@ -3036,9 +3038,9 @@ The line under the figure reports what the two filters are actually hearing, in 
 
 Three controls, and for ordinary amateur RTTY you will not touch any of them.
 
-**Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. If you change the radio's RTTY MARK menu, change this to match — the tuner cannot read that menu over CI-V, so it has to be told.
+**Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. The radio offers 1275, 1615 and 2125 Hz in **SET > Function > RTTY Mark Frequency**; if you change it there, change it here to match. The tuner does not yet read that menu for you, so for now the two are kept in step by hand.
 
-**Shift** — how far apart the two tones are. **170 Hz** is standard amateur RTTY. The others (200, 425, 450, 850) are there for commercial and utility stations, which is most of what you will find outside the amateur bands.
+**Shift** — how far apart the two tones are. **170 Hz** is standard amateur RTTY. The others (200, 425, 450, 850) are there for commercial and utility stations, which is most of what you will find outside the amateur bands. The tuner offers more shifts than the radio's own decoder does — the IC-7300 stops at 170, 200 and 425 in **SET > Function > RTTY Shift Width** — because the tuner also has to serve AFSK, where your software picks the tones and the radio's menu plays no part.
 
 **Rev** — which side of mark the space tone sits on. Leave it **unticked** for normal RTTY and tick it when the other station has their tones reversed, or when you have put the radio into **RTTY-R**.
 
