@@ -986,6 +986,32 @@ fieldset.calibration-card {
     transform: translateX(-50%);
     z-index: 1050;
     margin: 0;
+    max-height: 90vh;
+}
+
+/* The body scrolls, the title bar does not. Without this the dialog grows to
+   whatever its content wants - the scope is a ~324px square before a word of
+   the help text - and on a laptop it runs off the bottom of the screen with
+   nothing to scroll and no way to shrink it.
+
+   [open] is load-bearing. A <dialog> is display:none until it is opened, so
+   an unconditional `display: flex` here would override the UA rule and leave
+   the tuner permanently on screen.
+
+   scrollbar-gutter is not cosmetic either. The scope canvas is square and
+   takes its height from its own width, so a scrollbar appearing would narrow
+   it, shorten the content, and let the scrollbar disappear again - a flicker
+   loop at whatever window height sits on the boundary. Reserving the gutter
+   keeps the canvas width constant whether the scrollbar is there or not. */
+#rttyTunerDialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+#rttyTunerDialog > div:first-child { flex: none; }        /* title bar */
+#rttyTunerDialog .iwc-dialog-body {
+    overflow-y: auto;
+    min-height: 0;          /* or the flex item refuses to shrink below its content */
+    scrollbar-gutter: stable;
 }
 #fmDialog {
     position: fixed;

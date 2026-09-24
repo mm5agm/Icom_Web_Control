@@ -2228,7 +2228,7 @@
                 onclick="document.getElementById('rttyTunerDialog').close()"
                 aria-label="Close RTTY tuner">&#10005;</button>
     </div>
-    <div class="p-2">
+    <div class="p-2 iwc-dialog-body">
         <div class="d-flex align-items-center gap-2 mb-2 small flex-wrap">
             <label for="rttyTunerMark">Mark</label>
             <input id="rttyTunerMark" type="number" min="300" max="3000" step="5" value="2125"
@@ -2262,6 +2262,13 @@
             Waiting.
         </div>
         <div id="rttyTunerStatus" class="mt-1 small" role="status" aria-live="polite">Stopped.</div>
+        @* Collapsed by default, and that is the point. Open, this text is
+           taller than the scope it explains, which made the dialog run off the
+           bottom of a laptop screen with no way to shrink it back. It is worth
+           keeping - it answers the two questions this panel reliably prompts -
+           but it is read once, not every time the tuner is opened. *@
+        <details class="mt-2">
+            <summary class="small" style="color:#9ab; cursor:pointer;">How to read it, and two things that catch people out</summary>
         <div class="small mt-1" style="color:#9ab;">
             Tune for a clean cross: mark draws the line across, space the line up.
             Arms leaning and opening means off tune.
@@ -2313,6 +2320,7 @@
             <em>Baud Rate</em> on the Settings page is the CI-V serial port, and has
             nothing to do with RTTY.
         </div>
+        </details>
     </div>
 </dialog>
 
