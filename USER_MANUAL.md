@@ -3067,6 +3067,10 @@ The scope itself is shared with my Yaesu app, so the two draw an identical figur
 
 Two narrow filters listen to the receive audio, one parked on the **mark** tone and one on the **space** tone. Mark drives the figure sideways and space drives it up, so each tone draws its own line:
 
+![The RTTY Tuner dialog on a real signal: Mark 2125, Shift 170, Rev unticked, and a clean upright cross — a horizontal MARK ellipse crossing a vertical SPACE ellipse — with the status line reading "Mark 2125 Space 2295 Hz M -34 S -32 in -27 dBFS" and "Both tones in their filters - fine-tune for the thinnest cross (RTTY-L)"](pictures/RTTY-Tuner.png)
+
+That is the real thing: an amateur RTTY signal on 80m, 3598.3 kHz, standard 170 Hz shift with **Rev** unticked, caught with the radio's IF at 1800 Hz. Note the two figures are within 2 dB of each other in the status line — `M -34 S -32`. **Equal arms are the test.** One tone sitting steady while the other stays down is not RTTY at all, however bright the line looks; it is a single carrier, and a data mode such as PSK63 will do exactly that on a band full of RTTY.
+
 | What you see | What it means |
 |---|---|
 | **A clean upright cross** | On tune. Both tones are landing squarely in their filters. This is what you are aiming for. |
