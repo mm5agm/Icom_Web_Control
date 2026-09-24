@@ -2250,9 +2250,15 @@
             @* Reads SET > Function > RTTY Mark Frequency and RTTY Shift Width
                over CI-V (1A 05 00 39 / 00 40). The shared tuner hides this
                button by itself if the backend has no /api/rtty/radio-tones, so
-               it costs YWC nothing until YWC implements one. *@
+               it costs YWC nothing until YWC implements one.
+
+               The tuner now re-reads that menu every few seconds while it is
+               open, so in RTTY the button is only needed to take the radio's
+               numbers back after you have typed your own. It stays because it
+               is also the only way to read the menu in an AFSK mode, where the
+               automatic sync deliberately keeps its hands off. *@
             <button type="button" id="rttyTunerFromRadio" class="btn btn-sm iwc-dialog-btn"
-                    title="Read Mark and Shift from the radio's own RTTY menu (FSK modes)">From radio</button>
+                    title="Read Mark and Shift from the radio's own RTTY menu. In RTTY the tuner already follows that menu on its own; press this to take the radio's numbers back after typing your own, or to read them in an AFSK mode.">From radio</button>
         </div>
         <canvas id="rttyTunerCanvas" width="320" height="320"
                 style="width:100%; display:block; border:1px solid #444; border-radius:6px;"
@@ -2276,6 +2282,14 @@
         <div class="small mt-1" style="color:#9ab;">
             The tuner listens to the same audio device as the CW Reader, set on
             the Settings page. Both can run at once.
+        </div>
+        <div class="small mt-1" style="color:#9ab;">
+            In RTTY, Mark and Shift follow the radio's own
+            <b>SET &gt; Function</b> menu while this window is open &mdash; change
+            the shift on the radio and the tuner changes with it. Type your own
+            figure and it stops, and leaves yours alone; <b>From radio</b> takes
+            the radio's back. In an AFSK mode nothing is synced, because there
+            the tones are your software's.
         </div>
         @* Two questions this dialog reliably prompts, answered where they are
            asked. Both caught Colin out on 2026-09-24 with his own radio in

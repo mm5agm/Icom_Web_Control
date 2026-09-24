@@ -392,7 +392,6 @@ If the scope stops streaming for any other reason — it is off at the radio, or
 **Span buttons** — eight buttons in the panel header set the visible bandwidth, from **±2.5k** (narrowest — a single QSO fills the screen) through **±5k**, **±10k**, **±25k**, **±50k**, **±100k**, **±250k** to **±500k** (widest — a 1 MHz-wide view). The figure is the *half*-width either side of centre, matching the way the IC-7300 labels its own scope, so **±500k** shows a megahertz across the screen. Clicking one sets the radio's scope span, so the radio's front panel changes too; equally, changing the span on the radio lights the matching button in IWC, because the active button is re-synced from every incoming sweep.
 
 **Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
-
 **Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune that panel's VFO up or down by one **tuning step**. The step starts at 1 kHz and is remembered per VFO across browser reloads. Four things set it, and they all set the same thing:
 
 - **The Step box** on the spectrum's control bar, beside Bright — anything from 1 Hz to 1 MHz.
@@ -3056,20 +3055,24 @@ Three controls, and for ordinary amateur RTTY you will not touch any of them.
 > the CI-V serial port between the PC and the radio ([§6.1](#61-radio-connection)).
 > Different thing entirely, and changing it will not affect RTTY.
 
-**Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. The radio offers 1275, 1615 and 2125 Hz in **SET > Function > RTTY Mark Frequency**. You do not have to copy it across by hand — press **From radio** and the tuner reads that menu, and the shift, over CI-V and fills both boxes in.
+**Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. The radio offers 1275, 1615 and 2125 Hz in **SET > Function > RTTY Mark Frequency**. You do not have to copy it across by hand: in RTTY the tuner follows that menu on its own while it is open.
 
 **Shift** — how far apart the two tones are. **170 Hz** is standard amateur RTTY. The others (200, 425, 450, 850) are there for commercial and utility stations, which is most of what you will find outside the amateur bands. The tuner offers more shifts than the radio's own decoder does — the IC-7300 stops at 170, 200 and 425 in **SET > Function > RTTY Shift Width** — because the tuner also has to serve AFSK, where your software picks the tones and the radio's menu plays no part.
 
 **Rev** — for when **the other station** is sending reversed. Leave it unticked otherwise.
 
-#### The **From radio** button
+#### Following the radio, and the **From radio** button
 
-Reads **SET > Function > RTTY Mark Frequency** and **RTTY Shift Width** off the radio and puts them in the Mark and Shift boxes, so the tuner and the radio agree without you reading two menus off the front panel. It tells you what it read, and says so when the two already match.
+**In RTTY, Mark and Shift follow the radio on their own.** While the tuner window is open it re-reads **SET > Function > RTTY Mark Frequency** and **RTTY Shift Width** every few seconds, so changing the shift on the radio changes the tuner with it and the two never quietly disagree. There is no CI-V message for a SET-menu change, so re-reading is the only way to notice; it costs two short reads every four seconds, and only while the window is open.
 
-It is a button rather than something that happens automatically, for two reasons worth knowing:
+**It follows, but it does not argue.** The moment you type your own Mark or Shift, the tuner stops replacing it and leaves your figure alone — for the rest of the session and across a page reload. That matters more than it sounds. The radio's menu describes the radio's own decoder, and it is routinely the wrong description of what you are listening to: a utility station on 450 Hz shift while the menu still says 170 is the ordinary case, not an exotic one, and a tuner that dragged you back to 170 every four seconds would be useless for exactly the signals this scope is best at.
 
-- **It only describes FSK.** Those menu items belong to the radio's own RTTY mode. If you are running AFSK — DATA-L, DATA-U, LSB or USB, with MMTTY or fldigi making the tones — the radio's menu has nothing to do with what is arriving, and pressing the button would replace your software's settings with numbers that do not apply. IWC says so rather than refusing: press it in an AFSK mode and it reports the radio's values along with a note that you are not in FSK.
-- **It reads the menu, not the air.** When the radio's *own* decoder is running (**MENU » RTTY DECODE**) it uses 2125 Hz and 170 Hz whatever the menu says — that is in Icom's manual, not a quirk of IWC. So on the rare setup with the menu set to something else, the button reports the menu and the radio is actually using the standard pair. Both are worth knowing; neither is worth guessing on your behalf.
+**From radio** is how you hand control back. Press it and the tuner takes the radio's numbers again, and goes on following from there. It tells you what it read, and says so when the two already match. It is also the only way to read the menu in an AFSK mode, where nothing is synced for you.
+
+Two things about the reading itself are worth knowing:
+
+- **It only describes FSK.** Those menu items belong to the radio's own RTTY mode. If you are running AFSK — DATA-L, DATA-U, LSB or USB, with MMTTY or fldigi making the tones — the radio's menu has nothing to do with what is arriving, which is why nothing is synced automatically in those modes. Pressing the button there is not refused: it reports the radio's values along with a note that you are not in FSK, and leaves the decision to you.
+- **It reads the menu, not the air.** When the radio's *own* decoder is running (**MENU » RTTY DECODE**) it uses 2125 Hz and 170 Hz whatever the menu says — that is in Icom's manual, not a quirk of IWC. So on the rare setup with the menu set to something else, the tuner shows the menu and the radio is actually using the standard pair. Both are worth knowing; neither is worth guessing on your behalf.
 
 **Rev is not read from the radio**, and that is deliberate. The obvious candidate, **RTTY Keying Polarity** in the same menu, is not the same thing at all: it sets whether a key closure from an external terminal unit means mark or space, which is a *transmit* setting. Which way up a received signal is depends on the mode, and the tuner already follows that.
 
