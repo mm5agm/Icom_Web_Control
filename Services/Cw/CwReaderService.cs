@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Globalization;
 using System.Text;
+using Icom_Web_Control.Services.Audio;
 using RadioWebControl.Core.Services.Cw;
 
 namespace Icom_Web_Control.Services.Cw
@@ -38,6 +39,10 @@ namespace Icom_Web_Control.Services.Cw
         /// </summary>
         private const int MaxTextLength = 8000;
 
+        // The device is shared with the RTTY tuner, so the reader takes a
+        // hold on it rather than starting and stopping it. _source stays for
+        // the frames and the status fields; only the lifetime moved.
+        private readonly ReceiveAudioHold _audio;
         private readonly WaveInCwAudioSource _source;
         private readonly IRadioController _radio;
         private readonly RadioStateService _state;
@@ -58,13 +63,14 @@ namespace Icom_Web_Control.Services.Cw
         private int? _filterWidthHz;
 
         public CwReaderService(
-            WaveInCwAudioSource source,
+            ReceiveAudioHold audio,
             IRadioController radio,
             RadioStateService state,
             ISettingsService settings,
             ILogger<CwReaderService> logger)
         {
-            _source = source;
+            _audio = audio;
+            _source = audio.Source;
             _radio = radio;
             _state = state;
             _settings = settings;
@@ -89,7 +95,7 @@ namespace Icom_Web_Control.Services.Cw
                 IsRunning = true;
             }
 
-            await _source.StartAsync(ct);
+            await _audio.AcquireAsync(ct);
 
             _logger.LogInformation(
                 "CW reader started: pitch {Pitch} Hz, filter {Filter}, search window +/-{Search} Hz",
@@ -108,7 +114,7 @@ namespace Icom_Web_Control.Services.Cw
                 IsRunning = false;
             }
 
-            await _source.StopAsync(ct);
+            await _audio.ReleaseAsync(ct);
 
             // Emit the part-built character, so the last letter of the last
             // over is not silently swallowed by stopping.

@@ -423,9 +423,18 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.S
 // browser tab. Nothing here starts until the operator presses Start - the
 // device is not opened at boot.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.WaveInCwAudioSource>();
+// One WinMM capture device, two features that want it. The hold is what
+// lets the CW reader and the RTTY tuner run at the same time - and, more
+// to the point, stops either one's Stop from deafening the other.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Audio.ReceiveAudioHold>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwQsoLogService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>();
+
+// RTTY tuning scope. Nothing runs until the operator opens the dialog;
+// the service takes its audio hold on the first start and drops it a
+// couple of seconds after the last poll.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyTunerService>();
 
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and
