@@ -391,7 +391,32 @@ If the scope stops streaming for any other reason — it is off at the radio, or
 
 **Span buttons** — eight buttons in the panel header set the visible bandwidth, from **±2.5k** (narrowest — a single QSO fills the screen) through **±5k**, **±10k**, **±25k**, **±50k**, **±100k**, **±250k** to **±500k** (widest — a 1 MHz-wide view). The figure is the *half*-width either side of centre, matching the way the IC-7300 labels its own scope, so **±500k** shows a megahertz across the screen. Clicking one sets the radio's scope span, so the radio's front panel changes too; equally, changing the span on the radio lights the matching button in IWC, because the active button is re-synced from every incoming sweep.
 
-**Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
+**Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is. **You can turn the automatic mode change off** in **Settings → §6.1** (*Change mode automatically when tuning from the band plan*) — see the note below.
+
+> **When the automatic mode change gets in the way.** The band plan is where most people
+> operate, not where everyone operates, and on a contest weekend it is not where anyone
+> operates. RTTY runs well above 14.100; 40m SSB is used around 7.050. In both cases the
+> mode you want is not the mode the band plan gives, so every click puts the radio back
+> where you did not want it.
+>
+> **RTTY has no segment of its own in the band plan at all**, so it gets the worst of it:
+> 17m RTTY sits squarely inside the FT8/data segment, and a click there answers with
+> **DATA-U** and takes you straight out of RTTY.
+>
+> This is worth more than the annoyance it looks like. **MENU → SET → Connectors → MOD Input**
+> names the transmit audio source separately either side of the Data switch — **DATA OFF MOD**
+> (SSB, AM and FM; default **MIC, USB**) and **DATA MOD** (the data modes; default **USB**).
+> At the factory settings both admit USB audio, but setting DATA OFF MOD to **MIC** only is
+> the usual cure for Windows sounds going out on SSB, and with that set a mode change you
+> did not ask for quietly cuts your data software out of the transmit path. Receive audio is
+> produced in every mode, so you will not notice until you transmit and nothing goes out.
+>
+> Untick **Change mode automatically when tuning from the band plan** in
+> **Settings → §6.1** and IWC leaves the mode entirely to you. Clicking the spectrum and
+> clicking a DX spot row then tune only. Picking a named segment — CW, FT8, SSB, RTTY —
+> from a VFO’s band dropdown still sets that segment’s mode either way, because that is a
+> choice you made rather than a guess from a frequency.
+
 **Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune that panel's VFO up or down by one **tuning step**. The step starts at 1 kHz and is remembered per VFO across browser reloads. Four things set it, and they all set the same thing:
 
 - **The Step box** on the spectrum's control bar, beside Bright — anything from 1 Hz to 1 MHz.
@@ -951,7 +976,7 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 | Spotter | The station that reported the spot |
 | Comment | Free-text comment from the spotter |
 
-**Click any row** to QSY VFO A to that spot's frequency **and switch mode** to match the band-plan segment the frequency falls into (FT8 → DATA-U, CW → CW-U, phone segments → USB or LSB as appropriate, etc.). This matches the click-to-tune behaviour on the spectrum panel — so clicking an FT8 spot from a phone segment flips the radio to DATA-U in one step rather than leaving you on the wrong mode.
+**Click any row** to QSY VFO A to that spot's frequency **and switch mode** to match the band-plan segment the frequency falls into (FT8 → DATA-U, CW → CW-U, phone segments → USB or LSB as appropriate, etc.). This matches the click-to-tune behaviour on the spectrum panel — so clicking an FT8 spot from a phone segment flips the radio to DATA-U in one step rather than leaving you on the wrong mode. It also obeys the same **Settings → §6.1** switch: with *Change mode automatically when tuning from the band plan* unticked, clicking a spot tunes without touching the mode (§5.4).
 
 **Click any column header** to sort by that column; click again to reverse the sort direction. The current sort is shown by a ▲ or ▼ next to the column name.
 
@@ -1003,6 +1028,7 @@ Clicking **Restart Now** stops IWC and (when running as the installed exe) autom
 | Find my radio | Asks IWC to look for the radio instead of you. It opens each COM port in turn and asks any Icom on it to identify itself, at 19200 first, then 115200, then the remaining speeds; the first radio that answers wins, and its model, port and baud rate are filled into this page for you to **Save**. Nothing is saved or changed on the radio. If a port is held open by another program (WSJT-X, Log4OM, another CAT program) it says so rather than guessing — close that program and press it again. A radio that is switched off, or whose USB cable is out, cannot answer and will not be found. |
 | Baud Rate | The rate IWC opens the serial port at. Default: **19200**. If you used **Find my radio**, this is already the rate the radio answered at. **IC-7300 MkII:** leave it at 19200 — the MkII has no **CI-V USB Baud Rate** menu, and its **CI-V Baud Rate** item applies to the **[REMOTE]** socket only, so there is nothing to match and raising this will not speed the band scope up (measured: the same ~4 sweeps per second at 19200 and at 115200). **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
+| Change mode automatically when tuning from the band plan | On by default. Clicking the spectrum or a DX spot also sets the mode the band plan gives for that frequency. Turn it **off** for contest or off-band-plan work — RTTY above 14.100 and 40m SSB around 7.050 both fight the automatic change, RTTY has no band-plan segment of its own, and an unwanted change can move transmit audio away from your data software (**SET → Connectors → MOD Input**). Picking a named segment from a VFO band dropdown still sets that segment’s mode either way. See §5.4. |
 
 IWC talks to the radio using the CI-V protocol over that single USB serial connection. It identifies itself as controller `E0`, and works out the radio's own CI-V address at connect rather than assuming one — so `B6` (the MkII's default), `94` (the original IC-7300's) and any address you have set by hand all work with nothing to configure. After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success. On a fresh installation the serial port is deliberately left blank until you choose one — IWC will not guess a port number for you, except on a PC that has exactly one COM port, where it takes that one and saves it.
 

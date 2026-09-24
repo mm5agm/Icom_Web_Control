@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Icom_Web_Control.Services;
 using System.Net.Http;
@@ -94,6 +94,12 @@ namespace Icom_Web_Control.Pages
         public int SdrWaterfallBrightDbB { get; set; } = 0;
 
         public string BandPlan { get; set; } = "Region1";
+
+        /// <summary>
+        /// Rendered into the page as <c>window.iwcAutoModeChangeOnTune</c> and
+        /// read only by <c>autoModeForHz</c> in band-plan.js.
+        /// </summary>
+        public bool AutoModeChangeOnTune { get; set; } = true;
         public string RadioModel { get; set; } = "IC-7300MK2";
         public List<string> InstalledRoofingFilters { get; set; } = new() { "6", "7", "8", "9", "A" };
 
@@ -171,6 +177,7 @@ namespace Icom_Web_Control.Pages
             PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
             PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
+            AutoModeChangeOnTune = settings.AutoModeChangeOnTune;
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;
 

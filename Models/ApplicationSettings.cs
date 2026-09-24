@@ -1,4 +1,4 @@
-﻿namespace Icom_Web_Control.Models
+namespace Icom_Web_Control.Models
 {
     public class ApplicationSettings
     {
@@ -61,6 +61,32 @@
 
         // Band Plan
         public string BandPlan { get; set; } = "Region1";
+
+        // When true (default, and the behaviour since the spectrum panel
+        // arrived), tuning by clicking the spectrum or a DX spot also sets
+        // the mode from the band plan. Bruce VK2RT asked for the off switch
+        // for RTTY contest work (Yaesu Web Control discussion #169):
+        // operators do not follow the band plan, so a click at 7.050 meaning
+        // LSB was answered with DATA-U, and a click on RTTY above 14.100 with
+        // USB. It bites here too, and harder - the band plan carries no RTTY
+        // segment at all, so RTTY sitting inside a DATA segment (17m RTTY is
+        // squarely inside 18095-18109) is answered with DATA-U and the
+        // operator is thrown out of RTTY on every click.
+        //
+        // This is not cosmetic. MENU > SET > Connectors > MOD Input names the
+        // transmit modulation source separately either side of the Data
+        // switch - "DATA OFF MOD" (default MIC,USB) and "DATA MOD" (default
+        // USB) - so a mode change the operator did not ask for can move the
+        // transmit audio input. At the factory defaults both admit USB, but
+        // MIC-only on DATA OFF MOD is the usual cure for Windows sounds going
+        // out on SSB, and with that set an unwanted flip out of a data mode
+        // cuts the data software out of the transmit path. Receive goes on
+        // decoding perfectly, which is why it only shows up on transmit.
+        //
+        // Off does NOT disable the mode a named band-plan segment carries
+        // when it is picked from the segment dropdown: that is an explicit
+        // choice of a segment, not a mode inferred from a frequency.
+        public bool AutoModeChangeOnTune { get; set; } = true;
 
         // SDR Spectrum Display — per-VFO device assignment (v2.3.0+).
         //

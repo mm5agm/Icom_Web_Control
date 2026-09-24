@@ -2063,6 +2063,7 @@
         window.iwcTxToggleKey = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TxToggleKey));
         window.iwcVoiceNudgeStepHzA = @Model.VoiceNudgeStepHzA;
         window.iwcVoiceNudgeStepHzB = @Model.VoiceNudgeStepHzB;
+        window.iwcAutoModeChangeOnTune = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AutoModeChangeOnTune));
     </script>
     @* ?v= is the app version, not a hand-kept number.
        These used to carry counters that had to be bumped by hand whenever the
