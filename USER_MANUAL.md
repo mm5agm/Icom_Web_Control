@@ -3042,7 +3042,16 @@ Three controls, and for ordinary amateur RTTY you will not touch any of them.
 
 **Shift** — how far apart the two tones are. **170 Hz** is standard amateur RTTY. The others (200, 425, 450, 850) are there for commercial and utility stations, which is most of what you will find outside the amateur bands. The tuner offers more shifts than the radio's own decoder does — the IC-7300 stops at 170, 200 and 425 in **SET > Function > RTTY Shift Width** — because the tuner also has to serve AFSK, where your software picks the tones and the radio's menu plays no part.
 
-**Rev** — which side of mark the space tone sits on. Leave it **unticked** for normal RTTY and tick it when the other station has their tones reversed, or when you have put the radio into **RTTY-R**.
+**Rev** — which side of mark the space tone sits on. Leave it **unticked** for normal RTTY and tick it when the other station has their tones reversed, or when you have put the radio into the reverse mode.
+
+> **A name to watch out for.** The two RTTY modes are called different things on the radio and in this app, and you will have both in front of you:
+>
+> | The radio's screen | IWC's mode dropdown | What it is |
+> |---|---|---|
+> | **RTTY** | **RTTY-L** | Normal. Rev unticked. |
+> | **RTTY-R** | **RTTY-U** | Reverse. Rev ticked. |
+>
+> Nothing is wrong when they disagree — they are the same mode under two naming conventions, and CW does exactly the same thing (the radio's **CW-R** is IWC's **CW-L**). The suffixes are names rather than a statement about which sideband you are on; see [§18.1](#181-if-cw-is-new-to-you) for the CW version of the same caution. If you are ever unsure which you are in, the radio's own display is the one to believe.
 
 > **Which way round is it on this radio?** With the IC-7300 in plain **RTTY**, the space tone arrives **above** mark in the audio — 2125 and 2295 Hz at the standard 170 Hz shift — which is what **Rev unticked** expects. That is not guesswork: it was measured on an IC-7300 MkII by tuning a steady carrier, sweeping the tuner's own mark filter to find it at 2125 Hz, then moving the dial up 500 Hz and watching the tone move up 500 Hz with it. Audio that rises as the dial rises is the lower-sideband case, and it puts space above mark.
 >
