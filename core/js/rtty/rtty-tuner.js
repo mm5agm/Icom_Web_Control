@@ -59,6 +59,10 @@ export class RttyTuner {
         this._radioApplied = null;   // {markHz, shiftHz} we last took FROM the radio
         this._want    = null;        // settings we have POSTed but not yet seen come back
         this._wantAt  = 0;
+        this._radioBusy = false;     // a radio-tones read is outstanding
+        this._pushBusy    = false;   // a radio-tones write is outstanding
+        this._pushPending = null;    // the newest tones to write once it finishes
+        this._statusHold  = 0;       // Date.now() until which _draw must not overwrite
     }
 
     init() {
@@ -77,7 +81,18 @@ export class RttyTuner {
         this._loadSettings();
         this._showSettings();
 
-        const changed = () => { this._readSettings(); this._saveSettings(); this._send('start'); };
+        // The operator changing Mark or Shift here changes them on the radio
+        // too, so the two do not have to be kept in step by hand. Reverse has
+        // no radio equivalent (it is which way round the station we are
+        // listening to is sending) and so writes nothing.
+        const changed = () => {
+            const was = { markHz: this._settings.markHz, shiftHz: this._settings.shiftHz };
+            this._readSettings();
+            this._saveSettings();
+            this._send('start');
+            if (was.markHz !== this._settings.markHz || was.shiftHz !== this._settings.shiftHz)
+                this._pushToRadio();
+        };
         this._markEl?.addEventListener('change', changed);
         this._shiftEl?.addEventListener('change', changed);
         this._revEl?.addEventListener('change', changed);
@@ -167,12 +182,12 @@ export class RttyTuner {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
-                this._setStatus(body.error || `HTTP ${res.status}`);
+                this._setStatus(body.error || `HTTP ${res.status}`, 4000);
                 return;
             }
             if (what === 'start') this._sweeps.length = 0;
         } catch {
-            this._setStatus('Cannot reach the server.');
+            this._setStatus('Cannot reach the server.', 4000);
         }
     }
 
@@ -211,16 +226,28 @@ export class RttyTuner {
     // manual: the operator pressed the button, so say what happened either way
     // and apply even in an AFSK mode, where they may well have a reason.
     async _syncFromRadio(manual) {
+        // One at a time, and never for long. Reading the menu is a CI-V round
+        // trip on a bus the poll loop and the scope are already sharing, so it
+        // can take longer than the four seconds between two of these; without
+        // the guard they would stack up, and each one that arrives late writes
+        // a stale answer into the dialog.
+        if (this._radioBusy) {
+            if (manual) this._setStatus('Still reading the radio - try again in a moment.', 3000);
+            return;
+        }
+        this._radioBusy = true;
+        const abort = new AbortController();
+        const bail  = setTimeout(() => abort.abort(), 3000);
         try {
-            const res = await fetch('/api/rtty/radio-tones');
+            const res = await fetch('/api/rtty/radio-tones', { signal: abort.signal });
             if (res.status === 404) {          // this app cannot answer: stop asking
                 if (this._radioEl) this._radioEl.hidden = true;
                 this._stopRadioSync();
                 return;
             }
-            if (!res.ok) { if (manual) this._setStatus(`Radio settings: HTTP ${res.status}`); return; }
+            if (!res.ok) { if (manual) this._setStatus(`Radio settings: HTTP ${res.status}`, 4000); return; }
             const r = await res.json();
-            if (!r.ok) { if (manual) this._setStatus(r.reason || 'The radio did not answer.'); return; }
+            if (!r.ok) { if (manual) this._setStatus(r.reason || 'The radio did not answer.', 4000); return; }
 
             const mark  = Number.isFinite(r.markHz) ? Math.round(r.markHz) : null;
             const shift = SHIFTS.includes(r.shiftHz) ? r.shiftHz : null;
@@ -254,9 +281,73 @@ export class RttyTuner {
 
             const read = `Radio: mark ${this._settings.markHz} Hz, shift ${this._settings.shiftHz} Hz`;
             this._setStatus(r.note ? `${read}. ${r.note}`
-                                   : same ? `${read} - already matching.` : `${read}.`);
+                                   : same ? `${read} - already matching.` : `${read}.`, 4000);
         } catch {
-            if (manual) this._setStatus('Cannot reach the server.');
+            if (manual) this._setStatus('The radio did not answer in time.', 4000);
+        } finally {
+            clearTimeout(bail);
+            this._radioBusy = false;
+        }
+    }
+
+    // The other direction: what the operator chooses here goes into the
+    // radio's own RTTY menu (SET > Function > RTTY Mark/Shift), so the tuner
+    // and the radio's built-in decoder do not have to be set twice. FSK only,
+    // and the server enforces that - those menu items describe how the radio
+    // *transmits*, and in an AFSK mode the tones are the operator's software's.
+    //
+    // Latest-wins rather than queued. Working the Shift dropdown with the
+    // keyboard fires a change per step, and what matters is that the radio
+    // ends up on the one they stopped at, not that it visits the others.
+    async _pushToRadio() {
+        if (!this._radioEl) return;                  // this app has no radio endpoint
+        const want = { markHz: this._settings.markHz, shiftHz: this._settings.shiftHz };
+        if (this._pushBusy) { this._pushPending = want; return; }
+        this._pushBusy = true;
+        try {
+            const res = await fetch('/api/rtty/radio-tones', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(want)
+            });
+            if (res.status === 404) return;          // older server: nothing to say
+            if (!res.ok) { this._setStatus(`Radio: HTTP ${res.status}`, 4000); return; }
+            const r = await res.json();
+
+            if (!r.ok) { this._setStatus(r.reason || 'The radio would not take those tones.', 4000); return; }
+
+            // Only the parts the radio actually took. A null is a value with no
+            // rung on this radio - 450 and 850 Hz shift, for instance - and the
+            // tuner goes on using it regardless, because it is a receive aid
+            // and the radio's menu is not what makes it work.
+            const took = [];
+            if (r.markHz  != null) took.push(`mark ${r.markHz} Hz`);
+            if (r.shiftHz != null) took.push(`shift ${r.shiftHz} Hz`);
+            const missed = [];
+            if (r.markHz  == null) missed.push(`mark ${want.markHz} Hz`);
+            if (r.shiftHz == null) missed.push(`shift ${want.shiftHz} Hz`);
+
+            // Both sides now agree about whatever was written, so let the
+            // four-second sync resume following the radio for those - see
+            // _radioApplied. Anything the radio could not take leaves them
+            // disagreeing, and following would drag the tuner straight back off
+            // the value the operator chose.
+            this._radioApplied = missed.length ? null : { ...want };
+
+            this._setStatus(
+                missed.length
+                    ? (took.length ? `Radio set to ${took.join(', ')}; it has no ${missed.join(' or ')}.`
+                                   : `The radio has no ${missed.join(' or ')} - tuner only.`)
+                    : `Radio set to ${took.join(', ')}.`,
+                4000);
+        } catch {
+            this._setStatus('Cannot reach the server.', 4000);
+        } finally {
+            this._pushBusy = false;
+            const next = this._pushPending;
+            this._pushPending = null;
+            if (next && (next.markHz !== want.markHz || next.shiftHz !== want.shiftHz))
+                this._pushToRadio();
         }
     }
 
@@ -462,7 +553,12 @@ export class RttyTuner {
         return `Both tones in their filters - fine-tune for the thinnest cross${mode}.`;
     }
 
-    _setStatus(text) {
+    // _draw rewrites the status line twenty times a second, so anything worth
+    // reading - what the radio took, why it would not - has to be able to hold
+    // the line for a moment or it is gone before the eye reaches it.
+    _setStatus(text, holdMs = 0) {
+        if (holdMs) this._statusHold = Date.now() + holdMs;
+        else if (Date.now() < this._statusHold) return;
         if (this._status && this._status.textContent !== text) this._status.textContent = text;
     }
 }

@@ -116,5 +116,61 @@ namespace Icom_Web_Control.Controllers
                 return Ok(new { ok = false, reason = ex.Message });
             }
         }
+
+        public sealed record RadioTonesRequest(int MarkHz, int ShiftHz);
+
+        /// <summary>
+        /// Push the tuner's Mark and Shift into the radio's own RTTY menu
+        /// (1A 05 00 39 / 1A 05 00 40), so the two agree without a trip to the
+        /// front panel. The counterpart of the GET above and of the tuner's
+        /// "From radio" button.
+        ///
+        /// FSK only, for the same reason the GET says so: in an AFSK mode those
+        /// menu items describe a transmitter the operator is not using, and
+        /// writing them would change how the radio transmits on the strength of
+        /// a receive-side tuning aid.
+        ///
+        /// Always 200. The body says what the radio took: a null markHz or
+        /// shiftHz means this radio has no rung for that value — the menu items
+        /// are one-byte indexes into a short fixed list, and 450 and 850 Hz,
+        /// both perfectly ordinary on the air and both offered by the tuner,
+        /// simply are not on it.
+        /// </summary>
+        [HttpPost("radio-tones")]
+        public async Task<IActionResult> SetRadioTones([FromBody] RadioTonesRequest req)
+        {
+            var mode = _state.ModeA ?? "";
+            if (!mode.StartsWith("RTTY", StringComparison.OrdinalIgnoreCase))
+                return Ok(new
+                {
+                    ok     = false,
+                    mode,
+                    fsk    = false,
+                    reason = $"The radio is in {mode}, where your software makes the tones, "
+                             + "so its RTTY menu was left alone."
+                });
+
+            try
+            {
+                var w = await _radio.SetRttyToneSettingsAsync(req.MarkHz, req.ShiftHz,
+                                                              HttpContext.RequestAborted);
+                return Ok(new
+                {
+                    ok      = w.MarkHz != null || w.ShiftHz != null,
+                    mode,
+                    fsk     = true,
+                    markHz  = w.MarkHz,
+                    shiftHz = w.ShiftHz,
+                    reason  = w.MarkHz == null && w.ShiftHz == null
+                        ? "The radio has no setting for those tones."
+                        : null
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to write the radio's RTTY tone settings");
+                return Ok(new { ok = false, reason = ex.Message });
+            }
+        }
     }
 }

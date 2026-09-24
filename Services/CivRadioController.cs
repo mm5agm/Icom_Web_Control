@@ -2161,6 +2161,24 @@ namespace Icom_Web_Control.Services
             _ => 425,
         };
 
+        // The inverses. Exact matches only - see RttyToneWrite for why an
+        // unmatched value is refused rather than snapped to the nearest rung.
+        private static int RttyMarkCodeFromHz(int hz) => hz switch
+        {
+            1275 => 0,
+            1615 => 1,
+            2125 => 2,
+            _    => -1,
+        };
+
+        private static int RttyShiftCodeFromHz(int hz) => hz switch
+        {
+            170 => 0,
+            200 => 1,
+            425 => 2,
+            _   => -1,     // 450 and 850 are real shifts the IC-7300 cannot be told about
+        };
+
         /// <inheritdoc />
         public async Task<RttyToneSettings?> GetRttyToneSettingsAsync(CancellationToken cancellationToken = default)
         {
@@ -2173,6 +2191,26 @@ namespace Icom_Web_Control.Services
                 return null;
             }
             return new RttyToneSettings(RttyMarkHzFromCode(mark), RttyShiftHzFromCode(shift));
+        }
+
+        /// <inheritdoc />
+        public async Task<RttyToneWrite> SetRttyToneSettingsAsync(int markHz, int shiftHz, CancellationToken cancellationToken = default)
+        {
+            if (!IsConnected) return new RttyToneWrite(null, null);
+
+            int markCode  = RttyMarkCodeFromHz(markHz);
+            int shiftCode = RttyShiftCodeFromHz(shiftHz);
+
+            // Written one at a time, and each only if it has a rung. A shift the
+            // radio cannot hold must not stop the mark being set: the operator
+            // asked for both and should get whichever of them is possible.
+            if (markCode >= 0)
+                await WriteSetMenuByteAsync(0x00, 0x39, markCode, $"RTTY mark {markHz} Hz", cancellationToken);
+            if (shiftCode >= 0)
+                await WriteSetMenuByteAsync(0x00, 0x40, shiftCode, $"RTTY shift {shiftHz} Hz", cancellationToken);
+
+            return new RttyToneWrite(markCode  >= 0 ? markHz  : null,
+                                     shiftCode >= 0 ? shiftHz : null);
         }
 
         // -- RIT / ΔTX (CI-V 21) -----------------------------------------------
@@ -2953,6 +2991,7 @@ namespace Icom_Web_Control.Services
                 // visible and the Scope switch reachable. GitHub #1.
                 if (Environment.TickCount64 - Volatile.Read(ref _lastScopeAnnounceTicks) >= ScopeAnnounceEveryMs)
                     AnnounceScopeStatus();
+
 
                 loop++;
                 await DelayQuiet(ScopeAwarePollIntervalMs(), stoppingToken);
