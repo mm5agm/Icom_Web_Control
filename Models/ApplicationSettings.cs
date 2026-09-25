@@ -3,10 +3,14 @@ namespace Icom_Web_Control.Models
     public class ApplicationSettings
     {
         // Connection Settings
-        // IWC defaults are the verified IC-7300 MkII CI-V values (2026-07-25):
-        // COM8 = "IC-7300MK2 Serial Port A (CI-V)", 19200 8N1. Change the port
-        // in Settings if the radio enumerates elsewhere on another machine.
-        public string SerialPort { get; set; } = "COM8";
+        // The port is deliberately blank until chosen. It used to default to
+        // COM8 (the bench MkII's "Serial Port A (CI-V)"), which on any other PC
+        // is either absent or somebody else's device, and a first-time user
+        // saw "COM8 not found" with no hint that it was never theirs (#43).
+        // Blank makes CivRadioController.ConnectAsync say "choose a port" —
+        // or, when the PC has exactly one, take it. 19200 8N1 is the MkII's
+        // verified rate (2026-07-25) and the original IC-7300's on "Auto".
+        public string SerialPort { get; set; } = "";
         public int BaudRate { get; set; } = 19200;
         public string WebAddress { get; set; } = "0.0.0.0"; // Bind to all interfaces
 

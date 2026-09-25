@@ -93,6 +93,10 @@
             stepSelect.value = String(defaultStepHz || 10000);
             stepSelect.addEventListener('change', async function () {
                 const stepHz = parseInt(this.value, 10);
+                // The voice nudge step and the spectrum wheel step are the same
+                // number to the operator, so changing one changes both.
+                // fromVoice stops tuning-step.js POSTing it straight back.
+                window.iwcTuningStep?.set(vfo, stepHz, { fromVoice: true });
                 try {
                     await fetch('/api/voice/nudge-step', {
                         method: 'POST',
@@ -246,6 +250,9 @@
             controls.forEach(function (c) {
                 if (update.property === 'VoiceNudgeStepHz' + c.vfo && c.stepSelect) {
                     c.stepSelect.value = String(update.value);
+                    // A spoken "set step size" is a change to the shared tuning
+                    // step, so the spectrum wheel follows it too.
+                    window.iwcTuningStep?.set(c.vfo, parseInt(update.value, 10), { fromVoice: true });
                 }
             });
         });

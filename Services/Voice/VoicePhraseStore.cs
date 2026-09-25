@@ -108,6 +108,11 @@ namespace Icom_Web_Control.Services.Voice
                 // gets the commands without having to re-import anything.
                 if (config.Version < 10)
                     MigrateToV10(config);
+                // Version 11 added "one hertz" to the step-size vocabulary. Same
+                // shape, no collisions, so a v10 pack gains the one word rather
+                // than being reset.
+                if (config.Version < 11)
+                    MigrateToV11(config);
                 return config;
             }
             catch
@@ -414,9 +419,30 @@ namespace Icom_Web_Control.Services.Voice
             config.Version = 10;
         }
 
+        /// <summary>
+        /// v10 -> v11: the settable spectrum wheel step made 1 Hz a real step
+        /// size, so "one hertz" has to be sayable. An existing pack is carried
+        /// forward with just that entry added — the dropdown offered 1 Hz from
+        /// the moment the app updated, and a spoken step that silently did
+        /// nothing while the dropdown worked would be the confusing half.
+        /// A translated pack that already spells "1" its own way is left alone.
+        /// </summary>
+        private static void MigrateToV11(VoicePhrasesConfig config)
+        {
+            var step = config.SetNudgeStep;
+            if (step != null)
+            {
+                step.Vocabulary ??= new();
+                if (!step.Vocabulary.ContainsKey("1"))
+                    step.Vocabulary["1"] = ["one hertz"];
+            }
+
+            config.Version = 11;
+        }
+
         public static VoicePhrasesConfig BuildDefaults() => new()
         {
-            Version = 10,
+            Version = 11,
             SimpleCommands = new()
             {
                 ["SwapVFO"]          = ["swap v f o", "swap v f os", "swap a and b", "swap a b", "switch v f o", "switch a and b"],
@@ -619,6 +645,7 @@ namespace Icom_Web_Control.Services.Voice
                 Triggers   = ["set step", "step size", "nudge step"],
                 Vocabulary = new()
                 {
+                    ["1"]      = ["one hertz"],
                     ["10"]     = ["ten hertz"],
                     ["100"]    = ["one hundred hertz", "hundred hertz"],
                     ["1000"]   = ["one kilohertz", "one k"],
