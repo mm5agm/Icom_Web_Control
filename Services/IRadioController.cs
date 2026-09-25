@@ -1,3 +1,4 @@
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -54,6 +55,34 @@ namespace Icom_Web_Control.Services
     /// </para>
     /// </summary>
     public readonly record struct IfFilterWidthStep(int Hz, bool AtLimit);
+
+    /// <summary>
+    /// The radio's own RTTY tone settings, in Hz: where it puts the mark tone
+    /// in the receive audio and how far the space tone is from it.
+    ///
+    /// <para>These belong to <b>FSK</b> - the radio's built-in RTTY mode. In an
+    /// AFSK mode (DATA-L, DATA-U, LSB, USB) the tones are made by the
+    /// operator's software and the radio knows nothing about them, so these
+    /// values say nothing useful and the caller should not apply them.</para>
+    ///
+    /// <para><b>The radio may not be using what it reports.</b> On the IC-7300,
+    /// when its own internal RTTY decoder is running the radio forces 2125 Hz
+    /// and 170 Hz whatever the SET menu says (Basic manual, SET &gt; Function).
+    /// What this reads is the menu, so it is the operator's stated intent
+    /// rather than a guaranteed measurement of the audio. Offer it, do not
+    /// apply it silently.</para>
+    /// </summary>
+    public readonly record struct RttyToneSettings(int MarkHz, int ShiftHz);
+
+    /// <summary>
+    /// What the radio actually took when asked to change its RTTY tones.
+    /// A field is the value written, or <c>null</c> when this radio has no
+    /// setting for what was asked: the menu items are one-byte indexes into a
+    /// short fixed list, not free values, so 450 Hz and 850 Hz - both perfectly
+    /// ordinary on the air, and both offered by the tuner - simply have no rung
+    /// on an IC-7300. The caller says so rather than pretending it worked.
+    /// </summary>
+    public readonly record struct RttyToneWrite(int? MarkHz, int? ShiftHz);
 
     /// <summary>
     /// The semantic seam IWC introduces (the thing YWC lacked — see
@@ -286,6 +315,50 @@ namespace Icom_Web_Control.Services
 
         /// <summary>Set the break-in mode (0=OFF, 1=SEMI, 2=FULL; CI-V 16 47).</summary>
         Task SetCwBreakInAsync(int mode, CancellationToken cancellationToken = default);
+
+        // -- RTTY (FSK) tones --------------------------------------------------
+
+        /// <summary>
+        /// Read the radio's RTTY mark pitch and shift width, in Hz, so the RTTY
+        /// tuner can offer to match them rather than making the operator copy
+        /// two menu items across by hand.
+        ///
+        /// <para>Paired with <see cref="SetRttyToneSettingsAsync"/>. This one
+        /// was read-only at first, on the reasoning that the radio is the
+        /// authority and a receive-side tuning aid should follow it rather than
+        /// move the radio's own decoder and FSK transmit tones. Colin asked for
+        /// the other direction on 2026-09-24 and that is his call to make: an
+        /// operator who has set the tuner to the shift they can actually hear
+        /// expects the radio to agree, and having to key the same number into a
+        /// front-panel menu afterwards is the hand-copying this feature existed
+        /// to remove.</para>
+        ///
+        /// <para>Null when the radio cannot be asked - not connected, or it did
+        /// not answer. See <see cref="RttyToneSettings"/> for the two caveats
+        /// that come with the answer.</para>
+        /// </summary>
+        Task<RttyToneSettings?> GetRttyToneSettingsAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Put the RTTY tuner's mark pitch and shift width into the radio's own
+        /// SET menu, so the two agree without the operator keying the numbers in
+        /// twice.
+        ///
+        /// <para><b>This writes a transmit setting.</b> The same two menu items
+        /// govern the radio's FSK transmit tones, not just its decoder, so a
+        /// station that keys FSK from this radio will send on whatever is
+        /// written here. That is understood and intended; it is not a reason to
+        /// quietly skip the write.</para>
+        ///
+        /// <para>Takes Hz and maps to the radio's codes internally - the same
+        /// way round as <c>SetIfFilterWidthHzAsync</c>, and for the same reason:
+        /// which rungs exist is a fact about the radio and belongs below this
+        /// line. The result says what was taken; a value with no rung comes back
+        /// null rather than snapped to a neighbour, because silently moving an
+        /// operator's shift by 25 Hz is worse than telling them it will not
+        /// fit.</para>
+        /// </summary>
+        Task<RttyToneWrite> SetRttyToneSettingsAsync(int markHz, int shiftHz, CancellationToken cancellationToken = default);
 
         // -- TX audio chain: mic, speech compressor, monitor (CI-V 14 / 16) ----
         // Percentages, not raw 0–255: these are the units the sliders and the
@@ -557,7 +630,35 @@ namespace Icom_Web_Control.Services
         /// no scope has nothing to report.
         /// </summary>
         ScopeDiagnostics GetScopeDiagnostics() => new(false, 0, 0, null, null);
+
+        /// <summary>
+        /// Look for a radio on the PC's serial ports without knowing which port
+        /// or rate it is on: the "Find my radio" button in Settings (issue #43).
+        /// Reports where one answered so the operator can save that; it never
+        /// changes settings itself. A controller that is already connected
+        /// reports the live link rather than probing under itself. Default: a
+        /// controller with no hardware has nothing to look for.
+        /// </summary>
+        Task<RadioDiscovery> FindRadioAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(new RadioDiscovery(false, null, 0, null, Array.Empty<string>(), Array.Empty<string>()));
     }
+
+    /// <summary>
+    /// Result of <see cref="IRadioController.FindRadioAsync"/>.
+    /// </summary>
+    /// <param name="Found">A radio answered.</param>
+    /// <param name="Port">The serial port it answered on, in Settings' spelling ("COM3").</param>
+    /// <param name="Baud">The rate it answered at.</param>
+    /// <param name="Model">The Settings <c>RadioModel</c> value for what answered ("IC-7300", "IC-7300MK2").</param>
+    /// <param name="PortsProbed">Ports that were opened and stayed silent — or, when found, the ones tried before it.</param>
+    /// <param name="PortsBusy">Ports another program (or this one) holds open, so they could not be tried.</param>
+    public record RadioDiscovery(
+        bool Found,
+        string? Port,
+        int Baud,
+        string? Model,
+        IReadOnlyList<string> PortsProbed,
+        IReadOnlyList<string> PortsBusy);
 
     /// <summary>
     /// Snapshot of the band scope's state, for diagnostics only.
@@ -577,10 +678,25 @@ namespace Icom_Web_Control.Services
     /// my waterfall smoother on the radio's own screen" is a recurring
     /// question and this answers it with a number.
     /// </param>
+    /// <param name="BlockedReason">
+    /// Why the radio will not stream, when it has explicitly refused the
+    /// waveform-output command, else null. The operator-facing sentence, not a
+    /// code — it is printed verbatim.
+    ///
+    /// This is here because leaving it out cost a bug report. The original
+    /// IC-7300 refuses the command below 115200 baud, and the app knew that,
+    /// knew the radio menu to change and knew what to change it to — but none of
+    /// it reached the About block the manual asks users to paste, which could
+    /// only say "no sweep has ever arrived". That reads as a mystery, and
+    /// produced one (GitHub #47, and #2 before it). A refusal outranks the
+    /// counters: with no sweep ever assembled they are all zero and say nothing,
+    /// while this says exactly what to do.
+    /// </param>
     public record ScopeDiagnostics(
         bool Enabled,
         long SweepsCompleted,
         long SweepsDiscarded,
         double? SecondsSinceLastSweep,
-        double? SweepsPerSecond);
+        double? SweepsPerSecond,
+        string? BlockedReason = null);
 }

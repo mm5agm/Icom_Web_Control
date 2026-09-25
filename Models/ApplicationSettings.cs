@@ -1,12 +1,16 @@
-﻿namespace Icom_Web_Control.Models
+namespace Icom_Web_Control.Models
 {
     public class ApplicationSettings
     {
         // Connection Settings
-        // IWC defaults are the verified IC-7300 MkII CI-V values (2026-07-25):
-        // COM8 = "IC-7300MK2 Serial Port A (CI-V)", 19200 8N1. Change the port
-        // in Settings if the radio enumerates elsewhere on another machine.
-        public string SerialPort { get; set; } = "COM8";
+        // The port is deliberately blank until chosen. It used to default to
+        // COM8 (the bench MkII's "Serial Port A (CI-V)"), which on any other PC
+        // is either absent or somebody else's device, and a first-time user
+        // saw "COM8 not found" with no hint that it was never theirs (#43).
+        // Blank makes CivRadioController.ConnectAsync say "choose a port" —
+        // or, when the PC has exactly one, take it. 19200 8N1 is the MkII's
+        // verified rate (2026-07-25) and the original IC-7300's on "Auto".
+        public string SerialPort { get; set; } = "";
         public int BaudRate { get; set; } = 19200;
         public string WebAddress { get; set; } = "0.0.0.0"; // Bind to all interfaces
 
@@ -15,6 +19,16 @@
         // the first one that's free. User can pin a specific port here if they
         // know 8080 always clashes on their machine (e.g. Plex, Jenkins).
         public int HttpPort { get; set; } = 8080;
+
+        // When true (the default, and until now the only behaviour), the host
+        // exits about 30 seconds after the last browser tab disconnects, so
+        // closing the last tab closes the app. Set false to keep the process
+        // running with no browser connected — which is what you want when
+        // something other than a browser is the reason it is up: WSJT-X or
+        // Log4OM on the rigctld bridge, a DX cluster feed left running, or a
+        // shack PC you drive over RDP and would rather not have to restart.
+        // Quit it from the system tray instead.
+        public bool AutoShutdownWhenNoBrowsers { get; set; } = true;
 
         public string RadioModel { get; set; } = "IC-7300MK2"; // Icom single-receiver HF+6m(+4m EU)
 
@@ -57,6 +71,32 @@
 
         // Band Plan
         public string BandPlan { get; set; } = "Region1";
+
+        // When true (default, and the behaviour since the spectrum panel
+        // arrived), tuning by clicking the spectrum or a DX spot also sets
+        // the mode from the band plan. Bruce VK2RT asked for the off switch
+        // for RTTY contest work (Yaesu Web Control discussion #169):
+        // operators do not follow the band plan, so a click at 7.050 meaning
+        // LSB was answered with DATA-U, and a click on RTTY above 14.100 with
+        // USB. It bites here too, and harder - the band plan carries no RTTY
+        // segment at all, so RTTY sitting inside a DATA segment (17m RTTY is
+        // squarely inside 18095-18109) is answered with DATA-U and the
+        // operator is thrown out of RTTY on every click.
+        //
+        // This is not cosmetic. MENU > SET > Connectors > MOD Input names the
+        // transmit modulation source separately either side of the Data
+        // switch - "DATA OFF MOD" (default MIC,USB) and "DATA MOD" (default
+        // USB) - so a mode change the operator did not ask for can move the
+        // transmit audio input. At the factory defaults both admit USB, but
+        // MIC-only on DATA OFF MOD is the usual cure for Windows sounds going
+        // out on SSB, and with that set an unwanted flip out of a data mode
+        // cuts the data software out of the transmit path. Receive goes on
+        // decoding perfectly, which is why it only shows up on transmit.
+        //
+        // Off does NOT disable the mode a named band-plan segment carries
+        // when it is picked from the segment dropdown: that is an explicit
+        // choice of a segment, not a mode inferred from a frequency.
+        public bool AutoModeChangeOnTune { get; set; } = true;
 
         // SDR Spectrum Display — per-VFO device assignment (v2.3.0+).
         //

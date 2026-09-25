@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -289,6 +289,7 @@ builder.Services.AddSingleton<RadioStateService>();
 // retained in the tree (unregistered) as a no-hardware fallback for reference.
 // See docs/design/iwc-clone-split-plan.md.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Civ.ICivClient, Icom_Web_Control.Services.Civ.CivBusService>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Civ.RadioFinder>();
 
 // No-hardware preview mode: set IWC_USE_STUB_RADIO=1 to back the seam with the
 // canned StubRadioController instead of the real CI-V link. Lets the pseudo-dual
@@ -388,9 +389,17 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<WsjtxUdpService>()
 // Register process status cache service for efficient process lookups
 builder.Services.AddSingleton<ProcessStatusCacheService>();
 
-// Register radio memories service
-builder.Services.AddSingleton<Icom_Web_Control.Services.MemoryService>();
-builder.Services.AddSingleton<Icom_Web_Control.Services.MemoryBankService>();
+// Register radio memories services. Both live in core (shared with Yaesu
+// Web Control) and know nothing about where this app keeps its files, so the
+// paths are handed in here.
+var memoriesFolder = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+    "MM5AGM", "Icom Web Control");
+builder.Services.AddSingleton(new RadioWebControl.Core.Services.MemoryService(
+    Path.Combine(memoriesFolder, "memories.json")));
+builder.Services.AddSingleton(sp => new RadioWebControl.Core.Services.MemoryBankService(
+    sp.GetRequiredService<RadioWebControl.Core.Services.MemoryService>(),
+    Path.Combine(memoriesFolder, "memory-banks.json")));
 
 // Register DX cluster service — single instance shared between controllers and
 // the background hosted service so the API can read the spot buffer.
@@ -414,9 +423,18 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.S
 // browser tab. Nothing here starts until the operator presses Start - the
 // device is not opened at boot.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.WaveInCwAudioSource>();
+// One WinMM capture device, two features that want it. The hold is what
+// lets the CW reader and the RTTY tuner run at the same time - and, more
+// to the point, stops either one's Stop from deafening the other.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Audio.ReceiveAudioHold>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwQsoLogService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>();
+
+// RTTY tuning scope. Nothing runs until the operator opens the dialog;
+// the service takes its audio hold on the first start and drops it a
+// couple of seconds after the last poll.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyTunerService>();
 
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and

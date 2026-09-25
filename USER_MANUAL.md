@@ -1,4 +1,4 @@
-﻿# Icom Web Control — User Manual
+# Icom Web Control — User Manual
 
 > 🔍 **Searching this manual:** press **Ctrl + F** (Windows / Linux) or **⌘ + F** (Mac) to open your browser's find-in-page box. Type any term — a band name like "60m", a control like "Speech Processor", an error message you've hit — to jump straight to the relevant section.
 
@@ -68,6 +68,7 @@
     - 15.5 [WSJT-X is very slow to key the radio (long PTT / Tune delay)](#155-wsjt-x-is-very-slow-to-key-the-radio-1020-second-delay-on-ptt--tune)
     - 15.6 [Can I hear the radio from another room?](#156-can-i-hear-the-radio-from-another-room-i-have-iwc-working-downstairs-but-theres-no-sound)
     - 15.7 [I have the original IC-7300, not the MkII — what do I need to set differently?](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently)
+    - 15.8 [I set a 1 Hz tuning step and the radio's display doesn't change](#158-i-set-a-1-hz-tuning-step-and-the-radios-display-doesnt-change)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -104,6 +105,12 @@
     - 19.5 [Stopping](#195-stopping)
     - 19.6 [The panel](#196-the-panel)
     - 19.7 [Troubleshooting](#197-troubleshooting)
+20. [RTTY Tuner](#20-rtty-tuner)
+    - 20.1 [What the figure is telling you](#201-what-the-figure-is-telling-you)
+    - 20.2 [Mark, Shift and Rev](#202-mark-shift-and-rev)
+    - 20.3 [Your first session, step by step](#203-your-first-session-step-by-step)
+    - 20.4 [Running it alongside the CW Reader](#204-running-it-alongside-the-cw-reader)
+    - 20.5 [Troubleshooting](#205-troubleshooting)
 
 ---
 
@@ -148,6 +155,7 @@ The application was written for operators who want a large, clean, touchscreen-f
 - CW keyer with speed, break-in, delay, **sidetone pitch**, and five programmable memory messages
 - **CW Reader** — decodes the Morse you are hearing into text, with a one-press **Reader Mode** that sets the radio up for decoding and restores it afterwards, a **ZIN** zero-beat button and a **Log QSO** form that writes ADIF ([§18](#18-cw-reader))
 - **CW Send** — type a line and the radio keys it over CI-V, with Stop, at the keyer's own speed ([§19](#19-cw-send))
+- **RTTY Tuner** — the classic crossed-ellipse tuning scope, drawn from the radio's receive audio, for putting a RTTY signal exactly on its tones ([§20](#20-rtty-tuner))
 - TX monitor on/off toggle and level control
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Real-time spectrum display and waterfall using the **IC-7300's built-in band scope**, delivered over CI-V — no external SDR or IF tap needed
@@ -186,20 +194,29 @@ Before the app can communicate with your radio you need to tell it which serial 
 1. Open a browser and go to **http://localhost:8080**. If port 8080 was already in use on your PC (e.g. Plex, Jenkins, MiniTool ShadowMaker), IWC will have automatically picked the next free port from 8081–8089. **Hover over the IWC tray icon** down by the Windows clock to see the actual URL — or simply double-click the tray icon to have IWC open the right URL in your default browser.
 2. Click the **Settings** link in the navigation bar.
 3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver.
-4. Set **Serial Port** to the COM port your radio is connected to — the USB serial port the radio presents when you plug its USB cable in. **On the MkII that is the USB Type-C socket, and Windows creates the port by itself. On the original IC-7300 it is the USB Type-B socket, and you must install Icom's USB driver first** — until you do, Windows creates no port at all and there will be nothing here to choose. The driver is on Icom's support site under the radio's downloads. If you are unsure which port is which, go to **Diagnostics → Ports** for a list, or check Windows Device Manager.
+4. Set **Serial Port**. The box is a list of every COM port your PC has at that moment, so you choose rather than type. **If you don't know which one is the radio, switch the radio on and press "Find my radio"** — IWC tries each port at each speed until an Icom answers, then fills in the Radio Model, Serial Port and Baud Rate for you, and tells you what it found. It takes a couple of seconds, longer if the radio is on an unusual speed. Nothing is saved until you press **Save Settings**, so it is safe to press as often as you like.
+
+   The port is the USB serial port the radio presents when you plug its USB cable in. **On the MkII that is the USB Type-C socket, and Windows creates the port by itself. On the original IC-7300 it is the USB Type-B socket, and you must install Icom's USB driver first** — until you do, Windows creates no port at all, so the list will not have it and Find my radio cannot see it either. The driver is on Icom's support site under the radio's downloads. **Diagnostics → COM Ports** shows the same list if you want to check it elsewhere.
 5. Set **Baud Rate** — and this is the one place the two radios genuinely differ, so follow the row for the model you picked in step 3. Settings shows a warning if you choose a combination that will not work.
 
    | Your radio | In IWC's Settings | On the radio itself |
    |---|---|---|
    | **IC-7300 MkII** | **19200** | Nothing to change. The MkII has no **CI-V USB Baud Rate** menu, and the **CI-V Baud Rate** item under **Menu → Set → Connectors → CI-V** governs the round **[REMOTE]** socket only — leave it on "Auto". IWC's box alone decides the rate. |
-   | **IC-7300 (original)** | **115200** | **Menu → Set → Connectors → CI-V**: set **CI-V USB Port** to **Unlink from [REMOTE]** and **CI-V USB Baud Rate** to **115200**. |
+   | **IC-7300 (original)** | **115200** | **Menu → Set → Connectors → CI-V**: set **CI-V USB Port** to **Unlink from [REMOTE]** *first*, then **CI-V USB Baud Rate** to **115200**. The order matters — see the warning below. |
+
+   > **If the only speeds you are offered are 4800, 9600, 19200 and Auto, you are in the wrong menu item.** That one is **CI-V Baud Rate**, which belongs to the round **[REMOTE]** socket on the back panel and has no effect on a USB connection. Leave it alone. The item you want is **CI-V USB Baud Rate**, and it only becomes settable once **CI-V USB Port** is set to **Unlink from [REMOTE]** — which is why that has to be done first. This has caught a first-time user, who quite reasonably concluded their radio did not offer 115200 at all.
 
    **Why the original needs 115200:** it will not send band scope data at any lower rate. At 19200 everything else works perfectly — the radio connects, the meters move, the controls respond — and only the spectrum display stays permanently empty, which makes it look like a missing feature rather than a setting. Two owners have hit this independently, so if you have the original model, set 115200 now and save yourself the hunt. See [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently) for everything else that differs.
 6. Select your **Band Plan**: Region 1 (Europe/Africa/Middle East, includes 4m), Region 2 (Americas), Region 3 (Asia-Pacific), or Japan.
 7. If you run digital modes (FT8, FT4, RTTY, PSK) via USB audio, see the FAQ (§15) for a one-time radio menu change needed on the radio itself — it's not configurable from IWC.
 8. Click **Save Settings**, then **Test Connection**. A green tick means the app is talking to the radio.
 
-If you see a red cross, double-check the COM port number and baud rate, then try again.
+If you see a red cross, check in this order — it is roughly how often each one is to blame:
+
+1. **The USB cable, at both ends.** A cable that has worked its way out of the radio looks exactly like every other fault. This is the single commonest cause.
+2. **The radio is switched on.**
+3. **The COM port.** Press **Find my radio**: if it finds the radio, the port was wrong and it has just been corrected for you. If it reports that a port is *in use by another program*, close whatever else talks to the radio (WSJT-X, Log4OM, another CAT program) and press it again — two programs cannot share one COM port.
+4. **The baud rate**, if you have the original IC-7300 and set it by hand — Find my radio reports the speed the radio actually answered at.
 
 **Optional — extras you can set up later in Settings:**
 
@@ -255,11 +272,16 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.1.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.3.0**) are shown in the top-left corner.
 
-**Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the latest version or if the internet is not available.
+**Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears listing what has changed, with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the newest version or if the internet is not available.
 
-The banner only ever tells you about **full releases**. Pre-releases are deliberately left out of it — if you want to try one you go and fetch it yourself from the [releases page](https://github.com/mm5agm/Icom_Web_Control/releases), rather than being nudged towards a less-tested build while you're operating.
+**What it offers you depends on which build you are running, and on nothing else.**
+
+- **On a full release** — for example **v1.1.0** — the banner only ever tells you about another **full release**. Pre-releases are deliberately left out: if you want to try one you go and fetch it yourself from the [releases page](https://github.com/mm5agm/Icom_Web_Control/releases), rather than being nudged towards a less-tested build while you're operating. There is no setting that changes this.
+- **On a pre-release** — anything with a `-pre` in its name, such as **v1.2.0-pre1** — the banner also tells you about newer pre-releases, and marks them **Pre-release** so you can see what you are being offered. You chose to test, so leaving you on an old test build helps nobody; if you report something that three pre-releases ago fixed, neither of us finds out. When the finished version arrives you are offered that instead.
+
+Either way the banner never offers you a nightly `unstable-` build, and dismissing it is remembered for that version.
 
 **External app buttons** (WSJT-X, JTAlert, Log4OM, GridTracker, Fldigi) appear if they are enabled in Application Setup. The colour of each button indicates status:
 
@@ -359,19 +381,52 @@ The slider snaps to 5 W steps for ease of dragging, but the numerical label show
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over CI-V — there is no external SDR and nothing extra to plug in. It shows a real-time spectrum and scrolling waterfall of the band around the current VFO A frequency, and appears automatically once the radio is connected.
 
-![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
+![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright / Step bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
 
 **Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for three reasons: to give the screen space back to the rest of the control panel, to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
 
-**Switching the scope off collapses the panel**, so the spectrum, waterfall, span buttons and the Range / Speed / Bright bar all fold away and everything below them moves up. The switch itself stays put on its own row, with the reminder *"Spectrum hidden — switch Scope on to show it"* beside it, so the way back is always on screen. Your choice is remembered between sessions.
+**Switching the scope off collapses the panel**, so the spectrum, waterfall, span buttons and the Range / Speed / Bright / Step bar all fold away and everything below them moves up. The switch itself stays put on its own row, with the reminder *"Spectrum hidden — switch Scope on to show it"* beside it, so the way back is always on screen. Your choice is remembered between sessions.
 
 If the scope stops streaming for any other reason — it is off at the radio, or no sweep has arrived yet — the panel stays on screen and says what is happening instead ("Band scope is off — switch it on above the panel", or "Waiting for the radio's band scope…"). Only the switch collapses the panel; nothing the radio does can take the way of switching it back on off the screen.
 
 **Span buttons** — eight buttons in the panel header set the visible bandwidth, from **±2.5k** (narrowest — a single QSO fills the screen) through **±5k**, **±10k**, **±25k**, **±50k**, **±100k**, **±250k** to **±500k** (widest — a 1 MHz-wide view). The figure is the *half*-width either side of centre, matching the way the IC-7300 labels its own scope, so **±500k** shows a megahertz across the screen. Clicking one sets the radio's scope span, so the radio's front panel changes too; equally, changing the span on the radio lights the matching button in IWC, because the active button is re-synced from every incoming sweep.
 
-**Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is.
+**Click to tune** — Click anywhere on the spectrum **or the waterfall** to tune VFO A to that frequency. A click on a signal trail in the waterfall QSYs to the frequency of that column, which is the natural way to chase an interesting signal you can see slowly drifting down the screen. **The mode also changes automatically** to match the segment of the band you clicked into — CW below the digital sub-band, DATA-U around the FT8/FT4/RTTY watering holes, USB/LSB in the phone segment, FM at the top of 10m and on 2m/4m. If you click somewhere outside the recognised amateur bands the mode is left as-is. **You can turn the automatic mode change off** in **Settings → §6.1** (*Change mode automatically when tuning from the band plan*) — see the note below.
 
-**Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune VFO A up or down in 1 kHz steps.
+> **When the automatic mode change gets in the way.** The band plan is where most people
+> operate, not where everyone operates, and on a contest weekend it is not where anyone
+> operates. RTTY runs well above 14.100; 40m SSB is used around 7.050. In both cases the
+> mode you want is not the mode the band plan gives, so every click puts the radio back
+> where you did not want it.
+>
+> **RTTY has no segment of its own in the band plan at all**, so it gets the worst of it:
+> 17m RTTY sits squarely inside the FT8/data segment, and a click there answers with
+> **DATA-U** and takes you straight out of RTTY.
+>
+> This is worth more than the annoyance it looks like. **MENU → SET → Connectors → MOD Input**
+> names the transmit audio source separately either side of the Data switch — **DATA OFF MOD**
+> (SSB, AM and FM; default **MIC, USB**) and **DATA MOD** (the data modes; default **USB**).
+> At the factory settings both admit USB audio, but setting DATA OFF MOD to **MIC** only is
+> the usual cure for Windows sounds going out on SSB, and with that set a mode change you
+> did not ask for quietly cuts your data software out of the transmit path. Receive audio is
+> produced in every mode, so you will not notice until you transmit and nothing goes out.
+>
+> Untick **Change mode automatically when tuning from the band plan** in
+> **Settings → §6.1** and IWC leaves the mode entirely to you. Clicking the spectrum and
+> clicking a DX spot row then tune only. Picking a named segment — CW, FT8, SSB, RTTY —
+> from a VFO’s band dropdown still sets that segment’s mode either way, because that is a
+> choice you made rather than a guess from a frequency.
+
+**Mouse wheel to tune** — Scroll the mouse wheel over the spectrum to tune that panel's VFO up or down by one **tuning step**. The step starts at 1 kHz and is remembered per VFO across browser reloads. Four things set it, and they all set the same thing:
+
+- **The Step box** on the spectrum's control bar, beside Bright — anything from 1 Hz to 1 MHz.
+- **Right-click on the spectrum** for the same list as a pop-up menu, with the current step ticked. Escape or a click elsewhere closes it, and the arrow keys, Home and End move through it.
+- **Click a digit in the frequency display** — the digit you pick becomes the wheel step, so clicking the 100 Hz digit gives you a 100 Hz wheel. This is usually the quickest route, because you are already pointing at the digit you want to work in.
+- **The Voice Nudge Step Size** for that VFO, from its dropdown or by voice. The wheel and the voice nudge share one step per VFO, so changing either moves the other.
+
+Every change is announced to screen readers. 1 Hz is offered everywhere, including the voice nudge — 1 kHz is far too coarse for chasing RTTY, and no use at all for zero-beating CW. The feature came from Yaesu Web Control, where Bruce VK2RT [asked for it](https://github.com/mm5agm/Yaesu_Web_Control/discussions/168).
+
+**A 1 Hz step works, but the radio's own display will not show it.** The IC-7300's front panel normally reads seven digits, down to 10 Hz, so a 1 Hz step moves IWC's frequency display and leaves the radio's looking untouched. The radio has taken the command — IWC reads the frequency back from the rig rather than assuming it, so the eighth digit on screen is the VFO's real setting. To see that digit on the radio too, **touch the Hz digits on the radio's screen and hold for one second** to turn on its **1 Hz step Fine Tuning function**; hold them again to turn it back off. On the **original IC-7300** that function is offered in SSB, CW and RTTY only; the **MkII** sets no such restriction.
 
 **Frequency crosshair** — Move the mouse over the spectrum to see the exact RF frequency at the cursor position displayed above the waterfall.
 
@@ -389,15 +444,17 @@ If the scope stops streaming for any other reason — it is off at the radio, or
 
 **Persistent cursor — bookmark a frequency** — **Shift-click** anywhere on the panel to drop a persistent cyan cursor at that frequency, with the frequency in a small boxed label beside it. It stays put as you tune around with ordinary clicks, so you can mark a station to come back to. To remove it, **Shift-click on or near it** (within about 10 pixels).
 
-#### The Range / Speed / Bright bar
+#### The Range / Speed / Bright / Step bar
 
-The three sliders under the panel header shape the display. All three are per-VFO and are saved **on the server**, not just in your browser, so they follow you to a phone or tablet as well as surviving a reload.
+The three sliders under the panel header shape the display. All three are per-VFO and are saved **on the server**, not just in your browser, so they follow you to a phone or tablet as well as surviving a reload. The **Step** box at the end of the bar is not a display control — it sets how far the mouse wheel tunes, and it is kept in your browser rather than on the server.
 
 **Range** — the height of the vertical scale, in dB (5–140). This is a gain control for the trace: a *smaller* Range makes peaks taller, a *larger* one flattens everything out. It does **not** move the noise floor. IWC measures the noise floor on every sweep and pins it just above the bottom edge of the panel automatically, so the noise stays where you put it no matter how you set Range, and no matter how far you zoom the span in or out. Wind Range down until weak signals stand clear of the grass, and up again if strong signals are running off the top.
 
 **Speed** — how fast the waterfall scrolls, from **Full** down to **1/128**. Drag it left if signal trails are scrolling past faster than you can read them. The spectrum trace above the waterfall keeps updating live regardless of this setting.
 
 **Bright** — lifts the waterfall's colour mapping by up to 60 dB, bringing weak signals further up the colour scale so they show as blue-green rather than near-black. **Off** (0) is the unmodified mapping. Like Speed, it affects only the waterfall; the spectrum trace above it is untouched. The change applies to new rows as they scroll in — the history already on screen keeps the colours it was drawn with.
+
+**Step** — how far one mouse-wheel notch over this panel moves the dial, from 1 Hz to 1 MHz. It is the same number as the right-click menu, the selected digit on the frequency display and that VFO's voice nudge step; see **Mouse wheel to tune** above.
 
 #### The three badges
 
@@ -429,7 +486,7 @@ By default IWC shows **one** spectrum panel, for VFO A. The IC-7300 has a single
 
 Switching on **Enable pseudo-dual receiver** in **Settings → Spectrum Display** adds a second panel for VFO B — a *watch* panel — by time-sharing the one scope between them. On the **same band** both panels update live and your audio is never interrupted, because the single sweep covers both frequencies. Watching a **different** band is only possible by briefly borrowing the receiver, so it is off unless you also tick **Allow cross-band watch**; with that on, IWC retunes for a moment every few seconds (interval configurable, default 15 s) and your listening audio dips for about 0.4 s per peek. With cross-band watch off, a watch panel pointed at another band simply shows **Off-screen**. The peek only runs while a browser is actually showing the watch panel: choose **VFO A** (or **VFO B**) alone in the spectrum strip, or switch the scope off, and the retuning stops until you go back to **Both**. Commands you send during a peek — a voice **Band up**, a click on the spectrum, a memory recall — are held for the fraction of a second the receiver is borrowed and then applied to your own VFO, never to the one being watched.
 
-![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel](pictures/Spectrum_Scope_Both.png)
+![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel, each with its own tuning step: 1 Hz on A, 1 kHz on B](pictures/Spectrum_Scope_Both.png)
 
 **Listen / Listening** — with two panels up, the one you are hearing carries a green **Listening** badge and the other carries a **Listen** button. Click **Listen** to move the radio's audio to that VFO; the badge and button swap over. The badge follows the radio, so switching VFOs on the front panel moves it too.
 
@@ -497,6 +554,8 @@ The frequency display shows the current VFO frequency in MHz to 1 Hz resolution 
 3. Carry-over is automatic — for example, scrolling 9 → 0 on the kHz digit also increments the 10 kHz digit.
 4. The new frequency is sent to the radio approximately 200 ms after you stop scrolling.
 5. Click anywhere outside the frequency display to deselect.
+
+**Clicking a digit also sets the spectrum wheel step.** Whichever digit you select becomes the step the mouse wheel uses over that VFO's spectrum panel — click the 10 Hz digit and the spectrum tunes in 10 Hz. The step is latched when you click, so it survives deselecting. See [§5.4](#54-spectrum-display) for the other three ways to set it.
 
 **On a tablet or phone**, tap a digit to select it, then use the **▲** and **▼** buttons that appear below the display to adjust it.
 
@@ -917,7 +976,7 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 | Spotter | The station that reported the spot |
 | Comment | Free-text comment from the spotter |
 
-**Click any row** to QSY VFO A to that spot's frequency **and switch mode** to match the band-plan segment the frequency falls into (FT8 → DATA-U, CW → CW-U, phone segments → USB or LSB as appropriate, etc.). This matches the click-to-tune behaviour on the spectrum panel — so clicking an FT8 spot from a phone segment flips the radio to DATA-U in one step rather than leaving you on the wrong mode.
+**Click any row** to QSY VFO A to that spot's frequency **and switch mode** to match the band-plan segment the frequency falls into (FT8 → DATA-U, CW → CW-U, phone segments → USB or LSB as appropriate, etc.). This matches the click-to-tune behaviour on the spectrum panel — so clicking an FT8 spot from a phone segment flips the radio to DATA-U in one step rather than leaving you on the wrong mode. It also obeys the same **Settings → §6.1** switch: with *Change mode automatically when tuning from the band plan* unticked, clicking a spot tunes without touching the mode (§5.4).
 
 **Click any column header** to sort by that column; click again to reverse the sort direction. The current sort is shown by a ▲ or ▼ next to the column name.
 
@@ -962,14 +1021,26 @@ Clicking **Restart Now** stops IWC and (when running as the installed exe) autom
 
 ### 6.1 Radio Connection
 
+![Settings → Radio Connection with IC-7300 MkII chosen: the Radio Model dropdown, the Serial Port dropdown with its Refresh and Find my radio buttons, and the Baud Rate box set to 19200](pictures/Settings_Radio_Connection_7300MK2.png)
+
+*With **IC-7300 MkII** chosen — three fields, and nothing to set on the radio.*
+
+**Choose IC-7300 instead, and the page tells you what the original model needs:**
+
+![The same section with IC-7300 chosen: a blue five-step checklist of the radio's own CI-V menu items appears above the Serial Port field, and a yellow warning below the Baud Rate box explains that the band scope needs 115200](pictures/Settings_Radio_Connection_7300.png)
+
+*The blue checklist and the yellow band-scope warning appear for the original model only, because it is the only one that needs them. The steps are in the order the radio will let you do them — see [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).*
+
 | Setting | Description |
 |---------|-------------|
 | Radio Model | **IC-7300 MkII** (100 W, HF + 6m + 4m EU) or **IC-7300** (100 W, HF + 6m). Both are single-receiver with a built-in CI-V band scope. |
-| Serial Port | COM port the IC-7300 presents over its USB Type-C cable (e.g., COM3). Find it in Windows Device Manager or on the **Diagnostics → Ports** page. |
-| Baud Rate | The rate IWC opens the serial port at. Default: **19200**. **IC-7300 MkII:** leave it at 19200 — the MkII has no **CI-V USB Baud Rate** menu, and its **CI-V Baud Rate** item applies to the **[REMOTE]** socket only, so there is nothing to match and raising this will not speed the band scope up (measured: the same ~4 sweeps per second at 19200 and at 115200). **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
+| Serial Port | COM port the IC-7300 presents over its USB cable (Type-C on the MkII, Type-B on the original). The box lists every port your PC has right now; **Refresh** re-reads the list if you plug the radio in while the page is open, and **Other…** lets you type a port the list cannot see. If you don't know which port is the radio, press **Find my radio** (below). **Diagnostics → COM Ports** shows the same list. |
+| Find my radio | Asks IWC to look for the radio instead of you. It opens each COM port in turn and asks any Icom on it to identify itself, at 19200 first, then 115200, then the remaining speeds; the first radio that answers wins, and its model, port and baud rate are filled into this page for you to **Save**. Nothing is saved or changed on the radio. If a port is held open by another program (WSJT-X, Log4OM, another CAT program) it says so rather than guessing — close that program and press it again. A radio that is switched off, or whose USB cable is out, cannot answer and will not be found. |
+| Baud Rate | The rate IWC opens the serial port at. Default: **19200**. If you used **Find my radio**, this is already the rate the radio answered at. **IC-7300 MkII:** leave it at 19200 — the MkII has no **CI-V USB Baud Rate** menu, and its **CI-V Baud Rate** item applies to the **[REMOTE]** socket only, so there is nothing to match and raising this will not speed the band scope up (measured: the same ~4 sweeps per second at 19200 and at 115200). **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
+| Change mode automatically when tuning from the band plan | On by default. Clicking the spectrum or a DX spot also sets the mode the band plan gives for that frequency. Turn it **off** for contest or off-band-plan work — RTTY above 14.100 and 40m SSB around 7.050 both fight the automatic change, RTTY has no band-plan segment of its own, and an unwanted change can move transmit audio away from your data software (**SET → Connectors → MOD Input**). Picking a named segment from a VFO band dropdown still sets that segment’s mode either way. See §5.4. |
 
-IWC talks to the radio using the CI-V protocol over that single USB serial connection. It identifies itself as controller `E0`, and works out the radio's own CI-V address at connect rather than assuming one — so `B6` (the MkII's default), `94` (the original IC-7300's) and any address you have set by hand all work with nothing to configure. After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success.
+IWC talks to the radio using the CI-V protocol over that single USB serial connection. It identifies itself as controller `E0`, and works out the radio's own CI-V address at connect rather than assuming one — so `B6` (the MkII's default), `94` (the original IC-7300's) and any address you have set by hand all work with nothing to configure. After changing the serial port or baud rate, click **Test Connection** to verify the radio responds. A green tick confirms success. On a fresh installation the serial port is deliberately left blank until you choose one — IWC will not guess a port number for you, except on a PC that has exactly one COM port, where it takes that one and saves it.
 
 > **Running WSJT-X / FT8 via USB audio?** The IC-7300 needs its **USB SEND / audio** menu items set up before it will transmit digital audio from a PC. This is a one-time radio setup — see FAQ §15.
 
@@ -1273,6 +1344,13 @@ The editor shows all your saved memories in a table. For each memory you can edi
 
 Click **Save** to save all changes. Click **Add Memory** to append a blank row. Click the **trash** icon on any row to delete that memory.
 
+**Putting the list in order.** The order of the rows in the editor is the order everywhere else: the Mem panel tiles on the main page, and the order memories go to the radio (§8.4 - **Export to Radio** writes the first 99 in list order, so if your list is longer than the radio this is how you choose which 99 it gets). Two ways to change it:
+
+- Click the **Label**, **Frequency** or **Mode** column heading to sort the whole list by that column; click it again to reverse the sort. Sorting by Mode keeps each mode's memories in frequency order.
+- The three buttons at the right of each row move that memory **to the top**, **up one** or **down one**.
+
+Either way the row numbers change as you go and the message above the table says what you did - and reminds you that the new order is only kept when you press **Save**. Reload without saving and the list goes back to how it was.
+
 The **Pop Out** button opens the Memories page in a new browser tab — useful if you want to edit memories on a second monitor while the main control panel is open in the first.
 
 **Save to Mem button** — When you click "Save to Mem" on a VFO panel, the app captures the **full live state** of that VFO at the moment you clicked it: frequency, mode, IF width, NB/NR/AGC, and power. The memory is added with the applicable advanced fields populated. Edit the label later from the Memories page.
@@ -1331,6 +1409,8 @@ If a record has no frequency it's skipped silently — most loggers always inclu
 
 > **Warning:** Export to Radio (Replace) overwrites all 99 radio memory channels. Make sure you have imported or backed up anything you want to keep first.
 
+The radio has only 99 channels and the app can hold more, so if your list is longer than the radio, **Export to Radio** writes the first 99 in list order and stops. To choose which 99 go, put them at the top of the list first - sort by a column heading or use the row buttons (§8.1) - and press **Save** before you export.
+
 ---
 
 ### 8.5 Memory Banks
@@ -1347,6 +1427,8 @@ The **Memory Banks** bar appears at the top of the Memories page.
 4. If a bank with that name already exists, you are asked to confirm overwrite.
 
 The bank is saved immediately. Your current working memories are unchanged.
+
+A bank holds every field of every memory, advanced fields included. Before the fix on 2026-09-20 loading a bank kept only label, frequency, mode and the clarifier settings, so the IF width, NB, NR, AGC, power and notes captured by **Save to Mem** were quietly dropped every time a bank was loaded. A bank saved with an older version still has those fields in the file - they were saved, just not loaded - so loading it again with the current version brings them back.
 
 **Loading a bank:**
 
@@ -1747,6 +1829,8 @@ Access the Diagnostics page from the navigation bar. It is primarily used when s
 
 **Band scope delivery** — the panel at the top of the page, always visible. It shows how many spectrum sweeps per second are actually reaching IWC from the radio, measured over the last three seconds, along with the number of sweeps assembled and discarded since the app started.
 
+If the radio has *refused* to send scope data, the panel reads **Blocked** instead of a rate and prints the reason in place of the counters — which in that state are all zero and tell you nothing. On the original IC-7300 that reason is nearly always the baud rate; see §15.7.
+
 About **4 sweeps per second is normal over USB**, and there is nothing to fix if that is what you see. The radio does not send a sweep as one block — it splits it into 11 CI-V segments and paces them roughly 21 ms apart, which occupies about 89% of the time between sweeps. The CI-V baud-rate setting makes no difference to this; 19200 and 115200 measure the same.
 
 That figure is the answer to a question operators ask often: **why the radio's own waterfall shows CW when IWC's does not.** The radio draws its scope internally with no cable in the way. IWC gets about four frames a second, and a dot at 20 WPM lasts around 60 ms, so it can fall between sweeps entirely. It is a sampling limit, not smoothing.
@@ -1786,7 +1870,8 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 |---|---|
 | **F** | Enter full-screen mode |
 | **Esc** | Exit full-screen mode |
-| Mouse wheel (on spectrum) | Tune VFO A up or down in 1 kHz steps |
+| Mouse wheel (on spectrum) | Tune that panel's VFO by the current tuning step (1 kHz until you change it — see §5.4) |
+| Right-click (on spectrum) | Open the tuning-step menu, 1 Hz to 1 MHz, current step ticked |
 | Click on spectrum | Tune VFO A to the clicked frequency |
 | **Tab** (in band buttons) | Move focus into the band button group |
 | **← / →** (in band buttons) | Move to the previous/next band and switch immediately |
@@ -1803,7 +1888,7 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 
 | Input | Action | What happens |
 |---|---|---|
-| **Click** a digit | Select | That digit highlights yellow. The next step / arrow / button action acts on it. |
+| **Click** a digit | Select | That digit highlights yellow. The next step / arrow / button action acts on it, and that digit also becomes the spectrum mouse-wheel tuning step for this VFO (§5.4). |
 | **Mouse wheel** over a digit | Select + step | Wheels up = +1, wheels down = −1 on the digit under the cursor. |
 | **Tab** into the freq display | Focus the display | A blue outline appears around the whole display. Now the keyboard keys below act on it. |
 | **ArrowUp** / **ArrowDown** | Step selected digit by ±1 | If no digit is currently highlighted, the first press just highlights the kHz digit (4th from the right) — a second press then steps it. This avoids accidentally changing a digit you can't see is selected. |
@@ -1895,9 +1980,10 @@ A **Feature request** template is also available for ideas / improvements rather
 
 The radio is not answering on CI-V. IWC keeps retrying, so it clears itself the moment the link comes up.
 
+- **Check the USB cable at both ends.** A cable that has worked loose at the radio is the commonest cause of all, and it looks identical to every other fault.
 - Check that the radio is powered on.
-- Check the COM port in Settings. The **Check which COM ports this PC has** link in the "Radio not connected" banner lists every port your PC has and says whether the one you configured is among them; **Diagnostics → Ports** shows the same thing.
-- Check the baud rate in Settings. On the **original IC-7300** it must match the radio's **MENU → SET → Connectors → CI-V → CI-V USB Baud Rate** — that is the USB port's own setting, and the plain **CI-V Baud Rate** below it belongs to the round [REMOTE] socket and has no effect on a USB connection. The **MkII has no CI-V USB Baud Rate menu at all**, so there is nothing to match: set Settings to **19200** and ignore the radio's **CI-V Baud Rate**, which is the [REMOTE] socket's.
+- Check the COM port in Settings. The **Open Settings to choose the port or find the radio** link in the "Radio not connected" banner takes you straight to the port list; **Find my radio** there will locate the radio and correct the port and speed for you. **Diagnostics → COM Ports** shows the same list.
+- Check the baud rate in Settings. On the **original IC-7300** it must match the radio's **MENU → SET → Connectors → CI-V → CI-V USB Baud Rate** — that is the USB port's own setting, and the plain **CI-V Baud Rate** below it belongs to the round [REMOTE] socket and has no effect on a USB connection. (If that item offers you only 4800/9600/19200/Auto, it *is* the [REMOTE] one — see [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).) Easier: press **Find my radio**, which reports the speed the radio actually answered at. The **MkII has no CI-V USB Baud Rate menu at all**, so there is nothing to match: set Settings to **19200** and ignore the radio's **CI-V Baud Rate**, which is the [REMOTE] socket's.
 - **The CI-V address is not something to check** — IWC detects it, by asking on the CI-V broadcast address at connect and using whichever address replies. It works on `B6` (the MkII's default), `94` (the original IC-7300's) or any address you have set yourself, and there is no box for it in Settings.
 - Click **Test Connection** in Settings.
 - If IWC knows *why* it cannot connect — a COM port that is not present, for instance — the panel says so and offers a link to Settings instead of spinning.
@@ -1935,8 +2021,26 @@ The radio is talking, but no spectrum sweep has arrived. The panel gives up afte
 The panel is on screen and the radio is connected, but no sweep is arriving. The status badge at the right-hand end of the panel header says the same thing in one word (**Scope off**, **Connecting…**, **Live**, **Scope blocked**).
 
 - Check the **Scope** switch above the panel, and the scope on the radio's own screen.
-- Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate. The **Band scope delivery** panel on the Diagnostics page (§11) shows the same counters live, plus the measured sweeps-per-second.
+- Open **About** and read the **Band scope** line in the Diagnostics block. If it begins **"BLOCKED by the radio"** the rest of the line tells you exactly which radio setting is refusing and what to change it to — do that and nothing else here applies. "on, but NO sweep has ever arrived" means the radio is not sending scope data and has not said why; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate. The **Band scope delivery** panel on the Diagnostics page (§11) shows the same counters live, plus the measured sweeps-per-second.
 - Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
+
+**The spectrum freezes while you are using the radio's own menus**
+
+Expected, and not a fault. **The IC-7300 stops sending scope data while its SET
+menu is open on the front panel**, and starts again a moment after you leave it
+— which the radio does by itself after a few idle seconds if you touch nothing.
+The trace picks up where it left off. Measured on a MkII on 2026-09-24, four
+times over.
+
+It matters more than it sounds because the RTTY Tuner ([§20](#20-rtty-tuner))
+invites you into exactly that menu to set Mark and Shift. If you would rather
+not lose the trace at all, set the tones from the tuner instead — it writes them
+to the radio for you, with no trip to the front panel.
+
+IWC also watches for this. If the sweeps do not come back within about eight
+seconds it quietly re-sends the two commands that start them, which is what
+brings the trace back on the rare occasion the radio does not restart the stream
+by itself. You should never see that happen; it is in the log if you go looking.
 
 **Spectrum panel says "The radio refused to send scope data" (badge: Scope blocked)**
 
@@ -1993,7 +2097,6 @@ This affects **Firefox only**. Edge, Chrome and other Chromium-based browsers ne
 Up to and including v1.0.5, each needle was animated: told to sweep to its new position over 400 milliseconds. But readings arrive from the radio roughly every 150 milliseconds, so a new sweep began before the previous one had finished — up to three running at once. Chromium discards the frames that have been superseded; Firefox keeps them on the canvas, and the leftovers merge into what looks like one needle running off the end of the dial. On receive, with a steady signal, the needles barely move and the fault does not appear at all.
 
 - **Upgrade to v1.0.6 or later.** The animation has been removed, so needles move straight to each new reading — which at six to seven updates a second looks the same, without the artefacts. There is no setting to change.
-- **v1.0.6 is not out yet**, but the fix is available now as the pre-release **v1.0.6-pre1**, at https://github.com/mm5agm/Icom_Web_Control/releases/tag/v1.0.6-pre1 — download `Icom_Web_Control_Setup.exe` from that page and install it over your current version. IWC's update banner ignores pre-releases, so it will not offer this build to you; you have to follow the link.
 - **Staying on an older version?** Use Edge or Chrome for IWC and the gauges draw cleanly. There is no workaround within Firefox itself.
 
 **Meters appear to show incorrect values**
@@ -2012,7 +2115,9 @@ If **No** cannot shift it, the app says so and asks you to end `Icom_Web_Control
 
 **App shuts down unexpectedly after closing the browser**
 
-- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting. If you want to keep the app running (for example while WSJT-X is using it via rigctld), leave a browser tab open on the main page. If you need to force-quit immediately without waiting, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Icom_Web_Control.exe**, and click **End Task**.
+- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting, so closing the last tab closes the app.
+- If you want it to keep running with no browser open — while WSJT-X or Log4OM is using it via rigctld, say, or while a DX cluster feed is up — turn off **Automatically exit when no browser is connected** in **Settings → Web Server**, and quit it from the system tray instead. The change takes effect straight away; no restart needed. Otherwise, just leave any one tab open.
+- If you need to force-quit immediately without waiting, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Icom_Web_Control.exe**, and click **End Task**.
 
 **Cannot access the app from a tablet**
 
@@ -2146,22 +2251,45 @@ For either route, the radio's audio device on the shack PC is the **USB Audio CO
 
 ### 15.7 I have the original IC-7300, not the MkII — what do I need to set differently?
 
-Four things, and they are all one-off. IWC supports both radios, and the whole of the rest of this manual applies to yours unchanged — the spectrum, CW, memories, voice control, WSJT-X and rigctld all behave identically. It is only getting connected that differs.
+A handful of things, and they are all one-off. IWC supports both radios, and the whole of the rest of this manual applies to yours unchanged — the spectrum, CW, memories, voice control, WSJT-X and rigctld all behave identically. It is only getting connected that differs.
+
+Settings shows this same list on the page the moment you choose **IC-7300** as your radio model, so you do not have to work from the manual with the radio in front of you — there is a picture of it in [§6.1](#61-radio-connection).
 
 | | What to set | Where |
 |---|---|---|
-| **1. USB driver** | Install Icom's USB driver **before** plugging the radio in. The MkII does not need it; yours does. Until it is installed Windows creates no COM port at all, so IWC's port list will be empty or will not show the radio. | Icom's support site, under the IC-7300's downloads |
-| **2. Serial port** | The port that appears once the driver is in and the **USB Type-B** cable is connected. | IWC **Settings → Serial Port**; **Diagnostics → Ports** lists what your PC has |
-| **3. CI-V USB Port** | **Unlink from [REMOTE]**. | **Menu → Set → Connectors → CI-V** |
-| **4. Baud rate** | **115200**, set in *both* places so they match. Note it is **CI-V USB Baud Rate** you want — the plain **CI-V Baud Rate** below it belongs to the round **[REMOTE]** socket and has no effect on a USB connection. | IWC **Settings → Baud Rate**; radio **Menu → Set → Connectors → CI-V → CI-V USB Baud Rate** |
+| **1. USB driver** | Install Icom's USB driver **before** plugging the radio in. The MkII does not need it; yours does. Until it is installed Windows creates no COM port at all, so IWC's port list will not show the radio and **Find my radio** cannot see it either. | Icom's support site, under the IC-7300's downloads |
+| **2. Serial port** | The port that appears once the driver is in and the **USB Type-B** cable is connected. Easiest is to press **Find my radio** and let IWC fill it in. | IWC **Settings → Radio & CAT → Serial Port** |
+| **3. CI-V USB Port** | **Unlink from [REMOTE]**. Do this **before** item 4 — see below. | **Menu → Set → Connectors → CI-V** |
+| **4. CI-V USB Baud Rate** | **115200**, and **115200** in IWC too so they match. | radio **Menu → Set → Connectors → CI-V → CI-V USB Baud Rate**; IWC **Settings → Baud Rate** |
+| **5. CI-V USB Echo Back** | **OFF** — which is the factory setting, so this is only worth checking if you have been through these menus before. With it ON the radio sends your own commands back at you and IWC can mistake the echo for a reply. | **Menu → Set → Connectors → CI-V** |
+| **6. USB Serial Function** | **CI-V** — again the factory setting. If it has been changed to one of the other options, the port exists but nothing on it answers. | **Menu → Set → Connectors → CI-V** |
+| **7. USB SEND / USB Keying (CW)** | Leave **OFF** unless another program keys the radio through those lines. IWC never asserts DTR or RTS, deliberately — on this radio they can be wired to PTT, and opening a port should never put a transmitter on the air. | **Menu → Set → Connectors → USB SEND/Keying** |
+
+> **The trap in item 4, and why item 3 comes first.** The **CI-V USB Baud Rate** item only becomes settable once **CI-V USB Port** is **Unlink from [REMOTE]**. Until then the only baud item you can get at is the plain **CI-V Baud Rate** — which offers just 4800, 9600, 19200 and Auto, belongs to the round **[REMOTE]** socket on the back, and does nothing at all for a USB connection. If you are looking at a list without 115200 in it, you are in that item: leave it as you found it, go and unlink the USB port, and come back.
+>
+> **Auto is not enough.** The USB item's factory setting is **Auto**, which follows whatever speed the PC opens the port at. That is why the radio connects perfectly on IWC's default of 19200 with nothing changed on the radio — and also why the band scope stays blank, because the *scope* is the one thing the original model will not send below 115200. Both ends have to be at 115200 explicitly.
 
 **Items 3 and 4 are only about the spectrum scope, and that is exactly what makes them worth doing up front.** The original IC-7300 refuses to send band scope data unless both are right. Get them wrong and IWC still connects, the meters still move, every control still works — and the spectrum display simply never appears, which looks far more like a missing feature than a setting. Two owners found this independently before it was documented, which is why it is called out here rather than left in troubleshooting. IWC now warns you in Settings the moment you pick a combination that disables the scope, and the spectrum panel prints the reason rather than staying blank.
+
+**Digital modes.** If you run FT8, FT4, RTTY or PSK through the radio's USB audio, there is one more radio-side item — **DATA MOD**, set to **USB** — and it is covered in [§15.1](#151-wsjt-x-transmits-but-the-radio-shows-no-tx-audio-or-zero-power-output-in-data-u--data-l-mode). It has nothing to do with getting IWC connected, and it applies to the MkII equally.
 
 **You do not need to set a CI-V address anywhere.** Your radio's default is `94` where the MkII's is `B6`, but IWC never assumes either: at connect it asks for the radio's identity on the CI-V *broadcast* address and then uses whatever address answers. So the address is detected, not configured — there is no box for it in Settings, and IWC will find your radio even if you have changed its address from the factory default. If you see *"port opened, but the radio isn't responding"*, the address is not the reason; see [§14.2](#142-common-problems).
 
 Once those four are done there is nothing further to do differently, and nothing to keep in mind while using the app.
 
 > **On testing.** IWC is developed against a MkII, so everything above comes from owners of the original model reporting what worked for them rather than from my own bench. It is confirmed by two people independently, and has been working since v1.0.6. If you hit something this section does not cover, please open an issue ([§14.1](#141-reporting-a-bug)) — reports from original-IC-7300 owners are the only way this part of the manual improves.
+
+---
+
+### 15.8 I set a 1 Hz tuning step and the radio's display doesn't change
+
+Nothing is wrong. The IC-7300's front panel normally shows seven digits — megahertz down to **10 Hz** — so a 1 Hz change has nowhere to appear on it. IWC's own frequency display shows eight, which is why the two look out of step.
+
+The radio really has moved. IWC does not assume the frequency it just sent; it reads the VFO back from the radio several times a second, so the eighth digit on screen is what the rig is actually on. Tune 1 Hz at a time on a steady carrier and you can hear the beat note shift while the radio's display sits still.
+
+**To make the radio show it,** touch the **Hz digits** on the radio's own screen and hold for about a second. That turns on the **1 Hz step Fine Tuning function** and the eighth digit appears; holding them again turns it off. On the **original IC-7300** this is available in SSB, CW and RTTY only — in AM and FM there is no Fine Tuning to turn on, though IWC can still set the frequency to the hertz. The **MkII** places no restriction on it.
+
+It is worth turning on whenever you are zero-beating CW or chasing a drifting RTTY signal, which is what the 1 Hz step is there for in the first place ([§5.4](#54-spectrum-display)).
 
 ---
 
@@ -2421,6 +2549,8 @@ If you can't use a mouse wheel — head-tracking input, on-screen keyboard users
 - **ArrowLeft / ArrowRight** move the selection cursor sideways.
 - **Home / End** jump the selection to the **leftmost** (most significant — tens of MHz) or **rightmost** (least significant — Hz) digit.
 - The first arrow press when nothing is selected just highlights the kHz digit — a second press then steps it. This protects against an accidental ArrowUp changing the radio without you realising a digit was selected.
+
+**The spectrum's tuning step is keyboard-reachable too.** The mouse wheel over a spectrum panel tunes by a settable step ([§5.4](#54-spectrum-display)), and while right-clicking the spectrum is one way to pick that step, it is not the only one: the **Step** box on the spectrum's control bar, beside Bright, is an ordinary dropdown you can Tab to and change from the keyboard. Selecting a digit in the frequency display sets the same step, so if you tune by ArrowUp / ArrowDown you are setting it as you go.
 - Click the ▲ / ▼ buttons to step the selected digit by ±1 (one button click = one ArrowUp / ArrowDown). Press and hold to repeat that step every 500 ms until released.
 - Clicking outside the display deselects.
 
@@ -2446,7 +2576,7 @@ Everything in the table is wired to the IC-7300 over CI-V and works today.
 | Change band | "go to twenty metres", "switch to forty metres" | Jumps to that band's default (usually FT8) frequency. Bands: 160, 80, 60, 40, 30, 20, 17, 15, 12, 10, 6 and 4 metres. The band name alone works too — a bare "forty metres" is the same as "go to forty metres" |
 | Step up / down | "tune up" / "step up" / "nudge up"; "tune down" / "step down" / "nudge down" | Moves by the configured step size (see Set step size; default 10 kHz) |
 | Band up / down | "band up" / "band down" | Moves one amateur band up or down and lands on that band's default frequency — the same place "go to \<band\> metres" would put you, and the confirmation says which band. It stops at the ends rather than wrapping round: at 10 m "band up" says "Already on the highest band" instead of dropping you on 160 m. Bands your band plan doesn't include are skipped, so 4 m isn't in the sequence outside Region 1 |
-| Set step size | "set step ten kilohertz", "step size one kilohertz" | Sets the step size: 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. The step word alone works too ("ten kilohertz"). Same value as the step dropdown by the mic button — either one updates the other |
+| Set step size | "set step ten kilohertz", "step size one hertz" | Sets the step size: 1 Hz, 10 Hz, 100 Hz, 1 kHz, 10 kHz, or 100 kHz. The step word alone works too ("ten kilohertz"). Same value as the step dropdown by the mic button — either one updates the other, and it is the same step the spectrum mouse wheel uses ([§5.4](#54-spectrum-display)) |
 | Set mode | "mode U S B", "set mode L S B" (also C W, A M, F M, data, data l, r t t y — spell mode letters out one at a time) | Switches mode |
 | Swap VFOs | "swap V F O", "swap A and B" | Exchanges VFO A and B contents |
 | Set preamp | "set preamp off", "preamp one" (also two) | Preamp off / amp 1 / amp 2 (IC-7300 has two preamp stages) |
@@ -2544,7 +2674,7 @@ The Settings page → Voice Control section has a **Diagnostics** block that sho
 - The raw log file lives at `%APPDATA%\MM5AGM\Icom Web Control\logs\iwc-YYYYMMDD.log` if you ever need the unfiltered version (e.g. CAT command traffic, SDR worker status, etc.), but the Diagnostics page is the right tool for voice-specific issues.
 
 **"Tune up" doesn't seem to do much.**
-- The step size is shown (and changeable) in the dropdown next to the mic button, default **10 kHz**. If it's set small (e.g. 10 Hz) the movement can be easy to miss. Change it with the dropdown or by voice: "set step ten kilohertz".
+- The step size is shown (and changeable) in the dropdown next to the mic button, default **10 kHz**. If it's set small (e.g. 1 Hz or 10 Hz) the movement can be easy to miss. Change it with the dropdown or by voice: "set step ten kilohertz". This is the same per-VFO step the spectrum mouse wheel uses ([§5.4](#54-spectrum-display)), so setting it here changes the wheel too.
 - If you need bigger jumps use "set frequency to …" or "go to … metres" instead.
 
 **Speech engine works for a while then stops responding.**
@@ -2932,6 +3062,137 @@ Opening the panel reads the keyer speed and break-in setting from the radio, so 
 | A line is tagged **failed** | The radio did not take the command — the status line has the reason. Check the connection on the Diagnostics page; a line that failed part way through is abandoned rather than sent with a hole in it. |
 | Characters missing from what was sent | Only the characters listed in [§19.1](#191-sending-a-line) are keyed. The rest are dropped before the line is sent. |
 | Nobody comes back to my CQ | Check you are actually transmitting — the banner and the **sent** tag both tell you. Then check the radio: power, antenna, and whether the ATU has tuned on that band. |
+
+---
+
+## 20. RTTY Tuner
+
+The **RTTY Tune** button on the main control panel opens a crossed-ellipse tuning scope — the figure that RTTY operators have tuned by since the days of mechanical teleprinters. It listens to the radio's receive audio, picks out the two RTTY tones, and draws one against the other. When the signal is exactly on frequency the figure is a clean upright cross. When it is not, the arms lean and open out.
+
+Nothing here transmits, and nothing here touches the radio. The tuner only listens and draws; moving the signal onto its tones is done with your dial, as it always was.
+
+It does **not** decode RTTY into text. It is a tuning aid, and its job is to get the signal sitting exactly where a decoder can read it.
+
+You have a decoder already: **the IC-7300 decodes RTTY by itself**, with no PC and no software. Press **MENU » RTTY DECODE** on the radio and the decoded text appears on its screen, along with the radio's own tuning indicator and a waterfall. It will also log what it copies to the SD card, and it can send from eight stored messages. So the usual reason to open this tuner is to get a signal onto its tones from the browser — without having to lean over and watch the radio's own display while you do it. PC software such as MMTTY or fldigi is tuned exactly the same way.
+
+The scope itself is shared with my Yaesu app, so the two draw an identical figure from identical audio. What differs is only where the audio comes from.
+
+### 20.1 What the figure is telling you
+
+Two narrow filters listen to the receive audio, one parked on the **mark** tone and one on the **space** tone. Mark drives the figure sideways and space drives it up, so each tone draws its own line:
+
+![The RTTY Tuner dialog on a real signal: Mark 2125, Shift 170, Rev unticked, and a clean upright cross — a horizontal MARK ellipse crossing a vertical SPACE ellipse — with the status line reading "Mark 2125 Space 2295 Hz M -34 S -32 in -27 dBFS" and "Both tones in their filters - fine-tune for the thinnest cross (RTTY-L)"](pictures/RTTY-Tuner.png)
+
+That is the real thing: an amateur RTTY signal on 80m, 3598.3 kHz, standard 170 Hz shift with **Rev** unticked, caught with the radio's IF at 1800 Hz. Note the two figures are within 2 dB of each other in the status line — `M -34 S -32`. **Equal arms are the test.** One tone sitting steady while the other stays down is not RTTY at all, however bright the line looks; it is a single carrier, and a data mode such as PSK63 will do exactly that on a band full of RTTY.
+
+| What you see | What it means |
+|---|---|
+| **A clean upright cross** | On tune. Both tones are landing squarely in their filters. This is what you are aiming for. |
+| **Arms leaning over** | Off tune. The whole figure tilts towards the side that is too strong. Tune towards upright. |
+| **Arms opening into a fat X or an ellipse** | Still off tune, and far enough out that the tones are catching the skirts of the wrong filters. Keep going the same way the lean is pointing. |
+| **One strong line and one weak one** | Only one tone is arriving. Either the shift is wrong ([§20.2](#202-mark-shift-and-rev)), or you are tuned so far off that only one tone is inside the filter. |
+| **A blur with no shape** | No RTTY there — noise, an SSB signal, or the wrong audio device. Check the line under the figure is showing a signal level at all. |
+
+The line under the figure reports what the two filters are actually hearing, in dB, along with the overall input level. It is the quickest way to tell "nothing is arriving" from "something is arriving and it is not RTTY".
+
+### 20.2 Mark, Shift and Rev
+
+Three controls, and for ordinary amateur RTTY you will not touch any of them.
+
+> **There is no speed setting, and you have not missed it.** RTTY has a speed as
+> well as a shift — amateur RTTY is **45.45 baud**, and utility stations often
+> run 50 or 75 — so it is a fair question where you set it. The answer is
+> nowhere. The tuner does not need it: it is two narrow filters listening for two
+> tones, and tones do not care how fast they are being keyed. The figure crosses
+> just as cleanly on a 75-baud utility signal as on amateur RTTY.
+>
+> The radio does not offer it either. The IC-7300's built-in decoder is fixed at
+> 45.45 baud. **SET > Function** has exactly two RTTY items, Mark Frequency and
+> Shift Width; the **RTTY DECODE SET** screen has none; and there is no CI-V
+> command for speed, so no software could set it even if you wanted to. If you
+> need to decode anything other than 45.45 baud you need PC software — MMTTY and
+> fldigi both do it — and you can still tune it with this scope first.
+>
+> If you went looking on the Settings page and found **Baud Rate** there, that is
+> the CI-V serial port between the PC and the radio ([§6.1](#61-radio-connection)).
+> Different thing entirely, and changing it will not affect RTTY.
+
+**Mark** — the mark tone's pitch in the receive audio, in Hz. **2125** is the near-universal amateur standard and the IC-7300's own default, so leave it there unless you know your setup says otherwise. The radio offers 1275, 1615 and 2125 Hz in **SET > Function > RTTY Mark Frequency**. You do not have to copy it across by hand in either direction: in RTTY the tuner and that menu are kept in step for you while the window is open.
+
+**Shift** — how far apart the two tones are. **170 Hz** is standard amateur RTTY; **200** and **425 Hz** are used by commercial and utility stations, which is most of what you will find outside the amateur bands. Those three are the whole list, because they are what the radio itself offers in **SET > Function > RTTY Shift Width** — so whichever you pick, the radio can be set to match.
+
+**Rev** — for when **the other station** is sending reversed. Leave it unticked otherwise.
+
+#### Keeping the radio in step, and the **From radio** button
+
+**In RTTY, Mark and Shift are kept in step with the radio both ways round.**
+
+*Radio to tuner:* while the tuner window is open it re-reads **SET > Function > RTTY Mark Frequency** and **RTTY Shift Width** every few seconds, so changing the shift on the radio changes the tuner with it and the two never quietly disagree. There is no CI-V message for a SET-menu change, so re-reading is the only way to notice; it costs two short reads every four seconds, and only while the window is open.
+
+*Tuner to radio:* change Mark or Shift here and the radio's menu changes with you, so its built-in decoder does not have to be set a second time by hand. Every shift the tuner offers is one the radio has, so a shift always goes across. Mark is the looser of the two: the menu holds 1275, 1615 and 2125 Hz only, so a mark you have typed off those three has nowhere to go — the tuner goes on using it, the radio's menu is left alone, and the status line says which of the two it could set. **Rev writes nothing**, because it is a statement about the station you are listening to and the radio has no setting for it.
+
+**It follows, but it does not argue.** The moment you type your own Mark or Shift, the tuner stops replacing it and leaves your figure alone — for the rest of the session and across a page reload. That matters more than it sounds. The radio's menu describes the radio's own decoder, and it is routinely the wrong description of what you are listening to: a utility station on 425 Hz shift while the menu still says 170 is the ordinary case, not an exotic one, and a tuner that dragged you back to 170 every four seconds would be useless for exactly the signals this scope is best at.
+
+**From radio** is how you hand control back. Press it and the tuner takes the radio's numbers again, and goes on following from there. (Typing a figure of your own is not undone by this — it is written to the radio, but the *following* stops until you press the button.) It tells you what it read, and says so when the two already match. It is also the only way to read the menu in an AFSK mode, where nothing is synced for you.
+
+Two things about the reading itself are worth knowing:
+
+- **It only describes FSK.** Those menu items belong to the radio's own RTTY mode. If you are running AFSK — DATA-L, DATA-U, LSB or USB, with MMTTY or fldigi making the tones — the radio's menu has nothing to do with what is arriving, which is why nothing is synced automatically in those modes and **nothing is written to the radio there either**. Those items also govern how the radio *transmits* RTTY, and a receive-side tuning aid has no business changing that on behalf of someone who is not using it. Pressing the button there is not refused: it reports the radio's values along with a note that you are not in FSK, and leaves the decision to you.
+- **It reads the menu, not the air.** When the radio's *own* decoder is running (**MENU » RTTY DECODE**) it uses 2125 Hz and 170 Hz whatever the menu says — that is in Icom's manual, not a quirk of IWC. So on the rare setup with the menu set to something else, the tuner shows the menu and the radio is actually using the standard pair. Both are worth knowing; neither is worth guessing on your behalf.
+
+**Rev is not read from the radio**, and that is deliberate. The obvious candidate, **RTTY Keying Polarity** in the same menu, is not the same thing at all: it sets whether a key closure from an external terminal unit means mark or space, which is a *transmit* setting. Which way up a received signal is depends on the mode, and the tuner already follows that.
+
+> **Rev is not the RTTY-R switch, and ticking it for RTTY-R will break your copy.** The tuner reads the radio's mode for itself and works out which side of mark the space tone lands on, so putting the radio into RTTY-R is already allowed for. Tick Rev on top of that and you have reversed it twice, which puts the filters back exactly the wrong way round on a normal signal. Rev is the extra flip, for a station whose own tones are the wrong way up — common enough, and the reason the box is there.
+>
+> So: change mode on the radio and leave Rev alone; reach for Rev only when a signal will not resolve and you suspect the station rather than your own setup.
+>
+> **A name to watch out for**, since you will have both in front of you:
+>
+> | The radio's screen | IWC's mode dropdown | What it is |
+> |---|---|---|
+> | **RTTY** | **RTTY-L** | Normal |
+> | **RTTY-R** | **RTTY-U** | Reverse |
+>
+> Both are handled for you. The table is here so that a disagreement between the two displays does not look like a fault.
+>
+> Nothing is wrong when they disagree — they are the same mode under two naming conventions, and CW does exactly the same thing (the radio's **CW-R** is IWC's **CW-L**). The suffixes are names rather than a statement about which sideband you are on; see [§18.1](#181-if-cw-is-new-to-you) for the CW version of the same caution. If you are ever unsure which you are in, the radio's own display is the one to believe.
+
+> **Which way round is it on this radio?** With the IC-7300 in plain **RTTY**, the space tone arrives **above** mark in the audio — 2125 and 2295 Hz at the standard 170 Hz shift — which is what **Rev unticked** expects. That is not guesswork: it was measured on an IC-7300 MkII by tuning a steady carrier, sweeping the tuner's own mark filter to find it at 2125 Hz, then moving the dial up 500 Hz and watching the tone move up 500 Hz with it. Audio that rises as the dial rises is the lower-sideband case, and it puts space above mark.
+>
+> The same measurement settled something else worth knowing: **in RTTY the dial reads the mark frequency.** Put the dial on a station's mark and you are on it.
+>
+> If you are running AFSK instead — DATA-L, DATA-U, LSB or USB, where your software makes the tones and the radio is just an SSB transceiver — the same 2125 / 2295 defaults apply, because that is what RTTY software uses. The radio's RTTY MARK menu plays no part there.
+
+### 20.3 Your first session, step by step
+
+1. **Set the audio device first.** The tuner uses the CW Reader's audio-device setting on the Settings page — there is only one, and on a USB-connected IC-7300 it is the radio's own USB codec. If the CW Reader works, so will this. See [§18.3](#183-choosing-the-audio-device).
+2. **Put the radio in RTTY** and tune roughly onto a signal. RTTY lives just below the FT8 frequencies on most bands — 14.080–14.099 on 20m is the usual hunting ground.
+3. **Narrow the filter.** RTTY wants something like 300–500 Hz. A 2.4 kHz SSB filter puts half the band into the tuner at once and the figure will never settle.
+4. **Press RTTY Tune.** The figure starts drawing within a second or so.
+5. **Tune slowly** — 10 Hz steps are about right — until the cross stands upright. On a strong signal this is unmistakable; on a weak one, aim for the most upright you can get and the most equal arm lengths.
+6. **Close the dialog when you are done.** The tuner lets go of the audio device a couple of seconds later, and it also stops on its own if the page stops asking it for sweeps.
+
+The dialog can be dragged by its title bar, like the other panels.
+
+### 20.4 Running it alongside the CW Reader
+
+Both can be open and running at the same time, on the same audio device. This is worth saying because it did not come free: IWC opens one recording device, and until the tuner arrived the CW Reader owned it outright — whoever stopped last would have closed it under the other one, leaving a reader that looked perfectly healthy and simply never decoded another letter. The device is now shared properly and stays open until the last panel using it has finished with it.
+
+In practice you will rarely want both, since the radio can only be in one mode. It matters when you are switching back and forth across a band.
+
+### 20.5 Troubleshooting
+
+| Symptom | What to try |
+|---|---|
+| The figure never appears and the status line mentions the audio device | The recording device could not be opened. Check the CW Reader's audio-device setting on the Settings page ([§18.3](#183-choosing-the-audio-device)); the same causes and cures apply to both panels. |
+| A blur with no shape, and the input level is near silence | Nothing is reaching the sound card. Check the radio's USB audio output level, and that Windows has not muted or switched the input. |
+| A blur with a healthy input level | There is audio, but it is not RTTY at those tones. Check you are actually on a RTTY signal, then check **Shift** matches it. |
+| Only one arm draws | The shift is wrong, or you are tuned far enough off that only one tone is in the filter. Try the other shifts; 170 is standard amateur, the rest are utility stations. |
+| It only crosses with **Rev** ticked, on a plain amateur RTTY signal | That station is sending reversed — common enough, and exactly what Rev is for. |
+| *Every* signal needs **Rev**, including ones you know are normal | Something has been reversed twice. Untick Rev and change the radio's mode instead (**RTTY** ↔ **RTTY-R**) — the tuner follows the mode by itself, so Rev is not how you tell it about the radio. |
+| The figure is restless and will not settle on a strong signal | The IF filter is too wide and a neighbour is getting in. Narrow it to 300–500 Hz ([§5.8](#58-if-width-if-shape-filter-slot-and-af-gain)). |
+| It stops by itself after a while | It stops when nothing is asking it for sweeps — a minimised or backgrounded tab will do it. Bring the page back to the front and press **RTTY Tune** again. |
+| The *spectrum* freezes while you are setting the tones on the radio | Expected. The radio stops sending scope data while its SET menu is open, and resumes a moment after you leave it — see [§14.2](#142-common-problems). Setting Mark and Shift here instead writes them to the radio without the trip to the front panel. |
 
 ---
 

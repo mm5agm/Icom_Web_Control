@@ -268,6 +268,19 @@ namespace Icom_Web_Control.Services
 
         private int _rxBass;     // −5…+5, 0 = flat
         private int _rxTreble;
+        // The radio's RTTY menu defaults, so the tuner's "From radio" button
+        // does something visible with no hardware attached.
+        public Task<RttyToneSettings?> GetRttyToneSettingsAsync(CancellationToken ct = default)
+            => Task.FromResult<RttyToneSettings?>(new RttyToneSettings(2125, 170));
+
+        // Refuses the same two shifts the real radio has no rung for, so the
+        // dialog's "the radio has no 450 Hz shift" path is developable with no
+        // hardware on the bench.
+        public Task<RttyToneWrite> SetRttyToneSettingsAsync(int markHz, int shiftHz, CancellationToken ct = default)
+            => Task.FromResult(new RttyToneWrite(
+                markHz  is 1275 or 1615 or 2125 ? markHz  : null,
+                shiftHz is 170  or 200  or 425  ? shiftHz : null));
+
         public Task<(bool available, int bass, int treble)> GetRxToneAsync(RadioVfo vfo, CancellationToken ct = default)
             => Task.FromResult((true, _rxBass, _rxTreble));
         public Task SetRxToneAsync(RadioVfo vfo, int bass, int treble, CancellationToken ct = default)

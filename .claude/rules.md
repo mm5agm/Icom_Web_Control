@@ -353,26 +353,44 @@ text before committing.
 
 ---
 
-# 15. In-App Update Notifications — Full Releases Only (Non-Negotiable)
+# 15. In-App Update Notifications — Never Push a Pre-Release at an Operator (Non-Negotiable)
 
-**The in-app update banner must only ever announce a full release. It must never
-announce a pre-release or a draft.**
+**An operator running a full release must never be offered a pre-release or a
+draft. An operator already running a pre-release is told about newer
+pre-releases, because that is what running one means.**
 
-Pre-releases are opt-in: an operator who wants to test one goes to the GitHub
-releases page and downloads it deliberately. Interrupting someone who is
-operating the radio to push a less-tested build at them is the wrong trade.
+The first half is the original rule and has not moved. Pre-releases are opt-in:
+someone on a full release reaches one by going to the GitHub releases page and
+downloading it deliberately. Interrupting a person who is operating the radio to
+push a less-tested build at them is the wrong trade.
 
-Concretely, the update check (`wwwroot/js/ui/site.js`, `_checkForUpdate`) must:
+The second half was added on **2026-09-22 at Colin's request**, and is the same
+principle read properly rather than a reversal of it. A tester sitting on
+v1.2.0-pre1 was told nothing at all until the full release shipped — which is
+how someone ends up reporting a bug that was fixed three pre-releases ago, and
+how a tester gets left on the build with the fault still in it. They already
+opted in; the next pre-release is precisely what they signed up to hear about.
 
-- fetch `…/releases/latest` — **never** the `/releases` list endpoint, which
-  includes pre-releases and drafts;
-- bail out if the payload comes back with `prerelease` or `draft` set;
-- never gain a setting, flag or "advanced" opt-in that surfaces pre-releases in
-  the banner.
+Concretely, the update check (`core/js/update/update-banner.js`,
+`_checkForUpdate`) must:
+
+- decide **from the running version alone** — whether `x-app-version` carries a
+  pre-release suffix. **Never** from a setting, flag, checkbox or "advanced"
+  opt-in. There must be nothing in the UI that a full-release operator can find
+  and switch on;
+- fetch `…/releases/latest` when running a full release — **never** the
+  `/releases` list endpoint, which includes pre-releases and drafts;
+- use `…/releases` only when running a pre-release, and then still drop drafts,
+  and still drop any tag that is not `vX.Y.Z[-suffix]`. Yaesu Web Control
+  publishes nightly `unstable-YYYYMMDD` tags as GitHub **pre-releases**; they
+  are builds, not offers, and a tester must never be handed one by banner;
+- say plainly in the banner when what it is offering is a pre-release.
+
+The file is shared with Yaesu Web Control through the `core/` subtree, so this
+rule binds both apps, and a change to it has to be right for both.
 
 This applies to any future notification channel added to the app — a tray
-balloon, a Settings "check now" button, an About-page version line. Same rule:
-full releases only.
+balloon, a Settings "check now" button, an About-page version line. Same rule.
 
 ---
 

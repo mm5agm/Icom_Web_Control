@@ -186,6 +186,11 @@ plan.txt
 pictures/ico-ic-7300_it_xl.jpg
 pictures/icom-ic-7300MK2-2.jpg
 
+# Untitled captures the screenshot tool drops beside the real ones. A shot
+# that belongs in the manual gets a name; anything still called "Screenshot
+# <date> <time>" is a leftover and should never be staged by a git add -A.
+pictures/Screenshot *.png
+
 # Generated at build time from the Radio_Web_Control_Core subtree (core/js is
 # the single source of truth). See core/js/README.md.
 /wwwroot/js/calibration/calibration-engine.js

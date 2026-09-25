@@ -55,6 +55,15 @@ namespace Icom_Web_Control.Pages
         [TempData]
         public string? RestartRequiredReason { get; set; }
 
+        /// <summary>
+        /// False while the CI-V port is not open. The Radio &amp; CAT section
+        /// opens itself in that state, because the "port not found" banner
+        /// on the main page sends people here to fix exactly that, and a
+        /// collapsed section under a read-only summary looks like a page
+        /// that cannot be edited (#43).
+        /// </summary>
+        public bool RadioConnected => _radio.IsConnected;
+
         public List<string> NetworkAddresses { get; set; } = new();
 
         /// <summary>
@@ -107,6 +116,18 @@ namespace Icom_Web_Control.Pages
             // error - the same trap the DX cluster fields above are dodging.
             ModelState.Remove("Settings.CwAudioDeviceName");
 
+            // An unchosen port is the fresh-install state (the default is blank
+            // rather than the port this app was developed on — #43). It is still
+            // not savable, but the implicit [Required] above would report it as
+            // "The SerialPort field is required", which says nothing about what
+            // to do; replace it with the instruction.
+            if (string.IsNullOrWhiteSpace(Settings.SerialPort))
+            {
+                ModelState.Remove("Settings.SerialPort");
+                ModelState.AddModelError("Settings.SerialPort",
+                    "Choose the COM port your radio is connected to, or press Find my radio.");
+            }
+
             if (!ModelState.IsValid)
             {
                 // Log every ModelState error so we can see exactly which
@@ -120,7 +141,9 @@ namespace Icom_Web_Control.Pages
                             key, err.ErrorMessage);
                     }
                 }
-                StatusMessage = "❌ Settings not saved — see console log for validation errors.";
+                StatusMessage = ModelState.TryGetValue("Settings.SerialPort", out var portEntry) && portEntry.Errors.Count > 0
+                    ? "❌ Settings not saved — " + portEntry.Errors[0].ErrorMessage
+                    : "❌ Settings not saved — see console log for validation errors.";
                 NetworkAddresses = GetLocalIPAddresses();
                 CwAudioDeviceNames = BuildCwAudioDeviceNames(Settings.CwAudioDeviceName);
                 return Page();
@@ -167,12 +190,17 @@ namespace Icom_Web_Control.Pages
                 current.SerialPort        = Settings.SerialPort;
                 current.BaudRate          = Settings.BaudRate;
                 current.WebAddress        = Settings.WebAddress;
+                // Read by RadioHub on every disconnect, so it applies without a
+                // restart -- and it is deliberately not in the restart reasons
+                // below for that reason.
+                current.AutoShutdownWhenNoBrowsers = Settings.AutoShutdownWhenNoBrowsers;
                 // External-SDR spectrum config was removed from the Settings page
                 // (the IC-7300's scope comes over CI-V, not an IF-tapped SDR).
                 // The Sdr* fields are left untouched here so their persisted
                 // values survive the read-modify-write; the CI-V scope work
                 // (Phase 3 block 6) will decide their ultimate fate.
                 current.BandPlan          = Settings.BandPlan;
+                current.AutoModeChangeOnTune = Settings.AutoModeChangeOnTune;
                 // Icom IC-7300 / MkII is a direct-sampling SDR with no roofing
                 // filters and no CAT filter-selection command, so there is nothing
                 // to configure. Keep the list empty. (Field retained on the model

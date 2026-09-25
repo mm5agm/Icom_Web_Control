@@ -6,6 +6,10 @@
     <meta http-equiv="Content-Language" content="en">
     <meta name="language" content="en">
     <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Display">
+    @* Read by core/js/update/update-banner.js, which is shared with Yaesu Web
+       Control and so cannot know either app's repo or name. *@
+    <meta name="x-app-repo" content="mm5agm/Icom_Web_Control">
+    <meta name="x-app-name" content="Icom Web Control">
     <title>@(ViewData["Title"]?.ToString() == "Icom Web Control" ? "Icom Web Control" : ViewData["Title"] + " - Icom Web Control")</title>
     <script type="importmap">{}</script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
@@ -116,6 +120,9 @@
        and the page shows no live values at all. *@
     <script src="~/lib/microsoft-signalr/signalr.min.js"></script>
     <script src="~/js/ui/site.js" asp-append-version="true"></script>
+    <!-- Update banner — shared with YWC; lives in core/js/update/ and is copied
+         into wwwroot by the CopySharedCoreJs target. Independent of site.js. -->
+    <script src="~/js/update/update-banner.js" asp-append-version="true"></script>
     <!-- IC-7300 IF passband width + FIL slot — must load after site.js (defines window.IfWidth / setIfWidth / setFilterSlot). -->
     <script src="~/js/ui/ic7300-if-width.js" asp-append-version="true"></script>
     @{

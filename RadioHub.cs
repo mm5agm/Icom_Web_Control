@@ -11,6 +11,7 @@ namespace Icom_Web_Control.Hubs
         private readonly IHostApplicationLifetime _lifetime;
         private readonly RadioStateService _radioState;
         private readonly IRadioController _radio;
+        private readonly ISettingsService _settings;
 
         // All currently open SignalR connections
         private static readonly ConcurrentDictionary<string, byte> _connections = new();
@@ -31,12 +32,14 @@ namespace Icom_Web_Control.Hubs
         private static readonly object _shutdownLock = new();
 
         public RadioHub(ILogger<RadioHub> logger, IHostApplicationLifetime lifetime,
-                        RadioStateService radioState, IRadioController radio)
+                        RadioStateService radioState, IRadioController radio,
+                        ISettingsService settings)
         {
             _logger   = logger;
             _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
             _radioState = radioState;
             _radio = radio;
+            _settings = settings;
         }
 
         public override async Task OnConnectedAsync()
@@ -75,9 +78,18 @@ namespace Icom_Web_Control.Hubs
             await base.OnDisconnectedAsync(exception);
 
             // Only trigger shutdown countdown when a heartbeating client (main page tab)
-            // disconnects and no other heartbeating clients remain.
+            // disconnects and no other heartbeating clients remain — and only
+            // when AutoShutdownWhenNoBrowsers is on, which it is by default.
             if (wasHeartbeating && _heartbeats.IsEmpty)
             {
+                var settings = await _settings.GetSettingsAsync();
+                if (!settings.AutoShutdownWhenNoBrowsers)
+                {
+                    _logger.LogInformation(
+                        "All browser tabs closed — auto-shutdown disabled; host keeps running.");
+                    return;
+                }
+
                 _logger.LogInformation("All browser tabs closed. Shutting down in {s}s if none reconnect.",
                     ShutdownGrace.TotalSeconds);
                 ScheduleShutdown();

@@ -85,7 +85,8 @@ namespace Icom_Web_Control.Controllers
                 sweepsCompleted = s.SweepsCompleted,
                 sweepsDiscarded = s.SweepsDiscarded,
                 secondsSinceLastSweep = s.SecondsSinceLastSweep,
-                sweepsPerSecond = s.SweepsPerSecond
+                sweepsPerSecond = s.SweepsPerSecond,
+                blockedReason = s.BlockedReason
             });
         }
 
@@ -1261,6 +1262,39 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(500, new { error = "Failed to copy VFO" });
             }
             finally { _requestSemaphore.Release(); }
+        }
+
+        /// <summary>
+        /// "Find my radio" (Settings → Radio &amp; CAT). Asks the seam to look
+        /// for a radio on every serial port and reports where one answered.
+        /// Nothing is saved: the page fills the form and the operator saves.
+        /// </summary>
+        [HttpPost("find-radio")]
+        public async Task<IActionResult> FindRadio(CancellationToken cancellationToken)
+        {
+            try
+            {
+                _logger.LogInformation("Find my radio requested from Settings page (IsConnected={IsConnected})", _radio.IsConnected);
+                var r = await _radio.FindRadioAsync(cancellationToken);
+                return Ok(new
+                {
+                    found = r.Found,
+                    port = r.Port,
+                    baud = r.Baud,
+                    model = r.Model,
+                    portsProbed = r.PortsProbed,
+                    portsBusy = r.PortsBusy,
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                return StatusCode(499);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Find my radio failed");
+                return StatusCode(500, new { error = "Find my radio failed: " + ex.Message });
+            }
         }
 
         [HttpPost("reinitialize")]
