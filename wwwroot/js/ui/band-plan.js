@@ -567,3 +567,32 @@ export function modeForHz(hz) {
 
     return null;
 }
+
+/**
+ * modeForHz, gated by the operator's "change mode automatically when tuning"
+ * setting. Returns null - meaning "leave the mode alone" - when it is off.
+ *
+ * Use this, not modeForHz, for any mode change the operator did not ask for
+ * by name: clicking the spectrum, clicking a DX spot. Picking a named segment
+ * from a VFO's band dropdown is an explicit choice and goes on using that
+ * segment's own mode either way.
+ *
+ * This is the only place the flag is read, deliberately. A truthiness test at
+ * a call site would read undefined as off and silently kill mode-follow on
+ * every page that does not render the flag, so the comparison is against
+ * false and it lives here alone.
+ *
+ * Why it matters more than a wrong label: MENU > SET > Connectors > MOD Input
+ * names the transmit audio source separately either side of the Data switch
+ * ("DATA OFF MOD", "DATA MOD"), so a mode change nobody asked for can move
+ * the transmit audio input away from USB. Receive goes on decoding, which is
+ * why it stays invisible until the operator transmits. Asked for by Bruce
+ * VK2RT for RTTY contest work in Yaesu Web Control discussion #169; the same
+ * setting, under the same name, in both apps.
+ */
+export function autoModeForHz(hz) {
+    // Undefined on pages that never render the flag, so default to on - the
+    // behaviour everyone had before this setting existed.
+    if (globalThis.iwcAutoModeChangeOnTune === false) return null;
+    return modeForHz(hz);
+}

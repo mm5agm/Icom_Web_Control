@@ -1932,7 +1932,12 @@
                 <h5 class="mb-3">Radio Connection</h5>
                         <div class="mb-3">
                             <label asp-for="Settings.RadioModel" class="form-label">Radio Model</label>
-                            <select asp-for="Settings.RadioModel" class="form-select" style="max-width: 20rem;">
+                            @* w-auto on all four of these: Bootstrap's .form-select is
+                               display:block; width:100%, so without it a four-character baud
+                               rate is as wide as the page. Sizing to the widest option means
+                               no hand-picked number here has to be revisited when an option's
+                               text changes. max-width keeps them inside the column on a phone. *@
+                            <select asp-for="Settings.RadioModel" class="form-select w-auto" style="max-width: 100%;">
                                 <option value="IC-7300MK2">IC-7300 MkII</option>
                                 <option value="IC-7300">IC-7300</option>
                             </select>
@@ -1978,7 +1983,7 @@
                                The bound input stays as the value the form posts; it is only shown
                                for "Other…", so a port the list cannot see can still be typed. *@
                             <div class="input-group" style="max-width: 34rem;">
-                                <select id="serialPortSelect" class="form-select" style="max-width: 12rem;" aria-describedby="serialPortHelp">
+                                <select id="serialPortSelect" class="form-select" style="flex: 0 1 11rem; max-width: 11rem;" aria-describedby="serialPortHelp">
                                     <option value="@Model.Settings.SerialPort">@(string.IsNullOrEmpty(Model.Settings.SerialPort) ? "— choose a port —" : Model.Settings.SerialPort)</option>
                                 </select>
                                 <button type="button" class="btn btn-outline-secondary" id="serialPortRefresh" title="Refresh the list of ports">
@@ -2001,7 +2006,7 @@
                         </div>
                         <div class="mb-3">
                             <label asp-for="Settings.BaudRate" class="form-label">Baud Rate</label>
-                            <select asp-for="Settings.BaudRate" class="form-select" style="max-width: 12rem;">
+                            <select asp-for="Settings.BaudRate" class="form-select w-auto" style="max-width: 100%;">
                                 <option value="4800">4800</option>
                                 <option value="9600">9600</option>
                                 <option value="19200">19200 (Default)</option>
@@ -2171,7 +2176,7 @@
                         </script>
                         <div class="mb-3">
                             <label asp-for="Settings.BandPlan" class="form-label">Band Plan / IARU Region</label>
-                            <select asp-for="Settings.BandPlan" class="form-select">
+                            <select asp-for="Settings.BandPlan" class="form-select w-auto" style="max-width: 100%;">
                                 <option value="Region1">IARU Region 1 — Europe, Africa, Middle East (includes 4m)</option>
                                 <option value="Region2">IARU Region 2 — Americas (USA FCC Part 97 reference)</option>
                                 <option value="Region3">IARU Region 3 — Asia-Pacific</option>
@@ -2183,6 +2188,34 @@
                                 Australia, New Zealand, and most of Asia (except Japan) are in Region 3.
                             </div>
                             <span asp-validation-for="Settings.BandPlan" class="text-danger"></span>
+                        </div>
+                        <div class="mb-3 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" asp-for="Settings.AutoModeChangeOnTune" />
+                            <label class="form-check-label" asp-for="Settings.AutoModeChangeOnTune">
+                                Change mode automatically when tuning from the band plan
+                            </label>
+                            <div class="form-text">
+                                When enabled (default), clicking the spectrum or a DX spot also sets the mode to
+                                whatever the band plan says that frequency is for &mdash; so jumping from 14.074 to
+                                14.284 flips DATA-U to USB rather than leaving the radio in the wrong mode.
+                                <br />
+                                Turn it off if you work outside the band plan, which most contesters do: RTTY runs
+                                well above 14.100 and 40m SSB is used around 7.050, and in both cases the automatic
+                                change fights you on every click. RTTY has no segment of its own in the band plan at
+                                all, so every click while you are in RTTY takes you out of it &mdash; 17m RTTY sits
+                                inside the FT8 segment and a click there answers with DATA-U.
+                                <br />
+                                It matters more than it looks. <b>MENU &gt; SET &gt; Connectors &gt; MOD Input</b>
+                                names the transmit audio source separately either side of the Data switch
+                                (&quot;DATA OFF MOD&quot;, default MIC+USB, and &quot;DATA MOD&quot;, default USB).
+                                If you have set DATA OFF MOD to MIC only &mdash; the usual cure for Windows sounds
+                                going out on SSB &mdash; a mode change you did not ask for quietly cuts your data
+                                software out of the transmit path while receive carries on working normally.
+                                <br />
+                                Picking a named segment (CW, FT8, SSB, RTTY) from a VFO&apos;s band dropdown still
+                                sets that segment&apos;s mode either way &mdash; that is a choice you made, not a guess
+                                from the frequency.
+                            </div>
                         </div>
         </div>
     </details>

@@ -7,7 +7,7 @@
 // Frequency axis labels are computed from the VFO frequency reported by
 // SdrSpectrumPipeline so the display is always centred on the current band.
 
-import { modeForHz } from '../ui/band-plan.js';
+import { autoModeForHz } from '../ui/band-plan.js';
 import { tuningStep } from '../ui/tuning-step.js';
 import { formatTuningStep } from '../tuning/tuning-step-store.js';
 
@@ -873,7 +873,7 @@ export class SpectrumPanel {
         // click that tuned the signal had reset the mode first. Same for
         // RTTY-R. The USB/LSB and DATA flips are left alone - they are what
         // the follow is for.
-        const targetMode  = modeForHz(targetHz);
+        const targetMode  = autoModeForHz(targetHz);
         const currentMode = document.getElementById(`modeSelect${this._vfo}`)?.value || '';
         if (targetMode && window.setMode && !sameModeReversed(currentMode, targetMode)) {
             try { window.setMode(this._vfo, targetMode); } catch { /* ignore */ }

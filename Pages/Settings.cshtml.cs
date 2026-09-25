@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
@@ -196,6 +196,7 @@ namespace Icom_Web_Control.Pages
                 // values survive the read-modify-write; the CI-V scope work
                 // (Phase 3 block 6) will decide their ultimate fate.
                 current.BandPlan          = Settings.BandPlan;
+                current.AutoModeChangeOnTune = Settings.AutoModeChangeOnTune;
                 // Icom IC-7300 / MkII is a direct-sampling SDR with no roofing
                 // filters and no CAT filter-selection command, so there is nothing
                 // to configure. Keep the list empty. (Field retained on the model

@@ -57,6 +57,34 @@ namespace Icom_Web_Control.Services
     public readonly record struct IfFilterWidthStep(int Hz, bool AtLimit);
 
     /// <summary>
+    /// The radio's own RTTY tone settings, in Hz: where it puts the mark tone
+    /// in the receive audio and how far the space tone is from it.
+    ///
+    /// <para>These belong to <b>FSK</b> - the radio's built-in RTTY mode. In an
+    /// AFSK mode (DATA-L, DATA-U, LSB, USB) the tones are made by the
+    /// operator's software and the radio knows nothing about them, so these
+    /// values say nothing useful and the caller should not apply them.</para>
+    ///
+    /// <para><b>The radio may not be using what it reports.</b> On the IC-7300,
+    /// when its own internal RTTY decoder is running the radio forces 2125 Hz
+    /// and 170 Hz whatever the SET menu says (Basic manual, SET &gt; Function).
+    /// What this reads is the menu, so it is the operator's stated intent
+    /// rather than a guaranteed measurement of the audio. Offer it, do not
+    /// apply it silently.</para>
+    /// </summary>
+    public readonly record struct RttyToneSettings(int MarkHz, int ShiftHz);
+
+    /// <summary>
+    /// What the radio actually took when asked to change its RTTY tones.
+    /// A field is the value written, or <c>null</c> when this radio has no
+    /// setting for what was asked: the menu items are one-byte indexes into a
+    /// short fixed list, not free values, so 450 Hz and 850 Hz - both perfectly
+    /// ordinary on the air, and both offered by the tuner - simply have no rung
+    /// on an IC-7300. The caller says so rather than pretending it worked.
+    /// </summary>
+    public readonly record struct RttyToneWrite(int? MarkHz, int? ShiftHz);
+
+    /// <summary>
     /// The semantic seam IWC introduces (the thing YWC lacked — see
     /// docs/design/iwc-clone-split-plan.md). Everything above this line —
     /// touch UI (CatController), voice (IntentDispatcher), Hamlib (RigctldServer),
@@ -287,6 +315,50 @@ namespace Icom_Web_Control.Services
 
         /// <summary>Set the break-in mode (0=OFF, 1=SEMI, 2=FULL; CI-V 16 47).</summary>
         Task SetCwBreakInAsync(int mode, CancellationToken cancellationToken = default);
+
+        // -- RTTY (FSK) tones --------------------------------------------------
+
+        /// <summary>
+        /// Read the radio's RTTY mark pitch and shift width, in Hz, so the RTTY
+        /// tuner can offer to match them rather than making the operator copy
+        /// two menu items across by hand.
+        ///
+        /// <para>Paired with <see cref="SetRttyToneSettingsAsync"/>. This one
+        /// was read-only at first, on the reasoning that the radio is the
+        /// authority and a receive-side tuning aid should follow it rather than
+        /// move the radio's own decoder and FSK transmit tones. Colin asked for
+        /// the other direction on 2026-09-24 and that is his call to make: an
+        /// operator who has set the tuner to the shift they can actually hear
+        /// expects the radio to agree, and having to key the same number into a
+        /// front-panel menu afterwards is the hand-copying this feature existed
+        /// to remove.</para>
+        ///
+        /// <para>Null when the radio cannot be asked - not connected, or it did
+        /// not answer. See <see cref="RttyToneSettings"/> for the two caveats
+        /// that come with the answer.</para>
+        /// </summary>
+        Task<RttyToneSettings?> GetRttyToneSettingsAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Put the RTTY tuner's mark pitch and shift width into the radio's own
+        /// SET menu, so the two agree without the operator keying the numbers in
+        /// twice.
+        ///
+        /// <para><b>This writes a transmit setting.</b> The same two menu items
+        /// govern the radio's FSK transmit tones, not just its decoder, so a
+        /// station that keys FSK from this radio will send on whatever is
+        /// written here. That is understood and intended; it is not a reason to
+        /// quietly skip the write.</para>
+        ///
+        /// <para>Takes Hz and maps to the radio's codes internally - the same
+        /// way round as <c>SetIfFilterWidthHzAsync</c>, and for the same reason:
+        /// which rungs exist is a fact about the radio and belongs below this
+        /// line. The result says what was taken; a value with no rung comes back
+        /// null rather than snapped to a neighbour, because silently moving an
+        /// operator's shift by 25 Hz is worse than telling them it will not
+        /// fit.</para>
+        /// </summary>
+        Task<RttyToneWrite> SetRttyToneSettingsAsync(int markHz, int shiftHz, CancellationToken cancellationToken = default);
 
         // -- TX audio chain: mic, speech compressor, monitor (CI-V 14 / 16) ----
         // Percentages, not raw 0–255: these are the units the sliders and the

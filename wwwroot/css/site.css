@@ -970,6 +970,49 @@ fieldset.calibration-card {
     z-index: 1050;
     margin: 0;
 }
+
+/* The RTTY tuner, on the same terms as the dialogs above - and it has to be
+   here rather than left to the browser. A <dialog> shown with .show() keeps
+   the UA default of position:absolute with inset:0 and MARGIN:AUTO, and
+   margin:auto re-centres the box between its left and right edges. So a drag
+   that sets left alone moves it at half rate and it can never reach the left
+   of the screen, which is exactly what it did: it stopped in the middle.
+   position:fixed with margin:0 is also what makeDraggable's _clampDlg looks
+   for before it will keep a header on screen at all. */
+#rttyTunerDialog {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1050;
+    margin: 0;
+    max-height: 90vh;
+}
+
+/* The body scrolls, the title bar does not. Without this the dialog grows to
+   whatever its content wants - the scope is a ~324px square before a word of
+   the help text - and on a laptop it runs off the bottom of the screen with
+   nothing to scroll and no way to shrink it.
+
+   [open] is load-bearing. A <dialog> is display:none until it is opened, so
+   an unconditional `display: flex` here would override the UA rule and leave
+   the tuner permanently on screen.
+
+   scrollbar-gutter is not cosmetic either. The scope canvas is square and
+   takes its height from its own width, so a scrollbar appearing would narrow
+   it, shorten the content, and let the scrollbar disappear again - a flicker
+   loop at whatever window height sits on the boundary. Reserving the gutter
+   keeps the canvas width constant whether the scrollbar is there or not. */
+#rttyTunerDialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+#rttyTunerDialog > div:first-child { flex: none; }        /* title bar */
+#rttyTunerDialog .iwc-dialog-body {
+    overflow-y: auto;
+    min-height: 0;          /* or the flex item refuses to shrink below its content */
+    scrollbar-gutter: stable;
+}
 #fmDialog {
     position: fixed;
     top: 80px;

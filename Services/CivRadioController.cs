@@ -190,6 +190,39 @@ namespace Icom_Web_Control.Services
         private const int ScopeStaleMs = 2000;          // no sweep this long ⇒ not streaming
         private const int ScopeAnnounceEveryMs = 5000;  // watchdog re-announce cadence
 
+        // Scope waveform-output watchdog. The radio can stop sending 27 00 while
+        // the app still believes the scope is on: it was streaming, the port is
+        // open, nothing was switched off, and then the sweeps simply stop.
+        //
+        // The everyday cause is now known, confirmed on a MkII on 2026-09-24
+        // over four deliberate tries: **the radio stops waveform output while
+        // its own SET menu is open on the front panel**, and resumes a moment
+        // after it closes (it closes itself after a few idle seconds). That is
+        // benign, and it matters here only because the RTTY tuner's
+        // follow-the-radio feature invites the operator into that menu. A nudge
+        // sent while the menu is up achieves nothing — the radio acknowledges it
+        // and goes on sending nothing — which is why the first two nudges of a
+        // run are ordinary events rather than warnings.
+        //
+        // What is not benign, and is what this exists for, is that twice the
+        // same day the stream did *not* come back: sweeps stopped and stayed
+        // stopped for six minutes with enabled true and zero discards, until
+        // 27 10 01 / 27 11 01 sent by hand restored it instantly. Why that
+        // sticks sometimes and not others is still unknown. Before this there
+        // was no way back short of the operator finding the Scope switch and
+        // toggling it.
+        //
+        // Only ever after a sweep has been seen this run. A scope that has never
+        // streamed is the different fault of GitHub #2 / #47 — a refusal, or a
+        // band with no scope — and re-sending the same two commands every few
+        // seconds would bury that in the log rather than fix it.
+        private long _lastScopeReassertTicks;
+        private long _scopeReasserts;
+        private int _reassertsSinceSweep;
+        private const int ScopeSilentBeforeReassertMs = 8000;   // silence this long ⇒ nudge it
+        private const int ScopeReassertEveryMs = 15000;         // and no more often than this
+        private const int ScopeReassertAttempts = 3;            // and give up after this many
+
         /// <inheritdoc />
         public void RequestScopeStatusAnnounce()
         {
@@ -231,6 +264,55 @@ namespace Icom_Web_Control.Services
                     SendHub("SdrError", new { sdrId = "B", detail = blocked });
                 SendHub("SdrStatus", new { sdrId = "B", status });
             }
+        }
+
+        /// <summary>
+        /// Re-assert scope on + waveform output when the radio has gone quiet
+        /// under us. See <see cref="_lastScopeReassertTicks"/> for why.
+        /// </summary>
+        private async Task MaybeReassertScopeOutputAsync(CancellationToken ct)
+        {
+            if (_operatorScopeOff || !_bus.IsOpen || _scopeOutputBlocked != null)
+                return;
+            // Not while transmitting — the radio has its own reasons to stop the
+            // trace there, and a SET write mid-transmission is worth avoiding.
+            if (_state.IsTransmitting)
+                return;
+
+            long now = Environment.TickCount64;
+            long lastSweep = Volatile.Read(ref _lastSweepTicks);
+            if (lastSweep == 0)                                      // never streamed: not ours
+                return;
+            if (now - lastSweep < ScopeSilentBeforeReassertMs)
+                return;
+            if (now - Volatile.Read(ref _lastScopeReassertTicks) < ScopeReassertEveryMs)
+                return;
+            // Three tries, then leave it alone until a sweep proves the stream
+            // is back. Some silences are not a stuck stream and never will be:
+            // a band the scope will not run on answers every nudge politely and
+            // goes on sending nothing (GitHub #47). Nudging that for ever would
+            // put a CI-V write on the bus every fifteen seconds and bury the
+            // real diagnosis in the log.
+            if (Volatile.Read(ref _reassertsSinceSweep) >= ScopeReassertAttempts)
+                return;
+
+            Volatile.Write(ref _lastScopeReassertTicks, now);
+            long n = Interlocked.Increment(ref _scopeReasserts);
+            int sinceSweep = Interlocked.Increment(ref _reassertsSinceSweep);
+
+            // The first nudge of a silence is routine — an open SET menu looks
+            // exactly like this and is over in seconds. Only a silence that
+            // survives being nudged is worth a warning.
+            const string Message =
+                "[CivRadioController] No scope sweep for {Age:F1}s with the scope on — re-asserting 27 10/27 11 (nudge #{Count}, {Since} since the last sweep)";
+            if (sinceSweep <= 1)
+                _logger.LogInformation(Message, (now - lastSweep) / 1000.0, n, sinceSweep);
+            else
+                _logger.LogWarning(Message, (now - lastSweep) / 1000.0, n, sinceSweep);
+
+            await SendScopeSetAsync(CivProtocol.SubScopeOnOff, 0x01, "scope on (watchdog)", ct);
+            await NoteScopeOutputResultAsync(
+                await SendScopeSetAsync(CivProtocol.SubScopeOutput, 0x01, "scope waveform output (watchdog)", ct), ct);
         }
 
         /// <inheritdoc />
@@ -637,6 +719,8 @@ namespace Icom_Web_Control.Services
             // frames have the bus (see ScopePollIntervalMs).
             long sweepTicks = Environment.TickCount64;
             Volatile.Write(ref _lastSweepTicks, sweepTicks);
+            // The stream is alive, so the watchdog's budget is refilled.
+            Volatile.Write(ref _reassertsSinceSweep, 0);
             AccumulateSweepRate(sweepTicks);
 
             // The radio's live scope mode (tracks front-panel changes), carried on
@@ -2127,6 +2211,92 @@ namespace Icom_Web_Control.Services
                 _logger.LogWarning("[CivRadioController] Set {What} to {Value} was not acknowledged", what, value);
         }
 
+        // -- RTTY (FSK) tones (CI-V 1A 05 00 39 / 00 40) -----------------------
+        //
+        // Two SET-menu items, each a one-byte index rather than a value:
+        //   00 39  RTTY Mark Frequency   00=1275, 01=1615, 02=2125 Hz
+        //   00 40  RTTY Shift Width      00=170,  01=200,  02=425 Hz
+        //
+        // There is deliberately no third read here. The neighbouring item,
+        // 00 41 RTTY Keying Polarity, looks like the reverse switch and is not:
+        // the Basic manual defines it as "Key open/close = Mark/Space" versus
+        // "= Space/Mark", so it is the polarity of the FSK KEYING LINE from an
+        // external terminal unit on transmit. Which side of mark the space tone
+        // lands on in the RECEIVE audio is decided by the mode - RTTY vs RTTY-R
+        // - and RttyTunerService.TonesFor already reads that from the mode
+        // string. Wiring 00 41 to the tuner's Rev box would be reading a
+        // transmit setting to answer a receive question, and on a station that
+        // keys reversed it would get the answer backwards.
+        //
+        // There is also no RTTY speed here, because the radio has none: its
+        // decoder is fixed at 45.45 baud and the CI-V set has no command for it.
+
+        private static int RttyMarkHzFromCode(int code) => code switch
+        {
+            0 => 1275,
+            1 => 1615,
+            _ => 2125,
+        };
+
+        private static int RttyShiftHzFromCode(int code) => code switch
+        {
+            0 => 170,
+            1 => 200,
+            _ => 425,
+        };
+
+        // The inverses. Exact matches only - see RttyToneWrite for why an
+        // unmatched value is refused rather than snapped to the nearest rung.
+        private static int RttyMarkCodeFromHz(int hz) => hz switch
+        {
+            1275 => 0,
+            1615 => 1,
+            2125 => 2,
+            _    => -1,
+        };
+
+        private static int RttyShiftCodeFromHz(int hz) => hz switch
+        {
+            170 => 0,
+            200 => 1,
+            425 => 2,
+            _   => -1,     // 450 and 850 are real shifts the IC-7300 cannot be told about
+        };
+
+        /// <inheritdoc />
+        public async Task<RttyToneSettings?> GetRttyToneSettingsAsync(CancellationToken cancellationToken = default)
+        {
+            if (!IsConnected) return null;
+            int mark  = await ReadSetMenuByteAsync(0x00, 0x39, cancellationToken);
+            int shift = await ReadSetMenuByteAsync(0x00, 0x40, cancellationToken);
+            if (mark < 0 || shift < 0)
+            {
+                _logger.LogDebug("[CivRadioController] RTTY tone menu read failed (mark {Mark}, shift {Shift})", mark, shift);
+                return null;
+            }
+            return new RttyToneSettings(RttyMarkHzFromCode(mark), RttyShiftHzFromCode(shift));
+        }
+
+        /// <inheritdoc />
+        public async Task<RttyToneWrite> SetRttyToneSettingsAsync(int markHz, int shiftHz, CancellationToken cancellationToken = default)
+        {
+            if (!IsConnected) return new RttyToneWrite(null, null);
+
+            int markCode  = RttyMarkCodeFromHz(markHz);
+            int shiftCode = RttyShiftCodeFromHz(shiftHz);
+
+            // Written one at a time, and each only if it has a rung. A shift the
+            // radio cannot hold must not stop the mark being set: the operator
+            // asked for both and should get whichever of them is possible.
+            if (markCode >= 0)
+                await WriteSetMenuByteAsync(0x00, 0x39, markCode, $"RTTY mark {markHz} Hz", cancellationToken);
+            if (shiftCode >= 0)
+                await WriteSetMenuByteAsync(0x00, 0x40, shiftCode, $"RTTY shift {shiftHz} Hz", cancellationToken);
+
+            return new RttyToneWrite(markCode  >= 0 ? markHz  : null,
+                                     shiftCode >= 0 ? shiftHz : null);
+        }
+
         // -- RIT / ΔTX (CI-V 21) -----------------------------------------------
         //
         // One offset, two switches. The offset's wire form is two little-endian
@@ -2905,6 +3075,12 @@ namespace Icom_Web_Control.Services
                 // visible and the Scope switch reachable. GitHub #1.
                 if (Environment.TickCount64 - Volatile.Read(ref _lastScopeAnnounceTicks) >= ScopeAnnounceEveryMs)
                     AnnounceScopeStatus();
+
+                // …and the stream itself, which the status watchdog above can only
+                // report on, never restart.
+                try { await MaybeReassertScopeOutputAsync(stoppingToken); }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+                catch (Exception ex) { _logger.LogWarning(ex, "[CivRadioController] Scope re-assert failed"); }
 
                 loop++;
                 await DelayQuiet(ScopeAwarePollIntervalMs(), stoppingToken);
