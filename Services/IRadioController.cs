@@ -678,10 +678,25 @@ namespace Icom_Web_Control.Services
     /// my waterfall smoother on the radio's own screen" is a recurring
     /// question and this answers it with a number.
     /// </param>
+    /// <param name="BlockedReason">
+    /// Why the radio will not stream, when it has explicitly refused the
+    /// waveform-output command, else null. The operator-facing sentence, not a
+    /// code — it is printed verbatim.
+    ///
+    /// This is here because leaving it out cost a bug report. The original
+    /// IC-7300 refuses the command below 115200 baud, and the app knew that,
+    /// knew the radio menu to change and knew what to change it to — but none of
+    /// it reached the About block the manual asks users to paste, which could
+    /// only say "no sweep has ever arrived". That reads as a mystery, and
+    /// produced one (GitHub #47, and #2 before it). A refusal outranks the
+    /// counters: with no sweep ever assembled they are all zero and say nothing,
+    /// while this says exactly what to do.
+    /// </param>
     public record ScopeDiagnostics(
         bool Enabled,
         long SweepsCompleted,
         long SweepsDiscarded,
         double? SecondsSinceLastSweep,
-        double? SweepsPerSecond);
+        double? SweepsPerSecond,
+        string? BlockedReason = null);
 }
