@@ -2105,7 +2105,9 @@ If **No** cannot shift it, the app says so and asks you to end `Icom_Web_Control
 
 **App shuts down unexpectedly after closing the browser**
 
-- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting. If you want to keep the app running (for example while WSJT-X is using it via rigctld), leave a browser tab open on the main page. If you need to force-quit immediately without waiting, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Icom_Web_Control.exe**, and click **End Task**.
+- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting, so closing the last tab closes the app.
+- If you want it to keep running with no browser open — while WSJT-X or Log4OM is using it via rigctld, say, or while a DX cluster feed is up — turn off **Automatically exit when no browser is connected** in **Settings → Web Server**, and quit it from the system tray instead. The change takes effect straight away; no restart needed. Otherwise, just leave any one tab open.
+- If you need to force-quit immediately without waiting, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Icom_Web_Control.exe**, and click **End Task**.
 
 **Cannot access the app from a tablet**
 

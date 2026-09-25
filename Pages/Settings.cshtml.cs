@@ -190,6 +190,10 @@ namespace Icom_Web_Control.Pages
                 current.SerialPort        = Settings.SerialPort;
                 current.BaudRate          = Settings.BaudRate;
                 current.WebAddress        = Settings.WebAddress;
+                // Read by RadioHub on every disconnect, so it applies without a
+                // restart -- and it is deliberately not in the restart reasons
+                // below for that reason.
+                current.AutoShutdownWhenNoBrowsers = Settings.AutoShutdownWhenNoBrowsers;
                 // External-SDR spectrum config was removed from the Settings page
                 // (the IC-7300's scope comes over CI-V, not an IF-tapped SDR).
                 // The Sdr* fields are left untouched here so their persisted
