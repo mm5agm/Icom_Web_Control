@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using Icom_Web_Control.Services.Audio;
 using Icom_Web_Control.Services.Cw;
 using RadioWebControl.Core.Services.Rtty;
@@ -118,7 +118,11 @@ namespace Icom_Web_Control.Services.Rtty
         public async Task<string?> StartAsync(double markHz, int shiftHz, bool reverse)
         {
             if (markHz < 300 || markHz > 3000) return "Mark must be between 300 and 3000 Hz.";
-            if (shiftHz is not (170 or 200 or 425 or 450 or 850)) return "Shift must be 170, 200, 425, 450 or 850 Hz.";
+            // The three the IC-7300's SET > Function > RTTY Shift Width menu offers
+            // (CI-V 00 40: 00=170, 01=200, 02=425). The tuner used to accept 450 and
+            // 850 as receive-only rungs the radio could not be told about; they are
+            // gone, so every shift the tuner will run on is one the radio can follow.
+            if (shiftHz is not (170 or 200 or 425)) return "Shift must be 170, 200 or 425 Hz.";
             // Checked both ways round, so a later mode change cannot move space out of range.
             if (markHz + shiftHz > 3500 || markHz - shiftHz < 150)
                 return "That mark and shift put the space tone outside the audio passband.";

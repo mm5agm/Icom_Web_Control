@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Icom_Web_Control.Pages.IndexModel
 @{
     ViewData["Title"]     = "Icom Web Control";
@@ -2240,8 +2240,6 @@
                 <option value="170">170</option>
                 <option value="200">200</option>
                 <option value="425">425</option>
-                <option value="450">450</option>
-                <option value="850">850</option>
             </select>
             <div class="form-check mb-0">
                 <input class="form-check-input" type="checkbox" id="rttyTunerReverse">
@@ -2289,10 +2287,9 @@
             <b>SET &gt; Function</b> menu while this window is open, both ways
             round. Change the shift on the radio and the tuner changes with it;
             change it here and the radio changes with you, so its built-in
-            decoder does not have to be set twice. Only the three Mark figures
-            and the three Shift figures the radio itself offers can go back to
-            it &mdash; pick 450 or 850 and the tuner still works on it, but the
-            radio's menu is left where it was and the status line says so. In an
+            decoder does not have to be set twice. The Mark and Shift figures
+            offered here are the ones the radio itself has, so anything you pick
+            can go back to it. In an
             AFSK mode nothing is written or followed, because there the tones are
             your software's and that menu describes how the radio transmits;
             <b>From radio</b> still reads it.
