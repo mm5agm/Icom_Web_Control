@@ -2,10 +2,10 @@
 
 ![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
-![Latest release](https://img.shields.io/badge/Download-v1.1.0-brightgreen?style=flat-square)
+![Latest release](https://img.shields.io/badge/Download-v1.3.0-brightgreen?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Icom_Web_Control/latest/Icom_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 
-> **v1.1.0 — current release.** IWC controls the **Icom IC-7300** and **IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, a CW reader and sender, and a rigctld bridge for WSJT-X. The two radios speak near-identical CI-V and IWC drives both the same way — set the CI-V address to `94` for the original, `B6` for the MkII. Development and bench testing has been on a single IC-7300 MkII, and an owner of the original IC-7300 has confirmed v1.0.6 working on his radio. That is still only two radios between them, so if anything behaves unexpectedly — on either — please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
+> **v1.3.0 — current release.** IWC controls the **Icom IC-7300** and **IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, a CW reader and sender, a RTTY tuning scope, and a rigctld bridge for WSJT-X. The two radios speak near-identical CI-V and IWC drives both the same way — set the CI-V address to `94` for the original, `B6` for the MkII. Development and bench testing has been on a single IC-7300 MkII, and an owner of the original IC-7300 has confirmed v1.0.6 working on his radio. That is still only two radios between them, so if anything behaves unexpectedly — on either — please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
 >
 > **[⬇ Download the latest installer](https://github.com/mm5agm/Icom_Web_Control/releases/latest)**
 
@@ -21,20 +21,13 @@ If something has been biting you and a pre-release says it is fixed, or you want
 
 ## ✨ Added since the last release
 
-**v1.1.0 is the current release**, and it is the first with the Morse pair:
+**v1.3.0 is the current release.** Its headline is the RTTY Tuner, out in time for the CQ WW RTTY contest:
 
-- **CW Reader** — a **CW Read** button opens a reader that listens to the radio's own USB audio and prints what it hears as text, with a small spectrum and a tuning phasor. **Reader Mode** sets the radio up in one press and puts everything back when you leave; **ZIN** zero-beats the signal; confirmed contacts go to a **Log QSO** form that appends to an ADIF file. The decoder is the one my Yaesu app uses, unchanged. [§18](USER_MANUAL.md#18-cw-reader).
-- **CW Send** — type a line, press Enter, and the radio keys it over CI-V. **Stop** cuts in mid-piece; speed and break-in are the keyer's own. Not yet used on air by a CW operator. [§19](USER_MANUAL.md#19-cw-send).
+- **RTTY Tuner** — a **RTTY Tune** button opens the classic crossed-ellipse tuning scope, drawn from the radio's own receive audio. Two narrow filters listen for the mark and space tones and draw one against the other: a clean upright cross means you are on tune, leaning arms mean you are not. It does not transmit and it does not decode — the radio decodes RTTY by itself under **MENU » RTTY DECODE**, and this is how you put a signal on its tones without leaning over to watch the rig's screen. Mark and Shift are kept in step with the radio's own SET menu both ways round, and it stops following the moment you set a figure yourself. [§20](USER_MANUAL.md#20-rtty-tuner).
+- **The band scope gets itself going again** when the radio stops sending waveform data, instead of leaving a frozen trace until you restart the app — and when the radio's **SET** menu is what has stopped it, the panel now says so rather than just going blank.
+- **The automatic mode change when tuning can be turned off** — **Settings → §6.1**. RTTY has no band-plan segment of its own, so a click near the FT8 watering hole would answer with DATA-U and take you straight out of RTTY. [§5.4](USER_MANUAL.md#54-spectrum-display).
 
-Everything else in v1.1.0 is a fix, listed below. Full detail in the [v1.1.0 notes](#v110-2026-09-17).
-
-Since v1.1.0, in the **v1.2.0-pre1** pre-release — a pre-release, so the ⬇ Download link above still gives you v1.1.0; get it from the [releases page](https://github.com/mm5agm/Icom_Web_Control/releases):
-
-- **“Find my radio” sets IWC up for you.** Settings → Radio & CAT now lists the COM ports your PC has instead of asking you to type one, and a **Find my radio** button tries each of them at each speed until an Icom answers, then fills in the radio model, the port and the baud rate. It takes a couple of seconds, it tells you if a port is already in use by another program, and nothing is saved until you press Save Settings. A fresh install now starts with no port chosen rather than guessing at COM8. [§3](USER_MANUAL.md#3-first-time-setup).
-- **Original IC-7300 owners get the radio’s menu steps on the page.** Choose **IC-7300** as your radio model and Settings shows the CI-V menu items to set and the order to set them in — including the one that catches everybody, where the baud item you can see is the wrong one. [§15.7](USER_MANUAL.md#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).
-- **A tuning step you can set.** The mouse wheel over the spectrum moved a fixed 1 kHz, which is no use for RTTY or for zero-beating CW. Each VFO now has its own step, **1 Hz to 1 MHz**, set four ways that are all the same number: the **Step** box on the spectrum panel, a **right-click on the spectrum**, **clicking the digit you want to move** on the frequency display, or the voice command *“set step size one hertz”*. [§5.4](USER_MANUAL.md#54-spectrum-display).
-- **Testers get told about new test builds.** The update banner used to announce full releases only, to everybody, which left anyone on a pre-release hearing nothing until the finished version shipped. It now decides from the build you are running: on a full release nothing changes and there is no setting that could change it, and on a pre-release you are offered newer pre-releases, clearly labelled, with what is in them. [§5.1](USER_MANUAL.md#51-top-bar).
-- **Put your memories in the order you want** - on the Memories page, click the **Label**, **Frequency** or **Mode** heading to sort the list, or use the row buttons to move one memory to the top, up or down, then Save. The order is the order of the Mem panel tiles and the order **Export to Radio** writes them, so it is how you choose which 99 go to the radio. [§8.1](USER_MANUAL.md#81-memories-editor).
+Also now in a full release, first published in the v1.2.0-pre1 pre-release — **Find my radio** and a COM-port list so first-time setup no longer asks which port your radio is on; the **original IC-7300 menu checklist** on the Settings page; a **tuning step you can set** from 1 Hz to 1 MHz per VFO; **memory ordering** on the Memories page; and an **update banner that says what is in the release**. Full detail in the [v1.3.0 notes](#v130-2026-09-25) and the [v1.2.0-pre1 notes](#v120-pre1-2026-09-22).
 
 ## 🔧 Fixed since the last release
 
@@ -42,6 +35,10 @@ One line per fix, newest first, with the build that has it. A pre-release instal
 
 | Fixed | Issue | In build |
 |---|---|---|
+| The band scope could freeze and stay frozen until the app was restarted. IWC now notices the radio has stopped sending waveform data and asks for it again. | — | v1.3.0 |
+| Opening the radio's own SET menu stops it sending scope data — by design, not a fault — but IWC just showed an empty panel with no explanation. It now says the SET menu is what has stopped it. | — | v1.3.0 |
+| Clicking the spectrum near the FT8 segment answered with DATA-U and took you out of RTTY, which has no band-plan segment of its own. The automatic mode change can now be turned off in Settings → §6.1. | — | v1.3.0 |
+| The Radio & CAT dropdowns on the Settings page were sized to the page rather than to their contents, cutting off long COM port descriptions. | — | v1.3.0 |
 | A first-time user could not tell whether a failed connection was the wrong COM port, the wrong baud rate, a missing USB driver or a cable, and the app offered no way to find out. Settings now lists the ports, **Find my radio** identifies the radio and fills the settings in, and the start-up banner links straight to it. | [#43](https://github.com/mm5agm/Icom_Web_Control/issues/43) | v1.2.0-pre1 |
 | A fresh install arrived set to COM8 — the developer’s own port — so on anyone else’s PC it reported that a port was missing rather than that none had been chosen yet. The port now starts blank, and the message says so. | [#43](https://github.com/mm5agm/Icom_Web_Control/issues/43) | v1.2.0-pre1 |
 | Loading a memory bank kept only label, frequency, mode and clarifier, and silently dropped the IF width, NB, NR, AGC, power and notes that Save to Mem had captured. Banks now load every field; a bank saved by an older version still has them in the file and gets them back on its next load. | — | v1.2.0-pre1 |
@@ -76,6 +73,28 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 **`v1.1.0` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 or IC-7300 MkII end-to-end (see the summary at the top), bench-tested against a single MkII and confirmed by an owner on an original IC-7300. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
+
+### v1.3.0 (2026-09-25)
+
+> **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept. Everything that was in the v1.2.0-pre1 pre-release is in this build as well, so if you were waiting for the finished version, this is it.
+
+**The headline is the RTTY Tuner**, and it is here in time for the CQ WW RTTY contest this weekend.
+
+- **RTTY Tuner — the crossed ellipse, in the browser.** A **RTTY Tune** button on the main panel opens the classic crossed-ellipse tuning scope: two narrow filters listen to the radio's receive audio, one on the mark tone and one on the space tone, and each draws its own line. On tune you get a clean upright cross; off tune the arms lean and open out. It is a tuning aid and nothing else — it does not transmit, and it does not decode. **You already have a decoder**: the IC-7300 decodes RTTY on its own screen under **MENU » RTTY DECODE**, with no PC involved, and MMTTY and fldigi are tuned exactly the same way. What this gives you is the ability to put a signal on its tones from the browser without leaning over to watch the radio's own display. The scope itself is shared code with my Yaesu app, so both draw an identical figure from identical audio. User Manual, [§20](USER_MANUAL.md#20-rtty-tuner).
+
+- **Mark and Shift stay in step with the radio, both ways round.** While the tuner is open it re-reads **SET » Function » RTTY Mark Frequency** and **RTTY Shift Width** every few seconds, so changing the shift on the radio changes the tuner with it. Change it in the tuner instead and the radio's menu follows, so its built-in decoder does not have to be set a second time by hand. Only the figures the radio itself offers can go back to it — 1275/1615/2125 Hz mark, 170/200/425 Hz shift — so the wider utility shifts the tuner supports (450, 850) are used by the tuner and left off the radio, and the status line says which of the two it managed. **It follows, but it does not argue:** the moment you type your own Mark or Shift it stops replacing your figure, for the rest of the session and across a reload. A utility station on 450 Hz shift while the radio's menu still says 170 is the ordinary case, and a tuner that dragged you back every four seconds would be useless for exactly the signals this scope is best at.
+
+- **There is no speed setting, and you have not missed it.** Amateur RTTY is 45.45 baud and utilities run 50 or 75, so it is a fair question — but two narrow filters listening for two tones do not care how fast the tones are being keyed. The radio does not offer speed either: its decoder is fixed at 45.45 baud and there is no CI-V command for it.
+
+- **The band scope recovers on its own when the radio stops sending waveform.** The trace could freeze and stay frozen until the app was restarted. IWC now notices the waveform stream has stopped and asks the radio for it again. The underlying reason the radio stops is still not known — if you see the trace freeze, please say what you were doing at the time.
+
+- **A blank band scope now says why, where you are looking.** Opening the radio's own **SET** menu stops it sending scope data, which is the radio working as designed and not a fault — but IWC simply showed an empty panel. It now tells you plainly that the SET menu is what has stopped it, rather than leaving you to work out whether something is broken.
+
+- **The automatic mode change when tuning can be switched off.** Clicking the spectrum or a DX spot sets the mode the band plan gives for that frequency, which is helpful until it is not: **RTTY has no band-plan segment of its own**, so 17m RTTY sits inside the FT8 segment and a click there answers with DATA-U and takes you straight out of RTTY. Contest weekends and 40m SSB around 7.050 have the same problem. **Settings → §6.1**, *Change mode automatically when tuning from the band plan*. Picking a named segment from a VFO band dropdown still sets that segment's mode either way. User Manual, [§5.4](USER_MANUAL.md#54-spectrum-display).
+
+- **Fixed: the Radio & CAT dropdowns on the Settings page were sized to the page rather than to their contents**, so a long COM port description was cut off.
+
+**Also in this release, first published in v1.2.0-pre1** and described in full under [that entry](#v120-pre1-2026-09-22): **Find my radio** and the COM-port list, so a first-time setup no longer asks you to know which port your radio is on; the **original IC-7300 menu checklist** on the Settings page, including the CI-V baud item that catches everybody; a **tuning step you can set**, 1 Hz to 1 MHz per VFO, set four different ways; **memory ordering** on the Memories page, which is how you choose which 99 go to the radio; and an **update banner that tells you what is in the release** and that keeps pre-release testers informed.
 
 ### v1.2.0-pre1 (2026-09-22)
 
