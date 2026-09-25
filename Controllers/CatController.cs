@@ -85,7 +85,8 @@ namespace Icom_Web_Control.Controllers
                 sweepsCompleted = s.SweepsCompleted,
                 sweepsDiscarded = s.SweepsDiscarded,
                 secondsSinceLastSweep = s.SecondsSinceLastSweep,
-                sweepsPerSecond = s.SweepsPerSecond
+                sweepsPerSecond = s.SweepsPerSecond,
+                blockedReason = s.BlockedReason
             });
         }
 

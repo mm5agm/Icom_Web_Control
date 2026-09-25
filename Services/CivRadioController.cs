@@ -332,7 +332,11 @@ namespace Icom_Web_Control.Services
                 SweepsCompleted: _scope.SweepsCompleted,
                 SweepsDiscarded: _scope.SweepsDiscarded,
                 SecondsSinceLastSweep: age,
-                SweepsPerSecond: measured);
+                SweepsPerSecond: measured,
+                // Only meaningful while the operator wants the scope on, matching
+                // the precedence in AnnounceScopeStatus — a stale refusal from
+                // before they switched it off would otherwise outrank "off".
+                BlockedReason: _operatorScopeOff ? null : _scopeOutputBlocked);
         }
 
         public CivRadioController(

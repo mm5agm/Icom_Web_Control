@@ -602,6 +602,15 @@
                 return;
             }
 
+            // A refusal outranks the counters: they are all zero in that state,
+            // so they describe the symptom while this names the cause and the
+            // radio menu that fixes it (#47).
+            if (s.blockedReason) {
+                scopeRate.textContent = 'Blocked';
+                scopeDetail.textContent = s.blockedReason;
+                return;
+            }
+
             scopeRate.textContent = (s.sweepsPerSecond == null)
                 ? '—'
                 : s.sweepsPerSecond.toFixed(1) + ' sweeps/sec';

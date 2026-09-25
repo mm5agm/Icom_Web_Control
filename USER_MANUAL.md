@@ -381,7 +381,7 @@ The slider snaps to 5 W steps for ease of dragging, but the numerical label show
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over CI-V — there is no external SDR and nothing extra to plug in. It shows a real-time spectrum and scrolling waterfall of the band around the current VFO A frequency, and appears automatically once the radio is connected.
 
-![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
+![The spectrum panel: span buttons, Hold and status badges along the header, the Range / Speed / Bright / Step bar below it, then the spectrum trace with DX spots, band-plan markers and guard rails, and the waterfall underneath](pictures/Spectrum_Scope.png)
 
 **Scope switch** — a small **Scope** switch sits above the panel. Turning it off tells the radio to stop producing scope data altogether (CI-V `27 11`) and the trace goes quiet; turning it back on resumes it. It is there for three reasons: to give the screen space back to the rest of the control panel, to stop the display when you don't want it, and as the quick A/B test if you ever suspect the scope stream itself is adding noise to your receive audio — switch it off, listen, switch it back on.
 
@@ -486,7 +486,7 @@ By default IWC shows **one** spectrum panel, for VFO A. The IC-7300 has a single
 
 Switching on **Enable pseudo-dual receiver** in **Settings → Spectrum Display** adds a second panel for VFO B — a *watch* panel — by time-sharing the one scope between them. On the **same band** both panels update live and your audio is never interrupted, because the single sweep covers both frequencies. Watching a **different** band is only possible by briefly borrowing the receiver, so it is off unless you also tick **Allow cross-band watch**; with that on, IWC retunes for a moment every few seconds (interval configurable, default 15 s) and your listening audio dips for about 0.4 s per peek. With cross-band watch off, a watch panel pointed at another band simply shows **Off-screen**. The peek only runs while a browser is actually showing the watch panel: choose **VFO A** (or **VFO B**) alone in the spectrum strip, or switch the scope off, and the retuning stops until you go back to **Both**. Commands you send during a peek — a voice **Band up**, a click on the spectrum, a memory recall — are held for the fraction of a second the receiver is borrowed and then applied to your own VFO, never to the one being watched.
 
-![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel](pictures/Spectrum_Scope_Both.png)
+![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel, each with its own tuning step: 1 Hz on A, 1 kHz on B](pictures/Spectrum_Scope_Both.png)
 
 **Listen / Listening** — with two panels up, the one you are hearing carries a green **Listening** badge and the other carries a **Listen** button. Click **Listen** to move the radio's audio to that VFO; the badge and button swap over. The badge follows the radio, so switching VFOs on the front panel moves it too.
 
@@ -1020,6 +1020,16 @@ Most settings take effect the moment you click **Save Settings**. A few — radi
 Clicking **Restart Now** stops IWC and (when running as the installed exe) automatically relaunches it. The browser briefly shows a "Icom Web Control has stopped" overlay during the restart; just reload the tab once IWC is back. When running from source via `dotnet run`, the auto-relaunch is skipped — you'll need to start `dotnet run` again manually.
 
 ### 6.1 Radio Connection
+
+![Settings → Radio Connection with IC-7300 MkII chosen: the Radio Model dropdown, the Serial Port dropdown with its Refresh and Find my radio buttons, and the Baud Rate box set to 19200](pictures/Settings_Radio_Connection_7300MK2.png)
+
+*With **IC-7300 MkII** chosen — three fields, and nothing to set on the radio.*
+
+**Choose IC-7300 instead, and the page tells you what the original model needs:**
+
+![The same section with IC-7300 chosen: a blue five-step checklist of the radio's own CI-V menu items appears above the Serial Port field, and a yellow warning below the Baud Rate box explains that the band scope needs 115200](pictures/Settings_Radio_Connection_7300.png)
+
+*The blue checklist and the yellow band-scope warning appear for the original model only, because it is the only one that needs them. The steps are in the order the radio will let you do them — see [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).*
 
 | Setting | Description |
 |---------|-------------|
@@ -1819,6 +1829,8 @@ Access the Diagnostics page from the navigation bar. It is primarily used when s
 
 **Band scope delivery** — the panel at the top of the page, always visible. It shows how many spectrum sweeps per second are actually reaching IWC from the radio, measured over the last three seconds, along with the number of sweeps assembled and discarded since the app started.
 
+If the radio has *refused* to send scope data, the panel reads **Blocked** instead of a rate and prints the reason in place of the counters — which in that state are all zero and tell you nothing. On the original IC-7300 that reason is nearly always the baud rate; see §15.7.
+
 About **4 sweeps per second is normal over USB**, and there is nothing to fix if that is what you see. The radio does not send a sweep as one block — it splits it into 11 CI-V segments and paces them roughly 21 ms apart, which occupies about 89% of the time between sweeps. The CI-V baud-rate setting makes no difference to this; 19200 and 115200 measure the same.
 
 That figure is the answer to a question operators ask often: **why the radio's own waterfall shows CW when IWC's does not.** The radio draws its scope internally with no cable in the way. IWC gets about four frames a second, and a dot at 20 WPM lasts around 60 ms, so it can fall between sweeps entirely. It is a sampling limit, not smoothing.
@@ -2009,7 +2021,7 @@ The radio is talking, but no spectrum sweep has arrived. The panel gives up afte
 The panel is on screen and the radio is connected, but no sweep is arriving. The status badge at the right-hand end of the panel header says the same thing in one word (**Scope off**, **Connecting…**, **Live**, **Scope blocked**).
 
 - Check the **Scope** switch above the panel, and the scope on the radio's own screen.
-- Open **About** and read the **Band scope** line in the Diagnostics block. "on, but NO sweep has ever arrived" means the radio is not sending scope data at all; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate. The **Band scope delivery** panel on the Diagnostics page (§11) shows the same counters live, plus the measured sweeps-per-second.
+- Open **About** and read the **Band scope** line in the Diagnostics block. If it begins **"BLOCKED by the radio"** the rest of the line tells you exactly which radio setting is refusing and what to change it to — do that and nothing else here applies. "on, but NO sweep has ever arrived" means the radio is not sending scope data and has not said why; a large discard count means sweeps are arriving but being broken up by bus traffic — try a higher CI-V baud rate. The **Band scope delivery** panel on the Diagnostics page (§11) shows the same counters live, plus the measured sweeps-per-second.
 - Include that Diagnostics block in any bug report about a missing spectrum (§14.1).
 
 **The spectrum freezes while you are using the radio's own menus**
@@ -2103,7 +2115,9 @@ If **No** cannot shift it, the app says so and asks you to end `Icom_Web_Control
 
 **App shuts down unexpectedly after closing the browser**
 
-- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting. If you want to keep the app running (for example while WSJT-X is using it via rigctld), leave a browser tab open on the main page. If you need to force-quit immediately without waiting, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Icom_Web_Control.exe**, and click **End Task**.
+- This is normal behaviour. When the last browser tab is closed, the app waits 30 seconds for a reconnection before exiting, so closing the last tab closes the app.
+- If you want it to keep running with no browser open — while WSJT-X or Log4OM is using it via rigctld, say, or while a DX cluster feed is up — turn off **Automatically exit when no browser is connected** in **Settings → Web Server**, and quit it from the system tray instead. The change takes effect straight away; no restart needed. Otherwise, just leave any one tab open.
+- If you need to force-quit immediately without waiting, open Windows Task Manager (**Ctrl+Shift+Esc**), find **Icom_Web_Control.exe**, and click **End Task**.
 
 **Cannot access the app from a tablet**
 
@@ -2239,7 +2253,7 @@ For either route, the radio's audio device on the shack PC is the **USB Audio CO
 
 A handful of things, and they are all one-off. IWC supports both radios, and the whole of the rest of this manual applies to yours unchanged — the spectrum, CW, memories, voice control, WSJT-X and rigctld all behave identically. It is only getting connected that differs.
 
-Settings shows this same list on the page the moment you choose **IC-7300** as your radio model, so you do not have to work from the manual with the radio in front of you.
+Settings shows this same list on the page the moment you choose **IC-7300** as your radio model, so you do not have to work from the manual with the radio in front of you — there is a picture of it in [§6.1](#61-radio-connection).
 
 | | What to set | Where |
 |---|---|---|
