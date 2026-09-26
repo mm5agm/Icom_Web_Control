@@ -178,6 +178,7 @@ The application was written for operators who want a large, clean, touchscreen-f
 ## 2. Installation
 
 1. Download the installer from the [GitHub Releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
+   > **Edge or Chrome leaves an "Unconfirmed 123456.crdownload" file instead of the installer?** The browser has held the download because the installer is not signed with a commercial certificate and a new release has not been downloaded by many people yet. You do not need to turn off the browser's download protection. Press **Ctrl+J** to open the Downloads list, choose **Keep** on the installer (hover over it, or use the **...** next to it), and if it warns again choose **Show more → Keep anyway**. The file is then renamed to the proper `.exe` and will run.
 2. Run the installer. .NET 10 is bundled — you do not need to install it separately.
 3. A desktop shortcut and a Start Menu entry are created automatically. Both are called **Icom Web Control**, so typing "icom" into Start finds the app.
    > **Upgrading from v1.0.4 or earlier?** Those versions filed the Start Menu entry inside a folder named **MM5AGM**, which sorts it under **M** rather than **I** and makes it invisible to anyone searching for "Icom". Installing v1.0.5 moves it out to the top level and removes the old one, so you end up with a single entry where you would expect it. If Windows Search does not find a brand-new shortcut immediately, give it a minute to index.
