@@ -29,6 +29,13 @@ If something has been biting you and a pre-release says it is fixed, or you want
 - **A band scope that the radio has blocked now says so in the About block**, the one the manual asks you to paste into a bug report — naming the radio setting at fault instead of "no sweep has ever arrived" ([#47](https://github.com/mm5agm/Icom_Web_Control/issues/47)).
 - **The automatic mode change when tuning can be turned off** — **Settings → §6.1**. RTTY has no band-plan segment of its own, so a click near the FT8 watering hole would answer with DATA-U and take you straight out of RTTY. [§5.4](USER_MANUAL.md#54-spectrum-display).
 
+**Since v1.3.0** — in the code, not yet in a build:
+
+- **Pop-out windows for a second monitor.** The CW Reader, CW Send, RTTY Tuner, Twin PBT and DX Spots list can each open in a window of their own with their **↗** button, at any size and on any screen; **Reattach** puts them back. A pop-out window keeps IWC running on its own, as the main page does. [§5.18](USER_MANUAL.md#518-pop-out-windows).
+- **The CW Reader and RTTY Tuner close themselves when the mode leaves them behind** — the reader outside CW, the tuner outside RTTY, DATA and SSB — once the mode has held for two seconds, so a band change passing through another mode does not close them. A pop-out window pauses instead of closing. [§18](USER_MANUAL.md#18-cw-reader), [§20](USER_MANUAL.md#20-rtty-tuner).
+- **The RTTY Tuner can be resized**, and **Tones only** hides everything but the scope so it can be made very small. [§20](USER_MANUAL.md#20-rtty-tuner).
+- **CW Send won't send in the wrong mode.** Outside CW it says so, keeps the line in the box, and offers to switch the transmit VFO to CW. [§19.1](USER_MANUAL.md#191-sending-a-line).
+
 Also now in a full release, first published in the v1.2.0-pre1 pre-release — **Find my radio** and a COM-port list so first-time setup no longer asks which port your radio is on; the **original IC-7300 menu checklist** on the Settings page; a **tuning step you can set** from 1 Hz to 1 MHz per VFO; **memory ordering** on the Memories page; and an **update banner that says what is in the release**. Full detail in the [v1.3.0 notes](#v130-2026-09-25) and the [v1.2.0-pre1 notes](#v120-pre1-2026-09-22).
 
 ## 🔧 Fixed since the last release
@@ -37,6 +44,9 @@ One line per fix, newest first, with the build that has it. A pre-release instal
 
 | Fixed | Issue | In build |
 |---|---|---|
+| The spectrum's Range, Speed and Bright sliders had a faint track that was hard to see on the dark panel, and the keyboard focus ring on the spectrum's resize grip all but vanished against the VFO card under it. The sliders are now drawn like the Notch slider, and the grip is lighter, with a larger mark and an amber focus ring. | — | *Not yet in a build* |
+| A page left open but untouched - the About page, say - could stop counting as connected after a quiet spell, and IWC would then shut down underneath it, so the next click gave *connection refused*. Every page now keeps its connection alive the same way, with longer timeouts on both sides. | — | *Not yet in a build* |
+| The Twin PBT dialog showed what the radio's knobs were set to when it opened and never looked again, so a turn of the knobs at the radio left it out of date. It now re-reads whenever you come back to it. | — | *Not yet in a build* |
 | The spectrum panel was a fixed 280 pixels tall, on a 4K monitor as much as on a laptop. It now has a **Height** setting on its control bar, Shortest through Tallest, and a grip along the bottom of the panel that can be dragged (or driven from the keyboard) to anything from 40 to 1000 pixels, remembered per VFO ([§5.4](USER_MANUAL.md#54-spectrum-display)). | — | *Not yet in a build* |
 | A movable window (CW reader, RTTY tuner, DX spots and the rest) dragged over the meters or the spectrum let parts of what was underneath show through it, and when two overlapped, the one further down the page always won. Every movable window now sits on top of the page, and the one you last clicked or opened comes to the front. | — | *Not yet in a build* |
 | The app shut itself down about 30 seconds after the last browser tab disconnected, with no way to ask it not to — which is wrong whenever something other than a browser is the reason it is up: WSJT-X or Log4OM on the rigctld bridge, a DX cluster feed collecting spots, or a shack PC driven over RDP. **Settings → Web Server** now has a switch to keep it running. | — | v1.3.0 |

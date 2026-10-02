@@ -172,8 +172,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- SignalR connection setup and disconnect on page unload ---
     if (window.signalRConnection === undefined) {
-        window.signalRConnection = new signalR.HubConnectionBuilder().withUrl("/radioHub").withAutomaticReconnect().build();
-        window.signalRConnection.start().catch(function (err) { });
+        window.signalRConnection = window.rwcHubConnection("/radioHub");
+        window.signalRConnection.start().then(function () {
+            window.signalRConnection.invoke("Heartbeat").catch(function () { });
+        }).catch(function (err) { });
         // Heartbeat: send every 5 seconds
         window.signalRHeartbeatInterval = setInterval(function () {
             if (window.signalRConnection && window.signalRConnection.invoke) {
@@ -895,10 +897,7 @@ async function checkTxStatus() {
 // SignalR connection - shared by both the outer handler below and the
 // second handler at the bottom of the file (after the IIFE).
 // ---------------------------------------------------------------------------
-const connection = new signalR.HubConnectionBuilder()
-    .withUrl("/radioHub")
-    .withAutomaticReconnect()
-    .build();
+const connection = window.rwcHubConnection("/radioHub");
 
 // Redirect to Settings page if the backend signals an init failure
 connection.on("ShowSettingsPage", function () {
@@ -1094,6 +1093,7 @@ connection.on("RadioStateUpdate", function (update) {
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('A', update.value);
         if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('A', update.value);
         if (window.rxFilter && window.rxFilter.onModeChanged) window.rxFilter.onModeChanged('A', update.value);
+        window.cwSendPanel?.setMode?.('A', update.value);
     }
     if (update.property === "ModeB") {
         updateModeSelect('B', update.value);
@@ -1107,6 +1107,7 @@ connection.on("RadioStateUpdate", function (update) {
         if (window.voiceAnnounce) window.voiceAnnounce.sayMode('B', update.value);
         if (window.audioFilter && window.audioFilter.onModeChanged) window.audioFilter.onModeChanged('B', update.value);
         if (window.rxFilter && window.rxFilter.onModeChanged) window.rxFilter.onModeChanged('B', update.value);
+        window.cwSendPanel?.setMode?.('B', update.value);
     }
 
     // --- S-METER (push) ---
@@ -1268,6 +1269,7 @@ connection.on("RadioStateUpdate", function (update) {
         txVfo = update.value;
         updateTxButton();
         applyVfoActiveStyling();
+        window.cwSendPanel?.setTxVfo?.(update.value);
         if (typeof window.updateToolbarStatus === 'function') window.updateToolbarStatus('txVfo', update.value);
     }
     if (update.property === "ActiveVfo") {

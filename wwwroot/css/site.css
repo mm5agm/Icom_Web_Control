@@ -1430,3 +1430,30 @@ dialog[open]:not(:modal) {
 .spectrum-step-menu-item.active::after {
     content: " \2713";
 }
+
+/* Pop-out (<dialog>) close ✕ button. The dialogs have a dark (#222)
+   background, on which Bootstrap's btn-outline-secondary renders as
+   near-black text on near-black — the ✕ effectively vanishes. Give it an
+   explicit high-contrast red fill with a white glyph (matching the Twin PBT
+   dialog's already-fixed close button) so it's always visible. */
+.iwc-dialog-close {
+    background: #c0392b; color: #fff; border: 1px solid #e74c3c;
+    font-weight: bold; font-size: 1rem; line-height: 1; padding: 2px 11px;
+}
+.iwc-dialog-close:hover, .iwc-dialog-close:focus {
+    background: #e74c3c; color: #fff; border-color: #ff6b5a;
+}
+
+/* Action buttons inside a dark pop-out, for exactly the reason the close
+   button above needed fixing: btn-outline-secondary on #222 is near-black
+   on near-black and the label vanishes. Same fix, without the red - these
+   are ordinary actions, not a close. */
+.iwc-dialog-btn {
+    background: #333; color: #eee; border: 1px solid #666;
+    font-size: 0.8rem; line-height: 1.2; padding: 2px 8px;
+}
+.iwc-dialog-btn:hover, .iwc-dialog-btn:focus {
+    background: #444; color: #fff; border-color: #8ab;
+}
+.iwc-dialog-btn:disabled { color: #888; border-color: #444; }
+

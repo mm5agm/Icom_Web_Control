@@ -57,11 +57,7 @@ export class SdrSpectrumPipeline {
     connect() {
         if (this._connection) return;
 
-        const conn = new window.signalR
-            .HubConnectionBuilder()
-            .withUrl('/radioHub')
-            .withAutomaticReconnect()
-            .build();
+        const conn = window.rwcHubConnection('/radioHub');
 
         conn.on('RadioStateUpdate', (msg) => {
             // ServerShutdown: tear down our connection so Kestrel has nothing
@@ -121,6 +117,14 @@ export class SdrSpectrumPipeline {
      */
     onFrequencyB(handler) {
         this._pipeline.register('FrequencyB', (value) => handler(value));
+    }
+
+    /**
+     * Register a handler for VFO A mode changes (the radio's own mode string).
+     * @param {function(string)} handler
+     */
+    onModeA(handler) {
+        this._pipeline.register('ModeA', (value) => handler(value));
     }
 
     /**
