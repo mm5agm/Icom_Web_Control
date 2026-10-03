@@ -20,6 +20,11 @@
            window's own frame does the moving and resizing. */
         #rttyTunerDialog.rtty-popout {
             position: static;
+            /* site.css centres the floating dialog with left: 50% and a
+               -50% translate. position: static drops the left but not the
+               translate, which pushed the whole panel half its width off
+               the left edge of the window. */
+            transform: none;
             display: flex;
             flex-direction: column;
             width: 100%;
