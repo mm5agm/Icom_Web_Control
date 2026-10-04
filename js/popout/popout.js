@@ -31,9 +31,21 @@
 const CHANNEL_PREFIX = 'rwc-popout-';
 const WINDOW_PREFIX  = 'rwc-popout-';
 const GEOM_PREFIX    = 'popoutGeom_';
+// The page-area size the host asked window.open for, read once by the
+// pop-out to work out how big its own frame is (see frameFrom).
+const REQ_PREFIX     = 'popoutReq_';
+// The pop-out's frame size, kept per window so a reload still has it.
+const FRAME_KEY      = 'popoutFrame';
+// A frame bigger than this is not a frame: the browser did not give the
+// window the size it was asked for (clamped to the screen, say).
+const MAX_FRAME      = 400;
 
-export const MIN_WIDTH  = 320;
-export const MIN_HEIGHT = 200;
+// Only a guard against a broken saved value, never a size anyone is held to.
+// Sizes are in screen units, which at a browser zoom below 100% hold more of
+// the page than they look: 150 across at 50% zoom shows 300 CSS pixels, and
+// an operator who shrinks a pop-out that far means it.
+export const MIN_WIDTH  = 120;
+export const MIN_HEIGHT = 80;
 // Bigger than any real monitor arrangement, small enough that a corrupt value
 // cannot ask for a window the browser will refuse outright.
 const MAX_EXTENT = 16384;
@@ -76,6 +88,23 @@ export function clampGeometry(saved, def) {
     return out;
 }
 
+/**
+ * A default size that is a share of the screen's area, for a panel that has
+ * no natural size of its own. 0.25 is half the width by half the height.
+ * Pure, so it can be tested: the screen is passed in.
+ *
+ * @param {number} share  fraction of the screen's area, 0-1
+ * @param {{availWidth:number,availHeight:number}} scr  usually window.screen
+ * @returns {{width:number,height:number}}
+ */
+export function screenShare(share, scr) {
+    const k = Math.sqrt(Math.min(1, Math.max(0, share)));
+    return {
+        width:  Math.max(MIN_WIDTH,  Math.round((scr?.availWidth  || 0) * k)),
+        height: Math.max(MIN_HEIGHT, Math.round((scr?.availHeight || 0) * k)),
+    };
+}
+
 /** The window.open features string for a geometry from clampGeometry. */
 export function featuresFor(geom) {
     const parts = ['popup=yes', `width=${geom.width}`, `height=${geom.height}`];
@@ -83,6 +112,81 @@ export function featuresFor(geom) {
         parts.push(`left=${geom.left}`, `top=${geom.top}`);
     }
     return parts.join(',');
+}
+
+/**
+ * The size of a pop-out window's frame - borders and title bar - in the
+ * units window.open and outerWidth use, or null where it cannot be known.
+ *
+ * Those are screen units, which the browser's zoom does not change. The page
+ * area the pop-out can measure from inside, innerWidth, is in CSS pixels,
+ * which it does: at 50% zoom the same window is twice as many CSS pixels
+ * across. Saving innerWidth and handing it back to window.open therefore
+ * doubled the window at every Reattach. The size that was asked for is the
+ * page area in screen units, so outer size minus that is the frame, and
+ * outer size minus the frame is the page area at any zoom.
+ *
+ * Pure, so it can be tested.
+ *
+ * @param {{width:number,height:number}} outer  outerWidth / outerHeight on load
+ * @param {{width:number,height:number}|null} req  what window.open was asked for
+ * @returns {{w:number,h:number}|null}
+ */
+export function frameFrom(outer, req) {
+    if (!req || !outer) return null;
+    const w = Math.round(Number(outer.width)  - Number(req.width));
+    const h = Math.round(Number(outer.height) - Number(req.height));
+    if (!Number.isFinite(w) || !Number.isFinite(h)) return null;
+    if (w < 0 || h < 0 || w > MAX_FRAME || h > MAX_FRAME) return null;
+    return { w, h };
+}
+
+/**
+ * The page-area size to save, in window.open's units. With the frame known
+ * it is the outer size less the frame, whatever the zoom; without it, the
+ * inner size, which is right at 100% zoom and was all there was before.
+ * Pure, so it can be tested.
+ *
+ * @param {{innerWidth:number,innerHeight:number,outerWidth:number,outerHeight:number}} win
+ * @param {{w:number,h:number}|null} frame
+ * @returns {{width:number,height:number}}
+ */
+export function pageAreaSize(win, frame) {
+    if (frame && win.outerWidth > 0 && win.outerHeight > 0) {
+        return { width: win.outerWidth - frame.w, height: win.outerHeight - frame.h };
+    }
+    return { width: win.innerWidth, height: win.innerHeight };
+}
+
+/**
+ * A saved geometry fit to open with. A size saved before sizes were measured
+ * in screen units - with no `zoomSafe` mark - may have been inflated by the
+ * browser's zoom at every Reattach until it filled the screen, so only its
+ * position is kept and the size goes back to the default, once. So does a
+ * page area bigger than the whole screen, however it was saved: the window
+ * round it would be bigger still, with no edges left to grab and make it
+ * smaller. Anything up to the screen is kept - on a short screen, a tall
+ * pop-out is a sensible choice.
+ * Pure, so it can be tested.
+ *
+ * @param {object|null} saved  as read from storage
+ * @param {{availWidth:number,availHeight:number}|null} scr  usually window.screen
+ * @returns {object|null}
+ */
+export function usableSave(saved, scr) {
+    if (!saved || typeof saved !== 'object') return saved;
+    const out = { ...saved };
+    const tooBig = (v, avail) => Number(avail) > 0 && Number(v) > Number(avail);
+    if (!out.zoomSafe || tooBig(out.width, scr?.availWidth) || tooBig(out.height, scr?.availHeight)) {
+        delete out.width; delete out.height;
+    }
+    delete out.zoomSafe;
+    return out;
+}
+
+function readJson(store, key) {
+    try { return JSON.parse(store?.getItem(key) || 'null'); }
+    catch { return null; }
 }
 
 function readGeometry(name) {
@@ -170,7 +274,9 @@ export class PopoutHost {
      * @param {object} opts
      * @param {string} opts.name   short id, e.g. 'cw-reader'; names the window, channel and storage
      * @param {string} opts.url    the pop-out page
-     * @param {{width:number,height:number}} opts.defaultSize  page-area size the first time
+     * @param {{width:number,height:number}|(() => {width:number,height:number})} opts.defaultSize
+     *        page-area size the first time; a function is asked at each open,
+     *        so a size worked out from the screen follows the screen
      * @param {(open: boolean) => void} [opts.onChange]  the pop-out opened or closed
      * @param {() => void} [opts.onReattach]  the operator asked for the panel back
      */
@@ -195,7 +301,7 @@ export class PopoutHost {
             const t = ev.data?.type;
             if (t === 'opened')   this._setOpen(true);
             if (t === 'closed')   this._setOpen(false);
-            if (t === 'reattach') { this._setOpen(false); this._onReattach(); }
+            if (t === 'reattach') { this._setOpen(false); this._onReattach(ev.data.size ?? null); }
         });
         this._channel.postMessage({ type: 'ping' });
         return this;
@@ -209,7 +315,11 @@ export class PopoutHost {
     open() {
         if (this._open) { this.focus(); return true; }
 
-        const geom = clampGeometry(readGeometry(this._name), this._default);
+        const def  = typeof this._default === 'function' ? this._default() : this._default;
+        const geom = clampGeometry(usableSave(readGeometry(this._name), globalThis.screen), def);
+        // Tell the pop-out what it was asked to be, so it can measure its frame.
+        try { localStorage.setItem(REQ_PREFIX + this._name, JSON.stringify({ width: geom.width, height: geom.height })); }
+        catch { /* storage off: the pop-out falls back to its inner size */ }
         // A fixed name, so a second click (or a second main-page tab) finds
         // the same window instead of stacking up copies of it.
         const w = window.open(this._url, WINDOW_PREFIX + this._name, featuresFor(geom));
@@ -248,6 +358,25 @@ export class PopoutHost {
 }
 
 /**
+ * The size to give the in-page panel when it comes back from a pop-out: the
+ * pop-out's page area in CSS pixels, which is what the panel is sized in
+ * too (the browser zooms every page of one site alike), cut to fit the main
+ * window. Null for a size not worth using. Pure, so it can be tested.
+ *
+ * @param {{width:number,height:number}|null} size  the pop-out's inner size
+ * @param {{width:number,height:number}} view  the main window's inner size
+ * @returns {{width:number,height:number}|null}
+ */
+export function fitSize(size, view) {
+    const w = Math.round(Number(size?.width)), h = Math.round(Number(size?.height));
+    if (!(w > 0) || !(h > 0)) return null;
+    return {
+        width:  Math.max(MIN_WIDTH,  Math.min(w, Math.round(view.width)  - 16)),
+        height: Math.max(MIN_HEIGHT, Math.min(h, Math.round(view.height) - 16)),
+    };
+}
+
+/**
  * The main page's half of a pop-out panel, wired to its dialog and buttons:
  * the usual case, so each panel does not write it out again.
  *
@@ -264,12 +393,15 @@ export class PopoutHost {
  * @param {() => void} opts.show  opens the in-page panel
  * @param {{text:string,title:string,aria:string}} opts.closedLabel  the open button normally
  * @param {{text:string,title:string,aria:string}} opts.openLabel  the open button while popped out
+ * @param {boolean} [opts.takeSize=false]  on Reattach, give the dialog the size the
+ *        pop-out window was left at; for dialogs the operator can resize
  * @param {string} [opts.onClass='btn-outline-info'], [opts.offClass='btn-outline-secondary']
  * @returns {{ host: PopoutHost, open: () => void }} open() is what the toolbar button calls
  */
 export function attachPopout({
     name, url, defaultSize, dialog, openButton, popoutButton, show,
-    closedLabel, openLabel, onClass = 'btn-outline-info', offClass = 'btn-outline-secondary',
+    closedLabel, openLabel, takeSize = false,
+    onClass = 'btn-outline-info', offClass = 'btn-outline-secondary',
 }) {
     const label = l => {
         if (!openButton || !l) return;
@@ -285,7 +417,15 @@ export function attachPopout({
             openButton?.classList.toggle(onClass, open);
             openButton?.classList.toggle(offClass, !open);
         },
-        onReattach: () => { if (!dialog()?.open) show(); },
+        onReattach: size => {
+            const dlg = dialog();
+            const fit = takeSize && dlg ? fitSize(size, { width: window.innerWidth, height: window.innerHeight }) : null;
+            if (fit) {
+                dlg.style.width  = `${fit.width}px`;
+                dlg.style.height = `${fit.height}px`;
+            }
+            if (!dlg?.open) show();
+        },
     }).start();
 
     popoutButton?.addEventListener('click', () => {
@@ -305,6 +445,18 @@ export function attachPopout({
     };
 }
 
+/**
+ * Whether a page is in an ordinary browser tab rather than a pop-out window.
+ * Browsers hide the toolbar in a window opened with popup features and
+ * report it through window.toolbar.visible. Pure, so it can be tested.
+ *
+ * @param {{toolbar?:{visible?:boolean}}} win
+ * @returns {boolean}
+ */
+export function inTab(win) {
+    return win?.toolbar?.visible === true;
+}
+
 export class PopoutChild {
     /**
      * @param {object} opts
@@ -318,9 +470,38 @@ export class PopoutChild {
         this._last     = '';
         this._saveTimer = null;
         this._watch    = null;
+        this._frame    = null;
     }
 
     start() {
+        // A browser that restores its tabs after a restart brings a pop-out
+        // back as an ordinary tab, still carrying the pop-out's window name.
+        // The main page's window.open then finds that name and loads the
+        // panel into the tab - full window, no edges to resize - instead of
+        // opening a window. A tab has its toolbar; a pop-out window has not.
+        // So a tab gives the name up, and the next pop-out is a real window.
+        if (inTab(window)) {
+            try { if (window.name.startsWith(WINDOW_PREFIX)) window.name = ''; } catch { /* ignore */ }
+        }
+        // The frame is measured once, on load, while the window is still the
+        // size it was opened at, and kept in this window's session storage so
+        // a reload - by which time it may have been resized - keeps it.
+        this._frame = readJson(globalThis.sessionStorage, FRAME_KEY);
+        const measure = () => {
+            if (this._frame) return;
+            let req = null;
+            try {
+                req = readJson(localStorage, REQ_PREFIX + this._name);
+                localStorage.removeItem(REQ_PREFIX + this._name);
+            } catch { /* storage off */ }
+            this._frame = frameFrom({ width: window.outerWidth, height: window.outerHeight }, req);
+            if (this._frame) {
+                try { sessionStorage.setItem(FRAME_KEY, JSON.stringify(this._frame)); } catch { /* ignore */ }
+            }
+        };
+        if (globalThis.document?.readyState !== 'loading') measure();
+        else window.addEventListener('DOMContentLoaded', measure, { once: true });
+
         this._channel = makeChannel(this._name);
         this._channel?.addEventListener('message', ev => {
             if (ev.data?.type === 'ping') this._post('opened');
@@ -348,29 +529,41 @@ export class PopoutChild {
     /** Hand the panel back to the main page and close this window. */
     reattach() {
         this._saveGeometry();
-        this._post('reattach');
+        // The main page can give its panel the size this window was left at.
+        this._post('reattach', { size: { width: window.innerWidth, height: window.innerHeight } });
         window.close();
         // A window the operator opened by typing the address, rather than one
         // the main page opened, is not allowed to close itself. Go to the main
-        // page instead, so Reattach still does what it says.
-        setTimeout(() => { if (!window.closed) window.location.href = this._fallback; }, 300);
+        // page instead, so Reattach still does what it says. It drops the
+        // pop-out's window name first: a main page left holding it would be
+        // the place the next pop-out loads into, instead of a new window.
+        setTimeout(() => {
+            if (window.closed) return;
+            try { window.name = ''; } catch { /* ignore */ }
+            window.location.href = this._fallback;
+        }, 300);
     }
 
-    _post(type) {
-        try { this._channel?.postMessage({ type }); } catch { /* channel closed during unload */ }
+    _post(type, extra) {
+        try { this._channel?.postMessage({ type, ...extra }); } catch { /* channel closed during unload */ }
     }
 
     _saveGeometry() {
         // window.open's width and height are the page area, not the frame,
-        // so save the inner size; saving the outer one would grow the window
-        // by its title bar every time it was reopened. left and top are the
-        // frame's place on the screen, which is what screenX/Y report.
+        // so save the page area; saving the outer size would grow the window
+        // by its title bar every time it was reopened. See frameFrom for why
+        // that is not simply innerWidth. left and top are the frame's place
+        // on the screen, which is what screenX/Y report.
         const g = {
-            width:  window.innerWidth,
-            height: window.innerHeight,
+            ...pageAreaSize(window, this._frame),
             left:   window.screenX,
             top:    window.screenY,
         };
+        // Only a size measured from the frame is right at any zoom. Without
+        // the frame - storage off, or a window the browser would not make the
+        // size it was asked for - the inner size is saved unmarked, so the
+        // next open uses the default size rather than trusting it.
+        if (this._frame) g.zoomSafe = true;
         // A minimised window reports nothing useful; keep the last real one.
         if (!g.width || !g.height) return;
         const sig = JSON.stringify(g);
