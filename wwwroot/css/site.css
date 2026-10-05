@@ -1464,3 +1464,9 @@ dialog[open]:not(:modal) {
 }
 .iwc-dialog-btn:disabled { color: #888; border-color: #444; }
 
+
+/* Folded sections (js/layout/fold-panel.js). The targets carry d-flex or an
+   inline display, either of which beats the browser's own [hidden] rule, so
+   this one has to say !important. */
+.fold-target[hidden] { display: none !important; }
+.fold-btn { white-space: nowrap; }
