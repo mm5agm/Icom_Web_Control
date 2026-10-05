@@ -26,6 +26,7 @@
    - 5.15 [Memory Panel](#515-memory-panel)
    - 5.16 [Voice Announcements](#516-voice-announcements)
    - 5.17 [DX Spots List](#517-dx-spots-list)
+   - 5.18 [Pop-out windows](#518-pop-out-windows)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -433,8 +434,8 @@ Every change is announced to screen readers. 1 Hz is offered everywhere, includi
 
 **Panel height** — the whole spectrum panel can be made taller. There are two ways, and they set the same thing:
 
-- **The Height box** on the control bar, after Step — **Shortest**, **Short**, **Normal**, **Tall**, **Taller** or **Tallest**. This is the one to use if you just want it bigger without fiddling, and it is always on screen however tall the panel has become.
-- **The grip along the bottom of the panel** — a full-width strip with a dotted marker in the middle. Drag it down for more, up for less. Anything between 40 and 1000 pixels is allowed, so you are not limited to the six presets — when you drag to a size that is not one of them the Height box reads **Custom**. **Double-click the grip** to go straight back to the default height.
+- **The Height box** on the control bar, after Step — **50%**, **75%**, **100%**, **150%**, **200%** or **300%**, where 100% is the normal height (280 pixels). This is the one to use if you just want it bigger without fiddling, and it is always on screen however tall the panel has become.
+- **The grip along the bottom of the panel** — a full-width strip with a dotted marker in the middle. Drag it down for more, up for less. Anything between 40 and 1000 pixels is allowed, so you are not limited to the six presets — when you drag to a size that is not one of them the Height box shows that size as a percentage, such as **137%**. **Double-click the grip** to go straight back to the default height.
 - **At the short end the frequency scale drops out.** Below about 80 pixels there is no room for both the labels and the trace, so the labels go and the trace keeps the space — which is the point of a short panel. The Height box does not go that low; dragging the grip does, and at the 40-pixel floor the whole card is about 135 pixels tall, most of which is the title bar and the control bar above the trace.
 
   The grip also takes the keyboard. Tab to it (or click it once) and use **up and down arrows** to change the height 10 pixels at a time, **Shift** with them for 50, **Page Up / Page Down** for 100, and **Home** / **End** for the smallest and largest sizes. It works with a finger on a tablet too.
@@ -652,7 +653,9 @@ Things the radio does that the dialog cannot show you:
 - **Changing IF Width resets both PBT shifts to centre.** That is the radio's behaviour, not the app's. If the dialog happens to be open when you change the width, close and reopen it to see the reset — it reads the radio when it opens.
 - On the radio's own display, a dot **·** appears on the passband indicator whenever PBT is shifting the width.
 
-The sliders are read from the radio each time you open the dialog, not polled continuously, so a change made at the radio's knobs shows up the next time you open it.
+The sliders are read from the radio when you open the dialog, and again whenever you come back to it - click on the dialog, or switch back to the browser window - rather than polled continuously. So a change made at the radio's knobs shows up as soon as you return to the dialog.
+
+**In a window of its own.** The **↗** button in the dialog's title bar opens Twin PBT in a separate window, which can go on a second monitor ([§5.18](#518-pop-out-windows)). Each VFO button has its own window, though on the single-receiver IC-7300 both move the same passband. **Reattach** puts it back in the main page.
 
 **RX Tone** — The second button opens the **RX Tone Control** dialog. This is the radio's own *SET > Tone Control > RX* menu group, brought out where you can reach it: the audio filter edges plus the bass and treble shelves. It shapes the **receive audio only** — it does not touch the IF filter, and it has no effect on what you transmit.
 
@@ -1013,6 +1016,22 @@ Click the **DX Spots** button on the toolbar to open a list of DX cluster spots 
 **Position and persistence** — drag the title bar to move the panel anywhere on screen. Panel position, size, sort column, sort direction, and the All bands setting are all saved per browser so the panel returns to where you left it next session.
 
 **Empty state** — if you see "No spots on this band", either no spots are in the buffer yet (cluster just connected, give it a few seconds), or the DX cluster feature isn't configured at all (see §6.5).
+
+**In a window of its own.** The **↗** button in the list's title bar opens it in a separate window, which can go on a second monitor ([§5.18](#518-pop-out-windows)). The window starts with every spot the cluster already has and keeps up as new ones arrive, follows VFO A's band, and keeps the same sort and **All bands** choices. Clicking a row tunes VFO A just as it does in the main page. **Reattach** puts the list back.
+
+### 5.18 Pop-out windows
+
+A panel on the main page can be dragged around and resized, but it can't leave the browser window it's in. To put one on a second monitor, open it in a window of its own. At the moment the **CW Reader** ([§18](#18-cw-reader)), **CW Send** ([§19](#19-cw-send)), the **RTTY Tuner** ([§20](#20-rtty-tuner)), **Twin PBT** ([§5.7](#57-receiver-controls)) and the **DX Spots** list ([§5.17](#517-dx-spots-list)) can do this.
+
+- **To pop a panel out**, press the **↗** button in its title bar. The panel closes in the main page and opens in its own window. Its button on the main page changes to show that it's popped out, for example **CW Read (pop-out)**, and pressing that button brings the window to the front instead of opening a second copy.
+- **To put it back**, press **Reattach** in the pop-out window. The window closes and the panel opens in the main page again. Closing the window with **×** also works, but leaves the panel closed.
+- **Size and position are remembered.** The next time you pop the panel out, IWC asks the browser for the same size and place. The first time, the CW Reader opens at a quarter of the screen (half its width by half its height), so its edges are easy to grab and drag to the size you want. The pop-out window's size is its own: Reattach puts the panel back at the size it has on the main page.
+- **Second monitor.** The first time, the window opens on the same monitor as the main page, so drag it across. Chrome and Edge only let a page put a window on a *different* monitor if you give it permission to place windows, so on a computer with more than one monitor the pop-out window shows a bar asking for it. Press **Allow**, then **Allow** again when the browser asks, and the window should reopen on the monitor you left it on. Press **Not now** and the bar doesn't come back; the window then reopens on the main page's monitor and you drag it across each time. Firefox doesn't ask, and places the window itself.
+- **It goes behind the main page.** On the same monitor, clicking or scrolling the main page brings the main page to the front and covers the pop-out window, as with any two windows. A browser can't keep a window on top, so the pop-out is at its best on a second monitor. Press the panel's button on the main page, for example **CW Read (pop-out)**, to bring it back to the front, or use **Alt+Tab**.
+- **A blocked pop-up.** If your browser blocks the window, IWC says so. Allow pop-ups for IWC's address (usually `http://localhost:8080`) and press **↗** again.
+- **Reloading the main page** while a panel is popped out is fine. The main page still knows the window is open.
+- **A pop-out keeps IWC running.** IWC shuts down about 30 seconds after the last browser page closes (unless you have told it not to, [§6.2](#62-web-server-settings)). A pop-out window counts as a page, so closing the main tab and keeping only, say, the CW Reader window open on a second monitor does not shut the app down underneath it.
+- **Pop-out windows belong to this computer.** A tablet or a second PC using IWC at the same time keeps its own panels and doesn't see your pop-out.
 
 ---
 
@@ -2731,6 +2750,10 @@ The **CW Read** button on the main control panel opens a reader that listens to 
 
 Nothing here transmits. The reader only listens. To answer the station you are reading, use **CW Send** ([§19](#19-cw-send)).
 
+If you move VFO A out of CW (to RTTY or SSB, say) and it stays there for two seconds, the panel closes itself and a screen reader hears "CW reader closed, mode is now ...". Only the panel closes. The reader keeps running, as it does when you close it with **×**, so your copy is still there when you open it again. A brief change, such as a band change or a memory recall passing through another mode, does not close it.
+
+The **↗** button in the panel's title bar opens the reader in a window of its own, which you can put on a second monitor ([§5.18](#518-pop-out-windows)). That window doesn't close when the mode changes. Instead it says it is paused, and carries on as soon as VFO A is back in CW. **Log QSO** stays on the main page and isn't in the pop-out window.
+
 The decoder itself is shared with my Yaesu app, so the two read Morse identically — what differs is only how each radio is asked for a narrow filter.
 
 ![The CW Reader panel: Stop, Clear, Reader Mode ON, ZIN and Log QSO across the top with the Follow and Tune switches; decoded text on the left with callsigns, CQ and 5NN picked out in colour; the tone-finder spectrum and the phasor circle on the right; the signal line along the bottom reading tone 679 Hz, pitch 700 Hz, filter 250 Hz, 24 wpm, SNR 15 dB](pictures/CW-Reader.png)
@@ -2999,6 +3022,8 @@ Type into the box and press **Enter**. Nothing leaves the radio until you press 
 
 You can press Enter again while a line is still going out; the next line is queued and starts as soon as the first finishes, and the status line says how many are waiting.
 
+**The transmit VFO must be in CW** (CW-U or CW-L). The IC-7300's CI-V reference describes the radio sending the text as CW in CW mode, and says nothing about what it does in any other mode, so CW Send checks first rather than leave you looking at a line marked sent when nothing went out. If the transmit VFO is in USB, say, a banner says *"VFO A is in USB, so the radio won't send CW"* and the line is not sent; it stays in the box, ready to send once you have changed mode. The **Switch VFO A to CW** button beside the banner puts that VFO into CW-U. The mode is changed only when you press it, never behind your back.
+
 The keyer takes **A–Z, 0–9, space, and `/ ? . - , : ' ( ) = + " @ ^`**. Anything else is dropped before sending, and lower case is sent as upper. `^` is the IC-7300's prosign join: `^AR` keys AR as one character, `^SK` likewise. A line with nothing sendable in it is refused with a message rather than silently keying nothing. The **Speed** slider sets the radio's keyer speed (6–48 wpm) and is the same setting as the one on the CW Keyer panel — move either and the other follows.
 
 **Break-in decides whether it goes out**, exactly as it does for M1–M5 ([§5.12](#512-cw-keyer-panel)). With Break-in **Semi** or **Full** the line is transmitted. With Break-in **Off** the radio plays it to the sidetone and no RF leaves the set — a yellow banner across the top of the panel says so while that is the case, and each line is tagged **sidetone only** rather than **sent**.
@@ -3063,6 +3088,8 @@ For a beginner that is worth knowing as reassurance: a line sent by mistake, or 
 
 The panel is non-modal: it can stay open while you work the rest of the page, and the CW Reader can be open beside it. That pairing is the normal way to use it — read in one, answer in the other, with nothing to switch between. Drag the title bar to move it; drag the bottom-right corner to resize it, and the log grows to fill whatever height you give it. Both are remembered between sessions. Close it with **×**; a line already going out finishes on its own.
 
+**In a window of its own.** The **↗** button in the title bar opens CW Send in a separate window, which can go beside a popped-out CW Reader on a second monitor ([§5.18](#518-pop-out-windows)). The lines waiting to go out belong to the page you typed them in, so **↗** waits while a line from the main page is still being sent, and in the window **Reattach** waits while one is going out from there - press **Stop** if you don't want to wait. Closing the window mid-line asks first.
+
 Opening the panel reads the keyer speed and break-in setting from the radio, so a change made on the front panel since the page loaded is not sent at the wrong speed.
 
 ### 19.7 Troubleshooting
@@ -3072,6 +3099,7 @@ Opening the panel reads the keyer speed and break-in setting from the radio, so 
 | Lines are tagged **sidetone only** and nothing is transmitted | Break-in is **Off**. Set it to **Semi** or **Full** on the CW Keyer panel ([§5.12](#512-cw-keyer-panel)). The yellow banner on the panel says the same. If you meant to practise, that is the setting you want ([§19.2](#192-practising-without-transmitting)). |
 | I can't hear the sending | With break-in off the radio plays to the sidetone, so turn the radio's **MONI** level up. |
 | The gap between pieces is long, or the next piece starts before the last has finished | The wait between pieces is worked out from the keyer speed, so a slider that disagrees with the radio gets it wrong. Close and reopen the panel to re-read the speed from the radio, or nudge the **Speed** slider and it is written to the radio. |
+| Nothing is sent, and a banner says *"VFO A is in USB, so the radio won't send CW"* (or another mode) | Press **Switch VFO A to CW** on the banner, or change the mode yourself, and press Enter again - the line is still in the box. |
 | A line is tagged **failed** | The radio did not take the command — the status line has the reason. Check the connection on the Diagnostics page; a line that failed part way through is abandoned rather than sent with a hole in it. |
 | Characters missing from what was sent | Only the characters listed in [§19.1](#191-sending-a-line) are keyed. The rest are dropped before the line is sent. |
 | Nobody comes back to my CQ | Check you are actually transmitting — the banner and the **sent** tag both tell you. Then check the radio: power, antenna, and whether the ATU has tuned on that band. |
@@ -3089,6 +3117,12 @@ It does **not** decode RTTY into text. It is a tuning aid, and its job is to get
 You have a decoder already: **the IC-7300 decodes RTTY by itself**, with no PC and no software. Press **MENU » RTTY DECODE** on the radio and the decoded text appears on its screen, along with the radio's own tuning indicator and a waterfall. It will also log what it copies to the SD card, and it can send from eight stored messages. So the usual reason to open this tuner is to get a signal onto its tones from the browser — without having to lean over and watch the radio's own display while you do it. PC software such as MMTTY or fldigi is tuned exactly the same way.
 
 The scope itself is shared with my Yaesu app, so the two draw an identical figure from identical audio. What differs is only where the audio comes from.
+
+The tuner closes itself if VFO A leaves the modes it works in and stays out for two seconds, for example a move to CW, AM or FM. It stays open in RTTY-L, RTTY-U, the DATA modes, LSB and USB, because in the DATA modes and SSB the tones come from your RTTY software. A screen reader hears "RTTY tuner closed, mode is now ...".
+
+**Size, tones only and its own window.** Drag the tuner's bottom-right corner to make it bigger or smaller; the scope stays square and fills the space, and the size is remembered. Once **Mark** is set, the **Tones only** button in the title bar hides Mark, Shift, Rev and the text lines, leaving just the scope, so the tuner can be made very small. Press it again to bring them back. The **↗** button opens the tuner in a window of its own, which you can put on a second monitor ([§5.18](#518-pop-out-windows)). That window doesn't close when the mode changes. It says it is paused, lets go of the audio, and starts again when you go back to RTTY, DATA, LSB or USB.
+
+The tuner can be open in more than one place at once, for example the main page and a pop-out window, or a PC and a tablet. Closing it in one leaves it running in the others, and the audio is let go only when the last one closes.
 
 ### 20.1 What the figure is telling you
 

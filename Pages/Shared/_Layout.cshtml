@@ -13,7 +13,6 @@
     <title>@(ViewData["Title"]?.ToString() == "Icom Web Control" ? "Icom Web Control" : ViewData["Title"] + " - Icom Web Control")</title>
     <script type="importmap">{}</script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/Icom_Web_Control.styles.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/gauge-debug.css" />
     @* Bootstrap Icons, Canvas Gauges and SignalR (further down) are served from
        wwwroot/lib, not from a CDN. IWC runs on a shack PC that may never have an
@@ -119,6 +118,9 @@
        `signalR` is undefined, site.js dies on the first HubConnectionBuilder,
        and the page shows no live values at all. *@
     <script src="~/lib/microsoft-signalr/signalr.min.js"></script>
+    @* Builds every hub connection with a retry policy that never gives up -
+       shared with YWC; lives in core/js/hub/. Must load before site.js. *@
+    <script src="~/js/hub/hub-connection.js" asp-append-version="true"></script>
     <script src="~/js/ui/site.js" asp-append-version="true"></script>
     <!-- Update banner — shared with YWC; lives in core/js/update/ and is copied
          into wwwroot by the CopySharedCoreJs target. Independent of site.js. -->

@@ -378,13 +378,20 @@ pre, code { tab-size: 4; }
 /* ...but the dark dialogs (background #222) invert that into black on
    near-black, visible only on hover because Bootstrap's hover fills the
    button. That is how the CW Reader's Clear button and the Voice panel's
-   "Stop talking" both shipped invisible.
+   "Stop talking" both shipped invisible, and the RTTY tuner's Reattach
+   and Tones-only buttons after them.
 
    Listed by dialog id because the dark treatment is an inline style with no
    class to hang this on. If you add another dark dialog containing an
    outline-secondary button, add it here too - or give the dialogs a shared
    class and key this off that instead, which would be the better fix. */
 #cwReaderDialog .btn-outline-secondary,
+#cwSendDialog .btn-outline-secondary,
+#rttyTunerDialog .btn-outline-secondary,
+#audioFilterDialogA .btn-outline-secondary,
+#audioFilterDialogB .btn-outline-secondary,
+#dxSpotsDialog .btn-outline-secondary,
+#voxDialog .btn-outline-secondary,
 #voiceDialog .btn-outline-secondary {
     color: #adb5bd;          /* 7.3:1 on #222 - passes AA and AAA */
     border-color: #6c757d;
@@ -1430,3 +1437,30 @@ dialog[open]:not(:modal) {
 .spectrum-step-menu-item.active::after {
     content: " \2713";
 }
+
+/* Pop-out (<dialog>) close ✕ button. The dialogs have a dark (#222)
+   background, on which Bootstrap's btn-outline-secondary renders as
+   near-black text on near-black — the ✕ effectively vanishes. Give it an
+   explicit high-contrast red fill with a white glyph (matching the Twin PBT
+   dialog's already-fixed close button) so it's always visible. */
+.iwc-dialog-close {
+    background: #c0392b; color: #fff; border: 1px solid #e74c3c;
+    font-weight: bold; font-size: 1rem; line-height: 1; padding: 2px 11px;
+}
+.iwc-dialog-close:hover, .iwc-dialog-close:focus {
+    background: #e74c3c; color: #fff; border-color: #ff6b5a;
+}
+
+/* Action buttons inside a dark pop-out, for exactly the reason the close
+   button above needed fixing: btn-outline-secondary on #222 is near-black
+   on near-black and the label vanishes. Same fix, without the red - these
+   are ordinary actions, not a close. */
+.iwc-dialog-btn {
+    background: #333; color: #eee; border: 1px solid #666;
+    font-size: 0.8rem; line-height: 1.2; padding: 2px 8px;
+}
+.iwc-dialog-btn:hover, .iwc-dialog-btn:focus {
+    background: #444; color: #fff; border-color: #8ab;
+}
+.iwc-dialog-btn:disabled { color: #888; border-color: #444; }
+

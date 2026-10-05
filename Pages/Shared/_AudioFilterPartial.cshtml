@@ -1,0 +1,71 @@
+@model (string Vfo, bool Popout)
+@{
+    // One VFO's Twin PBT dialog, shared by the main page (one per VFO button)
+    // and the /AudioFilter?vfo= pop-out window. AudioFilterPanel
+    // (wwwroot/js/ui/audio-filter-panel.js) finds its elements by these ids.
+    // The id stays audioFilterDialog{vfo}, from when this was the Yaesu
+    // Audio Filter, so saved drag positions and the close-on-load list apply.
+    //
+    // Popout: true swaps the Pop out button for Reattach, and its close
+    // button closes the window rather than the dialog.
+    var vfo = Model.Vfo;
+    var popout = Model.Popout;
+}
+<dialog id="audioFilterDialog@(vfo)" open="@popout"
+        class="@(popout ? "audio-filter-popout" : null)"
+        style="@(popout ? null : "border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0; min-width:380px; max-width:520px; position:fixed; margin:0;")"
+        aria-labelledby="audioFilterDialogTitle@(vfo)">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444; @(popout ? "" : "cursor:move;")">
+        <strong id="audioFilterDialogTitle@(vfo)">Twin PBT — VFO @vfo</strong>
+        <div class="d-flex align-items-center gap-1">
+            @if (popout)
+            {
+                <button id="audioFilterReattachBtn@(vfo)" class="btn btn-sm btn-outline-secondary" type="button"
+                        title="Put the VFO @vfo Twin PBT back in the main page"
+                        aria-label="Reattach the VFO @vfo Twin PBT to the main page">Reattach</button>
+                <button class="btn btn-sm iwc-dialog-close" type="button" onclick="window.close()"
+                        aria-label="Close the VFO @vfo Twin PBT window">✕</button>
+            }
+            else
+            {
+                <button id="audioFilterPopoutBtn@(vfo)" class="btn btn-sm btn-outline-secondary" type="button"
+                        title="Open the VFO @vfo Twin PBT in a window of its own, which can go on another monitor"
+                        aria-label="Pop the VFO @vfo Twin PBT out into its own window"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></button>
+                <button class="btn btn-sm iwc-dialog-close" type="button" onclick="document.getElementById('audioFilterDialog@(vfo)').close()" title="Close" aria-label="Close VFO @vfo Twin PBT dialog">✕</button>
+            }
+        </div>
+    </div>
+    <div class="p-3 d-flex flex-column gap-3">
+        <div id="audioFilterStatus@(vfo)" class="small text-warning" style="min-height:1.2em;"></div>
+        <p class="small text-muted mb-0" style="color:#bbb !important;">
+            Move the sliders in <em>opposite</em> directions to narrow the receive
+            filter — each one cuts in from its own side of the passband.
+            Move them <em>together</em>, to the same value, and the passband keeps
+            its width but slides bodily: that is an <strong>IF Shift</strong>, for
+            pushing a whole crowded passband off an adjacent carrier.
+            Centre on both = no shift.
+        </p>
+        <div id="audioFilterControls@(vfo)">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <label class="mb-0 fw-bold" style="min-width:64px;">PBT1:</label>
+                <input type="range" id="pbtInnerSlider@(vfo)"
+                       min="0" max="255" step="1" value="128"
+                       style="flex:1; height:18px;"
+                       aria-label="PBT1 inner shift">
+                <span id="pbtInnerLabel@(vfo)" class="text-end" style="min-width:64px;">Centre</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <label class="mb-0 fw-bold" style="min-width:64px;">PBT2:</label>
+                <input type="range" id="pbtOuterSlider@(vfo)"
+                       min="0" max="255" step="1" value="128"
+                       style="flex:1; height:18px;"
+                       aria-label="PBT2 outer shift">
+                <span id="pbtOuterLabel@(vfo)" class="text-end" style="min-width:64px;">Centre</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-light"
+                    id="pbtClearBtn@(vfo)"
+                    title="Reset both PBT shifts to centre (no passband tuning)"
+                    aria-label="Clear Twin PBT">Clear PBT</button>
+        </div>
+    </div>
+</dialog>
