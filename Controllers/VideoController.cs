@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Icom_Web_Control.Services.Video;
 
@@ -139,6 +139,9 @@ namespace Icom_Web_Control.Controllers
             var key = (body?.Key ?? "").Trim();
             if (!string.IsNullOrEmpty(key) && !VideoDeviceKey.IsPersistableKey(key))
                 return BadRequest(new { error = "Invalid device key." });
+
+            // Save what the device is, not where it happened to be in the list.
+            key = VideoDeviceKey.Upgrade(key);
 
             var s = await _settings.GetAsync();
             if (!s.DisplayEnabled)
