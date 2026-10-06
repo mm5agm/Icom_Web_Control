@@ -2133,11 +2133,27 @@
             // is on screen: with the scope off there is no button, so a choice
             // saved earlier must not leave the page with no VFO panels and no
             // way to bring them back.
+            //
+            // "On screen" has to mean #spectrumPanels, NOT #spectrumContainer.
+            // The container deliberately STAYS visible with the scope off —
+            // it carries the Scope switch, which is the way back on. Only the
+            // panels collapse, and the fold buttons are inside them. Watching
+            // the container therefore reported the spectrum as showing while
+            // the buttons were gone, which is the trap this guard exists to
+            // stop: folded + scope off left no VFO panels and no control.
+            // Found on the bench 2026-10-06.
+            //
+            // Both are tested because they fail differently: the container
+            // hides when no scope source is configured at all, and a
+            // descendant's computed display is NOT forced to none by a hidden
+            // ancestor, so the panels alone would still read as showing.
             {
-                const vfoRow   = document.getElementById('vfoRow');
-                const specBox  = document.getElementById('spectrumContainer');
-                const btnB     = document.getElementById('vfoFoldBtnB');
-                const specOn   = () => !!specBox && getComputedStyle(specBox).display !== 'none';
+                const vfoRow     = document.getElementById('vfoRow');
+                const specBox    = document.getElementById('spectrumContainer');
+                const specPanels = document.getElementById('spectrumPanels');
+                const btnB       = document.getElementById('vfoFoldBtnB');
+                const visible    = el => !!el && getComputedStyle(el).display !== 'none';
+                const specOn     = () => visible(specBox) && visible(specPanels);
                 const shown    = { text: 'VFOs', title: 'Hide the VFO A and VFO B panels, leaving the spectrum', aria: 'Hide the VFO panels' };
                 const hidden   = { text: 'VFOs', title: 'Show the VFO A and VFO B panels again', aria: 'Show the VFO panels' };
                 let fold = null;
@@ -2171,9 +2187,17 @@
                 if (fold) {
                     btnB?.setAttribute('aria-controls', 'vfoRow');
                     btnB?.addEventListener('click', () => fold.toggle());
-                    // The spectrum card shows and hides with the scope.
-                    if (specBox) new MutationObserver(() => sync(fold.folded))
-                        .observe(specBox, { attributes: true, attributeFilter: ['style', 'class'] });
+                    // The panels collapse with the scope (style, set !important by
+                    // applyScopeCollapsed); the container hides when no scope
+                    // source is configured. Either one changing can take the
+                    // fold buttons off screen, so watch both.
+                    const watch = new MutationObserver(() => sync(fold.folded));
+                    for (const el of [specBox, specPanels]) {
+                        if (el) watch.observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
+                    }
+                    // A choice restored from storage is applied before the scope
+                    // state is known, so settle it once the page has it.
+                    sync(fold.folded);
                 }
             }
 
