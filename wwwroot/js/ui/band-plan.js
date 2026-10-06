@@ -8,7 +8,17 @@
 // Region 3 = Asia-Pacific excluding Japan (IARU R3 band plan)
 // Japan    = JARL band plan (differs from IARU R3 in several key areas)
 //
-// FT8 frequencies (14.074, 7.074 etc.) are the same worldwide regardless of region.
+// RTTY is 'RTTY-L' on every band, never 'RTTY-U'. In this app's vocabulary
+// 'RTTY-L' is the IC-7300's plain RTTY (CI-V mode 04) and 'RTTY-U' is RTTY-R
+// (08) - the reverse mode. Amateur RTTY is the lower-sideband case on every
+// band: measured on the bench 2026-09-24, normal RTTY puts space above mark
+// and the dial reads mark. Selecting RTTY-R from a band button therefore
+// handed the radio's own decoder mark and space swapped, and the RTTY Tuner
+// needed Rev pressed to show a cross. 20/15/10m carried 'RTTY-U' here while
+// 80/40m carried 'RTTY-L', which is how the inconsistency was spotted; it was
+// inherited from Yaesu Web Control's table before YWC corrected its own
+// (YWC v2.5.3-pre1).
+//// FT8 frequencies (14.074, 7.074 etc.) are the same worldwide regardless of region.
 // Differences are mainly in the SSB segment start, 80m/40m phone calling areas,
 // and 60m allocations.
 
@@ -45,7 +55,7 @@ export const BAND_PLANS = {
         '20m': {
             CW:   { freq: 14025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 14074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 14080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 14080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 14225000, mode: 'USB',     label: 'SSB' }
         },
         '17m': {
@@ -56,7 +66,7 @@ export const BAND_PLANS = {
         '15m': {
             CW:   { freq: 21025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 21074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 21080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 21080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 21280000, mode: 'USB',     label: 'SSB' }
         },
         '12m': {
@@ -67,7 +77,7 @@ export const BAND_PLANS = {
         '10m': {
             CW:   { freq: 28025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 28074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 28080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 28080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 28500000, mode: 'USB',     label: 'SSB' }
         },
         '6m': {
@@ -115,7 +125,7 @@ export const BAND_PLANS = {
         '20m': {
             CW:   { freq: 14025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 14074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 14080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 14080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 14225000, mode: 'USB',     label: 'SSB' }
         },
         '17m': {
@@ -126,7 +136,7 @@ export const BAND_PLANS = {
         '15m': {
             CW:   { freq: 21025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 21074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 21080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 21080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 21300000, mode: 'USB',     label: 'SSB' }
         },
         '12m': {
@@ -137,7 +147,7 @@ export const BAND_PLANS = {
         '10m': {
             CW:   { freq: 28025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 28074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 28080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 28080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 28500000, mode: 'USB',     label: 'SSB' }
         },
         '6m': {
@@ -180,7 +190,7 @@ export const BAND_PLANS = {
         '20m': {
             CW:   { freq: 14025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 14074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 14080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 14080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 14225000, mode: 'USB',     label: 'SSB' }
         },
         '17m': {
@@ -191,7 +201,7 @@ export const BAND_PLANS = {
         '15m': {
             CW:   { freq: 21025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 21074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 21080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 21080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 21290000, mode: 'USB',     label: 'SSB' }
         },
         '12m': {
@@ -202,7 +212,7 @@ export const BAND_PLANS = {
         '10m': {
             CW:   { freq: 28025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 28074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 28080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 28080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 28500000, mode: 'USB',     label: 'SSB' }
         },
         '6m': {
@@ -240,7 +250,7 @@ export const BAND_PLANS = {
         '20m': {
             CW:   { freq: 14025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 14074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 14080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 14080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 14225000, mode: 'USB',     label: 'SSB' }
         },
         '17m': {
@@ -251,7 +261,7 @@ export const BAND_PLANS = {
         '15m': {
             CW:   { freq: 21025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 21074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 21080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 21080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 21290000, mode: 'USB',     label: 'SSB' }
         },
         '12m': {
@@ -262,7 +272,7 @@ export const BAND_PLANS = {
         '10m': {
             CW:   { freq: 28025000, mode: 'CW-U',   label: 'CW' },
             FT8:  { freq: 28074000, mode: 'DATA-U',  label: 'FT8' },
-            RTTY: { freq: 28080000, mode: 'RTTY-U',  label: 'RTTY' },
+            RTTY: { freq: 28080000, mode: 'RTTY-L',  label: 'RTTY' },
             SSB:  { freq: 28500000, mode: 'USB',     label: 'SSB' }
         },
         '6m': {

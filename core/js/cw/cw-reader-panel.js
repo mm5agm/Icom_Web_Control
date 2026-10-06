@@ -46,19 +46,39 @@ export class CwReaderPanel {
         this._running  = false;
         this._text     = '';
         this._readerMode = false;
+        this._standalone = false;
+        this._paused   = false;
+        this._pausedEl = null;
     }
 
     // ── Lifecycle ───────────────────────────────────────────────────────────
 
-    init() {
+    /**
+     * @param {object} [opts]
+     * @param {boolean} [opts.standalone]  the panel is the whole page (a
+     *     pop-out window), not a floating dialog: no dragging, and the
+     *     in-page position is neither restored nor overwritten. The host
+     *     page calls startPolling() itself.
+     */
+    init(opts = {}) {
+        this._standalone = !!opts.standalone;
         this._dialog = document.getElementById('cwReaderDialog');
         if (!this._dialog) return;
+        this._pausedEl = document.getElementById('cwReaderPaused');
 
         this._out      = document.getElementById('cwReaderOut');
         this._status   = document.getElementById('cwReaderStatus');
         this._startBtn = document.getElementById('cwReaderStartBtn');
         this._clearBtn = document.getElementById('cwReaderClearBtn');
         this._autoScrl = document.getElementById('cwReaderAutoScroll');
+
+        // The tuning figure. Off by default: it is a thing you reach for while
+        // hunting for a signal, not something to leave spinning all session.
+        // Found before _loadSettings, which restores it: looked up after, the
+        // remembered setting had nothing to land on, so a fresh page - the
+        // pop-out every time - always came up with Tune off.
+        this._phasorBox = document.getElementById('cwPhasorBox');
+        this._phasorTgl = document.getElementById('cwPhasorToggle');
 
         this._loadSettings();
         if (this._autoScrl) {
@@ -77,10 +97,6 @@ export class CwReaderPanel {
             this._refreshReaderMode();
         }
 
-        // The tuning figure. Off by default: it is a thing you reach for while
-        // hunting for a signal, not something to leave spinning all session.
-        this._phasorBox = document.getElementById('cwPhasorBox');
-        this._phasorTgl = document.getElementById('cwPhasorToggle');
         this._phasorTgl?.addEventListener('change', () => {
             this._applyPhasor();
             this._saveSettings();
@@ -91,7 +107,32 @@ export class CwReaderPanel {
         // is cheap to leave running, so closing only stops the polling.
         this._dialog.addEventListener('close', () => this._stopPolling());
 
-        this._initDrag();
+        if (!this._standalone) this._initDrag();
+    }
+
+    /** Start reading. For a standalone page; the dialog does this on open. */
+    startPolling() { this._startPolling(); }
+
+    /** Stop reading. The decoder itself keeps running, as it does on close. */
+    stopPolling()  { this._stopPolling(); }
+
+    get isPaused() { return this._paused; }
+
+    /**
+     * Pause or resume the panel without closing it - for a pop-out window,
+     * where closing itself whenever the mode changed would make a window
+     * vanish off a second monitor. Paused, it stops polling and shows the
+     * host page's #cwReaderPaused banner, if it has one, with `message`.
+     * The decoder keeps running on the server either way.
+     */
+    setPaused(paused, message) {
+        this._paused = !!paused;
+        if (this._pausedEl) {
+            if (message) this._pausedEl.textContent = message;
+            this._pausedEl.hidden = !this._paused;
+        }
+        if (this._paused) this._stopPolling();
+        else this._startPolling();
     }
 
     toggle() {
@@ -214,6 +255,8 @@ export class CwReaderPanel {
     // ── Polling ─────────────────────────────────────────────────────────────
 
     _startPolling() {
+        // Start and Clear call this too, and must not quietly undo a pause.
+        if (this._paused) return;
         // Re-apply here rather than only on the toggle, so a panel reopened
         // with the figure remembered comes back with it running.
         this._applyPhasor();
@@ -451,7 +494,7 @@ export class CwReaderPanel {
             if (this._autoScrl && typeof s.autoScroll === 'boolean') {
                 this._autoScrl.checked = s.autoScroll;
             }
-            if (this._dialog && typeof s.left === 'number' && typeof s.top === 'number') {
+            if (this._dialog && !this._standalone && typeof s.left === 'number' && typeof s.top === 'number') {
                 // A <dialog> shown with show() is position:absolute, so it is placed
                 // against the document and scrolls with it. Every coordinate here is a
                 // viewport one - getBoundingClientRect on the way out, the stored value
@@ -470,13 +513,20 @@ export class CwReaderPanel {
 
     _saveSettings() {
         try {
-            const rect = this._dialog?.getBoundingClientRect();
-            localStorage.setItem(LS_KEY, JSON.stringify({
+            const s = {
                 autoScroll: this._autoScrl ? this._autoScrl.checked : true,
                 phasor:     this._phasorTgl ? this._phasorTgl.checked : false,
-                left: rect ? Math.round(rect.left) : undefined,
-                top:  rect ? Math.round(rect.top)  : undefined,
-            }));
+            };
+            if (this._standalone) {
+                // A pop-out fills its window, so its rect is no place for the
+                // in-page dialog. Keep whatever the main page last saved.
+                const prev = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+                if (prev && typeof prev.left === 'number') { s.left = prev.left; s.top = prev.top; }
+            } else {
+                const rect = this._dialog?.getBoundingClientRect();
+                if (rect) { s.left = Math.round(rect.left); s.top = Math.round(rect.top); }
+            }
+            localStorage.setItem(LS_KEY, JSON.stringify(s));
         } catch {
             // Private browsing, quota, storage disabled - all fine to ignore.
         }

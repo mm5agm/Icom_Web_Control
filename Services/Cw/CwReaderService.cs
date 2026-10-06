@@ -47,10 +47,17 @@ namespace Icom_Web_Control.Services.Cw
         private readonly IRadioController _radio;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
+        private readonly IHostEnvironment _host;
         private readonly ILogger<CwReaderService> _logger;
 
         private readonly object _gate = new();
         private readonly StringBuilder _text = new();
+
+        // Bench capture. Null unless a capture is running; guarded by _gate
+        // on start and stop, read without it on the audio thread.
+        private CwWavRecorder? _recorder;
+        private DateTime _captureStartedUtc;
+        private long _captureStartChars;
 
         private CwDecoderEngine? _engine;
         private CwTranscriptWriter? _transcript;
@@ -67,6 +74,7 @@ namespace Icom_Web_Control.Services.Cw
             IRadioController radio,
             RadioStateService state,
             ISettingsService settings,
+            IHostEnvironment host,
             ILogger<CwReaderService> logger)
         {
             _audio = audio;
@@ -74,6 +82,7 @@ namespace Icom_Web_Control.Services.Cw
             _radio = radio;
             _state = state;
             _settings = settings;
+            _host = host;
             _logger = logger;
         }
 
@@ -107,6 +116,9 @@ namespace Icom_Web_Control.Services.Cw
         public async Task StopAsync(CancellationToken ct = default)
         {
             if (!IsRunning) return;
+
+            // A capture is only meaningful while frames are arriving.
+            StopCapture();
 
             lock (_gate)
             {
@@ -240,6 +252,8 @@ namespace Icom_Web_Control.Services.Cw
                     Running          = IsRunning,
                     AudioDevicesOpen = _source.DeviceOpen,
                     CaptureError     = _source.CaptureError,
+                    CapturePath      = _recorder?.Path,
+                    CaptureSeconds   = _recorder?.DurationSeconds ?? 0,
                     AudioDeviceName  = _source.DeviceName,
                     Text             = text,
                     Cursor           = _totalChars,
@@ -315,6 +329,200 @@ namespace Icom_Web_Control.Services.Cw
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "MM5AGM", "Icom Web Control", "CW Transcripts");
 
+        // ---- bench capture --------------------------------------------------
+
+        /// <summary>
+        /// Start recording the frames the decoder is being fed, so a signal
+        /// that was copied badly can be replayed against the decoder later.
+        /// The point of recording here rather than with a separate tool is
+        /// that this is byte-for-byte what the live decoder heard, carry
+        /// buffer and dropped frames included.
+        /// </summary>
+        /// <param name="name">Optional base name; sanitised. A timestamp if omitted.</param>
+        /// <returns>The file being written.</returns>
+        /// <exception cref="InvalidOperationException">The reader is not running.</exception>
+        public string StartCapture(string? name = null)
+        {
+            lock (_gate)
+            {
+                if (!IsRunning)
+                    throw new InvalidOperationException(
+                        "The CW reader is not running, so there is no audio to capture.");
+
+                if (_recorder is not null) return _recorder.Path;
+
+                var dir = CaptureDirectory();
+                Directory.CreateDirectory(dir);
+                var path = Path.Combine(dir, SafeName(name) + ".wav");
+                _recorder = new CwWavRecorder(path, _source.SampleRate);
+                _captureStartedUtc = DateTime.UtcNow;
+                _captureStartChars = _totalChars;
+
+                _source.FrameAvailable += OnCaptureFrame;
+
+                _logger.LogInformation("CW bench capture started: {Path}", path);
+                return path;
+            }
+        }
+
+        /// <summary>
+        /// Stop recording and write the sidecar. Returns the summary, or null
+        /// if nothing was recording.
+        /// </summary>
+        public CwCaptureResult? StopCapture()
+        {
+            CwWavRecorder recorder;
+            string decoded;
+            DateTime startedUtc;
+
+            lock (_gate)
+            {
+                if (_recorder is null) return null;
+
+                _source.FrameAvailable -= OnCaptureFrame;
+                recorder = _recorder;
+                _recorder = null;
+                startedUtc = _captureStartedUtc;
+
+                // Only the copy decoded since the capture began, and only as
+                // far back as the ring still holds.
+                long oldest = _totalChars - _text.Length;
+                long from = Math.Max(_captureStartChars, oldest);
+                decoded = from >= _totalChars
+                    ? ""
+                    : _text.ToString((int)(from - oldest), (int)(_totalChars - from));
+            }
+
+            var seconds = recorder.DurationSeconds;
+            var path = recorder.Path;
+            recorder.Dispose();
+
+            string? sidecar;
+            try
+            {
+                sidecar = Path.ChangeExtension(path, ".txt");
+                File.WriteAllText(sidecar, SidecarText(path, startedUtc, seconds, decoded));
+            }
+            catch (Exception ex)
+            {
+                // The wav is the artefact that matters. A sidecar that could
+                // not be written is worth a log line, not a failed capture.
+                _logger.LogWarning(ex, "CW capture sidecar could not be written");
+                sidecar = null;
+            }
+
+            _logger.LogInformation("CW bench capture stopped: {Path}, {Seconds:F1} s", path, seconds);
+
+            return new CwCaptureResult
+            {
+                Path = path,
+                SidecarPath = sidecar,
+                Seconds = seconds,
+                Characters = decoded.Length,
+                DroppedFrames = _source.DroppedFrames,
+            };
+        }
+
+        private void OnCaptureFrame(ReadOnlyMemory<float> frame)
+        {
+            // Read without the lock: StopCapture unsubscribes before disposing,
+            // but a frame already in flight can still arrive, and CwWavRecorder
+            // ignores writes once it has closed.
+            _recorder?.Write(frame.Span);
+        }
+
+        /// <summary>
+        /// Captures go to the working copy's bench/ folder when there is one,
+        /// because that is where the shared corpus lives and it is gitignored
+        /// in its entirety. An installed copy has no bench/, so they land
+        /// under the app's own data folder instead.
+        /// </summary>
+        private string CaptureDirectory()
+        {
+            var bench = Path.Combine(_host.ContentRootPath, "bench");
+            if (Directory.Exists(bench)) return bench;
+
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "MM5AGM", "Icom Web Control", "CW Captures");
+        }
+
+        private static string SafeName(string? name)
+        {
+            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            if (string.IsNullOrWhiteSpace(name)) return "cw-" + stamp;
+
+            var cleaned = new string(name.Trim()
+                .Select(c => char.IsLetterOrDigit(c) || c == '-' || c == '_'
+                             ? char.ToLowerInvariant(c) : '-')
+                .ToArray())
+                .Trim('-');
+
+            if (cleaned.Length == 0) return "cw-" + stamp;
+            return cleaned.Length > 60 ? cleaned[..60].Trim('-') : cleaned;
+        }
+
+        /// <summary>
+        /// What was measured, and an explicit statement of what is not known.
+        /// Nothing here is inferred - every value is either read from the radio
+        /// or counted by the recorder, and where there is no ground truth it
+        /// says so in those words rather than leaving a later reader to assume
+        /// there is some.
+        /// </summary>
+        private string SidecarText(string path, DateTime startedUtc, double seconds, string decoded)
+        {
+            var sb = new StringBuilder();
+            var inv = CultureInfo.InvariantCulture;
+
+            sb.AppendLine(Path.GetFileName(path));
+            sb.AppendLine();
+            sb.AppendLine("Recorded by Icom Web Control's CW reader from the frames the decoder");
+            sb.AppendLine("was being fed - a WinMM recording device opened directly on the radio's");
+            sb.AppendLine("USB codec. Not a separate capture: this is byte-for-byte what the live");
+            sb.AppendLine("decoder heard.");
+            sb.AppendLine();
+            sb.AppendLine("started   " + startedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", inv)
+                          + " local (" + startedUtc.ToString("yyyy-MM-dd HH:mm:ss", inv) + "Z)");
+            sb.AppendLine("format    " + _source.SampleRate.ToString(inv) + " Hz, 1 ch, 16-bit, "
+                          + seconds.ToString("F1", inv) + " s");
+            if (!string.IsNullOrWhiteSpace(_source.DeviceName))
+                sb.AppendLine("device    " + _source.DeviceName);
+            if (_state.FrequencyA > 0)
+                sb.AppendLine("frequency " + (_state.FrequencyA / 1_000_000.0).ToString("F6", inv)
+                              + " MHz (VFO A)");
+            if (!string.IsNullOrWhiteSpace(_state.ModeA))
+                sb.AppendLine("mode      " + _state.ModeA);
+            sb.AppendLine("pitch     " + _pitchHz.ToString("F0", inv) + " Hz (read from the radio over CI-V)");
+            sb.AppendLine(_filterWidthHz is int w
+                ? "filter    " + w.ToString(inv) + " Hz (read from the radio over CI-V)"
+                : "filter    not known - the decoder used its default search window");
+            sb.AppendLine("search    +/-" + _searchWindowHz.ToString("F0", inv)
+                          + " Hz (derived from the filter)");
+            sb.AppendLine("dropped   " + _source.DroppedFrames.ToString(inv)
+                          + " frames (reader session total, not just this capture)");
+            sb.AppendLine("APF       not recorded. The app's APF state is its own last request,");
+            sb.AppendLine("          not a read-back from the radio, so it is not evidence.");
+            sb.AppendLine();
+            sb.AppendLine("The decoder is the shared one in Radio_Web_Control_Core, so this file can");
+            sb.AppendLine("be replayed through Yaesu Web Control's CwBench against the same engine:");
+            sb.Append("  CwBench.exe ").Append(Path.GetFileName(path))
+              .Append(" --pitch ").Append(_pitchHz.ToString("F0", inv));
+            if (_filterWidthHz is int fw) sb.Append(" --filter ").Append(fw.ToString(inv));
+            sb.AppendLine();
+            sb.AppendLine();
+            sb.AppendLine("GROUND TRUTH: none. No independent decoder transcript and no operator");
+            sb.AppendLine("copy was recorded for this capture. The text below is OUR OWN decode at");
+            sb.AppendLine("the time - internal evidence about the tone and nothing more. Any");
+            sb.AppendLine("callsign in it is not a confirmed identification and must never be");
+            sb.AppendLine("promoted into ground truth later.");
+            sb.AppendLine();
+            sb.AppendLine("OUR DECODE AT CAPTURE TIME (" + decoded.Length.ToString(inv) + " chars):");
+            sb.AppendLine(decoded.Length > 0 ? decoded : "(nothing decoded)");
+            sb.AppendLine();
+            sb.AppendLine("VERDICT: <not yet written - say what this file is and is not evidence for>");
+
+            return sb.ToString();
+        }
         // ---- engine lifecycle ----------------------------------------------
 
         /// <summary>Caller holds _gate.</summary>
@@ -516,6 +724,12 @@ namespace Icom_Web_Control.Services.Cw
         /// </summary>
         public string? CaptureError { get; init; }
 
+        /// <summary>The wav being written, or null when nothing is recording.</summary>
+        public string? CapturePath { get; init; }
+
+        /// <summary>Seconds recorded so far, 0 when nothing is recording.</summary>
+        public double CaptureSeconds { get; init; }
+
         /// <summary>Which device is being listened to, for the status line.</summary>
         public string? AudioDeviceName { get; init; }
 
@@ -573,6 +787,16 @@ namespace Icom_Web_Control.Services.Cw
     }
 
     /// <summary>The passband as the reader sees it, for the tuning display.</summary>
+    /// <summary>What a finished bench capture produced.</summary>
+    public sealed class CwCaptureResult
+    {
+        public string Path { get; init; } = "";
+        public string? SidecarPath { get; init; }
+        public double Seconds { get; init; }
+        public int Characters { get; init; }
+        public long DroppedFrames { get; init; }
+    }
+
     public sealed class CwSpectrumView
     {
         /// <summary>Centre frequency of the first bin, Hz.</summary>
