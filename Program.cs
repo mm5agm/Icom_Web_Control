@@ -456,6 +456,18 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>(
 // the service takes its audio hold on the first start and drops it a
 // couple of seconds after the last poll.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyTunerService>();
+// Radio Display: the IC-7300's HDMI output through a USB capture dongle,
+// served as MJPEG at /api/video/stream. Nothing opens the dongle until a
+// browser asks for the stream. Services/Video is IWC-local and stays that
+// way: the only thing it knows about this app is IVideoSettingsSource,
+// which the adapter below implements over ApplicationSettings, so it reads
+// like it belongs in Radio_Web_Control_Core -- but Fabio wrote it in Yaesu
+// Web Control and it does not move there until he approves. See the
+// "standing exception" section in CLAUDE.md before acting on that.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Video.IVideoSettingsSource,
+                              Icom_Web_Control.Services.ApplicationVideoSettingsSource>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Video.VideoSessionManager>();
+builder.Services.AddSingleton<Icom_Web_Control.Services.Video.VideoCaptureService>();
 
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and
