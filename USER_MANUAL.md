@@ -274,7 +274,7 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.3.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.4.0**) are shown in the top-left corner.
 
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears listing what has changed, with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the newest version or if the internet is not available.
 
@@ -1025,7 +1025,8 @@ A panel on the main page can be dragged around and resized, but it can't leave t
 
 - **To pop a panel out**, press the **↗** button in its title bar. The panel closes in the main page and opens in its own window. Its button on the main page changes to show that it's popped out, for example **CW Read (pop-out)**, and pressing that button brings the window to the front instead of opening a second copy.
 - **To put it back**, press **Reattach** in the pop-out window. The window closes and the panel opens in the main page again. Closing the window with **×** also works, but leaves the panel closed.
-- **Size and position are remembered.** The next time you pop the panel out, IWC asks the browser for the same size and place. The first time, the CW Reader opens at a quarter of the screen (half its width by half its height), so its edges are easy to grab and drag to the size you want. The pop-out window's size is its own: Reattach puts the panel back at the size it has on the main page.
+- **Size and position are remembered.** The next time you pop the panel out, IWC asks the browser for the same size and place. The first time, the CW Reader opens at a quarter of the screen (half its width by half its height), so its edges are easy to grab and drag to the size you want.
+- **Reattach keeps the size you chose.** Size the **CW Reader**, **CW Send** or the **RTTY Tuner** window how you like it and press **Reattach**: the panel comes back into the main page at that size, rather than snapping back to the size it had before. If the window was larger than the browser window it is coming home to, it is brought down to fit. **Twin PBT** and the **DX Spots** list are not resized this way — they return at their usual size.
 - **Second monitor.** The first time, the window opens on the same monitor as the main page, so drag it across. Chrome and Edge only let a page put a window on a *different* monitor if you give it permission to place windows, so on a computer with more than one monitor the pop-out window shows a bar asking for it. Press **Allow**, then **Allow** again when the browser asks, and the window should reopen on the monitor you left it on. Press **Not now** and the bar doesn't come back; the window then reopens on the main page's monitor and you drag it across each time. Firefox doesn't ask, and places the window itself.
 - **It goes behind the main page.** On the same monitor, clicking or scrolling the main page brings the main page to the front and covers the pop-out window, as with any two windows. A browser can't keep a window on top, so the pop-out is at its best on a second monitor. Press the panel's button on the main page, for example **CW Read (pop-out)**, to bring it back to the front, or use **Alt+Tab**.
 - **A blocked pop-up.** If your browser blocks the window, IWC says so. Allow pop-ups for IWC's address (usually `http://localhost:8080`) and press **↗** again.
@@ -2862,7 +2863,7 @@ Along the top of the panel are five buttons and two switches. The switches — *
 | **ZIN** | Tunes the signal onto your CW pitch — see [§18.8](#188-zin---zero-in-on-the-signal). |
 | **Log QSO** | Opens the log form — see [§18.10](#1810-logging-a-qso). |
 | **Follow** *(switch, on by default)* | Keeps the newest text in view. See below. |
-| **Tune** *(switch, off by default)* | Shows the tuning display beside the text — see [§18.6](#186-the-tune-display). |
+| **Tune** *(switch, off to start with)* | Shows the tuning display beside the text — see [§18.6](#186-the-tune-display). Once you have turned it on it stays on, including after a page reload, until you turn it off again. |
 | **×** | Closes the panel. It does **not** stop the reader — see [§18.7](#187-reader-mode). |
 
 **Follow** is the one to understand first, because the situation it exists for comes up in your first hour.
