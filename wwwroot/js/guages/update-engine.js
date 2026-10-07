@@ -28,8 +28,21 @@ export function updateGaugeValue(gaugeInstance, calibratedValue, options = {}) {
         value = clamp(value, min, max);
     }
 
-    // Only touch the underlying gauge value.
-    gaugeInstance.gauge.value = value;
+    // canvas-gauges remembers the target of the animation that started a run
+    // of overlapping animations, and every later one in that run ends on it
+    // instead of on its own value. Meters arrive faster than the animation
+    // lasts, so during an over the run never breaks, and the 0 at the end
+    // left the power needle on a value from early in the over while the label
+    // under it read 0 W. Every gauge has this fault, not just power.
+    // Cancelling the running animation first makes the new one start from
+    // where the needle is drawn and end on the value just sent.
+    // Ported from Yaesu Web Control v2.5.3-pre4 (38cea30e).
+    const g = gaugeInstance.gauge;
+    if (g.animation && g.animation.frame) {
+        g.animation.cancel();
+        delete g._value;
+    }
+    g.value = value;
 }
 
 /**

@@ -77,14 +77,24 @@ export class CwSendPanel {
             clearInputBtn: 'cwSendClearInputBtn',
             speedSlider: 'cwSendSpeedSlider',
             speedValue: 'cwSendSpeedValue',
+            modeWarn: 'cwSendModeWarn',
+            modeWarnText: 'cwSendModeWarnText',
+            switchCwBtn: 'cwSendSwitchCwBtn',
         }, ids);
         this._queue = [];          // [{ no, line, chunks, pos, stopped, el }]
         this._current = null;      // the item whose chunks are going out
         this._running = false;
         this._breakIn = null;      // '0' | '1' | '2' | null unknown
+        this._txVfo = null;        // 'A' | 'B' | null unknown
+        this._modes = { A: null, B: null };
         this._lineNo = 0;
         this._cursor = null;       // interval moving the highlight along the piece on air
         this._wait = null;         // { resolve } for the wait between pieces, so Stop can cut it short
+        // Called with true when a line starts going out and false once the
+        // queue has drained. The queue lives in one page only, so the pages
+        // use it to hold Pop out / Reattach while a line is on its way, and
+        // the pop-out tells the main page through it.
+        this.onBusy = null;
     }
 
     init() {
@@ -96,7 +106,11 @@ export class CwSendPanel {
         this._banner = $(this._ids.banner);
         this._speedSlider = $(this._ids.speedSlider);
         this._speedValue = $(this._ids.speedValue);
+        this._modeWarn = $(this._ids.modeWarn);
+        this._modeWarnText = $(this._ids.modeWarnText);
+        this._switchCwBtn = $(this._ids.switchCwBtn);
         if (!this._dialog || !this._input) return;
+        this._switchCwBtn?.addEventListener('click', () => this.switchToCw());
 
         this._input.addEventListener('keydown', e => this._onKeydown(e));
         $(this._ids.stopBtn)?.addEventListener('click', () => this.stop());
@@ -119,6 +133,9 @@ export class CwSendPanel {
     }
 
     // ── Open / close ─────────────────────────────────────────────────────
+
+    /** True from the first line queued until the queue has drained. */
+    get busy() { return this._running; }
 
     toggle() {
         if (!this._dialog) return;
@@ -181,13 +198,74 @@ export class CwSendPanel {
         if (off) this._banner.textContent = 'Break-in is off - text plays to the sidetone only, nothing is transmitted.';
     }
 
+    // The transmit VFO (TxVfo: 0 = A, 1 = B) and each VFO's mode, pushed in
+    // from the page. The CI-V reference has 17 keying the message as CW in
+    // CW mode; it says nothing of any other mode, and a line typed in USB
+    // would look sent while nothing went out. So this says so before the
+    // operator types, refuses the line, and offers the switch. The mode is
+    // never changed without the press.
+    setTxVfo(v) {
+        const n = parseInt(v, 10);
+        this._txVfo = n === 1 ? 'B' : n === 0 ? 'A' : null;
+        this._renderModeWarn();
+    }
+
+    setMode(vfo, mode) {
+        if (vfo !== 'A' && vfo !== 'B') return;
+        this._modes[vfo] = mode || null;
+        this._renderModeWarn();
+    }
+
+    /** The transmit VFO and its mode when that mode is not CW; null when it is, or unknown. */
+    get notCw() {
+        const vfo = this._txVfo;
+        const mode = vfo ? this._modes[vfo] : null;
+        if (!vfo || !mode || mode === 'CW-U' || mode === 'CW-L') return null;
+        return { vfo, mode };
+    }
+
+    _renderModeWarn() {
+        if (!this._modeWarn) return;
+        const bad = this.notCw;
+        this._modeWarn.hidden = !bad;
+        if (!bad) return;
+        if (this._modeWarnText) this._modeWarnText.textContent = `VFO ${bad.vfo} is in ${bad.mode}, so the radio won't send CW.`;
+        if (this._switchCwBtn) {
+            this._switchCwBtn.textContent = `Switch VFO ${bad.vfo} to CW`;
+            this._switchCwBtn.disabled = false;
+        }
+    }
+
+    // CW-U, the radio's plain CW (the other is CW-R). The warning goes when
+    // the radio's own mode report comes back over SignalR, not on the POST -
+    // the radio says what mode it is in, not this button.
+    async switchToCw() {
+        const bad = this.notCw;
+        if (!bad) return;
+        if (this._switchCwBtn) this._switchCwBtn.disabled = true;
+        try {
+            const r = await fetch(`/api/cat/mode/${bad.vfo.toLowerCase()}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: '3' }),
+            });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            this.setMode(bad.vfo, 'CW-U');
+            this._say(`VFO ${bad.vfo} switched to CW.`);
+        } catch (e) {
+            this._say(`Could not switch VFO ${bad.vfo} to CW: ${e.message}`, true);
+            if (this._switchCwBtn) this._switchCwBtn.disabled = false;
+        }
+        this._input?.focus();
+    }
+
     // ── Input ────────────────────────────────────────────────────────────
 
     _onKeydown(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
-            this.send(this._input.value);
-            this._input.value = '';
+            // A line that was refused stays in the box, to send once the
+            // reason is put right.
+            if (this.send(this._input.value) > 0) this._input.value = '';
         } else if (e.key === 'Escape') {
             e.preventDefault();
             // Escape is Stop while anything is going out; with nothing to
@@ -210,6 +288,11 @@ export class CwSendPanel {
         const clean = cleanCw(text);
         if (!clean) {
             if ((text || '').trim()) this._say('Nothing sendable in that line - the keyer takes A-Z, 0-9, space and / ? . - , : \' ( ) = + " @ ^ only.', true);
+            return 0;
+        }
+        const bad = this.notCw;
+        if (bad) {
+            this._say(`Not sent: VFO ${bad.vfo} is in ${bad.mode}, so the radio won't send CW. Switch it to CW first.`, true);
             return 0;
         }
         const chunks = chunkCw(clean);
@@ -251,6 +334,7 @@ export class CwSendPanel {
         if (this._running) return;
         this._running = true;
         this._setMemButtons(true);
+        try { this.onBusy?.(true); } catch { /* ignore */ }
         try {
             while (this._queue.length) {
                 this._current = this._queue.shift();
@@ -262,6 +346,7 @@ export class CwSendPanel {
             this._running = false;
             this._setMemButtons(false);
             this._updateQueueStatus();
+            try { this.onBusy?.(false); } catch { /* ignore */ }
         }
     }
 

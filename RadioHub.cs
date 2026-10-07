@@ -75,6 +75,17 @@ namespace Icom_Web_Control.Hubs
             _spectrumPanels.TryRemove(Context.ConnectionId, out _);
             bool wasHeartbeating = _heartbeats.TryRemove(Context.ConnectionId, out _);
 
+            // A navigation or a closed tab arrives with no exception. A
+            // connection the server gave up on -- one that sent nothing within
+            // ClientTimeoutInterval -- arrives with one. Logged so that a host
+            // that exits under an idle page says which end let go first.
+            if (exception is not null)
+            {
+                _logger.LogWarning(exception,
+                    "Browser connection {ConnectionId} ended with an error rather than a clean close.",
+                    Context.ConnectionId);
+            }
+
             await base.OnDisconnectedAsync(exception);
 
             // Only trigger shutdown countdown when a heartbeating client (main page tab)
@@ -96,7 +107,9 @@ namespace Icom_Web_Control.Hubs
             }
         }
 
-        // Called by the main page every 5 seconds
+        // Called every 5 seconds by the main page, and by each pop-out window
+        // (which has no site.js), so a pop-out left open on its own keeps the
+        // host running.
         public Task Heartbeat()
         {
             _heartbeats[Context.ConnectionId] = DateTime.UtcNow;
