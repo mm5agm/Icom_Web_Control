@@ -105,6 +105,33 @@ namespace Icom_Web_Control.Controllers
         /// open for that long rather than returning a job to poll. The browser has
         /// one button disabled meanwhile and nothing else to do.</para>
         /// </summary>
+        /// <summary>
+        /// A long recording of the receive audio to a WAV, for examining a signal
+        /// after the event instead of during it. Changes nothing on the radio.
+        /// </summary>
+        [HttpPost("capture")]
+        public async Task<IActionResult> Capture(double seconds = 60, string? name = null)
+        {
+            try
+            {
+                var (path, error) = await _auto.RecordAsync(
+                    seconds, name, HttpContext.RequestAborted);
+
+                return error != null
+                    ? Ok(new { ok = false, reason = error })
+                    : Ok(new { ok = true, path });
+            }
+            catch (OperationCanceledException)
+            {
+                return Ok(new { ok = false, reason = "Cancelled." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RTTY capture failed");
+                return Ok(new { ok = false, reason = ex.Message });
+            }
+        }
+
         [HttpPost("auto")]
         public async Task<IActionResult> Auto()
         {

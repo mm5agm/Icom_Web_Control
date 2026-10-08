@@ -1,3 +1,8 @@
+using System;
+using System.IO;
+using System.Linq;
+using RadioWebControl.Core.Services.Cw;
+using System.Collections.Generic;
 using Icom_Web_Control.Services.Audio;
 using Icom_Web_Control.Services.Cw;
 using RadioWebControl.Core.Services.Rtty;
@@ -82,21 +87,225 @@ namespace Icom_Web_Control.Services.Rtty
                 // unless they agree, which costs the operator no extra waiting and
                 // is the only thing that catches a spurious speed. See the method's
                 // own notes for the bench readings that put it there.
-                var (got, outcome) = RttySignalAnalyser.AnalyseAgreed(
+                var checkd = RttySignalAnalyser.AnalyseAgreed(
                     audio, WaveInCwAudioSource.Rate);
 
-                if (got == null)
-                    return RttyAutoResult.Failed(outcome == RttyAgreement.DidNotRepeat
-                        ? "The signal did not measure the same twice - it is probably "
-                          + "fading. Nothing was changed; try again when it steadies."
-                        : "No RTTY keying found. Tune the signal in and try again.");
+                // Every press keeps its four seconds, named after what Auto made of
+                // them, so a surprising answer can be examined instead of argued
+                // about. On the bench a properly tuned DDK9 gave 50.05, 105.17,
+                // 46.78 and 51.13 baud on consecutive presses, and there was no way
+                // to ask which of those the audio actually supported - the audio was
+                // gone. These files are the answer to that question, and they are
+                // also ready-made decoder fixtures.
+                SaveCapture(audio, checkd);
 
-                return Describe(got);
+                if (checkd.Estimate == null)
+                {
+                    LogRefusal(checkd);
+
+                    // The advisory goes on the refusals too, and it matters more
+                    // here than on an answer: a filter too narrow to pass the
+                    // station is one of the likeliest reasons the two halves could
+                    // not agree, and a bare "try again when it steadies" would send
+                    // the operator to wait out a fade that was never the problem.
+                    return RttyAutoResult.Failed(
+                        checkd.Outcome == RttyAgreement.DidNotRepeat
+                            ? "The signal did not measure the same twice - it is "
+                              + "probably fading. Nothing was changed; try again "
+                              + "when it steadies."
+                            : "No RTTY keying found. Tune the signal in and try again.",
+                        Advisories());
+                }
+
+                return Describe(checkd.Estimate);
             }
             finally
             {
                 _one.Release();
             }
+        }
+
+        /// <summary>
+        /// A long, continuous recording of the receive audio, straight to a WAV.
+        ///
+        /// <para>Auto's own captures are four seconds each, which is the right length
+        /// for the thing Auto does and the wrong length for working out why it keeps
+        /// changing its mind. A minute of the same station lets the same audio be cut
+        /// up and re-measured as often as the question needs, and the answers compared
+        /// against each other rather than against a signal that has since gone.</para>
+        ///
+        /// <para>Streamed to the file frame by frame, not buffered: a minute at 48 kHz
+        /// is 11 MB of float in memory, ten minutes is 115 MB, and there is no reason
+        /// to hold any of it.</para>
+        ///
+        /// <para>This changes nothing on the radio. It listens to whatever the receiver
+        /// is already doing.</para>
+        /// </summary>
+        /// <param name="seconds">How long to record. Clamped to 5 s - 30 min.</param>
+        /// <param name="name">Optional base name; a timestamp if omitted.</param>
+        public async Task<(string? path, string? error)> RecordAsync(
+            double seconds, string? name = null, CancellationToken ct = default)
+        {
+            seconds = Math.Clamp(seconds, 5, 30 * 60);
+
+            // Shares the one-at-a-time lock with Auto, because they share the device
+            // and because a press of Auto during a recording would otherwise take the
+            // audio away from it halfway through.
+            if (!await _one.WaitAsync(0, ct))
+                return (null, "Already listening - wait for that to finish.");
+
+            var dir = CaptureDirectory();
+            Directory.CreateDirectory(dir);
+
+            var stem = string.IsNullOrWhiteSpace(name)
+                ? $"rtty-long-{DateTime.Now:yyyyMMdd-HHmmss}"
+                : string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+            var path = Path.Combine(dir, stem + ".wav");
+
+            try
+            {
+                var error = await _audio.AcquireAsync(ct);
+                if (error != null) return (null, error);
+
+                try
+                {
+                    using var wav = new CwWavRecorder(path, WaveInCwAudioSource.Rate);
+
+                    // The frames arrive on the WinMM callback thread, so the writer is
+                    // the one thing two threads touch. CwWavRecorder locks internally -
+                    // the CW reader has been writing to it from that same thread since
+                    // it was built - so the handler only has to not throw.
+                    void OnFrame(ReadOnlyMemory<float> frame)
+                    {
+                        try { wav.Write(frame.Span); } catch { /* disposed mid-flight */ }
+                    }
+
+                    _audio.Source.FrameAvailable += OnFrame;
+                    try
+                    {
+                        _logger.LogInformation(
+                            "RTTY long capture started, {Seconds:F0} s: {Path}", seconds, path);
+
+                        await Task.Delay(TimeSpan.FromSeconds(seconds), ct);
+                    }
+                    finally
+                    {
+                        _audio.Source.FrameAvailable -= OnFrame;
+                    }
+
+                    _logger.LogInformation(
+                        "RTTY long capture finished: {Seconds:F1} s in {Path}",
+                        wav.DurationSeconds, path);
+
+                    return (path, null);
+                }
+                finally
+                {
+                    await _audio.ReleaseAsync(CancellationToken.None);
+                }
+            }
+            finally
+            {
+                _one.Release();
+            }
+        }
+
+        /// <summary>
+        /// How many captures to keep. Four seconds of 48 kHz mono is about 384 KB,
+        /// so sixty of them is a little over 20 MB - enough to cover a whole bench
+        /// session and small enough that nobody has to think about it.
+        /// </summary>
+        private const int KeepCaptures = 60;
+
+        /// <summary>
+        /// Where the captures go: beside the CW bench captures, under the same user
+        /// data directory as everything else the app writes.
+        /// </summary>
+        public static string CaptureDirectory() => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "MM5AGM", "Icom Web Control", "RTTY Captures");
+
+        /// <summary>
+        /// The audio Auto just judged, written to a WAV named after the judgement.
+        ///
+        /// <para>Reuses <see cref="CwWavRecorder"/> rather than writing a second RIFF
+        /// header: a WAV writer has nothing to do with any radio, which is why that
+        /// class is in core already, and the CW reader's bench captures have been
+        /// written by it since the decoder was built. The name carries the verdict so
+        /// that a directory listing is itself the bench log - a run of files reading
+        /// 50baud, 105baud, refused, 46baud is the instability in one glance.</para>
+        ///
+        /// <para>Never allowed to break Auto. The operator pressed a button to
+        /// measure a signal, not to write a file, so a full disk or a locked
+        /// directory is logged and swallowed.</para>
+        /// </summary>
+        private void SaveCapture(float[] audio, RttyAgreementResult r)
+        {
+            try
+            {
+                var dir = CaptureDirectory();
+                Directory.CreateDirectory(dir);
+
+                var verdict = r.Estimate is { } e
+                    ? $"{e.ShiftHz:F0}Hz-{e.Baud:F2}baud-conf{e.Confidence:F2}"
+                    : $"refused-{r.Outcome}";
+
+                var path = Path.Combine(
+                    dir, $"rtty-{DateTime.Now:yyyyMMdd-HHmmss}-{verdict}.wav");
+
+                using (var wav = new CwWavRecorder(path, WaveInCwAudioSource.Rate))
+                    wav.Write(audio);
+
+                _logger.LogInformation("RTTY Auto capture saved: {Path}", path);
+                PruneCaptures(dir);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "RTTY Auto capture could not be saved");
+            }
+        }
+
+        /// <summary>Oldest captures beyond <see cref="KeepCaptures"/>, deleted.</summary>
+        private void PruneCaptures(string dir)
+        {
+            // "rtty-2026...", not "rtty-long-2026...": the long captures are made
+            // deliberately, one at a time, and are the ones somebody will come back
+            // for. Only Auto's automatic four-second files are pruned.
+            var old = new DirectoryInfo(dir)
+                .GetFiles("rtty-2*.wav")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .Skip(KeepCaptures);
+
+            foreach (var file in old)
+            {
+                try { file.Delete(); }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Could not prune {File}", file.Name);
+                }
+            }
+        }
+
+        /// <summary>
+        /// A refusal, in the log, with the halves that caused it.
+        ///
+        /// Successes were logged from the start and refusals were not, which left
+        /// the one outcome that needs explaining as the one that wrote nothing at
+        /// all - so a bench report of "Auto did not find it" could not be told from
+        /// the operator having pressed at the wrong moment. The half figures are
+        /// what distinguishes the cases: a speed that moved while the tones held is
+        /// a fade, two different tone pairs are two stations, and one half finding
+        /// nothing is a signal that came and went inside the four seconds.
+        /// </summary>
+        private void LogRefusal(RttyAgreementResult r)
+        {
+            static string Half(RttySignalEstimate? e) => e == null
+                ? "nothing"
+                : $"{e.MarkHz:F0}/{e.SpaceHz:F0} Hz shift {e.ShiftHz:F0} {e.Baud:F2} baud";
+
+            _logger.LogInformation(
+                "RTTY Auto refused ({Outcome}): first half {Early}, second half {Late}",
+                r.Outcome, Half(r.Early), Half(r.Late));
         }
 
         /// <summary>
@@ -186,9 +395,11 @@ namespace Icom_Web_Control.Services.Rtty
 
             _logger.LogInformation(
                 "RTTY Auto: mark {Mark:F0} Hz, space {Space:F0} Hz, shift {Shift} Hz, " +
-                "{Baud:F2} baud, {Rev}, confidence {Conf:F2}, tone margin {Margin:F2}",
+                "{Baud:F2} baud, {Rev}, confidence {Conf:F2}, tone margin {Margin:F2}, " +
+                "halves agreed {Agreement:F2}",
                 got.MarkHz, got.SpaceHz, shift, got.Baud,
-                reverse ? "reversed" : "normal", got.Confidence, got.ToneMargin);
+                reverse ? "reversed" : "normal", got.Confidence, got.ToneMargin,
+                got.Agreement);
 
             return new RttyAutoResult
             {
@@ -203,7 +414,8 @@ namespace Icom_Web_Control.Services.Rtty
                 Reverse         = reverse,
                 Confidence      = Math.Round(got.Confidence, 2),
                 ToneMargin      = Math.Round(got.ToneMargin, 2),
-                Advice          = NarrowFilterNote(),
+                Agreement       = Math.Round(got.Agreement, 2),
+                Advice          = Advisories(),
             };
         }
 
@@ -222,6 +434,27 @@ namespace Icom_Web_Control.Services.Rtty
         /// they expected something wider, so only the operator can judge it - this
         /// tells them what they need in order to.</para>
         /// </summary>
+        private string? Advisories()
+        {
+            var notes = new List<string>();
+
+            // The one that cost a bench session. Auto in CW-U on a 250 Hz filter
+            // measured a shift of 93 to 108 Hz off DDK9 - the filter skirts, not the
+            // station - and said so with a straight face. Nothing in the audio can
+            // reveal that the receiver is in the wrong mode, because the audio is
+            // all the analyser gets.
+            var mode = _state.ModeA ?? "";
+            if (!mode.StartsWith("RTTY", StringComparison.OrdinalIgnoreCase))
+                notes.Add($"The radio is in {mode}, not RTTY, so the tones you are "
+                        + "hearing are not where RTTY would put them. Switch to RTTY "
+                        + "and press Auto again.");
+
+            var filter = NarrowFilterNote();
+            if (filter != null) notes.Add(filter);
+
+            return notes.Count == 0 ? null : string.Join(" ", notes);
+        }
+
         private string? NarrowFilterNote()
         {
             // 500 Hz is chosen to stay silent for every filter anyone receives RTTY
@@ -278,6 +511,14 @@ namespace Icom_Web_Control.Services.Rtty
         public double ToneMargin { get; set; }
 
         /// <summary>
+        /// How nearly the first and second halves of the capture measured the same
+        /// speed, 0 to 1. Separate from <see cref="Confidence"/> on purpose: a
+        /// result that is here at all already passed the agreement gate, so folding
+        /// one into the other would charge a signal twice for the same thing.
+        /// </summary>
+        public double Agreement { get; set; } = 1;
+
+        /// <summary>
         /// A note for the operator about something the analyser could not have
         /// known, or null when there is nothing to say. Shown after the figures, not
         /// instead of them: the answer is still the answer. Today it only ever
@@ -285,6 +526,7 @@ namespace Icom_Web_Control.Services.Rtty
         /// </summary>
         public string? Advice { get; set; }
 
-        public static RttyAutoResult Failed(string reason) => new() { Ok = false, Reason = reason };
+        public static RttyAutoResult Failed(string reason, string? advice = null) =>
+            new() { Ok = false, Reason = reason, Advice = advice };
     }
 }
