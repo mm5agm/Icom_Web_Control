@@ -14,7 +14,12 @@ namespace RadioWebControl.Core.Services.Rtty
     /// keying clusters nearly touch. <see cref="RttySignalAnalyser.SnapShift"/>
     /// turns it into one of the shifts a radio understands.
     /// </param>
-    /// <param name="Baud">The nearest of the speeds that were offered as candidates.</param>
+    /// <param name="Baud">
+    /// The measured speed, not rounded to anything. Good to a fraction of a baud,
+    /// so a station on one of the odd press-circuit speeds - 56.9, 74.2 - is
+    /// reported as it is rather than as the nearest famous number.
+    /// <see cref="RttySignalAnalyser.SnapBaud"/> says whether it is a standard one.
+    /// </param>
     /// <param name="Confidence">
     /// How sure the analyser is that this is a RTTY signal with these tones at this
     /// speed, 0 to 1. Below about 0.4 the answer is a guess and should be shown as
@@ -83,13 +88,22 @@ namespace RadioWebControl.Core.Services.Rtty
     /// run is a whole number of bits long - <em>except</em> that the stop element
     /// is one and a <em>half</em> bits, and the stop element is always mark. So the
     /// space runs are whole bits and the mark runs are not, and that single
-    /// asymmetry answers both questions. Measure every run; then for each candidate
-    /// speed, and for each of the two ways round the tones could be, ask how nearly
-    /// the runs of the <em>assumed space tone</em> come out a whole number of bits.
-    /// The combination that fits is the answer. A 6% speed error leaves visible
-    /// remainders on the longer runs, which is exactly the error that framing
-    /// checks are blind to; and getting the tones the wrong way round puts a stop
-    /// element into every run being measured, which wrecks the fit outright.</para>
+    /// asymmetry answers both questions. Measure every run; then sweep the speed
+    /// across the whole range a quarter of a percent at a time, and at each step,
+    /// for each of the two ways round the tones could be, ask how nearly the runs of
+    /// the <em>assumed space tone</em> come out a whole number of bits. The peak of
+    /// that sweep is the answer to both. A 6% speed error leaves visible remainders
+    /// on the longer runs, which is exactly the error that framing checks are blind
+    /// to; and getting the tones the wrong way round puts a stop element into every
+    /// run being measured, which wrecks the fit outright.</para>
+    ///
+    /// <para><b>It sweeps rather than trying a list of famous speeds</b> so that it
+    /// can report a station on a speed nobody tabulated - 56.9 and 74.2 turn up on
+    /// press circuits, and some stations are simply off frequency-standard. The
+    /// operator is told what was measured, and
+    /// <see cref="SnapBaud"/> says whether that happens to be a speed with a name.
+    /// Which peak of the sweep to take is not "the best one" - see
+    /// <see cref="PickSpeed"/>, where the only real trap lives.</para>
     ///
     /// <para><b>The one station this cannot place</b> is the one sending a one-bit
     /// stop element, because then every run really is a whole number of bits and
@@ -113,19 +127,26 @@ namespace RadioWebControl.Core.Services.Rtty
     public static class RttySignalAnalyser
     {
         /// <summary>
-        /// The speeds worth trying, slowest first - which is the order the choice
-        /// depends on. 45.45 is amateur RTTY and the figure the IC-7300's own
-        /// decoder is fixed at; 50 is most European commercial and weather
-        /// traffic, DDK9 among them; 75 and 100 turn up on press and military
-        /// circuits.
+        /// The speeds that have a name. 45.45 is amateur RTTY and the figure the
+        /// IC-7300's own decoder is fixed at; 50 is most European commercial and
+        /// weather traffic, DDK9 among them; 56.9 and 74.2 are press circuits; 75
+        /// and 100 turn up on press and military traffic.
+        ///
+        /// <para>This is a list for <see cref="SnapBaud"/> to recognise against,
+        /// <b>not</b> the set of speeds the analyser can find. It searches a
+        /// continuous range and reports what it measures, because a station on a
+        /// speed nobody tabulated is still a station and reporting it as the
+        /// nearest famous number would be a lie that decodes to rubbish.</para>
         /// </summary>
-        public static readonly double[] StandardBauds = { 45.45, 50.0, 75.0, 100.0 };
+        public static readonly double[] StandardBauds = { 45.45, 50.0, 56.9, 74.2, 75.0, 100.0 };
 
         /// <summary>
-        /// The shifts a listener meets. Offered for snapping a measurement to a
-        /// dropdown; the analyser itself never rounds to these, because a
-        /// measured 450 reported as 425 would hide the very thing the operator
-        /// asked to be told.
+        /// The shifts that have a name: 170 amateur and NAVTEX, 200 some military,
+        /// 425 weather and press, 450 the German DWD stations, 850 military and
+        /// aviation. As with <see cref="StandardBauds"/> this is for recognising a
+        /// measurement, not a limit on what can be found - the analyser never
+        /// rounds to it, because a measured 450 reported as 425 would hide the very
+        /// thing the operator asked to be told.
         /// </summary>
         public static readonly int[] StandardShifts = { 170, 200, 425, 450, 850 };
 
@@ -162,17 +183,18 @@ namespace RadioWebControl.Core.Services.Rtty
         /// <param name="sampleRate">Hz.</param>
         /// <param name="lowHz">Bottom of the search range.</param>
         /// <param name="highHz">Top of the search range.</param>
-        /// <param name="bauds">Speeds to consider, slowest first. Defaults to <see cref="StandardBauds"/>.</param>
+        /// <param name="lowBaud">Slowest speed to consider.</param>
+        /// <param name="highBaud">Fastest speed to consider.</param>
         public static RttySignalEstimate? Analyse(
             ReadOnlySpan<float> audio,
             int sampleRate,
             double lowHz = 300,
             double highHz = 3000,
-            IReadOnlyList<double>? bauds = null)
+            double lowBaud = 30,
+            double highBaud = 120)
         {
             if (sampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
-            bauds ??= StandardBauds;
-            if (bauds.Count == 0) throw new ArgumentException("no candidate speeds", nameof(bauds));
+            if (lowBaud <= 0 || highBaud < lowBaud) throw new ArgumentOutOfRangeException(nameof(lowBaud));
 
             // 4096 points is about 12 Hz a bin at 48 kHz, which resolves a 170 Hz
             // shift with room to spare. A window that long holds several bits and
@@ -205,7 +227,7 @@ namespace RadioWebControl.Core.Services.Rtty
             // passband. A signal gives tens of dB; noise alone gives a few.
             var prominence = Clamp01(Math.Log10((first.Value.level + second.Value.level) / (2 * floor + 1e-30)) / 1.5);
 
-            var framing = Framing(audio, sampleRate, toneA, toneB, bauds);
+            var framing = Framing(audio, sampleRate, toneA, toneB, lowBaud, highBaud);
             if (framing is null) return null;
 
             var (markHz, spaceHz, baud, fit, margin) = framing.Value;
@@ -217,6 +239,19 @@ namespace RadioWebControl.Core.Services.Rtty
             var confidence = prominence * fit;
 
             return new RttySignalEstimate(markHz, spaceHz, shift, baud, confidence, margin, fit);
+        }
+
+        /// <summary>
+        /// The nearest speed in <see cref="StandardBauds"/>, or null when the
+        /// measurement is not close to any of them - which means the station is on
+        /// a speed that is not in the table, and the measured figure is the one to
+        /// use and to show.
+        /// </summary>
+        /// <param name="tolerance">As a fraction. 1.5% separates every named speed.</param>
+        public static double? SnapBaud(double measured, double tolerance = 0.015)
+        {
+            var nearest = StandardBauds.OrderBy(b => Math.Abs(b - measured)).First();
+            return Math.Abs(nearest - measured) <= nearest * tolerance ? nearest : null;
         }
 
         /// <summary>
@@ -358,26 +393,23 @@ namespace RadioWebControl.Core.Services.Rtty
         /// </summary>
         private static (double markHz, double spaceHz, double baud, double fit, double margin)?
             Framing(ReadOnlySpan<float> audio, int sampleRate, double toneA, double toneB,
-                    IReadOnlyList<double> bauds)
+                    double lowBaud, double highBaud)
         {
-            var slowest = bauds.Min();
-            var fastest = bauds.Max();
-
-            // One bit at the fastest speed being considered, so the filter cannot
-            // smear two bits together whatever the signal turns out to be. The
-            // speed is not known yet, which is why this cannot use a bit time.
-            var window = Math.Max(8, (int)(sampleRate / fastest));
+            // One bit at the fastest speed in range, so the filter cannot smear two
+            // bits together whatever the signal turns out to be. The speed is not
+            // known yet, which is why this cannot use a bit time.
+            var window = Math.Max(8, (int)(sampleRate / highBaud));
 
             var a = new RttyToneMagnitude(window, toneA, sampleRate);
             var b = new RttyToneMagnitude(window, toneB, sampleRate);
 
             // A space run is a start element plus however many of the five data
             // bits are space, so between one and six bits. Anything shorter than a
-            // third of the fastest candidate bit is a noise glitch rather than an
+            // third of the fastest possible bit is a noise glitch rather than an
             // element, and anything longer than eight slow bits is an idle line or
             // a gap between transmissions rather than part of a character.
-            var shortest = sampleRate / fastest / 3.0;
-            var longest = sampleRate / slowest * 8.0;
+            var shortest = sampleRate / highBaud / 3.0;
+            var longest = sampleRate / lowBaud * 8.0;
 
             var runsA = new List<double>();     // runs during which tone A was on top
             var runsB = new List<double>();
@@ -402,49 +434,54 @@ namespace RadioWebControl.Core.Services.Rtty
 
             if (runsA.Count < 8 || runsB.Count < 8) return null;
 
-            double bestBaud = 0, bestFit = 0, bestOther = 0;
-            var bIsMark = false;
+            // Scan the whole range rather than a list of famous speeds, so that a
+            // station on one of the odd press-circuit rates is measured instead of
+            // being rounded to the nearest name. A quarter of a percent a step is
+            // finer than the fit can resolve, so the true speed always lands on the
+            // shoulder of a peak and the interpolation below can find its summit.
+            var steps = (int)Math.Ceiling(Math.Log(highBaud / lowBaud) / Math.Log(1.0025));
+            var fits = new double[steps + 1];
+            var polarity = new bool[steps + 1];
+            var others = new double[steps + 1];
 
-            foreach (var baud in bauds.OrderBy(x => x))      // slowest first
+            for (int i = 0; i <= steps; i++)
             {
-                var bit = sampleRate / baud;
+                var bit = sampleRate / (lowBaud * Math.Pow(1.0025, i));
 
                 // Each way round is scored on the runs of the tone it calls space,
                 // because those are the ones that should be whole bits.
                 var aMark = FitToWholeBits(runsB, bit);
                 var bMark = FitToWholeBits(runsA, bit);
 
-                var fit = Math.Max(aMark, bMark);
-                var other = Math.Min(aMark, bMark);
-
-                // The slowest candidate that fits well wins, so a later and better
-                // fitting one has to be clearly better to displace it - 0.05 being
-                // measurement scatter rather than a real difference.
-                //
-                // That rule is not caution, it is necessary: a bit period half the
-                // true one divides everything exactly too, since every whole number
-                // of bits is also a whole number of half-bits. It does not go the
-                // other way - a 50 baud yardstick leaves half-bit remainders all
-                // over a 100 baud signal - so the slow candidate is rejected on its
-                // own merits wherever it is genuinely wrong. Taking the best fit
-                // instead would read every 50 baud weather station as 100, and read
-                // its tones the wrong way round into the bargain, because at double
-                // speed the stop element stops being half a bit.
-                if (bestBaud == 0 || fit > bestFit + 0.05)
-                {
-                    bestBaud = baud;
-                    bestFit = fit;
-                    bestOther = other;
-                    bIsMark = bMark > aMark;
-                }
+                fits[i] = Math.Max(aMark, bMark);
+                others[i] = Math.Min(aMark, bMark);
+                polarity[i] = bMark > aMark;
             }
+
+            var peak = PickSpeed(fits);
+            if (peak < 0) return null;
+
+            // Interpolate across the peak for the fraction of a step between the
+            // samples either side of it, which is what turns a scan into a
+            // measurement.
+            double at = peak;
+            if (peak > 0 && peak < steps)
+            {
+                var denominator = fits[peak - 1] - 2 * fits[peak] + fits[peak + 1];
+                if (Math.Abs(denominator) > 1e-12)
+                    at += Math.Clamp(0.5 * (fits[peak - 1] - fits[peak + 1]) / denominator, -0.5, 0.5);
+            }
+
+            var bestBaud = lowBaud * Math.Pow(1.0025, at);
+            var bestFit = fits[peak];
+            var bIsMark = polarity[peak];
 
             // How much better the winning polarity fitted than the other one. On a
             // station using a one or two bit stop element the two come out the same,
             // because then every run is a whole number of bits and the asymmetry
             // this rests on is simply absent - so fall back to the duty cycle, weak
             // as it is, rather than pick a polarity by rounding error.
-            var margin = bestFit <= 0 ? 0 : (bestFit - bestOther) / bestFit;
+            var margin = bestFit <= 0 ? 0 : (bestFit - others[peak]) / bestFit;
             if (margin < PolarityMargin)
             {
                 var duty = WhichIsMarkByDuty(runsA, runsB);
@@ -455,6 +492,42 @@ namespace RadioWebControl.Core.Services.Rtty
             return bIsMark
                 ? (toneB, toneA, bestBaud, bestFit, margin)
                 : (toneA, toneB, bestBaud, bestFit, margin);
+        }
+
+        /// <summary>
+        /// Which peak of the scan is the speed: the <b>slowest</b> one that fits
+        /// about as well as the best does, not the best.
+        ///
+        /// <para>That is not caution, it is necessary. A bit period half the true
+        /// one divides everything exactly too, since every whole number of bits is
+        /// also a whole number of half-bits, so the scan has a second peak at double
+        /// the real speed which is every bit as convincing - sometimes a shade
+        /// better. It does not go the other way: a half-speed yardstick leaves
+        /// half-bit remainders all over the runs, so the slow end is rejected on its
+        /// own merits wherever it is genuinely wrong, and nothing real is lost by
+        /// preferring it. Taking the best fit instead read every 50 baud weather
+        /// station as 100, and read its tones the wrong way round into the bargain,
+        /// because at double speed the stop element stops being half a bit.</para>
+        /// </summary>
+        private static int PickSpeed(double[] fits)
+        {
+            var best = 0.0;
+            foreach (var fit in fits) best = Math.Max(best, fit);
+            if (best <= 0) return -1;
+
+            var good = best - 0.05;     // measurement scatter, not a real difference
+
+            // The first local maximum that is good enough. Scanning upwards from the
+            // slow end makes "first" and "slowest" the same thing.
+            for (int i = 0; i < fits.Length; i++)
+            {
+                if (fits[i] < good) continue;
+                if (i > 0 && fits[i - 1] > fits[i]) continue;
+                if (i < fits.Length - 1 && fits[i + 1] > fits[i]) continue;
+                return i;
+            }
+
+            return -1;
         }
 
         /// <summary>

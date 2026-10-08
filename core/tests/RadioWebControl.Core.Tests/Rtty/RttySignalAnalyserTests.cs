@@ -58,6 +58,20 @@ namespace RadioWebControl.Core.Tests.Rtty
         private static void Hz(double expected, double got, double tolerance = 6.0)
             => Assert.InRange(got, expected - tolerance, expected + tolerance);
 
+        /// <summary>
+        /// A speed assertion with a tolerance, because the speed is now measured
+        /// rather than chosen from a list and so comes back with a fraction on it.
+        ///
+        /// <para>Half a percent is what the analyser delivers across this matrix,
+        /// and it is far tighter than it needs to be: a character is seven and a
+        /// half bits, so half a percent of speed error has drifted the sampling
+        /// point by 4% of one bit by the stop element, which no demodulator
+        /// notices. It is tight enough to tell 74.2 from 75, which are 1.1% apart
+        /// and the closest two named speeds there are.</para>
+        /// </summary>
+        private static void Baud(double expected, double got, double tolerance = 0.005)
+            => Assert.InRange(got, expected * (1 - tolerance), expected * (1 + tolerance));
+
         private static void AddNoise(float[] audio, double sigma, int seed)
         {
             var random = new Random(seed);
@@ -81,7 +95,7 @@ namespace RadioWebControl.Core.Tests.Rtty
             Hz(2125, got!.MarkHz);
             Hz(2295, got.SpaceHz);
             Hz(170, got.ShiftHz);
-            Assert.Equal(45.45, got.Baud);
+            Baud(45.45, got.Baud);
         }
 
         [Theory]
@@ -98,7 +112,7 @@ namespace RadioWebControl.Core.Tests.Rtty
 
             Assert.NotNull(got);
             Hz(mark, got!.MarkHz);
-            Assert.Equal(baud, got.Baud);
+            Baud(baud, got.Baud);
 
             // The shift is asserted through the snap rather than raw, because that
             // is the form the operator and the radio both see, and because the raw
@@ -210,7 +224,7 @@ namespace RadioWebControl.Core.Tests.Rtty
 
             Assert.NotNull(got);
             Hz(170, got!.ShiftHz);
-            Assert.Equal(45.45, got.Baud);
+            Baud(45.45, got.Baud);
             Assert.True(got.ToneMargin <= 0.08,
                 $"it claimed a margin of {got.ToneMargin:F2} on a polarity it cannot know");
 
@@ -232,7 +246,7 @@ namespace RadioWebControl.Core.Tests.Rtty
 
             Assert.NotNull(got);
             Hz(170, got!.ShiftHz);
-            Assert.Equal(45.45, got.Baud);
+            Baud(45.45, got.Baud);
             Assert.True(got.Confidence > 0.7, $"confidence {got.Confidence:F2}");
         }
 
@@ -248,7 +262,7 @@ namespace RadioWebControl.Core.Tests.Rtty
             var got = RttySignalAnalyser.Analyse(Signal(2125, 170, baud), Rate);
 
             Assert.NotNull(got);
-            Assert.Equal(baud, got!.Baud);
+            Baud(baud, got!.Baud);
             Assert.True(got.BaudFit > 0.9, $"{baud} baud fitted only {got.BaudFit:F2}");
         }
 
@@ -257,12 +271,12 @@ namespace RadioWebControl.Core.Tests.Rtty
         {
             // The trap the "slowest that fits" rule exists for: 100 baud divides
             // a 50 baud signal perfectly, because every whole number of bits is
-            // also a whole number of half-bits. Taking the best-fitting candidate
-            // instead of the slowest adequate one reads every DWD weather station
-            // at double speed, and the text is rubbish with clean framing.
+            // also a whole number of half-bits. Taking the best-fitting peak of the
+            // sweep instead of the slowest adequate one reads every DWD weather
+            // station at double speed, and the text is rubbish with clean framing.
             var got = RttySignalAnalyser.Analyse(Signal(1000, 450, 50), Rate);
 
-            Assert.Equal(50.0, got!.Baud);
+            Baud(50.0, got!.Baud);
         }
 
         [Fact]
@@ -271,31 +285,66 @@ namespace RadioWebControl.Core.Tests.Rtty
             // The other direction, which is what makes the rule safe rather than
             // merely cautious: a 50 baud yardstick leaves half-bit remainders all
             // over a 100 baud signal, so the slow candidate is rejected on its
-            // own merits and not just preferred.
+            // own merits and not just preferred. Without this half the band would
+            // read at half speed, which is the price of the rule if it were only
+            // caution - it is not.
             var got = RttySignalAnalyser.Analyse(Signal(1500, 170, 100), Rate);
 
-            Assert.Equal(100.0, got!.Baud);
+            Baud(100.0, got!.Baud);
+        }
+
+        [Theory]
+        [InlineData(56.9)]      // a press circuit
+        [InlineData(74.2)]      // another, and only 1.1% from 75
+        [InlineData(68.3)]      // a speed nobody tabulated at all
+        public void A_speed_that_is_not_in_any_table_is_measured_rather_than_rounded(double baud)
+        {
+            // The point of searching a range instead of trying a list of famous
+            // numbers. A station on one of these is still a station, and reporting
+            // it as the nearest named speed would decode to rubbish - the error
+            // compounds over the seven and a half bits of a character.
+            var got = RttySignalAnalyser.Analyse(Signal(2125, 170, baud), Rate);
+
+            Assert.NotNull(got);
+            Baud(baud, got!.Baud);
+            Assert.True(got.BaudFit > 0.9, $"{baud} baud fitted only {got.BaudFit:F2}");
         }
 
         [Fact]
-        public void A_speed_that_was_not_offered_as_a_candidate_is_not_invented()
+        public void A_speed_outside_the_search_range_is_not_reported_as_one_inside_it()
         {
-            // 50 baud audio, with only 45.45 and 75 on the menu - neither a
-            // multiple of it, so neither can fit. The honest outcome is one of the
-            // two offered speeds plus a fit score that says it is wrong, not a
-            // confident 50 that was never asked about.
-            //
-            // 100 is kept off the menu deliberately: it would fit a 50 baud signal
-            // genuinely well, since every whole number of bits is also a whole
-            // number of half-bits, and a high score there would be correct rather
-            // than a fault.
+            // 45.45 baud looked for between 80 and 120, where it cannot be. What
+            // must not happen is a confident 90.9 - which is a real alias of it -
+            // being handed to the operator as the answer.
             var got = RttySignalAnalyser.Analyse(
-                Signal(2125, 170, 50), Rate, bauds: new[] { 45.45, 75.0 });
+                Signal(2125, 170, 45.45), Rate, lowBaud: 80, highBaud: 120);
 
-            Assert.NotNull(got);
-            Assert.Contains(got!.Baud, new[] { 45.45, 75.0 });
-            Assert.True(got.BaudFit < 0.8,
-                $"a wrong speed should not fit well, but fitted {got.BaudFit:F2}");
+            // It finds 90.9 and fits it well, because that genuinely is a whole
+            // number of half-bits. Asserted as what it is rather than wished away:
+            // the search range is the caller's promise about what is on the air,
+            // and a caller who narrows it wrongly gets the alias. The default range
+            // starts at 30 precisely so this cannot happen to the Auto button.
+            Assert.True(got is null || got.Baud > 80,
+                $"found {got?.Baud:F2} baud, which is outside the range it was given");
+        }
+
+        [Fact]
+        public void The_named_speeds_are_recognised_and_the_odd_ones_are_left_alone()
+        {
+            // What the pop-out acts on: a snapped speed fills the box, a null one
+            // blanks it and shows the measurement instead.
+            Assert.Equal(45.45, RttySignalAnalyser.SnapBaud(45.5));
+            Assert.Equal(50.0, RttySignalAnalyser.SnapBaud(49.9));
+            Assert.Equal(100.0, RttySignalAnalyser.SnapBaud(100.4));
+
+            // 74.2 and 75 are 1.1% apart, which is the tightest pair in the table
+            // and the reason the default tolerance is 1.5% rather than anything
+            // looser.
+            Assert.Equal(74.2, RttySignalAnalyser.SnapBaud(74.3));
+            Assert.Equal(75.0, RttySignalAnalyser.SnapBaud(74.9));
+
+            Assert.Null(RttySignalAnalyser.SnapBaud(68.3));
+            Assert.Null(RttySignalAnalyser.SnapBaud(38.0));
         }
 
         // --- noise, and knowing when to say nothing --------------------------
@@ -307,7 +356,7 @@ namespace RadioWebControl.Core.Tests.Rtty
 
             Assert.NotNull(got);
             Hz(2125, got!.MarkHz);
-            Assert.Equal(45.45, got.Baud);
+            Baud(45.45, got.Baud);
             Assert.True(got.Confidence > 0.5, $"confidence was only {got.Confidence:F2}");
         }
 
@@ -322,7 +371,7 @@ namespace RadioWebControl.Core.Tests.Rtty
             Assert.NotNull(got);
             Hz(2125, got!.MarkHz);
             Hz(170, got.ShiftHz);
-            Assert.Equal(45.45, got.Baud);
+            Baud(45.45, got.Baud);
         }
 
         [Fact]
@@ -337,7 +386,7 @@ namespace RadioWebControl.Core.Tests.Rtty
 
             Assert.NotNull(got);
             Hz(2125, got!.MarkHz);
-            Assert.Equal(45.45, got.Baud);
+            Baud(45.45, got.Baud);
             Assert.True(got.Confidence > 0.5, $"confidence was only {got.Confidence:F2}");
         }
 
@@ -454,7 +503,7 @@ namespace RadioWebControl.Core.Tests.Rtty
 
             Assert.NotNull(got);
             Hz(2125, got!.MarkHz);
-            Assert.Equal(45.45, got.Baud);
+            Baud(45.45, got.Baud);
         }
     }
 }
