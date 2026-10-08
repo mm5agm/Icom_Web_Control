@@ -77,10 +77,19 @@ namespace Icom_Web_Control.Services.Rtty
                     return RttyAutoResult.Failed(
                         "No receive audio arrived. Check the audio device on the Settings page.");
 
-                var got = RttySignalAnalyser.Analyse(audio, WaveInCwAudioSource.Rate);
+                // AnalyseAgreed, not Analyse: it measures the first and second
+                // halves of this same capture separately and refuses to answer
+                // unless they agree, which costs the operator no extra waiting and
+                // is the only thing that catches a spurious speed. See the method's
+                // own notes for the bench readings that put it there.
+                var (got, outcome) = RttySignalAnalyser.AnalyseAgreed(
+                    audio, WaveInCwAudioSource.Rate);
+
                 if (got == null)
-                    return RttyAutoResult.Failed(
-                        "No RTTY keying found. Tune the signal in and try again.");
+                    return RttyAutoResult.Failed(outcome == RttyAgreement.DidNotRepeat
+                        ? "The signal did not measure the same twice - it is probably "
+                          + "fading. Nothing was changed; try again when it steadies."
+                        : "No RTTY keying found. Tune the signal in and try again.");
 
                 return Describe(got);
             }
@@ -194,7 +203,37 @@ namespace Icom_Web_Control.Services.Rtty
                 Reverse         = reverse,
                 Confidence      = Math.Round(got.Confidence, 2),
                 ToneMargin      = Math.Round(got.ToneMargin, 2),
+                Advice          = NarrowFilterNote(),
             };
+        }
+
+        /// <summary>
+        /// Any shift wider than the IF filter is simply not in the audio, so a
+        /// narrow filter makes Auto confidently right about a pair of tones that is
+        /// the wrong pair. On the bench a 250 Hz CW filter left open gave a shift of
+        /// 104 Hz at good confidence, which is what the filter skirts were passing -
+        /// the analyser was not wrong, it was answering about what reached it.
+        ///
+        /// <para>This is a note and not a refusal, and that distinction was argued
+        /// out: a refusal would have to guess at what the operator is tuned to, and
+        /// a legitimate 170 Hz station through a 250 Hz filter would be refused for
+        /// no reason. It would not even have caught the case above, whose measured
+        /// shift fits a narrow station perfectly. Only the operator knows whether
+        /// they expected something wider, so only the operator can judge it - this
+        /// tells them what they need in order to.</para>
+        /// </summary>
+        private string? NarrowFilterNote()
+        {
+            // 500 Hz is chosen to stay silent for every filter anyone receives RTTY
+            // through - the usual 500 to 2400 - and speak up for the CW filters,
+            // which is where the problem lives.
+            const int NarrowHz = 500;
+
+            if (!int.TryParse(_state.IfWidthA, out var hz) || hz <= 0 || hz >= NarrowHz)
+                return null;
+
+            return $"Your IF filter is {hz} Hz, so no shift wider than that could "
+                 + "have been seen. Open it and press Auto again if you expected one.";
         }
     }
 
@@ -237,6 +276,14 @@ namespace Icom_Web_Control.Services.Rtty
         /// which tone is mark. Near zero means "try Rev if it does not copy".
         /// </summary>
         public double ToneMargin { get; set; }
+
+        /// <summary>
+        /// A note for the operator about something the analyser could not have
+        /// known, or null when there is nothing to say. Shown after the figures, not
+        /// instead of them: the answer is still the answer. Today it only ever
+        /// reports a narrow IF filter.
+        /// </summary>
+        public string? Advice { get; set; }
 
         public static RttyAutoResult Failed(string reason) => new() { Ok = false, Reason = reason };
     }
