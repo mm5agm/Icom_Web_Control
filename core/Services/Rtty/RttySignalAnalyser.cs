@@ -151,6 +151,14 @@ namespace RadioWebControl.Core.Services.Rtty
         public static readonly int[] StandardShifts = { 170, 200, 425, 450, 850 };
 
         /// <summary>
+        /// One step of the speed scan. A quarter of a percent is finer than the fit
+        /// can resolve, which is the point: the true speed then always lands on the
+        /// shoulder of a peak rather than on its summit, and the interpolation has
+        /// something to work with.
+        /// </summary>
+        private const double BaudStep = 1.0025;
+
+        /// <summary>
         /// How far either side of a peak its keying sidebands reach, for the
         /// centroid in <see cref="HighestPeak"/>. 60 Hz covers the keying spread of
         /// the fastest speed considered, and stays comfortably inside half of the
@@ -400,6 +408,25 @@ namespace RadioWebControl.Core.Services.Rtty
             // known yet, which is why this cannot use a bit time.
             var window = Math.Max(8, (int)(sampleRate / highBaud));
 
+            // How loud each tone is when it is the one being sent. The two are
+            // divided by these before being compared, and that is not a nicety.
+            //
+            // The comparison decides where one run ends and the next begins, so a
+            // comparison between two magnitudes of different scale puts every
+            // boundary in the wrong place - one way on the rising edge and the other
+            // way on the falling one, which lengthens every run of the louder tone
+            // by a constant amount and shortens every run of the quieter one by the
+            // same. A constant added to every run is read here as a longer bit, so
+            // the speed comes out low, and selective fading on a real HF signal
+            // leaves the two tones several dB apart as a matter of course.
+            //
+            // Measured on 2026-10-08: with the tones matched the scan read a 50 baud
+            // signal as 50.02, and with space 1.6 dB louder it read 49.05. The radio
+            // was reading 48.7 to 49.2 on a real station at the time, repeatably,
+            // and the same bench had already measured that station's two tones 1.6 dB
+            // apart. Mark louder reads fast in exactly the same proportion.
+            var (levelA, levelB) = ToneLevels(audio, sampleRate, toneA, toneB, window);
+
             var a = new RttyToneMagnitude(window, toneA, sampleRate);
             var b = new RttyToneMagnitude(window, toneB, sampleRate);
 
@@ -418,7 +445,7 @@ namespace RadioWebControl.Core.Services.Rtty
 
             for (int i = 0; i < audio.Length; i++)
             {
-                var difference = a.Process(audio[i]) - b.Process(audio[i]);
+                var difference = a.Process(audio[i]) / levelA - b.Process(audio[i]) / levelB;
                 if (i < window) continue;
 
                 since++;
@@ -439,14 +466,14 @@ namespace RadioWebControl.Core.Services.Rtty
             // being rounded to the nearest name. A quarter of a percent a step is
             // finer than the fit can resolve, so the true speed always lands on the
             // shoulder of a peak and the interpolation below can find its summit.
-            var steps = (int)Math.Ceiling(Math.Log(highBaud / lowBaud) / Math.Log(1.0025));
+            var steps = (int)Math.Ceiling(Math.Log(highBaud / lowBaud) / Math.Log(BaudStep));
             var fits = new double[steps + 1];
             var polarity = new bool[steps + 1];
             var others = new double[steps + 1];
 
             for (int i = 0; i <= steps; i++)
             {
-                var bit = sampleRate / (lowBaud * Math.Pow(1.0025, i));
+                var bit = sampleRate / (lowBaud * Math.Pow(BaudStep, i));
 
                 // Each way round is scored on the runs of the tone it calls space,
                 // because those are the ones that should be whole bits.
@@ -472,7 +499,7 @@ namespace RadioWebControl.Core.Services.Rtty
                     at += Math.Clamp(0.5 * (fits[peak - 1] - fits[peak + 1]) / denominator, -0.5, 0.5);
             }
 
-            var bestBaud = lowBaud * Math.Pow(1.0025, at);
+            var bestBaud = lowBaud * Math.Pow(BaudStep, at);
             var bestFit = fits[peak];
             var bIsMark = polarity[peak];
 
@@ -495,6 +522,63 @@ namespace RadioWebControl.Core.Services.Rtty
         }
 
         /// <summary>
+        /// How loud each of the two tones is while it is the one being sent, so that
+        /// they can be compared on equal terms.
+        ///
+        /// <para>Two passes, because the answer is needed before the boundaries are
+        /// known and the boundaries are what it is for. The first pass asks only
+        /// which tone is the louder at each instant, which no scaling can change the
+        /// sense of for most of a run, and takes the median of each tone's magnitude
+        /// over the samples where it won. A median, so that the edges - where both
+        /// filters are part way between one tone and the other, and which are the
+        /// samples the first pass places wrongly - cannot move it.</para>
+        ///
+        /// <para>The ratio is capped at 20 dB. Past that the quieter tone is more
+        /// likely absent than faded, and scaling noise up to meet a carrier would
+        /// manufacture keying out of nothing; capped, a signal that is not RTTY at
+        /// all goes on failing to fit, which is what the confidence is for.</para>
+        /// </summary>
+        private static (double a, double b) ToneLevels(
+            ReadOnlySpan<float> audio, int sampleRate, double toneA, double toneB, int window)
+        {
+            var a = new RttyToneMagnitude(window, toneA, sampleRate);
+            var b = new RttyToneMagnitude(window, toneB, sampleRate);
+
+            var onA = new List<double>();
+            var onB = new List<double>();
+
+            for (int i = 0; i < audio.Length; i++)
+            {
+                var magA = a.Process(audio[i]);
+                var magB = b.Process(audio[i]);
+                if (i < window) continue;
+                (magA > magB ? onA : onB).Add(magA > magB ? magA : magB);
+            }
+
+            // Neither tone can be calibrated from a handful of samples, and a tone
+            // that is hardly ever on top is not a tone. Leave both alone and let the
+            // fit say what it thinks.
+            var floor = Math.Max(16, (audio.Length - window) / 40);     // 2.5%
+            if (onA.Count < floor || onB.Count < floor) return (1, 1);
+
+            var levelA = Median(onA);
+            var levelB = Median(onB);
+            if (levelA <= 0 || levelB <= 0) return (1, 1);
+
+            var cap = Math.Pow(10, 20 / 20.0);
+            if (levelA > levelB * cap) levelA = levelB * cap;
+            if (levelB > levelA * cap) levelB = levelA * cap;
+
+            return (levelA, levelB);
+        }
+
+        private static double Median(List<double> values)
+        {
+            values.Sort();
+            return values[values.Count / 2];
+        }
+
+        /// <summary>
         /// Which peak of the scan is the speed: the <b>slowest</b> one that fits
         /// about as well as the best does, not the best.
         ///
@@ -508,26 +592,51 @@ namespace RadioWebControl.Core.Services.Rtty
         /// preferring it. Taking the best fit instead read every 50 baud weather
         /// station as 100, and read its tones the wrong way round into the bargain,
         /// because at double speed the stop element stops being half a bit.</para>
+        ///
+        /// <para>The slower candidates are looked for <b>only at exact submultiples
+        /// of the winning speed</b>, because that is the one place an alias can be.
+        /// This used to walk up from the slow end and take the first local maximum
+        /// within the slack, which is the same answer on synthetic audio and wrong
+        /// off the air: a real fit curve is rippled by noise and has a local maximum
+        /// every few steps, so the walk stopped on a ripple short of the summit. The
+        /// error was always in the same direction, which is how it showed - four
+        /// readings of a 50 baud station on 2026-10-08 came out 48.53, 48.86, 48.92
+        /// and 49.31, never once above, where synthetic audio had given 50.0 to
+        /// within half a percent.</para>
         /// </summary>
         private static int PickSpeed(double[] fits)
         {
-            var best = 0.0;
-            foreach (var fit in fits) best = Math.Max(best, fit);
-            if (best <= 0) return -1;
+            var best = 0;
+            for (int i = 1; i < fits.Length; i++)
+                if (fits[i] > fits[best]) best = i;
+            if (fits[best] <= 0) return -1;
 
-            var good = best - 0.05;     // measurement scatter, not a real difference
+            var good = fits[best] - 0.05;   // measurement scatter, not a real difference
 
-            // The first local maximum that is good enough. Scanning upwards from the
-            // slow end makes "first" and "slowest" the same thing.
-            for (int i = 0; i < fits.Length; i++)
+            // Its position is exact, so a narrow window around each submultiple is
+            // enough: wide enough to find the summit through the scatter, too narrow
+            // to wander off onto a neighbouring bump.
+            var window = (int)Math.Ceiling(Math.Log(1.015) / Math.Log(BaudStep));
+
+            // An alias sits at a whole multiple of the true speed, so the true speed
+            // sits at a whole division of this one and nowhere else is worth looking.
+            var chosen = best;
+            for (int k = 2; k <= 6; k++)
             {
-                if (fits[i] < good) continue;
-                if (i > 0 && fits[i - 1] > fits[i]) continue;
-                if (i < fits.Length - 1 && fits[i + 1] > fits[i]) continue;
-                return i;
+                var at = best - (int)Math.Round(Math.Log(k) / Math.Log(BaudStep));
+                if (at < 0) break;          // this and every slower one are off the
+                                            // bottom of the search range
+
+                var lo = Math.Max(0, at - window);
+                var hi = Math.Min(fits.Length - 1, at + window);
+                var local = lo;
+                for (int i = lo; i <= hi; i++)
+                    if (fits[i] > fits[local]) local = i;
+
+                if (fits[local] >= good && local < chosen) chosen = local;
             }
 
-            return -1;
+            return chosen;
         }
 
         /// <summary>

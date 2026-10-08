@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using RadioWebControl.Core.Services.Rtty;
 using Xunit;
 
@@ -36,6 +37,46 @@ namespace RadioWebControl.Core.Tests.Rtty
 
             if (noiseSigma > 0) AddNoise(audio, noiseSigma, seed);
             return audio;
+        }
+
+        /// <summary>
+        /// The same signal, but with one tone louder than the other - which is what
+        /// an HF signal nearly always is, and what <see cref="RttyModulator"/> has no
+        /// reason to produce. Selective fading treats the two tones as two separate
+        /// signals, because a few hundred hertz apart is exactly the scale on which
+        /// it works, so a few dB between them is the normal state of affairs rather
+        /// than a fault.
+        /// </summary>
+        private static float[] Lopsided(
+            double markHz, double shiftHz, double baud, double spaceDbLouder,
+            string text = Traffic)
+        {
+            const double markAmp = 0.4;
+            var spaceAmp = markAmp * Math.Pow(10, spaceDbLouder / 20);
+            var pulses = RttyModulator.Pulses(text, RttyFigureSet.Ita2, true, 1.5, 20, 10, true);
+
+            var perBit = Rate / baud;
+            var samples = new List<float>();
+            double phase = 0, carried = 0;
+
+            foreach (var pulse in pulses)
+            {
+                var want = pulse.Bits * perBit + carried;
+                var count = (int)Math.Round(want);
+                carried = want - count;
+
+                var step = 2 * Math.PI * (pulse.Mark ? markHz : markHz + shiftHz) / Rate;
+                var amplitude = pulse.Mark ? markAmp : spaceAmp;
+
+                for (int i = 0; i < count; i++)
+                {
+                    samples.Add((float)(amplitude * Math.Sin(phase)));
+                    phase += step;
+                    if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
+                }
+            }
+
+            return samples.ToArray();
         }
 
         /// <summary>
@@ -345,6 +386,60 @@ namespace RadioWebControl.Core.Tests.Rtty
 
             Assert.Null(RttySignalAnalyser.SnapBaud(68.3));
             Assert.Null(RttySignalAnalyser.SnapBaud(38.0));
+        }
+
+        // --- one tone louder than the other ----------------------------------
+
+        [Theory]
+        [InlineData(0.0)]
+        [InlineData(1.6)]
+        [InlineData(3.0)]
+        [InlineData(6.0)]
+        [InlineData(-1.6)]
+        [InlineData(-3.0)]
+        [InlineData(-6.0)]
+        public void A_signal_with_one_tone_louder_is_still_measured_at_its_real_speed(
+            double spaceDbLouder)
+        {
+            var got = RttySignalAnalyser.Analyse(Lopsided(2125, 450, 50.0, spaceDbLouder), Rate);
+
+            Assert.NotNull(got);
+            Hz(2125, got!.MarkHz);
+            Hz(2575, got.SpaceHz);
+
+            // Looser than the half a percent the matched case gets, and the residual
+            // is still a clean function of the imbalance - about a sixth of a percent
+            // per dB, in the direction of the louder tone. It is small enough to snap
+            // to a named speed and far smaller than a demodulator cares about.
+            Baud(50.0, got.Baud, 0.012);
+        }
+
+        [Fact]
+        public void An_unequalised_comparison_is_what_made_the_speed_read_low()
+        {
+            // The regression this guards. Before the two magnitudes were divided by
+            // their own levels, the comparison between them crossed away from the
+            // tones' midpoint: every run of the louder tone gained a constant, a
+            // constant on every run reads as a longer bit, and the speed came out
+            // low in proportion. A real station on 2026-10-08 read 48.7 to 49.2
+            // repeatably where it should have read 50, and its tones had already been
+            // measured 1.6 dB apart on the same bench.
+            //
+            // 1.6 dB used to cost 1.9% of the speed. The test above holds it to 1.2%
+            // at nearly four times the imbalance; this one states the direction, which
+            // is the part that made it findable - the error never once fell on the
+            // other side of the true speed.
+            var quiet = RttySignalAnalyser.Analyse(Lopsided(2125, 450, 50.0, 6.0), Rate);
+            var loud  = RttySignalAnalyser.Analyse(Lopsided(2125, 450, 50.0, -6.0), Rate);
+
+            Assert.NotNull(quiet);
+            Assert.NotNull(loud);
+            Assert.True(quiet!.Baud < 50.0, $"space louder should still read slightly low, got {quiet.Baud}");
+            Assert.True(loud!.Baud > 50.0, $"mark louder should still read slightly high, got {loud.Baud}");
+
+            // And both snap to the right rung, which is what the operator sees.
+            Assert.Equal(50.0, RttySignalAnalyser.SnapBaud(quiet.Baud));
+            Assert.Equal(50.0, RttySignalAnalyser.SnapBaud(loud.Baud));
         }
 
         // --- noise, and knowing when to say nothing --------------------------
