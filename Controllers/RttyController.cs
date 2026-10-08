@@ -18,16 +18,19 @@ namespace Icom_Web_Control.Controllers
     public class RttyController : ControllerBase
     {
         private readonly RttyTunerService _tuner;
+        private readonly RttyAutoService _auto;
         private readonly IRadioController _radio;
         private readonly RadioStateService _state;
         private readonly ILogger<RttyController> _logger;
 
         public RttyController(RttyTunerService tuner,
+                              RttyAutoService auto,
                               IRadioController radio,
                               RadioStateService state,
                               ILogger<RttyController> logger)
         {
             _tuner = tuner;
+            _auto = auto;
             _radio = radio;
             _state = state;
             _logger = logger;
@@ -38,6 +41,7 @@ namespace Icom_Web_Control.Controllers
             public double MarkHz  { get; set; } = RttyTunerService.DefaultMarkHz;
             public int    ShiftHz { get; set; } = RttyTunerService.DefaultShiftHz;
             public bool   Reverse { get; set; }
+            public double Baud    { get; set; } = RttyTunerService.DefaultBaud;
         }
 
         /// <summary>
@@ -56,7 +60,7 @@ namespace Icom_Web_Control.Controllers
             req ??= new StartRequest();
             try
             {
-                var error = await _tuner.StartAsync(req.MarkHz, req.ShiftHz, req.Reverse, id);
+                var error = await _tuner.StartAsync(req.MarkHz, req.ShiftHz, req.Reverse, req.Baud, id);
                 if (error != null) return BadRequest(new { error });
                 return Ok(_tuner.Frame(0, id));
             }
@@ -85,6 +89,67 @@ namespace Icom_Web_Control.Controllers
         [HttpGet("tuner")]
         public IActionResult Tuner([FromQuery] int points = 500, [FromQuery] string? client = null)
             => Ok(_tuner.Frame(Math.Clamp(points, 0, RadioWebControl.Core.Services.Rtty.RttyTuningScope.RingPoints), ClientId(client)));
+
+        /// <summary>
+        /// Listen for a few seconds and work out what is being sent: the tones, the
+        /// shift, which way round they are and the speed.
+        ///
+        /// <para>Always 200, like <c>radio-tones</c> and for the same reason - the
+        /// shared tuner uses the shape of the reply to decide whether to show the
+        /// Auto button at all, so a 404 has to mean "this app cannot do it" and
+        /// nothing else. <c>ok: false</c> with a reason means it could not hear a
+        /// signal, which is a message for the operator rather than a missing
+        /// feature.</para>
+        ///
+        /// <para>It takes about four seconds to answer, and it holds the request
+        /// open for that long rather than returning a job to poll. The browser has
+        /// one button disabled meanwhile and nothing else to do.</para>
+        /// </summary>
+        /// <summary>
+        /// A long recording of the receive audio to a WAV, for examining a signal
+        /// after the event instead of during it. Changes nothing on the radio.
+        /// </summary>
+        [HttpPost("capture")]
+        public async Task<IActionResult> Capture(double seconds = 60, string? name = null)
+        {
+            try
+            {
+                var (path, error) = await _auto.RecordAsync(
+                    seconds, name, HttpContext.RequestAborted);
+
+                return error != null
+                    ? Ok(new { ok = false, reason = error })
+                    : Ok(new { ok = true, path });
+            }
+            catch (OperationCanceledException)
+            {
+                return Ok(new { ok = false, reason = "Cancelled." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RTTY capture failed");
+                return Ok(new { ok = false, reason = ex.Message });
+            }
+        }
+
+        [HttpPost("auto")]
+        public async Task<IActionResult> Auto()
+        {
+            try
+            {
+                return Ok(await _auto.AnalyseAsync(HttpContext.RequestAborted));
+            }
+            catch (OperationCanceledException)
+            {
+                // The operator closed the dialog or the tab while it was listening.
+                return Ok(RttyAutoResult.Failed("Cancelled."));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RTTY Auto failed");
+                return Ok(RttyAutoResult.Failed(ex.Message));
+            }
+        }
 
         /// <summary>
         /// The radio's own RTTY mark and shift, for the tuner's "From radio"

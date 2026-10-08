@@ -59,6 +59,11 @@ namespace Icom_Web_Control.Services.Rtty
         public const double DefaultMarkHz  = 2125.0;
         public const int    DefaultShiftHz = 170;
 
+        /// <summary>
+        /// Amateur RTTY, and what the radio's own decoder is fixed at.
+        /// </summary>
+        public const double DefaultBaud = 45.45;
+
         private readonly ReceiveAudioHold _audio;
         private readonly RadioStateService _state;
         private readonly ILogger<RttyTunerService> _logger;
@@ -71,6 +76,13 @@ namespace Icom_Web_Control.Services.Rtty
         private double _markHz = DefaultMarkHz;
         private int _shiftHz = DefaultShiftHz;
         private bool _reverse;
+        // The scope does not use this - it is two filters and speed means nothing
+        // to it. It is held here because this is the server-side record of what the
+        // operator is listening to, and the reader that decodes it will want it. On
+        // the server rather than in the page for the reason Reader Mode's state is:
+        // a reload must not lose the one figure the operator cannot re-derive by
+        // eye. See the note on Baud in StartAsync.
+        private double _baud = DefaultBaud;
         // One per window showing the figure; the audio is held while any is.
         private readonly RttyTunerLeases _leases = new();
         private System.Threading.Timer? _timer;
@@ -106,17 +118,32 @@ namespace Icom_Web_Control.Services.Rtty
         /// The filters are shared, so a re-tone from one window moves them for
         /// every window. Returns an error for bad settings.
         /// </summary>
-        public async Task<string?> StartAsync(double markHz, int shiftHz, bool reverse, string? client = null)
+        public async Task<string?> StartAsync(double markHz, int shiftHz, bool reverse,
+                                              double baud = DefaultBaud, string? client = null)
         {
             if (markHz < 300 || markHz > 3000) return "Mark must be between 300 and 3000 Hz.";
-            // The three the IC-7300's SET > Function > RTTY Shift Width menu offers
-            // (CI-V 00 40: 00=170, 01=200, 02=425). The tuner used to accept 450 and
-            // 850 as receive-only rungs the radio could not be told about; they are
-            // gone, so every shift the tuner will run on is one the radio can follow.
-            if (shiftHz is not (170 or 200 or 425)) return "Shift must be 170, 200 or 425 Hz.";
+            // Any shift that fits in the audio, not just the three the radio's
+            // SET > Function > RTTY Shift Width menu offers (CI-V 00 40: 00=170,
+            // 01=200, 02=425).
+            //
+            // This was briefly restricted to those three, on the reasoning that a
+            // shift the radio cannot be told about is a shift the operator cannot
+            // use. That is the wrong way round, and Colin settled it on 2026-10-08:
+            // the decoder is the authority, not the radio's own. A listener meets
+            // 450 Hz on the DWD weather stations and 850 Hz on aviation circuits
+            // every day, and IWC can copy both - it is only the radio's built-in
+            // decoder that cannot, and nothing here depends on that decoder. Writing
+            // the menu is a separate request and already reports honestly when there
+            // is no rung for a figure; see RttyController.SetRadioTones.
+            if (shiftHz < 20 || shiftHz > 1200) return "Shift must be between 20 and 1200 Hz.";
             // Checked both ways round, so a later mode change cannot move space out of range.
             if (markHz + shiftHz > 3500 || markHz - shiftHz < 150)
                 return "That mark and shift put the space tone outside the audio passband.";
+            // Not used by the scope, only recorded - but recorded wrong is worse than
+            // not recorded, so it is checked like anything else. The range covers
+            // every speed a listener meets, from 45.45 to the 100 and 200 baud
+            // military and aviation circuits.
+            if (baud < 20 || baud > 300) return "Speed must be between 20 and 300 baud.";
 
             bool acquire;
             lock (_gate)
@@ -124,6 +151,7 @@ namespace Icom_Web_Control.Services.Rtty
                 _markHz = markHz;
                 _shiftHz = shiftHz;
                 _reverse = reverse;
+                _baud = baud;
                 _leases.Start(client, DateTime.UtcNow);
 
                 var (m, s) = TonesFor(_state.ModeA, _markHz, _shiftHz, _reverse);
@@ -244,6 +272,7 @@ namespace Icom_Web_Control.Services.Rtty
                 SpaceHz          = f?.SpaceHz ?? space,
                 ShiftHz          = _shiftHz,
                 Reverse          = _reverse,
+                Baud             = _baud,
                 CaptureError     = _captureError,
                 AudioDevicesOpen = _audio.Source.DeviceOpen,
             };
@@ -304,6 +333,13 @@ namespace Icom_Web_Control.Services.Rtty
         public double  SpaceHz          { get; set; }
         public int     ShiftHz          { get; set; }
         public bool    Reverse          { get; set; }
+
+        /// <summary>
+        /// The speed the operator has set, which the scope does not use. Here so
+        /// that the dialog shows the same figure after a reload, and for the reader
+        /// to pick up. See the field it comes from in RttyTunerService.
+        /// </summary>
+        public double  Baud             { get; set; }
         public string? CaptureError     { get; set; }
         public bool    AudioDevicesOpen { get; set; }
 
