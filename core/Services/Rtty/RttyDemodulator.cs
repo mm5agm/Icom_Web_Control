@@ -11,10 +11,9 @@ namespace RadioWebControl.Core.Services.Rtty
     /// looks much the same whichever it is.</para>
     ///
     /// <para><b>1. Which tone is sounding.</b> The audio is mixed down against
-    /// each tone in turn and averaged over exactly one bit time. One bit and no
-    /// longer is the matched filter for this problem - the longest window that
-    /// cannot straddle two bits, so it collects all the signal there is and the
-    /// least noise possible. The two magnitudes are subtracted and the
+    /// each tone in turn and averaged over exactly one bit time by
+    /// <see cref="RttyToneMagnitude"/>, which is where the reasoning about that
+    /// window length lives. The two magnitudes are subtracted and the
     /// <em>sign</em> of the difference is the decision. Subtracting rather than
     /// comparing against a level is what makes the decoder indifferent to signal
     /// strength: a station fading by 20 dB moves both magnitudes together and
@@ -44,8 +43,8 @@ namespace RadioWebControl.Core.Services.Rtty
     /// </summary>
     public sealed class RttyDemodulator
     {
-        private readonly Tone _mark;
-        private readonly Tone _space;
+        private readonly RttyToneMagnitude _mark;
+        private readonly RttyToneMagnitude _space;
         private readonly Ita2Decoder _decoder;
         private readonly double _samplesPerBit;
 
@@ -111,8 +110,8 @@ namespace RadioWebControl.Core.Services.Rtty
             // while behaving perfectly at 45.45.
             _activityRate = 1.0 / (_samplesPerBit * 12);
 
-            _mark = new Tone(window, markHz, sampleRate);
-            _space = new Tone(window, spaceHz, sampleRate);
+            _mark = new RttyToneMagnitude(window, markHz, sampleRate);
+            _space = new RttyToneMagnitude(window, spaceHz, sampleRate);
             _decoder = new Ita2Decoder(set, usos);
         }
 
@@ -300,57 +299,6 @@ namespace RadioWebControl.Core.Services.Rtty
             }
 
             return text?.ToString() ?? string.Empty;
-        }
-
-        /// <summary>
-        /// One tone's magnitude: mix down against it, then average over exactly
-        /// one bit time.
-        ///
-        /// <para>A plain sliding sum rather than a recursive filter, because a
-        /// bit boundary is a hard edge in time and this is the filter that
-        /// respects it. It forgets a bit the instant the bit is over, where a
-        /// recursive filter carries a little of the previous bit into the next
-        /// one for ever.</para>
-        /// </summary>
-        private sealed class Tone
-        {
-            private readonly double[] _i;
-            private readonly double[] _q;
-            private readonly double _step;
-            private double _sumI, _sumQ, _phase;
-            private int _at;
-
-            public Tone(int window, double hz, int sampleRate)
-            {
-                _i = new double[window];
-                _q = new double[window];
-                _step = 2 * Math.PI * hz / sampleRate;
-            }
-
-            public void Reset()
-            {
-                Array.Clear(_i);
-                Array.Clear(_q);
-                _sumI = _sumQ = _phase = 0;
-                _at = 0;
-            }
-
-            public double Process(float sample)
-            {
-                var i = sample * Math.Cos(_phase);
-                var q = -sample * Math.Sin(_phase);
-
-                _phase += _step;
-                if (_phase > 2 * Math.PI) _phase -= 2 * Math.PI;
-
-                _sumI += i - _i[_at];
-                _sumQ += q - _q[_at];
-                _i[_at] = i;
-                _q[_at] = q;
-                if (++_at == _i.Length) _at = 0;
-
-                return Math.Sqrt(_sumI * _sumI + _sumQ * _sumQ) / _i.Length;
-            }
         }
     }
 }

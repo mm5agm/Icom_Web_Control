@@ -1,0 +1,460 @@
+using System;
+using RadioWebControl.Core.Services.Rtty;
+using Xunit;
+
+namespace RadioWebControl.Core.Tests.Rtty
+{
+    /// <summary>
+    /// The analyser is told nothing and has to work out everything, so every test
+    /// here generates a signal whose tones and speed are known exactly and then
+    /// checks the answer that comes back. That is the only honest way to test it:
+    /// on the air there is no way to know whether the analyser was wrong or the
+    /// station was not what it was assumed to be.
+    ///
+    /// The text matters more than it looks. A bare "RYRYRY" alternates every bit
+    /// and gives the tone-duty test nothing to work with, which is why most of
+    /// these send sentences - realistic keying, with the uneven run lengths the
+    /// speed estimate actually feeds on.
+    /// </summary>
+    public class RttySignalAnalyserTests
+    {
+        private const int Rate = 48_000;
+
+        private const string Traffic =
+            "CQ CQ DE MM5AGM MM5AGM K THE WEATHER HERE IS FINE AND THE RIG IS WORKING WELL";
+
+        private static float[] Signal(
+            double markHz, double shiftHz, double baud,
+            string text = Traffic, bool reversed = false, double noiseSigma = 0, int seed = 11)
+        {
+            var spaceHz = markHz + shiftHz;
+            var audio = RttyModulator.ToAudio(
+                text, Rate,
+                reversed ? spaceHz : markHz,
+                reversed ? markHz : spaceHz,
+                baud, idleBitsBefore: 20, idleBitsAfter: 10);
+
+            if (noiseSigma > 0) AddNoise(audio, noiseSigma, seed);
+            return audio;
+        }
+
+        /// <summary>
+        /// A frequency assertion with a tolerance worth stating: six hertz.
+        ///
+        /// <para>That is what the analyser actually delivers - measured across this
+        /// whole matrix the worst tone error was 5.2 Hz, and every case but one was
+        /// inside 1.6 Hz. The outlier is a 170 Hz shift at 100 baud, which is the
+        /// hardest geometry there is: the keying clusters are at their widest and
+        /// the two tones at their closest, so each peak sits partly inside the
+        /// other.</para>
+        ///
+        /// <para>It is also comfortably good enough, which is why the tolerance is
+        /// set here rather than chased. The demodulator reads a tone through a
+        /// filter tens of hertz wide, so six hertz makes no difference whatever to
+        /// whether the text comes out; the finest distinction that matters is
+        /// telling a 425 shift from a 450, which are 25 Hz apart and have their own
+        /// test below.</para>
+        /// </summary>
+        private static void Hz(double expected, double got, double tolerance = 6.0)
+            => Assert.InRange(got, expected - tolerance, expected + tolerance);
+
+        private static void AddNoise(float[] audio, double sigma, int seed)
+        {
+            var random = new Random(seed);
+            for (int i = 0; i < audio.Length; i++)
+            {
+                var u1 = 1.0 - random.NextDouble();
+                var u2 = random.NextDouble();
+                var gauss = Math.Sqrt(-2 * Math.Log(u1)) * Math.Cos(2 * Math.PI * u2);
+                audio[i] += (float)(gauss * sigma * 0.1);
+            }
+        }
+
+        // --- the tones -------------------------------------------------------
+
+        [Fact]
+        public void An_amateur_RTTY_signal_is_measured_as_2125_and_2295_at_45_baud()
+        {
+            var got = RttySignalAnalyser.Analyse(Signal(2125, 170, 45.45), Rate);
+
+            Assert.NotNull(got);
+            Hz(2125, got!.MarkHz);
+            Hz(2295, got.SpaceHz);
+            Hz(170, got.ShiftHz);
+            Assert.Equal(45.45, got.Baud);
+        }
+
+        [Theory]
+        [InlineData(2125, 170, 45.45)]   // amateur RTTY
+        [InlineData(1275, 170, 45.45)]   // the old low tones, still met on recordings
+        [InlineData(2125, 200, 50.0)]    // some military traffic
+        [InlineData(1000, 425, 50.0)]    // weather and press
+        [InlineData(1000, 450, 50.0)]    // DDK9 and the other DWD stations
+        [InlineData(1000, 850, 75.0)]    // military, aviation, AFTN
+        [InlineData(1500, 170, 100.0)]   // fast press circuits
+        public void Every_combination_a_listener_meets_is_identified(double mark, double shift, double baud)
+        {
+            var got = RttySignalAnalyser.Analyse(Signal(mark, shift, baud), Rate);
+
+            Assert.NotNull(got);
+            Hz(mark, got!.MarkHz);
+            Assert.Equal(baud, got.Baud);
+
+            // The shift is asserted through the snap rather than raw, because that
+            // is the form the operator and the radio both see, and because the raw
+            // figure is out by 10 Hz in the 170-at-100-baud case for the reason
+            // given on Hz() - which snapping absorbs with 20 Hz to spare.
+            Assert.Equal((int)shift, RttySignalAnalyser.SnapShift(got.ShiftHz));
+        }
+
+        [Fact]
+        public void The_shift_is_measured_finely_enough_to_tell_170_from_200()
+        {
+            // 30 Hz apart, and a 4096-point window at 48 kHz is nearly 12 Hz a
+            // bin - so without the parabolic refinement of each peak these two
+            // would be two or three bins apart and could not be separated with
+            // any confidence.
+            var narrow = RttySignalAnalyser.Analyse(Signal(2125, 170, 45.45), Rate);
+            var wider = RttySignalAnalyser.Analyse(Signal(2125, 200, 45.45), Rate);
+
+            Assert.Equal(170, RttySignalAnalyser.SnapShift(narrow!.ShiftHz));
+            Assert.Equal(200, RttySignalAnalyser.SnapShift(wider!.ShiftHz));
+        }
+
+        [Fact]
+        public void A_425_shift_is_not_reported_as_450_or_the_other_way_round()
+        {
+            // The two are 6% apart and the distinction is the whole reason the
+            // DDK9 picture came out wrong at 425: the operator needs to be told
+            // which it is, so snapping has to resolve them.
+            Assert.Equal(425, RttySignalAnalyser.SnapShift(
+                RttySignalAnalyser.Analyse(Signal(1000, 425, 50), Rate)!.ShiftHz));
+
+            Assert.Equal(450, RttySignalAnalyser.SnapShift(
+                RttySignalAnalyser.Analyse(Signal(1000, 450, 50), Rate)!.ShiftHz));
+        }
+
+        [Fact]
+        public void A_shift_that_matches_nothing_standard_is_reported_as_matching_nothing()
+        {
+            // Better than silently rounding: two peaks 600 Hz apart are usually
+            // not a RTTY pair at all, and saying "nearest is 450" about them
+            // would be worse than saying nothing.
+            Assert.Null(RttySignalAnalyser.SnapShift(600));
+        }
+
+        // --- which way round -------------------------------------------------
+
+        [Fact]
+        public void A_reversed_station_is_spotted_from_which_tone_it_rests_on()
+        {
+            var got = RttySignalAnalyser.Analyse(Signal(2125, 170, 45.45, reversed: true), Rate);
+
+            Assert.NotNull(got);
+
+            // Reversed means the station idles on the *upper* tone, so mark is
+            // the higher of the two and the shift comes out negative-going.
+            Hz(2295, got!.MarkHz);
+            Hz(2125, got.SpaceHz);
+            Assert.True(got.MarkHz > got.SpaceHz);
+        }
+
+        [Fact]
+        public void The_tone_it_names_as_mark_is_the_one_that_actually_decodes()
+        {
+            // The end-to-end claim, and the only one that matters to an operator:
+            // hand the analyser's answer straight to the demodulator and the text
+            // comes out. Everything else here is measurement; this is the product.
+            foreach (var reversed in new[] { false, true })
+            {
+                var audio = Signal(2125, 170, 45.45, reversed: reversed);
+                var got = RttySignalAnalyser.Analyse(audio, Rate)!;
+
+                var decoder = new RttyDemodulator(Rate, got.MarkHz, got.SpaceHz, got.Baud);
+                var text = decoder.Feed(audio);
+
+                Assert.Contains("MM5AGM", text);
+            }
+        }
+
+        [Fact]
+        public void The_polarity_is_decided_by_a_wide_margin_and_not_a_hair()
+        {
+            // Worth pinning as a number, because the first version of this decided
+            // the polarity on a 0.01 margin - the right answer by luck - and a test
+            // that only checked the answer passed happily. The run-length test
+            // replaced it and reports about 0.63.
+            var got = RttySignalAnalyser.Analyse(Signal(2125, 170, 45.45), Rate);
+
+            Assert.True(got!.ToneMargin > 0.4,
+                $"the polarity was decided on a margin of only {got.ToneMargin:F2}");
+        }
+
+        [Fact]
+        public void A_station_with_a_one_bit_stop_element_says_it_cannot_judge_the_polarity()
+        {
+            // The documented hole, pinned so it stays documented. With a one-bit
+            // stop element every run is a whole number of bits, so nothing in the
+            // keying distinguishes mark from space and the answer is a coin toss -
+            // it comes out wrong on this sample, in fact.
+            //
+            // So the test asserts what is actually promised: the tones and the speed
+            // are right, and the margin admits the polarity is a guess. It
+            // deliberately does not assert which polarity, because that would be
+            // pinning down a coin.
+            var audio = RttyModulator.ToAudio(
+                Traffic, Rate, 2125, 2295, 45.45,
+                stopBits: 1.0, idleBitsBefore: 20, idleBitsAfter: 10);
+
+            var got = RttySignalAnalyser.Analyse(audio, Rate);
+
+            Assert.NotNull(got);
+            Hz(170, got!.ShiftHz);
+            Assert.Equal(45.45, got.Baud);
+            Assert.True(got.ToneMargin <= 0.08,
+                $"it claimed a margin of {got.ToneMargin:F2} on a polarity it cannot know");
+
+            // The other half of the promise: being unsure of the polarity must not
+            // make it unsure of what it does know.
+            Assert.True(got.Confidence > 0.7,
+                $"confidence collapsed to {got.Confidence:F2} over a polarity it was " +
+                $"not being asked about");
+        }
+
+        [Fact]
+        public void A_station_with_a_two_bit_stop_element_is_identified_apart_from_polarity()
+        {
+            var audio = RttyModulator.ToAudio(
+                Traffic, Rate, 2125, 2295, 45.45,
+                stopBits: 2.0, idleBitsBefore: 20, idleBitsAfter: 10);
+
+            var got = RttySignalAnalyser.Analyse(audio, Rate);
+
+            Assert.NotNull(got);
+            Hz(170, got!.ShiftHz);
+            Assert.Equal(45.45, got.Baud);
+            Assert.True(got.Confidence > 0.7, $"confidence {got.Confidence:F2}");
+        }
+
+        // --- the speed -------------------------------------------------------
+
+        [Theory]
+        [InlineData(45.45)]
+        [InlineData(50.0)]
+        [InlineData(75.0)]
+        [InlineData(100.0)]
+        public void The_speed_is_found_without_decoding_anything(double baud)
+        {
+            var got = RttySignalAnalyser.Analyse(Signal(2125, 170, baud), Rate);
+
+            Assert.NotNull(got);
+            Assert.Equal(baud, got!.Baud);
+            Assert.True(got.BaudFit > 0.9, $"{baud} baud fitted only {got.BaudFit:F2}");
+        }
+
+        [Fact]
+        public void A_50_baud_station_is_not_read_as_100()
+        {
+            // The trap the "slowest that fits" rule exists for: 100 baud divides
+            // a 50 baud signal perfectly, because every whole number of bits is
+            // also a whole number of half-bits. Taking the best-fitting candidate
+            // instead of the slowest adequate one reads every DWD weather station
+            // at double speed, and the text is rubbish with clean framing.
+            var got = RttySignalAnalyser.Analyse(Signal(1000, 450, 50), Rate);
+
+            Assert.Equal(50.0, got!.Baud);
+        }
+
+        [Fact]
+        public void A_100_baud_station_is_not_read_as_50()
+        {
+            // The other direction, which is what makes the rule safe rather than
+            // merely cautious: a 50 baud yardstick leaves half-bit remainders all
+            // over a 100 baud signal, so the slow candidate is rejected on its
+            // own merits and not just preferred.
+            var got = RttySignalAnalyser.Analyse(Signal(1500, 170, 100), Rate);
+
+            Assert.Equal(100.0, got!.Baud);
+        }
+
+        [Fact]
+        public void A_speed_that_was_not_offered_as_a_candidate_is_not_invented()
+        {
+            // 50 baud audio, with only 45.45 and 75 on the menu - neither a
+            // multiple of it, so neither can fit. The honest outcome is one of the
+            // two offered speeds plus a fit score that says it is wrong, not a
+            // confident 50 that was never asked about.
+            //
+            // 100 is kept off the menu deliberately: it would fit a 50 baud signal
+            // genuinely well, since every whole number of bits is also a whole
+            // number of half-bits, and a high score there would be correct rather
+            // than a fault.
+            var got = RttySignalAnalyser.Analyse(
+                Signal(2125, 170, 50), Rate, bauds: new[] { 45.45, 75.0 });
+
+            Assert.NotNull(got);
+            Assert.Contains(got!.Baud, new[] { 45.45, 75.0 });
+            Assert.True(got.BaudFit < 0.8,
+                $"a wrong speed should not fit well, but fitted {got.BaudFit:F2}");
+        }
+
+        // --- noise, and knowing when to say nothing --------------------------
+
+        [Fact]
+        public void A_signal_a_listener_would_call_good_is_identified_correctly()
+        {
+            var got = RttySignalAnalyser.Analyse(Signal(2125, 170, 45.45, noiseSigma: 0.8), Rate);
+
+            Assert.NotNull(got);
+            Hz(2125, got!.MarkHz);
+            Assert.Equal(45.45, got.Baud);
+            Assert.True(got.Confidence > 0.5, $"confidence was only {got.Confidence:F2}");
+        }
+
+        [Fact]
+        public void A_weak_but_readable_signal_is_still_identified_correctly()
+        {
+            // The same noise level the demodulator copies perfectly at, so the
+            // analyser must not be the weaker half of the pair - an Auto button
+            // that gives up before the decoder does is worse than no button.
+            var got = RttySignalAnalyser.Analyse(Signal(2125, 170, 45.45, noiseSigma: 2.0), Rate);
+
+            Assert.NotNull(got);
+            Hz(2125, got!.MarkHz);
+            Hz(170, got.ShiftHz);
+            Assert.Equal(45.45, got.Baud);
+        }
+
+        [Fact]
+        public void A_signal_well_down_in_the_noise_is_still_identified()
+        {
+            // Four times the noise of the "weak" case, and well past the point
+            // where the demodulator copies cleanly - which is the way round it
+            // should be. An Auto button is useful precisely when the operator
+            // cannot tell what they are listening to, and that is when the signal
+            // is poor.
+            var got = RttySignalAnalyser.Analyse(Signal(2125, 170, 45.45, noiseSigma: 4.0), Rate);
+
+            Assert.NotNull(got);
+            Hz(2125, got!.MarkHz);
+            Assert.Equal(45.45, got.Baud);
+            Assert.True(got.Confidence > 0.5, $"confidence was only {got.Confidence:F2}");
+        }
+
+        [Fact]
+        public void Noise_on_its_own_is_reported_with_low_confidence()
+        {
+            // It will still name two peaks - noise always has a highest bin, and
+            // refusing to answer is not better than answering with a number that
+            // says "this is a guess". What matters is that the number is low
+            // enough for a caller to act on.
+            var hiss = new float[Rate * 3];
+            AddNoise(hiss, 1.0, 5);
+
+            var got = RttySignalAnalyser.Analyse(hiss, Rate);
+
+            // Asserted as a disjunction rather than behind an if, so that it cannot
+            // start passing silently if the answer becomes null one day. It is not
+            // null today: hiss always has a highest bin, and three seconds of it
+            // scores 0.02.
+            Assert.True(got is null || got.Confidence < 0.4,
+                $"noise claimed confidence {got?.Confidence:F2} " +
+                $"({got?.MarkHz:F0}/{got?.SpaceHz:F0} Hz, {got?.Baud} baud)");
+        }
+
+        [Fact]
+        public void A_plain_carrier_is_not_mistaken_for_a_RTTY_signal()
+        {
+            // One tone, not two. A tuning carrier or a stuck transmitter, and
+            // whatever second peak gets found is noise - so the confidence has to
+            // collapse even though the strongest peak is strong.
+            var carrier = new float[Rate * 3];
+            for (int i = 0; i < carrier.Length; i++)
+                carrier[i] = (float)(0.5 * Math.Sin(2 * Math.PI * 1500 * i / Rate));
+            AddNoise(carrier, 0.3, 3);
+
+            var got = RttySignalAnalyser.Analyse(carrier, Rate);
+
+            // Today this returns null outright - a steady carrier has no keying in
+            // it, so there are not enough runs to measure. The disjunction is so
+            // that the test still means something if that changes.
+            Assert.True(got is null || got.Confidence < 0.4,
+                $"a carrier claimed confidence {got?.Confidence:F2}");
+        }
+
+        [Fact]
+        public void Silence_says_nothing_rather_than_guessing()
+        {
+            var got = RttySignalAnalyser.Analyse(new float[Rate * 2], Rate);
+
+            // Digital silence has no keying to measure, so there is nothing to
+            // report and null is what comes back.
+            Assert.True(got is null || got.Confidence < 0.2,
+                $"silence claimed confidence {got?.Confidence:F2}");
+        }
+
+        [Fact]
+        public void Too_little_audio_to_judge_is_refused_outright()
+        {
+            // A tenth of a second does not hold enough keying transitions to
+            // measure a speed from, and a confident answer from it would be a
+            // fabrication. Null is the honest return.
+            var clip = Signal(2125, 170, 45.45).AsSpan(0, 4000);
+
+            Assert.Null(RttySignalAnalyser.Analyse(clip, Rate));
+        }
+
+        // --- the search range ------------------------------------------------
+
+        [Fact]
+        public void A_tone_outside_the_search_range_is_not_found()
+        {
+            // The documented limit, pinned so it stays documented: if a tone has
+            // fallen outside the receiver's passband - which is what being badly
+            // off tune looks like - there is nothing here that can recover it.
+            var got = RttySignalAnalyser.Analyse(
+                Signal(2125, 170, 45.45), Rate, lowHz: 300, highHz: 1200);
+
+            // Both real tones are above 1200, so whatever comes back is the signal
+            // leaking over the edge of the range, and it must not look convincing.
+            Assert.True(got is null || got.Confidence < 0.4,
+                $"found {got?.MarkHz:F0}/{got?.SpaceHz:F0} Hz outside the range, " +
+                $"confidence {got?.Confidence:F2}");
+        }
+
+        [Fact]
+        public void A_narrowed_search_range_still_finds_a_signal_inside_it()
+        {
+            // The other half of the previous test: narrowing the range is useful
+            // precisely because it excludes interference, so it must not also
+            // exclude the wanted signal.
+            var got = RttySignalAnalyser.Analyse(
+                Signal(2125, 170, 45.45), Rate, lowHz: 1800, highHz: 2600);
+
+            Assert.NotNull(got);
+            Hz(2125, got!.MarkHz);
+            Hz(170, got.ShiftHz);
+        }
+
+        // --- sample rates ----------------------------------------------------
+
+        [Theory]
+        [InlineData(48000)]
+        [InlineData(44100)]
+        [InlineData(11025)]
+        [InlineData(8000)]
+        public void Any_sample_rate_a_sound_card_offers_works(int rate)
+        {
+            // 8 kHz is the awkward one: it leaves 2295 Hz only just inside the
+            // Nyquist limit, and the FFT bins are six times wider than at 48 kHz.
+            var audio = RttyModulator.ToAudio(
+                Traffic, rate, 2125, 2295, 45.45, idleBitsBefore: 20, idleBitsAfter: 10);
+
+            var got = RttySignalAnalyser.Analyse(audio, rate);
+
+            Assert.NotNull(got);
+            Hz(2125, got!.MarkHz);
+            Assert.Equal(45.45, got.Baud);
+        }
+    }
+}

@@ -1,0 +1,505 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using RadioWebControl.Core.Services.Spectrum;
+
+namespace RadioWebControl.Core.Services.Rtty
+{
+    /// <summary>What a stretch of audio looks like it is carrying.</summary>
+    /// <param name="MarkHz">The tone the signal idles on.</param>
+    /// <param name="SpaceHz">The other one. Below <paramref name="MarkHz"/> for a reversed signal.</param>
+    /// <param name="ShiftHz">
+    /// The measured separation, unrounded and not snapped to anything. Good to a
+    /// few hertz - worst measured 10 Hz, on a 170 shift at 100 baud, where the two
+    /// keying clusters nearly touch. <see cref="RttySignalAnalyser.SnapShift"/>
+    /// turns it into one of the shifts a radio understands.
+    /// </param>
+    /// <param name="Baud">The nearest of the speeds that were offered as candidates.</param>
+    /// <param name="Confidence">
+    /// How sure the analyser is that this is a RTTY signal with these tones at this
+    /// speed, 0 to 1. Below about 0.4 the answer is a guess and should be shown as
+    /// one: an empty band scores about 0.02.
+    ///
+    /// <para><b>It says nothing about which way round the tones are.</b> That is
+    /// <see cref="ToneMargin"/>, and keeping them apart is deliberate - a station
+    /// sending a one-bit stop element is identified perfectly except for its
+    /// polarity, and folding the one uncertainty into the other would either hide
+    /// it or throw away a good answer to the other question. A caller showing this
+    /// to an operator should read both.</para>
+    /// </param>
+    /// <param name="ToneMargin">
+    /// How much better the tones this way round fitted than the other way round,
+    /// from 0 to 1. Around 0.3 on a station using the usual one-and-a-half bit stop
+    /// element; near zero on one using a one or two bit stop, where nothing in the
+    /// keying distinguishes the two tones and the answer is a guess. Worth showing
+    /// the operator as a reverse button to press rather than acting on silently.
+    /// See <see cref="RttySignalAnalyser"/>.
+    /// </param>
+    /// <param name="BaudFit">
+    /// How nearly every measured tone-reversal came out a whole number of bits
+    /// long at the chosen speed, 0 to 1. The strongest part of the estimate.
+    /// </param>
+    public sealed record RttySignalEstimate(
+        double MarkHz,
+        double SpaceHz,
+        double ShiftHz,
+        double Baud,
+        double Confidence,
+        double ToneMargin,
+        double BaudFit);
+
+    /// <summary>
+    /// Listens to a few seconds of audio and works out what the signal in it is:
+    /// the two tones, which way round they are, and the speed.
+    ///
+    /// <para>The point is that a listener tuning across a band has none of that
+    /// information. On the amateur bands it is 2125/2295 at 45.45 baud and
+    /// always has been, but a short-wave listener meets 425 and 450 Hz shifts on
+    /// the weather and press stations, 850 Hz on military circuits, and 50, 75
+    /// and 100 baud alongside 45.45. Guessing by hand means six dropdown
+    /// permutations and a judgement about reverse.</para>
+    ///
+    /// <para><b>What it needs.</b> Both tones have to be inside the receiver's
+    /// audio passband and visible above the noise - roughly, if they can be seen
+    /// as two lines in a waterfall, this will find them. It needs a few seconds,
+    /// because the speed is measured from the lengths of the keying intervals and
+    /// a handful of them is not enough. It does not need the operator to be
+    /// anywhere near correctly tuned, since it searches the whole passband; being
+    /// off tune only matters once a tone falls off the edge of it.</para>
+    ///
+    /// <para><b>Two measurements.</b> The tones come from the spectrum. Which of
+    /// them is mark, and how fast the station is sending, come out together from
+    /// the lengths of the keying runs - they are one question, not two, and
+    /// answering them separately is what the first version of this got wrong.</para>
+    ///
+    /// <para><b>The tones</b> are the two strongest peaks in an averaged spectrum,
+    /// far enough apart to be a shift rather than one peak measured twice. Solid,
+    /// as long as nothing louder than the wanted signal shares the passband -
+    /// another station or a carrier will be picked in preference, and there is no
+    /// way for this to know. See <see cref="HighestPeak"/> for how each one is
+    /// pinned down to a hertz or two.</para>
+    ///
+    /// <para><b>The speed and the polarity</b> both come from one fact: a keying
+    /// run is a whole number of bits long - <em>except</em> that the stop element
+    /// is one and a <em>half</em> bits, and the stop element is always mark. So the
+    /// space runs are whole bits and the mark runs are not, and that single
+    /// asymmetry answers both questions. Measure every run; then for each candidate
+    /// speed, and for each of the two ways round the tones could be, ask how nearly
+    /// the runs of the <em>assumed space tone</em> come out a whole number of bits.
+    /// The combination that fits is the answer. A 6% speed error leaves visible
+    /// remainders on the longer runs, which is exactly the error that framing
+    /// checks are blind to; and getting the tones the wrong way round puts a stop
+    /// element into every run being measured, which wrecks the fit outright.</para>
+    ///
+    /// <para><b>The one station this cannot place</b> is the one sending a one-bit
+    /// stop element, because then every run really is a whole number of bits and
+    /// there is nothing in the keying to tell the two tones apart. Its tones and
+    /// its speed come out exactly right and its polarity is a coin toss - so what
+    /// matters is that it says so, and it does:
+    /// <see cref="RttySignalEstimate.ToneMargin"/> collapses to near zero while
+    /// <see cref="RttySignalEstimate.Confidence"/> stays high, which is the honest
+    /// description of what is and is not known.</para>
+    ///
+    /// <para><b>Why not simply ask which tone is sounding for longer.</b> Because
+    /// it does not work, which took a measurement to establish. RTTY idles on mark
+    /// and the stop element is mark, so mark ought to lead - but the common English
+    /// letters have mark-sparse ITA-2 codes (E is one mark bit in five, T likewise)
+    /// and the data bits cancel the stop element advantage almost exactly. Over a
+    /// page of plain English text mark won 50.5% of the time: a coin toss, and
+    /// getting it wrong decodes to rubbish. It survives here only as a tie-break
+    /// for the one case the run-length test cannot settle - see
+    /// <see cref="WhichIsMarkByDuty"/>.</para>
+    /// </summary>
+    public static class RttySignalAnalyser
+    {
+        /// <summary>
+        /// The speeds worth trying, slowest first - which is the order the choice
+        /// depends on. 45.45 is amateur RTTY and the figure the IC-7300's own
+        /// decoder is fixed at; 50 is most European commercial and weather
+        /// traffic, DDK9 among them; 75 and 100 turn up on press and military
+        /// circuits.
+        /// </summary>
+        public static readonly double[] StandardBauds = { 45.45, 50.0, 75.0, 100.0 };
+
+        /// <summary>
+        /// The shifts a listener meets. Offered for snapping a measurement to a
+        /// dropdown; the analyser itself never rounds to these, because a
+        /// measured 450 reported as 425 would hide the very thing the operator
+        /// asked to be told.
+        /// </summary>
+        public static readonly int[] StandardShifts = { 170, 200, 425, 450, 850 };
+
+        /// <summary>
+        /// How far either side of a peak its keying sidebands reach, for the
+        /// centroid in <see cref="HighestPeak"/>. 60 Hz covers the keying spread of
+        /// the fastest speed considered, and stays comfortably inside half of the
+        /// narrowest shift in use - 85 Hz - so the two tones' clusters cannot
+        /// overlap and pull each other's centroids together.
+        /// </summary>
+        private const double ClusterHz = 60;
+
+        /// <summary>
+        /// How far down the peak the centroid in <see cref="HighestPeak"/> reaches,
+        /// as a fraction of its height above the noise floor. See the note there:
+        /// this is what keeps the asymmetrical inter-tone energy out of the sum.
+        /// </summary>
+        private const double ClusterFloor = 0.30;
+
+        /// <summary>
+        /// How much better one way round has to fit than the other before the run
+        /// lengths are taken to have settled which tone is mark. Below this the
+        /// difference is rounding error and the weak duty-cycle tie-break is used
+        /// instead - which is the right outcome for a station sending a one or two
+        /// bit stop element, where the two really are indistinguishable.
+        /// </summary>
+        private const double PolarityMargin = 0.08;
+
+        /// <summary>
+        /// Analyse a block of audio. Null when there is nothing in it that looks
+        /// like two tones - too short, silent, or only one peak in the passband.
+        /// </summary>
+        /// <param name="audio">A few seconds. Two is thin, five is comfortable.</param>
+        /// <param name="sampleRate">Hz.</param>
+        /// <param name="lowHz">Bottom of the search range.</param>
+        /// <param name="highHz">Top of the search range.</param>
+        /// <param name="bauds">Speeds to consider, slowest first. Defaults to <see cref="StandardBauds"/>.</param>
+        public static RttySignalEstimate? Analyse(
+            ReadOnlySpan<float> audio,
+            int sampleRate,
+            double lowHz = 300,
+            double highHz = 3000,
+            IReadOnlyList<double>? bauds = null)
+        {
+            if (sampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
+            bauds ??= StandardBauds;
+            if (bauds.Count == 0) throw new ArgumentException("no candidate speeds", nameof(bauds));
+
+            // 4096 points is about 12 Hz a bin at 48 kHz, which resolves a 170 Hz
+            // shift with room to spare. A window that long holds several bits and
+            // so sees both tones at once - which is wanted here, unlike in the
+            // demodulator where the whole point is to see one bit at a time.
+            const int Window = 4096;
+            if (audio.Length < Window * 2) return null;
+
+            var spectrum = AverageSpectrum(audio, Window);
+            var binHz = (double)sampleRate / Window;
+
+            // The general level of the passband, wanted before the peaks because
+            // the centroid that locates each one subtracts it.
+            var floor = MedianLevel(spectrum, binHz, lowHz, highHz);
+
+            var first = HighestPeak(spectrum, binHz, lowHz, highHz, floor, exclude: double.NaN);
+            if (first is null) return null;
+
+            // At least 80 Hz away: closer than that and it is the skirt of the
+            // first peak, not the other tone. The narrowest shift in use is 170.
+            var second = HighestPeak(spectrum, binHz, lowHz, highHz, floor,
+                                     exclude: first.Value.hz, excludeWidthHz: 80);
+            if (second is null) return null;
+
+            var toneA = first.Value.hz;
+            var toneB = second.Value.hz;
+            var shift = Math.Abs(toneA - toneB);
+
+            // How much the two peaks stand above the general level of the
+            // passband. A signal gives tens of dB; noise alone gives a few.
+            var prominence = Clamp01(Math.Log10((first.Value.level + second.Value.level) / (2 * floor + 1e-30)) / 1.5);
+
+            var framing = Framing(audio, sampleRate, toneA, toneB, bauds);
+            if (framing is null) return null;
+
+            var (markHz, spaceHz, baud, fit, margin) = framing.Value;
+
+            // Multiplied rather than averaged: both have to be true, and a strong
+            // pair of peaks means nothing if the keying in them fits no speed on
+            // the list. The polarity margin is deliberately not a factor here -
+            // see the note on RttySignalEstimate.Confidence.
+            var confidence = prominence * fit;
+
+            return new RttySignalEstimate(markHz, spaceHz, shift, baud, confidence, margin, fit);
+        }
+
+        /// <summary>
+        /// The nearest shift in <see cref="StandardShifts"/>, or null when the
+        /// measurement is not close to any of them - which is itself worth
+        /// knowing, since it usually means the two peaks found were not a RTTY
+        /// pair at all.
+        /// </summary>
+        public static int? SnapShift(double measuredHz, double tolerance = 0.08)
+        {
+            var nearest = StandardShifts.OrderBy(s => Math.Abs(s - measuredHz)).First();
+            return Math.Abs(nearest - measuredHz) <= nearest * tolerance ? nearest : null;
+        }
+
+        /// <summary>
+        /// Magnitude spectrum averaged over as many half-overlapped Hann windows
+        /// as the audio holds. Averaging is what makes a steady tone stand out
+        /// from noise: the tone adds up in the same bin every time and the noise
+        /// does not.
+        /// </summary>
+        private static double[] AverageSpectrum(ReadOnlySpan<float> audio, int window)
+        {
+            var bins = new double[window / 2];
+            var re = new double[window];
+            var im = new double[window];
+
+            var hann = new double[window];
+            for (int i = 0; i < window; i++)
+                hann[i] = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / window);
+
+            var blocks = 0;
+            for (int at = 0; at + window <= audio.Length; at += window / 2)
+            {
+                for (int i = 0; i < window; i++)
+                {
+                    re[i] = audio[at + i] * hann[i];
+                    im[i] = 0;
+                }
+
+                Fft.Transform(re, im);
+
+                for (int i = 0; i < bins.Length; i++)
+                    bins[i] += Math.Sqrt(re[i] * re[i] + im[i] * im[i]);
+
+                blocks++;
+            }
+
+            if (blocks > 1)
+                for (int i = 0; i < bins.Length; i++) bins[i] /= blocks;
+
+            return bins;
+        }
+
+        /// <summary>
+        /// Where a tone is, to within a hertz or two.
+        ///
+        /// <para>Not simply the strongest bin. A keyed tone is not a single line:
+        /// switching it on and off at the baud rate spreads its energy into keying
+        /// sidebands either side of the carrier, and a window this long resolves
+        /// them, so the tallest bin is usually a sideband rather than the carrier
+        /// itself. Taking it at face value - even with a parabola fitted through
+        /// its neighbours - put the answer out by 3 to 6 Hz, worst at the low
+        /// sample rates where the bins are fine enough to separate the sidebands
+        /// cleanly.</para>
+        ///
+        /// <para>The sidebands are symmetrical about the carrier, which is the way
+        /// out: the centre of gravity of the cluster is the carrier even though no
+        /// single bin in it is. Hence an energy-weighted centroid, with the noise
+        /// floor subtracted first so a noise pedestal cannot drag it.</para>
+        ///
+        /// <para>The centroid is taken only over the bins near the top of the peak,
+        /// <see cref="ClusterFloor"/> of its height and above, and that is what
+        /// makes it work rather than a refinement of it. Keying a tone also throws
+        /// low-level energy into the gap between the two tones, and that energy is
+        /// <em>not</em> symmetrical about either carrier - it is all on the inner
+        /// side. A centroid over everything within a fixed span therefore pulls
+        /// both tones towards each other, which measured a 170 Hz shift as 167. Cut
+        /// the skirts off and what is left is the symmetrical part. The cut also
+        /// makes the span adapt to the signal, since a faster station's cluster is
+        /// genuinely wider; <see cref="ClusterHz"/> is only a backstop, to
+        /// guarantee the other tone can never be drawn in.</para>
+        /// </summary>
+        private static (double hz, double level)? HighestPeak(
+            double[] bins, double binHz, double lowHz, double highHz, double floor,
+            double exclude, double excludeWidthHz = 0)
+        {
+            var from = Math.Max(1, (int)Math.Ceiling(lowHz / binHz));
+            var to = Math.Min(bins.Length - 2, (int)Math.Floor(highHz / binHz));
+
+            var best = -1;
+            for (int i = from; i <= to; i++)
+            {
+                if (!double.IsNaN(exclude) && Math.Abs(i * binHz - exclude) < excludeWidthHz) continue;
+                // A local maximum, so that the shoulder of a strong peak cannot be
+                // returned as a second tone.
+                if (bins[i] < bins[i - 1] || bins[i] < bins[i + 1]) continue;
+                if (best < 0 || bins[i] > bins[best]) best = i;
+            }
+
+            if (best < 0) return null;
+
+            var span = Math.Max(1, (int)Math.Round(ClusterHz / binHz));
+            var lowBin = Math.Max(0, best - span);
+            var highBin = Math.Min(bins.Length - 1, best + span);
+            var cut = (bins[best] - floor) * ClusterFloor;
+
+            double weighted = 0, weight = 0;
+            for (int i = lowBin; i <= highBin; i++)
+            {
+                var above = bins[i] - floor;
+                if (above <= cut) continue;
+
+                // Energy rather than magnitude: it is the squared quantity that is
+                // distributed symmetrically about the carrier.
+                var w = above * above;
+                weighted += i * w;
+                weight += w;
+            }
+
+            var at = weight > 0 ? weighted / weight : best;
+            return (at * binHz, bins[best]);
+        }
+
+        private static double MedianLevel(double[] bins, double binHz, double lowHz, double highHz)
+        {
+            var from = Math.Max(1, (int)Math.Ceiling(lowHz / binHz));
+            var to = Math.Min(bins.Length - 1, (int)Math.Floor(highHz / binHz));
+            if (to <= from) return 1e-30;
+
+            var slice = new double[to - from + 1];
+            Array.Copy(bins, from, slice, 0, slice.Length);
+            Array.Sort(slice);
+            return Math.Max(slice[slice.Length / 2], 1e-30);
+        }
+
+        /// <summary>
+        /// The speed and which tone is mark, together, from the run lengths. Null
+        /// when there is not enough keying in the audio to judge either.
+        /// </summary>
+        private static (double markHz, double spaceHz, double baud, double fit, double margin)?
+            Framing(ReadOnlySpan<float> audio, int sampleRate, double toneA, double toneB,
+                    IReadOnlyList<double> bauds)
+        {
+            var slowest = bauds.Min();
+            var fastest = bauds.Max();
+
+            // One bit at the fastest speed being considered, so the filter cannot
+            // smear two bits together whatever the signal turns out to be. The
+            // speed is not known yet, which is why this cannot use a bit time.
+            var window = Math.Max(8, (int)(sampleRate / fastest));
+
+            var a = new RttyToneMagnitude(window, toneA, sampleRate);
+            var b = new RttyToneMagnitude(window, toneB, sampleRate);
+
+            // A space run is a start element plus however many of the five data
+            // bits are space, so between one and six bits. Anything shorter than a
+            // third of the fastest candidate bit is a noise glitch rather than an
+            // element, and anything longer than eight slow bits is an idle line or
+            // a gap between transmissions rather than part of a character.
+            var shortest = sampleRate / fastest / 3.0;
+            var longest = sampleRate / slowest * 8.0;
+
+            var runsA = new List<double>();     // runs during which tone A was on top
+            var runsB = new List<double>();
+            var onA = true;
+            long since = 0;
+
+            for (int i = 0; i < audio.Length; i++)
+            {
+                var difference = a.Process(audio[i]) - b.Process(audio[i]);
+                if (i < window) continue;
+
+                since++;
+                var nowA = difference > 0;
+                if (nowA == onA) continue;
+
+                if (since >= shortest && since <= longest)
+                    (onA ? runsA : runsB).Add(since);
+
+                onA = nowA;
+                since = 0;
+            }
+
+            if (runsA.Count < 8 || runsB.Count < 8) return null;
+
+            double bestBaud = 0, bestFit = 0, bestOther = 0;
+            var bIsMark = false;
+
+            foreach (var baud in bauds.OrderBy(x => x))      // slowest first
+            {
+                var bit = sampleRate / baud;
+
+                // Each way round is scored on the runs of the tone it calls space,
+                // because those are the ones that should be whole bits.
+                var aMark = FitToWholeBits(runsB, bit);
+                var bMark = FitToWholeBits(runsA, bit);
+
+                var fit = Math.Max(aMark, bMark);
+                var other = Math.Min(aMark, bMark);
+
+                // The slowest candidate that fits well wins, so a later and better
+                // fitting one has to be clearly better to displace it - 0.05 being
+                // measurement scatter rather than a real difference.
+                //
+                // That rule is not caution, it is necessary: a bit period half the
+                // true one divides everything exactly too, since every whole number
+                // of bits is also a whole number of half-bits. It does not go the
+                // other way - a 50 baud yardstick leaves half-bit remainders all
+                // over a 100 baud signal - so the slow candidate is rejected on its
+                // own merits wherever it is genuinely wrong. Taking the best fit
+                // instead would read every 50 baud weather station as 100, and read
+                // its tones the wrong way round into the bargain, because at double
+                // speed the stop element stops being half a bit.
+                if (bestBaud == 0 || fit > bestFit + 0.05)
+                {
+                    bestBaud = baud;
+                    bestFit = fit;
+                    bestOther = other;
+                    bIsMark = bMark > aMark;
+                }
+            }
+
+            // How much better the winning polarity fitted than the other one. On a
+            // station using a one or two bit stop element the two come out the same,
+            // because then every run is a whole number of bits and the asymmetry
+            // this rests on is simply absent - so fall back to the duty cycle, weak
+            // as it is, rather than pick a polarity by rounding error.
+            var margin = bestFit <= 0 ? 0 : (bestFit - bestOther) / bestFit;
+            if (margin < PolarityMargin)
+            {
+                var duty = WhichIsMarkByDuty(runsA, runsB);
+                bIsMark = duty.bIsMark;
+                margin = Math.Min(duty.margin, PolarityMargin);   // claims no more than it has
+            }
+
+            return bIsMark
+                ? (toneB, toneA, bestBaud, bestFit, margin)
+                : (toneA, toneB, bestBaud, bestFit, margin);
+        }
+
+        /// <summary>
+        /// Which tone is mark, by which is on the air for longer. The tie-break of
+        /// last resort: see the note on the class about why it is nearly useless on
+        /// plain text, and why it is still worth having for the station whose run
+        /// lengths cannot decide. True when tone B is mark.
+        /// </summary>
+        private static (bool bIsMark, double margin) WhichIsMarkByDuty(
+            List<double> runsA, List<double> runsB)
+        {
+            var onA = runsA.Sum();
+            var onB = runsB.Sum();
+            var total = onA + onB;
+            if (total <= 0) return (false, 0);
+
+            return (onB > onA, Math.Abs(onA - onB) / total);
+        }
+
+        /// <summary>
+        /// How nearly every run is a whole number of bits long: 1 for a perfect
+        /// fit, 0 for no relationship at all. Weighted by length, because a 6%
+        /// speed error shows up on a six-bit run and is lost in the noise on a
+        /// one-bit one.
+        /// </summary>
+        private static double FitToWholeBits(List<double> runs, double bit)
+        {
+            double weighted = 0, weight = 0;
+
+            foreach (var run in runs)
+            {
+                var bits = run / bit;
+                if (bits < 0.5 || bits > 13) continue;
+
+                var error = Math.Abs(bits - Math.Round(bits));
+
+                // Half a bit out is as wrong as it is possible to be, so scale to
+                // that and the score runs over the full range.
+                weighted += bits * (1 - Math.Min(error, 0.5) / 0.5);
+                weight += bits;
+            }
+
+            return weight == 0 ? 0 : weighted / weight;
+        }
+
+        private static double Clamp01(double x) => double.IsNaN(x) ? 0 : Math.Clamp(x, 0, 1);
+    }
+}
