@@ -384,9 +384,20 @@ export class RttyTuner {
                 return;
             }
 
+            // The recognised figure where there is one, the raw measurement
+            // where there is not - and then the same numbers are what the status
+            // line reports, so the operator is never told two things about one
+            // result. Measuring a 50 baud station at 50.65 is a 1.3% error, not a
+            // discovery: SnapBaud's tolerance is the analyser saying it knows
+            // which speed that is, and showing "50.65 measured" would claim it
+            // had found an odd one. The measured figure still wins whenever
+            // nothing on the list fits, which is the case the label is for.
+            const shiftHz = r.snappedShiftHz ?? r.shiftHz;
+            const baudHz  = r.snappedBaud    ?? r.baud;
+
             this._settings.markHz  = Math.round(r.markHz);
-            this._settings.shiftHz = r.shiftHz;
-            this._settings.baud    = r.baud;
+            this._settings.shiftHz = shiftHz;
+            this._settings.baud    = baudHz;
             this._settings.reverse = !!r.reverse;
             this._showSettings();
             this._saveSettings();
@@ -407,8 +418,8 @@ export class RttyTuner {
             this._pushQuiet = true;
             try { await this._pushToRadio(); } finally { this._pushQuiet = false; }
 
-            const shift = r.snappedShiftHz == null ? `${r.shiftHz} Hz measured` : `${r.shiftHz} Hz`;
-            const baud  = r.snappedBaud   == null ? `${r.baud} baud measured`  : `${r.baud} baud`;
+            const shift = r.snappedShiftHz == null ? `${shiftHz} Hz measured` : `${shiftHz} Hz`;
+            const baud  = r.snappedBaud    == null ? `${baudHz} baud measured`  : `${baudHz} baud`;
             const parts = [`mark ${Math.round(r.markHz)} Hz`, `shift ${shift}`, baud];
             if (r.reverse) parts.push('reversed');
 
