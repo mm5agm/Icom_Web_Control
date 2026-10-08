@@ -457,6 +457,11 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>(
 // couple of seconds after the last poll.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyTunerService>();
 
+// The tuner's Auto button: four seconds of audio through Core's signal
+// analyser, on demand. It takes its own audio hold, so it works whether or
+// not the scope is running.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyAutoService>();
+
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and
 // the file sink captures Information+ globally so we can read what happened
