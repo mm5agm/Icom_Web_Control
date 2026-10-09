@@ -3306,12 +3306,13 @@ wrong answer would do the most harm — it would overwrite the settings you had 
 leave you nothing to go back to. So pressing it on an empty band, on SSB, or on a
 data mode that is not RTTY costs you nothing but the four seconds.
 
-There are two different kinds of doubt, and the status line distinguishes them
+There are three different kinds of doubt, and the status line distinguishes them
 because they call for different things:
 
 | What it says | What to do |
 |---|---|
 | It could not make sense of it | Nothing was changed. Tune the signal in better, narrow the IF, and try again. If it keeps refusing, what you are hearing is probably not RTTY — PSK and the FT modes will never satisfy it. |
+| It says **only one of the two tones was in range** | Nothing was changed. You are tuned so far off that one tone has fallen outside the audio the measurement works in, so there is no pair to measure. If it moved the dial towards the signal, press **Auto** again and it will measure it properly; otherwise tune closer first. |
 | It gives you figures, and adds that **which tone is mark is a guess** | The speed and both tones are measured; only which of the two is mark is uncertain. Try it, and if the text does not come out, tick **Rev**. |
 | It gives you figures with no warning | Use them. |
 
@@ -3324,6 +3325,17 @@ because they call for different things:
 > station that sends a one-bit stop element instead is still measured correctly for
 > speed, but the asymmetry it leans on is then simply absent, and that is the case
 > where it warns you about mark.
+
+> **Why one tone out of range gets its own answer.** It is the one failure that
+> does not look like one. With both tones present, a signal Auto cannot read
+> gives a low score and is refused. With only one tone present, it measures that
+> tone against the loudest thing left beside it — which is a piece of the same
+> tone's own skirt — and the keying in it fits a speed beautifully, so the answer
+> comes back *confident* and wrong: on the bench a true 450 Hz shift at 50 baud
+> was reported as 115 Hz at 100 baud, and scored 0.92 out of 1. It used to
+> overwrite your shift and speed with that. It no longer writes anything at all
+> in this case, and says which case it is, because the dial correction it makes
+> from the tone it can hear is usually enough that a second press gets it right.
 
 Auto measures rather than choosing from a list, so a station on no standard shift
 or speed is reported as it is, shown in the box labelled *measured*, and used

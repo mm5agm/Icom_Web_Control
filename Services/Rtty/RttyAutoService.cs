@@ -415,10 +415,15 @@ namespace Icom_Web_Control.Services.Rtty
             _logger.LogInformation(
                 "RTTY Auto: mark {Mark:F0} Hz, space {Space:F0} Hz, shift {Shift} Hz, " +
                 "{Baud:F2} baud, {Rev}, confidence {Conf:F2}, tone margin {Margin:F2}, " +
-                "halves agreed {Agreement:F2}",
+                "halves agreed {Agreement:F2}, peaks {Balance:F1} dB apart{Fragment}",
                 got.MarkHz, got.SpaceHz, shift, got.Baud,
                 reverse ? "reversed" : "normal", got.Confidence, got.ToneMargin,
-                got.Agreement);
+                got.Agreement, got.ToneBalanceDb,
+                got.MeasuredAFragment
+                    ? got.AtScanEdge
+                        ? " - HALF A SIGNAL (a tone is outside the scanned range)"
+                        : " - HALF A SIGNAL (the second peak is not the other tone)"
+                    : "");
 
             return new RttyAutoResult
             {
@@ -434,6 +439,10 @@ namespace Icom_Web_Control.Services.Rtty
                 Confidence      = Math.Round(got.Confidence, 2),
                 ToneMargin      = Math.Round(got.ToneMargin, 2),
                 Agreement       = Math.Round(got.Agreement, 2),
+                ToneBalanceDb   = double.IsInfinity(got.ToneBalanceDb)
+                                      ? 99
+                                      : Math.Round(got.ToneBalanceDb, 1),
+                HalfSignal      = got.MeasuredAFragment,
                 Advice          = Advisories(),
             };
         }
@@ -658,6 +667,28 @@ namespace Icom_Web_Control.Services.Rtty
         /// which tone is mark. Near zero means "try Rev if it does not copy".
         /// </summary>
         public double ToneMargin { get; set; }
+
+        /// <summary>
+        /// How far the weaker of the two peaks sat below the stronger, in dB. A
+        /// matched pair comes out within a few dB; a large figure means the second
+        /// peak was not the other tone. Capped at 99 so the field is always a
+        /// number the browser can print.
+        /// </summary>
+        public double ToneBalanceDb { get; set; }
+
+        /// <summary>
+        /// True when the analyser measured a fragment rather than a tone pair -
+        /// one tone outside the range it scans, or a second peak far too weak to
+        /// be the other half of a keyed signal.
+        ///
+        /// <para><b>The dial move that went with it still stands, and the shift
+        /// and the speed must not be written anywhere.</b> See
+        /// <see cref="RttySignalEstimate.MeasuredAFragment"/>: the loud tone is
+        /// real, so the correction computed from it moves the signal towards the
+        /// middle of the passband and a second press measures it properly, but the
+        /// figures reported alongside it are wrong and confident.</para>
+        /// </summary>
+        public bool HalfSignal { get; set; }
 
         /// <summary>
         /// How nearly the first and second halves of the capture measured the same
