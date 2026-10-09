@@ -48,6 +48,8 @@ namespace Icom_Web_Control.Services.Rtty
 
         private readonly ReceiveAudioHold _audio;
         private readonly RadioStateService _state;
+        private readonly IRadioController _radio;
+        private readonly ISettingsService _settings;
         private readonly ILogger<RttyAutoService> _logger;
 
         // One analysis at a time. Two at once would both be correct - they would
@@ -58,17 +60,28 @@ namespace Icom_Web_Control.Services.Rtty
 
         public RttyAutoService(ReceiveAudioHold audio,
                                RadioStateService state,
+                               IRadioController radio,
+                               ISettingsService settings,
                                ILogger<RttyAutoService> logger)
         {
             _audio = audio;
             _state = state;
+            _radio = radio;
+            _settings = settings;
             _logger = logger;
         }
 
         /// <summary>Whether an analysis is running, for the button's state.</summary>
         public bool IsBusy => _one.CurrentCount == 0;
 
-        public async Task<RttyAutoResult> AnalyseAsync(CancellationToken ct = default)
+        /// <param name="wantedMarkHz">
+        /// Where the tuner's mark filter is, for the centring in
+        /// <see cref="CentreAsync"/>. Null leaves the radio alone - which is what
+        /// a caller that does not know gets, because moving an operator's VFO
+        /// towards a guess would be worse than not moving it.
+        /// </param>
+        public async Task<RttyAutoResult> AnalyseAsync(double? wantedMarkHz = null,
+                                                       CancellationToken ct = default)
         {
             if (!await _one.WaitAsync(0, ct))
                 return RttyAutoResult.Failed("Already listening - wait for that to finish.");
@@ -117,7 +130,13 @@ namespace Icom_Web_Control.Services.Rtty
                         Advisories());
                 }
 
-                return Describe(checkd.Estimate);
+                var result = Describe(checkd.Estimate);
+
+                // Inside the semaphore, so two presses cannot both decide to move
+                // the same radio, and after Describe so the figures reported are
+                // the ones the decision was taken on.
+                await CentreAsync(result, wantedMarkHz, ct);
+                return result;
             }
             finally
             {
@@ -419,6 +438,108 @@ namespace Icom_Web_Control.Services.Rtty
             };
         }
 
+        // ---- putting the signal where the filters are --------------------
+
+        /// <summary>
+        /// Move the dial so that the mark tone just measured arrives on the mark
+        /// the tuner's filters are sitting on, and record on
+        /// <paramref name="result"/> what was done.
+        ///
+        /// <para><b>Why the radio moves rather than the filters.</b> Until this,
+        /// a confident Auto answer moved the tuner's mark to wherever the signal
+        /// happened to be, which draws a good figure and leaves the station
+        /// off-centre in the IF. That is where the bench session of 2026-10-08
+        /// went wrong: with the dial 350 Hz out, the tone separation came back
+        /// right on every press and the speed on three presses in eight, because
+        /// a tone pair sitting on the slope of the filter arrives with one tone
+        /// attenuated, and keying whose two halves differ in amplitude cannot be
+        /// timed. Moving the receiver instead puts the signal in the middle of
+        /// the operator's filter, where everything downstream - the figure, the
+        /// speed, a decoder - gets the signal it was designed for.</para>
+        ///
+        /// <para><b>What it will not do.</b> The arithmetic, the distance limit
+        /// and the confidence floor are all <see cref="RttyMarkCentre"/>'s, and
+        /// the mode test is too: only the radio's own FSK modes qualify, because
+        /// an operator in an AFSK mode is running their own software with its own
+        /// tuning indicator and their own idea of where the dial belongs. On top
+        /// of that this reads the VFO back from the radio rather than trusting the
+        /// cached frequency - the poll is six or seven times a second and the
+        /// operator may have turned the knob since - and it refuses while the
+        /// radio is transmitting, because retuning a transmitter mid-transmission
+        /// is not something software should do on its own initiative.</para>
+        /// </summary>
+        private async Task CentreAsync(RttyAutoResult result, double? wantedMarkHz,
+                                       CancellationToken ct)
+        {
+            if (wantedMarkHz is not { } wanted || wanted <= 0) return;
+
+            var settings = await _settings.GetSettingsAsync();
+            if (!settings.RttyAutoCentreMark) return;
+
+            if (RttyMarkCentre.SidebandForFskMode(result.Mode) is not { } lowerSideband)
+            {
+                // Not logged as a refusal. The mode advisory has already told the
+                // operator that the radio is not in RTTY, which is the useful
+                // half, and an AFSK operator has not asked for this at all.
+                return;
+            }
+
+            if (!_radio.IsConnected || _state.IsTransmitting) return;
+
+            var offset = RttyMarkCentre.ComputeOffsetHz(
+                measuredMarkHz: result.MarkHz,
+                wantedMarkHz:   wanted,
+                lowerSideband:  lowerSideband,
+                confidence:     result.Confidence);
+            if (offset is null)
+            {
+                _logger.LogInformation(
+                    "RTTY Auto: mark {Measured:F0} Hz against {Wanted:F0} Hz wanted, " +
+                    "confidence {Conf:F2} - dial left alone",
+                    result.MarkHz, wanted, result.Confidence);
+                return;
+            }
+
+            try
+            {
+                // Read, do not assume. The cached frequency is from the poll loop
+                // and this is about to be written back as an absolute figure, so a
+                // stale value here would not be a stale display - it would move the
+                // radio somewhere it has already been.
+                long from = await _radio.GetFrequencyHzAsync(RadioVfo.A, ct);
+                if (from <= 0) return;
+
+                long to = from + offset.Value;
+                await _radio.SetFrequencyHzAsync(RadioVfo.A, to, ct);
+                _state.FrequencyA = to;
+
+                result.CentreOffsetHz = offset.Value;
+                result.FrequencyHz    = to;
+                result.MeasuredMarkHz = result.MarkHz;
+
+                // The mark the caller is told about is now the one the signal will
+                // arrive on, not the one it arrived on, because that is what the
+                // tuner's filters should be set to - and the figure is redrawn from
+                // this number a moment later. MeasuredMarkHz keeps the other half,
+                // for the sentence the operator reads.
+                result.MarkHz  = Math.Round(wanted, 1);
+                result.SpaceHz = Math.Round(
+                    RttyTunerService.TonesFor(result.Mode, wanted, result.ShiftHz, result.Reverse).SpaceHz, 1);
+
+                _logger.LogInformation(
+                    "RTTY Auto: mark heard at {Measured:F0} Hz, wanted {Wanted:F0} Hz - " +
+                    "moved VFO A {Offset:+#;-#;0} Hz, {From} to {To}",
+                    result.MeasuredMarkHz, wanted, offset.Value, from, to);
+            }
+            catch (Exception ex)
+            {
+                // The measurement is still worth having, so this is reported and
+                // swallowed rather than thrown: the operator gets the figures and
+                // an unmoved dial, which is the state they were already in.
+                _logger.LogWarning(ex, "RTTY Auto: could not move the VFO");
+            }
+        }
+
         /// <summary>
         /// Any shift wider than the IF filter is simply not in the audio, so a
         /// narrow filter makes Auto confidently right about a pair of tones that is
@@ -525,6 +646,28 @@ namespace Icom_Web_Control.Services.Rtty
         /// reports a narrow IF filter.
         /// </summary>
         public string? Advice { get; set; }
+
+        /// <summary>
+        /// How far the dial was moved to bring the measured mark onto the tuner's
+        /// mark, or null when it was not moved - which is the ordinary case, and
+        /// includes every reason for not moving it. Null and zero are different
+        /// answers here: a dial that did not move and a dial that moved by nothing
+        /// look identical on the radio, but only one of them is worth telling the
+        /// operator about.
+        /// </summary>
+        public double? CentreOffsetHz { get; set; }
+
+        /// <summary>Where the dial ended up, in Hz. Null when nothing moved.</summary>
+        public long? FrequencyHz { get; set; }
+
+        /// <summary>
+        /// Where the mark was actually heard, before the move. Null when nothing
+        /// moved, in which case <see cref="MarkHz"/> is both. These are separate
+        /// because after a move the two are different and the operator is owed
+        /// both: the one their filters are now on, and the one that explains why
+        /// their radio just retuned itself.
+        /// </summary>
+        public double? MeasuredMarkHz { get; set; }
 
         public static RttyAutoResult Failed(string reason, string? advice = null) =>
             new() { Ok = false, Reason = reason, Advice = advice };

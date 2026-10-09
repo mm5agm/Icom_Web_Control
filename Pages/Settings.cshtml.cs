@@ -216,6 +216,8 @@ namespace Icom_Web_Control.Pages
                 current.CwAudioDeviceName = (Settings.CwAudioDeviceName ?? "").Trim();
                 current.CwReaderFilterHz  = Math.Clamp(Settings.CwReaderFilterHz, 50, 1000);
                 current.CwReaderUseApf    = Settings.CwReaderUseApf;
+                current.RttyTunerSetMode   = Settings.RttyTunerSetMode;
+                current.RttyAutoCentreMark = Settings.RttyAutoCentreMark;
 
                 // DX cluster settings — copy through. Normalise callsign to upper case.
                 current.DxClusterEnabled         = Settings.DxClusterEnabled;

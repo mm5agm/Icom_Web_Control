@@ -91,21 +91,6 @@ namespace Icom_Web_Control.Controllers
             => Ok(_tuner.Frame(Math.Clamp(points, 0, RadioWebControl.Core.Services.Rtty.RttyTuningScope.RingPoints), ClientId(client)));
 
         /// <summary>
-        /// Listen for a few seconds and work out what is being sent: the tones, the
-        /// shift, which way round they are and the speed.
-        ///
-        /// <para>Always 200, like <c>radio-tones</c> and for the same reason - the
-        /// shared tuner uses the shape of the reply to decide whether to show the
-        /// Auto button at all, so a 404 has to mean "this app cannot do it" and
-        /// nothing else. <c>ok: false</c> with a reason means it could not hear a
-        /// signal, which is a message for the operator rather than a missing
-        /// feature.</para>
-        ///
-        /// <para>It takes about four seconds to answer, and it holds the request
-        /// open for that long rather than returning a job to poll. The browser has
-        /// one button disabled meanwhile and nothing else to do.</para>
-        /// </summary>
-        /// <summary>
         /// A long recording of the receive audio to a WAV, for examining a signal
         /// after the event instead of during it. Changes nothing on the radio.
         /// </summary>
@@ -132,12 +117,36 @@ namespace Icom_Web_Control.Controllers
             }
         }
 
+        /// <summary>
+        /// Listen for a few seconds and work out what is being sent: the tones, the
+        /// shift, which way round they are and the speed.
+        ///
+        /// <para>Always 200, like <c>radio-tones</c> and for the same reason - the
+        /// shared tuner uses the shape of the reply to decide whether to show the
+        /// Auto button at all, so a 404 has to mean "this app cannot do it" and
+        /// nothing else. <c>ok: false</c> with a reason means it could not hear a
+        /// signal, which is a message for the operator rather than a missing
+        /// feature.</para>
+        ///
+        /// <para>It takes about four seconds to answer, and it holds the request
+        /// open for that long rather than returning a job to poll. The browser has
+        /// one button disabled meanwhile and nothing else to do.</para>
+        /// </summary>
+        ///
+        /// <param name="body">
+        /// Optionally where the tuner's mark filter is, so that a confident answer
+        /// can move the dial to bring the signal onto it. Optional because the
+        /// mark is the dialog's own setting and the dialog is the authority on it -
+        /// the server's copy is only as fresh as the last start - and because a
+        /// request that does not say must leave the radio alone rather than centre
+        /// on a default the operator may have changed.
+        /// </param>
         [HttpPost("auto")]
-        public async Task<IActionResult> Auto()
+        public async Task<IActionResult> Auto([FromBody] AutoRequest? body = null)
         {
             try
             {
-                return Ok(await _auto.AnalyseAsync(HttpContext.RequestAborted));
+                return Ok(await _auto.AnalyseAsync(body?.MarkHz, HttpContext.RequestAborted));
             }
             catch (OperationCanceledException)
             {
@@ -250,4 +259,12 @@ namespace Icom_Web_Control.Controllers
             }
         }
     }
+
+    /// <summary>
+    /// What the browser sends with an Auto request. A record with one optional
+    /// field rather than a query parameter, so that the shared tuner can send it
+    /// to an app that does not read it yet without the request failing.
+    /// </summary>
+    /// <param name="MarkHz">The tuner's mark, in audio Hz.</param>
+    public sealed record AutoRequest(double? MarkHz);
 }

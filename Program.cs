@@ -457,6 +457,11 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>(
 // couple of seconds after the last poll.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyTunerService>();
 
+// The tuner needs the radio in a mode that can carry a tone pair, and puts the
+// mode and filter back when it stops. A singleton because the record of what
+// the operator was in has to outlive their browser tab.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyTunerModeService>();
+
 // The tuner's Auto button: four seconds of audio through Core's signal
 // analyser, on demand. It takes its own audio hold, so it works whether or
 // not the scope is running.
