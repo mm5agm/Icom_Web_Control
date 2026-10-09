@@ -642,9 +642,9 @@
                                 title="Open CW send - type a line, press Enter, the radio keys it"
                                 onclick="window.cwSendOpen ? window.cwSendOpen() : (window.cwSendPanel && window.cwSendPanel.toggle())">CW Send</button>
                         <button id="rttyTunerOpenBtn" class="btn btn-sm ms-1 btn-outline-secondary"
-                                aria-label="RTTY tuner - crossed-ellipse tuning scope"
-                                title="Open the RTTY tuner - mark and space filters on an X-Y scope; tune for the cross"
-                                onclick="window.rttyTunerOpen && window.rttyTunerOpen()">RTTY Tune</button>
+                                aria-label="RTTY panel - tuning scope and reader"
+                                title="Open the RTTY panel - tune for the cross on the X-Y scope, and read the decoded text"
+                                onclick="window.rttyTunerOpen && window.rttyTunerOpen()">RTTY</button>
                         <button class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="FM repeater controls"
                                 title="Open FM repeater controls panel"
@@ -2067,6 +2067,7 @@
         import { AudioFilterPanel }     from "/js/ui/audio-filter-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwReaderPanel }        from "/js/cw/cw-reader-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { RttyTuner }            from "/js/rtty/rtty-tuner.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { RttyReader }           from "/js/rtty/rtty-reader.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwQsoForm }            from "/js/cw/cw-qso-form.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwSendPanel }          from "/js/ui/cw-send-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         window.bandPlanData = BAND_PLANS;
@@ -2786,6 +2787,11 @@
             // dropped request costs one frame of the figure.
             window.rttyTuner = new RttyTuner();
             window.rttyTuner.init();
+            // The reader shares the panel and takes its settings from the
+            // tuner, so there is nothing to wire between the two here. It
+            // follows the dialog being open by itself - see _followDialog -
+            // which is why it needs no entry in the pop-out below either.
+            window.rttyReader = new RttyReader().init();
             // The tuner can live in a window of its own (/RttyTuner) too. Each
             // window holds the radio's audio under its own lease, so popping
             // out - which closes the dialog here - does not stop the figure.
@@ -2794,20 +2800,23 @@
                 // Reattach gives the dialog the size the window was left at.
                 takeSize: true,
                 url: '/RttyTuner',
-                defaultSize: { width: 380, height: 520 },
+                // Two columns' worth: the decode text needs the width, and
+                // the operator can still drag it narrow, where the panel
+                // folds into one column on its own.
+                defaultSize: { width: 900, height: 640 },
                 dialog: () => document.getElementById('rttyTunerDialog'),
                 openButton: document.getElementById('rttyTunerOpenBtn'),
                 popoutButton: document.getElementById('rttyTunerPopoutBtn'),
                 show: () => window.rttyTuner.toggle(),
                 closedLabel: {
-                    text: 'RTTY Tune',
-                    title: 'Open the RTTY tuner - mark and space filters on an X-Y scope; tune for the cross',
-                    aria: 'RTTY tuner - crossed-ellipse tuning scope',
+                    text: 'RTTY',
+                    title: 'Open the RTTY panel - tune for the cross on the X-Y scope, and read the decoded text',
+                    aria: 'RTTY panel - tuning scope and reader',
                 },
                 openLabel: {
-                    text: 'RTTY Tune (pop-out)',
-                    title: 'The RTTY tuner is in its own window - click to bring it to the front',
-                    aria: 'RTTY tuner is in a pop-out window - bring it to the front',
+                    text: 'RTTY (pop-out)',
+                    title: 'The RTTY panel is in its own window - click to bring it to the front',
+                    aria: 'RTTY panel is in a pop-out window - bring it to the front',
                 },
             }).open;
 
@@ -2876,7 +2885,7 @@
             const modePanelGuards = [
                 guardFor('CW reader', 'cwReaderDialog', 'cwReaderOpenBtn',
                          m => m.startsWith('CW')),
-                guardFor('RTTY tuner', 'rttyTunerDialog', 'rttyTunerOpenBtn',
+                guardFor('RTTY panel', 'rttyTunerDialog', 'rttyTunerOpenBtn',
                          m => m.startsWith('RTTY') || m.startsWith('DATA') || m === 'LSB' || m === 'USB'),
             ];
             modePanelGuards.forEach(g => g.setMode('@Model.RadioState.ModeA'));

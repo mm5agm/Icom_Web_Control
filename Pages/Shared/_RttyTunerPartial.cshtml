@@ -1,31 +1,67 @@
 @model bool
 @{
-    // The RTTY tuner's markup and CSS, shared by the main page's floating
-    // dialog and the /RttyTuner pop-out window. RttyTuner (core) finds its
-    // elements by these ids, so both pages run the same tuner code.
+    // The RTTY panel's markup and CSS, shared by the main page's floating
+    // dialog and the /RttyTuner pop-out window. Three sections in one panel:
+    // Tune (the crossed-ellipse scope), Decode (the reader) and Send.
+    //
+    // One panel rather than three, and it is not only about screen space. The
+    // reader has no Mark, Shift, Speed or Rev of its own - the server reads
+    // them from the tuner - so tuning the cross or pressing Auto is what points
+    // the decoder at the signal. Two dialogs would have meant two sets of the
+    // same four boxes and a new way for them to disagree.
+    //
+    // RttyTuner and RttyReader (both core/js/rtty/) find their elements by
+    // these ids, so both pages run the same code. The ids still say
+    // "rttyTuner" where they always did: the tuner's own markup has not
+    // changed, only what it sits next to.
     //
     // Model: true for the pop-out, which swaps the Pop out button for
     // Reattach; its close button closes the window rather than the dialog.
     var popout = Model;
 }
 <style>
-    #rttyTunerDialog { width:340px; min-width:220px; min-height:200px; max-width:95vw; max-height:95vh; resize:both; overflow:auto; }
+    /* Wide enough for the two columns the layout is built around: the decode
+       text on the left, the tuner's square scope on the right. It shrinks to
+       one column on its own - see the container query below - so the operator
+       can still make it narrow. */
+    #rttyTunerDialog { width:820px; min-width:300px; min-height:220px; max-width:95vw; max-height:95vh; resize:both; overflow:auto; container-type:inline-size; }
     #rttyTunerDialog[open] { display:flex; flex-direction:column; }
     #rttyTunerDialog .rtty-header { flex:0 0 auto; cursor:move; }
     #rttyTunerDialog .rtty-body { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+
+    /* The two columns. The tuner column is a fixed width because the scope is
+       square and there is nothing to gain by stretching it; widening the panel
+       widens the text instead, which is what the operator is reading. */
+    #rttyTunerDialog .rtty-split { flex:1 1 auto; min-height:0; display:flex; gap:0.5rem; }
+    #rttyTunerDialog .rtty-col-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:0.5rem; }
+    #rttyTunerDialog .rtty-col-tune { flex:0 0 320px; min-width:0; display:flex; flex-direction:column; }
+
+    /* Too narrow for two columns: one column, in reading order. The tuner
+       column keeps its place in the document so that tabbing still follows
+       what is on screen - the Tones only button is the way to get the scope on
+       its own, not a reshuffle that moves the focus order about. */
+    @@container (max-width: 640px) {
+        #rttyTunerDialog .rtty-split { flex-direction:column; }
+        #rttyTunerDialog .rtty-col-tune { flex:0 0 auto; }
+    }
+
     #rttyTunerDialog .rtty-scope-box { flex:0 0 auto; }
     /* Once the operator has sized the dialog, or in the pop-out, the scope
-       takes whatever room is left and stays square inside it. Positioned so
-       that the canvas's own size cannot push the box bigger. */
+       takes whatever room is left in its column and stays square inside it.
+       Positioned so that the canvas's own size cannot push the box bigger. */
     #rttyTunerDialog.user-sized .rtty-scope-box { flex:1 1 auto; min-height:120px; position:relative; overflow:hidden; }
     #rttyTunerDialog.user-sized #rttyTunerCanvas { position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); }
+
     /* Tones only: once Mark is set the operator only needs the cross, so the
-       settings and readouts go and the window can be made very small. */
+       settings, the readouts and the other two sections go, and the window can
+       be made very small. */
     #rttyTunerDialog.rtty-compact .rtty-controls,
     #rttyTunerDialog.rtty-compact #rttyTunerInfo,
-    #rttyTunerDialog.rtty-compact .rtty-hint { display:none !important; }
+    #rttyTunerDialog.rtty-compact .rtty-hint,
+    #rttyTunerDialog.rtty-compact .rtty-col-main { display:none !important; }
     #rttyTunerDialog.rtty-compact .rtty-body { padding:0.25rem !important; }
     #rttyTunerDialog.rtty-compact { min-width:160px; min-height:160px; }
+
     /* Shown only in the pop-out, which stays open when the mode changes
        rather than vanishing off a second monitor. */
     #rttyTunerPaused {
@@ -38,202 +74,336 @@
         border-radius: 0.25rem;
         margin-bottom: 0.5rem;
     }
+
+    /* A section heading with a rule running off to the right of it. */
+    #rttyTunerDialog .rtty-section {
+        display:flex; align-items:center; gap:0.5rem;
+        flex:0 0 auto; min-height:1.75rem;
+    }
+    #rttyTunerDialog .rtty-section > .rtty-section-name {
+        font-size:0.68rem; letter-spacing:0.09em; text-transform:uppercase; color:#9ab; flex:0 0 auto;
+    }
+    #rttyTunerDialog .rtty-section > .rtty-rule { flex:1 1 auto; height:1px; background:#3a3a3a; }
+
+    #rttyTunerDialog .rtty-decode { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:0.35rem; }
+    #rttyReaderOut {
+        flex:1 1 auto; min-height:4.5rem; overflow:auto;
+        background:#111; border:1px solid #444; border-radius:6px;
+        padding:0.5rem 0.6rem;
+        font-family:ui-monospace, Consolas, monospace; font-size:0.82rem; line-height:1.55;
+        color:#dfe; white-space:pre-wrap; word-break:break-word;
+    }
+    #rttyReaderStatus { font-family:ui-monospace, Consolas, monospace; font-size:0.72rem; color:#9ab; }
+
+    #rttyTunerDialog .rtty-send { flex:0 0 auto; display:flex; flex-direction:column; gap:0.35rem; }
+    #rttySendNotice {
+        font-size:0.78rem; font-weight:600; color:#ffd23f;
+        background:rgba(255, 210, 63, 0.10);
+        border-left:3px solid #ffd23f; border-radius:0.25rem;
+        padding:0.4rem 0.5rem;
+    }
+    #rttySendNotice .rtty-send-why { font-weight:400; color:#cfd6dd; }
 </style>
-<!-- RTTY tuner (core/js/rtty/rtty-tuner.js finds these ids): the mark filter on X, the space filter on Y, as a terminal unit
-     used to drive an oscilloscope. Non-modal so the VFO stays in reach. -->
+<!-- RTTY panel. The tuner (core/js/rtty/rtty-tuner.js) draws the mark filter on
+     X and the space filter on Y, as a terminal unit used to drive an
+     oscilloscope; the reader (core/js/rtty/rtty-reader.js) prints what the
+     server's demodulator makes of the same audio. Non-modal so the VFO stays
+     in reach. -->
 <dialog id="rttyTunerDialog" open="@popout"
         class="@(popout ? "rtty-popout user-sized" : null)"
         style="@(popout ? null : "border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0;")"
         aria-labelledby="rttyTunerTitle">
     <div class="rtty-header d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
-        <strong id="rttyTunerTitle">RTTY Tuner</strong>
+        <strong id="rttyTunerTitle">RTTY</strong>
         <div class="d-flex align-items-center gap-1">
             <button id="rttyTunerCompactBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-pressed="false"
-                    title="Tones only - show just the scope, without Mark, Shift and the readouts"
+                    title="Tones only - show just the scope, without the settings, the readouts or the decoded text"
                     aria-label="Tones only view"><i class="bi bi-fullscreen-exit" aria-hidden="true"></i></button>
             @if (popout)
             {
                 <button id="rttyTunerReattachBtn" class="btn btn-sm btn-outline-secondary" type="button"
-                        title="Put the RTTY tuner back in the main page"
-                        aria-label="Reattach the RTTY tuner to the main page">Reattach</button>
+                        title="Put the RTTY panel back in the main page"
+                        aria-label="Reattach the RTTY panel to the main page">Reattach</button>
                 <button class="btn btn-sm iwc-dialog-close" type="button" onclick="window.close()"
-                        aria-label="Close the RTTY tuner window">&#10005;</button>
+                        aria-label="Close the RTTY window">&#10005;</button>
             }
             else
             {
                 <button id="rttyTunerPopoutBtn" class="btn btn-sm btn-outline-secondary" type="button"
-                        title="Open the RTTY tuner in a window of its own, which can go on another monitor"
-                        aria-label="Pop the RTTY tuner out into its own window"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></button>
+                        title="Open the RTTY panel in a window of its own, which can go on another monitor"
+                        aria-label="Pop the RTTY panel out into its own window"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></button>
                 <button class="btn btn-sm iwc-dialog-close" type="button"
                         onclick="document.getElementById('rttyTunerDialog').close()"
-                        aria-label="Close RTTY tuner">&#10005;</button>
+                        aria-label="Close RTTY panel">&#10005;</button>
             }
         </div>
     </div>
     <div class="rtty-body p-2">
         <div id="rttyTunerPaused" role="status" hidden></div>
-        <div class="rtty-controls d-flex align-items-center gap-2 mb-2 small flex-wrap">
-            <label for="rttyTunerMark">Mark</label>
-            <input id="rttyTunerMark" type="number" min="300" max="3000" step="5" value="2125"
-                   class="form-control form-control-sm" style="width:5.5rem;"
-                   title="Mark tone in the receive audio, Hz. 2125 unless your RTTY setup says otherwise.">
-            @* The three the radio's own SET > Function > RTTY Shift Width menu
-               offers (CI-V 00 40: 00=170, 01=200, 02=425), plus the two a
-               listener meets constantly and the radio has no rung for. 450 is
-               the German DWD weather stations, 850 military and aviation.
+        <div class="rtty-split">
 
-               Offering a shift the radio cannot be set to is deliberate, and it
-               was Colin's call on 2026-10-08: the decoder is the authority, not
-               the radio's built-in one. The tuner is two filters and the reader
-               is arithmetic, and both work perfectly on 450 - it is only the
-               radio's own decoder that cannot be told about it, and nothing
-               here goes through that. The push to the radio already reports
-               honestly when there is no rung for a figure.
+            @* Decode and Send. First in the document because they are on the
+               left, and the two agree on purpose: the tab order walks the panel
+               the way it looks. *@
+            <div class="rtty-col-main">
 
-               Auto adds a sixth entry of its own when it measures a shift that
-               is none of these; see _setChoice in rtty-tuner.js. *@
-            <label for="rttyTunerShift">Shift</label>
-            <select id="rttyTunerShift" class="form-select form-select-sm" style="width:auto;"
-                    title="Shift between the two tones, Hz. 170 is amateur RTTY. 450 and 850 are ordinary on utility stations; the radio's own decoder cannot be set to them but IWC can copy them.">
-                <option value="170">170</option>
-                <option value="200">200</option>
-                <option value="425">425</option>
-                <option value="450">450</option>
-                <option value="850">850</option>
-            </select>
-            @* The scope does not use the speed - it is two filters and speed
-               means nothing to them. It is here because this dialog is where
-               the operator says what they are listening to, it is what Auto
-               measures, and it is what the reader will decode with. Kept on the
-               server with Mark and Shift so a page reload does not lose it. *@
-            <label for="rttyTunerBaud">Speed</label>
-            <select id="rttyTunerBaud" class="form-select form-select-sm" style="width:auto;"
-                    title="Sending speed in baud. 45.45 is amateur RTTY and the only speed the radio's own decoder reads; 50 is most European weather and commercial traffic. The scope does not need this - it is for decoding.">
-                <option value="45.45">45.45</option>
-                <option value="50">50</option>
-                <option value="75">75</option>
-                <option value="100">100</option>
-            </select>
-            <div class="form-check mb-0">
-                <input class="form-check-input" type="checkbox" id="rttyTunerReverse">
-                <label class="form-check-label" for="rttyTunerReverse"
-                       title="The other station is sending reversed. The radio's own RTTY/RTTY-R setting is followed automatically - this is on top of it.">Rev</label>
+                <div class="rtty-decode">
+                    <div class="rtty-section">
+                        <span class="rtty-section-name">Decode</span>
+                        <span class="rtty-rule"></span>
+                        @* Which figures table to print above the shift. ITA2 is
+                           the international one and what every European
+                           utility station sends; US TTY differs in a handful of
+                           punctuation codes and is what American amateur gear
+                           has always used. The letters are identical either
+                           way, so a wrong choice here shows up as odd
+                           punctuation, not gibberish. *@
+                        <label for="rttyReaderFigures" class="visually-hidden">Figures table</label>
+                        <select id="rttyReaderFigures" class="form-select form-select-sm" style="width:auto;"
+                                title="Which punctuation set to print above the figures shift. ITA2 is the international standard and what European weather and press stations send; US TTY is the American amateur variant. The letters are the same either way.">
+                            <option value="Ita2">ITA2</option>
+                            <option value="UsTty">US TTY</option>
+                        </select>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="rttyReaderAutoScroll" checked>
+                            <label class="form-check-label small" for="rttyReaderAutoScroll"
+                                   title="Keep the newest text in view. Turn it off to read back without being dragged to the bottom.">Scroll</label>
+                        </div>
+                        <button type="button" id="rttyReaderStartBtn" class="btn btn-sm btn-success"
+                                aria-pressed="false"
+                                title="Start decoding the receive audio. The decoder uses the Mark, Shift, Speed and Rev set in the Tune column - tune the cross first.">Start</button>
+                        <button type="button" id="rttyReaderClearBtn" class="btn btn-sm iwc-dialog-btn"
+                                title="Throw away the text on screen. The decoder keeps running.">Clear</button>
+                    </div>
+                    @* role=log rather than a plain div: a screen reader then
+                       announces new copy as it arrives instead of only when the
+                       operator goes looking for it. aria-live is polite, so it
+                       waits for a gap rather than talking over anything. *@
+                    <div id="rttyReaderOut" role="log" aria-live="polite" aria-label="Decoded RTTY text" tabindex="0"></div>
+                    <div id="rttyReaderStatus" role="status" aria-live="polite">Stopped.</div>
+                </div>
+
+                @* Send is here so the shape of the finished panel is visible,
+                   and it does nothing yet. That is not laziness about the
+                   markup: on this radio RTTY transmit is not a CI-V command at
+                   all. 17 is CW-only, and FSK means holding a DTR or RTS line
+                   up and down in time with the bits (USB Keying, 1A 05 00 98) -
+                   a mechanism IWC has no precedent for anywhere. Receive first,
+                   as Colin scoped it on 2026-10-09; sending is its own piece of
+                   work with its own bench session, and the radio is never put
+                   on the air by accident in the meantime. *@
+                <div class="rtty-send">
+                    <div class="rtty-section">
+                        <span class="rtty-section-name">Send</span>
+                        <span class="rtty-rule"></span>
+                    </div>
+                    <div id="rttySendNotice" role="status">
+                        Sending is not built yet.
+                        <span class="rtty-send-why">RTTY transmit on this radio is not a CI-V
+                        command &mdash; it needs the FSK keying line driven in time with the
+                        bits. Receiving works now; this is where sending will go.</span>
+                    </div>
+                    <div class="d-flex">
+                        <label for="rttySendInput" class="visually-hidden">Line to send</label>
+                        <input id="rttySendInput" type="text" disabled
+                               placeholder="Type here and press Enter to send"
+                               class="form-control form-control-sm"
+                               style="background:#0d0d0d; color:#7d848c; border-color:#3a3a3a; border-right:none; border-radius:0.375rem 0 0 0.375rem; font-family:ui-monospace,Consolas,monospace;">
+                        <button type="button" id="rttySendBtn" class="btn btn-sm" disabled
+                                style="background:#2c3a33; color:#7d9c8a; border:1px solid #3a3a3a; border-radius:0 0.375rem 0.375rem 0;">Send</button>
+                    </div>
+                </div>
+
             </div>
-            @* Reads SET > Function > RTTY Mark Frequency and RTTY Shift Width
-               over CI-V (1A 05 00 39 / 00 40). The shared tuner hides this
-               button by itself if the backend has no /api/rtty/radio-tones, so
-               it costs YWC nothing until YWC implements one.
 
-               The tuner now re-reads that menu every few seconds while it is
-               open, so in RTTY the button is only needed to take the radio's
-               numbers back after you have typed your own. It stays because it
-               is also the only way to read the menu in an AFSK mode, where the
-               automatic sync deliberately keeps its hands off. *@
-            <button type="button" id="rttyTunerFromRadio" class="btn btn-sm iwc-dialog-btn"
-                    title="Read Mark and Shift from the radio's own RTTY menu. In RTTY the tuner already follows that menu on its own; press this to take the radio's numbers back after typing your own, or to read them in an AFSK mode.">From radio</button>
-            @* Listens for about four seconds and fills in all four settings
-               from what it hears. The shared tuner hides this button by itself
-               if the backend has no /api/rtty/auto, so it costs YWC nothing
-               until YWC has one. *@
-            <button type="button" id="rttyTunerAutoBtn" class="btn btn-sm iwc-dialog-btn"
-                    title="Listen for a few seconds and work out the tones, the shift, which way round they are and the speed. Needs the signal tuned in well enough to hear the two tones; it changes nothing if it cannot make sense of what it hears."
-                    aria-label="Work out the RTTY settings by listening">Auto</button>
-        </div>
-        <div class="rtty-scope-box">
-            <canvas id="rttyTunerCanvas" width="320" height="320"
-                    style="width:100%; display:block; border:1px solid #444; border-radius:6px;"
-                    aria-label="RTTY crossed-ellipse tuning scope"></canvas>
-        </div>
-        <div id="rttyTunerInfo" class="mt-1"
-             style="font-family:ui-monospace,Consolas,monospace; font-size:0.72rem; color:#9ab;">
-            Waiting.
-        </div>
-        <div id="rttyTunerStatus" class="mt-1 small" role="status" aria-live="polite">Stopped.</div>
-        @* Collapsed by default, and that is the point. Open, this text is
-           taller than the scope it explains, which made the dialog run off the
-           bottom of a laptop screen with no way to shrink it back. It is worth
-           keeping - it answers the two questions this panel reliably prompts -
-           but it is read once, not every time the tuner is opened. *@
-        <details class="rtty-hint mt-2">
-            <summary class="small" style="color:#9ab; cursor:pointer;">How to read it, and two things that catch people out</summary>
-        <div class="small mt-1" style="color:#9ab;">
-            Tune for a clean cross: mark draws the line across, space the line up.
-            Arms leaning and opening means off tune.
-        </div>
-        <div class="small mt-1" style="color:#9ab;">
-            The tuner listens to the same audio device as the CW Reader, set on
-            the Settings page. Both can run at once.
-        </div>
-        <div class="small mt-1" style="color:#9ab;">
-            In RTTY, Mark and Shift are kept in step with the radio's own
-            <b>SET &gt; Function</b> menu while this window is open, both ways
-            round. Change the shift on the radio and the tuner changes with it;
-            change it here and the radio changes with you, so its built-in
-            decoder does not have to be set twice. Two of the shifts offered here
-            &mdash; 450 and 850 &mdash; have no rung in that menu; pick one and the
-            tuner and the reader use it, and you are told the radio kept its own.
-            In an
-            AFSK mode nothing is written or followed, because there the tones are
-            your software's and that menu describes how the radio transmits;
-            <b>From radio</b> still reads it.
-        </div>
-        @* Two questions this dialog reliably prompts, answered where they are
-           asked. Both caught Colin out on 2026-09-24 with his own radio in
-           front of him.
+            @* Tune: the scope and the four settings that point both it and the
+               decoder at the signal. On the right, by Colin's choice. *@
+            <div class="rtty-col-tune">
+                <div class="rtty-section">
+                    <span class="rtty-section-name">Tune</span>
+                    <span class="rtty-rule"></span>
+                </div>
+                <div class="rtty-controls d-flex align-items-center gap-2 mb-2 small flex-wrap">
+                    <label for="rttyTunerMark">Mark</label>
+                    <input id="rttyTunerMark" type="number" min="300" max="3000" step="5" value="2125"
+                           class="form-control form-control-sm" style="width:5.5rem;"
+                           title="Mark tone in the receive audio, Hz. 2125 unless your RTTY setup says otherwise.">
+                    @* The three the radio's own SET > Function > RTTY Shift Width menu
+                       offers (CI-V 00 40: 00=170, 01=200, 02=425), plus the two a
+                       listener meets constantly and the radio has no rung for. 450 is
+                       the German DWD weather stations, 850 military and aviation.
 
-           The Rev note is a correction: an earlier draft of this text said to
-           tick Rev when the radio is in RTTY-R. That is wrong and it is the
-           expensive kind of wrong, because it gets the tones exactly backwards
-           while sounding right. RttyTunerService.TonesFor already derives
-           space-above from the mode string and the service subscribes to mode
-           changes, so the radio's own RTTY/RTTY-R setting is handled; Rev is
-           the separate flip for a station transmitting reversed.
+                       Offering a shift the radio cannot be set to is deliberate, and it
+                       was Colin's call on 2026-10-08: the decoder is the authority, not
+                       the radio's built-in one. The tuner is two filters and the reader
+                       is arithmetic, and both work perfectly on 450 - it is only the
+                       radio's own decoder that cannot be told about it, and nothing
+                       here goes through that. The push to the radio already reports
+                       honestly when there is no rung for a figure.
 
-           The speed one needs care: the natural assumption is
-           that a radio with a built-in RTTY decoder must have a speed
-           dropdown somewhere, and therefore a CI-V command behind it. It has
-           neither - checked against all three MkII manuals. SET > Function
-           carries exactly two RTTY items (Mark Frequency, Shift Width), the
-           RTTY DECODE SET screen carries none, and the CI-V reference's
-           1A 05 block has 00 39 / 00 40 / 00 41 for mark, shift and keying
-           polarity and nothing for speed. The decoder is fixed at 45.45 baud.
-           The other trap is that the Settings page does have a "Baud Rate",
-           and it is the CI-V serial port - a different thing entirely. *@
-        <div class="small mt-1" style="color:#9ab;">
-            <strong>Rev</strong> is for when the <em>other station</em> is sending
-            reversed. You do not tick it for <strong>RTTY-R</strong> &mdash; the tuner
-            reads the radio's mode and already allows for it, so ticking Rev as well
-            puts the tones back the wrong way round. (The radio's screen says
-            <strong>RTTY-R</strong> where IWC's mode dropdown says
-            <strong>RTTY-U</strong>: same mode, two naming conventions.)
+                       Auto adds a sixth entry of its own when it measures a shift that
+                       is none of these; see _setChoice in rtty-tuner.js. *@
+                    <label for="rttyTunerShift">Shift</label>
+                    <select id="rttyTunerShift" class="form-select form-select-sm" style="width:auto;"
+                            title="Shift between the two tones, Hz. 170 is amateur RTTY. 450 and 850 are ordinary on utility stations; the radio's own decoder cannot be set to them but IWC can copy them.">
+                        <option value="170">170</option>
+                        <option value="200">200</option>
+                        <option value="425">425</option>
+                        <option value="450">450</option>
+                        <option value="850">850</option>
+                    </select>
+                    @* The scope does not use the speed - it is two filters and
+                       speed means nothing to them. The reader does: it is the
+                       one setting on this panel that only matters to the
+                       decoder, which is why it sat here unused until there was
+                       a decoder to use it. Kept on the server with Mark and
+                       Shift so a page reload does not lose it. *@
+                    <label for="rttyTunerBaud">Speed</label>
+                    <select id="rttyTunerBaud" class="form-select form-select-sm" style="width:auto;"
+                            title="Sending speed in baud, and what the decoder reads at. 45.45 is amateur RTTY and the only speed the radio's own decoder reads; 50 is most European weather and commercial traffic. The scope itself does not need this.">
+                        <option value="45.45">45.45</option>
+                        <option value="50">50</option>
+                        <option value="75">75</option>
+                        <option value="100">100</option>
+                    </select>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="rttyTunerReverse">
+                        <label class="form-check-label" for="rttyTunerReverse"
+                               title="The other station is sending reversed. The radio's own RTTY/RTTY-R setting is followed automatically - this is on top of it.">Rev</label>
+                    </div>
+                    @* Reads SET > Function > RTTY Mark Frequency and RTTY Shift Width
+                       over CI-V (1A 05 00 39 / 00 40). The shared tuner hides this
+                       button by itself if the backend has no /api/rtty/radio-tones, so
+                       it costs YWC nothing until YWC implements one.
+
+                       The tuner now re-reads that menu every few seconds while it is
+                       open, so in RTTY the button is only needed to take the radio's
+                       numbers back after you have typed your own. It stays because it
+                       is also the only way to read the menu in an AFSK mode, where the
+                       automatic sync deliberately keeps its hands off. *@
+                    <button type="button" id="rttyTunerFromRadio" class="btn btn-sm iwc-dialog-btn"
+                            title="Read Mark and Shift from the radio's own RTTY menu. In RTTY the tuner already follows that menu on its own; press this to take the radio's numbers back after typing your own, or to read them in an AFSK mode.">From radio</button>
+                    @* Listens for about four seconds and fills in all four settings
+                       from what it hears. The shared tuner hides this button by itself
+                       if the backend has no /api/rtty/auto, so it costs YWC nothing
+                       until YWC has one. *@
+                    <button type="button" id="rttyTunerAutoBtn" class="btn btn-sm iwc-dialog-btn"
+                            title="Listen for a few seconds and work out the tones, the shift, which way round they are and the speed. Needs the signal tuned in well enough to hear the two tones; it changes nothing if it cannot make sense of what it hears."
+                            aria-label="Work out the RTTY settings by listening">Auto</button>
+                </div>
+                <div class="rtty-scope-box">
+                    <canvas id="rttyTunerCanvas" width="320" height="320"
+                            style="width:100%; display:block; border:1px solid #444; border-radius:6px;"
+                            aria-label="RTTY crossed-ellipse tuning scope"></canvas>
+                </div>
+                <div id="rttyTunerInfo" class="mt-1"
+                     style="font-family:ui-monospace,Consolas,monospace; font-size:0.72rem; color:#9ab;">
+                    Waiting.
+                </div>
+                <div id="rttyTunerStatus" class="mt-1 small" role="status" aria-live="polite">Stopped.</div>
+                @* Collapsed by default, and that is the point. Open, this text is
+                   taller than the scope it explains, which made the dialog run off the
+                   bottom of a laptop screen with no way to shrink it back. It is worth
+                   keeping - it answers the questions this panel reliably prompts -
+                   but it is read once, not every time the panel is opened. *@
+                <details class="rtty-hint mt-2">
+                    <summary class="small" style="color:#9ab; cursor:pointer;">How to read it, and three things that catch people out</summary>
+                <div class="small mt-1" style="color:#9ab;">
+                    Tune for a clean cross: mark draws the line across, space the line up.
+                    Arms leaning and opening means off tune.
+                </div>
+                <div class="small mt-1" style="color:#9ab;">
+                    <strong>Decode</strong> uses the Mark, Shift, Speed and Rev set here,
+                    so there is nothing to set twice &mdash; get the cross upright, or
+                    press <strong>Auto</strong>, and the reader is already listening in
+                    the right place. Change any of them while it is running and it
+                    follows, losing only the character it was in the middle of.
+                </div>
+                <div class="small mt-1" style="color:#9ab;">
+                    The panel listens to the same audio device as the CW Reader, set on
+                    the Settings page. Tuning, decoding and the CW Reader can all run at
+                    once.
+                </div>
+                <div class="small mt-1" style="color:#9ab;">
+                    In RTTY, Mark and Shift are kept in step with the radio's own
+                    <b>SET &gt; Function</b> menu while this window is open, both ways
+                    round. Change the shift on the radio and the tuner changes with it;
+                    change it here and the radio changes with you, so its built-in
+                    decoder does not have to be set twice. Two of the shifts offered here
+                    &mdash; 450 and 850 &mdash; have no rung in that menu; pick one and the
+                    tuner and the reader use it, and you are told the radio kept its own.
+                    In an
+                    AFSK mode nothing is written or followed, because there the tones are
+                    your software's and that menu describes how the radio transmits;
+                    <b>From radio</b> still reads it.
+                </div>
+                @* Three questions this panel reliably prompts, answered where
+                   they are asked. The first two caught Colin out on 2026-09-24
+                   with his own radio in front of him.
+
+                   The Rev note is a correction: an earlier draft of this text said to
+                   tick Rev when the radio is in RTTY-R. That is wrong and it is the
+                   expensive kind of wrong, because it gets the tones exactly backwards
+                   while sounding right. RttyTunerService.TonesFor already derives
+                   space-above from the mode string and the service subscribes to mode
+                   changes, so the radio's own RTTY/RTTY-R setting is handled; Rev is
+                   the separate flip for a station transmitting reversed.
+
+                   The speed one needs care: the natural assumption is
+                   that a radio with a built-in RTTY decoder must have a speed
+                   dropdown somewhere, and therefore a CI-V command behind it. It has
+                   neither - checked against all three MkII manuals. SET > Function
+                   carries exactly two RTTY items (Mark Frequency, Shift Width), the
+                   RTTY DECODE SET screen carries none, and the CI-V reference's
+                   1A 05 block has 00 39 / 00 40 / 00 41 for mark, shift and keying
+                   polarity and nothing for speed. The decoder is fixed at 45.45 baud.
+                   The other trap is that the Settings page does have a "Baud Rate",
+                   and it is the CI-V serial port - a different thing entirely. *@
+                <div class="small mt-1" style="color:#9ab;">
+                    <strong>Rev</strong> is for when the <em>other station</em> is sending
+                    reversed. You do not tick it for <strong>RTTY-R</strong> &mdash; the panel
+                    reads the radio's mode and already allows for it, so ticking Rev as well
+                    puts the tones back the wrong way round. (The radio's screen says
+                    <strong>RTTY-R</strong> where IWC's mode dropdown says
+                    <strong>RTTY-U</strong>: same mode, two naming conventions.)
+                </div>
+                <div class="small mt-1" style="color:#9ab;">
+                    <strong>Auto</strong> listens for about four seconds and works out all
+                    four settings from the signal itself &mdash; the two tones, the shift
+                    between them, which way round they are, and the speed. It needs the
+                    signal tuned in well enough that the tones are in the receiver's audio,
+                    but not much better than that; it copes with a signal too weak to read.
+                    If it cannot make sense of what it hears it says so and changes nothing,
+                    so pressing it on an empty band costs you nothing.
+                    <br>
+                    It measures rather than guesses from a list, so a shift or a speed that
+                    is on no list appears in the box labelled <em>measured</em> &mdash;
+                    452 Hz, or 56.9 baud on a press circuit. Those work here exactly as the
+                    standard ones do.
+                </div>
+                <div class="small mt-1" style="color:#9ab;">
+                    <strong>The radio's own decoder is fixed at 45.45 baud</strong>
+                    (<em>MENU &rarr; RTTY DECODE</em>), and nothing can change it: <em>SET
+                    &rarr; Function</em> has only Mark Frequency and Shift Width, and there is
+                    no CI-V command for speed. That limit is the radio's, not IWC's &mdash;
+                    the <strong>Speed</strong> box above is what <em>IWC</em> decodes with, so
+                    a 50 baud weather station is ordinary listening here even though the
+                    radio's screen cannot read it. The scope itself does not use the speed at
+                    all; it is two filters, and only needs to know where the tones sit.
+                    <br>
+                    <em>Baud Rate</em> on the Settings page is something else entirely &mdash;
+                    the CI-V serial port.
+                </div>
+                <div class="small mt-1" style="color:#9ab;">
+                    <strong>The signal figure</strong> on the Decode line is how decisively
+                    one tone is beating the other: about 0.8 on a real station, around a
+                    third on hiss. It is there because a decoder reading noise prints
+                    plausible-looking words with no outward sign that they are not real, and
+                    that number is the difference.
+                </div>
+                </details>
+            </div>
+
         </div>
-        <div class="small mt-1" style="color:#9ab;">
-            <strong>Auto</strong> listens for about four seconds and works out all
-            four settings from the signal itself &mdash; the two tones, the shift
-            between them, which way round they are, and the speed. It needs the
-            signal tuned in well enough that the tones are in the receiver's audio,
-            but not much better than that; it copes with a signal too weak to read.
-            If it cannot make sense of what it hears it says so and changes nothing,
-            so pressing it on an empty band costs you nothing.
-            <br>
-            It measures rather than guesses from a list, so a shift or a speed that
-            is on no list appears in the box labelled <em>measured</em> &mdash;
-            452 Hz, or 56.9 baud on a press circuit. Those work here exactly as the
-            standard ones do.
-        </div>
-        <div class="small mt-1" style="color:#9ab;">
-            <strong>The radio's own decoder is fixed at 45.45 baud</strong>
-            (<em>MENU &rarr; RTTY DECODE</em>), and nothing can change it: <em>SET
-            &rarr; Function</em> has only Mark Frequency and Shift Width, and there is
-            no CI-V command for speed. That limit is the radio's, not IWC's &mdash;
-            the <strong>Speed</strong> box above is what <em>IWC</em> decodes with, so
-            a 50 baud weather station is ordinary listening here even though the
-            radio's screen cannot read it. The scope itself does not use the speed at
-            all; it is two filters, and only needs to know where the tones sit.
-            <br>
-            <em>Baud Rate</em> on the Settings page is something else entirely &mdash;
-            the CI-V serial port.
-        </div>
-        </details>
     </div>
 </dialog>

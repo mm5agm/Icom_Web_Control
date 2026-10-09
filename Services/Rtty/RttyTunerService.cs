@@ -104,6 +104,33 @@ namespace Icom_Web_Control.Services.Rtty
         public bool IsRunning { get { lock (_gate) return _scope != null; } }
 
         /// <summary>
+        /// What the operator has said they are listening to. Held here, and
+        /// readable whether the scope is running or not, because this dialog is
+        /// where those four figures are set and this service is where they
+        /// survive a page reload - so the reader asks the tuner rather than
+        /// keeping a second copy that could disagree with the figure on screen.
+        ///
+        /// <para>Note what is <em>not</em> here: where the two tones actually
+        /// land in the audio. That depends on the radio's mode as well, which
+        /// moves under both of us, so each side works it out from
+        /// <see cref="TonesFor"/> against the mode of the moment rather than
+        /// being handed a pair that was right a second ago.</para>
+        /// </summary>
+        public RttyListening Listening
+        {
+            get { lock (_gate) return new RttyListening(_markHz, _shiftHz, _reverse, _baud); }
+        }
+
+        /// <summary>
+        /// The operator has changed one of those four. Raised outside the lock,
+        /// and only on a real change: a start that re-sends the same settings -
+        /// which every re-poll of a second browser window does - says nothing,
+        /// because a listener that rebuilds a decoder on it would be rebuilding
+        /// it several times a second and never decode a character.
+        /// </summary>
+        public event Action<RttyListening>? ListeningChanged;
+
+        /// <summary>
         /// Where the mark and space filters go, in audio Hz. Pure and static,
         /// so the rule can be exercised without a radio - though the rule
         /// itself has now been checked against one: see the bench note on the
@@ -158,8 +185,11 @@ namespace Icom_Web_Control.Services.Rtty
             var modeNote = await _mode.EnsureAsync(shiftHz, baud);
 
             bool acquire;
+            bool changed;
             lock (_gate)
             {
+                changed = _markHz != markHz || _shiftHz != shiftHz
+                       || _reverse != reverse || _baud != baud;
                 _markHz = markHz;
                 _shiftHz = shiftHz;
                 _reverse = reverse;
@@ -188,6 +218,11 @@ namespace Icom_Web_Control.Services.Rtty
                 acquire = !_holdsCapture && !_acquiring;
                 if (acquire) _acquiring = true;
             }
+
+            // Outside the lock: a handler that rebuilt a decoder while holding
+            // it would be holding this one too, and this one is taken on every
+            // audio frame.
+            if (changed) ListeningChanged?.Invoke(new RttyListening(markHz, shiftHz, reverse, baud));
 
             if (acquire)
             {
@@ -380,6 +415,14 @@ namespace Icom_Web_Control.Services.Rtty
 
         public void Dispose() => StopNowAsync("shutting down").GetAwaiter().GetResult();
     }
+
+    /// <summary>
+    /// The four figures the operator sets in the RTTY dialog. Mark and shift
+    /// place the tones, Reverse flips which is which, and Baud is the sending
+    /// speed - which the scope has no use for and the reader cannot work
+    /// without.
+    /// </summary>
+    public sealed record RttyListening(double MarkHz, int ShiftHz, bool Reverse, double Baud);
 
     public sealed class RttyTunerFrame
     {
