@@ -21,7 +21,7 @@
 // A word on what the text is worth. This is a machine reading tones out of
 // noise: on a clean signal it is close to perfect, and on a marginal one it
 // prints plausible-looking rubbish with no outward sign of the difference. The
-// signal figure on the status line is the honest answer to "is anything
+// signal figure on the readout line is the honest answer to "is anything
 // there?" - about 0.8 for a real station and around a third for hiss - and it
 // is shown for exactly that reason. Nothing here hides low-confidence output:
 // an operator can see a wrong letter, but they cannot see one that was never
@@ -44,6 +44,7 @@ export class RttyReader {
         this._dialog   = null;
         this._out      = null;
         this._status   = null;
+        this._info     = null;    // the numbers; deliberately not a live region
         this._statusSig = null;   // what status last said, so an unchanged line leaves the DOM alone
         this._startBtn = null;
         this._clearBtn = null;
@@ -63,6 +64,7 @@ export class RttyReader {
 
         this._dialog   = document.getElementById(this._dialogId);
         this._status   = document.getElementById('rttyReaderStatus');
+        this._info     = document.getElementById('rttyReaderInfo');
         this._startBtn = document.getElementById('rttyReaderStartBtn');
         this._clearBtn = document.getElementById('rttyReaderClearBtn');
         this._autoScrl = document.getElementById('rttyReaderAutoScroll');
@@ -235,12 +237,48 @@ export class RttyReader {
             }
         }
 
+        this._render(snap);
+    }
+
+    // Two lines, and the split is the whole point of having two. The numbers
+    // change on every poll, so they go in a plain div: as a live region a
+    // screen reader would read the signal figure out loud twice a second and
+    // bury the decoded text underneath it. The status line is the live region
+    // and therefore says only the handful of things that genuinely change,
+    // which is why it is a sentence and not a readout. The tuner next to it
+    // splits its own two lines the same way, for the same reason.
+    _render(snap) {
+        this._renderInfo(snap);
         this._renderStatus(snap);
+    }
+
+    _renderInfo(snap) {
+        if (!this._info) return;
+
+        let text;
+        if (!snap.running) {
+            text = 'Waiting.';
+        } else {
+            const hz   = v => Math.round(v);
+            const bits = [
+                `mark ${hz(snap.markHz)}  space ${hz(snap.spaceHz)} Hz`,
+                `${snap.baud} baud`,
+            ];
+            // Reverse belongs here rather than in the sentence: it is a
+            // setting being reported back, not an event.
+            if (snap.reverse) bits.push('rev');
+            bits.push(`signal ${Number(snap.activity ?? 0).toFixed(2)}`);
+            text = bits.join('   ');
+        }
+
+        if (this._info.textContent !== text) this._info.textContent = text;
     }
 
     _renderStatus(snap) {
         if (!this._status) return;
 
+        // Four possible sentences, so the signature guard below stops this
+        // speaking at all unless something really changed.
         let text, tone;
         if (snap.captureError) {
             text = snap.captureError;
@@ -248,18 +286,15 @@ export class RttyReader {
         } else if (!snap.running) {
             text = 'Stopped.';
             tone = 'idle';
+        } else if (snap.activity >= snap.squelch) {
+            text = 'Decoding.';
+            tone = 'good';
         } else {
-            const hz    = v => Math.round(v);
-            const heard = snap.activity >= snap.squelch;
-            const bits  = [
-                `mark ${hz(snap.markHz)} space ${hz(snap.spaceHz)} Hz`,
-                `${snap.baud} baud`,
-                `signal ${Number(snap.activity ?? 0).toFixed(2)}`,
-            ];
-            if (snap.reverse) bits.push('rev');
-            if (!heard) bits.push('nothing to decode');
-            text = bits.join('  ');
-            tone = heard ? 'good' : 'idle';
+            // Not an error: there is audio, just not enough of it in the two
+            // tones to be worth printing. Saying so beats an empty pane and no
+            // explanation for it.
+            text = 'Listening - nothing in the tones yet.';
+            tone = 'idle';
         }
 
         // The status line is rewritten twice a second; skip the DOM write when
