@@ -1,4 +1,4 @@
-namespace Icom_Web_Control.Models
+﻿namespace Icom_Web_Control.Models
 {
     public class ApplicationSettings
     {
@@ -284,6 +284,27 @@ namespace Icom_Web_Control.Models
         // their property; and refused anyway unless the radio is in its own FSK
         // mode - see RttyMarkCentre.
         public bool RttyAutoCentreMark { get; set; } = true;
+
+        // Whether the RTTY panel shows only what you need to tune a signal in:
+        // the tone controls and the crossed-ellipse scope, without the Decode
+        // and Send sections.
+        //
+        // Named for what asks for it. A contest operator already has a decoder
+        // - MMTTY, 2Tone, N1MM's own - and what they want from IWC is the one
+        // thing their logger cannot draw: the crossed figure, small, on a
+        // second monitor, next to everything else fighting for that screen.
+        // Bruce VK2RT asked for a smaller tuner window after CQ WW RTTY 2026,
+        // and the thing he asked for and did not get was a panel that stops
+        // changing size while he is working - see the status line's reserved
+        // height in _RttyTunerPartial.
+        //
+        // Off by default: the Decode section is the reason most operators open
+        // the panel at all, and a setting that hides the feature you came for
+        // should be one you asked for. With it on, the pages do not start the
+        // reader - its Stop button is not on screen to press, and a decoder
+        // running where nobody can stop it is the trap this comment exists to
+        // record.
+        public bool RttyContestMode { get; set; } = false;
 
         // Per-band IF Width/Shift/Mode memory — keyed by band name (e.g. "20m")
         public Dictionary<string, BandProfile> BandProfilesA { get; set; } = new();

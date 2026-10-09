@@ -75,15 +75,29 @@
         // The reader in the same panel. The dialog is open from the moment this
         // page loads and never closes, so the reader starts polling on init and
         // only the pause below ever stops it.
-        const reader = new RttyReader();
-        reader.init();
+        //
+        // Unless Contest Mode (Settings) is on, which hides the Decode section
+        // and the reader's Start/Stop button with it: nothing would show the
+        // text, and a decode still running on the server from an earlier
+        // session would have no button left to stop it. The flag is read off
+        // the class the partial put on the dialog, so this window and the main
+        // page cannot disagree about it. See ApplicationSettings.RttyContestMode.
+        const contest = document.getElementById('rttyTunerDialog')
+            ?.classList.contains('rtty-contest');
+        let reader = null;
+        if (contest) {
+            fetch('/api/rtty/reader/stop', { method: 'POST' }).catch(() => { });
+        } else {
+            reader = new RttyReader();
+            reader.init();
+        }
 
         // One panel as far as the mode watcher is concerned: pausing the window
         // has to stop both pollers, or the reader would keep asking for text
         // from a decoder listening to a radio that has left RTTY.
         const panel = {
             get isPaused() { return tuner.isPaused; },
-            setPaused(paused, text) { tuner.setPaused(paused, text); reader.setPaused(paused); },
+            setPaused(paused, text) { tuner.setPaused(paused, text); reader?.setPaused(paused); },
         };
 
         // The main page closes its tuner once the mode has settled somewhere

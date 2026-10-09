@@ -2554,7 +2554,8 @@
                 signal is tuned in, and its Auto button listens for a few seconds and
                 works out the shift, the speed and which way round the tones are. Both
                 of them depend on the receiver passing both tones equally, which is what
-                these two settings are about.
+                the first two settings are about. The third is about how much of the
+                panel you want on screen.
             </p>
 
             <div class="row g-3">
@@ -2588,14 +2589,38 @@
                     </div>
                     <div class="form-text">
                         When Auto is sure of what it heard, the dial moves so the mark tone
-                        arrives on the tuner's mark - up to 500 Hz, in RTTY only, and never
-                        while transmitting. Auto says what it moved and by how much.
+                        arrives on the tuner's mark - by as much as your IF filter is wide,
+                        and never less than 500 Hz, in RTTY only and never while
+                        transmitting. Auto says what it moved and by how much.
                     </div>
                     <div class="form-text">
                         This is worth having on: a signal sitting off-centre in the IF arrives
                         with one tone quieter than the other, and the speed cannot be measured
                         from keying whose two halves are unequal. Tuning it in fixes the figure,
                         the speed and anything decoding it, all at once.
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="rttyContestMode"
+                               name="Settings.RttyContestMode" value="true"
+                               @(Model.Settings.RttyContestMode ? "checked" : "") />
+                        <input type="hidden" name="Settings.RttyContestMode" value="false" />
+                        <label class="form-check-label" for="rttyContestMode">RTTY Contest Mode</label>
+                    </div>
+                    <div class="form-text">
+                        Shows the tuner on its own - the tone controls, the crossed figure
+                        and its readouts - and leaves out Decode and Send. The panel is
+                        narrower for it, and the two message lines keep their height so it
+                        stops changing size while you are tuning.
+                    </div>
+                    <div class="form-text">
+                        For contesting, where the logger already has a decoder and what it
+                        cannot draw is the figure. Turning this on also stops the decoder,
+                        because its Stop button is one of the things that goes.
                     </div>
                 </div>
             </div>

@@ -1,4 +1,4 @@
-# Icom Web Control
+﻿# Icom Web Control
 
 ![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
@@ -21,12 +21,13 @@ If something has been biting you and a pre-release says it is fixed, or you want
 
 ## ✨ Added since the last release
 
-**Not yet in a build** — in the code, and will be in the next pre-release. All four are RTTY, and together they turn the tuner into a receive station:
+**Not yet in a build** — in the code, and will be in the next pre-release. All five are RTTY, and together they turn the tuner into a receive station:
 
 - **The RTTY panel decodes now.** What was the RTTY Tuner is one **RTTY** panel in two columns: the crossed-ellipse scope and its controls on the right, a **Decode** pane printing the text on the left, and a **Send** box underneath showing where sending will go — **Send is greyed out and does not transmit**, and [§20.6](USER_MANUAL.md#206-sending) says why it is harder than it looks. The decoder has no Mark, Shift, Speed or Rev of its own: it uses the ones in the Tune column beside it, so getting the cross upright is the whole of setting it up, and switching the radio between RTTY and RTTY-R needs nothing pressed. [§20.5](USER_MANUAL.md#205-decoding-the-text).
 - **Auto works out the shift and the speed for you.** Press **Auto** and it listens for four seconds and reports what it heard — and it reports what it *measured*, not the nearest entry on a list. The radio's own menu offers three shifts and its decoder is fixed at 45.45 baud; that is the radio's limit, not this one's, so a weather station on 450 Hz shift at 50 baud is ordinary listening here. It refuses rather than guesses when the two halves of what it heard do not agree. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
 - **The panel sets the radio up for RTTY, and puts it back.** Open it in CW or AM and it switches to RTTY-L, remembering the mode and filter you were in and restoring both when you close it — the same bargain **Reader Mode** makes for CW. It leaves DATA and SSB alone, because there the tones are your software's and the radio is deliberately a plain SSB set. The filter is only ever **widened**, never narrowed. [§20.9](USER_MANUAL.md#209-what-the-tuner-changes-on-your-radio), [§6.8](USER_MANUAL.md#68-rtty-tuner).
-- **A confident Auto tunes the signal in.** Having measured where the tones actually are, it moves the VFO so the mark lands where the tuner is listening, and says in the status line that it moved and by how much. It will not move on a weak answer, will not move less than 25 Hz, and will not move more than 500 Hz — so it corrects mistuning and never goes hunting. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
+- **A confident Auto tunes the signal in.** Having measured where the tones actually are, it moves the VFO so the mark lands where the tuner is listening, and says in the status line that it moved and by how much. It will not move on a weak answer, will not move less than 25 Hz, and will not move the mark outside the IF filter you are listening through — never less than 500 Hz, whatever the filter — so it corrects mistuning and never goes hunting. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
+- **RTTY Contest Mode.** A switch on the Settings page that leaves the RTTY panel as just the tuner — the tone controls, the crossed figure and its readouts, in a narrow panel, with **Decode** and **Send** left out. For contesting, where your logger already has a decoder and the one thing it cannot draw is the figure. It also holds the panel still: the two lines under the scope keep their height instead of reflowing it under your mouse every time the status changes. The same switch is in Yaesu Web Control. [§20.10](USER_MANUAL.md#2010-contest-mode-the-tuner-on-its-own).
 
 **v1.4.0 is the current release.** Its headline is pop-out windows — the panels on a second monitor:
 

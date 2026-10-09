@@ -1,4 +1,4 @@
-# Icom Web Control — User Manual
+﻿# Icom Web Control — User Manual
 
 > 🔍 **Searching this manual:** press **Ctrl + F** (Windows / Linux) or **⌘ + F** (Mac) to open your browser's find-in-page box. Type any term — a band name like "60m", a control like "Speech Processor", an error message you've hit — to jump straight to the relevant section.
 
@@ -117,6 +117,7 @@
     - 20.7 [Running it alongside the CW Reader](#207-running-it-alongside-the-cw-reader)
     - 20.8 [Troubleshooting](#208-troubleshooting)
     - 20.9 [What the tuner changes on your radio](#209-what-the-tuner-changes-on-your-radio)
+    - 20.10 [Contest Mode: the tuner on its own](#2010-contest-mode-the-tuner-on-its-own)
 
 ---
 
@@ -1308,8 +1309,9 @@ switching would break. It also **never narrows a filter**, only widens one that
 could not have carried the shift: a narrow filter is how you dig a signal out of
 a crowded band, and only you know what else is on the band.
 
-**What the second one will not do.** It will not move more than 500 Hz — past
-that it is more likely a different station than a mistuning — will not move at
+**What the second one will not do.** It will not move the mark further than your
+IF filter is wide, and never less than 500 Hz whatever the filter — past the
+passband it is more likely a different station than a mistuning — will not move at
 all for a correction under about 25 Hz, which is the limit of what the analyser
 can resolve, will not move while you are transmitting, and will not move the dial
 in SSB or the DATA modes, where your software owns the tuning and has its own
@@ -3333,8 +3335,12 @@ correct shift and a different speed on every press. Putting the signal in the
 middle of the filter fixes the figure, the speed and anything decoding it, all at
 once.
 
-What it will not do: move more than **500 Hz** — beyond that it is more likely a
-different station than a mistuning; move at all unless it is sure, or if the
+What it will not do: move the mark further than your **IF filter is wide**, and
+never less than **500 Hz** whatever the filter is set to — beyond the passband it
+is more likely a different station than a mistuning. The limit used to be a flat
+500 Hz, which refused a correction of 599 Hz on a signal sitting plainly inside a
+1200 Hz filter; it is the filter you are listening through that decides what
+counts as the same station. It will not move at all unless it is sure, or if the
 answer is within about 25 Hz, which is the limit of what it can measure; move
 while you are transmitting; or move the dial in **LSB, USB or the DATA modes**,
 where your own RTTY software is making the tones and has its own tuning
@@ -3457,7 +3463,7 @@ Tuning and decoding together is the normal way to use the RTTY panel. Running th
 | It stops by itself after a while | It stops when nothing is asking it for sweeps — a minimised or backgrounded tab will do it. Bring the page back to the front and press **RTTY** again. |
 | **The radio changed mode, or the filter widened, when I opened the tuner** | That is meant to happen, and it is put back when you close the tuner. [§20.9](#209-what-the-tuner-changes-on-your-radio) says exactly what it does and how to turn it off. |
 | **Auto** moved my dial | Also meant to happen, when it is sure of the signal: it puts the mark tone onto the tuner's Mark so the figure stands upright and the speed can be measured. It says what it moved. Turn it off with *Auto also tunes the signal in* on the Settings page ([§20.3](#203-auto-working-out-what-you-are-listening-to)). |
-| **Auto** said the figures but did not move the dial | It only moves in **RTTY-L** or **RTTY-U** — never in SSB or DATA, where your own software owns the tuning — and only when it is sure, the correction is more than about 25 Hz, less than 500 Hz, and you are not transmitting. |
+| **Auto** said the figures but did not move the dial | It only moves in **RTTY-L** or **RTTY-U** — never in SSB or DATA, where your own software owns the tuning — and only when it is sure, the correction is more than about 25 Hz, no further than your IF filter is wide (and never less than 500 Hz), and you are not transmitting. |
 | **The decoder prints nothing, and the status line says *nothing to decode*** | The squelch is holding because the two tones are not strong enough to be worth printing. Check the `signal` figure: a third or so is hiss. Tune for the cross, and narrow the IF filter so a neighbour is not sharing the passband. |
 | **The decoder prints, but it is gibberish** | Something is wrong in the Tune column rather than the Decode pane. In order of likelihood: the cross is not upright, **Rev** is wrong (try it both ways — reversed RTTY is common), or the shift does not match. Press **Auto** and let it measure. A `signal` figure below about 0.5 will produce rubbish whatever the settings. |
 | **Numbers decode correctly but punctuation does not** | Wrong figures table. Switch **Figures** between **ITA2** and **US TTY** ([§20.5](#205-decoding-the-text)). |
@@ -3490,6 +3496,34 @@ nothing happened.
 
 Auto's dial move is the third thing it changes, and it has its own switch:
 [§20.3](#203-auto-working-out-what-you-are-listening-to).
+
+### 20.10 Contest Mode: the tuner on its own
+
+If you are contesting, you almost certainly have a decoder already — MMTTY,
+2Tone, or the one built into your logger — and the thing those cannot draw is
+the crossed figure. **RTTY Contest Mode**, on the Settings page under **RTTY
+Tuner**, gives you just that: the tone controls, the scope and its two readout
+lines, in a narrow panel, with **Decode** and **Send** left out.
+
+Two things come with it:
+
+- **The panel stops changing size.** The two lines under the figure are the
+  status line and the readouts, and their text changes length as the tuner
+  reports — *"Stopped."* one moment and *"Auto: shift 450, 45.45 baud, moved
+  −599 Hz"* the next. Each change used to reflow the panel and shift the scope
+  under the mouse that was tuning it. In Contest Mode both lines keep two
+  lines' worth of height whatever they say.
+- **The decoder stops.** Hiding the **Decode** pane hides its **Stop** button
+  with it, so turning Contest Mode on stops the decoder rather than leaving it
+  running where nothing can stop it. Turn Contest Mode off and press **Start**
+  again to get it back.
+
+Everything else is unchanged: **Auto** and **From radio** are still there,
+**Tones only** still shrinks it to the figure alone, and the panel still pops
+out into a window of its own ([§5.18](#518-pop-out-windows)) at whatever size
+you leave it. The same switch, under the same name, is in Yaesu Web Control —
+where there is no decode pane to leave out, so it hides the hint text and
+steadies the two lines.
 
 ---
 

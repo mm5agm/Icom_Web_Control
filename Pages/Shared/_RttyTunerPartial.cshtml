@@ -1,4 +1,5 @@
 @model bool
+@inject Icom_Web_Control.Services.ISettingsService SettingsSvc
 @{
     // The RTTY panel's markup and CSS, shared by the main page's floating
     // dialog and the /RttyTuner pop-out window. Three sections in one panel:
@@ -18,6 +19,11 @@
     // Model: true for the pop-out, which swaps the Pop out button for
     // Reattach; its close button closes the window rather than the dialog.
     var popout = Model;
+
+    // RTTY Contest Mode (Settings) leaves only the Tune section. Read here
+    // rather than passed in, so the main page's dialog and the pop-out window
+    // cannot end up disagreeing about it.
+    var contest = (await SettingsSvc.GetSettingsAsync()).RttyContestMode;
 }
 <style>
     /* Wide enough for the two columns the layout is built around: the decode
@@ -61,6 +67,29 @@
     #rttyTunerDialog.rtty-compact .rtty-col-main { display:none !important; }
     #rttyTunerDialog.rtty-compact .rtty-body { padding:0.25rem !important; }
     #rttyTunerDialog.rtty-compact { min-width:160px; min-height:160px; }
+
+    /* Contest Mode: the Tune section on its own. The same hide as Tones only
+       uses for the other two sections, but from a setting rather than a button,
+       and the tone controls stay - Mark, Shift, Speed, Rev, From radio and Auto
+       are the whole point of the panel once the decode has gone. Narrower to
+       match: the 820px default is sized for two columns, and one column left at
+       that width is mostly empty space on a screen a contest is already
+       fighting over. */
+    #rttyTunerDialog.rtty-contest .rtty-col-main,
+    #rttyTunerDialog.rtty-contest .rtty-hint { display:none !important; }
+    #rttyTunerDialog.rtty-contest:not(.rtty-popout) { width:360px; }
+    #rttyTunerDialog.rtty-contest .rtty-col-tune { flex:1 1 auto; }
+
+    /* The one thing Bruce VK2RT asked for and did not get: a panel that holds
+       still. Both lines are live regions whose text changes length as the tuner
+       reports - "Stopped." to "Auto: shift 450, 45.45 baud, moved -599 Hz" and
+       back - and each reflow moved the scope under a mouse that was tuning.
+       Two lines' worth of room is reserved so the text can grow into it instead
+       of pushing. min-height, not height: a long message still wraps rather
+       than being clipped, and it is only the common case that has to stop
+       jumping. */
+    #rttyTunerDialog.rtty-contest #rttyTunerInfo,
+    #rttyTunerDialog.rtty-contest #rttyTunerStatus { min-height:2.4em; }
 
     /* Shown only in the pop-out, which stays open when the mode changes
        rather than vanishing off a second monitor. */
@@ -110,11 +139,11 @@
      server's demodulator makes of the same audio. Non-modal so the VFO stays
      in reach. -->
 <dialog id="rttyTunerDialog" open="@popout"
-        class="@(popout ? "rtty-popout user-sized" : null)"
+        class="@(string.Join(" ", new[] { popout ? "rtty-popout user-sized" : null, contest ? "rtty-contest" : null }.Where(c => c is not null)))"
         style="@(popout ? null : "border:1px solid #555; border-radius:8px; background:#222; color:#eee; padding:0;")"
         aria-labelledby="rttyTunerTitle">
     <div class="rtty-header d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #444;">
-        <strong id="rttyTunerTitle">RTTY</strong>
+        <strong id="rttyTunerTitle">@(contest ? "RTTY Tuner" : "RTTY")</strong>
         <div class="d-flex align-items-center gap-1">
             <button id="rttyTunerCompactBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-pressed="false"
                     title="Tones only - show just the scope, without the settings, the readouts or the decoded text"

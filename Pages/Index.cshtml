@@ -2791,7 +2791,20 @@
             // tuner, so there is nothing to wire between the two here. It
             // follows the dialog being open by itself - see _followDialog -
             // which is why it needs no entry in the pop-out below either.
-            window.rttyReader = new RttyReader().init();
+            //
+            // Contest Mode (Settings) hides the Decode section, and with it the
+            // reader's own Start/Stop button. Starting the reader then would
+            // poll for text nothing can show, and - worse - a decode left
+            // running on the server from an earlier session would have no
+            // button anywhere to stop it. So: do not start it, and stop the
+            // server once on load. The flag is read off the class the partial
+            // put on the dialog, so this page and the pop-out cannot disagree
+            // about it. See ApplicationSettings.RttyContestMode.
+            if (document.getElementById('rttyTunerDialog')?.classList.contains('rtty-contest')) {
+                fetch('/api/rtty/reader/stop', { method: 'POST' }).catch(() => { });
+            } else {
+                window.rttyReader = new RttyReader().init();
+            }
             // The tuner can live in a window of its own (/RttyTuner) too. Each
             // window holds the radio's audio under its own lease, so popping
             // out - which closes the dialog here - does not stop the figure.
