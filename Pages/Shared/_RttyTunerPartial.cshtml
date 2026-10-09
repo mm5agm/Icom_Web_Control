@@ -180,7 +180,17 @@
                        operator goes looking for it. aria-live is polite, so it
                        waits for a gap rather than talking over anything. *@
                     <div id="rttyReaderOut" role="log" aria-live="polite" aria-label="Decoded RTTY text" tabindex="0"></div>
-                    <div id="rttyReaderStatus" role="status" aria-live="polite">Stopped.</div>
+                    @* The numbers go in their own line, which is NOT a live region:
+                       they change twice a second, and announcing them would talk
+                       over the decoded text that the operator actually wants. The
+                       status line below is the live region and says only the few
+                       things that change - the tuner column splits its two lines
+                       the same way. *@
+                    <div id="rttyReaderInfo" class="mt-1"
+                         style="font-family:ui-monospace,Consolas,monospace; font-size:0.72rem; color:#9ab;">
+                        Waiting.
+                    </div>
+                    <div id="rttyReaderStatus" class="small" role="status" aria-live="polite">Stopped.</div>
                 </div>
 
                 @* Send is here so the shape of the finished panel is visible,
