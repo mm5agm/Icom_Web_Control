@@ -344,6 +344,38 @@ namespace Icom_Web_Control.Services.Rtty
                 var (m, s) = TonesFor(_state.ModeA, _markHz, _shiftHz, _reverse);
                 if (m != _scope.MarkHz || s != _scope.SpaceHz) _scope.SetTones(m, s);
             }
+
+            // Outside the lock, because it writes to the radio, and only when
+            // there is something to write: the mode arrives on every third poll
+            // loop and the usual answer is "still RTTY, nothing to do".
+            if (_mode.HeldMode is not null
+                && RttyMarkCentre.SidebandForFskMode(_state.ModeA) is null)
+            {
+                _ = HoldModeAsync();
+            }
+        }
+
+        /// <summary>
+        /// Put the mode back when something outside the tuner has moved it. Any
+        /// failure is logged and dropped: the figure is still worth drawing, and
+        /// a mode that could not be written will be tried again on the next poll
+        /// that reports it.
+        /// </summary>
+        private async Task HoldModeAsync()
+        {
+            try
+            {
+                var note = await _mode.ReassertAsync();
+                if (note is null) return;
+                lock (_gate)
+                {
+                    if (_scope != null) _modeNote = note;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "RTTY tuner: holding the mode threw");
+            }
         }
 
         public void Dispose() => StopNowAsync("shutting down").GetAwaiter().GetResult();

@@ -604,5 +604,19 @@ export function autoModeForHz(hz) {
     // Undefined on pages that never render the flag, so default to on - the
     // behaviour everyone had before this setting existed.
     if (globalThis.iwcAutoModeChangeOnTune === false) return null;
+
+    // A panel whose whole job is to sit in one mode while the operator tunes
+    // around registers itself in globalThis.radioModeHolds while it is open,
+    // and the band plan stands down for as long as it is there.
+    //
+    // Without this, tuning round a signal with the RTTY tuner open takes the
+    // radio out from under it: on 30m the plan says CW for 10.100, so the
+    // click that moved the dial also wrote CW-U, the page's mode guard saw a
+    // mode the tuner is no use in and closed the dialog two seconds later, and
+    // the tuner's own restore then put the pre-tuner mode back. From the bench,
+    // 2026-10-09: "when i change the frequency, the radio reverts to cw and
+    // rtty tune stops". The mode is the panel's until the operator closes it.
+    if (globalThis.radioModeHolds?.size) return null;
+
     return modeForHz(hz);
 }

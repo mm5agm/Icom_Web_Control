@@ -69,6 +69,12 @@ namespace Icom_Web_Control.Services.Rtty
 
         private Saved? _saved;
 
+        // The FSK mode the tuner is operating in and will put back if something
+        // else moves the radio out of it - null when the tuner is not holding
+        // the mode at all, which is every AFSK session: there the mode is the
+        // operator's software's business and nothing here may touch it.
+        private string? _heldMode;
+
         // The shift and speed the filter was last sized for. Every poll of the
         // figure is preceded by a start, and a start that read the mode and the
         // filter width would put two CI-V round trips in front of every one of
@@ -91,6 +97,14 @@ namespace Icom_Web_Control.Services.Rtty
         private sealed record Saved(string? Mode, int IfWidthHz);
 
         public bool IsOn => _saved is not null;
+
+        /// <summary>
+        /// The FSK mode being held for as long as the tuner runs, or null if
+        /// none is. Read without the gate on purpose: it is a single reference
+        /// and the only caller is deciding whether a re-assert is worth a task
+        /// at all, which <see cref="ReassertAsync"/> then re-checks properly.
+        /// </summary>
+        public string? HeldMode => _heldMode;
 
         /// <summary>
         /// Make sure the radio can carry this signal, saving what was there the
@@ -149,6 +163,16 @@ namespace Icom_Web_Control.Services.Rtty
                 var widened = await WidenIfNeededAsync(shiftHz, baud, ct);
                 _sizedFor = (shiftHz, baud);
 
+                // What to hold. The mode the radio is in now, if it is one of
+                // the radio's own FSK modes - which is either the one just
+                // written or one it was already in. An AFSK session holds
+                // nothing: RTTY-L would be the wrong answer there, and the
+                // operator did not ask for it.
+                var effective = RttyMarkCentre.SidebandForFskMode(_state.ModeA) is not null
+                    ? _state.ModeA
+                    : null;
+                _heldMode = effective;
+
                 return Join(switched, widened);
             }
             finally { _gate.Release(); }
@@ -195,8 +219,55 @@ namespace Icom_Web_Control.Services.Rtty
                 // which is more use than a service that believes it already has.
                 _saved = null;
                 _sizedFor = null;
+                _heldMode = null;
                 _logger.LogInformation("RTTY tuner: restored mode {Mode}, IF width {Width} Hz",
                                        saved.Mode, saved.IfWidthHz);
+            }
+            finally { _gate.Release(); }
+        }
+
+        /// <summary>
+        /// Put the held mode back when something else has moved the radio out of
+        /// it while the tuner is running. Returns a line for the status bar when
+        /// it had to act, null when there was nothing to do.
+        ///
+        /// <para>The operator's own front panel is the obvious cause, but not the
+        /// common one. A band change recalls that band's stacking register, which
+        /// carries the mode the band was last used in, so simply moving from 30 m
+        /// to 20 m can land the radio in CW with nobody having asked for it. The
+        /// page's mode guard then closes the panel two seconds later and the stop
+        /// restores the pre-tuner mode, so an incidental mode change ends the
+        /// session - which is what the bench reported on 2026-10-09.</para>
+        ///
+        /// <para><b>While the tuner is open the mode is the tuner's.</b> Leaving
+        /// RTTY is done by closing it, which is also the only thing that puts
+        /// the operator's own mode back. Nothing is held in an AFSK session: see
+        /// <see cref="_heldMode"/>.</para>
+        /// </summary>
+        public async Task<string?> ReassertAsync(CancellationToken ct = default)
+        {
+            if (_heldMode is null) return null;
+            if (RttyMarkCentre.SidebandForFskMode(_state.ModeA) is not null) return null;
+
+            await _gate.WaitAsync(ct);
+            try
+            {
+                // Re-read everything inside the gate. A restore may have run
+                // while this was waiting for it, in which case the mode is
+                // deliberately not RTTY any more and writing one back would
+                // undo the operator's own settings a moment after returning
+                // them.
+                if (_heldMode is not { } hold) return null;
+                var now = _state.ModeA;
+                if (RttyMarkCentre.SidebandForFskMode(now) is not null) return null;
+                if (!_radio.IsConnected) return null;
+
+                await _radio.SetModeAsync(RadioVfo.A, hold, ct);
+                _state.ModeA = hold;
+                _logger.LogInformation(
+                    "RTTY tuner: mode went to {From} with the tuner open, held at {To}", now, hold);
+
+                return $"Mode went to {now} - held at {hold}. Close the tuner to leave RTTY.";
             }
             finally { _gate.Release(); }
         }
