@@ -216,6 +216,11 @@ namespace Icom_Web_Control.Pages
                 current.CwAudioDeviceName = (Settings.CwAudioDeviceName ?? "").Trim();
                 current.CwReaderFilterHz  = Math.Clamp(Settings.CwReaderFilterHz, 50, 1000);
                 current.CwReaderUseApf    = Settings.CwReaderUseApf;
+                // Contest Mode arrived with its checkbox and without this
+                // line, so the switch would not stay where it was put: this
+                // handler copies field by field, and a property it does not
+                // name is discarded on save behind a "saved successfully".
+                current.RttyContestMode    = Settings.RttyContestMode;
                 current.RttyTunerSetMode   = Settings.RttyTunerSetMode;
                 current.RttyAutoCentreMark = Settings.RttyAutoCentreMark;
 
