@@ -1297,7 +1297,7 @@ has any way of knowing that the audio is wrong.
 
 | Setting | What it does |
 |---|---|
-| **Set RTTY mode when the tuner starts** | Puts VFO A into **RTTY-L** if it was in a mode RTTY cannot be received in at all — CW, AM or FM — and opens the IF filter if it is too narrow to carry the shift you are tuned for. Your mode and filter are put back when the tuner stops. |
+| **Set RTTY mode when the tuner starts** | Puts VFO A into **RTTY-L** if it was in a mode RTTY cannot be received in at all — CW, AM or FM — and opens the IF filter if it is too narrow to carry both of your tones. Your mode and filter are put back when the tuner stops. |
 | **Auto also tunes the signal in** | When **Auto** is sure of what it heard, the dial moves so the mark tone arrives on the tuner's **Mark**, and the status line says which way it went and by how much. |
 
 **What the first one will not do.** It only ever takes the radio *out of* CW, AM,
@@ -1306,8 +1306,19 @@ they are** — the two FSK modes need nothing done to them, and in SSB or DATA t
 tones are being made by your own software with the radio as a plain SSB
 transceiver, which is a perfectly good way to run the tuner and one this
 switching would break. It also **never narrows a filter**, only widens one that
-could not have carried the shift: a narrow filter is how you dig a signal out of
+could not have carried both tones: a narrow filter is how you dig a signal out of
 a crowded band, and only you know what else is on the band.
+
+**How wide it asks for.** Not the shift plus a little, which is the figure most
+RTTY writing quotes. This radio holds its RTTY passband centred on the **mark**
+tone, so the space tone sits the whole shift away from the middle of the filter
+and is the first thing to be lost — measured on the bench, a 550 Hz filter put
+the space tone of a 450 Hz shift signal 33 dB down and decoded nothing at all,
+while 1200 Hz read it cleanly. So it asks for roughly twice the shift plus a
+little for the keying, and it reads the width back afterwards so the figure you
+are shown is the one the radio actually took. If the pair sits too far from the
+middle of the passband for even the widest filter, it tells you and asks you to
+move the dial.
 
 **What the second one will not do.** It will not move the mark further than your
 IF filter is wide, and never less than 500 Hz whatever the filter — past the
@@ -3160,7 +3171,7 @@ Drag the panel narrower than about 640 pixels and the two columns fold into one,
 Nothing here transmits. It does change three things on the receiver, all of them so that the figure can be believed, and all of them undone when you close it:
 
 - **It puts the radio into RTTY** if it was in a mode RTTY cannot be received in at all — CW, AM or FM — and puts your mode back afterwards ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
-- **It opens the IF filter** if the filter is too narrow to carry the shift you are set to. It never narrows one.
+- **It opens the IF filter** if the filter is too narrow to carry both tones. It never narrows one. How wide is wide enough depends on where your tones sit in the audio and not only on the shift, because this radio centres its RTTY passband on the **mark** tone — so the space tone is the one that falls off the edge, and a 450 Hz shift needs about 1 kHz of filter rather than the 550 Hz the usual rule-of-thumb suggests. If even the widest filter cannot reach both tones the status line says so and asks you to move the dial, which is the only thing that can fix it.
 - **Auto moves the dial** to bring the signal onto the tones, when it is sure of what it heard, and says so ([§20.3](#203-auto-working-out-what-you-are-listening-to)).
 
 It will also put the radio's own **RTTY Mark Frequency** and **Shift Width** menu in step with what you choose, so its built-in decoder does not have to be set twice ([§20.2](#202-mark-shift-speed-and-rev)). Both of the automatic changes can be turned off on the Settings page, and fine-tuning by hand works exactly as it always did.

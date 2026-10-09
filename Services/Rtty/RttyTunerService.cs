@@ -182,7 +182,7 @@ namespace Icom_Web_Control.Services.Rtty
             // which side of the mark the space tone sits on, so a mode change
             // after the filters were placed would place them on the wrong sides.
             // Only the first start of a run changes anything - see EnsureAsync.
-            var modeNote = await _mode.EnsureAsync(shiftHz, baud);
+            var modeNote = await _mode.EnsureAsync(markHz, shiftHz, baud);
 
             bool acquire;
             bool changed;
