@@ -490,13 +490,14 @@ namespace Icom_Web_Control.Services.Rtty
                 measuredMarkHz: result.MarkHz,
                 wantedMarkHz:   wanted,
                 lowerSideband:  lowerSideband,
-                confidence:     result.Confidence);
+                confidence:     result.Confidence,
+                maxOffsetHz:    PassbandCapHz());
             if (offset is null)
             {
                 _logger.LogInformation(
                     "RTTY Auto: mark {Measured:F0} Hz against {Wanted:F0} Hz wanted, " +
-                    "confidence {Conf:F2} - dial left alone",
-                    result.MarkHz, wanted, result.Confidence);
+                    "confidence {Conf:F2}, passband {Cap:F0} Hz - dial left alone",
+                    result.MarkHz, wanted, result.Confidence, PassbandCapHz());
                 return;
             }
 
@@ -575,6 +576,33 @@ namespace Icom_Web_Control.Services.Rtty
 
             return notes.Count == 0 ? null : string.Join(" ", notes);
         }
+
+        /// <summary>
+        /// How far the dial may move in one press: the width of the filter the
+        /// signal arrived through.
+        ///
+        /// <para>A tone the analyser measured is a tone that came out of the IF
+        /// filter, so it cannot have been further from the dial than that filter
+        /// is wide. That makes the filter width the honest limit, and a far better
+        /// one than a constant: it tightens itself when the operator narrows down
+        /// on a signal and opens up when they go looking for one.</para>
+        ///
+        /// <para><b>Why not the old flat 500 Hz.</b> On 2026-10-09 DDK9 was
+        /// copying through a 1200 Hz filter with its mark 619 Hz off the wanted
+        /// 2125 - decoding, plainly the right station, and twice refused with
+        /// "dial left alone" because 619 is more than 500. The operator moved the
+        /// VFO by hand instead, which is the job this feature exists to do.</para>
+        ///
+        /// <para>Nothing here can make the guard stricter than that old constant:
+        /// <see cref="RttyMarkCentre.ComputeOffsetHz"/> takes the larger of this
+        /// and <see cref="RttyMarkCentre.MaxOffsetHz"/>, so an unparseable width,
+        /// a disconnected radio or a 250 Hz CW filter all behave exactly as they
+        /// did before. The narrow-filter case has its own answer anyway, in
+        /// <see cref="NarrowFilterNote"/>, which tells the operator rather than
+        /// silently guessing for them.</para>
+        /// </summary>
+        private double PassbandCapHz()
+            => int.TryParse(_state.IfWidthA, out var hz) && hz > 0 ? hz : 0;
 
         private string? NarrowFilterNote()
         {
