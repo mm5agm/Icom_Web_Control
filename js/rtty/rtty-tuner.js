@@ -1,4 +1,4 @@
-// RTTY crossed-ellipse tuning scope.
+﻿// RTTY crossed-ellipse tuning scope.
 //
 // How RTTY was tuned before anything had a waterfall: the terminal unit's mark
 // filter went to the X plates of an oscilloscope and its space filter to the Y
@@ -425,6 +425,31 @@ export class RttyTuner {
                 return;
             }
 
+            // Half a signal: one of the two tones was outside what the analyser
+            // could see, so the mark is sound and the shift and the speed are not.
+            // This is not a low-confidence answer and cannot be caught as one -
+            // bench-measured at 0.92 and 0.97 - so it is tested before the
+            // confidence gate and answered on its own terms.
+            //
+            // Nothing is written. The dial has already moved on the strength of
+            // the tone that was real, which brings the rest of the signal into
+            // view, so pressing Auto again measures it properly; what must not
+            // happen is the working shift and speed in the dialog being replaced
+            // by figures measured from a fragment, which is what used to happen
+            // silently. The settings are left exactly as the operator had them.
+            if (r.halfSignal) {
+                const moved = r.centreOffsetHz
+                    ? `Moved the dial ${Math.abs(Math.round(r.centreOffsetHz))} Hz ` +
+                      `${r.centreOffsetHz < 0 ? 'down' : 'up'} towards it - press Auto ` +
+                      `again to measure it.`
+                    : `Tune it closer to the middle of the passband and try again.`;
+                this._setStatus(
+                    `Auto: only one of the two tones was in range, so the shift and ` +
+                    `speed could not be measured and have been left alone. ${moved}` +
+                    advice, 12000);
+                return;
+            }
+
             if (r.confidence < 0.4) {
                 this._setStatus(
                     `Could not make sense of it - that may not be RTTY, or another ` +
@@ -444,9 +469,16 @@ export class RttyTuner {
             const shiftHz = r.snappedShiftHz ?? r.shiftHz;
             const baudHz  = r.snappedBaud    ?? r.baud;
 
+            // The speed is the one field that can arrive uncorroborated on an
+            // otherwise good answer. Both halves of the capture found the same
+            // two tones and agreed which was the mark, and one of them read the
+            // keying at a different speed - which is what a fade does to that
+            // measurement, not evidence that the station changed speed. The
+            // operator's speed is nearly always 45.45 and nearly always right,
+            // so it is kept; everything the halves did agree on is applied.
             this._settings.markHz  = Math.round(r.markHz);
             this._settings.shiftHz = shiftHz;
-            this._settings.baud    = baudHz;
+            if (!r.speedUnmeasured) this._settings.baud = baudHz;
             this._settings.reverse = !!r.reverse;
             this._showSettings();
             this._saveSettings();
@@ -468,7 +500,9 @@ export class RttyTuner {
             try { await this._pushToRadio(); } finally { this._pushQuiet = false; }
 
             const shift = r.snappedShiftHz == null ? `${shiftHz} Hz measured` : `${shiftHz} Hz`;
-            const baud  = r.snappedBaud    == null ? `${baudHz} baud measured`  : `${baudHz} baud`;
+            const baud  = r.speedUnmeasured
+                ? `speed left at ${this._settings.baud} - it did not measure twice`
+                : r.snappedBaud == null ? `${baudHz} baud measured` : `${baudHz} baud`;
             const parts = [`mark ${Math.round(r.markHz)} Hz`, `shift ${shift}`, baud];
             if (r.reverse) parts.push('reversed');
 
