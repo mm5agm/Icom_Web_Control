@@ -1,4 +1,4 @@
-namespace Icom_Web_Control.Models
+﻿namespace Icom_Web_Control.Models
 {
     public class ApplicationSettings
     {
@@ -259,6 +259,52 @@ namespace Icom_Web_Control.Models
         // reading may not want it. When on, Reader Mode asks for MID rather
         // than NAR - see CwReaderModeService for why.
         public bool CwReaderUseApf { get; set; } = true;
+
+        // Whether starting the RTTY tuner puts the radio into RTTY first.
+        //
+        // The tuner opens on whatever the radio was last doing, and a CW filter
+        // cannot carry an RTTY tone pair - so the figure draws a convincing
+        // ellipse out of one tone and the skirt of the other, which is worse than
+        // drawing nothing. On by default for that reason. Switchable because an
+        // operator running AFSK from their own software owns their radio's mode,
+        // and because anyone who would rather the software never touched the mode
+        // is entitled to that. RttyTunerModeService only ever switches out of the
+        // modes RTTY cannot be copied in at all, and only ever widens a filter.
+        public bool RttyTunerSetMode { get; set; } = true;
+
+        // Whether a confident Auto answer also moves the VFO so the measured mark
+        // lands on the tuner's mark.
+        //
+        // Measured on the bench on 2026-10-08: with the dial 350 Hz out, Auto got
+        // the 450 Hz shift right on eight presses out of eight and the speed right
+        // on three, because a tone pair off-centre in the IF arrives with one tone
+        // attenuated and keying with unequal halves cannot be timed. Correcting
+        // the tuning is therefore what a confident tone measurement is worth
+        // spending. Switchable because it moves the operator's VFO, which is
+        // their property; and refused anyway unless the radio is in its own FSK
+        // mode - see RttyMarkCentre.
+        public bool RttyAutoCentreMark { get; set; } = true;
+
+        // Whether the RTTY panel shows only what you need to tune a signal in:
+        // the tone controls and the crossed-ellipse scope, without the Decode
+        // and Send sections.
+        //
+        // Named for what asks for it. A contest operator already has a decoder
+        // - MMTTY, 2Tone, N1MM's own - and what they want from IWC is the one
+        // thing their logger cannot draw: the crossed figure, small, on a
+        // second monitor, next to everything else fighting for that screen.
+        // Bruce VK2RT asked for a smaller tuner window after CQ WW RTTY 2026,
+        // and the thing he asked for and did not get was a panel that stops
+        // changing size while he is working - see the status line's reserved
+        // height in _RttyTunerPartial.
+        //
+        // Off by default: the Decode section is the reason most operators open
+        // the panel at all, and a setting that hides the feature you came for
+        // should be one you asked for. With it on, the pages do not start the
+        // reader - its Stop button is not on screen to press, and a decoder
+        // running where nobody can stop it is the trap this comment exists to
+        // record.
+        public bool RttyContestMode { get; set; } = false;
 
         // Per-band IF Width/Shift/Mode memory — keyed by band name (e.g. "20m")
         public Dictionary<string, BandProfile> BandProfilesA { get; set; } = new();

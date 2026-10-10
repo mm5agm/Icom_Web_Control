@@ -66,6 +66,7 @@ namespace Icom_Web_Control.Services.Rtty
 
         private readonly ReceiveAudioHold _audio;
         private readonly RadioStateService _state;
+        private readonly RttyTunerModeService _mode;
         private readonly ILogger<RttyTunerService> _logger;
         private readonly object _gate = new();
 
@@ -76,6 +77,8 @@ namespace Icom_Web_Control.Services.Rtty
         private double _markHz = DefaultMarkHz;
         private int _shiftHz = DefaultShiftHz;
         private bool _reverse;
+        // What RttyTunerModeService changed about the radio, for the status line.
+        private string? _modeNote;
         // The scope does not use this - it is two filters and speed means nothing
         // to it. It is held here because this is the server-side record of what the
         // operator is listening to, and the reader that decodes it will want it. On
@@ -89,14 +92,43 @@ namespace Icom_Web_Control.Services.Rtty
 
         public RttyTunerService(ReceiveAudioHold audio,
                                 RadioStateService state,
+                                RttyTunerModeService mode,
                                 ILogger<RttyTunerService> logger)
         {
             _audio = audio;
             _state = state;
+            _mode = mode;
             _logger = logger;
         }
 
         public bool IsRunning { get { lock (_gate) return _scope != null; } }
+
+        /// <summary>
+        /// What the operator has said they are listening to. Held here, and
+        /// readable whether the scope is running or not, because this dialog is
+        /// where those four figures are set and this service is where they
+        /// survive a page reload - so the reader asks the tuner rather than
+        /// keeping a second copy that could disagree with the figure on screen.
+        ///
+        /// <para>Note what is <em>not</em> here: where the two tones actually
+        /// land in the audio. That depends on the radio's mode as well, which
+        /// moves under both of us, so each side works it out from
+        /// <see cref="TonesFor"/> against the mode of the moment rather than
+        /// being handed a pair that was right a second ago.</para>
+        /// </summary>
+        public RttyListening Listening
+        {
+            get { lock (_gate) return new RttyListening(_markHz, _shiftHz, _reverse, _baud); }
+        }
+
+        /// <summary>
+        /// The operator has changed one of those four. Raised outside the lock,
+        /// and only on a real change: a start that re-sends the same settings -
+        /// which every re-poll of a second browser window does - says nothing,
+        /// because a listener that rebuilds a decoder on it would be rebuilding
+        /// it several times a second and never decode a character.
+        /// </summary>
+        public event Action<RttyListening>? ListeningChanged;
 
         /// <summary>
         /// Where the mark and space filters go, in audio Hz. Pure and static,
@@ -145,13 +177,28 @@ namespace Icom_Web_Control.Services.Rtty
             // military and aviation circuits.
             if (baud < 20 || baud > 300) return "Speed must be between 20 and 300 baud.";
 
+            // Before the lock, and before the tones are worked out, because the
+            // mode is an input to both: TonesFor reads _state.ModeA to decide
+            // which side of the mark the space tone sits on, so a mode change
+            // after the filters were placed would place them on the wrong sides.
+            // Only the first start of a run changes anything - see EnsureAsync.
+            var modeNote = await _mode.EnsureAsync(markHz, shiftHz, baud);
+
             bool acquire;
+            bool changed;
             lock (_gate)
             {
+                changed = _markHz != markHz || _shiftHz != shiftHz
+                       || _reverse != reverse || _baud != baud;
                 _markHz = markHz;
                 _shiftHz = shiftHz;
                 _reverse = reverse;
                 _baud = baud;
+                // Kept rather than returned: StartAsync's return value is an
+                // error, and what the mode service did is not an error. It rides
+                // out on the next frame so every window showing the figure says
+                // the same thing, including one that opened afterwards.
+                if (modeNote != null) _modeNote = modeNote;
                 _leases.Start(client, DateTime.UtcNow);
 
                 var (m, s) = TonesFor(_state.ModeA, _markHz, _shiftHz, _reverse);
@@ -171,6 +218,11 @@ namespace Icom_Web_Control.Services.Rtty
                 acquire = !_holdsCapture && !_acquiring;
                 if (acquire) _acquiring = true;
             }
+
+            // Outside the lock: a handler that rebuilt a decoder while holding
+            // it would be holding this one too, and this one is taken on every
+            // audio frame.
+            if (changed) ListeningChanged?.Invoke(new RttyListening(markHz, shiftHz, reverse, baud));
 
             if (acquire)
             {
@@ -240,9 +292,15 @@ namespace Icom_Web_Control.Services.Rtty
                 // finds the scope gone, so only a completed hold is ours.
                 release = _holdsCapture;
                 _holdsCapture = false;
+                _modeNote = null;
             }
 
             if (release) await _audio.ReleaseAsync();
+
+            // After the audio, because the restore talks to the radio over the
+            // same 19200-baud bus the scope was polling, and outside the lock
+            // because it awaits. A no-op unless the start changed something.
+            await _mode.RestoreAsync();
             _logger.LogInformation("RTTY tuner stopped ({Why})", why);
         }
 
@@ -275,6 +333,7 @@ namespace Icom_Web_Control.Services.Rtty
                 Baud             = _baud,
                 CaptureError     = _captureError,
                 AudioDevicesOpen = _audio.Source.DeviceOpen,
+                ModeNote         = _modeNote,
             };
             if (f == null) return frame;
 
@@ -320,10 +379,50 @@ namespace Icom_Web_Control.Services.Rtty
                 var (m, s) = TonesFor(_state.ModeA, _markHz, _shiftHz, _reverse);
                 if (m != _scope.MarkHz || s != _scope.SpaceHz) _scope.SetTones(m, s);
             }
+
+            // Outside the lock, because it writes to the radio, and only when
+            // there is something to write: the mode arrives on every third poll
+            // loop and the usual answer is "still RTTY, nothing to do".
+            if (_mode.HeldMode is not null
+                && RttyMarkCentre.SidebandForFskMode(_state.ModeA) is null)
+            {
+                _ = HoldModeAsync();
+            }
+        }
+
+        /// <summary>
+        /// Put the mode back when something outside the tuner has moved it. Any
+        /// failure is logged and dropped: the figure is still worth drawing, and
+        /// a mode that could not be written will be tried again on the next poll
+        /// that reports it.
+        /// </summary>
+        private async Task HoldModeAsync()
+        {
+            try
+            {
+                var note = await _mode.ReassertAsync();
+                if (note is null) return;
+                lock (_gate)
+                {
+                    if (_scope != null) _modeNote = note;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "RTTY tuner: holding the mode threw");
+            }
         }
 
         public void Dispose() => StopNowAsync("shutting down").GetAwaiter().GetResult();
     }
+
+    /// <summary>
+    /// The four figures the operator sets in the RTTY dialog. Mark and shift
+    /// place the tones, Reverse flips which is which, and Baud is the sending
+    /// speed - which the scope has no use for and the reader cannot work
+    /// without.
+    /// </summary>
+    public sealed record RttyListening(double MarkHz, int ShiftHz, bool Reverse, double Baud);
 
     public sealed class RttyTunerFrame
     {
@@ -341,6 +440,13 @@ namespace Icom_Web_Control.Services.Rtty
         /// </summary>
         public double  Baud             { get; set; }
         public string? CaptureError     { get; set; }
+        /// <summary>
+        /// What was changed about the radio so that the figure could be trusted -
+        /// a mode switch, a widened filter, or both. Null when nothing was, which
+        /// is the usual case: an operator already in RTTY with a sensible filter
+        /// is told nothing, because nothing happened to them.
+        /// </summary>
+        public string? ModeNote        { get; set; }
         public bool    AudioDevicesOpen { get; set; }
 
         /// <summary>Interleaved x (mark filter), y (space filter), -1000..1000 of Peak.</summary>
