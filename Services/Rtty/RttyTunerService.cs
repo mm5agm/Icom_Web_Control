@@ -182,7 +182,7 @@ namespace Icom_Web_Control.Services.Rtty
             // which side of the mark the space tone sits on, so a mode change
             // after the filters were placed would place them on the wrong sides.
             // Only the first start of a run changes anything - see EnsureAsync.
-            var modeNote = await _mode.EnsureAsync(markHz, shiftHz, baud);
+            var modeNote = await _mode.EnsureAsync(markHz, shiftHz, baud, reverse);
 
             bool acquire;
             bool changed;
@@ -316,15 +316,18 @@ namespace Icom_Web_Control.Services.Rtty
         public RttyTunerFrame Frame(int points, string? client = null)
         {
             RttyScopeFrame? f;
+            bool hostRunning;
             lock (_gate)
             {
-                f = _scope != null && _leases.Poll(client, DateTime.UtcNow) ? _scope.Snapshot(points) : null;
+                hostRunning = _scope != null;
+                f = hostRunning && _leases.Poll(client, DateTime.UtcNow) ? _scope!.Snapshot(points) : null;
             }
 
             var (mark, space) = TonesFor(_state.ModeA, _markHz, _shiftHz, _reverse);
             var frame = new RttyTunerFrame
             {
                 Running          = f != null,
+                HostRunning      = hostRunning,
                 Mode             = _state.ModeA ?? "",
                 MarkHz           = f?.MarkHz ?? mark,
                 SpaceHz          = f?.SpaceHz ?? space,
@@ -427,6 +430,14 @@ namespace Icom_Web_Control.Services.Rtty
     public sealed class RttyTunerFrame
     {
         public bool    Running          { get; set; }
+
+        /// <summary>
+        /// The scope is running for some window, which need not be the one
+        /// asking. A window whose lease lapsed - a background tab, polled once
+        /// a minute - rejoins on the settings already running instead of
+        /// starting the host again on its own stale ones.
+        /// </summary>
+        public bool    HostRunning      { get; set; }
         public string  Mode             { get; set; } = "";
         public double  MarkHz           { get; set; }
         public double  SpaceHz          { get; set; }
