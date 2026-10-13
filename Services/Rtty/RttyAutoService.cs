@@ -51,6 +51,7 @@ namespace Icom_Web_Control.Services.Rtty
         private readonly IRadioController _radio;
         private readonly ISettingsService _settings;
         private readonly ILogger<RttyAutoService> _logger;
+        private readonly RttyTunerModeService _tunerMode;
 
         // One analysis at a time. Two at once would both be correct - they would
         // simply hear the same audio - but they would also both hold the device and
@@ -62,8 +63,10 @@ namespace Icom_Web_Control.Services.Rtty
                                RadioStateService state,
                                IRadioController radio,
                                ISettingsService settings,
+                               RttyTunerModeService tunerMode,
                                ILogger<RttyAutoService> logger)
         {
+            _tunerMode = tunerMode;
             _audio = audio;
             _state = state;
             _radio = radio;
@@ -86,8 +89,16 @@ namespace Icom_Web_Control.Services.Rtty
             if (!await _one.WaitAsync(0, ct))
                 return RttyAutoResult.Failed("Already listening - wait for that to finish.");
 
+            // The filter the tuner left may be narrow, sized for the last
+            // station, and a station that is not in it cannot be found. Opened
+            // for the listen and put back below unless this press ends with the
+            // pair centred, when the next start sizes it for the new one.
+            int? listenedFrom = null;
+            bool centred = false;
             try
             {
+                listenedFrom = await _tunerMode.BeginListeningAsync(ct);
+
                 var (audio, captureError) = await ListenAsync(ct);
                 if (captureError != null)
                     return RttyAutoResult.Failed(captureError);
@@ -135,11 +146,16 @@ namespace Icom_Web_Control.Services.Rtty
                 // Inside the semaphore, so two presses cannot both decide to move
                 // the same radio, and after Describe so the figures reported are
                 // the ones the decision was taken on.
-                await CentreAsync(result, wantedMarkHz, ct);
+                centred = await CentreAsync(result, wantedMarkHz, ct);
                 return result;
             }
             finally
             {
+                if (listenedFrom is { } width && !centred)
+                {
+                    try { await _tunerMode.EndListeningAsync(width, CancellationToken.None); }
+                    catch (Exception ex) { _logger.LogWarning(ex, "RTTY Auto: could not put the IF width back"); }
+                }
                 _one.Release();
             }
         }
@@ -477,23 +493,46 @@ namespace Icom_Web_Control.Services.Rtty
         /// radio is transmitting, because retuning a transmitter mid-transmission
         /// is not something software should do on its own initiative.</para>
         /// </summary>
-        private async Task CentreAsync(RttyAutoResult result, double? wantedMarkHz,
-                                       CancellationToken ct)
+        /// <returns>
+        /// True when the radio has been set up for this pair - menu shift, PBT
+        /// and the passband centre known - so the tuner may size the filter to
+        /// it. The dial itself may or may not have needed moving.
+        /// </returns>
+        private async Task<bool> CentreAsync(RttyAutoResult result, double? wantedMarkHz,
+                                             CancellationToken ct)
         {
-            if (wantedMarkHz is not { } wanted || wanted <= 0) return;
-
             var settings = await _settings.GetSettingsAsync();
-            if (!settings.RttyAutoCentreMark) return;
+            if (!settings.RttyAutoCentreMark) return false;
 
             if (RttyMarkCentre.SidebandForFskMode(result.Mode) is not { } lowerSideband)
             {
                 // Not logged as a refusal. The mode advisory has already told the
                 // operator that the radio is not in RTTY, which is the useful
                 // half, and an AFSK operator has not asked for this at all.
-                return;
+                return false;
             }
 
-            if (!_radio.IsConnected || _state.IsTransmitting) return;
+            if (!_radio.IsConnected || _state.IsTransmitting) return false;
+            if (result.Confidence < RttyMarkCentre.MinConfidence) return false;
+
+            // With the tuner running, the target is not the dialog's mark but
+            // the mark that puts the middle of the pair on the middle of the
+            // passband - that is what lets the filter come down to shift plus
+            // twice the baud. Without it, the old behaviour: the dialog's mark.
+            bool prepared = false;
+            double? target = wantedMarkHz;
+            if (await _tunerMode.CentreForAsync(result.ShiftHz, ct) is { } centre)
+            {
+                prepared = true;
+                if (RttyMarkCentre.MarkForCentredPair(result.MarkHz, result.SpaceHz, centre) is { } m)
+                {
+                    target = m;
+                    _logger.LogInformation(
+                        "RTTY Auto: passband centre {Centre:F0} Hz, pair {Mark:F0}/{Space:F0} - mark wanted at {Target:F0} Hz",
+                        centre, result.MarkHz, result.SpaceHz, m);
+                }
+            }
+            if (target is not { } wanted || wanted <= 0) return prepared;
 
             var offset = RttyMarkCentre.ComputeOffsetHz(
                 measuredMarkHz: result.MarkHz,
@@ -507,7 +546,7 @@ namespace Icom_Web_Control.Services.Rtty
                     "RTTY Auto: mark {Measured:F0} Hz against {Wanted:F0} Hz wanted, " +
                     "confidence {Conf:F2}, passband {Cap:F0} Hz - dial left alone",
                     result.MarkHz, wanted, result.Confidence, PassbandCapHz());
-                return;
+                return prepared;
             }
 
             try
@@ -517,7 +556,7 @@ namespace Icom_Web_Control.Services.Rtty
                 // stale value here would not be a stale display - it would move the
                 // radio somewhere it has already been.
                 long from = await _radio.GetFrequencyHzAsync(RadioVfo.A, ct);
-                if (from <= 0) return;
+                if (from <= 0) return prepared;
 
                 long to = from + offset.Value;
                 await _radio.SetFrequencyHzAsync(RadioVfo.A, to, ct);
@@ -548,6 +587,7 @@ namespace Icom_Web_Control.Services.Rtty
                 // an unmoved dial, which is the state they were already in.
                 _logger.LogWarning(ex, "RTTY Auto: could not move the VFO");
             }
+            return prepared;
         }
 
         /// <summary>
