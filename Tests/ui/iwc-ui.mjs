@@ -457,6 +457,21 @@ test('/radio: has no key that transmits, and nothing clicked here wrote one', as
     } finally { await page.close(); }
 });
 
+test('/radio: band keys and mode keys each sit on one line, labels not clipped', async () => {
+    const page = await radioPage();
+    try {
+        for (const row of ['.rp-bands', '.rp-modes']) {
+            const r = await page.eval(`(() => {
+                const bs = [...document.querySelectorAll('${row} button')];
+                return { n: bs.length, tops: new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size,
+                    clipped: bs.filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent) };
+            })()`);
+            expect(r.n > 0 && r.tops === 1, `${row}: ${r.n} keys on ${r.tops} lines`);
+            expect(r.clipped.length === 0, `${row}: clipped labels ${r.clipped.join(', ')}`);
+        }
+    } finally { await page.close(); }
+});
+
 // The window keys (CW, RTTY, MEMORIES, DX, METERS, RX SETUP) and their windows.
 const winShown = (page, id) => page.eval(`(() => {
     const f = document.querySelector('.rp-win[data-win="${id}"]');
