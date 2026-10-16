@@ -21,7 +21,7 @@ const PAGES = [
     '/', '/About', '/ApplicationSetup', '/AudioFilter', '/Calibrations',
     '/Calibration/MeterCalibration',
     '/CwReader', '/CwSend', '/Diagnostics', '/DxSpots', '/Labels', '/Memories',
-    '/Ports', '/RttyTuner', '/Settings', '/UserManual', '/radio',
+    '/Ports', '/RttyTuner', '/Settings', '/UserManual', '/radio', '/flexui',
 ];
 
 const suite = new Suite(`Icom Web Control UI checks against ${BASE}`);
@@ -452,6 +452,78 @@ test('/radio: has no key that transmits, and nothing clicked here wrote one', as
             await page.eval(`document.querySelectorAll(${JSON.stringify(keys)})[${i}].click()`);
         const bad = (await page.writes()).filter(w => FORBIDDEN.test(w.path));
         expect(bad.length === 0, `transmit writes: ${JSON.stringify(bad)}`);
+    } finally { await page.close(); }
+});
+
+// ---------------------------------------------------------------- Experimental UI (/flexui)
+
+// /flexui is Index moved into the shared dock (core/js/flex). These check the
+// move, not the radio: the hub is stubbed as everywhere else in this file.
+const flexWhere = (page, c) => page.eval(`(() => { const s = document.querySelector('[data-ywc-component="${c}"]'); if (!s) return 'gone'; return s.closest('#ywcFlexParking') ? 'parked' : s.closest('#ywcFlexHost') ? 'docked' : 'elsewhere'; })()`);
+const openFlex = async () => {
+    const page = await open('/flexui', { settleMs: 3500 });
+    await page.eval(`document.querySelector('#initOverlay button')?.click()`);
+    await sleep(500);
+    return page;
+};
+
+test('flexui: every section is docked, with gauges sized', async () => {
+    const page = await openFlex();
+    try {
+        for (const c of ['toolbar', 'meters', 'spectrum', 'vfoA', 'vfoB']) {
+            expect(await flexWhere(page, c) === 'docked', `${c} is ${await flexWhere(page, c)}, not docked`);
+        }
+        expect(await flexWhere(page, 'clarifier') === 'docked', 'clarifier is not in the dock (it is a tab behind Toolbar)');
+        expect(!await page.eval(`document.body.classList.contains('iwc-flex-pending')`), 'the page is still marked pending');
+        const unsized = await page.eval(`[...document.querySelectorAll('#ywcFlexHost [data-ywc-component="meters"] canvas')].filter(c => !c.width || !c.height).map(c => c.id)`);
+        expect(unsized.length === 0, `meter canvases with no size: ${unsized.join(', ')}`);
+        expect(await page.eval(`!!document.getElementById('vfoRow')?.dataset`), '#vfoRow (site.js reads the radio model from it) has gone');
+    } finally { await page.close(); }
+});
+
+test('flexui: a hidden panel is parked and still gets live updates', async () => {
+    const page = await openFlex();
+    try {
+        const toggle = () => page.eval(`[...document.querySelectorAll('#ywcFlexPanelsMenu a, #ywcFlexPanelsMenu button')].find(e => e.textContent.trim() === 'VFO B')?.click()`);
+        await toggle(); await sleep(500);
+        expect(await flexWhere(page, 'vfoB') === 'parked', 'VFO B was not parked when hidden');
+        await page.state('FrequencyB', 7012345); await sleep(300);
+        expect(await page.eval(`document.getElementById('vfoBCol').textContent.includes('7.012')`), 'parked VFO B did not take a frequency update');
+        await toggle(); await sleep(600);
+        expect(await flexWhere(page, 'vfoB') === 'docked', 'VFO B did not come back when shown');
+    } finally { await page.close(); }
+});
+
+test('flexui: pop-out takes live updates and comes home with its canvases', async () => {
+    const page = await openFlex();
+    try {
+        for (const [tab, el] of [['vfoA', 'vfoACol'], ['meters', 'meterCard']]) {
+            await page.eval(`window.ywcFlex.model.doAction(window.FlexLayout.Actions.popoutTab('${tab}'))`);
+            await page.waitFor(`document.getElementById('${el}')?.ownerDocument !== document`, { what: `${tab} to pop out` });
+            await sleep(1500);   // the pop-out's listeners are attached once its window has loaded
+            if (tab === 'vfoA') {
+                await page.state('FrequencyA', 14074000); await sleep(300);
+                expect(await page.eval(`document.getElementById('vfoACol').textContent.includes('14.074')`), 'popped-out VFO A did not take a frequency update');
+            }
+            await page.eval(`document.getElementById('${el}').ownerDocument.defaultView.close()`);
+            await page.waitFor(`document.getElementById('${el}')?.ownerDocument === document && !!document.getElementById('${el}').closest('#ywcFlexHost')`, { what: `${tab} to dock again` });
+        }
+        const lost = await page.eval(`[...document.querySelectorAll('#ywcFlexHost canvas')].filter(c => c.getContext('2d')?.isContextLost?.()).map(c => c.id)`);
+        expect(lost.length === 0, `canvases lost their context: ${lost.join(', ')}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('flexui: Save current as... writes the layout to /api/flexlayouts', async () => {
+    const page = await openFlex();
+    try {
+        await page.eval(`window.prompt = () => 'ui test layout'`);
+        await page.clearWrites();
+        await page.eval(`[...document.querySelectorAll('#ywcFlexLayoutMenu a, #ywcFlexLayoutMenu button')].find(e => e.textContent.includes('Save current'))?.click()`);
+        await sleep(600);
+        const w = (await page.writes()).find(x => /^\/api\/flexlayouts/.test(x.path));
+        expect(!!w, 'no write to /api/flexlayouts');
+        expect(w.body?.name === 'ui test layout' && !!w.body?.layout?.layout, `unexpected body: ${JSON.stringify(w.body).slice(0, 200)}`);
     } finally { await page.close(); }
 });
 

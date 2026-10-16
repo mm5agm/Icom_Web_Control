@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+@* The Experimental UI's layout: Index.cshtml served at /flexui. Everything
+   the Classic layout (_Layout.cshtml) loads is loaded here too, in the same
+   order, so the page's scripts see exactly what they see on Classic. Added:
+   the FlexLayout library and theme, the shared pop-out bridge (first, so it
+   sees every listener), and a compact header carrying the dock's toolbar.
+   The dock itself is core/js/flex/flex-workspace.js, shared with Yaesu Web
+   Control; js/flexui/iwc-flex.js is this app's configuration of it. *@
+<html lang="en" class="iwc-flex">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Language" content="en">
+    <meta name="language" content="en">
+    <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Display">
+    <meta name="x-app-repo" content="mm5agm/Icom_Web_Control">
+    <meta name="x-app-name" content="Icom Web Control">
+    <title>@(ViewData["Title"]?.ToString() == "Experimental UI" ? "Experimental UI - Icom Web Control" : ViewData["Title"] + " - Icom Web Control")</title>
+    <script type="importmap">{}</script>
+    @* First script on the page: it has to see every listener the others add,
+       so a popped-out panel gets them too. See the file's header. *@
+    <script src="~/js/flex/flex-popout-bridge.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/gauge-debug.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/lib/flexlayout/style/light.css" asp-append-version="true" />
+    <script src="~/lib/canvas-gauges/gauge.min.js"></script>
+    <script type="module">
+        import { calibrateNumeric, calibrateSMeterLabel, calibrateSMeterForGauge, loadFromBackend } from '/js/calibration/calibration-engine.js?v=@Icom_Web_Control.AppVersion.Display';
+        window.calibrationEngine = { calibrateNumeric, calibrateSMeterLabel, calibrateSMeterForGauge };
+        const calibMap = { 'S-Meter': ['SMETER', 'SMETER_LABELS'] };
+        window.calibrationEngine.reload = () => loadFromBackend(calibMap);
+        window.calibrationEngine.reload();
+    </script>
+    <script type="module">
+        import { MeterFormatters } from '/js/ui/meter-formatters.js?v=@Icom_Web_Control.AppVersion.Display';
+        window.MeterFormatters = MeterFormatters;
+    </script>
+</head>
+<body class="iwc-flex-body iwc-flex-pending">
+    <header class="iwc-flex-nav" @(((string?)ViewData["BodyRole"] == "application") ? Html.Raw("aria-hidden=\"false\"") : Html.Raw(""))>
+        <a class="iwc-flex-brand" asp-area="" asp-page="/Index">Icom Web Control
+            <small class="text-muted fw-normal" style="font-size:0.6em;">v@(AppVersion.Display)</small>
+        </a>
+        <nav class="iwc-flex-nav-links" aria-label="Site navigation">
+            <a asp-area="" asp-page="/Index">Classic Home</a>
+            <a href="/flexui" aria-current="page"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i> Experimental UI</a>
+            <a asp-area="" asp-page="/Settings">Settings</a>
+            <a asp-area="" asp-page="/Memories">Memories</a>
+            <a asp-area="" asp-page="/UserManual">User Manual</a>
+            <a asp-area="" asp-page="/About">About</a>
+        </nav>
+        <div class="iwc-flex-toolbar" role="toolbar" aria-label="Workspace">
+            <div class="dropdown">
+                <button id="flexPanelsBtn" class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false" title="Show or hide panels">
+                    <i class="bi bi-window-stack" aria-hidden="true"></i> Panels
+                </button>
+                <ul id="ywcFlexPanelsMenu" class="dropdown-menu dropdown-menu-end" role="menu"></ul>
+            </div>
+            <div class="dropdown">
+                <button id="flexLayoutsBtn" class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false" title="Saved layouts">
+                    <i class="bi bi-layout-split" aria-hidden="true"></i> <span id="ywcFlexLayoutName">Default</span>
+                </button>
+                <ul id="ywcFlexLayoutMenu" class="dropdown-menu dropdown-menu-end" role="menu"></ul>
+            </div>
+            <label class="visually-hidden" for="flexLayoutScale">UI size</label>
+            <select id="flexLayoutScale" class="form-select form-select-sm" title="UI size - changes text and control size, never panel positions">
+                <option value="xsmall">X-Small</option>
+                <option value="small">Small</option>
+                <option value="medium">Medium</option>
+                <option value="large">Large</option>
+            </select>
+            <button id="flexResetLayoutBtn" class="btn btn-sm btn-outline-secondary" type="button"
+                    title="Go back to the Default layout and discard its unsaved changes">
+                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reset
+            </button>
+        </div>
+    </header>
+
+    @{
+        var _bodyRole  = (string?)ViewData["BodyRole"]  ?? "main";
+        var _bodyLabel = (string?)ViewData["BodyLabel"];
+    }
+    <main role="@_bodyRole" @(_bodyLabel != null ? Html.Raw($"aria-label=\"{_bodyLabel}\"") : Html.Raw("")) class="iwc-flex-main">
+        <div id="ywcFlexHost" class="iwc-flex-host" aria-label="Dockable radio panels"></div>
+        @* The page's own markup. iwc-flex.js moves its sections into the dock
+           once the page's scripts have bound to them; what is left (dialogs,
+           overlays, the hidden #vfoRow data holder) stays here. *@
+        <div id="iwcFlexSource" class="iwc-flex-source container-fluid">
+            @RenderBody()
+        </div>
+        @* Panels the dock is not showing are parked here, still in the
+           document, so live updates keep reaching them. *@
+        <div id="ywcFlexParking" hidden aria-hidden="true" style="display:none"></div>
+    </main>
+
+    <dialog id="flexLayoutsDialog" class="iwc-flex-layouts-dialog" aria-labelledby="flexLayoutsTitle">
+        <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom" id="flexLayoutsHeader" style="cursor:move;">
+            <h2 id="flexLayoutsTitle" class="h6 mb-0">Manage layouts</h2>
+            <button type="button" class="btn-close" aria-label="Close" onclick="this.closest('dialog').close()"></button>
+        </div>
+        <div id="flexLayoutsAdmin" class="p-3"></div>
+    </dialog>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/microsoft-signalr/signalr.min.js"></script>
+    <script src="~/js/hub/hub-connection.js" asp-append-version="true"></script>
+    <script src="~/js/ui/site.js" asp-append-version="true"></script>
+    <script src="~/js/update/update-banner.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs/dialog-stack.js" asp-append-version="true"></script>
+    <script src="~/js/ui/ic7300-if-width.js" asp-append-version="true"></script>
+    @{
+        var _iwcSettingsService = (Icom_Web_Control.Services.ISettingsService)Context.RequestServices
+            .GetService(typeof(Icom_Web_Control.Services.ISettingsService))!;
+        var _iwcVoiceEnabled = false;
+        try
+        {
+            var _iwcSettings = await _iwcSettingsService.GetSettingsAsync();
+            _iwcVoiceEnabled = _iwcSettings.VoiceControlEnabled;
+        }
+        catch { /* settings unavailable -> defaults */ }
+    }
+    <script>
+        window.iwcVoiceEnabled = @(_iwcVoiceEnabled ? "true" : "false");
+    </script>
+    <script src="~/js/ui/voice-control.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/flexui.css" asp-append-version="true" />
+    <script src="~/lib/flexlayout/flexlayout.bundle.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

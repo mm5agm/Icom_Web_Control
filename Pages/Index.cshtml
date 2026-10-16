@@ -4,6 +4,14 @@
     ViewData["Title"]     = "Icom Web Control";
     ViewData["BodyRole"]  = "application";
     ViewData["BodyLabel"] = "Icom radio control panel";
+    // Served at /flexui too (Program.cs page route): the Experimental UI is
+    // this page's own markup, moved into dockable tabs by js/flexui/iwc-flex.js.
+    if (Model.IsFlexUi)
+    {
+        Layout = "_FlexLayout";
+        ViewData["Title"]     = "Experimental UI";
+        ViewData["BodyLabel"] = "Icom radio experimental workspace";
+    }
     // The IC-7300's CI-V mode set. Data variants (USB-D/LSB-D/FM-D) map to
     // DATA-U/DATA-L/DATA-FM via command 1A 06; the Yaesu-only strings
     // (FM-N, AM-N, DATA-FM-N, PSK) have no IC-7300 equivalent and are dropped.
@@ -5305,4 +5313,10 @@
         applyVisibility(getVisible());
     })();
     </script>
+    @if (Model.IsFlexUi)
+    {
+        @* Last, so every Classic script above has bound to the page before its
+           sections move into the dock. *@
+        <script type="module" src="~/js/flexui/iwc-flex.js" asp-append-version="true"></script>
+    }
 }
