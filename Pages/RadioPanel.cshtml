@@ -1,0 +1,59 @@
+@page "/radio"
+@model Icom_Web_Control.Pages.RadioPanelModel
+@{
+    Layout = null;
+}
+@* The radio panel draws its own page: no Bootstrap, no site nav, and by
+   Colin's choice (2026-10-13) no external-program launcher links and no
+   accessibility layer - Classic keeps both. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Radio - Icom Web Control</title>
+    <link rel="icon" href="~/favicon.ico" />
+    <style>html, body { margin: 0; height: 100%; background: #0b0d10; }</style>
+</head>
+<body>
+    <div id="radioPanel"></div>
+
+    <script src="~/lib/microsoft-signalr/signalr.min.js"></script>
+    <script src="~/js/hub/hub-connection.js" asp-append-version="true"></script>
+    @* The IC-7300's filter widths per mode (window.IfWidth), so the panel's
+       WIDTH chip uses the same table as Classic. *@
+    <script src="~/js/ui/ic7300-if-width.js" asp-append-version="true"></script>
+    <script type="module">
+        import { startIcomRadioPanel } from '/js/ui/radio-panel-icom.js?v=@Icom_Web_Control.AppVersion.Current';
+        // Layout = null, so no site.js: this connection is what tells the host
+        // a browser is still here. The adapter uses it for live state too.
+        const conn = window.rwcHubConnection('/radioHub');
+        startIcomRadioPanel(document.getElementById('radioPanel'), {
+            conn,
+            model: '@Model.RadioModel',
+            maxPowerW: @Model.MaxPowerW,
+            maxHz: @Model.MaxHz,
+            bandPlan: '@Model.BandPlan',
+            autoModeChangeOnTune: @(Model.AutoModeChangeOnTune ? "true" : "false"),
+            views: [
+                { label: 'Classic', href: '/' },
+                { label: 'Radio', href: '/radio', on: true },
+            ],
+            menu: [
+                { group: 'SETUP', items: [
+                    { label: 'Settings', href: '/Settings' },
+                    { label: 'Application Setup', href: '/ApplicationSetup' },
+                    { label: 'Memories', href: '/Memories' },
+                    { label: 'Labels', href: '/Labels' },
+                    { label: 'Meter Calibration', href: '/MeterCalibration' },
+                    { label: 'Diagnostics', href: '/Diagnostics' },
+                ] },
+                { group: 'HELP', items: [
+                    { label: 'User Manual', href: '/UserManual' },
+                    { label: 'About', href: '/About' },
+                ] },
+            ],
+        });
+    </script>
+</body>
+</html>
