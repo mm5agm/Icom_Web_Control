@@ -35,6 +35,14 @@ namespace Icom_Web_Control.Pages
             _settingsService = settingsService;
         }
 
+        /// <summary>
+        /// True when this page is being served at /flexui, the Experimental UI:
+        /// the same markup in the dockable layout (see Program.cs's page route
+        /// and Pages/Shared/_FlexLayout.cshtml).
+        /// </summary>
+        public bool IsFlexUi => string.Equals(
+            HttpContext?.Request.Path.Value?.TrimEnd('/'), "/flexui", StringComparison.OrdinalIgnoreCase);
+
         public string SelectedBandA { get; set; } = string.Empty;
         public string SelectedBandB { get; set; } = string.Empty;
 

@@ -353,7 +353,10 @@ builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<Ra
 // the Connect / Test-Connection endpoints call IRadioController.ConnectAsync.
 
 // ADD THIS LINE for Razor Pages support:
-builder.Services.AddRazorPages();
+// /flexui is the Index page itself, in the dock layout: the same markup and
+// the same scripts, so the Experimental UI cannot drift from Classic.
+builder.Services.AddRazorPages(options =>
+    options.Conventions.AddPageRoute("/Index", "flexui"));
 
 // ── HTTP port resolution ────────────────────────────────────────────────────
 // Pick the port BEFORE Kestrel binds, so we can fall back gracefully if the
@@ -421,6 +424,17 @@ builder.Services.AddSingleton(new RadioWebControl.Core.Services.MemoryService(
 builder.Services.AddSingleton(sp => new RadioWebControl.Core.Services.MemoryBankService(
     sp.GetRequiredService<RadioWebControl.Core.Services.MemoryService>(),
     Path.Combine(memoriesFolder, "memory-banks.json")));
+
+// Named Experimental UI (/flexui) layouts - flex-layouts.json in the same
+// folder. The store is in core (shared with Yaesu Web Control); the
+// controller is this app's.
+builder.Services.AddSingleton<RadioWebControl.Core.Services.Flex.IFlexLayoutStore>(sp =>
+{
+    var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("FlexLayoutStore");
+    return new RadioWebControl.Core.Services.Flex.FlexLayoutStore(
+        Path.Combine(memoriesFolder, "flex-layouts.json"),
+        msg => log.LogWarning("{Message}", msg));
+});
 
 // Register DX cluster service — single instance shared between controllers and
 // the background hosted service so the API can read the spot buffer.

@@ -1,0 +1,152 @@
+/* Experimental UI (/flexui). Index.cshtml's own sections are moved into the
+   shared dock's panels (js/flexui/iwc-flex.js); these rules let the Classic
+   markup sit in a dock panel instead of a Bootstrap grid. */
+
+html.iwc-flex, .iwc-flex-body {
+    height: 100%;
+}
+
+.iwc-flex-body {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    overflow: hidden;
+}
+
+.iwc-flex-nav {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    padding: 0.25rem 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+    background: #f8f9fa;
+}
+
+.iwc-flex-brand {
+    font-weight: 600;
+    color: inherit;
+    text-decoration: none;
+}
+
+.iwc-flex-nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.iwc-flex-nav-links a {
+    color: #495057;
+    text-decoration: none;
+}
+
+.iwc-flex-nav-links a[aria-current="page"] {
+    font-weight: 600;
+    color: #0d6efd;
+}
+
+.iwc-flex-toolbar {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.iwc-flex-toolbar .form-select {
+    width: auto;
+}
+
+.iwc-flex-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* What is left of the page (banners, overlay, dialogs) sits above the dock. */
+.iwc-flex-source {
+    order: -1;
+    flex: 0 0 auto;
+}
+
+/* Until the dock has adopted them, keep the Classic sections from flashing. */
+.iwc-flex-pending .iwc-flex-source > .row {
+    visibility: hidden;
+}
+
+#ywcFlexHost {
+    flex: 1 1 auto;
+    min-height: 60vh;
+    width: 100%;
+    /* FlexLayout's root is position:absolute; inset:0. */
+    position: relative;
+    overflow: hidden;
+}
+
+.ywc-flex-panel-host,
+.ywc-panel-body {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+.ywc-panel-body {
+    overflow: auto;
+    padding: 0.25rem;
+    box-sizing: border-box;
+}
+
+.flexlayout__tab_moveable:has(> .ywc-flex-panel-host) {
+    overflow: hidden !important;
+}
+
+/* Classic sections are grid rows and columns; in a panel they fill it. */
+.iwc-flex-panel > .row {
+    margin: 0;
+}
+
+.iwc-flex-panel > .row.mt-2,
+.iwc-flex-panel > .row.mt-3 {
+    margin-top: 0 !important;
+}
+
+.iwc-flex-panel > [class*="col-"] {
+    width: 100%;
+    max-width: 100%;
+    flex: 0 0 100%;
+    padding: 0;
+}
+
+/* Classic's "hide VFO B" hides the column; in the dock the tab does that. */
+.iwc-flex-panel > #vfoBCol {
+    display: block !important;
+}
+
+.iwc-flex-vfo-row {
+    display: none !important;
+}
+
+.iwc-flex-empty-note {
+    display: none;
+    margin: 0.5rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.iwc-flex-panel:has(> #spectrumContainer[style*="display: none"]) > .iwc-flex-empty-note,
+.iwc-flex-panel:has(> #spectrumContainer[style*="display:none"]) > .iwc-flex-empty-note {
+    display: block;
+}
+
+.iwc-flex-body .flexlayout__tab_button {
+    font-size: 0.8rem;
+}
+
+.iwc-flex-layouts-dialog {
+    border: 1px solid #adb5bd;
+    border-radius: 8px;
+    padding: 0;
+    width: min(620px, 94vw);
+}

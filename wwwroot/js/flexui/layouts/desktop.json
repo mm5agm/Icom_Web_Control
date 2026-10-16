@@ -1,0 +1,65 @@
+{
+  "global": {
+    "tabEnableClose": true,
+    "tabSetEnableMaximize": true,
+    "tabEnablePopout": true,
+    "tabEnablePopoutFloatIcon": true,
+    "rootOrientationVertical": true,
+    "splitterSize": 8
+  },
+  "borders": [],
+  "layout": {
+    "type": "row",
+    "weight": 100,
+    "children": [
+      {
+        "type": "tabset",
+        "weight": 9,
+        "children": [
+          { "type": "tab", "id": "toolbar", "name": "Toolbar", "component": "toolbar" }
+        ]
+      },
+      {
+        "type": "tabset",
+        "weight": 22,
+        "children": [
+          { "type": "tab", "id": "meters", "name": "Meters", "component": "meters" }
+        ]
+      },
+      {
+        "type": "tabset",
+        "weight": 30,
+        "children": [
+          { "type": "tab", "id": "spectrum", "name": "Spectrum", "component": "spectrum" }
+        ]
+      },
+      {
+        "type": "row",
+        "weight": 32,
+        "children": [
+          {
+            "type": "tabset",
+            "weight": 50,
+            "children": [
+              { "type": "tab", "id": "vfoA", "name": "VFO A", "component": "vfoA" }
+            ]
+          },
+          {
+            "type": "tabset",
+            "weight": 50,
+            "children": [
+              { "type": "tab", "id": "vfoB", "name": "VFO B", "component": "vfoB" }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "tabset",
+        "weight": 7,
+        "children": [
+          { "type": "tab", "id": "clarifier", "name": "Clarifier", "component": "clarifier" }
+        ]
+      }
+    ]
+  }
+}
