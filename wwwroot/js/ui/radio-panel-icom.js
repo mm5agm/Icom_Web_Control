@@ -23,6 +23,8 @@ import { mountRadioPanel } from '/js/radio-panel/radio-panel.js';
 import { alignBins, txMeterFraction, rangeLegends } from '/js/radio-panel/panel-math.js';
 import { BAND_PLANS, BAND_EDGES, nearestBandForHz, loadBandPlanFromServer, autoModeForHz, getSegments, segmentForHz } from '/js/ui/band-plan.js';
 import { calibrateNumeric, loadFromBackend } from '/js/calibration/calibration-engine.js';
+import { ICOM_WINDOWS, startIcomWindows } from '/js/ui/radio-panel-icom-windows.js';
+import { PopoutHost } from '/js/popout/popout.js';
 
 const BANDS = ['160m', '80m', '60m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m', '4m'];
 // The IC-7300's modes as IWC shows them (CW-L is CW-R, RTTY-U is RTTY-R,
@@ -43,6 +45,8 @@ const STEP_KEY = 'iwc.radioPanel.stepHz';
 const SPANS_HZ = [5e3, 10e3, 20e3, 50e3, 100e3, 200e3, 500e3, 1e6];
 const SPOT_MAX_AGE_MS = 30 * 60 * 1000;
 const WSJTX_POLL_MS = 3000;
+// Opening the CW or RTTY window puts the radio in that mode, as on YWC.
+const WINDOW_MODE = { cw: { mode: 'CW-U', is: /^CW/ }, rtty: { mode: 'RTTY-L', is: /^RTTY/ } };
 
 const on = v => v === true || v === 'true' || v === 1 || (typeof v === 'string' && v !== '' && v !== '0' && v !== '00' && v !== 'false');
 const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -77,6 +81,8 @@ export function startIcomRadioPanel(root, cfg) {
     // 4 m only where the region has it.
     const bands = BANDS.filter(b => b !== '4m' || edges().some(e => e.name === '4m'));
 
+    let win = null;             // the windows; those restored from last time report during mount
+    const windowShown = {};     // group -> panels of it shown on the board
     const panel = mountRadioPanel(root, {
         brandShort: 'IWC',
         brandName: 'Icom Web Control',
@@ -148,7 +154,15 @@ export function startIcomRadioPanel(root, cfg) {
         modes: MODES.map(m => ({ id: m, label: MODE_LABEL[m] ?? m })),
         spectrumPanes: [{ id: 'A', tab: 'VFO-A', name: 'VFO-A · SCOPE' }, { id: 'B', tab: 'VFO-B', name: 'VFO-B · SCOPE' }],
         spectrumSpans: SPANS_HZ.map(hz => ({ hz })),
-        frequencyEntry: false,
+        frequencyEntry: true,
+        windows: ICOM_WINDOWS,
+        onWindowPanel: (g, p, shown) => { win?.onShow(g, p, shown); windowMode(g, p, shown); },
+        onWindowPopout: (g, p) => { win?.popout(g, p); windowMode(g, p, true, true); },
+        // The spectrum's own window, for a second screen: /RadioSpectrum.
+        onSpectrumPopout: () => {
+            if (!specHost.open()) alert('The browser blocked the spectrum window. Allow pop-ups for this page and press the key again.');
+        },
+        onSpectrumBack: () => specHost.recall(),
         clock: true,
         fullscreenKey: true,
         vfoChips: ['seg'],
@@ -158,6 +172,14 @@ export function startIcomRadioPanel(root, cfg) {
         storagePrefix: 'iwc.radioPanel.',
         fontBase: '/lib/fonts',
     });
+    // While the spectrum is in its own window the board stops drawing it.
+    let specAway = false;
+    const specHost = new PopoutHost({
+        name: 'radio-spectrum',
+        url: '/RadioSpectrum',
+        defaultSize: { width: 1100, height: 700 },
+        onChange: open => { specAway = open; panel.setSpectrumAway(open); },
+    }).start();
 
     // ---- the slice of radio state the panel derives things from ----------
     const r = {
@@ -175,6 +197,28 @@ export function startIcomRadioPanel(root, cfg) {
     panel.setStep(stepText(stepHz));
     panel.setSelected('A');
     const spots = new Map();       // callsign -> { call, hz, at }
+
+    win = startIcomWindows(panel.windows, {
+        maxPowerW, maxHz, post,
+        selected: () => r.sel,
+        freq: vfo => r.freq[vfo] ?? 0,
+    });
+
+    // ---- the CW and RTTY windows bring their mode -------------------------
+    // Opening either one (its key, or a ⇱ window of its own) puts the
+    // selected VFO in that mode, as the radio's own keys do. A VFO already in
+    // it is left alone - CW-R stays CW-R - and windows reopened as the page
+    // loads change nothing.
+    function windowMode(g, p, shown, popout = false) {
+        const want = WINDOW_MODE[g];
+        if (!want) return;
+        const set = windowShown[g] ??= new Set();
+        const was = set.size;
+        if (shown) set.add(p); else set.delete(p);
+        if (!win || !shown || (was && !popout)) return;
+        const v = r.sel;
+        if (!want.is.test(r.mode[v])) post(`/api/cat/mode/${v.toLowerCase()}`, { mode: want.mode });
+    }
 
     // ---- WSJT-X TX light ----------------------------------------------------
     async function pollWsjtx() {
@@ -318,6 +362,7 @@ export function startIcomRadioPanel(root, cfg) {
     }
 
     function act(kind, id, vfo, dir) {
+        if (kind === 'entry') return win.entry(id);
         // The digit wheel, the dial and the spectrum panes tune either VFO.
         if (vfo && !['tune', 'dial', 'spectrum', 'span'].includes(kind) && !boxLive(vfo)) return;
         const v = vfo || r.sel, rx = v.toLowerCase();
@@ -729,7 +774,7 @@ export function startIcomRadioPanel(root, cfg) {
             let bins = v.bins;
             const dial = r.freq[pane];
             if (dial > 0 && num(v.centreHz) > 0) bins = alignBins(bins, num(v.centreHz) - dial, span);
-            panel.pushSpectrum(bins, pane);
+            if (!specAway) panel.pushSpectrum(bins, pane);
         },
         DxSpot: addSpot,
         DxClusterStatus: v => {
@@ -748,6 +793,7 @@ export function startIcomRadioPanel(root, cfg) {
     conn.on('RadioStateUpdate', msg => {
         const fn = handlers[msg?.property];
         if (fn) try { fn(msg.value); } catch (e) { console.warn('radio panel:', msg.property, e); }
+        win.onRadioState(msg);
     });
     conn.onreconnecting(() => panel.setLamp('cat', 'warn'));
     conn.onclose(() => panel.setLamp('cat', 'bad'));

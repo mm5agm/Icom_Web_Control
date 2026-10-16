@@ -22,6 +22,8 @@ const PAGES = [
     '/Calibration/MeterCalibration',
     '/CwReader', '/CwSend', '/Diagnostics', '/DxSpots', '/Labels', '/Memories',
     '/Ports', '/RttyTuner', '/Settings', '/UserManual', '/radio', '/flexui',
+    '/RadioSpectrum', '/RadioWindow?g=cw', '/RadioWindow?g=rtty', '/RadioWindow?g=mem',
+    '/RadioWindow?g=meters', '/RadioWindow?g=rx',
 ];
 
 const suite = new Suite(`Icom Web Control UI checks against ${BASE}`);
@@ -452,6 +454,119 @@ test('/radio: has no key that transmits, and nothing clicked here wrote one', as
             await page.eval(`document.querySelectorAll(${JSON.stringify(keys)})[${i}].click()`);
         const bad = (await page.writes()).filter(w => FORBIDDEN.test(w.path));
         expect(bad.length === 0, `transmit writes: ${JSON.stringify(bad)}`);
+    } finally { await page.close(); }
+});
+
+test('/radio: band keys and mode keys each sit on one line, labels not clipped', async () => {
+    const page = await radioPage();
+    try {
+        for (const row of ['.rp-bands', '.rp-modes']) {
+            const r = await page.eval(`(() => {
+                const bs = [...document.querySelectorAll('${row} button')];
+                return { n: bs.length, tops: new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size,
+                    clipped: bs.filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent) };
+            })()`);
+            expect(r.n > 0 && r.tops === 1, `${row}: ${r.n} keys on ${r.tops} lines`);
+            expect(r.clipped.length === 0, `${row}: clipped labels ${r.clipped.join(', ')}`);
+        }
+    } finally { await page.close(); }
+});
+
+// The window keys (CW, RTTY, MEMORIES, DX, METERS, RX SETUP) and their windows.
+const winShown = (page, id) => page.eval(`(() => {
+    const f = document.querySelector('.rp-win[data-win="${id}"]');
+    return !!f && !f.hidden && getComputedStyle(f).display !== 'none';
+})()`);
+
+test('/radio: every window key opens its window and its x shuts it', async () => {
+    const page = await radioPage();
+    try {
+        const ids = await page.eval(`[...document.querySelectorAll('.rp-skey[data-group]')].map(b => b.dataset.group)`);
+        expect(['cw', 'rtty', 'mem', 'dx', 'meters', 'rx'].every(id => ids.includes(id)), `window keys: ${ids.join(', ')}`);
+        for (const id of ids) {
+            await page.eval(`document.querySelector('.rp-skey[data-group="${id}"]').click()`);
+            expect(await winShown(page, id), `${id} window did not open`);
+            await page.eval(`document.querySelector('.rp-win[data-win="${id}"] .rp-win-x').click()`);
+            expect(!(await winShown(page, id)), `${id} window did not shut`);
+        }
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('/radio: opening the CW window switches to CW, RTTY to RTTY-L', async () => {
+    const page = await radioPage();
+    try {
+        await page.eval(`document.querySelector('.rp-skey[data-group="cw"]').click()`);
+        let w = writesTo(await page.writes(), '/api/cat/mode/a');
+        expect(w.length === 1 && w[0].body.mode === 'CW-U', `CW window wrote ${JSON.stringify(w)}`);
+        await page.clearWrites();
+        await page.eval(`document.querySelector('.rp-skey[data-group="rtty"]').click()`);
+        w = writesTo(await page.writes(), '/api/cat/mode/a');
+        expect(w.length === 1 && w[0].body.mode === 'RTTY-L', `RTTY window wrote ${JSON.stringify(w)}`);
+    } finally { await page.close(); }
+});
+
+test('/radio: the CW keyer sets speed and pitch, never sends', async () => {
+    const page = await radioPage();
+    try {
+        await page.state('CwSpeed', 20);
+        await page.state('CwPitch', 600);
+        await page.eval(`document.querySelector('.rp-skey[data-group="cw"]').click()`);
+        await page.clearWrites();
+        // The keyer's two "+" keys: speed first, then pitch.
+        await page.eval(`[...document.querySelectorAll('[data-panel="keyer"] button')].filter(b => b.textContent.trim() === '+').forEach(b => b.click())`);
+        const ws = await page.writes();
+        const sp = writesTo(ws, '/api/cat/cw/speed'), pi = writesTo(ws, '/api/cat/cwpitch');
+        expect(sp.length === 1 && sp[0].body.speed === 21, `speed wrote ${JSON.stringify(sp)}`);
+        expect(pi.length === 1 && pi[0].body.hz === 610, `pitch wrote ${JSON.stringify(pi)}`);
+        expect(!ws.some(w => FORBIDDEN.test(w.path)), `transmit writes: ${JSON.stringify(ws)}`);
+    } finally { await page.close(); }
+});
+
+test('/radio: the meters window shows the S-meter', async () => {
+    const page = await radioPage();
+    try {
+        await page.eval(`document.querySelector('.rp-skey[data-group="meters"]').click()`);
+        await page.state('SMeterA', 120);
+        const txt = await page.eval(`document.querySelector('.rp-win[data-win="meters"] .rp-wbar .txt')?.textContent ?? ''`);
+        expect(txt && txt !== '--', `S bar reads "${txt}"`);
+    } finally { await page.close(); }
+});
+
+test('/RadioWindow?g=meters: draws its panels and follows live state', async () => {
+    const page = await open('/RadioWindow?g=meters', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the window hub handler' });
+        const titles = await page.eval(`[...document.querySelectorAll('.rp-wpop .rp-wpanel-title')].map(t => t.textContent)`);
+        expect(titles.join('|') === 'ALL METERS|S-METER HISTORY', `panels: ${titles.join('|')}`);
+        expect(await page.eval('__rwcTest.started'), 'the hub was never started, so nothing live reaches the window');
+        await page.state('ActiveVfo', 0);
+        await page.state('SMeterA', 120);
+        const txt = await page.eval(`document.querySelector('.rp-wbar .txt')?.textContent ?? ''`);
+        expect(txt && txt !== '--', `S bar reads "${txt}"`);
+    } finally { await page.close(); }
+});
+
+test('/RadioWindow: an unknown group says so', async () => {
+    const page = await open('/RadioWindow?g=nonsense', { settleMs: 800 });
+    try {
+        expect(/No such window/.test(await text(page, '#radioWindow')), 'no "No such window" text');
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: span picker sets the radio scope span (half-width)', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        expect(await page.eval('__rwcTest.started'), 'the hub was never started');
+        await page.state('FrequencyA', 14_074_000);
+        const bins = Array.from({ length: 475 }, (_, i) => (i === 237 ? -40 : -110));
+        await page.state('SpectrumUpdate', { sdrId: 'A', bins, centreHz: 14_074_000, spanHz: 50_000, mode: 'Center' });
+        await page.eval(`(() => { const s = document.querySelector('[data-pane="A"] select.rp-spop-span') ?? document.querySelector('select.rp-spop-span');
+            s.value = '100000'; s.dispatchEvent(new Event('change')); })()`);
+        const w = writesTo(await page.writes(), '/api/cat/scopespan/a');
+        expect(w.length === 1 && w[0].body === 50000, `scopespan wrote ${JSON.stringify(w)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
     } finally { await page.close(); }
 });
 
