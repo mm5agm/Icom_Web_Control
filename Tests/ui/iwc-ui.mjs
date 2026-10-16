@@ -21,7 +21,7 @@ const PAGES = [
     '/', '/About', '/ApplicationSetup', '/AudioFilter', '/Calibrations',
     '/Calibration/MeterCalibration',
     '/CwReader', '/CwSend', '/Diagnostics', '/DxSpots', '/Labels', '/Memories',
-    '/Ports', '/RttyTuner', '/Settings', '/UserManual',
+    '/Ports', '/RttyTuner', '/Settings', '/UserManual', '/radio',
 ];
 
 const suite = new Suite(`Icom Web Control UI checks against ${BASE}`);
@@ -134,7 +134,7 @@ test('CW Reader pop-out pauses outside CW and resumes in CW', async note => {
 
 test('RTTY Tuner pop-out pauses outside RTTY/DATA/SSB and resumes', async note => {
     const { onPause, onResume } = await modePopoutChecks({ path: '/RttyTuner', pausedSel: '#rttyTunerPaused', announceSel: '#rttyTunerAnnounce',
-        name: 'RTTY tuner', good: 'RTTY-L', bad: 'CW-U', note });
+        name: 'RTTY panel', good: 'RTTY-L', bad: 'CW-U', note });
     expect(onPause.some(w => /\/api\/rtty\/tuner\/stop/.test(w.path)), `no tuner stop sent on pause (sent: ${onPause.map(w => w.path).join(', ') || 'nothing'})`);
     expect(onResume.some(w => /\/api\/rtty\/tuner\/start/.test(w.path)), `no tuner start sent on resume (sent: ${onResume.map(w => w.path).join(', ') || 'nothing'})`);
 });
@@ -319,6 +319,139 @@ test('Index: dragging the DX Spots title still moves the dialog', async () => {
         const pos1 = await dialogPos(page);
         expect(Math.abs(pos1.x - pos0.x - 120) < 4 && Math.abs(pos1.y - pos0.y - 60) < 4,
             `expected a move of 120, 60; got ${pos1.x - pos0.x}, ${pos1.y - pos0.y}`);
+    } finally { await page.close(); }
+});
+
+// ---------------------------------------------------------------- /radio
+// The shared radio panel with IWC's adapter. The radio "is" whatever these
+// tests emit; every write is stubbed and checked for its URL and body.
+
+// A button inside `scope` whose text (or, failing that, title) starts with `label`.
+const clickButton = async (page, scope, label) => {
+    const p = await page.eval(`(() => {
+        const bs = [...document.querySelectorAll(${JSON.stringify(scope + ' button')})];
+        const b = bs.find(b => b.textContent.trim() === ${JSON.stringify(label)})
+            ?? bs.find(b => b.textContent.trim().startsWith(${JSON.stringify(label)}));
+        if (!b) return null;
+        const r = b.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    })()`);
+    if (!p) throw new Error(`no button "${label}" in ${scope}`);
+    await page.click(p);
+};
+const radioPage = async () => {
+    const page = await open('/radio', { settleMs: 2000 });
+    await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the adapter hub handler' });
+    for (const [p, v] of [['IsConnected', true], ['ActiveVfo', 0], ['FrequencyA', 14_074_000], ['BandA', '20m'],
+        ['ModeA', 'USB'], ['IfWidthA', '2400'], ['SelectedFilterA', '1'], ['AgcA', '2'], ['AttA', '00'], ['IpoA', '1']])
+        await page.state(p, v);
+    await page.clearWrites();
+    return page;
+};
+const writesTo = (ws, prefix) => ws.filter(w => w.path.toLowerCase().startsWith(prefix));
+// Anything that keys the radio, or switches it off.
+const FORBIDDEN = /\/api\/cat\/(tx|vox|atu|cw\/send|radiopower)\b/i;
+
+test('/radio: live state reaches the VFO box', async () => {
+    const page = await radioPage();
+    try {
+        const freq = await text(page, '.rp-freq');
+        expect(/14\.074/.test(freq), `frequency shows "${freq}"`);
+        const chips = await page.eval(`[...document.querySelectorAll('.rp-chips')[0].children].map(c => c.textContent).join('|')`);
+        expect(/USB/.test(chips) && /2\.4/.test(chips) && /MID/.test(chips), `VFO-A chips are "${chips}"`);
+        const flags = chips;
+        expect(/P\.AMP1/.test(flags), `preamp flag missing from "${flags}"`);
+    } finally { await page.close(); }
+});
+
+test('/radio: band, mode and receiver keys send IWC bodies', async () => {
+    const page = await radioPage();
+    try {
+        await clickButton(page, '.rp-bands', '40');
+        await clickButton(page, '.rp-modes', 'CW');
+        await clickButton(page, '.rp-gkeys', 'ATT');
+        await clickButton(page, '.rp-gkeys', 'P.AMP');
+        await clickButton(page, '.rp-gkeys', 'AGC');
+        await clickButton(page, '.rp-gkeys', 'FILTER');
+        const ws = await page.writes();
+        const one = (prefix, want) => {
+            const w = writesTo(ws, prefix);
+            expect(w.length === 1, `${prefix}: ${w.length} writes`);
+            expect(JSON.stringify(w[0].body) === JSON.stringify(want), `${prefix} sent ${JSON.stringify(w[0].body)}, want ${JSON.stringify(want)}`);
+        };
+        one('/api/cat/band/a', { band: '40m' });
+        one('/api/cat/mode/a', { mode: 'CW-U' });
+        one('/api/cat/attenuator/a', { code: '20' });
+        one('/api/cat/ipo/a', { code: '2' });
+        one('/api/cat/agc/a', { code: '3' });
+        one('/api/radio/filter/a', { fil: 2 });
+    } finally { await page.close(); }
+});
+
+test('/radio: selecting VFO B moves the keys and settings to B', async () => {
+    const page = await radioPage();
+    try {
+        await page.state('ActiveVfo', 1);
+        const name = await text(page, '.rp-group-A .rp-group-name');
+        expect(/VFO-B/.test(name), `receiver group says "${name}"`);
+        await clickButton(page, '.rp-gkeys', 'ATT');
+        const ws = await page.writes();
+        expect(writesTo(ws, '/api/cat/attenuator/b').length === 1, `ATT wrote ${JSON.stringify(ws.map(w => w.path))}`);
+        // A press on the VFO A/B key asks for A again.
+        await page.clearWrites();
+        await clickButton(page, '.rp-panel', 'VFO A / B');
+        expect(writesTo(await page.writes(), '/api/cat/active-vfo/a').length === 1, 'VFO A / B did not select A');
+    } finally { await page.close(); }
+});
+
+test('/radio: the width chip lists the IC-7300 widths and sets one', async () => {
+    const page = await radioPage();
+    try {
+        await page.click('.rp-chips > span:nth-child(2)');
+        const labels = await page.eval(`[...document.querySelectorAll('.rp-picker button')].map(b => b.textContent)`);
+        expect(labels.length === 41, `${labels.length} SSB widths listed (want 41: 50 Hz - 3.6 kHz)`);
+        expect(labels.includes('2.4 kHz') && labels.includes('50 Hz') && labels.includes('3.6 kHz'), `widths: ${labels.join(', ')}`);
+        await clickButton(page, '.rp-picker', '1.8 kHz');
+        const w = writesTo(await page.writes(), '/api/radio/ifwidth/a');
+        expect(w.length === 1 && w[0].body.hz === 1800, `ifwidth wrote ${JSON.stringify(w)}`);
+    } finally { await page.close(); }
+});
+
+test('/radio: scope frames light the lamp and are drawn', async () => {
+    const page = await radioPage();
+    try {
+        const bins = Array.from({ length: 475 }, (_, i) => (i === 237 ? -40 : -110));
+        await page.state('SdrStatus', { sdrId: 'A', status: 'streaming' });
+        for (let i = 0; i < 5; i++) await page.state('SpectrumUpdate', { sdrId: 'A', bins, centreHz: 14_074_000, spanHz: 50_000, mode: 'Center' });
+        const lamp = await page.eval(`[...document.querySelectorAll('.rp-lamp')].map(l => l.parentElement.textContent.trim() + ':' + l.className)`);
+        expect(lamp.some(l => /SCOPE:.*\bon\b/.test(l)), `lamps: ${lamp.join(', ')}`);
+    } finally { await page.close(); }
+});
+
+test('/radio: M.STORE saves the selected VFO to IWC memories', async () => {
+    const page = await radioPage();
+    try {
+        await clickButton(page, '.rp-mem-keys', 'M.STORE');
+        const w = writesTo(await page.writes(), '/api/memory/save-vfo/a');
+        expect(w.length === 1, `M.STORE wrote ${w.length}`);
+        await page.waitFor(`[...document.querySelectorAll('.rp-mem-keys .rp-sub')].some(s => s.textContent === 'SAVED')`, { what: 'SAVED on M.STORE' });
+    } finally { await page.close(); }
+});
+
+test('/radio: has no key that transmits, and nothing clicked here wrote one', async () => {
+    const page = await radioPage();
+    try {
+        const labels = await page.eval(`[...document.querySelectorAll('button')].map(b => b.textContent.trim())`);
+        for (const bad of ['TUNE', 'VOX', 'MOX', 'PTT', 'TX'])
+            expect(!labels.includes(bad), `a "${bad}" key is on the page`);
+        // Every key, not the menus or view links (those navigate away).
+        const keys = '.rp-gkeys button, .rp-top button.rp-key, .rp-mem-keys button, button.rp-key';
+        const n = await page.eval(`document.querySelectorAll(${JSON.stringify(keys)}).length`);
+        expect(n > 15, `only ${n} keys found`);
+        for (let i = 0; i < n; i++)
+            await page.eval(`document.querySelectorAll(${JSON.stringify(keys)})[${i}].click()`);
+        const bad = (await page.writes()).filter(w => FORBIDDEN.test(w.path));
+        expect(bad.length === 0, `transmit writes: ${JSON.stringify(bad)}`);
     } finally { await page.close(); }
 });
 
