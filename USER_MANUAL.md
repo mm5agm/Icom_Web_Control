@@ -27,6 +27,7 @@
    - 5.16 [Voice Announcements](#516-voice-announcements)
    - 5.17 [DX Spots List](#517-dx-spots-list)
    - 5.18 [Pop-out windows](#518-pop-out-windows)
+   - 5.19 [Experimental UI](#519-experimental-ui)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -1039,6 +1040,21 @@ A panel on the main page can be dragged around and resized, but it can't leave t
 - **Reloading the main page** while a panel is popped out is fine. The main page still knows the window is open.
 - **A pop-out keeps IWC running.** IWC shuts down about 30 seconds after the last browser page closes (unless you have told it not to, [§6.2](#62-web-server-settings)). A pop-out window counts as a page, so closing the main tab and keeping only, say, the CW Reader window open on a second monitor does not shut the app down underneath it.
 - **Pop-out windows belong to this computer.** A tablet or a second PC using IWC at the same time keeps its own panels and doesn't see your pop-out.
+
+### 5.19 Experimental UI
+
+**Experimental UI** in the top bar opens a second way of working the radio, at `http://localhost:8080/flexui`. Its dockable workspace was designed by Fabio Valente (CR7CDC) for Yaesu Web Control, and IWC uses the same one. The Classic page described in the rest of §5 is unchanged and is still where IWC opens; **Classic Home** in the Experimental UI's top bar takes you back, and both can be open in different tabs at once.
+
+The Experimental UI is the Classic page itself, rearranged into panels: **Toolbar**, **Clarifier**, **Meters**, **Spectrum**, **VFO A** and **VFO B**. Every button, slider and readout is the one on the Classic page, so they behave exactly the same; only where they sit is different.
+
+- **Arranging panels.** Drag a panel by its tab to move it. Drop it on the edge of another panel to dock it beside it, or in the middle to put the two together as tabs. Drag the dividers between panels to resize them. **Clarifier** starts as a tab behind **Toolbar**; click its tab to see it.
+- **Popping a panel out.** The pop-out button at the right of a panel's tab bar moves the panel into a window of its own, which you can put on another screen. It keeps working there, meters and scope included. Close the window to bring the panel back into the main page.
+- **Showing and hiding panels.** The **Panels** menu shows or hides each one, so a panel you have closed can be brought back. A hidden panel keeps up with the radio, so it is current the moment you show it again.
+- **UI size.** The size box (X-Small to Large) changes the size of the text and controls without moving the panels.
+- **Layouts.** The layouts menu, which shows the name of the layout in use, holds named arrangements. **Save current as…** saves what is on screen under a name, and **Manage layouts…** renames or deletes them. Layouts are saved in IWC itself (`flex-layouts.json`, in the same folder as your settings), not in the browser, so another browser or PC using the same IWC sees the same list. Once a named layout is chosen, changes to it are saved as you make them. **Default** is the built-in arrangement and is never overwritten: changes made to it are kept by this browser only, until you save them under a name.
+- **Reset** puts the panels back where the Default arrangement has them.
+
+It is called experimental because it is new. If something works on the Classic page and not here, please report it and say which page you were on.
 
 ---
 
