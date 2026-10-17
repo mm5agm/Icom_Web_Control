@@ -585,10 +585,10 @@ const openFlex = async () => {
 test('flexui: every section is docked, with gauges sized', async () => {
     const page = await openFlex();
     try {
-        for (const c of ['toolbar', 'meters', 'spectrum', 'vfoA', 'vfoB']) {
+        for (const c of ['vfoActions', 'meters', 'spectrum', 'vfoA', 'vfoB']) {
             expect(await flexWhere(page, c) === 'docked', `${c} is ${await flexWhere(page, c)}, not docked`);
         }
-        expect(await flexWhere(page, 'clarifier') === 'docked', 'clarifier is not in the dock (it is a tab behind Toolbar)');
+        expect(await flexWhere(page, 'clarifier') === 'docked', 'clarifier is not in the dock');
         expect(!await page.eval(`document.body.classList.contains('iwc-flex-pending')`), 'the page is still marked pending');
         const unsized = await page.eval(`[...document.querySelectorAll('#ywcFlexHost [data-ywc-component="meters"] canvas')].filter(c => !c.width || !c.height).map(c => c.id)`);
         expect(unsized.length === 0, `meter canvases with no size: ${unsized.join(', ')}`);
@@ -746,6 +746,37 @@ test('flexui: VFO cards are three columns, and the S bar follows the receiving V
         r = await readWith(120);
         expect(r.B.value > 0 && !r.B.grey && r.B.chip !== 'S0', `B receiving, B bar: ${JSON.stringify(r.B)}`);
         expect(r.A.value === 0 && r.A.grey && r.A.chip === 'S0', `B receiving, A bar: ${JSON.stringify(r.A)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('flexui: toolbar is a strip above the dock, and VFO Actions is a panel', async () => {
+    const page = await openFlex();
+    try {
+        const t = await page.eval(`(() => {
+            const strip = document.querySelector('.iwc-flex-toolbar-row');
+            const host = document.getElementById('ywcFlexHost');
+            const inStrip = ids => ids.filter(id => !strip?.contains(document.getElementById(id)));
+            const actions = document.querySelector('#ywcFlexHost [data-ywc-component="vfoActions"]');
+            const vb = document.getElementById('vfoBToggleBtn');
+            return {
+                strip: !!strip,
+                inDock: !!strip?.closest('#ywcFlexHost'),
+                above: !!strip && strip.getBoundingClientRect().bottom <= host.getBoundingClientRect().top + 1,
+                visible: !!strip && strip.getBoundingClientRect().height > 10,
+                missing: inStrip(['utcClock', 'memBtn', 'sMeterHistoryToggleBtn', 'flexPanelsBtn', 'flexLayoutsBtn', 'flexLayoutScale', 'flexResetLayoutBtn', 'connectBtn', 'radioPowerBtn']),
+                dockBeforeConnect: !!document.querySelector('.iwc-flex-toolbar-row .iwc-flex-toolbar + #connectBtn'),
+                headerEmpty: !document.querySelector('.iwc-flex-nav .iwc-flex-toolbar'),
+                notInActions: ['swapVfoBtn', 'copyBtoABtn', 'copyAtoBBtn', 'splitBtn', 'quickSplitBtn'].filter(id => !actions?.contains(document.getElementById(id))),
+                vfoBHidden: !vb || getComputedStyle(vb).display === 'none',
+            };
+        })()`);
+        expect(t.strip && !t.inDock, `toolbar strip: ${JSON.stringify(t)}`);
+        expect(t.above && t.visible, `the strip is not shown above the dock: ${JSON.stringify(t)}`);
+        expect(!t.missing.length, `not in the strip: ${t.missing.join(', ')}`);
+        expect(t.dockBeforeConnect && t.headerEmpty, `dock controls not moved in front of Connect: ${JSON.stringify(t)}`);
+        expect(!t.notInActions.length, `not in VFO Actions: ${t.notInActions.join(', ')}`);
+        expect(t.vfoBHidden, 'the VFO-B show/hide key is still showing (the tab does that here)');
         expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
     } finally { await page.close(); }
 });

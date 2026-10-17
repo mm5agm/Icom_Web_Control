@@ -21,13 +21,14 @@ import { initFlexLayoutsAdmin, enableDialogDrag } from '/js/flex/flex-layouts-ad
 const IWC_FLEX_CONFIG = {
     layoutUrl: '/js/flexui/layouts/desktop.json',
     // v3: Linear Meters is a narrow column beside the Spectrum, as on YWC.
-    layoutVersion: 'v3',
+    // v4: the toolbar is a strip above the dock; VFO Actions is a panel.
+    layoutVersion: 'v4',
     storagePrefix: 'iwc.flexui.',
     apiBase: '/api/flexlayouts',
     popoutUrl: '/popout.html',
     fallbackPanel: 'vfoA',
     panels: [
-        { id: 'toolbar', name: 'Toolbar', component: 'toolbar' },
+        { id: 'vfoActions', name: 'VFO Actions', component: 'vfoActions' },
         { id: 'linearMeters', name: 'Linear Meters', component: 'linearMeters' },
         { id: 'meters', name: 'Meters', component: 'meters' },
         { id: 'spectrum', name: 'Spectrum', component: 'spectrum' },
@@ -78,10 +79,10 @@ function moveSectionsIntoParking() {
         source.appendChild(vfoRow);
         vfoRow.classList.add('iwc-flex-vfo-row');
     }
-    if (s.toolbar) {
-        wrap('toolbar', s.toolbar, parking);
-        s.toolbar.classList.add('iwc-flex-toolbar-row');
-    }
+    // Fabio's VFO Actions panel (YWC _VfoActions.cshtml) takes the swap,
+    // copy and split keys out of the toolbar row before it becomes the strip.
+    wrap('vfoActions', buildVfoActions(), parking);
+    if (s.toolbar) placeToolbarStrip(s.toolbar);
 
     // Shown in the Spectrum panel while the page has the scope hidden
     // (no scope stream configured, or the radio not connected yet).
@@ -92,6 +93,25 @@ function moveSectionsIntoParking() {
         note.textContent = 'The scope is not showing. It appears here once the radio is connected and its scope is streaming.';
         spectrumBody.prepend(note);
     }
+}
+
+function buildVfoActions() {
+    const col = el('div', 'op-col op-col--vfo-actions');
+    col.id = 'vfoActionsSection';
+    return appendAll(col, ...['swapVfoBtn', 'copyBtoABtn', 'copyAtoBBtn', 'splitBtn', 'quickSplitBtn']
+        .map((id) => document.getElementById(id)));
+}
+
+/**
+ * The toolbar row stays in the page, above the dock, as YWC's
+ * _FlexToolbar does: clock and Coffee on the left; apps, Mem, S-hist, the
+ * dock's own controls, Connect and POWER on the right.
+ */
+function placeToolbarStrip(row) {
+    row.classList.add('iwc-flex-toolbar-row');
+    const dock = document.querySelector('.iwc-flex-nav .iwc-flex-toolbar');
+    const connect = document.getElementById('connectBtn');
+    if (dock && connect) connect.before(dock);
 }
 
 function el(tag, className) {

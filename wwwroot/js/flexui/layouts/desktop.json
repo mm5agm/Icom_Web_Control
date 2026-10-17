@@ -13,28 +13,40 @@
     "weight": 100,
     "children": [
       {
-        "type": "tabset",
-        "weight": 7,
+        "type": "row",
+        "weight": 10,
         "children": [
           {
-            "type": "tab",
-            "id": "toolbar",
-            "name": "Toolbar",
-            "component": "toolbar"
+            "type": "tabset",
+            "weight": 35,
+            "children": [
+              {
+                "type": "tab",
+                "id": "vfoActions",
+                "name": "VFO Actions",
+                "component": "vfoActions"
+              }
+            ],
+            "minHeight": 66
           },
           {
-            "type": "tab",
-            "id": "clarifier",
-            "name": "Clarifier",
-            "component": "clarifier"
+            "type": "tabset",
+            "weight": 65,
+            "children": [
+              {
+                "type": "tab",
+                "id": "clarifier",
+                "name": "Clarifier",
+                "component": "clarifier"
+              }
+            ],
+            "minHeight": 66
           }
-        ],
-        "selected": 0,
-        "minHeight": 48
+        ]
       },
       {
         "type": "row",
-        "weight": 53,
+        "weight": 50,
         "children": [
           {
             "type": "tabset",

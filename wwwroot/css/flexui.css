@@ -430,3 +430,46 @@ html.iwc-flex, .iwc-flex-body {
     opacity: 0.35;
     pointer-events: none;
 }
+
+/* ---- Toolbar strip (YWC _FlexToolbar): above the dock, not a tab ---- */
+.iwc-flex-body .iwc-flex-toolbar-row {
+    margin: 0 !important;
+    padding: 0.2rem 0.5rem !important;
+    align-items: center;
+    row-gap: 0.25rem;
+    border-bottom: 1px solid #333;
+}
+
+.iwc-flex-body .iwc-flex-toolbar-row > [class*="col-"] {
+    padding: 0 0.15rem;
+}
+
+.iwc-flex-body .iwc-flex-toolbar-row > .ms-auto {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.iwc-flex-body .iwc-flex-toolbar-row .iwc-flex-toolbar {
+    margin-left: 0;
+}
+
+/* Hiding VFO B is the VFO B tab's close button here. */
+.iwc-flex-body .iwc-flex-toolbar-row #vfoBToggleBtn {
+    display: none !important;
+}
+
+/* ---- VFO Actions panel (YWC _VfoActions): operating-bar keys ---- */
+.iwc-flex-body .op-col--vfo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.3rem;
+}
+
+.iwc-flex-body .op-col--vfo-actions .btn {
+    min-width: 3.6rem;
+    height: 2.65rem;
+    padding: 0.22rem 0.55rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
