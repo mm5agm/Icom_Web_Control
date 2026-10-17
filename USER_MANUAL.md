@@ -28,6 +28,7 @@
    - 5.17 [DX Spots List](#517-dx-spots-list)
    - 5.18 [Pop-out windows](#518-pop-out-windows)
    - 5.19 [Experimental UI](#519-experimental-ui)
+   - 5.20 [Radio panel](#520-radio-panel)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -1055,6 +1056,64 @@ The Experimental UI is the Classic page itself, rearranged into panels: **Toolba
 - **Reset** puts the panels back where the Default arrangement has them.
 
 It is called experimental because it is new. If something works on the Classic page and not here, please report it and say which page you were on.
+
+### 5.20 Radio panel
+
+**Radio** in the top bar, on both the Classic page and the Experimental UI, opens a third way of working the radio, at `http://localhost:8080/radio`. It is laid out like the front of a transceiver: the meter and the keys down the left, a screen in the middle with the VFOs, the band scope and the band and mode keys, the main dial on the right, and a row of knobs along the bottom. The **Classic**, **Experimental** and **Radio** buttons in its top strip move between the three, and they can all be open in different tabs at once.
+
+The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300's. Everything on it works the radio: the keys, the knobs, the main dial and the windows opened from the keys under the meter.
+
+**The screen.**
+
+- **VFO-A** and **VFO-B** show each VFO's frequency, mode, IF width, AGC and filter, and anything switched on, such as P.AMP, ATT, NB, NR, AN, MN or APF. **SPLIT** appears beside VFO-A when split is on. The **SEG** chip shows the band segment, and clicking it gives a list to change it. **ENT** opens a keypad for typing in a frequency.
+- **The band scope** is the radio's own scope, the same one as the spectrum on the Classic page ([§5.4](#54-spectrum-display)), with the passband shaded, the band edges and band-plan marks, the frequency along the bottom and DX cluster spots ([§5.17](#517-dx-spots-list)) marked on it. **OUT OF BAND** appears when the dial is outside the band. The **VFO-A** and **VFO-B** tabs choose which VFO's scope you see; with pseudo-dual off in Settings ([§6.3](#63-spectrum-scope)) the scope follows the selected VFO. If the radio has stopped sending scope data, the scope says why.
+  - **Click** to tune there, or turn the **mouse wheel** to tune one step a notch. A thin line and a readout follow the mouse and show exactly the frequency a click would send.
+  - **Shift+click** drops a marker; Shift+click on it again to clear it. Markers are not saved.
+  - In the scope's bottom-left corner are the **span** list, **HOLD**, and **SCOPE**, which sets the range, speed, brightness and passband shading.
+  - The **⇱** key opens the scope in a browser window of its own, for a second screen.
+- **The top strip** has lamps for the radio's CI-V link (**CI-V**), the band scope (**SCOPE**) and the DX cluster (**DX**): green is working, amber is connecting, red is a fault. **Click CI-V** to disconnect from the radio, and again to connect, as **Connect** does on the Classic page; while it is disconnected IWC lets go of the COM port, so another program can use it. Beside the lamps are WSJT-X's transmit state and a UTC clock. **F** fills the screen with the panel; Esc goes back. **MENU**, at the right-hand end, drops down IWC's other pages: Settings, Application Setup, Memories, Labels, Meter Calibration and Diagnostics, then the User Manual and About. Each opens in a new tab, so the panel keeps running behind it.
+
+**Changing things in the VFO boxes.** Click the mode, the IF width or the AGC in a VFO box to get a list, and click one to change it; click anywhere else or press Esc to close the list. Click P.AMP, ATT, NB and the other words in a box to switch them, as their keys do. Hold the mouse over a digit of a frequency and turn the mouse wheel to move that digit up or down. Only the VFO the radio is on can be changed this way; the other one is shown but cannot be changed from its box.
+
+**The selected VFO.** One VFO is outlined and tagged **SELECTED**. That is the VFO the radio is on, and it is the one the keys, knobs and mode keys work on. **Click the other VFO**, or press **VFO A / B**, to select it. If you change it on the radio itself, the outline follows.
+
+**The main dial and the knobs.** Turn the mouse wheel over a knob, or drag it round, to turn it.
+
+- **The main dial** tunes the selected VFO one step at a time. The **−** and **+** keys under it tune down or up by one step, landing on a whole step as the radio's dial does. Press **STEP** to go through 10 Hz, 50 Hz, 100 Hz, 500 Hz, 1 kHz, 5 kHz and 10 kHz; this browser remembers it.
+- **AF / RF·SQL**: the inner knob is the AF gain (volume), the outer ring the RF gain.
+- **TWIN PBT**: inner and outer passband tuning. Both at the centre is no shift.
+- **NOTCH / NR**: the inner knob is the manual notch position, the outer ring the noise reduction level.
+- **MIC / COMP**: the inner knob is the mic gain, the outer ring the compressor level. **POWER / MONI**: the inner knob is the RF power, the outer ring the monitor level. **SPEED / PITCH** is the CW keyer speed and the CW pitch.
+- **The clarifier knob** sets the RIT / ΔTX offset. **RIT** and **ΔTX** beside it switch them on and off, and **CLR** sets the offset back to zero without switching either off.
+
+**The keys.** Each key's light shows whether that function is on, and the small text under some of them shows the setting.
+
+- **P.AMP** steps through off, P.AMP1 and P.AMP2. **ATT** switches the 20 dB attenuator.
+- **AGC** steps through FAST, MID and SLOW. **FILTER** steps through FIL1, FIL2 and FIL3.
+- **NB**, **NR** and **AN** (auto notch) switch on and off. **MN** switches the manual notch on; each press while it is on steps its width. **APF** steps through OFF, WIDE, MID and NAR.
+- **COMP** switches the speech compressor, which only affects transmit audio. **MONI** switches the monitor on and off; it does not transmit.
+- **A▸B**, **B▸A**, **A⇄B** and **SPLIT** copy, swap and split the VFOs. **Q.SPLIT** puts the other VFO 5 kHz up and turns split on.
+- **M.STORE** adds the selected VFO to IWC's memory list, the one on the Memories page ([§8](#8-radio-memories)), and shows **SAVED** under it. It does not write to the radio's own memories.
+- **M▸VFO** and **VFO▸M** work with the radio's own 99 memory channels. The IC-7300 cannot tell IWC which channel it is on, so both keys drop down a list to pick from. **M▸VFO** lists the channels that have something in them; click one and the selected VFO tunes to it. **VFO▸M** lists all 99, empty ones included; click one, and the key names it, such as **M013?**. Press **VFO▸M** again within four seconds to write the selected VFO over that channel, or leave it and nothing is written. This writes to the radio's memory, not to IWC's memory list.
+
+**Bands and modes.** The band keys under the scope change band on the selected VFO, and the mode keys change its mode; the lit mode key is the one it is in.
+
+**The meter.** On receive, the needle shows the S-meter. On transmit, the **PO**, **SWR**, **ALC**, **COMP** and **IDD** buttons under it choose what the lower scale and the needle show. **VDD**, the supply voltage, is read all the time.
+
+**The windows.** The keys under the meter open windows on top of the panel. Drag a window by its title bar and resize it from its corner. Each part of a window can be closed (**×**), or torn off into a window of its own and put back into its group again; pressing the key again brings back anything you closed. Where each window was, and which were open, is remembered by this browser.
+
+- **CW** (switches to CW): the keyer, the CW Reader ([§18](#18-cw-reader)) and CW Send ([§19](#19-cw-send)).
+- **RTTY** (switches to RTTY): the RTTY tuner and reader ([§20](#20-rtty)). Its send part only explains why sending is not offered yet.
+- **MEMORIES**: IWC's own memories and banks ([§8](#8-radio-memories)), not the radio's channels.
+- **DX**: the DX spots list and the watch list ([§5.17](#517-dx-spots-list)).
+- **METERS**: all the meters, and the S-meter history.
+- **RX SETUP**: Twin PBT and the receive levels.
+
+The CW Reader, CW Send, the RTTY tuner and the DX spots each have a **⇱** key that opens them in a browser window of their own. Unlike a window on the panel, that one can go on another screen. In the CW and RTTY windows, **⇱ WINDOW** in the title bar does the same for the whole window. CW Send's Send key and keyer memories make the radio transmit, and are marked in red.
+
+**Theme and size.** The two boxes at the right of the top strip choose the colours and the size. **Dark console** is the usual look; **Night (red)**, **Silver classic**, **Daylight**, **Green display** and **High contrast** are the others, and **Match computer** follows Windows' light or dark setting. **Fit** makes the whole panel fit the window; the percentages fix its size and let you scroll. Both are remembered by this browser, so a tablet and a PC can each have their own.
+
+The Radio panel has none of the screen-reader or voice-control work of the Classic page, and no launch buttons for WSJT-X or other programs. Those stay on the Classic page.
 
 ---
 
@@ -2922,7 +2981,7 @@ Set your CW pitch in the CW Keyer panel ([§5.12](#512-cw-keyer-panel)) and tune
 
 ### 18.5 The panel controls
 
-Along the top of the panel are five buttons and two switches. The switches — **Follow** and **Tune** — are easy to miss because they do not look like the buttons beside them, and both are worth knowing about.
+Along the top of the panel are six buttons and two switches. The switches — **Follow** and **Tune** — are easy to miss because they do not look like the buttons beside them, and both are worth knowing about.
 
 | Control | What it does |
 |---|---|
@@ -2930,6 +2989,7 @@ Along the top of the panel are five buttons and two switches. The switches — *
 | **Clear** | Empties the on-screen text. The transcript file on disk is not touched, so this is safe to press when you move to a new station. |
 | **Reader Mode** | Sets the radio up for decoding, and puts your settings back afterwards — see [§18.7](#187-reader-mode). |
 | **ZIN** | Tunes the signal onto your CW pitch — see [§18.8](#188-zin---zero-in-on-the-signal). |
+| **Auto** | Moves the dial onto a station keying in your filter and sets the filter for its speed — see [Auto](#auto-tune-the-station-in-for-you) in §18.7. |
 | **Log QSO** | Opens the log form — see [§18.10](#1810-logging-a-qso). |
 | **Follow** *(switch, on by default)* | Keeps the newest text in view. See below. |
 | **Tune** *(switch, off to start with)* | Shows the tuning display beside the text — see [§18.6](#186-the-tune-display). Once you have turned it on it stays on, including after a page reload, until you turn it off again. |
@@ -2991,6 +3051,21 @@ Several details worth knowing:
 - **Starting from a non-CW mode.** From FM, SSB or DATA, Reader Mode switches to CW and puts your mode back on Stop, but the 250 Hz it wrote into the selected CW filter slot stays there — it has no earlier CW width to restore. If that slot was something other than 250 Hz, set it again by hand.
 
 Reader Mode only touches VFO A.
+
+#### Auto: tune the station in for you
+
+**Auto** does for a CW station what the RTTY Tuner's Auto does for RTTY ([§20.3](#203-auto-working-out-what-you-are-listening-to)). Press it with a station keying somewhere in your filter, and it moves the dial so the station's tone sits on your CW pitch, then sets the filter for the speed it is sending. The status line says what it did, for example *Auto: 17 wpm, moved the dial -347 Hz onto pitch, filter 250 Hz, APF on.* If the reader is not running, Auto starts it.
+
+It works in one or two steps:
+
+1. **If the station can't be read yet** — well off pitch in a wide filter, with neighbours either side — Auto moves onto the tone and closes the filter to 500 Hz. That is usually what lets the reader start copying.
+2. **Once it is copying**, Auto makes the final small move onto pitch and sets the width for the speed: your Reader Mode width (250 Hz unless you changed it in [§6.7](#67-cw-reader)) at most speeds, opening up to 500 Hz for fast CW, which a narrow filter would smear.
+
+A station that is already readable when you press it gets only the second step, so a filter you had already narrowed for it is not opened to 500 Hz on the way.
+
+The filter and APF go through Reader Mode, so **Stop** puts your own back. Auto leaves AGC as it is. The dial stays where Auto put it: that is the station, and moving back would take you off it.
+
+Auto changes nothing when it can't be sure. With no steady tone for 10 seconds — a bare carrier, noise, or two stations of equal strength — it says so and leaves the radio alone. It only works in CW-U or CW-L, never while transmitting, and like Reader Mode it only touches VFO A. If it found the station but it still isn't readable after the first step, it says so; press **Auto** again once text is appearing.
 
 ### 18.8 ZIN - zero in on the signal
 
