@@ -1289,6 +1289,7 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ActiveVfo") {
         activeVfo = update.value;
         applyVfoActiveStyling();
+        window.refreshVfoSBars?.();
         // Pseudo-dual receiver (Phase 5): let the spectrum panels move their
         // "Listening" badge / Listen button to the VFO that now has the audio.
         if (typeof window.onActiveVfoChanged === 'function') window.onActiveVfoChanged(activeVfo);
@@ -3071,11 +3072,41 @@ window.setApf = setApf;
         // when gaugeTitleShow is true (set in gauge.js).
         const sLabel = document.getElementById(labelId);
         if (sLabel) sLabel.textContent = sUnit;
+        updateVfoSBars(receiver, gaugePos, sUnit);
+    }
+
+    // /flexui's bar S-meter in each VFO card (no canvases on Classic, so
+    // this is a no-op there). A single receiver has one reading, and it
+    // belongs to whichever VFO is receiving: that bar moves, the other
+    // reads S0 and is greyed (.linear-smeter-inactive).
+    let lastSBar = { receiver: 'A', gaugePos: 0, sUnit: 'S0' };
+    function updateVfoSBars(receiver, gaugePos, sUnit) {
+        if (!window.meterPanel?.getGauge('smeterBarA')) return;
+        const single = document.getElementById('vfoRow')?.dataset.singleReceiver === 'true';
+        // The status poll reports a B reading too; one receiver has none.
+        if (single && receiver === 'B') return;
+        lastSBar = { receiver, gaugePos, sUnit };
+        const target = single ? (activeVfo === 1 ? 'B' : 'A') : receiver;
+        for (const v of ['A', 'B']) {
+            const live = v === target;
+            if (single || live) {
+                window.meterPanel.update(`smeterBar${v}`, live ? gaugePos : 0);
+                const chip = document.getElementById(`sMeterLinearValue${v}`);
+                if (chip) chip.textContent = live ? sUnit : 'S0';
+            }
+            if (single) {
+                document.getElementById(`sMeterLinearRow${v}`)
+                    ?.classList.toggle('linear-smeter-inactive', !live);
+            }
+        }
     }
     // Exposed so the outer SignalR RadioStateUpdate handler (different scope)
     // can drive the needle at the backend poll rate instead of waiting for the
     // 500 ms status poll — see the "SMeterA"/"SMeterB" cases there.
     window.updateSMeter = updateSMeter;
+    // A/B on the radio moves the reading to the other bar straight away,
+    // not on the next S-meter change (an unchanged reading is not resent).
+    window.refreshVfoSBars = () => updateVfoSBars(lastSBar.receiver, lastSBar.gaugePos, lastSBar.sUnit);
 
     // Update MIC bar meter (0-255 raw value)
     function updateMICMeter(value) {

@@ -12,7 +12,7 @@
 import { SMeterGauge, PowerGauge, SWRGauge, ALCGauge, CompressionGauge, IDDGauge, VDDGauge } from './gauge.js?v=1';
 // Fabio Valente's bar meters from YWC's Experimental UI, shared through core
 // (core/js/meters/linear-gauge.js). Used on /flexui only; see Index.cshtml.
-import { LinearPowerGauge, LinearSWRGauge, LinearALCGauge, LinearCompressionGauge, LinearIDDGauge, LinearVDDGauge } from '/js/meters/linear-gauge.js';
+import { LinearSMeterGauge, LinearPowerGauge, LinearSWRGauge, LinearALCGauge, LinearCompressionGauge, LinearIDDGauge, LinearVDDGauge } from '/js/meters/linear-gauge.js';
 
 // Registry of gauge constructors.
 // Add new meter types here as your UI grows.
@@ -24,7 +24,8 @@ const gaugeRegistry = {
     compression: CompressionGauge,
     idd: IDDGauge,
     vdd: VDDGauge,
-    powerLinear:       LinearPowerGauge,
+    smeterLinear:      LinearSMeterGauge,
+    powerLinear:      LinearPowerGauge,
     swrLinear:         LinearSWRGauge,
     alcLinear:         LinearALCGauge,
     compressionLinear: LinearCompressionGauge,

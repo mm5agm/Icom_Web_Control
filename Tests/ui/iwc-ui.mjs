@@ -694,6 +694,62 @@ test('flexui: Linear Meters panel shows, and each bar follows its radial', async
     } finally { await page.close(); }
 });
 
+// Fabio's VFO cards: the Classic controls moved into his three columns, and
+// a bar S-meter that follows the receiving VFO (one receiver on the IC-7300).
+test('flexui: VFO cards are three columns, and the S bar follows the receiving VFO', async () => {
+    const page = await openFlex();
+    try {
+        const layout = await page.eval(`(() => {
+            const col = (v, c) => document.querySelector('#vfo' + v + 'Col .vfo-col--' + c);
+            const has = (v, c, id) => !!col(v, c)?.querySelector('#' + id + v);
+            const out = {};
+            for (const v of ['A', 'B']) {
+                out[v] = {
+                    cols: [...document.querySelectorAll('#vfo' + v + 'Col .vfo-body-grid > .vfo-col')].length,
+                    tune: ['freq', 'sMeterLinearCanvas', 'rfGainSlider', 'afGainSlider', 'bandRadioGroup', 'segmentSelect', 'modeSelect', 'saveMemBtn'].filter(id => !has(v, 'tune', id)),
+                    band: ['ifWidthSelect', 'filGroup', 'ifShapeGroup', 'apfSelect', 'audioFilterBtn', 'rxFilterBtn'].filter(id => !has(v, 'band', id)),
+                    keys: ['agcGroup', 'ipoGroup', 'attGroup', 'nrGroup', 'nbGroup', 'notchGroup', 'manualNotchFreq'].filter(id => !has(v, 'keys', id)),
+                    leftover: !!document.querySelector('#vfo' + v + 'Col .receiver-controls-group'),
+                    status: document.getElementById('vfo' + v + 'StatusLine')?.previousElementSibling?.className,
+                    barWidth: document.getElementById('sMeterLinearCanvas' + v)?.width ?? 0,
+                };
+            }
+            return out;
+        })()`);
+        for (const v of ['A', 'B']) {
+            const l = layout[v];
+            expect(l.cols === 3, `VFO ${v} has ${l.cols} columns`);
+            expect(!l.tune.length && !l.band.length && !l.keys.length, `VFO ${v} misplaced: ${JSON.stringify(l)}`);
+            expect(!l.leftover, `VFO ${v} still has the Classic controls group`);
+            expect(l.status === 'vfo-body-grid', `VFO ${v} status line is not below the grid (after ${l.status})`);
+            expect(l.barWidth > 100, `VFO ${v} S bar is ${l.barWidth}px wide`);
+        }
+
+        const read = () => page.eval(`(() => {
+            const mp = window.meterPanel;
+            const r = v => ({ value: mp.getGauge('smeterBar' + v)?.gauge.value,
+                              chip: document.getElementById('sMeterLinearValue' + v)?.textContent,
+                              grey: document.getElementById('sMeterLinearRow' + v)?.classList.contains('linear-smeter-inactive') });
+            return { A: r('A'), B: r('B') };
+        })()`);
+        // The 500 ms status poll feeds the meter too (0 here, no radio), so
+        // each reading is set and read back in one evaluation.
+        const readWith = (raw) => page.eval(`(() => { updateSMeter('A', ${raw}); updateSMeter('B', 0); return 0; })()`).then(read);
+        await page.state('ActiveVfo', 0); await sleep(200);
+        let r = await readWith(120);
+        expect(r.A.value > 0 && !r.A.grey && r.A.chip !== 'S0', `A receiving, A bar: ${JSON.stringify(r.A)}`);
+        expect(r.B.value === 0 && r.B.grey && r.B.chip === 'S0', `A receiving, B bar: ${JSON.stringify(r.B)}`);
+        // A/B alone moves the greying, before any new reading.
+        await page.state('ActiveVfo', 1); await sleep(200);
+        r = await read();
+        expect(!r.B.grey && r.A.grey, `after A/B the grey bar did not swap: ${JSON.stringify(r)}`);
+        r = await readWith(120);
+        expect(r.B.value > 0 && !r.B.grey && r.B.chip !== 'S0', `B receiving, B bar: ${JSON.stringify(r.B)}`);
+        expect(r.A.value === 0 && r.A.grey && r.A.chip === 'S0', `B receiving, A bar: ${JSON.stringify(r.A)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
 // ----------------------------------------------------------------
 
 try {

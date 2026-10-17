@@ -336,3 +336,97 @@ html.iwc-flex, .iwc-flex-body {
     background: #0dcaf0;
     color: #000;
 }
+
+/* VFO cards: Fabio Valente's three-column body (YWC flexui/site.css), built
+   from the Classic card by iwc-flex.js regridVfo(): tune | filter | keys. */
+.iwc-flex-body .vfo-body-grid {
+    display: grid;
+    grid-template-columns: minmax(17.5rem, 1.2fr) minmax(8.75rem, auto) minmax(15rem, 1fr);
+    column-gap: 0.75rem;
+    row-gap: 0.4rem;
+    align-items: start;
+}
+
+.iwc-flex-body .vfo-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.iwc-flex-body .vfo-col .vfo-freq-row {
+    flex-wrap: nowrap;
+    margin: 0 !important;
+}
+
+/* RF / AF / squelch: one label column, sliders the width of the freq row. */
+.iwc-flex-body .vfo-gain-stack {
+    display: grid;
+    grid-template-columns: 4.4rem minmax(0, 1fr) 2.4rem;
+    column-gap: 0.4rem;
+    row-gap: 0.2rem;
+    align-items: center;
+    width: 100%;
+}
+
+.iwc-flex-body .vfo-gain-stack .vfo-control-item {
+    display: contents;
+}
+
+.iwc-flex-body .vfo-gain-stack .vfo-control-item[style*="display: none"],
+.iwc-flex-body .vfo-gain-stack .vfo-control-item[style*="display:none"] {
+    display: none;
+}
+
+.iwc-flex-body .vfo-gain-stack input[type="range"] {
+    width: 100%;
+    min-width: 0;
+    height: 16px;
+}
+
+.iwc-flex-body .vfo-col--band .vfo-control-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.1rem;
+}
+
+/* Two key columns when the panel has room, one when it hasn't. */
+.iwc-flex-body .vfo-col--keys .vfo-controls-column {
+    margin-left: 0;
+    grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+}
+
+.iwc-flex-body .vfo-col--keys .vfo-control-item > .vfo-control-label:first-child {
+    flex: 0 0 4.6rem;
+}
+
+.iwc-flex-body .vfo-col--keys .vfo-control-item > .dsp-seg-group,
+.iwc-flex-body .vfo-col--keys .vfo-control-item > input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.iwc-flex-body .vfo-control-label {
+    color: var(--yaesu-ink, #e6e6e6);
+}
+
+/* Per-VFO bar S-meter, between the frequency and the gain sliders. */
+.iwc-flex-body .linear-meter-row--vfo {
+    width: 100%;
+    margin: 0.15rem 0 0.25rem;
+    transition: opacity 0.25s ease, filter 0.25s ease;
+}
+
+.iwc-flex-body .linear-meter-row--vfo .linear-meter-value {
+    flex: 0 0 3.2rem;
+    background: #198754;
+    color: #fff;
+    border-radius: 3px;
+}
+
+/* Single receiver: the VFO that is not receiving has no reading of its own. */
+.iwc-flex-body .linear-meter-row--vfo.linear-smeter-inactive {
+    filter: grayscale(1);
+    opacity: 0.35;
+    pointer-events: none;
+}

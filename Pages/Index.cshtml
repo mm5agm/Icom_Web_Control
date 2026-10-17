@@ -1203,6 +1203,17 @@
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
                                oninput="document.getElementById('afGainValueA').innerText = this.value">
                     </div>
+                    @if (Model.IsFlexUi)
+                    {
+                        @* Experimental UI only: Fabio Valente's per-VFO bar S-meter. The
+                           IC-7300 has one receiver, so site.js updateSMeter puts the one
+                           reading on the receiving VFO's bar and greys the other. *@
+                        <div class="linear-meter-row linear-meter-row--vfo" id="sMeterLinearRowA">
+                            <span class="linear-meter-label">S</span>
+                            <canvas id="sMeterLinearCanvasA" role="img" aria-hidden="true" aria-label="VFO A S-meter (linear)"></canvas>
+                            <span id="sMeterLinearValueA" class="linear-meter-value linear-meter-value--smeter">S0</span>
+                        </div>
+                    }
 
                     <!-- Twin PBT (Digital Passband Tuning) + RX Tone Control -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
@@ -1491,6 +1502,17 @@
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
                                oninput="document.getElementById('afGainValueB').innerText = this.value">
                     </div>
+                    @if (Model.IsFlexUi)
+                    {
+                        @* Experimental UI only: Fabio Valente's per-VFO bar S-meter. The
+                           IC-7300 has one receiver, so site.js updateSMeter puts the one
+                           reading on the receiving VFO's bar and greys the other. *@
+                        <div class="linear-meter-row linear-meter-row--vfo" id="sMeterLinearRowB">
+                            <span class="linear-meter-label">S</span>
+                            <canvas id="sMeterLinearCanvasB" role="img" aria-hidden="true" aria-label="VFO B S-meter (linear)"></canvas>
+                            <span id="sMeterLinearValueB" class="linear-meter-value linear-meter-value--smeter">S0</span>
+                        </div>
+                    }
 
                     <!-- Twin PBT (Digital Passband Tuning) + RX Tone Control -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
@@ -2296,7 +2318,11 @@
                                                   { from: 70, to: 90, color: 'rgba(255,255,0,.25)' },
                                                   { from: 90, to: 100, color: 'rgba(255,0,0,.25)' }] },
                 iddLinear:         { type: 'iddLinear', canvasId: 'iddLinearCanvas' },
-                vddLinear:         { type: 'vddLinear', canvasId: 'vddLinearCanvas', minValue: 10, maxValue: 16, nominal: 13.8 }
+                vddLinear:         { type: 'vddLinear', canvasId: 'vddLinearCanvas', minValue: 10, maxValue: 16, nominal: 13.8 },
+                // /flexui's per-VFO S bars. Not `smeterLinear`: site.js
+                // updateSMeter chooses which bar the one reading goes to.
+                smeterBarA:        { type: 'smeterLinear', canvasId: 'sMeterLinearCanvasA' },
+                smeterBarB:        { type: 'smeterLinear', canvasId: 'sMeterLinearCanvasB' }
             });
             window.ic7300Meters = new Ic7300Meters(window.meterPanel, window.calibrationEngine);
 

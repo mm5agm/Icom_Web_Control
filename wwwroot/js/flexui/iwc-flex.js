@@ -94,6 +94,82 @@ function moveSectionsIntoParking() {
     }
 }
 
+function el(tag, className) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    return node;
+}
+
+function appendAll(parent, ...nodes) {
+    for (const node of nodes) if (node) parent.appendChild(node);
+    return parent;
+}
+
+/**
+ * Rebuild one VFO card's body as Fabio's three columns (YWC _VfoA.cshtml):
+ * tune (frequency, S bar, RF/AF/squelch, band, segment, mode), filter
+ * (IF width, slot, shape, APF, Twin PBT, RX Tone) and keys (voice mic, the
+ * AGC/preamp/ATT/NR/NB/notch grid). The Classic controls are moved, not
+ * copied, so their handlers and ids are unchanged; the status line stays
+ * below the grid.
+ */
+function regridVfo(v) {
+    const $ = (id) => document.getElementById(id + v);
+    const item = (id) => $(id)?.closest('.vfo-control-item') || null;
+    const body = document.getElementById(`vfo${v}Col`)?.querySelector('.card-body');
+    const freqRow = $('freq')?.closest('.vfo-freq-row');
+    if (!body || !freqRow || body.querySelector('.vfo-body-grid')) return;
+    const oldGroup = body.querySelector('.receiver-controls-group');
+
+    // AF gain sits in the Classic freq row with its value inside the label;
+    // in the gain stack it takes the label | slider | value columns.
+    const afSlider = $('afGainSlider');
+    const afValue = $('afGainValue');
+    let afItem = null;
+    if (afSlider && afValue) {
+        const oldLabel = afValue.closest('label');
+        afItem = el('div', 'vfo-control-item');
+        const label = el('label', 'vfo-control-label');
+        label.htmlFor = afSlider.id;
+        label.textContent = 'AF Gain';
+        afValue.className = 'vfo-control-label';
+        afSlider.style.width = '';
+        appendAll(afItem, label, afSlider, afValue);
+        oldLabel?.remove();
+    }
+    const gainStack = appendAll(el('div', 'vfo-gain-stack'), item('rfGainSlider'), afItem, $('squelchRow'));
+
+    // APF leaves the segment row for the filter column.
+    const apfSelect = $('apfSelect');
+    let apfItem = null;
+    if (apfSelect) {
+        const oldLabel = apfSelect.previousElementSibling;
+        apfItem = el('div', 'vfo-control-item');
+        const label = el('label', 'vfo-control-label');
+        label.htmlFor = apfSelect.id;
+        label.textContent = 'APF';
+        appendAll(apfItem, label, apfSelect);
+        if (oldLabel?.tagName === 'SPAN') oldLabel.remove();
+    }
+    const segmentRow = $('segmentSelect')?.parentElement || null;
+    const modeRow = $('modeSelect')?.parentElement || null;
+    modeRow?.classList.remove('mt-1');
+    if (modeRow) appendAll(modeRow, $('saveMemBtn')?.parentElement);
+
+    const tune = appendAll(el('div', 'vfo-col vfo-col--tune'),
+        freqRow, $('sMeterLinearRow'), gainStack,
+        $('bandRadioGroup')?.closest('.band-buttons-container'), segmentRow, modeRow);
+    const band = appendAll(el('div', 'vfo-col vfo-col--band'),
+        $('ifWidthRow'), item('filGroup'), item('ifShapeGroup'), apfItem,
+        $('audioFilterBtn')?.parentElement);
+    const keys = appendAll(el('div', 'vfo-col vfo-col--keys'),
+        $('voiceMicContainer'), $('agcGroup')?.closest('.vfo-controls-column'));
+
+    body.prepend(appendAll(el('div', 'vfo-body-grid'), tune, band, keys));
+    // Only the emptied Classic wrappers are left in it.
+    oldGroup?.remove();
+}
+
 function wireLayoutsDialog() {
     const dialog = document.getElementById('flexLayoutsDialog');
     if (!dialog) return;
@@ -116,6 +192,8 @@ function wireLayoutsDialog() {
 function start() {
     const host = document.getElementById('ywcFlexHost');
     if (!host) return;
+    regridVfo('A');
+    regridVfo('B');
     moveSectionsIntoParking();
     wireLayoutsDialog();
     window.addEventListener('ywc-flex-ready', () => {
