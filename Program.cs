@@ -465,6 +465,8 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Audio.ReceiveAudioHold>(
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwQsoLogService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>();
+// The CW reader's Auto button: dial onto pitch, then the filter for the speed.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwAutoService>();
 
 // RTTY tuning scope. Nothing runs until the operator opens the dialog;
 // the service takes its audio hold on the first start and drops it a

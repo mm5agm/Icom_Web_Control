@@ -21,6 +21,7 @@ namespace Icom_Web_Control.Controllers
         private readonly CwReaderService _reader;
         private readonly CwQsoLogService _log;
         private readonly CwReaderModeService _readerMode;
+        private readonly CwAutoService _auto;
         private readonly IRadioController _radio;
         private readonly RadioStateService _state;
         private readonly ILogger<CwController> _logger;
@@ -28,6 +29,7 @@ namespace Icom_Web_Control.Controllers
         public CwController(CwReaderService reader,
                             CwQsoLogService log,
                             CwReaderModeService readerMode,
+                            CwAutoService auto,
                             IRadioController radio,
                             RadioStateService state,
                             ILogger<CwController> logger)
@@ -35,6 +37,7 @@ namespace Icom_Web_Control.Controllers
             _reader = reader;
             _log = log;
             _readerMode = readerMode;
+            _auto = auto;
             _radio = radio;
             _state = state;
             _logger = logger;
@@ -183,6 +186,26 @@ namespace Icom_Web_Control.Controllers
                 // radio narrow with APF on, and the message is how they find
                 // out rather than wondering why the band went quiet.
                 _logger.LogError(ex, "Failed to leave Reader Mode");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// The Auto button: finds the station the reader can hear, tunes it onto
+        /// pitch and sets the filter for its speed. Starts the reader if it is
+        /// not running. A station not found is a 200 with Ok false: it is an
+        /// answer for the operator, not a fault.
+        /// </summary>
+        [HttpPost("auto")]
+        public async Task<IActionResult> Auto(CancellationToken ct)
+        {
+            try
+            {
+                return Ok(await _auto.RunAsync(ct));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CW Auto failed");
                 return StatusCode(500, new { error = ex.Message });
             }
         }
