@@ -773,6 +773,44 @@ test('flexui: Levels keys follow the radio and write through the Classic control
     } finally { await page.close(); }
 });
 
+test('flexui: Buttons keys follow the Classic buttons and press them', async () => {
+    const page = await openFlex();
+    try {
+        expect(await flexWhere(page, 'buttons') === 'docked', 'Buttons panel is not docked');
+        const k = await page.eval(`(() => {
+            const sec = document.getElementById('buttonsSection');
+            const strip = document.querySelector('.iwc-flex-toolbar-row');
+            return {
+                labels: [...sec.querySelectorAll(':scope > .toggle-dd__btn .toggle-dd__label')].map(l => l.textContent),
+                leftInStrip: ['atuBtn', 'atuTuneBtn', 'voxBtn', 'voiceBtn', 'dxSpotsOpenBtn'].filter(id => strip?.contains(document.getElementById(id))),
+                classicHidden: !!document.getElementById('atuBtn')?.closest('.iwc-flex-buttons-classic[hidden]'),
+            };
+        })()`);
+        const want = ['ATU', 'Tune', 'FM Rep', 'VOX', 'CW', 'CW Read', 'CW Send', 'RTTY', 'DX Spots', 'DX Watch', 'Voice'];
+        expect(JSON.stringify(k.labels) === JSON.stringify(want), `keys: ${JSON.stringify(k.labels)}`);
+        expect(!k.leftInStrip.length && k.classicHidden, `Classic buttons not parked: ${JSON.stringify(k)}`);
+        // Radio -> LEDs. ATU, Tune and VOX are never pressed here: no TX.
+        const leds = () => page.eval(`({ atu: document.querySelector('#atuBtnKey .toggle-dd__led').classList.contains('is-on'),
+                                         vox: document.querySelector('#voxBtnKey .toggle-dd__led').classList.contains('is-on') })`);
+        await page.state('AtuEnabled', true); await page.state('VoxOn', true); await sleep(300);
+        let l = await leds();
+        expect(l.atu && l.vox, `LEDs did not follow on: ${JSON.stringify(l)}`);
+        await page.state('AtuEnabled', false); await page.state('VoxOn', false); await sleep(300);
+        l = await leds();
+        expect(!l.atu && !l.vox, `LEDs did not follow off: ${JSON.stringify(l)}`);
+        // A key presses its Classic button: FM Rep opens the FM dialog.
+        const open = await page.eval(`(() => {
+            const key = [...document.querySelectorAll('#buttonsSection .toggle-dd__btn')].find(b => b.textContent.trim() === 'FM Rep');
+            key.click();
+            const d = document.getElementById('fmDialog'); const o = d.open; d.close(); return o;
+        })()`);
+        expect(open, 'FM Rep key did not open the FM dialog');
+        const bad = (await page.writes()).filter(w => FORBIDDEN.test(w.path));
+        expect(!bad.length, `transmit writes: ${JSON.stringify(bad)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
 test('flexui: toolbar is a strip above the dock, and VFO Actions is a panel', async () => {
     const page = await openFlex();
     try {

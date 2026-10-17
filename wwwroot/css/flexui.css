@@ -490,3 +490,22 @@ html.iwc-flex, .iwc-flex-body {
     font-size: 0.8rem;
     font-weight: 600;
 }
+
+/* ---- Buttons panel (YWC _Buttons): a key grid that reflows with width ---- */
+.iwc-flex-body .op-col--buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    grid-auto-rows: minmax(2.65rem, auto);
+    align-content: start;
+    gap: 0.3rem;
+    min-width: 0;
+}
+.iwc-flex-body .op-col--buttons > .toggle-dd__btn {
+    width: 100%;
+    min-width: 0;
+}
+/* Tuning: ATU and Tune go red while a cycle runs, as Classic's do. */
+.iwc-flex-body .op-col--buttons > .toggle-dd__btn.is-tuning {
+    border-color: #dc3545;
+    color: #ff6b6b;
+}

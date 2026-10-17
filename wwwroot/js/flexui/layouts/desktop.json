@@ -14,11 +14,11 @@
     "children": [
       {
         "type": "row",
-        "weight": 10,
+        "weight": 21,
         "children": [
           {
             "type": "tabset",
-            "weight": 30,
+            "weight": 24,
             "children": [
               {
                 "type": "tab",
@@ -31,7 +31,7 @@
           },
           {
             "type": "tabset",
-            "weight": 25,
+            "weight": 20,
             "children": [
               {
                 "type": "tab",
@@ -44,7 +44,20 @@
           },
           {
             "type": "tabset",
-            "weight": 45,
+            "weight": 30,
+            "children": [
+              {
+                "type": "tab",
+                "id": "buttons",
+                "name": "Buttons",
+                "component": "buttons"
+              }
+            ],
+            "minHeight": 66
+          },
+          {
+            "type": "tabset",
+            "weight": 26,
             "children": [
               {
                 "type": "tab",
@@ -59,7 +72,7 @@
       },
       {
         "type": "row",
-        "weight": 50,
+        "weight": 41,
         "children": [
           {
             "type": "tabset",
@@ -96,7 +109,7 @@
       },
       {
         "type": "row",
-        "weight": 40,
+        "weight": 38,
         "children": [
           {
             "type": "tabset",

@@ -17,6 +17,7 @@
 
 import { initFlexWorkspace } from '/js/flex/flex-workspace.js';
 import { buildLevelsKeys } from '/js/flexui/iwc-keys.js';
+import { buildButtonsKeys } from '/js/flexui/iwc-buttons.js';
 import { initFlexLayoutsAdmin, enableDialogDrag } from '/js/flex/flex-layouts-admin.js';
 
 const IWC_FLEX_CONFIG = {
@@ -24,7 +25,8 @@ const IWC_FLEX_CONFIG = {
     // v3: Linear Meters is a narrow column beside the Spectrum, as on YWC.
     // v4: the toolbar is a strip above the dock; VFO Actions is a panel.
     // v5: Levels panel.
-    layoutVersion: 'v5',
+    // v6: Buttons panel.
+    layoutVersion: 'v6',
     storagePrefix: 'iwc.flexui.',
     apiBase: '/api/flexlayouts',
     popoutUrl: '/popout.html',
@@ -32,6 +34,7 @@ const IWC_FLEX_CONFIG = {
     panels: [
         { id: 'levels', name: 'Levels', component: 'levels' },
         { id: 'vfoActions', name: 'VFO Actions', component: 'vfoActions' },
+        { id: 'buttons', name: 'Buttons', component: 'buttons' },
         { id: 'linearMeters', name: 'Linear Meters', component: 'linearMeters' },
         { id: 'meters', name: 'Meters', component: 'meters' },
         { id: 'spectrum', name: 'Spectrum', component: 'spectrum' },
@@ -87,6 +90,9 @@ function moveSectionsIntoParking() {
     wrap('vfoActions', buildVfoActions(), parking);
     // Fabio's Levels keys (YWC _Levels.cshtml) on IWC's own controls.
     wrap('levels', buildLevelsKeys(), parking);
+    // Fabio's Buttons panel (YWC _Buttons.cshtml): ATU, Tune, VOX and the
+    // panel openers leave the toolbar row for keys of their own.
+    wrap('buttons', buildButtonsKeys(), parking);
     if (s.toolbar) placeToolbarStrip(s.toolbar);
 
     // Shown in the Spectrum panel while the page has the scope hidden
