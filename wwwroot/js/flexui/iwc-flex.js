@@ -20,8 +20,8 @@ import { initFlexLayoutsAdmin, enableDialogDrag } from '/js/flex/flex-layouts-ad
 
 const IWC_FLEX_CONFIG = {
     layoutUrl: '/js/flexui/layouts/desktop.json',
-    // v2: the Linear Meters panel joined the Meters tabset.
-    layoutVersion: 'v2',
+    // v3: Linear Meters is a narrow column beside the Spectrum, as on YWC.
+    layoutVersion: 'v3',
     storagePrefix: 'iwc.flexui.',
     apiBase: '/api/flexlayouts',
     popoutUrl: '/popout.html',

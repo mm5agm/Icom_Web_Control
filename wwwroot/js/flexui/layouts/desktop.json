@@ -33,33 +33,39 @@
         "minHeight": 48
       },
       {
-        "type": "tabset",
-        "weight": 22,
+        "type": "row",
+        "weight": 53,
         "children": [
           {
-            "type": "tab",
-            "id": "linearMeters",
-            "name": "Linear Meters",
-            "component": "linearMeters"
+            "type": "tabset",
+            "weight": 24,
+            "children": [
+              {
+                "type": "tab",
+                "id": "linearMeters",
+                "name": "Linear Meters",
+                "component": "linearMeters"
+              },
+              {
+                "type": "tab",
+                "id": "meters",
+                "name": "Meters",
+                "component": "meters"
+              }
+            ],
+            "selected": 0
           },
           {
-            "type": "tab",
-            "id": "meters",
-            "name": "Meters",
-            "component": "meters"
-          }
-        ],
-        "selected": 0
-      },
-      {
-        "type": "tabset",
-        "weight": 31,
-        "children": [
-          {
-            "type": "tab",
-            "id": "spectrum",
-            "name": "Spectrum",
-            "component": "spectrum"
+            "type": "tabset",
+            "weight": 76,
+            "children": [
+              {
+                "type": "tab",
+                "id": "spectrum",
+                "name": "Spectrum",
+                "component": "spectrum"
+              }
+            ]
           }
         ]
       },
