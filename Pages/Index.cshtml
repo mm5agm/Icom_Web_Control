@@ -665,6 +665,9 @@
                                 aria-label="DX spots — list of cluster spots on current band"
                                 title="Open DX spots list — see callsigns spotted on the current band"
                                 onclick="window.dxSpotsOpen ? window.dxSpotsOpen() : (window.dxSpotsPanel && window.dxSpotsPanel.toggle())">DX Spots</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary" type="button" data-open-shortcuts
+                                aria-label="Keyboard shortcuts"
+                                title="Keyboard shortcuts (?)">?</button>
                         @* Says when a mode change closes the CW reader or the RTTY tuner. *@
                         <span id="panelModeAnnounce" class="visually-hidden" role="status" aria-live="polite"></span>
                         <button id="voiceBtn"
@@ -2067,6 +2070,7 @@
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=@Icom_Web_Control.AppVersion.Display";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=@Icom_Web_Control.AppVersion.Display";
         import { initMemoriesPanel }   from "/js/ui/memories.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { initKeyboardShortcuts } from "/js/ui/keyboard-shortcuts.js?v=@Icom_Web_Control.AppVersion.Display";
         import { DxSpotsPanel }         from "/js/dx/dx-spots-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { ModePanelGuard }       from "/js/modes/mode-panel-guard.js?v=@Icom_Web_Control.AppVersion.Display";
         import { attachPopout, screenShare } from "/js/popout/popout.js?v=@Icom_Web_Control.AppVersion.Display";
@@ -2101,6 +2105,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             initFreqKeyboard();
             initMemoriesPanel();
+            initKeyboardShortcuts({ autoModeForHz });
 
             // Fold the meter gauges and the Clarifier strip away (YWC
             // Discussion #171). The choice is kept per browser, and what is

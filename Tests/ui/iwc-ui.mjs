@@ -312,6 +312,84 @@ test('Index: a click on the All bands switch padding toggles it and does not dra
     } finally { await page.close(); }
 });
 
+// Keyboard shortcuts. Keys go in as keydown events on the document, which is
+// what the shortcut listener sees; every write is stubbed.
+const press = (page, key, code, mods = {}) => page.eval(`document.dispatchEvent(new KeyboardEvent('keydown',
+    ${JSON.stringify({ key, code, bubbles: true, cancelable: true, ...mods })}))`);
+const shortcutsPage = async () => {
+    const page = await open('/', { settleMs: 2500 });
+    await page.waitFor(`getComputedStyle(document.getElementById('initOverlay')).display === 'none'`,
+        { timeoutMs: 16000, what: 'start-up overlay gone' });
+    await page.state('FrequencyA', 14_200_000);
+    await page.state('ModeA', 'LSB');
+    await page.eval(`document.activeElement?.blur?.()`);
+    await page.clearWrites();
+    return page;
+};
+
+test('Keys: u sets USB and i tunes up 100 Hz on VFO A', async () => {
+    const page = await shortcutsPage();
+    try {
+        // From what the page holds, not 14.2 MHz: a live radio's own
+        // FrequencyA broadcast can land after the test's.
+        const was = await page.eval(`window.radioControl._state.lastBackendFreq.A`);
+        await press(page, 'u', 'KeyU');
+        await press(page, 'i', 'KeyI');
+        await sleep(400);
+        const ws = await page.writes();
+        const m = modeWrites(ws), f = freqWrites(ws);
+        expect(m.length === 1 && m[0].body.mode === '2', `expected one mode write of USB ("2"), got ${JSON.stringify(m)}`);
+        expect(f.length === 1 && f[0].body.frequencyHz === was + 100, `expected one frequency write of ${was + 100}, got ${JSON.stringify(f)}`);
+    } finally { await page.close(); }
+});
+
+test('Keys: n switches the active VFO to B', async () => {
+    const page = await shortcutsPage();
+    try {
+        await press(page, 'n', 'KeyN');
+        await sleep(400);
+        const v = writesTo(await page.writes(), '/api/cat/active-vfo/');
+        expect(v.length === 1 && v[0].path.toLowerCase().endsWith('/b'), `expected one write to active-vfo/b, got ${JSON.stringify(v)}`);
+    } finally { await page.close(); }
+});
+
+test('Keys: ? opens the list, keys do nothing while it is open, Esc closes it', async () => {
+    const page = await shortcutsPage();
+    try {
+        await press(page, '?', 'Slash', { shiftKey: true });
+        await page.waitFor(`document.getElementById('keyboardShortcutsDialog')?.open`, { timeoutMs: 2000, what: 'shortcuts dialog open' });
+        const rows = await page.eval(`document.querySelectorAll('#keyboardShortcutsDialog tbody tr').length`);
+        expect(rows > 20, `only ${rows} rows in the shortcuts list`);
+        await press(page, 'u', 'KeyU');
+        await press(page, 'i', 'KeyI');
+        await sleep(400);
+        const ws = await page.writes();
+        expect(modeWrites(ws).length === 0 && freqWrites(ws).length === 0, `a key reached the radio under the help list: ${JSON.stringify(ws)}`);
+        await press(page, 'Escape', 'Escape');
+        await page.waitFor(`!document.getElementById('keyboardShortcutsDialog').open`, { timeoutMs: 2000, what: 'shortcuts dialog closed' });
+    } finally { await page.close(); }
+});
+
+test('Keys: nothing fires while typing in a text field', async () => {
+    const page = await shortcutsPage();
+    try {
+        await page.eval(`(() => { document.getElementById('dxWatchDialog').show(); document.getElementById('dxWatchNewInput').focus(); })()`);
+        await press(page, 'u', 'KeyU');
+        await sleep(400);
+        expect(modeWrites(await page.writes()).length === 0, 'u in the DX Watch box changed the mode');
+    } finally { await page.close(); }
+});
+
+test('Keys: the configured TX key is never a shortcut as well', async () => {
+    const page = await shortcutsPage();
+    try {
+        await page.eval(`window.iwcTxToggleKey = 'u'`);
+        await press(page, 'u', 'KeyU');
+        await sleep(400);
+        expect(modeWrites(await page.writes()).length === 0, 'u changed the mode while it is the TX key');
+    } finally { await page.close(); }
+});
+
 test('Index: dragging the DX Spots title still moves the dialog', async () => {
     const page = await indexWithSpot();
     try {
