@@ -5,8 +5,11 @@
    the FlexLayout library and theme, the shared pop-out bridge (first, so it
    sees every listener), and a compact header carrying the dock's toolbar.
    The dock itself is core/js/flex/flex-workspace.js, shared with Yaesu Web
-   Control; js/flexui/iwc-flex.js is this app's configuration of it. *@
-<html lang="en" class="iwc-flex">
+   Control; js/flexui/iwc-flex.js is this app's configuration of it.
+   The look is Fabio Valente's dark theme from YWC's Experimental UI:
+   css/flexui/theme.css (his palette) and FlexLayout's dark.css, both loaded
+   after Classic's site.css so they win on this page and nowhere else. *@
+<html lang="en" class="iwc-flex" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -23,7 +26,7 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/gauge-debug.css" />
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
-    <link rel="stylesheet" href="~/lib/flexlayout/style/light.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/flexlayout/style/dark.css" asp-append-version="true" />
     <script src="~/lib/canvas-gauges/gauge.min.js"></script>
     <script type="module">
         import { calibrateNumeric, calibrateSMeterLabel, calibrateSMeterForGauge, loadFromBackend } from '/js/calibration/calibration-engine.js?v=@Icom_Web_Control.AppVersion.Display';
@@ -129,6 +132,7 @@
     </script>
     <script src="~/js/ui/voice-control.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/flexui/theme.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/flexui.css" asp-append-version="true" />
     <script src="~/lib/flexlayout/flexlayout.bundle.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)

@@ -11,8 +11,11 @@ html.iwc-flex, .iwc-flex-body {
     flex-direction: column;
     margin: 0;
     overflow: hidden;
+    background: var(--yaesu-face-lo, #1a1a1a);
+    color: var(--yaesu-ink, #e6e6e6);
 }
 
+/* Header colours from YWC's flex-widgets.css (.ywc-flex-nav). */
 .iwc-flex-nav {
     flex: 0 0 auto;
     display: flex;
@@ -20,14 +23,15 @@ html.iwc-flex, .iwc-flex-body {
     flex-wrap: wrap;
     gap: 0.25rem 1rem;
     padding: 0.25rem 0.75rem;
-    border-bottom: 1px solid #dee2e6;
-    background: #f8f9fa;
+    border-bottom: 1px solid #333;
+    background: #111;
 }
 
 .iwc-flex-brand {
-    font-weight: 600;
-    color: inherit;
+    font-weight: 700;
+    color: #ffe066;
     text-decoration: none;
+    white-space: nowrap;
 }
 
 .iwc-flex-nav-links {
@@ -38,13 +42,13 @@ html.iwc-flex, .iwc-flex-body {
 }
 
 .iwc-flex-nav-links a {
-    color: #495057;
+    color: #cfe3ff;
     text-decoration: none;
 }
 
 .iwc-flex-nav-links a[aria-current="page"] {
-    font-weight: 600;
-    color: #0d6efd;
+    font-weight: 700;
+    color: #fff;
 }
 
 .iwc-flex-toolbar {
@@ -144,9 +148,134 @@ html.iwc-flex, .iwc-flex-body {
     font-size: 0.8rem;
 }
 
+.iwc-flex-body .flexlayout__layout {
+    background: #1a1a1a;
+}
+
 .iwc-flex-layouts-dialog {
-    border: 1px solid #adb5bd;
-    border-radius: 8px;
+    border: 1px solid var(--yaesu-edge, #0d0d0d);
     padding: 0;
     width: min(620px, 94vw);
+    background: var(--yaesu-face, #2a2a2a);
+    color: var(--yaesu-ink, #e6e6e6);
+}
+
+.iwc-flex-layouts-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+}
+
+/* Squared corners, as on YWC's Experimental UI: rounded corners waste space
+   on a dense dockable surface. Circles (LEDs, spinners) stay round. */
+.iwc-flex-body {
+    --bs-border-radius: 0;
+    --bs-border-radius-sm: 0;
+    --bs-border-radius-lg: 0;
+    --bs-border-radius-pill: 0;
+    --bs-card-border-radius: 0;
+    --bs-btn-border-radius: 0;
+    --bs-btn-border-radius-sm: 0;
+    --bs-btn-border-radius-lg: 0;
+    --bs-badge-border-radius: 0;
+    --bs-modal-border-radius: 0;
+    --bs-toast-border-radius: 0;
+    --bs-dropdown-border-radius: 0;
+    --flexlayout-tab-button-radius: 0;
+    --flexlayout-border-button-radius: 0;
+}
+
+.iwc-flex-body .card,
+.iwc-flex-body .btn,
+.iwc-flex-body .btn-group > .btn,
+.iwc-flex-body .form-control,
+.iwc-flex-body .form-select,
+.iwc-flex-body .dropdown-menu,
+.iwc-flex-body .badge,
+.iwc-flex-body .modal-content,
+.iwc-flex-body .flexlayout__tab,
+.iwc-flex-body .flexlayout__tab_button,
+.iwc-flex-body .flexlayout__tabset,
+.iwc-flex-body .flexlayout__splitter,
+.iwc-flex-body .flexlayout__border_button,
+.iwc-flex-body .flexlayout__popup_menu,
+.iwc-flex-body .flexlayout__tab_toolbar_button,
+.iwc-flex-body .flexlayout__drag_rect {
+    border-radius: 0;
+}
+
+/* Classic's own light-theme colours, re-done for the dark theme. Classic's
+   site.css (and a few inline styles in Index.cshtml) set these as black on
+   white; on /flexui they take Fabio's palette instead. */
+.iwc-flex-body .vfo-control-label,
+.iwc-flex-body .form-label,
+.iwc-flex-body label {
+    color: var(--yaesu-ink);
+}
+
+.iwc-flex-body .gauge-label {
+    color: var(--ywc-gauge-tick);
+    text-shadow: 0 1px 2px #000, 0 0 2px #000;
+}
+
+.iwc-flex-body #saveMemBtnA,
+.iwc-flex-body #saveMemBtnB,
+.iwc-flex-body #memBtn {
+    color: var(--yaesu-ink) !important;
+}
+
+.iwc-flex-body .band-radio-label {
+    background-color: var(--yaesu-face-lo);
+    border-color: #4a4a4a;
+    color: var(--yaesu-ink);
+}
+
+.iwc-flex-body .band-radio-label:hover {
+    background-color: var(--yaesu-face-hi);
+    border-color: var(--ywc-focus);
+}
+
+.iwc-flex-body .border-primary .band-radio-label:has(input:checked) {
+    background-color: #1f5a78;
+    border-color: var(--ywc-vfo-a);
+    color: #fff;
+}
+
+.iwc-flex-body .border-success .band-radio-label:has(input:checked) {
+    background-color: #2a7a58;
+    border-color: var(--ywc-vfo-b);
+    color: #fff;
+}
+
+/* Out of band keeps Classic's warning: bold black on red. */
+.iwc-flex-body .band-radio-label.band-oob,
+.iwc-flex-body .band-radio-label.band-oob:hover {
+    background-color: #dc3545;
+    border-color: #842029;
+    color: #000;
+}
+
+.iwc-flex-body .dsp-seg {
+    background: var(--yaesu-face-lo);
+    border-color: #4a4a4a;
+    color: var(--yaesu-ink);
+}
+
+.iwc-flex-body .dsp-seg:hover {
+    background: var(--yaesu-face-hi);
+}
+
+.iwc-flex-body .dsp-seg.active {
+    background: #198754;
+    border-color: #146c43;
+    color: #fff;
+}
+
+/* One rule each: a browser drops a whole rule over a pseudo it does not know. */
+.iwc-flex-body .ifshift-slider::-webkit-slider-runnable-track {
+    background: var(--ywc-gauge-track);
+}
+
+.iwc-flex-body .ifshift-slider::-moz-range-track {
+    background: var(--ywc-gauge-track);
 }

@@ -642,6 +642,30 @@ test('flexui: Save current as... writes the layout to /api/flexlayouts', async (
     } finally { await page.close(); }
 });
 
+// Fabio's dark theme. A Classic rule loaded after it, or an inline
+// !important in Index.cshtml, puts a white key back on a dark page.
+test('flexui: dark theme, and Classic keys inside it are dark too', async () => {
+    const page = await openFlex();
+    try {
+        const r = await page.eval(`(() => {
+            const bg = s => { const e = document.querySelector(s); return e ? getComputedStyle(e).backgroundColor : 'missing'; };
+            const fg = s => { const e = document.querySelector(s); return e ? getComputedStyle(e).color : 'missing'; };
+            return {
+                theme: document.documentElement.dataset.bsTheme,
+                body: bg('body'), nav: bg('.iwc-flex-nav'),
+                band: bg('.band-radio-label:not(:has(input:checked))'),
+                label: fg('.vfo-control-label'), saveMem: fg('#saveMemBtnA'),
+            };
+        })()`);
+        const level = c => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(c); return m ? (+m[1] + +m[2] + +m[3]) / 3 : NaN; };
+        const light = c => level(c) > 180;
+        const dark = c => level(c) < 80;
+        expect(r.theme === 'dark', `data-bs-theme is ${r.theme}`);
+        expect(dark(r.body) && dark(r.nav) && dark(r.band), `light background: ${JSON.stringify(r)}`);
+        expect(light(r.label) && light(r.saveMem), `dark text on dark: ${JSON.stringify(r)}`);
+    } finally { await page.close(); }
+});
+
 // ----------------------------------------------------------------
 
 try {
