@@ -518,23 +518,39 @@ test('/radio: a VFO>M pick left for 4 s is dropped, not written', async () => {
     } finally { await page.close(); }
 });
 
-test('/radio: all 99 radio channels can be scrolled to, the list stays in the window', async () => {
-    const all = Array.from({ length: 99 }, (_, i) => ({ channel: i + 1, isEmpty: true, frequencyHz: 0, mode: '', name: '' }));
-    const page = await radioPage(all);
-    try {
-        await clickButton(page, '.rp-mem-keys', VFO_TO_M);
-        await waitForList(page);
-        const fit = await page.eval(`(() => {
-            const kl = document.querySelector('.rp-keylist');
-            kl.scrollTop = kl.scrollHeight;
-            const r = kl.getBoundingClientRect();
-            const last = [...kl.querySelectorAll('.rp-menu-item')].pop().getBoundingClientRect();
-            return { top: r.top, bottom: r.bottom, h: innerHeight, last: last.bottom, text: kl.lastElementChild.textContent };
-        })()`);
-        expect(fit.top >= 0 && fit.bottom <= fit.h, `list spans ${fit.top}-${fit.bottom} in a ${fit.h} px window`);
-        expect(fit.last <= fit.bottom + 1 && /^M99/.test(fit.text), `last item "${fit.text}" ends at ${fit.last}, list at ${fit.bottom}`);
-    } finally { await page.close(); }
-});
+// What counts is whether M99 can be seen: the panel's sizer clips at the
+// panel's own bottom edge, which is above the window's when the panel is
+// shorter than the window (Colin's bench, 2026-10-17: only M1-M12 reachable).
+for (const size of ['fit', '50'])
+    test(`/radio: all 99 radio channels can be scrolled to and seen (size ${size})`, async () => {
+        const all = Array.from({ length: 99 }, (_, i) => ({ channel: i + 1, isEmpty: true, frequencyHz: 0, mode: '', name: '' }));
+        const page = await radioPage(all);
+        try {
+            await page.eval(`(() => {
+                const sel = [...document.querySelectorAll('select')].find(x => x.title === 'Size');
+                sel.value = ${JSON.stringify(size)};
+                sel.dispatchEvent(new Event('change'));
+            })()`);
+            await clickButton(page, '.rp-mem-keys', VFO_TO_M);
+            await waitForList(page);
+            const seen = await page.eval(`(() => {
+                const kl = document.querySelector('.rp-keylist');
+                kl.scrollTop = kl.scrollHeight;
+                const items = [...kl.querySelectorAll('.rp-menu-item')];
+                const at = el => { const r = el.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); };
+                return { last: at(items.at(-1)) === items.at(-1), text: items.at(-1).textContent };
+            })()`);
+            expect(seen.last && /^M99/.test(seen.text), `"${seen.text}" is hidden after scrolling the list to the end`);
+            // and the top of the list, scrolled back
+            const top = await page.eval(`(() => {
+                const kl = document.querySelector('.rp-keylist');
+                kl.scrollTop = 0;
+                const first = kl.querySelector('.rp-menu-item'), r = first.getBoundingClientRect();
+                return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === first;
+            })()`);
+            expect(top, 'M01 is hidden with the list scrolled to the top');
+        } finally { await page.close(); }
+    });
 
 test('/radio: has no key that transmits, and nothing clicked here wrote one', async () => {
     const page = await radioPage();
