@@ -20,13 +20,15 @@ import { initFlexLayoutsAdmin, enableDialogDrag } from '/js/flex/flex-layouts-ad
 
 const IWC_FLEX_CONFIG = {
     layoutUrl: '/js/flexui/layouts/desktop.json',
-    layoutVersion: 'v1',
+    // v2: the Linear Meters panel joined the Meters tabset.
+    layoutVersion: 'v2',
     storagePrefix: 'iwc.flexui.',
     apiBase: '/api/flexlayouts',
     popoutUrl: '/popout.html',
     fallbackPanel: 'vfoA',
     panels: [
         { id: 'toolbar', name: 'Toolbar', component: 'toolbar' },
+        { id: 'linearMeters', name: 'Linear Meters', component: 'linearMeters' },
         { id: 'meters', name: 'Meters', component: 'meters' },
         { id: 'spectrum', name: 'Spectrum', component: 'spectrum' },
         { id: 'vfoA', name: 'VFO A', component: 'vfoA' },
@@ -39,6 +41,8 @@ const IWC_FLEX_CONFIG = {
 function findSections() {
     const meterCard = document.getElementById('meterCard');
     return {
+        // Fabio's bar meters: rendered on /flexui only (Index.cshtml).
+        linearMeters: document.getElementById('linearMetersSection'),
         meters: meterCard?.closest('.row') || null,
         spectrum: document.getElementById('spectrumContainer'),
         vfoA: document.getElementById('vfoACol'),
@@ -66,7 +70,7 @@ function moveSectionsIntoParking() {
     const s = findSections();
     const vfoRow = document.getElementById('vfoRow');
 
-    for (const component of ['meters', 'spectrum', 'vfoA', 'vfoB', 'clarifier']) {
+    for (const component of ['linearMeters', 'meters', 'spectrum', 'vfoA', 'vfoB', 'clarifier']) {
         if (s[component]) wrap(component, s[component], parking);
     }
     // #vfoRow is a data holder now: keep it in the page, out of the toolbar.

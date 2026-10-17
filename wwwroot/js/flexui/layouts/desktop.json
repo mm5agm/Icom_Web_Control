@@ -34,19 +34,26 @@
       },
       {
         "type": "tabset",
-        "weight": 33,
+        "weight": 22,
         "children": [
+          {
+            "type": "tab",
+            "id": "linearMeters",
+            "name": "Linear Meters",
+            "component": "linearMeters"
+          },
           {
             "type": "tab",
             "id": "meters",
             "name": "Meters",
             "component": "meters"
           }
-        ]
+        ],
+        "selected": 0
       },
       {
         "type": "tabset",
-        "weight": 20,
+        "weight": 31,
         "children": [
           {
             "type": "tab",

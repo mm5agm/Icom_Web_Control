@@ -666,6 +666,34 @@ test('flexui: dark theme, and Classic keys inside it are dark too', async () => 
     } finally { await page.close(); }
 });
 
+// Fabio's bar meters. Each one is fed by MeterPanel mirroring its radial,
+// so a bar that is drawn but never moves is the failure to catch.
+test('flexui: Linear Meters panel shows, and each bar follows its radial', async () => {
+    const page = await openFlex();
+    try {
+        const r = await page.eval(`(() => {
+            const mp = window.meterPanel;
+            mp.update('power', 50);
+            mp.update('vdd', 13.8);
+            updateMeterDomLabel('PowerMeter', { displayValue: { watts: 50, rawAvg: 0 } });
+            const tab = [...document.querySelectorAll('.flexlayout__tab_button_content')].map(e => e.textContent.trim());
+            return {
+                tabs: tab,
+                bars: ['power', 'swr', 'compression', 'alc', 'idd', 'vdd'].filter(k => !mp.getGauge(k + 'Linear')),
+                width: document.getElementById('powerLinearCanvas')?.width ?? 0,
+                power: mp.getGauge('powerLinear')?.gauge.value,
+                vdd: mp.getGauge('vddLinear')?.gauge.value,
+                chip: document.getElementById('powerLinearValue')?.textContent,
+            };
+        })()`);
+        expect(r.tabs.includes('Linear Meters'), `no Linear Meters tab: ${r.tabs.join(', ')}`);
+        expect(r.bars.length === 0, `no bar gauge for: ${r.bars.join(', ')}`);
+        expect(r.width > 100, `power bar is ${r.width}px wide`);
+        expect(r.power === 50 && r.vdd === 13.8, `bars did not follow: power ${r.power}, vdd ${r.vdd}`);
+        expect(r.chip === '50 W', `power chip reads "${r.chip}"`);
+    } finally { await page.close(); }
+});
+
 // ----------------------------------------------------------------
 
 try {

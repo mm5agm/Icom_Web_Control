@@ -406,6 +406,7 @@ function updateMeterDomLabel(property, result) {
             if (rawEl) rawEl.textContent = 'Raw Power Out: ' + Math.round(dv.rawAvg);
             const canvas = document.getElementById('powerMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('powerLinearValue', formatted + ' W');
             break;
         }
         case 'SWRMeter': {
@@ -414,6 +415,7 @@ function updateMeterDomLabel(property, result) {
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('swrMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('swrLinearValue', formatted);
             break;
         }
         case 'CompressionMeter': {
@@ -422,6 +424,7 @@ function updateMeterDomLabel(property, result) {
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('compressionMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('compressionLinearValue', formatted + ' dB');
             break;
         }
         case 'ALCMeter': {
@@ -442,6 +445,7 @@ function updateMeterDomLabel(property, result) {
             if (meterEl) meterEl.textContent = String(pct);
             const alcCanvas = document.getElementById('alcMeterCanvas');
             if (alcCanvas) alcCanvas.dataset.reading = String(pct);
+            setLinearMeterChip('alcLinearValue', window.MeterFormatters.percent(pct));
             break;
         }
         case 'IDDMeter': {
@@ -450,6 +454,7 @@ function updateMeterDomLabel(property, result) {
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('iddMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('iddLinearValue', formatted + ' A');
             break;
         }
         case 'VDDMeter': {
@@ -458,9 +463,18 @@ function updateMeterDomLabel(property, result) {
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('vddMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('vddLinearValue', formatted + ' V');
             break;
         }
     }
+}
+
+// The value chip beside a bar meter (Experimental UI only; absent on Classic).
+// The overlay formatters carry no unit, because a radial has it on its face;
+// a bar does not, so its chip does.
+function setLinearMeterChip(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
 }
 
 // Outer power setter (stub - real version is inside the IIFE)

@@ -279,3 +279,60 @@ html.iwc-flex, .iwc-flex-body {
 .iwc-flex-body .ifshift-slider::-moz-range-track {
     background: var(--ywc-gauge-track);
 }
+
+/* Linear Meters panel: Fabio's bar meters, rules from YWC's flex-widgets.css. */
+.iwc-flex-body .op-col--linear-meters {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.iwc-flex-body .linear-meter-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.iwc-flex-body .linear-meter-label {
+    flex: 0 0 2.2rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: right;
+    color: var(--yaesu-ink, #e6e6e6);
+    line-height: 1;
+}
+
+.iwc-flex-body .linear-meter-row canvas {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    height: 28px;
+    display: block;
+}
+
+.iwc-flex-body .linear-meter-value {
+    flex: 0 0 3.6rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+    line-height: 1;
+    background: #dc3545;
+    color: #fff;
+    padding: 2px 5px;
+}
+
+.iwc-flex-body .linear-meter-value--comp {
+    background: #ffc107;
+    color: #000;
+}
+
+.iwc-flex-body .linear-meter-value--alc {
+    background: #0dcaf0;
+    color: #000;
+}

@@ -461,6 +461,47 @@
 
     <!-- (Status line moved inside each VFO panel — see #vfoAStatusLine / #vfoBStatusLine) -->
 
+    @if (Model.IsFlexUi)
+    {
+        @* Experimental UI only: Fabio Valente's bar meters (YWC's Linear
+           Meters panel, same ids and classes). MeterPanel.update mirrors each
+           radial to its `<key>Linear` bar, so nothing else feeds them; site.js
+           writes the value chips beside the chips under the radials. The
+           IC-7300 has no TEMP meter over CI-V, so there is no TEMP row. *@
+        <div id="linearMetersSection" class="op-col op-col--linear-meters">
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">PWR</span>
+                <canvas id="powerLinearCanvas" role="img" aria-hidden="true" aria-label="Power output meter (linear)"></canvas>
+                <span id="powerLinearValue" class="linear-meter-value linear-meter-value--pwr">0 W</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">SWR</span>
+                <canvas id="swrLinearCanvas" role="img" aria-hidden="true" aria-label="SWR meter (linear)"></canvas>
+                <span id="swrLinearValue" class="linear-meter-value linear-meter-value--swr">1.0:1</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">COMP</span>
+                <canvas id="compressionLinearCanvas" role="img" aria-hidden="true" aria-label="Compression meter (linear)"></canvas>
+                <span id="compressionLinearValue" class="linear-meter-value linear-meter-value--comp">0 dB</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">ALC</span>
+                <canvas id="alcLinearCanvas" role="img" aria-hidden="true" aria-label="ALC meter (linear)"></canvas>
+                <span id="alcLinearValue" class="linear-meter-value linear-meter-value--alc">0%</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">IDD</span>
+                <canvas id="iddLinearCanvas" role="img" aria-hidden="true" aria-label="Drain current meter (linear)"></canvas>
+                <span id="iddLinearValue" class="linear-meter-value linear-meter-value--idd">0.0 A</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">VDD</span>
+                <canvas id="vddLinearCanvas" role="img" aria-hidden="true" aria-label="Amplifier supply voltage meter (linear)"></canvas>
+                <span id="vddLinearValue" class="linear-meter-value linear-meter-value--vdd">--.- V</span>
+            </div>
+        </div>
+    }
+
     <!-- Power and SWR Meters -->
     <div class="row mt-3">
         <div class="col-12">
@@ -2237,7 +2278,25 @@
                 compression: { canvasId: 'compressionMeterCanvas' },
                 alc:         { canvasId: 'alcMeterCanvas' },
                 idd:         { canvasId: 'iddMeterCanvas' },
-                vdd:         { canvasId: 'vddMeterCanvas' }
+                vdd:         { canvasId: 'vddMeterCanvas' },
+                // /flexui's bar meters (no canvas on Classic, so skipped there).
+                // update('power', v) also sets powerLinear, so each bar is set
+                // to its radial's scale here; SWR's 0-255 face is the default.
+                powerLinear:       { type: 'powerLinear', canvasId: 'powerLinearCanvas', maxValue: 100,
+                                     majorTicks: ['0', '25', '50', '75', '100'] },
+                swrLinear:         { type: 'swrLinear', canvasId: 'swrLinearCanvas' },
+                compressionLinear: { type: 'compressionLinear', canvasId: 'compressionLinearCanvas', maxValue: 30,
+                                     majorTicks: ['0', '5', '10', '15', '20', '25', '30'],
+                                     highlights: [{ from: 0, to: 10, color: 'rgba(0,255,0,.25)' },
+                                                  { from: 10, to: 20, color: 'rgba(255,255,0,.25)' },
+                                                  { from: 20, to: 30, color: 'rgba(255,0,0,.25)' }] },
+                alcLinear:         { type: 'alcLinear', canvasId: 'alcLinearCanvas', maxValue: 100,
+                                     majorTicks: ['0', '20', '40', '60', '80', '100'],
+                                     highlights: [{ from: 0, to: 70, color: 'rgba(0,255,0,.25)' },
+                                                  { from: 70, to: 90, color: 'rgba(255,255,0,.25)' },
+                                                  { from: 90, to: 100, color: 'rgba(255,0,0,.25)' }] },
+                iddLinear:         { type: 'iddLinear', canvasId: 'iddLinearCanvas' },
+                vddLinear:         { type: 'vddLinear', canvasId: 'vddLinearCanvas', minValue: 10, maxValue: 16, nominal: 13.8 }
             });
             window.ic7300Meters = new Ic7300Meters(window.meterPanel, window.calibrationEngine);
 
