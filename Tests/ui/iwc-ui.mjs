@@ -275,6 +275,21 @@ test('DxSpots pop-out shows a spot pushed over the hub', async () => {
     } finally { await page.close(); }
 });
 
+// Diagnostics "Start fresh test log": the mark goes to the server (stubbed
+// here), the download links point at the log endpoint.
+test('/Diagnostics: Start fresh test log marks the log, the download links fetch it', async () => {
+    const page = await open('/Diagnostics', { settleMs: 1500 });
+    try {
+        const links = await page.eval(`[...document.querySelectorAll('a[href^="/api/diagnostics/log"]')].map(a => a.getAttribute('href'))`);
+        expect(links.includes('/api/diagnostics/log') && links.includes('/api/diagnostics/log?full=true'), `links ${JSON.stringify(links)}`);
+        await page.eval(`document.getElementById('diag-mark-log').click()`);
+        await page.waitFor(`__rwcTest.writes.length > 0`, { what: 'the mark' });
+        const w = await page.writes();
+        expect(w.length === 1 && w[0].method === 'POST' && w[0].path === '/api/diagnostics/log/mark', `wrote ${JSON.stringify(w)}`);
+        await page.waitFor(`/Fresh capture started/.test(document.getElementById('diag-mark-result').textContent)`, { what: 'the confirmation' });
+    } finally { await page.close(); }
+});
+
 const dialogPos = page => page.eval(`(() => { const r = document.getElementById('dxSpotsDialog').getBoundingClientRect(); return { x: r.left, y: r.top }; })()`);
 const allBands = page => page.eval(`document.getElementById('dxSpotsAllBandsChk').checked`);
 
