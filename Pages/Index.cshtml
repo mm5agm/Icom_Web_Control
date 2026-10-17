@@ -2067,6 +2067,9 @@
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=@Icom_Web_Control.AppVersion.Display";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=@Icom_Web_Control.AppVersion.Display";
         import { initMemoriesPanel }   from "/js/ui/memories.js?v=@Icom_Web_Control.AppVersion.Display";
+        // Side-effect import: publishes window.radioFeatureSetup, the "set it up"
+        // pop-outs the CW reader and DX spots panels offer. Loaded before them.
+        import "/js/dialogs/feature-setup.js?v=@Icom_Web_Control.AppVersion.Display";
         import { DxSpotsPanel }         from "/js/dx/dx-spots-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { ModePanelGuard }       from "/js/modes/mode-panel-guard.js?v=@Icom_Web_Control.AppVersion.Display";
         import { attachPopout, screenShare } from "/js/popout/popout.js?v=@Icom_Web_Control.AppVersion.Display";
