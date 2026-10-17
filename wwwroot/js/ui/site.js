@@ -1147,6 +1147,15 @@ connection.on("RadioStateUpdate", function (update) {
         if (label)  label.textContent = update.value;
     }
 
+    // --- MIC GAIN --- (YWC #228: missing, so a change made in another tab
+    // never moved this slider.)
+    if (update.property === "MicGain") {
+        const slider = document.getElementById('micGainSlider');
+        const label  = document.getElementById('micGainValue');
+        if (slider) slider.value = update.value;
+        if (label)  label.textContent = update.value;
+    }
+
     // --- FREQUENCY CHANGE ---
     //
     // Important: `state` in this scope refers to a variable defined inside an
