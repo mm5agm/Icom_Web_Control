@@ -3936,6 +3936,8 @@
         // --- MONITOR ON/OFF + LEVEL ---
         let _monitorOn = @(Model.MonitorOn ? "true" : "false");
         function _updateMonitorBtn(on) {
+            // Keep the toggle's idea of the state in step with the radio too.
+            _monitorOn = on;
             const btn = document.getElementById('monitorOnBtn');
             if (!btn) return;
             btn.classList.toggle('btn-warning', on);
@@ -5324,6 +5326,8 @@
         window.setMicGain    = setMicGain;
         window.toggleProc    = toggleProc;
         window.setProcLevel  = setProcLevel;
+        // site.js calls this on ProcEnabled; without it the key never followed the radio.
+        window.updateProcButton = updateProcButton;
         window.toggleAtu        = toggleAtu;
         window.startAtuTune     = startAtuTune;
         window.stopAtuTune      = stopAtuTune;

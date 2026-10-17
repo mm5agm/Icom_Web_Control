@@ -466,6 +466,23 @@ html.iwc-flex, .iwc-flex-body {
     gap: 0.3rem;
 }
 
+/* ---- Levels panel (YWC _Levels): POWER / MIC / PROC / MONI keys ---- */
+.iwc-flex-body .op-col--levels {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 0.3rem;
+}
+/* Four keys on one line: they share the width rather than wrapping. */
+.iwc-flex-body .op-col--levels > div:not([hidden]) {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.iwc-flex-body .op-col--levels .toggle-dd__btn {
+    width: 100%;
+    min-width: 0;
+}
+
 .iwc-flex-body .op-col--vfo-actions .btn {
     min-width: 3.6rem;
     height: 2.65rem;

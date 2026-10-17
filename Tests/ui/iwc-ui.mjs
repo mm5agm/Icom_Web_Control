@@ -750,6 +750,29 @@ test('flexui: VFO cards are three columns, and the S bar follows the receiving V
     } finally { await page.close(); }
 });
 
+test('flexui: Levels keys follow the radio and write through the Classic controls', async () => {
+    const page = await openFlex();
+    try {
+        expect(await flexWhere(page, 'levels') === 'docked', 'Levels panel is not docked');
+        const keys = await page.eval(`[...document.querySelectorAll('#levelsSection .toggle-dd__btn')].length`);
+        expect(keys >= 4, `Levels has ${keys} keys, not 4`);
+        // Radio -> key, silently.
+        await page.state('ProcEnabled', true);
+        await page.state('ProcLevel', 42);
+        await page.state('MonitorLevelA', 17);
+        await sleep(300);
+        let s = await page.eval(`({ proc: window.procCycleButton.getState(), mon: window.monitorCycleButton.getState() })`);
+        expect(s.proc.selectedId === '1' && s.proc.value === 42, `PROC key did not follow: ${JSON.stringify(s.proc)}`);
+        expect(s.mon.value === 17, `MONI key did not follow: ${JSON.stringify(s.mon)}`);
+        // Key -> Classic slider (whose change handler does the write).
+        await page.eval(`window.powerCycleButton.setState({ value: 30 })`);
+        await sleep(400);
+        const w = await page.eval(`({ slider: document.getElementById('powerSlider').value, label: document.getElementById('powerValue').textContent })`);
+        expect(w.slider === '30' && /30/.test(w.label), `POWER key did not reach the Classic slider: ${JSON.stringify(w)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
 test('flexui: toolbar is a strip above the dock, and VFO Actions is a panel', async () => {
     const page = await openFlex();
     try {

@@ -18,7 +18,20 @@
         "children": [
           {
             "type": "tabset",
-            "weight": 35,
+            "weight": 30,
+            "children": [
+              {
+                "type": "tab",
+                "id": "levels",
+                "name": "Levels",
+                "component": "levels"
+              }
+            ],
+            "minHeight": 66
+          },
+          {
+            "type": "tabset",
+            "weight": 25,
             "children": [
               {
                 "type": "tab",
@@ -31,7 +44,7 @@
           },
           {
             "type": "tabset",
-            "weight": 65,
+            "weight": 45,
             "children": [
               {
                 "type": "tab",
