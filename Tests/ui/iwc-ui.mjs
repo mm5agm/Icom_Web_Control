@@ -348,10 +348,10 @@ const RADIO_CHANNELS = [
     { channel: 2, isEmpty: true, frequencyHz: 0, mode: '', name: '' },
     { channel: 3, isEmpty: false, frequencyHz: 14_025_000, mode: 'CW-U', name: '' },
 ];
-const radioPage = async () => {
+const radioPage = async (channels = RADIO_CHANNELS) => {
     const page = await open('/radio', {
         settleMs: 2000,
-        before: `__rwcTest.getOverrides['/api/memory/radio-channels'] = ${JSON.stringify({ channels: RADIO_CHANNELS, misses: 0 })};`,
+        before: `__rwcTest.getOverrides['/api/memory/radio-channels'] = ${JSON.stringify({ channels, misses: 0 })};`,
     });
     await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the adapter hub handler' });
     for (const [p, v] of [['IsConnected', true], ['ActiveVfo', 0], ['FrequencyA', 14_074_000], ['BandA', '20m'],
@@ -515,6 +515,24 @@ test('/radio: a VFO>M pick left for 4 s is dropped, not written', async () => {
         await clickButton(page, '.rp-mem-keys', VFO_TO_M);
         await waitForList(page);
         expect((await page.writes()).length === 0, 'it wrote after the pick lapsed');
+    } finally { await page.close(); }
+});
+
+test('/radio: all 99 radio channels can be scrolled to, the list stays in the window', async () => {
+    const all = Array.from({ length: 99 }, (_, i) => ({ channel: i + 1, isEmpty: true, frequencyHz: 0, mode: '', name: '' }));
+    const page = await radioPage(all);
+    try {
+        await clickButton(page, '.rp-mem-keys', VFO_TO_M);
+        await waitForList(page);
+        const fit = await page.eval(`(() => {
+            const kl = document.querySelector('.rp-keylist');
+            kl.scrollTop = kl.scrollHeight;
+            const r = kl.getBoundingClientRect();
+            const last = [...kl.querySelectorAll('.rp-menu-item')].pop().getBoundingClientRect();
+            return { top: r.top, bottom: r.bottom, h: innerHeight, last: last.bottom, text: kl.lastElementChild.textContent };
+        })()`);
+        expect(fit.top >= 0 && fit.bottom <= fit.h, `list spans ${fit.top}-${fit.bottom} in a ${fit.h} px window`);
+        expect(fit.last <= fit.bottom + 1 && /^M99/.test(fit.text), `last item "${fit.text}" ends at ${fit.last}, list at ${fit.bottom}`);
     } finally { await page.close(); }
 });
 

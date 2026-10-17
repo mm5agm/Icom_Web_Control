@@ -1358,7 +1358,15 @@ export function mountRadioPanel(root, opts = {}) {
             const left = (kr.left - pr.left) * f;
             keyList.style.right = 'auto';
             keyList.style.left = Math.max(0, Math.min(left, panel.offsetWidth - keyList.offsetWidth)) + 'px';
-            keyList.style.top = ((kr.bottom - pr.top) * f + 6) + 'px';
+            // Fit the window: below the key if it fits or there is more room
+            // there, else above it. A long list (99 memory channels) scrolls
+            // inside that height rather than running off the page.
+            const below = window.innerHeight - kr.bottom - 12, above = kr.top - 12;
+            const down = below >= 240 || below >= above;
+            keyList.style.maxHeight = Math.max(120, (down ? below : above) * f) + 'px';
+            keyList.style.top = down
+                ? ((kr.bottom - pr.top) * f + 6) + 'px'
+                : ((kr.top - pr.top) * f - 6 - keyList.offsetHeight) + 'px';
         },
         closeKeyList,
         setKey(id, { on = false, tx = false, sub } = {}, vfo) {
