@@ -143,6 +143,10 @@ export function startIcomRadioPanel(root, cfg) {
         vfoKeyColumns: 3,
         memKeys: [
             { id: 'mstore', label: 'M.STORE', title: "Add the selected VFO to IWC's memory list (the Memories page). It does not write to the radio's own memories" },
+            // The radio's own 99 channels. The IC-7300 cannot say which one it
+            // is on, so each key lists them and the operator picks.
+            { id: 'mtovfo', label: 'M▸VFO', title: "Pick one of the radio's own memory channels and tune the selected VFO to it" },
+            { id: 'vfotom', label: 'VFO▸M', title: "Pick one of the radio's own memory channels, then press again to write the selected VFO over it (not IWC's Memories)" },
         ],
         // CLR zeroes the offset and leaves RIT / ΔTX as they are.
         clarKeys: [
@@ -361,6 +365,98 @@ export function startIcomRadioPanel(root, cfg) {
         if (text) mstoreTimer = setTimeout(() => mstoreSays(''), 4000);
     }
 
+    // ---- the radio's own memory channels ---------------------------------
+    // Reading all 99 takes a few seconds, so the key says READING meanwhile.
+    // VFO▸M is two presses: pick a channel from the list, then press VFO▸M
+    // again within 4 s. The server re-reads the channel and refuses if it no
+    // longer holds what the list showed.
+    const memSays = {};
+    function memKeySays(id, text, lit = !!text, holdMs = 4000) {
+        clearTimeout(memSays[id]);
+        panel.setKey(id, { on: lit, sub: text }, 'mem');
+        if (text && holdMs) memSays[id] = setTimeout(() => memKeySays(id, ''), holdMs);
+    }
+    const chName = ch => 'M' + String(ch).padStart(2, '0');
+    const chLine = c => (c.isEmpty ? `${chName(c.channel)}  (empty)`
+        : `${chName(c.channel)}  ${(c.frequencyHz / 1e6).toFixed(3)} ${c.mode}${c.name ? '  ' + c.name : ''}`);
+    let memReading = false;
+    async function radioChannels(id) {
+        if (memReading) return null;
+        memReading = true;
+        memKeySays(id, 'READING', true, 0);
+        try {
+            const res = await fetch('/api/memory/radio-channels');
+            if (!res.ok) { memKeySays(id, res.status === 503 ? 'NO RADIO' : 'FAILED'); return null; }
+            memKeySays(id, '');
+            return (await res.json())?.channels ?? [];
+        } catch {
+            memKeySays(id, 'FAILED');
+            return null;
+        } finally {
+            memReading = false;
+        }
+    }
+    const who = rx => 'VFO-' + rx.toUpperCase();
+    // A second press closes the open list without reading the radio again.
+    function closeIfListed(id) {
+        const kl = root.querySelector('.rp-keylist');
+        if (!kl || kl.hidden || kl.dataset.for !== 'mem:' + id) return false;
+        panel.closeKeyList();
+        return true;
+    }
+
+    async function memoryToVfo(rx) {
+        if (closeIfListed('mtovfo')) return;
+        const list = await radioChannels('mtovfo');
+        if (!list) return;
+        const used = list.filter(c => !c.isEmpty);
+        const items = [{ group: `TUNE ${who(rx)} TO A RADIO CHANNEL` }];
+        for (const c of used) {
+            items.push({
+                label: chLine(c),
+                title: `Tune ${who(rx)} to ${chName(c.channel)}`,
+                run: () => post(`/api/memory/radio-channel/${c.channel}/to-vfo/${rx}`)
+                    .then(res => memKeySays('mtovfo', res?.ok ? chName(c.channel) : 'FAILED')),
+            });
+        }
+        if (!used.length) items.push({ group: 'NO CHANNELS PROGRAMMED ON THE RADIO' });
+        panel.openKeyList('mtovfo', items, 'mem');
+    }
+
+    let vfoToMemArm = null;
+    function vfoToMemDisarm() {
+        vfoToMemArm = null;
+        memKeySays('vfotom', '');
+    }
+    async function vfoToMemory(rx) {
+        if (vfoToMemArm) {
+            const { c, rx: armedRx } = vfoToMemArm;
+            vfoToMemDisarm();
+            const res = await post(`/api/memory/radio-channel/${c.channel}/from-vfo/${armedRx}`,
+                { isEmpty: !!c.isEmpty, frequencyHz: c.frequencyHz, mode: c.mode });
+            return memKeySays('vfotom', res?.ok ? 'WROTE ' + chName(c.channel) : res?.status === 409 ? 'CHANGED' : 'FAILED');
+        }
+        if (closeIfListed('vfotom')) return;
+        const list = await radioChannels('vfotom');
+        if (!list) return;
+        const items = [{ group: `WRITE ${who(rx)} OVER A RADIO CHANNEL` }];
+        for (const c of list) {
+            items.push({
+                label: chLine(c),
+                title: c.isEmpty ? `Choose ${chName(c.channel)}` : `Choose ${chName(c.channel)} - what it holds now will be lost`,
+                run: () => {
+                    vfoToMemArm = { c, rx };
+                    // Lit and asking; the hold timer disarms it.
+                    clearTimeout(memSays.vfotom);
+                    panel.setKey('vfotom', { on: true, sub: chName(c.channel) + '?' }, 'mem');
+                    memSays.vfotom = setTimeout(vfoToMemDisarm, 4000);
+                },
+            });
+        }
+        if (!list.length) items.push({ group: 'THE RADIO DID NOT ANSWER' });
+        panel.openKeyList('vfotom', items, 'mem');
+    }
+
     function act(kind, id, vfo, dir) {
         if (kind === 'entry') return win.entry(id);
         // The digit wheel, the dial and the spectrum panes tune either VFO.
@@ -446,6 +542,8 @@ export function startIcomRadioPanel(root, cfg) {
             case 'memKey':
                 if (id === 'mstore')
                     return post(`/api/memory/save-vfo/${rx}`, { label: '' }).then(res => mstoreSays(res?.ok ? 'SAVED' : 'FAILED'));
+                if (id === 'mtovfo') return memoryToVfo(rx);
+                if (id === 'vfotom') return vfoToMemory(rx);
         }
     }
 

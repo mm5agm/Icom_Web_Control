@@ -280,6 +280,106 @@ namespace Icom_Web_Control.Controllers
             return Ok(new { written });
         }
 
+        // ── The radio's own channels, one at a time (Radio panel M▸VFO / VFO▸M) ─
+        //
+        // The IC-7300 cannot report which channel it is on, so the panel lists
+        // the channels and the operator picks one. M▸VFO reads the channel and
+        // tunes the VFO to it, leaving the radio in VFO mode; it never selects
+        // the channel on the radio. VFO▸M writes the VFO's frequency, mode and
+        // filter over a channel, keeping its name. Neither keys TX.
+
+        [HttpGet("radio-channels")]
+        public async Task<IActionResult> RadioChannels()
+        {
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
+
+            var list = new List<object>();
+            int misses = 0;
+            for (int ch = 1; ch <= RadioChannelCount; ch++)
+            {
+                var c = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
+                if (c == null) { misses++; continue; }
+                list.Add(c.IsEmpty || c.FrequencyHz <= 0
+                    ? new { channel = ch, isEmpty = true, frequencyHz = 0L, mode = "", name = "" }
+                    : new { channel = ch, isEmpty = false, frequencyHz = c.FrequencyHz, mode = c.Mode, name = c.Name.Trim() });
+            }
+            return Ok(new { channels = list, misses });
+        }
+
+        [HttpPost("radio-channel/{ch:int}/to-vfo/{vfo}")]
+        public async Task<IActionResult> RadioChannelToVfo(int ch, string vfo)
+        {
+            if (ch < 1 || ch > RadioChannelCount) return BadRequest(new { error = "No such channel." });
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
+
+            var c = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
+            if (c == null) return StatusCode(504, new { error = "The radio did not answer the memory read." });
+            if (c.IsEmpty || c.FrequencyHz <= 0) return Conflict(new { error = $"Channel {ch} is empty." });
+
+            var v = string.Equals(vfo, "B", StringComparison.OrdinalIgnoreCase) ? RadioVfo.B : RadioVfo.A;
+            // Mode, then filter, then frequency, as Recall does.
+            await _radio.SetModeAsync(v, c.Mode, CancellationToken.None);
+            await Task.Delay(50);
+            if (c.Filter is >= 1 and <= 3)
+                await _radio.SetSelectedFilterAsync(v, c.Filter, CancellationToken.None);
+            await _radio.SetFrequencyHzAsync(v, c.FrequencyHz, CancellationToken.None);
+            if (v == RadioVfo.B) { _radioStateService.ModeB = c.Mode; _radioStateService.FrequencyB = c.FrequencyHz; }
+            else                 { _radioStateService.ModeA = c.Mode; _radioStateService.FrequencyA = c.FrequencyHz; }
+
+            _logger.LogInformation("Radio channel {Ch} to VFO-{Vfo}: {Freq} Hz {Mode}", ch, v, c.FrequencyHz, c.Mode);
+            return Ok(new { channel = ch, vfo = v.ToString(), frequencyHz = c.FrequencyHz, mode = c.Mode });
+        }
+
+        /// <summary>What the operator was shown for the channel when they chose it.</summary>
+        public class ChannelSeen
+        {
+            public bool IsEmpty { get; set; }
+            public long FrequencyHz { get; set; }
+            public string? Mode { get; set; }
+        }
+
+        [HttpPost("radio-channel/{ch:int}/from-vfo/{vfo}")]
+        public async Task<IActionResult> VfoToRadioChannel(int ch, string vfo, [FromBody] ChannelSeen? seen)
+        {
+            if (ch < 1 || ch > RadioChannelCount) return BadRequest(new { error = "No such channel." });
+            if (seen == null) return BadRequest(new { error = "Say what the channel held when it was chosen." });
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio is not connected." });
+
+            bool isA = !string.Equals(vfo, "B", StringComparison.OrdinalIgnoreCase);
+            long hz = isA ? _radioStateService.FrequencyA : _radioStateService.FrequencyB;
+            string? mode = isA ? _radioStateService.ModeA : _radioStateService.ModeB;
+            if (hz <= 0 || string.IsNullOrEmpty(mode))
+                return StatusCode(503, new { error = "The VFO's frequency and mode are not known yet." });
+
+            // Re-read, so a channel changed at the front panel since the list
+            // was shown is not overwritten unseen.
+            var now = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
+            if (now == null) return StatusCode(504, new { error = "The radio did not answer the memory read." });
+            bool nowEmpty = now.IsEmpty || now.FrequencyHz <= 0;
+            if (nowEmpty != seen.IsEmpty
+                || (!nowEmpty && (now.FrequencyHz != seen.FrequencyHz || !string.Equals(now.Mode, seen.Mode, StringComparison.Ordinal))))
+                return Conflict(new { error = $"Channel {ch} changed on the radio. Open the list again." });
+
+            int fil = int.TryParse(isA ? _radioStateService.SelectedFilterA : _radioStateService.SelectedFilterB, out var f) && f is >= 1 and <= 3 ? f : 1;
+            var ok = await _radio.WriteMemoryChannelAsync(new RadioMemoryChannel
+            {
+                Channel       = ch,
+                FrequencyHz   = hz,
+                Mode          = mode,
+                Filter        = fil,
+                TxFrequencyHz = hz,
+                TxMode        = mode,
+                Name          = nowEmpty ? "" : now.Name,
+            }, CancellationToken.None);
+            if (!ok) return StatusCode(504, new { error = "The radio did not accept the memory write." });
+
+            _logger.LogInformation("VFO-{Vfo} to radio channel {Ch}: {Freq} Hz {Mode} FIL{Fil}", isA ? "A" : "B", ch, hz, mode, fil);
+            return Ok(new { channel = ch, frequencyHz = hz, mode, name = nowEmpty ? "" : now.Name.Trim() });
+        }
+
         /// <summary>Map an app memory onto a radio channel (label→name capped at 16, split off, TX mirrors RX).</summary>
         private static RadioMemoryChannel ToRadioChannel(AppMemory m, int channel) => new()
         {
