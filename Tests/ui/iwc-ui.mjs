@@ -419,8 +419,18 @@ const clickButton = async (page, scope, label) => {
     if (!p) throw new Error(`no button "${label}" in ${scope}`);
     await page.click(p);
 };
-const radioPage = async () => {
-    const page = await open('/radio', { settleMs: 2000 });
+// The radio's own channels, as GET /api/memory/radio-channels gives them, so no
+// test reads the real radio's memories.
+const RADIO_CHANNELS = [
+    { channel: 1, isEmpty: false, frequencyHz: 7_074_000, mode: 'USB', name: 'FT8 40' },
+    { channel: 2, isEmpty: true, frequencyHz: 0, mode: '', name: '' },
+    { channel: 3, isEmpty: false, frequencyHz: 14_025_000, mode: 'CW-U', name: '' },
+];
+const radioPage = async (channels = RADIO_CHANNELS) => {
+    const page = await open('/radio', {
+        settleMs: 2000,
+        before: `__rwcTest.getOverrides['/api/memory/radio-channels'] = ${JSON.stringify({ channels, misses: 0 })};`,
+    });
     await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the adapter hub handler' });
     for (const [p, v] of [['IsConnected', true], ['ActiveVfo', 0], ['FrequencyA', 14_074_000], ['BandA', '20m'],
         ['ModeA', 'USB'], ['IfWidthA', '2400'], ['SelectedFilterA', '1'], ['AgcA', '2'], ['AttA', '00'], ['IpoA', '1']])
@@ -517,6 +527,108 @@ test('/radio: M.STORE saves the selected VFO to IWC memories', async () => {
         await page.waitFor(`[...document.querySelectorAll('.rp-mem-keys .rp-sub')].some(s => s.textContent === 'SAVED')`, { what: 'SAVED on M.STORE' });
     } finally { await page.close(); }
 });
+
+// The radio-memory keys' labels (the arrow is U+25B8).
+const M_TO_VFO = 'M\u25B8VFO', VFO_TO_M = 'VFO\u25B8M';
+const keySub = (page, label) => page.eval(`(() => {
+    const b = [...document.querySelectorAll('.rp-mem-keys button')].find(b => b.textContent.trim().startsWith(${JSON.stringify(label)}));
+    return b?.querySelector('.rp-sub')?.textContent ?? null;
+})()`);
+const LIST_ITEMS = `document.querySelectorAll('.rp-keylist:not([hidden]) .rp-menu-item')`;
+const keyListItems = page => page.eval(`[...${LIST_ITEMS}].map(b => b.textContent)`);
+const waitForList = page => page.waitFor(`${LIST_ITEMS}.length > 0`, { what: 'the channel list' });
+
+test('/radio: M>VFO lists the programmed radio channels and tunes to one', async () => {
+    const page = await radioPage();
+    try {
+        await clickButton(page, '.rp-mem-keys', M_TO_VFO);
+        await waitForList(page);
+        const items = await keyListItems(page);
+        expect(items.length === 2 && /^M01 .*7\.074 USB .*FT8 40/.test(items[0]) && /^M03 .*14\.025 CW-U/.test(items[1]),
+            `listed ${JSON.stringify(items)} (the empty M02 should not be)`);
+        await clickButton(page, '.rp-keylist', 'M03');
+        const w = (await page.writes()).filter(x => /radio-channel/.test(x.path));
+        expect(w.length === 1 && w[0].path === '/api/memory/radio-channel/3/to-vfo/a', `wrote ${JSON.stringify(w)}`);
+        await page.waitFor(`[...document.querySelectorAll('.rp-mem-keys .rp-sub')].some(s => s.textContent === 'M03')`, { what: 'M03 on the key' });
+    } finally { await page.close(); }
+});
+
+test('/radio: M>VFO pressed again closes its list', async () => {
+    const page = await radioPage();
+    try {
+        await clickButton(page, '.rp-mem-keys', M_TO_VFO);
+        await waitForList(page);
+        await clickButton(page, '.rp-mem-keys', M_TO_VFO);
+        expect(await page.eval(`document.querySelector('.rp-keylist').hidden`), 'the list is still open');
+        expect((await page.writes()).length === 0, 'something was written');
+    } finally { await page.close(); }
+});
+
+test('/radio: VFO>M writes only on a second press, naming what it saw', async () => {
+    const page = await radioPage();
+    try {
+        await clickButton(page, '.rp-mem-keys', VFO_TO_M);
+        await waitForList(page);
+        const items = await keyListItems(page);
+        expect(items.length === 3 && /^M02 .*\(empty\)/.test(items[1]), `listed ${JSON.stringify(items)}`);
+        await clickButton(page, '.rp-keylist', 'M01');
+        expect((await page.writes()).length === 0, 'picking a channel wrote at once');
+        expect(await keySub(page, VFO_TO_M) === 'M01?', `key says "${await keySub(page, VFO_TO_M)}"`);
+        await clickButton(page, '.rp-mem-keys', VFO_TO_M);
+        await page.waitFor(`__rwcTest.writes.length > 0`, { what: 'the write' });
+        const w = await page.writes();
+        expect(w.length === 1 && w[0].path === '/api/memory/radio-channel/1/from-vfo/a', `wrote ${JSON.stringify(w)}`);
+        expect(JSON.stringify(w[0].body) === JSON.stringify({ isEmpty: false, frequencyHz: 7_074_000, mode: 'USB' }), `sent ${JSON.stringify(w[0].body)}`);
+    } finally { await page.close(); }
+});
+
+test('/radio: a VFO>M pick left for 4 s is dropped, not written', async () => {
+    const page = await radioPage();
+    try {
+        await clickButton(page, '.rp-mem-keys', VFO_TO_M);
+        await waitForList(page);
+        await clickButton(page, '.rp-keylist', 'M02');
+        await new Promise(r => setTimeout(r, 4300));
+        expect(await keySub(page, VFO_TO_M) === '', `key still says "${await keySub(page, VFO_TO_M)}"`);
+        await clickButton(page, '.rp-mem-keys', VFO_TO_M);
+        await waitForList(page);
+        expect((await page.writes()).length === 0, 'it wrote after the pick lapsed');
+    } finally { await page.close(); }
+});
+
+// What counts is whether M99 can be seen: the panel's sizer clips at the
+// panel's own bottom edge, which is above the window's when the panel is
+// shorter than the window (Colin's bench, 2026-10-17: only M1-M12 reachable).
+for (const size of ['fit', '50'])
+    test(`/radio: all 99 radio channels can be scrolled to and seen (size ${size})`, async () => {
+        const all = Array.from({ length: 99 }, (_, i) => ({ channel: i + 1, isEmpty: true, frequencyHz: 0, mode: '', name: '' }));
+        const page = await radioPage(all);
+        try {
+            await page.eval(`(() => {
+                const sel = [...document.querySelectorAll('select')].find(x => x.title === 'Size');
+                sel.value = ${JSON.stringify(size)};
+                sel.dispatchEvent(new Event('change'));
+            })()`);
+            await clickButton(page, '.rp-mem-keys', VFO_TO_M);
+            await waitForList(page);
+            const seen = await page.eval(`(() => {
+                const kl = document.querySelector('.rp-keylist');
+                kl.scrollTop = kl.scrollHeight;
+                const items = [...kl.querySelectorAll('.rp-menu-item')];
+                const at = el => { const r = el.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); };
+                return { last: at(items.at(-1)) === items.at(-1), text: items.at(-1).textContent };
+            })()`);
+            expect(seen.last && /^M99/.test(seen.text), `"${seen.text}" is hidden after scrolling the list to the end`);
+            // and the top of the list, scrolled back
+            const top = await page.eval(`(() => {
+                const kl = document.querySelector('.rp-keylist');
+                kl.scrollTop = 0;
+                const first = kl.querySelector('.rp-menu-item'), r = first.getBoundingClientRect();
+                return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === first;
+            })()`);
+            expect(top, 'M01 is hidden with the list scrolled to the top');
+        } finally { await page.close(); }
+    });
 
 test('/radio: has no key that transmits, and nothing clicked here wrote one', async () => {
     const page = await radioPage();
