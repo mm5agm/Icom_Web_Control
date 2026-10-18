@@ -906,6 +906,18 @@ test('flexui: Save current as... writes the layout to /api/flexlayouts', async (
     } finally { await page.close(); }
 });
 
+// ---------------------------------------------------------------- MIC gain
+
+test('Index: MIC gain slider follows a MicGain update', async () => {
+    const page = await open('/', { settleMs: 1500 });
+    try {
+        await page.state('MicGain', 37);
+        await page.waitFor(`document.getElementById('micGainSlider').value === '37' && document.getElementById('micGainValue').textContent === '37'`,
+            { timeoutMs: 2000, what: 'slider and label at 37' });
+        expect(writesTo(await page.writes(), '/api/cat/micgain').length === 0, 'the update was written back to the radio');
+    } finally { await page.close(); }
+});
+
 // ----------------------------------------------------------------
 
 try {
