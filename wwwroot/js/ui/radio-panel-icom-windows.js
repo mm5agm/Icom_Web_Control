@@ -29,7 +29,7 @@ import { sMeterFraction, sMeterText, txMeterFraction } from '/js/radio-panel/pan
 import { SMeterHistoryPanel } from '/js/guages/smeter-history-panel.js';
 import {
     num, h, note, row, keys, framed, windowPopouts, openPopout, meterBars,
-    memoriesWindow, dxWatchWindow, frequencyEntryWindow,
+    memoriesWindow, dxWatchWindow, frequencyEntryWindow, wheelSteps,
 } from '/js/radio-panel/window-kit.js';
 
 export const ICOM_WINDOWS = [
@@ -109,6 +109,9 @@ export function startIcomWindows(windows, ctx) {
         const pitch = row(body, 'PITCH');
         keys(body, [['−', () => setPitch(-10)], ['+', () => setPitch(10)]]);
         const bk = row(body, 'BREAK-IN');
+        // The mouse wheel over SPEED or PITCH steps it, as the - / + keys do.
+        wheelSteps(speed.parentElement, d => setSpeed(d));
+        wheelSteps(pitch.parentElement, d => setPitch(d * 10));
         // Classic's ZIN: nudges the VFO so the signal the CW reader hears sits
         // on the pitch. It tunes; it does not transmit. It needs the reader
         // running, and says so if it is not.
@@ -118,11 +121,13 @@ export function startIcomWindows(windows, ctx) {
         function setSpeed(d) {
             const wpm = Math.max(6, Math.min(48, num(state.CwSpeed) + d));
             if (!state.CwSpeed || wpm === num(state.CwSpeed)) return;
+            state.CwSpeed = wpm;
             ctx.post('/api/cat/cw/speed', { speed: wpm });
         }
         function setPitch(d) {
             const hz = Math.max(300, Math.min(900, num(state.CwPitch) + d));
             if (state.CwPitch == null || hz === num(state.CwPitch)) return;
+            state.CwPitch = hz;
             ctx.post('/api/cat/cwpitch', { hz });
         }
         async function zeroIn() {

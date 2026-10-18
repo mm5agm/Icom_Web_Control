@@ -787,6 +787,28 @@ test('/radio: the CW keyer sets speed and pitch, never sends', async () => {
     } finally { await page.close(); }
 });
 
+test('/radio: the mouse wheel steps the CW keyer speed and pitch', async () => {
+    const page = await radioPage();
+    try {
+        await page.state('CwSpeed', 20);
+        await page.state('CwPitch', 600);
+        await page.eval(`document.querySelector('.rp-skey[data-group="cw"]').click()`);
+        await page.clearWrites();
+        // Wheel up over SPEED, down over PITCH (rows 1 and 2 of the keyer).
+        await page.eval(`(() => {
+            const rows = [...document.querySelectorAll('[data-panel="keyer"] .rp-wrow')];
+            const wheel = (el, dy) => el.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, bubbles: true, cancelable: true }));
+            wheel(rows[0], -100);
+            wheel(rows[1], 100);
+        })()`);
+        const ws = await page.writes();
+        const sp = writesTo(ws, '/api/cat/cw/speed'), pi = writesTo(ws, '/api/cat/cwpitch');
+        expect(sp.length === 1 && sp[0].body.speed === 21, `speed wrote ${JSON.stringify(sp)}`);
+        expect(pi.length === 1 && pi[0].body.hz === 590, `pitch wrote ${JSON.stringify(pi)}`);
+        expect(!ws.some(w => FORBIDDEN.test(w.path)), `transmit writes: ${JSON.stringify(ws)}`);
+    } finally { await page.close(); }
+});
+
 test('/radio: the meters window shows the S-meter', async () => {
     const page = await radioPage();
     try {
