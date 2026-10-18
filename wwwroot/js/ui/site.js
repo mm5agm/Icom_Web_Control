@@ -878,6 +878,9 @@ async function copyVfo(direction) {
     } catch {}
 }
 window.copyVfo = copyVfo;
+// The keyboard shortcuts (keyboard-shortcuts.js) act on the active VFO.
+window.setActiveVfo = setActiveVfo;
+window.getActiveVfoLetter = () => (activeVfo === 1 ? 'B' : 'A');
 
 async function checkTxStatus() {
     try {
