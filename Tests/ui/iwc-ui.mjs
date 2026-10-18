@@ -275,6 +275,65 @@ test('DxSpots pop-out shows a spot pushed over the hub', async () => {
     } finally { await page.close(); }
 });
 
+// The "set it up" pop-outs (core/js/dialogs/feature-setup.js). State is
+// faked, so no test reads or writes the real settings.
+const FS_STATE = {
+    dxCluster: { enabled: false, host: '', port: 7300, callsign: '' },
+    cwAudio: { rxDevice: 'Line (USB AUDIO  CODEC)', devices: [
+        { key: 'Microphone (Webcam)', name: 'Microphone (Webcam)', likelyRadio: false },
+        { key: 'Line (USB AUDIO  CODEC)', name: 'Line (USB AUDIO  CODEC)', likelyRadio: true },
+    ] },
+};
+const fsOpen = path => open(path, { settleMs: 1500, before: `__rwcTest.getOverrides['/api/feature-setup/state'] = ${JSON.stringify(FS_STATE)};` });
+
+for (const path of ['/', '/CwReader', '/DxSpots'])
+    test(`${path}: provides the CW audio and DX cluster set-up pop-outs`, async () => {
+        const page = await fsOpen(path);
+        try {
+            await page.waitFor(`!!window.radioFeatureSetup`, { timeoutMs: 8000, what: 'window.radioFeatureSetup' });
+            expect(await page.eval(`radioFeatureSetup.provides('cw-audio') && radioFeatureSetup.provides('dx-cluster')`), 'a pop-out is missing');
+        } finally { await page.close(); }
+    });
+
+test('CW audio pop-out: shows the current device, saves only the one picked', async () => {
+    const page = await fsOpen('/CwReader');
+    try {
+        await page.waitFor(`!!window.radioFeatureSetup`, { timeoutMs: 8000, what: 'window.radioFeatureSetup' });
+        await page.eval(`radioFeatureSetup.open('cw-audio')`);
+        await page.waitFor(`document.getElementById('featureSetupDialog')?.open`, { what: 'the dialog' });
+        const sel = await page.eval(`(() => { const s = document.getElementById('fsCwRx'); return { v: s.value, opts: [...s.options].map(o => o.textContent) }; })()`);
+        expect(sel.v === 'Line (USB AUDIO  CODEC)', `selected "${sel.v}"`);
+        expect(sel.opts.some(t => /CODEC\) \(looks like the radio\)/.test(t)), `options ${JSON.stringify(sel.opts)}`);
+        await page.eval(`(() => { const s = document.getElementById('fsCwRx'); s.value = 'Microphone (Webcam)'; document.getElementById('featureSetupSave').click(); })()`);
+        await page.waitFor(`__rwcTest.writes.length > 0`, { what: 'the save' });
+        // Only the pop-out's own writes: the main page may also send a
+        // load-time voice nudge-step sync (tuning-step.js), which is not ours.
+        const w = (await page.writes()).filter(x => x.path.startsWith('/api/feature-setup/'));
+        expect(w.length === 1 && w[0].path === '/api/feature-setup/audio-rx' && w[0].body.device === 'Microphone (Webcam)', `wrote ${JSON.stringify(w)}`);
+    } finally { await page.close(); }
+});
+
+test('DX cluster pop-out: saves the four cluster fields', async () => {
+    const page = await fsOpen('/');
+    try {
+        await page.waitFor(`!!window.radioFeatureSetup`, { timeoutMs: 8000, what: 'window.radioFeatureSetup' });
+        await page.eval(`radioFeatureSetup.open('dx-cluster')`);
+        await page.waitFor(`document.getElementById('featureSetupDialog')?.open`, { what: 'the dialog' });
+        await page.eval(`(() => {
+            document.getElementById('fsDxHost').value = 'dx.example.org';
+            document.getElementById('fsDxCall').value = 'n0call';
+            document.getElementById('featureSetupSave').click();
+        })()`);
+        await page.waitFor(`__rwcTest.writes.length > 0`, { what: 'the save' });
+        // Only the pop-out's own writes: the main page may also send a
+        // load-time voice nudge-step sync (tuning-step.js), which is not ours.
+        const w = (await page.writes()).filter(x => x.path.startsWith('/api/feature-setup/'));
+        expect(w.length === 1 && w[0].path === '/api/feature-setup/dx-cluster'
+            && JSON.stringify(w[0].body) === JSON.stringify({ enabled: true, host: 'dx.example.org', port: 7300, callsign: 'n0call' }),
+            `wrote ${JSON.stringify(w)}`);
+    } finally { await page.close(); }
+});
+
 const dialogPos = page => page.eval(`(() => { const r = document.getElementById('dxSpotsDialog').getBoundingClientRect(); return { x: r.left, y: r.top }; })()`);
 const allBands = page => page.eval(`document.getElementById('dxSpotsAllBandsChk').checked`);
 
