@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -353,7 +353,10 @@ builder.Services.AddSingleton<IRadioStateService>(sp => sp.GetRequiredService<Ra
 // the Connect / Test-Connection endpoints call IRadioController.ConnectAsync.
 
 // ADD THIS LINE for Razor Pages support:
-builder.Services.AddRazorPages();
+// /flexui is the Index page itself, in the dock layout: the same markup and
+// the same scripts, so the Experimental UI cannot drift from Classic.
+builder.Services.AddRazorPages(options =>
+    options.Conventions.AddPageRoute("/Index", "flexui"));
 
 // ── HTTP port resolution ────────────────────────────────────────────────────
 // Pick the port BEFORE Kestrel binds, so we can fall back gracefully if the
@@ -422,6 +425,17 @@ builder.Services.AddSingleton(sp => new RadioWebControl.Core.Services.MemoryBank
     sp.GetRequiredService<RadioWebControl.Core.Services.MemoryService>(),
     Path.Combine(memoriesFolder, "memory-banks.json")));
 
+// Named Experimental UI (/flexui) layouts - flex-layouts.json in the same
+// folder. The store is in core (shared with Yaesu Web Control); the
+// controller is this app's.
+builder.Services.AddSingleton<RadioWebControl.Core.Services.Flex.IFlexLayoutStore>(sp =>
+{
+    var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("FlexLayoutStore");
+    return new RadioWebControl.Core.Services.Flex.FlexLayoutStore(
+        Path.Combine(memoriesFolder, "flex-layouts.json"),
+        msg => log.LogWarning("{Message}", msg));
+});
+
 // Register DX cluster service — single instance shared between controllers and
 // the background hosted service so the API can read the spot buffer.
 builder.Services.AddSingleton<Icom_Web_Control.Services.DxClusterService>();
@@ -451,11 +465,30 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Audio.ReceiveAudioHold>(
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwQsoLogService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>();
+// The CW reader's Auto button: dial onto pitch, then the filter for the speed.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwAutoService>();
 
 // RTTY tuning scope. Nothing runs until the operator opens the dialog;
 // the service takes its audio hold on the first start and drops it a
 // couple of seconds after the last poll.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyTunerService>();
+
+// The reader that decodes what the tuner is looking at. A singleton for the
+// same reasons the CW reader is one: one recording device, one decoder, and one
+// piece of decoded text however many browser tabs are open. It takes mark,
+// shift, reverse and speed from the tuner rather than keeping its own, so there
+// is no second set of settings to get out of step.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyReaderService>();
+
+// The tuner needs the radio in a mode that can carry a tone pair, and puts the
+// mode and filter back when it stops. A singleton because the record of what
+// the operator was in has to outlive their browser tab.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyTunerModeService>();
+
+// The tuner's Auto button: four seconds of audio through Core's signal
+// analyser, on demand. It takes its own audio hold, so it works whether or
+// not the scope is running.
+builder.Services.AddSingleton<Icom_Web_Control.Services.Rtty.RttyAutoService>();
 
 // Route everything through Serilog (file sink configured above). The previous
 // console + filter chain is gone — it was invisible in a WinExe anyway, and

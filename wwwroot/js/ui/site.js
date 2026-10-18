@@ -878,6 +878,9 @@ async function copyVfo(direction) {
     } catch {}
 }
 window.copyVfo = copyVfo;
+// The keyboard shortcuts (keyboard-shortcuts.js) act on the active VFO.
+window.setActiveVfo = setActiveVfo;
+window.getActiveVfoLetter = () => (activeVfo === 1 ? 'B' : 'A');
 
 async function checkTxStatus() {
     try {
@@ -1143,6 +1146,15 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ProcLevel") {
         const slider = document.getElementById('procLevelSlider');
         const label  = document.getElementById('procLevelValue');
+        if (slider) slider.value = update.value;
+        if (label)  label.textContent = update.value;
+    }
+
+    // --- MIC GAIN --- (YWC #228: missing, so a change made in another tab
+    // never moved this slider.)
+    if (update.property === "MicGain") {
+        const slider = document.getElementById('micGainSlider');
+        const label  = document.getElementById('micGainValue');
         if (slider) slider.value = update.value;
         if (label)  label.textContent = update.value;
     }

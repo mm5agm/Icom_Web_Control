@@ -1716,6 +1716,10 @@ namespace Icom_Web_Control.Services
                 return;
             }
             if (vfo == RadioVfo.A) _state.SelectedFilterA = fil.ToString(); else _state.SelectedFilterB = fil.ToString();
+            // Each FIL slot holds its own width. Read it now rather than leave
+            // the old one showing until the slow poll comes round (seconds).
+            // 1A 03 is receiver-wide, so only the operating VFO's is readable.
+            if (vfo == ActiveVfo) await GetIfFilterWidthHzAsync(vfo, ct);
         }
 
         /// <summary>Read the given VFO's mode and map it to its filter-width group. None on a miss.</summary>

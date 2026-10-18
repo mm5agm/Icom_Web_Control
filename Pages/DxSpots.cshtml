@@ -56,6 +56,9 @@
        This page has no _Layout, so it must load it itself. *@
     <script src="~/js/hub/hub-connection.js" asp-append-version="true"></script>
     <script type="module">
+        // Side-effect import: publishes window.radioFeatureSetup, the "set it up"
+        // pop-outs the CW reader and DX spots panels offer. Loaded before them.
+        import "/js/dialogs/feature-setup.js?v=@Icom_Web_Control.AppVersion.Display";
         import { DxSpotsPanel } from "/js/dx/dx-spots-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { autoModeForHz } from "/js/ui/band-plan.js?v=1";
         import { PopoutChild, offerScreenPermission } from "/js/popout/popout.js?v=@Icom_Web_Control.AppVersion.Display";

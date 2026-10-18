@@ -13,11 +13,15 @@ namespace Icom_Web_Control.Hubs
         private readonly IRadioController _radio;
         private readonly ISettingsService _settings;
 
-        // All currently open SignalR connections
+        // Every currently open SignalR connection, and the whole of what the
+        // host means by "a browser is watching". Presence used to mean a
+        // connection that had called Heartbeat(), which only site.js and the
+        // Classic pop-outs do. The Radio panel (/radio) and its pop-outs set
+        // Layout = null and never heartbeated, so with /radio open and one
+        // Classic pop-out, closing the pop-out shut the host down 30s later.
+        // Counting the connection itself asks nothing of a new page beyond
+        // connecting to this hub. Same rule as YWC's RadioHub.
         private static readonly ConcurrentDictionary<string, byte> _connections = new();
-
-        // Connections that have sent at least one heartbeat (i.e. the main page tab)
-        private static readonly ConcurrentDictionary<string, DateTime> _heartbeats = new();
 
         // Which spectrum panels each main-page tab currently has on screen, as
         // reported by SpectrumPanels(). The cross-band peek borrows the receiver
@@ -73,7 +77,6 @@ namespace Icom_Web_Control.Hubs
         {
             _connections.TryRemove(Context.ConnectionId, out _);
             _spectrumPanels.TryRemove(Context.ConnectionId, out _);
-            bool wasHeartbeating = _heartbeats.TryRemove(Context.ConnectionId, out _);
 
             // A navigation or a closed tab arrives with no exception. A
             // connection the server gave up on -- one that sent nothing within
@@ -88,10 +91,10 @@ namespace Icom_Web_Control.Hubs
 
             await base.OnDisconnectedAsync(exception);
 
-            // Only trigger shutdown countdown when a heartbeating client (main page tab)
-            // disconnects and no other heartbeating clients remain — and only
-            // when AutoShutdownWhenNoBrowsers is on, which it is by default.
-            if (wasHeartbeating && _heartbeats.IsEmpty)
+            // Only trigger the shutdown countdown when the last connection of
+            // any kind has gone — and only when AutoShutdownWhenNoBrowsers is
+            // on, which it is by default.
+            if (_connections.IsEmpty)
             {
                 var settings = await _settings.GetSettingsAsync();
                 if (!settings.AutoShutdownWhenNoBrowsers)
@@ -101,18 +104,25 @@ namespace Icom_Web_Control.Hubs
                     return;
                 }
 
-                _logger.LogInformation("All browser tabs closed. Shutting down in {s}s if none reconnect.",
+                // This fires on every page change too: the page being left
+                // drops its connection a moment before the new page opens its
+                // own, and the cancel in OnConnectedAsync follows at once.
+                _logger.LogInformation(
+                    "Last live browser connection dropped (page change or tab closed). Shutting down in {s}s unless one reconnects.",
                     ShutdownGrace.TotalSeconds);
                 ScheduleShutdown();
             }
         }
 
-        // Called every 5 seconds by the main page, and by each pop-out window
-        // (which has no site.js), so a pop-out left open on its own keeps the
-        // host running.
+        // Called every 5 seconds by site.js and by the Classic pop-outs.
+        // Presence is the connection itself now, so this no longer decides
+        // whether the host lives -- but it still cancels a pending shutdown,
+        // because a page that connects before the previous tab's
+        // OnDisconnectedAsync runs would otherwise miss the cancel in
+        // OnConnectedAsync and let that disconnect arm the timer.
         public Task Heartbeat()
         {
-            _heartbeats[Context.ConnectionId] = DateTime.UtcNow;
+            CancelShutdown();
             return Task.CompletedTask;
         }
 
@@ -156,7 +166,7 @@ namespace Icom_Web_Control.Hubs
 
                 Task.Delay(ShutdownGrace, token).ContinueWith(t =>
                 {
-                    if (!t.IsCanceled && _heartbeats.IsEmpty)
+                    if (!t.IsCanceled && _connections.IsEmpty)
                     {
                         _logger.LogInformation("No clients reconnected — stopping application.");
                         _lifetime.StopApplication();

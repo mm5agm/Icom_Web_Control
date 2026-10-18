@@ -4,6 +4,14 @@
     ViewData["Title"]     = "Icom Web Control";
     ViewData["BodyRole"]  = "application";
     ViewData["BodyLabel"] = "Icom radio control panel";
+    // Served at /flexui too (Program.cs page route): the Experimental UI is
+    // this page's own markup, moved into dockable tabs by js/flexui/iwc-flex.js.
+    if (Model.IsFlexUi)
+    {
+        Layout = "_FlexLayout";
+        ViewData["Title"]     = "Experimental UI";
+        ViewData["BodyLabel"] = "Icom radio experimental workspace";
+    }
     // The IC-7300's CI-V mode set. Data variants (USB-D/LSB-D/FM-D) map to
     // DATA-U/DATA-L/DATA-FM via command 1A 06; the Yaesu-only strings
     // (FM-N, AM-N, DATA-FM-N, PSK) have no IC-7300 equivalent and are dropped.
@@ -642,9 +650,9 @@
                                 title="Open CW send - type a line, press Enter, the radio keys it"
                                 onclick="window.cwSendOpen ? window.cwSendOpen() : (window.cwSendPanel && window.cwSendPanel.toggle())">CW Send</button>
                         <button id="rttyTunerOpenBtn" class="btn btn-sm ms-1 btn-outline-secondary"
-                                aria-label="RTTY tuner - crossed-ellipse tuning scope"
-                                title="Open the RTTY tuner - mark and space filters on an X-Y scope; tune for the cross"
-                                onclick="window.rttyTunerOpen && window.rttyTunerOpen()">RTTY Tune</button>
+                                aria-label="RTTY panel - tuning scope and reader"
+                                title="Open the RTTY panel - tune for the cross on the X-Y scope, and read the decoded text"
+                                onclick="window.rttyTunerOpen && window.rttyTunerOpen()">RTTY</button>
                         <button class="btn btn-sm ms-1 btn-outline-secondary"
                                 aria-label="FM repeater controls"
                                 title="Open FM repeater controls panel"
@@ -657,6 +665,9 @@
                                 aria-label="DX spots — list of cluster spots on current band"
                                 title="Open DX spots list — see callsigns spotted on the current band"
                                 onclick="window.dxSpotsOpen ? window.dxSpotsOpen() : (window.dxSpotsPanel && window.dxSpotsPanel.toggle())">DX Spots</button>
+                        <button class="btn btn-sm ms-1 btn-outline-secondary" type="button" data-open-shortcuts
+                                aria-label="Keyboard shortcuts"
+                                title="Keyboard shortcuts (?)">?</button>
                         @* Says when a mode change closes the CW reader or the RTTY tuner. *@
                         <span id="panelModeAnnounce" class="visually-hidden" role="status" aria-live="polite"></span>
                         <button id="voiceBtn"
@@ -2059,6 +2070,10 @@
         import { loadLabels }           from "/js/ui/a11y-labels.js?v=@Icom_Web_Control.AppVersion.Display";
         import { initFreqKeyboard }     from "/js/ui/freq-keyboard.js?v=@Icom_Web_Control.AppVersion.Display";
         import { initMemoriesPanel }   from "/js/ui/memories.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { initKeyboardShortcuts } from "/js/ui/keyboard-shortcuts.js?v=@Icom_Web_Control.AppVersion.Display";
+        // Side-effect import: publishes window.radioFeatureSetup, the "set it up"
+        // pop-outs the CW reader and DX spots panels offer. Loaded before them.
+        import "/js/dialogs/feature-setup.js?v=@Icom_Web_Control.AppVersion.Display";
         import { DxSpotsPanel }         from "/js/dx/dx-spots-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { ModePanelGuard }       from "/js/modes/mode-panel-guard.js?v=@Icom_Web_Control.AppVersion.Display";
         import { attachPopout, screenShare } from "/js/popout/popout.js?v=@Icom_Web_Control.AppVersion.Display";
@@ -2067,6 +2082,7 @@
         import { AudioFilterPanel }     from "/js/ui/audio-filter-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwReaderPanel }        from "/js/cw/cw-reader-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { RttyTuner }            from "/js/rtty/rtty-tuner.js?v=@Icom_Web_Control.AppVersion.Display";
+        import { RttyReader }           from "/js/rtty/rtty-reader.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwQsoForm }            from "/js/cw/cw-qso-form.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwSendPanel }          from "/js/ui/cw-send-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         window.bandPlanData = BAND_PLANS;
@@ -2092,6 +2108,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             initFreqKeyboard();
             initMemoriesPanel();
+            initKeyboardShortcuts({ autoModeForHz });
 
             // Fold the meter gauges and the Clarifier strip away (YWC
             // Discussion #171). The choice is kept per browser, and what is
@@ -2700,6 +2717,17 @@
             // that window to the front instead of opening the dialog, and the
             // dialog stays shut so the two are not both polling. Reattach in
             // the window, or closing it, gives the button back.
+            // Opening the CW reader puts the radio in CW, as opening the RTTY
+            // panel puts it in RTTY (that one on the server - see
+            // RttyTunerModeService). Only on opening, not when the button
+            // brings a pop-out to the front, and not if it is already CW.
+            let readerModeA = '@Model.RadioState.ModeA';
+            const openCwReaderInCw = () => {
+                const dlg = document.getElementById('cwReaderDialog');
+                if (!dlg?.open && !readerModeA.startsWith('CW')) window.setMode('A', 'CW-U');
+                window.cwReaderPanel.toggle();
+            };
+
             window.cwReaderOpen = attachPopout({
                 name: 'cw-reader',
                 // Reattach gives the dialog the size the window was left at.
@@ -2712,7 +2740,7 @@
                 dialog: () => document.getElementById('cwReaderDialog'),
                 openButton: document.getElementById('cwReaderOpenBtn'),
                 popoutButton: document.getElementById('cwReaderPopoutBtn'),
-                show: () => window.cwReaderPanel.toggle(),
+                show: openCwReaderInCw,
                 closedLabel: {
                     text: 'CW Read',
                     title: 'Open the CW reader - decodes the received Morse to text',
@@ -2786,6 +2814,24 @@
             // dropped request costs one frame of the figure.
             window.rttyTuner = new RttyTuner();
             window.rttyTuner.init();
+            // The reader shares the panel and takes its settings from the
+            // tuner, so there is nothing to wire between the two here. It
+            // follows the dialog being open by itself - see _followDialog -
+            // which is why it needs no entry in the pop-out below either.
+            //
+            // Contest Mode (Settings) hides the Decode section, and with it the
+            // reader's own Start/Stop button. Starting the reader then would
+            // poll for text nothing can show, and - worse - a decode left
+            // running on the server from an earlier session would have no
+            // button anywhere to stop it. So: do not start it, and stop the
+            // server once on load. The flag is read off the class the partial
+            // put on the dialog, so this page and the pop-out cannot disagree
+            // about it. See ApplicationSettings.RttyContestMode.
+            if (document.getElementById('rttyTunerDialog')?.classList.contains('rtty-contest')) {
+                fetch('/api/rtty/reader/stop', { method: 'POST' }).catch(() => { });
+            } else {
+                window.rttyReader = new RttyReader().init();
+            }
             // The tuner can live in a window of its own (/RttyTuner) too. Each
             // window holds the radio's audio under its own lease, so popping
             // out - which closes the dialog here - does not stop the figure.
@@ -2794,20 +2840,23 @@
                 // Reattach gives the dialog the size the window was left at.
                 takeSize: true,
                 url: '/RttyTuner',
-                defaultSize: { width: 380, height: 520 },
+                // Two columns' worth: the decode text needs the width, and
+                // the operator can still drag it narrow, where the panel
+                // folds into one column on its own.
+                defaultSize: { width: 900, height: 640 },
                 dialog: () => document.getElementById('rttyTunerDialog'),
                 openButton: document.getElementById('rttyTunerOpenBtn'),
                 popoutButton: document.getElementById('rttyTunerPopoutBtn'),
                 show: () => window.rttyTuner.toggle(),
                 closedLabel: {
-                    text: 'RTTY Tune',
-                    title: 'Open the RTTY tuner - mark and space filters on an X-Y scope; tune for the cross',
-                    aria: 'RTTY tuner - crossed-ellipse tuning scope',
+                    text: 'RTTY',
+                    title: 'Open the RTTY panel - tune for the cross on the X-Y scope, and read the decoded text',
+                    aria: 'RTTY panel - tuning scope and reader',
                 },
                 openLabel: {
-                    text: 'RTTY Tune (pop-out)',
-                    title: 'The RTTY tuner is in its own window - click to bring it to the front',
-                    aria: 'RTTY tuner is in a pop-out window - bring it to the front',
+                    text: 'RTTY (pop-out)',
+                    title: 'The RTTY panel is in its own window - click to bring it to the front',
+                    aria: 'RTTY panel is in a pop-out window - bring it to the front',
                 },
             }).open;
 
@@ -2876,11 +2925,14 @@
             const modePanelGuards = [
                 guardFor('CW reader', 'cwReaderDialog', 'cwReaderOpenBtn',
                          m => m.startsWith('CW')),
-                guardFor('RTTY tuner', 'rttyTunerDialog', 'rttyTunerOpenBtn',
+                guardFor('RTTY panel', 'rttyTunerDialog', 'rttyTunerOpenBtn',
                          m => m.startsWith('RTTY') || m.startsWith('DATA') || m === 'LSB' || m === 'USB'),
             ];
             modePanelGuards.forEach(g => g.setMode('@Model.RadioState.ModeA'));
-            spectrumPipeline.onModeA(mode => modePanelGuards.forEach(g => g.setMode(mode)));
+            spectrumPipeline.onModeA(mode => {
+                readerModeA = mode || '';
+                modePanelGuards.forEach(g => g.setMode(mode));
+            });
 
             // The log form is separate from the reader and starts closed. The
             // operator opens it when a QSO is worth keeping, and it asks the
@@ -5269,4 +5321,10 @@
         applyVisibility(getVisible());
     })();
     </script>
+    @if (Model.IsFlexUi)
+    {
+        @* Last, so every Classic script above has bound to the page before its
+           sections move into the dock. *@
+        <script type="module" src="~/js/flexui/iwc-flex.js" asp-append-version="true"></script>
+    }
 }

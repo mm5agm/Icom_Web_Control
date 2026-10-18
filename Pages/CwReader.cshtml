@@ -55,6 +55,9 @@
        This page has no _Layout, so it must load it itself. *@
     <script src="~/js/hub/hub-connection.js" asp-append-version="true"></script>
     <script type="module">
+        // Side-effect import: publishes window.radioFeatureSetup, the "set it up"
+        // pop-outs the CW reader and DX spots panels offer. Loaded before them.
+        import "/js/dialogs/feature-setup.js?v=@Icom_Web_Control.AppVersion.Display";
         import { CwReaderPanel }  from "/js/cw/cw-reader-panel.js?v=@Icom_Web_Control.AppVersion.Display";
         import { startModePausedPopout } from "/js/popout/popout-mode-pause.js?v=@Icom_Web_Control.AppVersion.Display";
         import { PopoutChild, offerScreenPermission } from "/js/popout/popout.js?v=@Icom_Web_Control.AppVersion.Display";

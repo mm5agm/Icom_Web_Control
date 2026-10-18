@@ -668,6 +668,7 @@ namespace Icom_Web_Control.Services
                 new("SquelchB", SquelchB),
                 new("ProcEnabled", ProcEnabled),
                 new("ProcLevel", ProcLevel),
+                new("MicGain", MicGain),
                 new("AtuEnabled", AtuEnabled),
                 new("AtuTuning", AtuTuning),
                 new("MonitorOn", MonitorOn),
