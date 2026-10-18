@@ -306,7 +306,9 @@ test('CW audio pop-out: shows the current device, saves only the one picked', as
         expect(sel.opts.some(t => /CODEC\) \(looks like the radio\)/.test(t)), `options ${JSON.stringify(sel.opts)}`);
         await page.eval(`(() => { const s = document.getElementById('fsCwRx'); s.value = 'Microphone (Webcam)'; document.getElementById('featureSetupSave').click(); })()`);
         await page.waitFor(`__rwcTest.writes.length > 0`, { what: 'the save' });
-        const w = await page.writes();
+        // Only the pop-out's own writes: the main page may also send a
+        // load-time voice nudge-step sync (tuning-step.js), which is not ours.
+        const w = (await page.writes()).filter(x => x.path.startsWith('/api/feature-setup/'));
         expect(w.length === 1 && w[0].path === '/api/feature-setup/audio-rx' && w[0].body.device === 'Microphone (Webcam)', `wrote ${JSON.stringify(w)}`);
     } finally { await page.close(); }
 });
@@ -323,7 +325,9 @@ test('DX cluster pop-out: saves the four cluster fields', async () => {
             document.getElementById('featureSetupSave').click();
         })()`);
         await page.waitFor(`__rwcTest.writes.length > 0`, { what: 'the save' });
-        const w = await page.writes();
+        // Only the pop-out's own writes: the main page may also send a
+        // load-time voice nudge-step sync (tuning-step.js), which is not ours.
+        const w = (await page.writes()).filter(x => x.path.startsWith('/api/feature-setup/'));
         expect(w.length === 1 && w[0].path === '/api/feature-setup/dx-cluster'
             && JSON.stringify(w[0].body) === JSON.stringify({ enabled: true, host: 'dx.example.org', port: 7300, callsign: 'n0call' }),
             `wrote ${JSON.stringify(w)}`);
