@@ -1061,6 +1061,8 @@ It is called experimental because it is new. If something works on the Classic p
 
 ### 5.20 Radio panel
 
+![The Radio panel on 14.018.998 MHz CW: the frequency display and meters along the top, the scope and waterfall in the middle with a DX spot, and the front-panel style knobs and keys around them](pictures/Radio_GUI.png)
+
 **Radio** in the top bar, on both the Classic page and the Experimental UI, opens a third way of working the radio, at `http://localhost:8080/radio`. It is laid out like the front of a transceiver: the meter and the keys down the left, a screen in the middle with the VFOs, the band scope and the band and mode keys, the main dial on the right, and a row of knobs along the bottom. The **Classic**, **Experimental** and **Radio** buttons in its top strip move between the three, and they can all be open in different tabs at once.
 
 The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300's. Everything on it works the radio: the keys, the knobs, the main dial and the windows opened from the keys under the meter.
