@@ -13,6 +13,38 @@ a different and much older format.
 
 ---
 
+### v1.4.0 (2026-10-07)
+
+> **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept.
+
+**The headline is pop-out windows**: the panels you want to keep an eye on, on whatever screen you want them, at whatever size.
+
+- **Pop-out windows for a second monitor.** The CW Reader, CW Send, RTTY Tuner, Twin PBT and DX Spots list each have a **↗** button that opens them in a browser window of their own. Drag that window to a second monitor, size it how you like, and the panel keeps working in it — a pop-out holds IWC open by itself, exactly as the main page does, so the app will not shut down just because the main tab is not the one you are looking at. **Reattach** brings the panel back into the page, and it comes back at the size you had made the window rather than snapping back to the old dialog size. User Manual, [§5.18](USER_MANUAL.md#518-pop-out-windows).
+
+- **The CW Reader and RTTY Tuner get out of the way when the mode changes.** The reader closes itself outside CW, and the tuner outside RTTY, DATA and SSB — but only once the new mode has held for **two seconds**, so spinning through the band stack or passing through another mode on the way does not shut them. A panel that has been popped out **pauses instead of closing**, because closing somebody's second-monitor window out from under them is not a favour. User Manual, [§18](USER_MANUAL.md#18-cw-reader), [§20](USER_MANUAL.md#20-rtty).
+
+- **The RTTY Tuner can be resized, and shrunk to almost nothing.** Drag it to whatever size suits, and **Tones only** hides the controls and the status line so the crossed ellipse alone is left — small enough to tuck into a corner of the screen and still tune by. User Manual, [§20](USER_MANUAL.md#20-rtty).
+
+- **CW Send refuses to send in the wrong mode.** Ask it to send while the transmit VFO is in SSB and it says so plainly, **keeps the line you typed** in the box rather than throwing it away, and offers to switch the VFO to CW for you. User Manual, [§19.1](USER_MANUAL.md#191-sending-a-line).
+
+- **The spectrum panel is no longer a fixed 280 pixels tall.** On a 4K monitor it was a stripe. Its control bar now has a **Height** setting from 50% to 300%, and there is a grip along the bottom edge that can be dragged — or driven with the arrow keys — to anything from 40 to 1000 pixels. The height is remembered per VFO. User Manual, [§5.4](USER_MANUAL.md#54-spectrum-display).
+
+- **Movable windows now sit on top of the page, and the one you last touched is in front.** Dragging the CW reader or the RTTY tuner over the meters or the spectrum used to let parts of what was underneath show through it, and when two of them overlapped the one further down the page always won regardless of which you were using. Both are fixed: every movable window is drawn above the page, and clicking or opening one brings it to the front.
+
+- **Fixed: folding the VFOs away with the Scope off stranded the page.** Fold the VFO panels, switch the **Scope** off, and you were left with no VFO panels and no button to bring them back — the **VFOs** button lives in the spectrum panel's header, which the Scope switch collapses along with everything else in it. The only way out was turning the Scope back on. The panels now return when the scope goes away, and reloading with the Scope already off starts with them showing.
+
+- **Fixed: clicking a RTTY segment on 20, 15 or 10 m set RTTY-R instead of RTTY.** Reversed RTTY hands the radio's own decoder mark and space the wrong way round, so it decoded nothing at all on a signal that was tuned perfectly well. Twelve band-plan entries carried the wrong mode, across all four regions.
+
+- **Fixed: the DX Spots list opened where you could not see it.** On the main page its remembered position was below the bottom of the window, and the page does not scroll that far — so pressing the button appeared to do nothing whatsoever. It now opens across the top of the window, and a position remembered from a larger screen is brought back into view. A click on the gap between the **All bands** switch and its label now flips the switch, too.
+
+- **Fixed: the CW Reader's Tune switch was never remembered** and came back off on every page load. It now stays as you left it.
+
+- **Fixed: the Twin PBT dialog went stale.** It showed where the radio's knobs were when it opened and never looked again, so turning them at the radio left the dialog describing something that was no longer true. It re-reads whenever you come back to it.
+
+- **Fixed: a page left open but untouched could have the app shut down underneath it.** The About page, say, left open in a tab — after a quiet spell it stopped counting as connected, IWC shut itself down, and the next click gave *connection refused*. Every page now keeps its connection alive the same way, with longer timeouts at both ends.
+
+- **Fixed: the spectrum's sliders and resize grip were hard to see.** The Range, Speed and Bright sliders had a faint track that all but vanished on the dark panel, and the keyboard focus ring on the resize grip disappeared against the VFO card beneath it. The sliders are now drawn like the Notch slider, and the grip is lighter, with a larger mark and an amber focus ring.
+
 ### v1.3.0 (2026-09-25)
 
 > **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept. Everything that was in the v1.2.0-pre1 pre-release is in this build as well, so if you were waiting for the finished version, this is it.

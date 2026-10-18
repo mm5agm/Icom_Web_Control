@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-released-brightgreen?style=flat-square)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0-blue?style=flat-square)
-![Latest release](https://img.shields.io/badge/Download-v1.4.0-brightgreen?style=flat-square)
+![Latest release](https://img.shields.io/badge/Download-v1.5.0-brightgreen?style=flat-square)
 ![Downloads](https://img.shields.io/github/downloads/mm5agm/Icom_Web_Control/latest/Icom_Web_Control_Setup.exe?label=Downloads&style=flat-square)
 
 > **v1.4.0 — current release.** IWC controls the **Icom IC-7300** and **IC-7300 MkII** end-to-end: frequency/mode, S-meter and Po/SWR/ALC, PTT, band/VFO/split, RF power, the RX DSP panel, the CI-V spectrum scope, ATU, voice control, a CW reader and sender, a RTTY tuning scope, and a rigctld bridge for WSJT-X. The two radios speak near-identical CI-V and IWC drives both the same way — set the CI-V address to `94` for the original, `B6` for the MkII. Development and bench testing has been on a single IC-7300 MkII, and an owner of the original IC-7300 has confirmed v1.0.6 working on his radio. That is still only two radios between them, so if anything behaves unexpectedly — on either — please report it. I'm building Icom Web Control (**IWC**) as a sibling to my [Yaesu Web Control](https://github.com/mm5agm/Yaesu_Web_Control) (YWC) project, for Icom CI-V transceivers. The two are deliberately separate applications with separate repositories — YWC stays Yaesu-only, IWC stays Icom-only.
@@ -21,7 +21,7 @@ If something has been biting you and a pre-release says it is fixed, or you want
 
 ## ✨ Added since the last release
 
-**Not yet in a build** — in the code, and will be in the next pre-release. The first five are RTTY, and together they turn the tuner into a receive station:
+**v1.5.0 is the current release.** Its headline is three ways to run the radio — Classic, the Experimental UI and the Radio panel — and the RTTY panel now decodes. The first five are RTTY, and together they turn the tuner into a receive station:
 
 - **The RTTY panel decodes now.** What was the RTTY Tuner is one **RTTY** panel in two columns: the crossed-ellipse scope and its controls on the right, a **Decode** pane printing the text on the left, and a **Send** box underneath showing where sending will go — **Send is greyed out and does not transmit**, and [§20.6](USER_MANUAL.md#206-sending) says why it is harder than it looks. The decoder has no Mark, Shift, Speed or Rev of its own: it uses the ones in the Tune column beside it, so getting the cross upright is the whole of setting it up, and switching the radio between RTTY and RTTY-R needs nothing pressed. [§20.5](USER_MANUAL.md#205-decoding-the-text).
 - **Auto works out the shift and the speed for you.** Press **Auto** and it listens for four seconds and reports what it heard — and it reports what it *measured*, not the nearest entry on a list. The radio's own menu offers three shifts and its decoder is fixed at 45.45 baud; that is the radio's limit, not this one's, so a weather station on 450 Hz shift at 50 baud is ordinary listening here. It refuses rather than guesses when the two halves of what it heard do not agree — and it now also refuses when only one of the two tones was in range at all. That case used to come back *confident*: with the other tone outside what the measurement can see, it measured the surviving tone against a piece of its own skirt, fitted a speed to it beautifully, and reported a true 450 Hz shift at 50 baud as 115 Hz at 100 baud with a score of 0.92 out of 1 — overwriting the shift and speed you had. It now says which case it is and writes nothing, while keeping the dial nudge that usually makes a second press work. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
@@ -33,18 +33,11 @@ If something has been biting you and a pre-release says it is fixed, or you want
 - **CW Auto.** An **Auto** button in the CW Reader: press it with a station keying in your filter and it moves the dial so the station sits on your pitch, then sets the filter for the speed it is sending, through Reader Mode so **Stop** puts your filter back. It changes nothing when it cannot find one steady tone. [§18.7](USER_MANUAL.md#auto-tune-the-station-in-for-you).
 - **The CW Reader prints less junk.** It now splits two characters the sender ran together, judges word gaps only from gaps measured at the current speed, drops held text that nothing has followed for five seconds, and holds back the lone weak E, I and T — and words made only of weak dits — that noise produces between overs. A run of real dahs, such as a slow `TTT` or `MMM`, is no longer thrown away as chatter.
 - **Icons in the top bar, and all three layouts reach each other.** The Classic page's top bar has icons and the same grouping as Yaesu Web Control's, and Classic, Experimental UI and Radio each have links to the other two.
+- **Keyboard shortcuts on the main page.** Single keys for tuning, bands, modes, IF width, filter slot, span and the panels, on Classic and the Experimental UI — the same keys as Yaesu Web Control. Press **?** for the list. [§13](USER_MANUAL.md#13-keyboard-shortcuts).
+- **"Set it up" buttons.** When the CW Reader has no audio device or the DX Spots list has no cluster, the message has a button that sets just that up, without a trip to Settings. [§18.3](USER_MANUAL.md#183-choosing-the-audio-device), [§5.17](USER_MANUAL.md#517-dx-spots-list).
+- **Diagnostics → Start fresh test log.** Do the test, then **Download test log**, and you get just that test's log to attach to an issue. [§11](USER_MANUAL.md#11-diagnostics).
 
-**v1.4.0 is the current release.** Its headline is pop-out windows — the panels on a second monitor:
-
-- **Pop-out windows for a second monitor.** The CW Reader, CW Send, RTTY Tuner, Twin PBT and DX Spots list can each open in a window of their own with their **↗** button, at any size and on any screen; **Reattach** puts them back, at the size you left the window. A pop-out window keeps IWC running on its own, as the main page does. [§5.18](USER_MANUAL.md#518-pop-out-windows).
-- **The CW Reader and RTTY Tuner close themselves when the mode leaves them behind** — the reader outside CW, the tuner outside RTTY, DATA and SSB — once the mode has held for two seconds, so a band change passing through another mode does not close them. A pop-out window pauses instead of closing. [§18](USER_MANUAL.md#18-cw-reader), [§20](USER_MANUAL.md#20-rtty).
-- **The RTTY Tuner can be resized**, and **Tones only** hides everything but the scope so it can be made very small. [§20](USER_MANUAL.md#20-rtty).
-- **CW Send won't send in the wrong mode.** Outside CW it says so, keeps the line in the box, and offers to switch the transmit VFO to CW. [§19.1](USER_MANUAL.md#191-sending-a-line).
-- **The spectrum panel's height is yours to set** — a **Height** setting from 50% to 300% of the old fixed 280 pixels, and a grip along the bottom of the panel you can drag or drive from the keyboard, remembered per VFO. [§5.4](USER_MANUAL.md#54-spectrum-display).
-
-Also in this release, and described under the [v1.4.0 notes](#v140-2026-10-07): **movable windows now sit on top of the page** with the one you last clicked in front, the **DX Spots list opens where you can see it**, the **CW Reader's Tune switch is remembered**, the **Twin PBT dialog re-reads the radio** when you come back to it, and a page left open and untouched **no longer has the app shut down underneath it**.
-
-Previous releases: the **RTTY Tuner** and the self-recovering band scope arrived in v1.3.0 — full detail in the [v1.3.0 notes](RELEASE_HISTORY.md#v130-2026-09-25); **Find my radio**, the original IC-7300 menu checklist, the settable tuning step and memory ordering in the [v1.2.0-pre1 notes](RELEASE_HISTORY.md#v120-pre1-2026-09-22).
+Previous releases: **pop-out windows** for a second monitor arrived in v1.4.0 — full detail in the [v1.4.0 notes](RELEASE_HISTORY.md#v140-2026-10-07); the **RTTY Tuner** and the self-recovering band scope in the [v1.3.0 notes](RELEASE_HISTORY.md#v130-2026-09-25); **Find my radio**, the IC-7300 menu checklist, the settable tuning step and memory ordering in the [v1.2.0-pre1 notes](RELEASE_HISTORY.md#v120-pre1-2026-09-22).
 
 ## 🔧 Fixed since the last release
 
@@ -52,6 +45,8 @@ One line per fix, newest first, with the build that has it. A pre-release instal
 
 | Fixed | Issue | In build |
 |---|---|---|
+| Closing a pop-out window could shut IWC down with the Radio panel still open: only pages that sent a regular "still here" signal counted as open, and the Radio panel and its pop-outs never sent one. Every open page now counts. | — | v1.5.0 |
+| The MIC gain slider on the Classic and Experimental pages did not move when the mic gain was changed on the Radio panel or in another tab. It now follows. | — | v1.5.0 |
 | Folding the VFO panels away and then switching the **Scope** off left the main page with nothing on it and no way back: the **VFOs** button that unfolds them lives in the spectrum panel's header, and the Scope switch collapses that header, button and all. Switching the Scope back on was the only escape. The panels now come back when the scope goes away, and a reload with the Scope already off starts with them showing. | — | v1.4.0 |
 | Clicking a RTTY segment on the spectrum on 20, 15 or 10 m set the radio to **RTTY-R** instead of plain RTTY, which hands the radio's own decoder mark and space the wrong way round — so it sat there decoding nothing on a signal that was tuned correctly. Twelve band-plan entries were affected, in all four regions. | — | v1.4.0 |
 | The DX Spots list opened wherever it sat in the page's layout the first time, which on the main page was below the bottom of the window - and the page doesn't scroll that far, so pressing the button seemed to do nothing. It now opens across the top of the window, and a place remembered from a bigger screen is brought back into view. | — | v1.4.0 |
@@ -99,7 +94,7 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 
 ## Status & plan
 
-**`v1.4.0` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 or IC-7300 MkII end-to-end (see the summary at the top), bench-tested against a single MkII and confirmed by an owner on an original IC-7300. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
+**`v1.5.0` is the current release**, and `v1.0.0` was the first — IWC controls an IC-7300 or IC-7300 MkII end-to-end (see the summary at the top), bench-tested against a single MkII and confirmed by an owner on an original IC-7300. The full build plan — how IWC is carved out of YWC, what's kept, what's rebuilt, and the phased CI-V roadmap — lives in [docs/design/iwc-clone-split-plan.md](docs/design/iwc-clone-split-plan.md).
 
 ## Release notes
 
@@ -108,37 +103,30 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
 
-### v1.4.0 (2026-10-07)
+### v1.5.0 (2026-10-18)
 
 > **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept.
 
-**The headline is pop-out windows**: the panels you want to keep an eye on, on whatever screen you want them, at whatever size.
+**The headline is three ways to run the radio.** Classic is unchanged and is still where IWC opens; the Experimental UI and the Radio panel are new, and the top bar of each reaches the other two.
 
-- **Pop-out windows for a second monitor.** The CW Reader, CW Send, RTTY Tuner, Twin PBT and DX Spots list each have a **↗** button that opens them in a browser window of their own. Drag that window to a second monitor, size it how you like, and the panel keeps working in it — a pop-out holds IWC open by itself, exactly as the main page does, so the app will not shut down just because the main tab is not the one you are looking at. **Reattach** brings the panel back into the page, and it comes back at the size you had made the window rather than snapping back to the old dialog size. User Manual, [§5.18](USER_MANUAL.md#518-pop-out-windows).
+- **The Radio panel.** **Radio** in the top bar opens the IC-7300 laid out like the front of a transceiver, at `/radio`: meter and keys down the left, VFO-A and VFO-B over the radio's own band scope, the main dial and the knobs, and windows for CW, RTTY, memories, DX spots, meters and receive setup that drag, resize, tear off and pop out onto a second screen. **M▸VFO** and **VFO▸M** work with the radio's own 99 memory channels, the CW keyer's speed and pitch step with the mouse wheel, and there are six colour themes, including Night (red) for operating in the dark. It is the panel from Yaesu Web Control, shared between the two apps. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
 
-- **The CW Reader and RTTY Tuner get out of the way when the mode changes.** The reader closes itself outside CW, and the tuner outside RTTY, DATA and SSB — but only once the new mode has held for **two seconds**, so spinning through the band stack or passing through another mode on the way does not shut them. A panel that has been popped out **pauses instead of closing**, because closing somebody's second-monitor window out from under them is not a favour. User Manual, [§18](USER_MANUAL.md#18-cw-reader), [§20](USER_MANUAL.md#20-rtty).
+- **The Experimental UI.** The main page as a workspace of panels — Toolbar, Clarifier, Meters, Spectrum, VFO A and VFO B — that you can drag, dock side by side or as tabs, resize, hide and pop out, with named layouts saved in IWC. It is the Classic page's own controls rearranged, not a copy, so everything behaves as it does there. The workspace is Fabio Valente's (CR7CDC), from Yaesu Web Control. User Manual, [§5.19](USER_MANUAL.md#519-experimental-ui).
 
-- **The RTTY Tuner can be resized, and shrunk to almost nothing.** Drag it to whatever size suits, and **Tones only** hides the controls and the status line so the crossed ellipse alone is left — small enough to tuck into a corner of the screen and still tune by. User Manual, [§20](USER_MANUAL.md#20-rtty).
+- **The RTTY panel decodes.** What was the RTTY Tuner is now one **RTTY** panel: the crossed-ellipse tuner beside a **Decode** pane printing the text. **Auto** listens for four seconds and reports the shift and speed it actually measured — not the nearest entry on the radio's short list — and refuses rather than guesses when what it heard does not add up; when it is confident it tunes the signal in. The panel sets the radio up for RTTY and puts your mode and filter back when you close it, and **RTTY Contest Mode** in Settings leaves just the tuner for use beside a logger. **Send** is greyed out and does not transmit. User Manual, [§20](USER_MANUAL.md#20-rtty).
 
-- **CW Send refuses to send in the wrong mode.** Ask it to send while the transmit VFO is in SSB and it says so plainly, **keeps the line you typed** in the box rather than throwing it away, and offers to switch the VFO to CW for you. User Manual, [§19.1](USER_MANUAL.md#191-sending-a-line).
+- **CW Auto, and a CW Reader that prints less junk.** **Auto** in the CW Reader moves the dial so the station you are hearing sits on your pitch and sets the filter for the speed it is sending, through Reader Mode so **Stop** puts your filter back. The reader also splits characters the sender ran together, judges word gaps at the current speed, and no longer prints the stray E, I and T that noise produces between overs. User Manual, [§18.7](USER_MANUAL.md#auto-tune-the-station-in-for-you).
 
-- **The spectrum panel is no longer a fixed 280 pixels tall.** On a 4K monitor it was a stripe. Its control bar now has a **Height** setting from 50% to 300%, and there is a grip along the bottom edge that can be dragged — or driven with the arrow keys — to anything from 40 to 1000 pixels. The height is remembered per VFO. User Manual, [§5.4](USER_MANUAL.md#54-spectrum-display).
+- **Keyboard shortcuts on the main page.** Single keys for tuning, bands, modes, IF width, filter slot, span and the panels, on Classic and the Experimental UI — the same keys as Yaesu Web Control. Press **?** for the list. User Manual, [§13](USER_MANUAL.md#13-keyboard-shortcuts).
 
-- **Movable windows now sit on top of the page, and the one you last touched is in front.** Dragging the CW reader or the RTTY tuner over the meters or the spectrum used to let parts of what was underneath show through it, and when two of them overlapped the one further down the page always won regardless of which you were using. Both are fixed: every movable window is drawn above the page, and clicking or opening one brings it to the front.
+- **"Set it up" buttons.** When the CW Reader has no audio device, or the DX Spots list has no cluster, the message now has a button that opens a small window for just that setting, instead of sending you off to find it in Settings. User Manual, [§18.3](USER_MANUAL.md#183-choosing-the-audio-device), [§5.17](USER_MANUAL.md#517-dx-spots-list).
 
-- **Fixed: folding the VFOs away with the Scope off stranded the page.** Fold the VFO panels, switch the **Scope** off, and you were left with no VFO panels and no button to bring them back — the **VFOs** button lives in the spectrum panel's header, which the Scope switch collapses along with everything else in it. The only way out was turning the Scope back on. The panels now return when the scope goes away, and reloading with the Scope already off starts with them showing.
+- **A test log you can send me.** **Diagnostics → Start fresh test log**, do the test, then **Download test log**: you get just that test's part of the log, ready to drag into a GitHub issue. User Manual, [§11](USER_MANUAL.md#11-diagnostics).
 
-- **Fixed: clicking a RTTY segment on 20, 15 or 10 m set RTTY-R instead of RTTY.** Reversed RTTY hands the radio's own decoder mark and space the wrong way round, so it decoded nothing at all on a signal that was tuned perfectly well. Twelve band-plan entries carried the wrong mode, across all four regions.
+- **Fixed: closing a pop-out could shut IWC down with the Radio panel still open.** IWC only counted pages that sent a regular "still here" signal, and the Radio panel did not send one — so with the Radio panel open and one pop-out window, closing the pop-out stopped the app 30 seconds later. Every open page now counts.
 
-- **Fixed: the DX Spots list opened where you could not see it.** On the main page its remembered position was below the bottom of the window, and the page does not scroll that far — so pressing the button appeared to do nothing whatsoever. It now opens across the top of the window, and a position remembered from a larger screen is brought back into view. A click on the gap between the **All bands** switch and its label now flips the switch, too.
+- **Fixed: the MIC gain slider did not follow a change made elsewhere.** Moving it on the Radio panel, or in another tab, left the Classic and Experimental sliders where they were. They now follow. The IC-7300's own MIC knob still does not reach IWC: nothing reads the radio's mic gain yet.
 
-- **Fixed: the CW Reader's Tune switch was never remembered** and came back off on every page load. It now stays as you left it.
-
-- **Fixed: the Twin PBT dialog went stale.** It showed where the radio's knobs were when it opened and never looked again, so turning them at the radio left the dialog describing something that was no longer true. It re-reads whenever you come back to it.
-
-- **Fixed: a page left open but untouched could have the app shut down underneath it.** The About page, say, left open in a tab — after a quiet spell it stopped counting as connected, IWC shut itself down, and the next click gave *connection refused*. Every page now keeps its connection alive the same way, with longer timeouts at both ends.
-
-- **Fixed: the spectrum's sliders and resize grip were hard to see.** The Range, Speed and Bright sliders had a faint track that all but vanished on the dark panel, and the keyboard focus ring on the resize grip disappeared against the VFO card beneath it. The sliders are now drawn like the Notch slider, and the grip is lighter, with a larger mark and an amber focus ring.
 
 ## 📝 CW Reader
 

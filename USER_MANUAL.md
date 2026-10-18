@@ -990,6 +990,8 @@ The feature uses your browser's built-in text-to-speech engine (Web Speech API),
 
 Click the **DX Spots** button on the toolbar to open a list of DX cluster spots filtered to the current band. This complements the spectrum overlay — and unlike the overlay, it works **whether or not you have an SDR connected**.
 
+If no DX cluster is set up yet, the empty list has a **Set up the DX cluster** button. It asks for the cluster's host and port and your login callsign, switches the cluster on and saves those four settings, without leaving the page. Everything else about the cluster stays on the Settings page.
+
 | Column | What it shows |
 |---|---|
 | Callsign | The spotted station. Watched callsigns (from §5.14) appear in **bright red**. |
@@ -1102,7 +1104,7 @@ The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300'
 
 **The windows.** The keys under the meter open windows on top of the panel. Drag a window by its title bar and resize it from its corner. Each part of a window can be closed (**×**), or torn off into a window of its own and put back into its group again; pressing the key again brings back anything you closed. Where each window was, and which were open, is remembered by this browser.
 
-- **CW** (switches to CW): the keyer, the CW Reader ([§18](#18-cw-reader)) and CW Send ([§19](#19-cw-send)).
+- **CW** (switches to CW): the keyer, the CW Reader ([§18](#18-cw-reader)) and CW Send ([§19](#19-cw-send)). The keyer's **SPEED** and **PITCH** step with their **−** / **+** keys or with the mouse wheel over them — 1 WPM, or 10 Hz, a notch.
 - **RTTY** (switches to RTTY): the RTTY tuner and reader ([§20](#20-rtty)). Its send part only explains why sending is not offered yet.
 - **MEMORIES**: IWC's own memories and banks ([§8](#8-radio-memories)), not the radio's channels.
 - **DX**: the DX spots list and the watch list ([§5.17](#517-dx-spots-list)).
@@ -1988,6 +1990,8 @@ These are lower-priority for most users than the S-Meter and Power calibrations.
 
 Access the Diagnostics page from the navigation bar. It is primarily used when something is not working as expected.
 
+**Start fresh test log / Download test log** — if I have asked you for a log, click **Start fresh test log**, do the test on the radio, then click **Download test log**. You get just the part of the log written since you clicked Start — not the whole day — as a file you can drag straight into the GitHub issue or discussion. **Download the full log**, underneath, gives you everything.
+
 **Band scope delivery** — the panel at the top of the page, always visible. It shows how many spectrum sweeps per second are actually reaching IWC from the radio, measured over the last three seconds, along with the number of sweeps assembled and discarded since the app started.
 
 If the radio has *refused* to send scope data, the panel reads **Blocked** instead of a rate and prints the reason in place of the counters — which in that state are all zero and tell you nothing. On the original IC-7300 that reason is nearly always the baud rate; see §15.7.
@@ -2026,6 +2030,34 @@ On touch devices, tap a digit in the frequency display to select it (it highligh
 ---
 
 ## 13. Keyboard Shortcuts
+
+### Main page shortcuts
+
+The main page — Classic and the Experimental UI — answers single keys, so the radio can be run without the mouse. Press **?** (or **h**) for the full list on screen. The keys are the same as Yaesu Web Control's, so moving between the two apps keeps the same fingers. Shortcuts are ignored while you are typing in a text field, and browser chords such as Ctrl+F are never taken over. If you have set a **transmit key** in Settings, no shortcut acts on that key.
+
+| Key | What it does |
+|---|---|
+| **g** | Open the frequency keypad for the active VFO |
+| **j / ←** and **i / →** | Frequency down / up 100 Hz (**Shift**: 1 kHz, **Alt**: 10 kHz) |
+| **[ / ]** | Frequency down / up 1 Hz (**Shift**: 50 Hz) |
+| **Shift + Alt + j / i** | Tune to the previous / next DX spot |
+| **n** | Switch the active VFO (A ↔ B) |
+| **N** | Copy VFO A to B |
+| **m** | Open / close the memories panel |
+| **b / B** | Previous / next band |
+| **l**, **u**, **c**, **a**, **q**, **d** | LSB, USB, CW, AM, FM, DATA-U |
+| **C** (or **Alt + c**), **Alt + d** | CW-R, DATA-L |
+| **p / P** | Narrower / wider IF width, one step |
+| **/** | Next filter slot (FIL1 → FIL2 → FIL3) |
+| **z / Z** (or **> / <**) | Narrower / wider spectrum span (**Alt**: narrowest / widest) — while the scope is showing |
+| **w / W** | Spectrum vertical range −/+ 1 dB (**Alt**: 10 dB) |
+| **s** / **S** | Hold / release the spectrum; reset the vertical range to 60 dB |
+| **D** / **@** | Open / close the DX Spots list; open the DX Watch list |
+| **x** / **y** | Show / hide the VFO B panel; the S-meter history strip |
+| **f / F** | Full screen |
+| **? or h** / **Esc** | Open the shortcut list / close it, a dialog, or full screen |
+
+### Mouse and other keys
 
 | Key / Action | Result |
 |---|---|
@@ -2956,7 +2988,7 @@ The reader opens a Windows recording device directly — normally the radio's ow
 
 It is opened **shared**, so your logging or digital-mode software can hold the same device at the same time. You do not have to close WSJT-X to read CW. I have tested this directly rather than assuming it: two separate programs opened the same USB codec at once and both received audio throughout.
 
-If no device is chosen, or the one you chose has been unplugged, the reader says so in words on the status line rather than sitting there printing nothing.
+If no device is chosen, or the one you chose has been unplugged, the reader says so in words on the status line rather than sitting there printing nothing — with a **Set it up** button beside the message. It opens a small window listing your recording devices, marks the one that looks like the radio, and saves just that one choice, so you do not have to go and find the field in Settings.
 
 ### 18.4 Your first session, step by step
 
