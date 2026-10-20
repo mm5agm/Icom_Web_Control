@@ -130,6 +130,10 @@ namespace Icom_Web_Control.Pages
         // this flag is what un-gates panel B despite data-single-receiver.
         public bool PseudoDualReceiverEnabled { get; set; } = false;
 
+        // Settings > Voice Control. The Radio panel (Layout = null, so no
+        // window.iwcVoiceEnabled) reads it from here to show its VOICE key.
+        public bool VoiceControlEnabled { get; set; } = false;
+
         // How the watch panel's (VFO B) span buttons behave: "ZoomIn" (software
         // crop, B independent), "Shared" (both drive the one physical span), or
         // "Hidden" (no B span buttons). See ApplicationSettings.PseudoDualWatchSpanMode.
@@ -183,6 +187,7 @@ namespace Icom_Web_Control.Pages
             VoiceNudgeStepHzA = settings.VoiceNudgeStepHzA;
             VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
             PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
+            VoiceControlEnabled = settings.VoiceControlEnabled;
             PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             AutoModeChangeOnTune = settings.AutoModeChangeOnTune;

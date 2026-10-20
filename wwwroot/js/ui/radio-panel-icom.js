@@ -64,11 +64,12 @@ function post(url, body) {
 // The IC-7300's filter widths per mode, from ic7300-if-width.js (loaded by
 // the page before this module), so there is one table.
 const widthsForMode = mode => window.IfWidth?.widthsForMode?.(mode) ?? null;
+const VOICE_TITLE = 'Voice control: hold while you speak a command, release when you have finished. Right-click a mic button on Classic for the list of commands';
 const widthLabel = hz => (hz < 1000 ? hz + ' Hz' : (hz / 1000).toFixed(hz % 1000 ? (hz % 100 ? 2 : 1) : 1) + ' kHz');
 
 /**
  * @param {HTMLElement} root
- * @param {object} cfg  { conn, model, maxPowerW, maxHz, bandPlan, pseudoDual, autoModeChangeOnTune, views, menu }
+ * @param {object} cfg  { conn, model, maxPowerW, maxHz, bandPlan, pseudoDual, autoModeChangeOnTune, voice, views, menu }
  */
 export function startIcomRadioPanel(root, cfg) {
     const model = cfg.model;
@@ -100,6 +101,9 @@ export function startIcomRadioPanel(root, cfg) {
             { id: 'mainsub', label: 'VFO A / B', title: 'Select VFO A or VFO B: the keys, knobs and rows act on the selected VFO' },
             { id: 'proc', label: 'COMP', title: 'Speech compressor on / off (transmit audio only)' },
             { id: 'moni', label: 'MONI', title: 'Monitor on / off: hear your own transmit audio. It does not transmit' },
+            // Classic's mic button, as a key: held while speaking, released to
+            // end the command. Only with Settings > Voice Control on.
+            ...(cfg.voice ? [{ id: 'voice', label: 'VOICE', hold: true, title: VOICE_TITLE }] : []),
         ],
         rxGroups: {
             knobs: [
@@ -496,6 +500,12 @@ export function startIcomRadioPanel(root, cfg) {
                     return;
                 }
                 return tuneBy(id === 'up' ? stepHz : -stepHz);
+            case 'keyDown':
+                if (id === 'voice') return post('/api/voice/start?vfo=' + r.sel);
+                return;
+            case 'keyUp':
+                if (id === 'voice') return post('/api/voice/stop');
+                return;
             case 'key':
                 switch (id) {
                     case 'mainsub': return act('vfo', r.sel === 'A' ? 'B' : 'A');
@@ -893,10 +903,31 @@ export function startIcomRadioPanel(root, cfg) {
         if (fn) try { fn(msg.value); } catch (e) { console.warn('radio panel:', msg.property, e); }
         win.onRadioState(msg);
     });
+    if (cfg.voice) {
+        conn.on('VoiceStatusUpdate', showVoice);
+        fetch('/api/voice/status').then(x => (x.ok ? x.json() : null)).then(s => { if (s) showVoice(s); }).catch(() => {});
+    }
     conn.onreconnecting(() => panel.setLamp('cat', 'warn'));
     conn.onclose(() => panel.setLamp('cat', 'bad'));
     panel.setLamp('cat', 'warn');
     conn.start().catch(() => panel.setLamp('cat', 'bad'));
 
     return panel;
+
+    // The VOICE key follows the recogniser, as Classic's mic button does: lit
+    // while listening or acting, red on an error, and what it heard underneath.
+    function showVoice(st) {
+        const heard = st.lastHeard ? String(st.lastHeard) : '';
+        const short = heard.length > 14 ? heard.slice(0, 13) + '…' : heard;
+        const title = st.state === 'Error' && st.errorMessage ? 'Voice error: ' + st.errorMessage
+            : heard ? VOICE_TITLE + '\nLast heard: ' + heard : VOICE_TITLE;
+        switch (st.state) {
+            case 'Listening':    panel.setKey('voice', { on: true, sub: 'LISTENING', title }); break;
+            case 'Heard':
+            case 'Executing':    panel.setKey('voice', { on: true, sub: short, title }); break;
+            case 'Unrecognised': panel.setKey('voice', { sub: '???', title }); break;
+            case 'Error':        panel.setKey('voice', { tx: true, sub: 'ERROR', title }); break;
+            case 'Idle':         panel.setKey('voice', { sub: '', title }); break;
+        }
+    }
 }
