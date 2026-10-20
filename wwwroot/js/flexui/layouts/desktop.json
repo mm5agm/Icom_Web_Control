@@ -13,52 +13,103 @@
     "weight": 100,
     "children": [
       {
-        "type": "tabset",
-        "weight": 7,
+        "type": "row",
+        "weight": 21,
         "children": [
           {
-            "type": "tab",
-            "id": "toolbar",
-            "name": "Toolbar",
-            "component": "toolbar"
+            "type": "tabset",
+            "weight": 24,
+            "children": [
+              {
+                "type": "tab",
+                "id": "levels",
+                "name": "Levels",
+                "component": "levels"
+              }
+            ],
+            "minHeight": 66
           },
           {
-            "type": "tab",
-            "id": "clarifier",
-            "name": "Clarifier",
-            "component": "clarifier"
-          }
-        ],
-        "selected": 0,
-        "minHeight": 48
-      },
-      {
-        "type": "tabset",
-        "weight": 33,
-        "children": [
+            "type": "tabset",
+            "weight": 20,
+            "children": [
+              {
+                "type": "tab",
+                "id": "vfoActions",
+                "name": "VFO Actions",
+                "component": "vfoActions"
+              }
+            ],
+            "minHeight": 66
+          },
           {
-            "type": "tab",
-            "id": "meters",
-            "name": "Meters",
-            "component": "meters"
-          }
-        ]
-      },
-      {
-        "type": "tabset",
-        "weight": 20,
-        "children": [
+            "type": "tabset",
+            "weight": 30,
+            "children": [
+              {
+                "type": "tab",
+                "id": "buttons",
+                "name": "Buttons",
+                "component": "buttons"
+              }
+            ],
+            "minHeight": 66
+          },
           {
-            "type": "tab",
-            "id": "spectrum",
-            "name": "Spectrum",
-            "component": "spectrum"
+            "type": "tabset",
+            "weight": 26,
+            "children": [
+              {
+                "type": "tab",
+                "id": "clarifier",
+                "name": "Clarifier",
+                "component": "clarifier"
+              }
+            ],
+            "minHeight": 66
           }
         ]
       },
       {
         "type": "row",
-        "weight": 40,
+        "weight": 41,
+        "children": [
+          {
+            "type": "tabset",
+            "weight": 24,
+            "children": [
+              {
+                "type": "tab",
+                "id": "linearMeters",
+                "name": "Linear Meters",
+                "component": "linearMeters"
+              },
+              {
+                "type": "tab",
+                "id": "meters",
+                "name": "Meters",
+                "component": "meters"
+              }
+            ],
+            "selected": 0
+          },
+          {
+            "type": "tabset",
+            "weight": 76,
+            "children": [
+              {
+                "type": "tab",
+                "id": "spectrum",
+                "name": "Spectrum",
+                "component": "spectrum"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "row",
+        "weight": 38,
         "children": [
           {
             "type": "tabset",
