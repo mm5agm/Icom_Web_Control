@@ -721,6 +721,27 @@ test('/radio: has no key that transmits, and nothing clicked here wrote one', as
     } finally { await page.close(); }
 });
 
+test('/radio: VOICE key listens while held and shows what the recogniser is doing', async note => {
+    const page = await radioPage();
+    try {
+        const sel = `[...document.querySelectorAll('button.rp-key')].find(b => b.textContent.includes('VOICE'))`;
+        if (!await page.eval(`!!${sel}`)) { note('voice control is off in this install, so there is no VOICE key'); return; }
+        const press = type => page.eval(`${sel}.dispatchEvent(new PointerEvent('${type}', { bubbles: true, button: 0, pointerId: 1 }))`);
+        const look = () => page.eval(`(() => { const b = ${sel}; return b.querySelector('.rp-led').className + '|' + b.querySelector('.rp-sub').textContent; })()`);
+        const voice = state => page.emit('VoiceStatusUpdate', { state, lastHeard: null, lastIntent: null, errorMessage: null, vfo: 'A' });
+        await press('pointerdown');
+        expect(writesTo(await page.writes(), '/api/voice/').map(w => w.path).join() === '/api/voice/start?vfo=A',
+            `press sent ${JSON.stringify(await page.writes())}`);
+        await voice('Listening');
+        expect(await look() === 'rp-led on|LISTENING', `while listening the key shows "${await look()}"`);
+        await press('pointerup');
+        const paths = writesTo(await page.writes(), '/api/voice/').map(w => w.path);
+        expect(paths.join() === '/api/voice/start?vfo=A,/api/voice/stop', `press and release sent ${paths.join(', ')}`);
+        await voice('Idle');
+        expect(await look() === 'rp-led|', `back at idle the key shows "${await look()}"`);
+    } finally { await page.close(); }
+});
+
 test('/radio: band keys and mode keys each sit on one line, labels not clipped', async () => {
     const page = await radioPage();
     try {

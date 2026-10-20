@@ -146,9 +146,12 @@ function turnable(el, { deg = 15, partAt = () => undefined, onStep, onTurn }) {
  *                                          app's other pages. Each opens in a new tab,
  *                                          so the panel keeps running behind it
  *   lamps:  [{ id, label, click, title }]  `click` makes the lamp a key: act('lamp', id)
- *   keys:   [{ id, label, inert, title }]  left column, two per row; `inert` keeps
+ *   keys:   [{ id, label, inert, hold, title }]  left column, two per row; `inert` keeps
  *                                          one key display-only even with onAction
- *                                          (e.g. anything that would transmit)
+ *                                          (e.g. anything that would transmit);
+ *                                          `hold` makes it a press-and-hold key that
+ *                                          acts act('keyDown', id) / act('keyUp', id)
+ *                                          instead of act('key', id) (push to talk)
  *   vfoKeys:[{ id, label, inert, title }]  under the dial, vfoKeyColumns per row (default 3)
  *   dualDial (bool)                        on a dual-receiver radio, the dial is an outer
  *                                          ring (MAIN, VFO-A) round an inner knob (SUB,
@@ -207,7 +210,8 @@ function turnable(el, { deg = 15, partAt = () => undefined, onStep, onTurn }) {
  *                                          after AGC; filled with setChip(vfo, kind,
  *                                          text) and listed by choices(kind, vfo)
  *   storagePrefix, fontBase
- *   onAction(kind, id, vfo)                kind: 'key' | 'band' | 'mode' | 'step' | 'vfoKey'
+ *   onAction(kind, id, vfo)                kind: 'key' | 'keyDown' | 'keyUp' (a `hold` key)
+ *                                          | 'band' | 'mode' | 'step' | 'vfoKey'
  *                                          | 'vfo' (the operator clicked VFO 'A' or 'B')
  *                                          | 'width' | 'agc' | a vfoChips kind (picked
  *                                            from a VFO box chip)
@@ -254,6 +258,37 @@ export function mountRadioPanel(root, opts = {}) {
         b.type = 'button';
         if (act && kind && !inert) b.addEventListener('click', () => act(kind, id));
         else if (kind) b.disabled = true;
+        return b;
+    };
+    // A key that acts while it is held: keyDown on press, keyUp on release,
+    // however the press ends - lifted on the key or off it, cancelled by the
+    // browser, or the window losing focus mid-press - so a held key can never
+    // be left down.
+    const holdButton = (cls, id, inert = false) => {
+        const b = h('button', cls);
+        b.type = 'button';
+        if (!act || inert) { b.disabled = true; return b; }
+        let down = false;
+        const up = () => {
+            if (!down) return;
+            down = false;
+            b.classList.remove('held');
+            act('keyUp', id);
+        };
+        b.addEventListener('pointerdown', e => {
+            if (e.button !== 0 || down) return;
+            down = true;
+            try { b.setPointerCapture?.(e.pointerId); } catch { /* blur and pointerup still end it */ }
+            b.classList.add('held');
+            act('keyDown', id);
+        });
+        b.addEventListener('pointerup', up);
+        b.addEventListener('pointercancel', up);
+        b.addEventListener('lostpointercapture', up);
+        window.addEventListener('blur', up);
+        // A long touch would otherwise open the context menu and end the press.
+        b.addEventListener('contextmenu', e => e.preventDefault());
+        b.style.touchAction = 'none';
         return b;
     };
 
@@ -386,7 +421,7 @@ export function mountRadioPanel(root, opts = {}) {
     const keysGrid = h('div', 'rp-keys');
     const keyEls = {};
     for (const k of opts.keys ?? []) {
-        const b = button('rp-key', 'key', k.id, k.inert);
+        const b = k.hold ? holdButton('rp-key', k.id, k.inert) : button('rp-key', 'key', k.id, k.inert);
         if (k.title) b.title = k.title;
         const led = h('span', 'rp-led'), sub = h('span', 'rp-sub', '');
         b.append(led, h('span', null, k.label), sub);
@@ -1378,9 +1413,11 @@ export function mountRadioPanel(root, opts = {}) {
                 : ((kr.top - pr.top) * f - 6 - keyList.offsetHeight) + 'px';
         },
         closeKeyList,
-        setKey(id, { on = false, tx = false, sub } = {}, vfo) {
+        // `title`, when given, replaces the key's hover text.
+        setKey(id, { on = false, tx = false, sub, title } = {}, vfo) {
             const k = keyEls[vfo ? vfo + ':' + id : id];
             if (!k) return;
+            if (title !== undefined) k.b.title = title ?? '';
             if (!k.led) { k.b.classList.toggle('on', on || tx); return; }
             k.led.className = 'rp-led' + (tx ? ' tx' : on ? ' on' : '');
             if (k.sub && sub !== undefined) k.sub.textContent = sub ?? '';
