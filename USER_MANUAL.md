@@ -284,7 +284,7 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.5.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.6.0**) are shown in the top-left corner.
 
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears listing what has changed, with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the newest version or if the internet is not available.
 
@@ -1050,14 +1050,31 @@ A panel on the main page can be dragged around and resized, but it can't leave t
 
 **Experimental UI** in the top bar opens a second way of working the radio, at `http://localhost:8080/flexui`. Its dockable workspace was designed by Fabio Valente (CR7CDC) for Yaesu Web Control, and IWC uses the same one. The Classic page described in the rest of §5 is unchanged and is still where IWC opens; **Classic Home** in the Experimental UI's top bar takes you back, and both can be open in different tabs at once.
 
-The Experimental UI is the Classic page itself, rearranged into panels: **Toolbar**, **Clarifier**, **Meters**, **Spectrum**, **VFO A** and **VFO B**. Every button, slider and readout is the one on the Classic page, so they behave exactly the same; only where they sit is different.
+![The Experimental UI: the toolbar strip across the top, then the Levels, VFO Actions, Buttons and Clarifier panels, Linear Meters beside the Spectrum, and the VFO A and VFO B cards along the bottom](pictures/IWC_Experimental.png)
 
-- **Arranging panels.** Drag a panel by its tab to move it. Drop it on the edge of another panel to dock it beside it, or in the middle to put the two together as tabs. Drag the dividers between panels to resize them. **Clarifier** starts as a tab behind **Toolbar**; click its tab to see it.
+The Experimental UI has a dark look, also Fabio's. Its controls are the Classic page's own controls, rearranged: every button, slider and readout behaves exactly as it does on the Classic page; only where it sits and how it looks are different. Underneath the toolbar strip it has these panels:
+
+- **The toolbar strip** runs across the top, under the menu bar, and is not a panel. It holds the UTC clock, **Mem**, **S-hist**, the logger buttons and **Connect** / **POWER**. The dock's own controls are in front of Connect: **Panels**, the layouts menu, the UI size and **Reset**.
+- **Levels** — **POWER**, **MIC**, **PROC** and **MONI** keys. Each one shows its current setting and follows the radio.
+- **VFO Actions** — **A↔B**, **B→A**, **A→B**, **Split** and **+5k**.
+- **Buttons** — **ATU**, **Tune**, **FM Rep** and **VOX**, plus the keys that open the CW, CW Reader, CW Send, RTTY, DX Spots, DX Watch and Voice panels. ATU works as it does on Classic: tap it to switch the tuner in or out, and hold it to start a tune.
+- **Clarifier** — the same as on the Classic page.
+- **Linear Meters** — PWR, SWR, COMP, ALC, IDD and VDD as bars in a narrow column beside the Spectrum. Each bar reads the same as the dial meter on the **Meters** tab behind it. The IC-7300 doesn't report temperature over CI-V, so there is no TEMP bar.
+- **Spectrum** — the radio's band scope, as on the Classic page.
+- **VFO A** and **VFO B** — one card per VFO, in three columns:
+  - Tuning: frequency, a bar S-meter, RF and AF gain, band, mode and Save to Mem.
+  - Filter: IF width, filter slot, IF shape, APF, Twin PBT and RX Tone.
+  - Keys: the voice mic button, AGC, preamp, ATT, NR, NB and notch.
+
+  The IC-7300 has one receiver, so only the VFO you are listening on shows a reading. The other S-meter shows S0, greyed out. Showing and hiding VFO B is done with its tab, so the Classic VFO-B key is hidden here.
+
+- **Arranging panels.** Drag a panel by its tab to move it. Drop it on the edge of another panel to dock it beside it, or in the middle to put the two together as tabs. Drag the dividers between panels to resize them.
 - **Popping a panel out.** The pop-out button at the right of a panel's tab bar moves the panel into a window of its own, which you can put on another screen. It keeps working there, meters and scope included. Close the window to bring the panel back into the main page.
 - **Showing and hiding panels.** The **Panels** menu shows or hides each one, so a panel you have closed can be brought back. A hidden panel keeps up with the radio, so it is current the moment you show it again.
 - **UI size.** The size box (X-Small to Large) changes the size of the text and controls without moving the panels.
 - **Layouts.** The layouts menu, which shows the name of the layout in use, holds named arrangements. **Save current as…** saves what is on screen under a name, and **Manage layouts…** renames or deletes them. Layouts are saved in IWC itself (`flex-layouts.json`, in the same folder as your settings), not in the browser, so another browser or PC using the same IWC sees the same list. Once a named layout is chosen, changes to it are saved as you make them. **Default** is the built-in arrangement and is never overwritten: changes made to it are kept by this browser only, until you save them under a name.
 - **Reset** puts the panels back where the Default arrangement has them.
+- **Coming from v1.5.0.** If you rearranged **Default** in v1.5.0, those changes are set back the first time you open this version, because the old **Toolbar** panel has gone. Your named layouts are still in the layouts menu, but they were saved before the new panels existed. Add the new panels from the **Panels** menu, or press **Reset** and save the new arrangement under a name.
 
 It is called experimental because it is new. If something works on the Classic page and not here, please report it and say which page you were on.
 

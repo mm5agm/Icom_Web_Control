@@ -106,6 +106,24 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
 
+### v1.6.0-pre1 (2026-10-20)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build.
+>
+> **What needs testing:** the Experimental UI's new panels on your own radio. Please report anything that works on the Classic page but not here, and say which page you were on.
+
+- **The Experimental UI gets Fabio Valente's (CR7CDC) dark look from Yaesu Web Control.** In v1.5.0, **Experimental UI** showed the light Classic controls in dock panels. It is now dark, and the panels are rebuilt the way Fabio laid them out for YWC:
+  - The toolbar is a strip across the top.
+  - **Levels** has POWER, MIC, PROC and MONI keys.
+  - **VFO Actions** has A↔B, B→A, A→B, Split and +5k.
+  - **Buttons** has ATU, Tune, FM Rep, VOX and the keys that open the CW, RTTY, DX and Voice panels.
+  - **Linear Meters** shows PWR, SWR, COMP, ALC, IDD and VDD as bars beside the Spectrum.
+  - **VFO A** and **VFO B** are three-column cards, each with a bar S-meter.
+
+  They are still the Classic page's own controls underneath, so they behave as they do there, and the Classic page itself is unchanged. If you rearranged **Default** in v1.5.0, it starts again from the new arrangement. User Manual, [§5.19](USER_MANUAL.md#519-experimental-ui).
+- **Fixed: the VOX and PROC buttons did not follow the radio.** Switching VOX or the speech processor on at the radio, or from another page, left IWC's buttons showing the old state. They now follow the radio, on Classic and in the Experimental UI.
+- **The Windows Security section of this README explains the Defender warning.** Edge and Defender flagged v1.5.0 as `Trojan:Win32/Wacatac.B!ml`, which is a false positive, and it has been reported to Microsoft. That section now explains how to check the download and keep it. This build is unsigned in the same way and may be flagged too.
+
 ### v1.5.0 (2026-10-18)
 
 > **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept.
