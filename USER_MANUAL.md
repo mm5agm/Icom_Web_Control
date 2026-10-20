@@ -1115,6 +1115,7 @@ The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300'
 - **AGC** steps through FAST, MID and SLOW. **FILTER** steps through FIL1, FIL2 and FIL3.
 - **NB**, **NR** and **AN** (auto notch) switch on and off. **MN** switches the manual notch on; each press while it is on steps its width. **APF** steps through OFF, WIDE, MID and NAR.
 - **COMP** switches the speech compressor, which only affects transmit audio. **MONI** switches the monitor on and off; it does not transmit.
+- **VOICE** is voice control's mic button ([§17](#17-voice-control)). It is only there when voice control is switched on. Hold it down while you speak a command and let go when you have finished; the command works on the selected VFO. While it listens the key lights and shows **LISTENING**, then shows what it heard, **???** if it didn't recognise it, or **ERROR** in red if something went wrong.
 - **A▸B**, **B▸A**, **A⇄B** and **SPLIT** copy, swap and split the VFOs. **Q.SPLIT** puts the other VFO 5 kHz up and turns split on.
 - **M.STORE** adds the selected VFO to IWC's memory list, the one on the Memories page ([§8](#8-radio-memories)), and shows **SAVED** under it. It does not write to the radio's own memories.
 - **M▸VFO** and **VFO▸M** work with the radio's own 99 memory channels. The IC-7300 cannot tell IWC which channel it is on, so both keys drop down a list to pick from. **M▸VFO** lists the channels that have something in them; click one and the selected VFO tunes to it. **VFO▸M** lists all 99, empty ones included; click one, and the key names it, such as **M013?**. Press **VFO▸M** again within four seconds to write the selected VFO over that channel, or leave it and nothing is written. This writes to the radio's memory, not to IWC's memory list.
@@ -2853,11 +2854,11 @@ This is a primary accessibility feature: a partially-sighted operator can drive 
 
    > **Windows "Voice Clarity" and other microphone enhancements.** IWC works with them on or off — the recogniser only needs a clean level, and IWC sets that itself. Clarity's noise suppression can help in a noisy shack but is tuned for calls and can soften consonants, so if you want to try it, use **Test this pack** (§17.6) with a few commands each way and keep whichever is rejected less. Whatever you choose, **don't toggle it while IWC is running** if you can help it: Windows re-initialises the microphone underneath the app, and the next press of the mic button spends a moment reopening it (you'll see *"stopped delivering audio — reopening it"* in the log) before it can listen.
 
-After restart, you should see a **mic button on the Index page beside the VFO panel**, next to the band/mode controls. If you don't see it, jump to [§17.4 Troubleshooting](#174-troubleshooting).
+After restart, you should see a **mic button on the Index page beside the VFO panel**, next to the band/mode controls. The Radio panel has a **VOICE** key next to **MONI** that does the same job ([§5.20](#520-radio-panel)). If you don't see either, jump to [§17.4 Troubleshooting](#174-troubleshooting).
 
 ### 17.3 Using the mic button
 
-The mic button is a **press-and-hold** control — it doesn't latch. Hold it to listen, release to process.
+The mic button is a **press-and-hold** control — it doesn't latch. Hold it to listen, release to process. The **VOICE** key on the Radio panel works the same way.
 
 1. **Press and hold** the mic button. The button colour changes to indicate the speech engine is listening.
 2. **Speak the command clearly** at a normal volume.

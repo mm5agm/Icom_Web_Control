@@ -106,6 +106,14 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
 
+### v1.6.0-pre2 (2026-10-20)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre1 below.
+>
+> **What needs testing:** voice control from the Radio panel.
+
+- **The Radio panel has a VOICE key for voice control.** Until now the only way to use voice control was the mic button on the Classic page. With voice control switched on, the Radio panel has a **VOICE** key next to **MONI**. Hold it down while you speak a command and let go when you have finished; the command works on the selected VFO. While it listens the key lights and shows **LISTENING**, then shows what it heard. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+
 ### v1.6.0-pre1 (2026-10-20)
 
 > **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build.
