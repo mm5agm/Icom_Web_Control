@@ -871,10 +871,10 @@ const openFlex = async () => {
 test('flexui: every section is docked, with gauges sized', async () => {
     const page = await openFlex();
     try {
-        for (const c of ['toolbar', 'meters', 'spectrum', 'vfoA', 'vfoB']) {
+        for (const c of ['vfoActions', 'meters', 'spectrum', 'vfoA', 'vfoB']) {
             expect(await flexWhere(page, c) === 'docked', `${c} is ${await flexWhere(page, c)}, not docked`);
         }
-        expect(await flexWhere(page, 'clarifier') === 'docked', 'clarifier is not in the dock (it is a tab behind Toolbar)');
+        expect(await flexWhere(page, 'clarifier') === 'docked', 'clarifier is not in the dock');
         expect(!await page.eval(`document.body.classList.contains('iwc-flex-pending')`), 'the page is still marked pending');
         const unsized = await page.eval(`[...document.querySelectorAll('#ywcFlexHost [data-ywc-component="meters"] canvas')].filter(c => !c.width || !c.height).map(c => c.id)`);
         expect(unsized.length === 0, `meter canvases with no size: ${unsized.join(', ')}`);
@@ -937,6 +937,206 @@ test('Index: MIC gain slider follows a MicGain update', async () => {
         await page.waitFor(`document.getElementById('micGainSlider').value === '37' && document.getElementById('micGainValue').textContent === '37'`,
             { timeoutMs: 2000, what: 'slider and label at 37' });
         expect(writesTo(await page.writes(), '/api/cat/micgain').length === 0, 'the update was written back to the radio');
+    } finally { await page.close(); }
+});
+
+// Fabio's dark theme. A Classic rule loaded after it, or an inline
+// !important in Index.cshtml, puts a white key back on a dark page.
+test('flexui: dark theme, and Classic keys inside it are dark too', async () => {
+    const page = await openFlex();
+    try {
+        const r = await page.eval(`(() => {
+            const bg = s => { const e = document.querySelector(s); return e ? getComputedStyle(e).backgroundColor : 'missing'; };
+            const fg = s => { const e = document.querySelector(s); return e ? getComputedStyle(e).color : 'missing'; };
+            return {
+                theme: document.documentElement.dataset.bsTheme,
+                body: bg('body'), nav: bg('.iwc-flex-nav'),
+                band: bg('.band-radio-label:not(:has(input:checked))'),
+                label: fg('.vfo-control-label'), saveMem: fg('#saveMemBtnA'),
+            };
+        })()`);
+        const level = c => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(c); return m ? (+m[1] + +m[2] + +m[3]) / 3 : NaN; };
+        const light = c => level(c) > 180;
+        const dark = c => level(c) < 80;
+        expect(r.theme === 'dark', `data-bs-theme is ${r.theme}`);
+        expect(dark(r.body) && dark(r.nav) && dark(r.band), `light background: ${JSON.stringify(r)}`);
+        expect(light(r.label) && light(r.saveMem), `dark text on dark: ${JSON.stringify(r)}`);
+    } finally { await page.close(); }
+});
+
+// Fabio's bar meters. Each one is fed by MeterPanel mirroring its radial,
+// so a bar that is drawn but never moves is the failure to catch.
+test('flexui: Linear Meters panel shows, and each bar follows its radial', async () => {
+    const page = await openFlex();
+    try {
+        const r = await page.eval(`(() => {
+            const mp = window.meterPanel;
+            mp.update('power', 50);
+            mp.update('vdd', 13.8);
+            updateMeterDomLabel('PowerMeter', { displayValue: { watts: 50, rawAvg: 0 } });
+            const tab = [...document.querySelectorAll('.flexlayout__tab_button_content')].map(e => e.textContent.trim());
+            return {
+                tabs: tab,
+                bars: ['power', 'swr', 'compression', 'alc', 'idd', 'vdd'].filter(k => !mp.getGauge(k + 'Linear')),
+                width: document.getElementById('powerLinearCanvas')?.width ?? 0,
+                power: mp.getGauge('powerLinear')?.gauge.value,
+                vdd: mp.getGauge('vddLinear')?.gauge.value,
+                chip: document.getElementById('powerLinearValue')?.textContent,
+            };
+        })()`);
+        expect(r.tabs.includes('Linear Meters'), `no Linear Meters tab: ${r.tabs.join(', ')}`);
+        expect(r.bars.length === 0, `no bar gauge for: ${r.bars.join(', ')}`);
+        expect(r.width > 100, `power bar is ${r.width}px wide`);
+        expect(r.power === 50 && r.vdd === 13.8, `bars did not follow: power ${r.power}, vdd ${r.vdd}`);
+        expect(r.chip === '50 W', `power chip reads "${r.chip}"`);
+    } finally { await page.close(); }
+});
+
+// Fabio's VFO cards: the Classic controls moved into his three columns, and
+// a bar S-meter that follows the receiving VFO (one receiver on the IC-7300).
+test('flexui: VFO cards are three columns, and the S bar follows the receiving VFO', async () => {
+    const page = await openFlex();
+    try {
+        const layout = await page.eval(`(() => {
+            const col = (v, c) => document.querySelector('#vfo' + v + 'Col .vfo-col--' + c);
+            const has = (v, c, id) => !!col(v, c)?.querySelector('#' + id + v);
+            const out = {};
+            for (const v of ['A', 'B']) {
+                out[v] = {
+                    cols: [...document.querySelectorAll('#vfo' + v + 'Col .vfo-body-grid > .vfo-col')].length,
+                    tune: ['freq', 'sMeterLinearCanvas', 'rfGainSlider', 'afGainSlider', 'bandRadioGroup', 'segmentSelect', 'modeSelect', 'saveMemBtn'].filter(id => !has(v, 'tune', id)),
+                    band: ['ifWidthSelect', 'filGroup', 'ifShapeGroup', 'apfSelect', 'audioFilterBtn', 'rxFilterBtn'].filter(id => !has(v, 'band', id)),
+                    keys: ['agcGroup', 'ipoGroup', 'attGroup', 'nrGroup', 'nbGroup', 'notchGroup', 'manualNotchFreq'].filter(id => !has(v, 'keys', id)),
+                    leftover: !!document.querySelector('#vfo' + v + 'Col .receiver-controls-group'),
+                    status: document.getElementById('vfo' + v + 'StatusLine')?.previousElementSibling?.className,
+                    barWidth: document.getElementById('sMeterLinearCanvas' + v)?.width ?? 0,
+                };
+            }
+            return out;
+        })()`);
+        for (const v of ['A', 'B']) {
+            const l = layout[v];
+            expect(l.cols === 3, `VFO ${v} has ${l.cols} columns`);
+            expect(!l.tune.length && !l.band.length && !l.keys.length, `VFO ${v} misplaced: ${JSON.stringify(l)}`);
+            expect(!l.leftover, `VFO ${v} still has the Classic controls group`);
+            expect(l.status === 'vfo-body-grid', `VFO ${v} status line is not below the grid (after ${l.status})`);
+            expect(l.barWidth > 100, `VFO ${v} S bar is ${l.barWidth}px wide`);
+        }
+
+        const read = () => page.eval(`(() => {
+            const mp = window.meterPanel;
+            const r = v => ({ value: mp.getGauge('smeterBar' + v)?.gauge.value,
+                              chip: document.getElementById('sMeterLinearValue' + v)?.textContent,
+                              grey: document.getElementById('sMeterLinearRow' + v)?.classList.contains('linear-smeter-inactive') });
+            return { A: r('A'), B: r('B') };
+        })()`);
+        // The 500 ms status poll feeds the meter too (0 here, no radio), so
+        // each reading is set and read back in one evaluation.
+        const readWith = (raw) => page.eval(`(() => { updateSMeter('A', ${raw}); updateSMeter('B', 0); return 0; })()`).then(read);
+        await page.state('ActiveVfo', 0); await sleep(200);
+        let r = await readWith(120);
+        expect(r.A.value > 0 && !r.A.grey && r.A.chip !== 'S0', `A receiving, A bar: ${JSON.stringify(r.A)}`);
+        expect(r.B.value === 0 && r.B.grey && r.B.chip === 'S0', `A receiving, B bar: ${JSON.stringify(r.B)}`);
+        // A/B alone moves the greying, before any new reading.
+        await page.state('ActiveVfo', 1); await sleep(200);
+        r = await read();
+        expect(!r.B.grey && r.A.grey, `after A/B the grey bar did not swap: ${JSON.stringify(r)}`);
+        r = await readWith(120);
+        expect(r.B.value > 0 && !r.B.grey && r.B.chip !== 'S0', `B receiving, B bar: ${JSON.stringify(r.B)}`);
+        expect(r.A.value === 0 && r.A.grey && r.A.chip === 'S0', `B receiving, A bar: ${JSON.stringify(r.A)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('flexui: Levels keys follow the radio and write through the Classic controls', async () => {
+    const page = await openFlex();
+    try {
+        expect(await flexWhere(page, 'levels') === 'docked', 'Levels panel is not docked');
+        const keys = await page.eval(`[...document.querySelectorAll('#levelsSection .toggle-dd__btn')].length`);
+        expect(keys >= 4, `Levels has ${keys} keys, not 4`);
+        // Radio -> key, silently.
+        await page.state('ProcEnabled', true);
+        await page.state('ProcLevel', 42);
+        await page.state('MonitorLevelA', 17);
+        await sleep(300);
+        let s = await page.eval(`({ proc: window.procCycleButton.getState(), mon: window.monitorCycleButton.getState() })`);
+        expect(s.proc.selectedId === '1' && s.proc.value === 42, `PROC key did not follow: ${JSON.stringify(s.proc)}`);
+        expect(s.mon.value === 17, `MONI key did not follow: ${JSON.stringify(s.mon)}`);
+        // Key -> Classic slider (whose change handler does the write).
+        await page.eval(`window.powerCycleButton.setState({ value: 30 })`);
+        await sleep(400);
+        const w = await page.eval(`({ slider: document.getElementById('powerSlider').value, label: document.getElementById('powerValue').textContent })`);
+        expect(w.slider === '30' && /30/.test(w.label), `POWER key did not reach the Classic slider: ${JSON.stringify(w)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('flexui: Buttons keys follow the Classic buttons and press them', async () => {
+    const page = await openFlex();
+    try {
+        expect(await flexWhere(page, 'buttons') === 'docked', 'Buttons panel is not docked');
+        const k = await page.eval(`(() => {
+            const sec = document.getElementById('buttonsSection');
+            const strip = document.querySelector('.iwc-flex-toolbar-row');
+            return {
+                labels: [...sec.querySelectorAll(':scope > .toggle-dd__btn .toggle-dd__label')].map(l => l.textContent),
+                leftInStrip: ['atuBtn', 'atuTuneBtn', 'voxBtn', 'voiceBtn', 'dxSpotsOpenBtn'].filter(id => strip?.contains(document.getElementById(id))),
+                classicHidden: !!document.getElementById('atuBtn')?.closest('.iwc-flex-buttons-classic[hidden]'),
+            };
+        })()`);
+        const want = ['ATU', 'Tune', 'FM Rep', 'VOX', 'CW', 'CW Read', 'CW Send', 'RTTY', 'DX Spots', 'DX Watch', 'Voice'];
+        expect(JSON.stringify(k.labels) === JSON.stringify(want), `keys: ${JSON.stringify(k.labels)}`);
+        expect(!k.leftInStrip.length && k.classicHidden, `Classic buttons not parked: ${JSON.stringify(k)}`);
+        // Radio -> LEDs. ATU, Tune and VOX are never pressed here: no TX.
+        const leds = () => page.eval(`({ atu: document.querySelector('#atuBtnKey .toggle-dd__led').classList.contains('is-on'),
+                                         vox: document.querySelector('#voxBtnKey .toggle-dd__led').classList.contains('is-on') })`);
+        await page.state('AtuEnabled', true); await page.state('VoxOn', true); await sleep(300);
+        let l = await leds();
+        expect(l.atu && l.vox, `LEDs did not follow on: ${JSON.stringify(l)}`);
+        await page.state('AtuEnabled', false); await page.state('VoxOn', false); await sleep(300);
+        l = await leds();
+        expect(!l.atu && !l.vox, `LEDs did not follow off: ${JSON.stringify(l)}`);
+        // A key presses its Classic button: FM Rep opens the FM dialog.
+        const open = await page.eval(`(() => {
+            const key = [...document.querySelectorAll('#buttonsSection .toggle-dd__btn')].find(b => b.textContent.trim() === 'FM Rep');
+            key.click();
+            const d = document.getElementById('fmDialog'); const o = d.open; d.close(); return o;
+        })()`);
+        expect(open, 'FM Rep key did not open the FM dialog');
+        const bad = (await page.writes()).filter(w => FORBIDDEN.test(w.path));
+        expect(!bad.length, `transmit writes: ${JSON.stringify(bad)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('flexui: toolbar is a strip above the dock, and VFO Actions is a panel', async () => {
+    const page = await openFlex();
+    try {
+        const t = await page.eval(`(() => {
+            const strip = document.querySelector('.iwc-flex-toolbar-row');
+            const host = document.getElementById('ywcFlexHost');
+            const inStrip = ids => ids.filter(id => !strip?.contains(document.getElementById(id)));
+            const actions = document.querySelector('#ywcFlexHost [data-ywc-component="vfoActions"]');
+            const vb = document.getElementById('vfoBToggleBtn');
+            return {
+                strip: !!strip,
+                inDock: !!strip?.closest('#ywcFlexHost'),
+                above: !!strip && strip.getBoundingClientRect().bottom <= host.getBoundingClientRect().top + 1,
+                visible: !!strip && strip.getBoundingClientRect().height > 10,
+                missing: inStrip(['utcClock', 'memBtn', 'sMeterHistoryToggleBtn', 'flexPanelsBtn', 'flexLayoutsBtn', 'flexLayoutScale', 'flexResetLayoutBtn', 'connectBtn', 'radioPowerBtn']),
+                dockBeforeConnect: !!document.querySelector('.iwc-flex-toolbar-row .iwc-flex-toolbar + #connectBtn'),
+                headerEmpty: !document.querySelector('.iwc-flex-nav .iwc-flex-toolbar'),
+                notInActions: ['swapVfoBtn', 'copyBtoABtn', 'copyAtoBBtn', 'splitBtn', 'quickSplitBtn'].filter(id => !actions?.contains(document.getElementById(id))),
+                vfoBHidden: !vb || getComputedStyle(vb).display === 'none',
+            };
+        })()`);
+        expect(t.strip && !t.inDock, `toolbar strip: ${JSON.stringify(t)}`);
+        expect(t.above && t.visible, `the strip is not shown above the dock: ${JSON.stringify(t)}`);
+        expect(!t.missing.length, `not in the strip: ${t.missing.join(', ')}`);
+        expect(t.dockBeforeConnect && t.headerEmpty, `dock controls not moved in front of Connect: ${JSON.stringify(t)}`);
+        expect(!t.notInActions.length, `not in VFO Actions: ${t.notInActions.join(', ')}`);
+        expect(t.vfoBHidden, 'the VFO-B show/hide key is still showing (the tab does that here)');
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
     } finally { await page.close(); }
 });
 

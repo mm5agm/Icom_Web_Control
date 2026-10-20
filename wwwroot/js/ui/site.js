@@ -406,6 +406,7 @@ function updateMeterDomLabel(property, result) {
             if (rawEl) rawEl.textContent = 'Raw Power Out: ' + Math.round(dv.rawAvg);
             const canvas = document.getElementById('powerMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('powerLinearValue', formatted + ' W');
             break;
         }
         case 'SWRMeter': {
@@ -414,6 +415,7 @@ function updateMeterDomLabel(property, result) {
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('swrMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('swrLinearValue', formatted);
             break;
         }
         case 'CompressionMeter': {
@@ -422,6 +424,7 @@ function updateMeterDomLabel(property, result) {
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('compressionMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('compressionLinearValue', formatted + ' dB');
             break;
         }
         case 'ALCMeter': {
@@ -442,6 +445,7 @@ function updateMeterDomLabel(property, result) {
             if (meterEl) meterEl.textContent = String(pct);
             const alcCanvas = document.getElementById('alcMeterCanvas');
             if (alcCanvas) alcCanvas.dataset.reading = String(pct);
+            setLinearMeterChip('alcLinearValue', window.MeterFormatters.percent(pct));
             break;
         }
         case 'IDDMeter': {
@@ -450,6 +454,7 @@ function updateMeterDomLabel(property, result) {
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('iddMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('iddLinearValue', formatted + ' A');
             break;
         }
         case 'VDDMeter': {
@@ -458,9 +463,18 @@ function updateMeterDomLabel(property, result) {
             if (el) el.textContent = formatted;
             const canvas = document.getElementById('vddMeterCanvas');
             if (canvas) canvas.dataset.reading = formatted;
+            setLinearMeterChip('vddLinearValue', formatted + ' V');
             break;
         }
     }
+}
+
+// The value chip beside a bar meter (Experimental UI only; absent on Classic).
+// The overlay formatters carry no unit, because a radial has it on its face;
+// a bar does not, so its chip does.
+function setLinearMeterChip(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
 }
 
 // Outer power setter (stub - real version is inside the IIFE)
@@ -1287,6 +1301,7 @@ connection.on("RadioStateUpdate", function (update) {
     if (update.property === "ActiveVfo") {
         activeVfo = update.value;
         applyVfoActiveStyling();
+        window.refreshVfoSBars?.();
         // Pseudo-dual receiver (Phase 5): let the spectrum panels move their
         // "Listening" badge / Listen button to the VFO that now has the audio.
         if (typeof window.onActiveVfoChanged === 'function') window.onActiveVfoChanged(activeVfo);
@@ -3069,11 +3084,41 @@ window.setApf = setApf;
         // when gaugeTitleShow is true (set in gauge.js).
         const sLabel = document.getElementById(labelId);
         if (sLabel) sLabel.textContent = sUnit;
+        updateVfoSBars(receiver, gaugePos, sUnit);
+    }
+
+    // /flexui's bar S-meter in each VFO card (no canvases on Classic, so
+    // this is a no-op there). A single receiver has one reading, and it
+    // belongs to whichever VFO is receiving: that bar moves, the other
+    // reads S0 and is greyed (.linear-smeter-inactive).
+    let lastSBar = { receiver: 'A', gaugePos: 0, sUnit: 'S0' };
+    function updateVfoSBars(receiver, gaugePos, sUnit) {
+        if (!window.meterPanel?.getGauge('smeterBarA')) return;
+        const single = document.getElementById('vfoRow')?.dataset.singleReceiver === 'true';
+        // The status poll reports a B reading too; one receiver has none.
+        if (single && receiver === 'B') return;
+        lastSBar = { receiver, gaugePos, sUnit };
+        const target = single ? (activeVfo === 1 ? 'B' : 'A') : receiver;
+        for (const v of ['A', 'B']) {
+            const live = v === target;
+            if (single || live) {
+                window.meterPanel.update(`smeterBar${v}`, live ? gaugePos : 0);
+                const chip = document.getElementById(`sMeterLinearValue${v}`);
+                if (chip) chip.textContent = live ? sUnit : 'S0';
+            }
+            if (single) {
+                document.getElementById(`sMeterLinearRow${v}`)
+                    ?.classList.toggle('linear-smeter-inactive', !live);
+            }
+        }
     }
     // Exposed so the outer SignalR RadioStateUpdate handler (different scope)
     // can drive the needle at the backend poll rate instead of waiting for the
     // 500 ms status poll — see the "SMeterA"/"SMeterB" cases there.
     window.updateSMeter = updateSMeter;
+    // A/B on the radio moves the reading to the other bar straight away,
+    // not on the next S-meter change (an unchanged reading is not resent).
+    window.refreshVfoSBars = () => updateVfoSBars(lastSBar.receiver, lastSBar.gaugePos, lastSBar.sUnit);
 
     // Update MIC bar meter (0-255 raw value)
     function updateMICMeter(value) {
