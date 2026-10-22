@@ -6,6 +6,8 @@
 // dial sits in the middle. Without pseudo-dual the server tags every frame
 // 'A' and the sweep follows the selected VFO, so frames go to that VFO's
 // pane. The span picker sets the radio's scope span - the one write here.
+// With X-WATCH off and the VFOs on different bands the watch pane is hidden,
+// as on the board (collapseWatch there).
 
 import { mountSpectrumPopout } from '/js/radio-panel/spectrum-popout.js';
 import { alignBins, spanText } from '/js/radio-panel/panel-math.js';
@@ -18,6 +20,7 @@ const STATUS_TEXT = {
     disconnected: 'Radio not connected', blocked: 'The radio is not sending scope data',
     outofrange: 'This VFO is outside the scope span',
 };
+const XWATCH_OFF_TEXT = 'Cross-band watch is off: X-WATCH switches it on';
 
 const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
@@ -49,7 +52,12 @@ export function startIcomSpectrumPopout(root, cfg) {
         fontBase: '/lib/fonts',
     });
 
-    const r = { sel: 'A', freq: { A: 0, B: 0 }, mode: { A: '', B: '' }, widthHz: { A: null, B: null } };
+    const r = {
+        sel: 'A', freq: { A: 0, B: 0 }, mode: { A: '', B: '' }, widthHz: { A: null, B: null },
+        band: { A: '', B: '' },
+        xwatch: true,          // until the hub says (it does on connect)
+        forcedView: null,      // { was, now }: the tab collapseWatch chose, and the one it replaced
+    };
     const paneFor = id => (pseudoDual ? id : r.sel);
     const refreshPassband = vfo => pop.pane(vfo).setPassband(r.mode[vfo], r.widthHz[vfo]);
 
@@ -59,6 +67,32 @@ export function startIcomSpectrumPopout(root, cfg) {
         pop.pane(other).clear();
         pop.pane(other).setStatus('The scope follows the selected VFO (pseudo-dual is off in Settings)');
     }
+
+    // Cross-band watch off with the VFOs on different bands: the watch pane
+    // could only say it was out of range, so only the VFO you hear shows,
+    // and your own tab comes back when the bands meet or X-WATCH comes on.
+    const watchVfo = () => (r.sel === 'A' ? 'B' : 'A');
+    const watchCollapsed = () => pseudoDual && !r.xwatch && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
+    function collapseWatch() {
+        if (!pseudoDual) return;
+        const view = pop.view;
+        if (watchCollapsed()) {
+            if (!r.forcedView) {
+                if (view !== r.sel) { r.forcedView = { was: view, now: r.sel }; pop.setView(r.sel); }
+            } else if (view === r.forcedView.now && view !== r.sel) {
+                // Listening moved to the other VFO: follow it.
+                r.forcedView.now = r.sel;
+                pop.setView(r.sel);
+            }
+            pop.pane(watchVfo()).clear();
+            pop.pane(watchVfo()).setStatus(XWATCH_OFF_TEXT);
+        } else if (r.forcedView) {
+            // Unless the operator has picked a tab since.
+            if (view === r.forcedView.now) pop.setView(r.forcedView.was);
+            r.forcedView = null;
+        }
+    }
+    const statusText = (vfo, text) => (watchCollapsed() && vfo === watchVfo() ? XWATCH_OFF_TEXT : text);
 
     const spots = new Map();       // callsign -> { call, hz, at }
     function addSpot(sp) {
@@ -81,21 +115,23 @@ export function startIcomSpectrumPopout(root, cfg) {
         ['Frequency' + vfo]: v => { r.freq[vfo] = num(v); pop.pane(vfo).setFrequency(r.freq[vfo]); },
         ['Mode' + vfo]: v => { r.mode[vfo] = String(v ?? ''); refreshPassband(vfo); },
         ['IfWidth' + vfo]: v => { r.widthHz[vfo] = v === '' || v == null ? null : num(v); refreshPassband(vfo); },
-        ['Band' + vfo]: () => pop.pane(vfo).clear(),
+        ['Band' + vfo]: v => { r.band[vfo] = String(v ?? ''); pop.pane(vfo).clear(); collapseWatch(); },
     });
     const handlers = {
         ...perVfo('A'),
         ...perVfo('B'),
-        ActiveVfo: v => { r.sel = num(v) === 1 ? 'B' : 'A'; showIdlePane(); },
+        ActiveVfo: v => { r.sel = num(v) === 1 ? 'B' : 'A'; showIdlePane(); collapseWatch(); },
+        CrossBandWatch: v => { r.xwatch = !!v?.enabled; collapseWatch(); },
         SdrStatus: v => {
             const id = v?.sdrId;
             if (id !== 'A' && id !== 'B') return;
             const st = String(v.status ?? '');
-            pop.pane(paneFor(id)).setStatus(st in STATUS_TEXT ? STATUS_TEXT[st] : st);
+            const vfo = paneFor(id);
+            pop.pane(vfo).setStatus(statusText(vfo, st in STATUS_TEXT ? STATUS_TEXT[st] : st));
         },
         SdrError: v => {
             const id = v?.sdrId;
-            if ((id === 'A' || id === 'B') && v.detail) pop.pane(paneFor(id)).setStatus(String(v.detail));
+            if ((id === 'A' || id === 'B') && v.detail) pop.pane(paneFor(id)).setStatus(statusText(paneFor(id), String(v.detail)));
         },
         SpectrumUpdate: v => {
             const id = v?.sdrId;

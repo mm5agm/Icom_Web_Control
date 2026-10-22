@@ -973,6 +973,31 @@ test('/RadioSpectrum: span picker sets the radio scope span (half-width)', async
     } finally { await page.close(); }
 });
 
+test('/RadioSpectrum: with X-WATCH off and the VFOs on different bands, only the heard VFO shows', async note => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        const shown = () => page.eval(`[...document.querySelectorAll('.rp-spop-body [data-pane]')].filter(h => h.style.display !== 'none').map(h => h.dataset.pane).join()`);
+        await page.eval(`[...document.querySelectorAll('.rp-spop-tab')].find(t => /both/i.test(t.textContent))?.click()`);
+        if (await shown() !== 'A,B') { note(`no Both view (${await shown()}): pseudo-dual is off in Settings`); return; }
+        await page.state('ActiveVfo', 0);
+        await page.state('CrossBandWatch', { enabled: true, intervalSeconds: 15 });
+        await page.state('BandA', '20m');
+        await page.state('BandB', '6m');
+        expect(await shown() === 'A,B', `X-WATCH on: panes ${await shown()}, want A,B`);
+        await page.state('CrossBandWatch', { enabled: false, intervalSeconds: 15 });
+        expect(await shown() === 'A', `X-WATCH off, two bands: panes ${await shown()}, want A`);
+        await page.state('ActiveVfo', 1);
+        expect(await shown() === 'B', `listening on B: panes ${await shown()}, want B`);
+        await page.state('CrossBandWatch', { enabled: true, intervalSeconds: 15 });
+        expect(await shown() === 'A,B', `X-WATCH back on: panes ${await shown()}, want A,B`);
+        await page.state('CrossBandWatch', { enabled: false, intervalSeconds: 15 });
+        await page.state('BandB', '20m');
+        expect(await shown() === 'A,B', `one band: panes ${await shown()}, want A,B`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
 // ---------------------------------------------------------------- Experimental UI (/flexui)
 
 // /flexui is Index moved into the shared dock (core/js/flex). These check the
