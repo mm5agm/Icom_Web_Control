@@ -2334,7 +2334,8 @@ export class SpectrumPanel {
             connecting:   'Waiting for the radio’s band scope…',
             disconnected: 'Radio unavailable — retrying every 5 s',
             unconfigured: 'Band scope is off — switch it on above the panel',
-            outofrange:   'Watch VFO is off-screen — widen the scope span, or turn on cross-band peek in Settings',
+            // With X-Watch on (Index wireCrossBandWatch), the next peek fills it.
+            outofrange:   window.__iwcWatchOn?.() ? 'Waiting for data' : 'Watch VFO is off-screen — widen the scope span, or switch X-Watch on',
             blocked:      'The radio refused to send scope data',
         };
 

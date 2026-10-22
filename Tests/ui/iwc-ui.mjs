@@ -683,6 +683,24 @@ test('/radio: the watch VFO shows its trace without the waterfall', async note =
     } finally { await page.close(); }
 });
 
+test('/radio: out of range with X-WATCH on says Waiting for data', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        const msg = () => page.eval(`document.querySelector('.rp-specpane-B .rp-spec-empty')?.textContent ?? 'none'`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('BandB', '20m');
+        await page.state('SdrStatus', { sdrId: 'B', status: 'outofrange' });
+        await page.state('CrossBandWatch', XW_ON);
+        expect(await msg() === 'Waiting for data', `X-WATCH on after the status: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(/outside the scope span/.test(await msg()), `X-WATCH off: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_ON);
+    } finally { await page.close(); }
+});
+
 test('Index: X-Watch switches cross-band watch, lists intervals, sits beside Listening', async note => {
     const page = await open('/', { settleMs: 2000 });
     try {
@@ -1063,6 +1081,25 @@ test('/RadioSpectrum: the watch pane shows its trace without the waterfall', asy
         await page.state('BandB', '20m');
         expect(await bare() === 'A', `one band: no waterfall on "${await bare()}", want A`);
         expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: out of range with X-WATCH on says Waiting for data', async note => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        await page.eval(`[...document.querySelectorAll('.rp-spop-tab')].find(t => /both/i.test(t.textContent))?.click()`);
+        const shown = await page.eval(`[...document.querySelectorAll('.rp-spop-body [data-pane]')].filter(h => h.style.display !== 'none').map(h => h.dataset.pane).join()`);
+        if (shown !== 'A,B') { note(`no Both view (${shown}): pseudo-dual is off in Settings`); return; }
+        const msg = () => page.eval(`document.querySelector('.rp-spop-body [data-pane="B"] .rp-spec-empty')?.textContent ?? 'none'`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('BandB', '20m');
+        await page.state('CrossBandWatch', XW_OFF);
+        await page.state('SdrStatus', { sdrId: 'B', status: 'outofrange' });
+        expect(/outside the scope span/.test(await msg()), `X-WATCH off: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_ON);
+        expect(await msg() === 'Waiting for data', `X-WATCH on: B says "${await msg()}"`);
     } finally { await page.close(); }
 });
 

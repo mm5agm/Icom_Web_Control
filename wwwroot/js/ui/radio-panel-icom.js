@@ -775,6 +775,7 @@ export function startIcomRadioPanel(root, cfg) {
         disconnected: 'Radio not connected', blocked: 'The radio is not sending scope data',
         outofrange: 'This VFO is outside the scope span',
     };
+    const WAITING_TEXT = 'Waiting for data';
     function refreshScopeLamp() {
         const sts = Object.values(scopeState);
         panel.setLamp('sdr', sts.includes('streaming') ? 'on' : sts.includes('connecting') ? 'warn'
@@ -825,7 +826,10 @@ export function startIcomRadioPanel(root, cfg) {
         const pane = paneFor(id);
         scopeState[pseudoDual ? id : 'A'] = st;
         refreshScopeLamp();
-        const text = watchCollapsed() && pane === watchVfo() ? XWATCH_OFF_TEXT : detail || (st in SCOPE_MSG ? SCOPE_MSG[st] : st);
+        // Out of the sweep with X-WATCH on, the next peek fills it.
+        const text = watchCollapsed() && pane === watchVfo() ? XWATCH_OFF_TEXT
+            : st === 'outofrange' && r.xwatch ? WAITING_TEXT
+            : detail || (st in SCOPE_MSG ? SCOPE_MSG[st] : st);
         panel.setSpectrumSource({ label: 'SCOPE', status: text }, pane);
     }
 
@@ -853,6 +857,9 @@ export function startIcomRadioPanel(root, cfg) {
             r.xwatchSec = num(v?.intervalSeconds) || r.xwatchSec;
             panel.setKey('xwatch', { on: r.xwatch, sub: r.xwatch ? r.xwatchSec + ' s' : 'OFF' });
             collapseWatch();
+            // Out of range says Waiting for data or not by X-WATCH, which can
+            // arrive after it.
+            for (const id of ['A', 'B']) if (scopeState[id] === 'outofrange') scopeStatus(id, 'outofrange');
         },
         IsConnected: v => { r.catOn = on(v); panel.setLamp('cat', r.catOn ? 'on' : 'bad'); if (r.catOn) readPbt(); },
         FrequencyA: v => { if (wheelHolds('A')) return; r.freq.A = num(v); panel.setFrequency('A', r.freq.A); checkBand('A'); refreshSeg('A'); },
