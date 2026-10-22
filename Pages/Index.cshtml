@@ -2673,9 +2673,9 @@
                     showA = heard === 'A';
                     showB = heard === 'B';
                 }
-                // Cross-band watch on with the VFOs on different bands: the watch
-                // panel is refreshed only by the peeks, one waterfall row each,
-                // so it shows its trace alone.
+                // The watch panel (the VFO you are not hearing) is refreshed only
+                // by the peeks, on one band or two, one waterfall row each, so it
+                // shows its trace alone.
                 const peeked = window.__iwcWatchPeeks?.() ? (heard === 'A' ? 'B' : 'A') : null;
                 spectrumPanelA.setWaterfallHidden(peeked === 'A');
                 spectrumPanelB.setWaterfallHidden(peeked === 'B');
@@ -3272,7 +3272,7 @@
                 }).catch(() => {});
                 const crossBand = () => !!band.A && !!band.B && band.A !== band.B;
                 window.__iwcWatchCollapse = () => !on && crossBand();
-                window.__iwcWatchPeeks = () => on && crossBand();
+                window.__iwcWatchPeeks = () => true;
                 function refresh() {
                     btn.classList.toggle('active', on);
                     btn.setAttribute('aria-pressed', String(on));

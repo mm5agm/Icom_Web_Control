@@ -74,9 +74,9 @@ export function startIcomSpectrumPopout(root, cfg) {
     const watchVfo = () => (r.sel === 'A' ? 'B' : 'A');
     const crossBand = () => pseudoDual && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
     const watchCollapsed = () => crossBand() && !r.xwatch;
-    // With it on, the watch pane is refreshed only by the peeks, one waterfall
-    // row each, so it shows its trace without the waterfall.
-    const watchPeeked = () => (crossBand() && r.xwatch ? watchVfo() : null);
+    // The VFO you are not hearing is refreshed only by the peeks, on one band
+    // or two, one waterfall row each: its pane shows the trace alone.
+    const watchPeeked = () => (pseudoDual ? watchVfo() : null);
     function collapseWatch() {
         if (!pseudoDual) return;
         for (const v of ['A', 'B']) pop.pane(v).setWaterfall(v !== watchPeeked());
