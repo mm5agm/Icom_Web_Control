@@ -559,7 +559,7 @@ export function mountRadioPanel(root, opts = {}) {
         const spotsEl = h('div');
         const marksEl = h('div');
         const label = h('div', 'rp-spec-label', '');
-        const empty = h('div', 'rp-spec-empty', 'No SDR');
+        const empty = h('div', 'rp-spec-empty', 'Waiting for data');
         const oob = h('div', 'rp-spec-oob', 'OUT OF BAND');
         spec.append(pb, marksEl, h('div', 'rp-cursor'), spotsEl, label, oob, empty);
         const axis = h('div', 'rp-axis');
