@@ -25,6 +25,7 @@ import { BAND_PLANS, BAND_EDGES, nearestBandForHz, loadBandPlanFromServer, autoM
 import { calibrateNumeric, loadFromBackend } from '/js/calibration/calibration-engine.js';
 import { ICOM_WINDOWS, startIcomWindows } from '/js/ui/radio-panel-icom-windows.js';
 import { PopoutHost } from '/js/popout/popout.js';
+import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
 
 const BANDS = ['160m', '80m', '60m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m', '4m'];
 // The IC-7300's modes as IWC shows them (CW-L is CW-R, RTTY-U is RTTY-R,
@@ -911,6 +912,13 @@ export function startIcomRadioPanel(root, cfg) {
     conn.onclose(() => panel.setLamp('cat', 'bad'));
     panel.setLamp('cat', 'warn');
     conn.start().catch(() => panel.setLamp('cat', 'bad'));
+    // The scope tab chosen (VFO-A, VFO-B or Both), while the spectrum is the
+    // view on screen and has not gone to its own window, which reports its own.
+    reportSpectrumPanes(conn, () => {
+        const on = !specAway && panel.screenView() === 'sdr';
+        const v = panel.spectrumView();
+        return { A: on && (v === 'A' || v === 'both'), B: on && (v === 'B' || v === 'both') };
+    });
 
     return panel;
 

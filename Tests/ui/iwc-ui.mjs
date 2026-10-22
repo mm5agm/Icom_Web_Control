@@ -592,6 +592,30 @@ test('/radio: scope frames light the lamp and are drawn', async () => {
     } finally { await page.close(); }
 });
 
+// The cross-band peek only runs while some page reports the watch pane on
+// screen; the board must report its spectrum tab, not only Classic.
+test('/radio: the spectrum tabs tell the hub which panes are on screen', async () => {
+    const page = await radioPage();
+    try {
+        await page.eval(`(() => {
+            const conn = __rwcTest.handlers.find(h => h.name === 'radiostateupdate').conn;
+            const invoke = conn.invoke;
+            window.__panes = [];
+            conn.invoke = function (name, ...args) {
+                if (name === 'SpectrumPanels') window.__panes.push(args.join(','));
+                return invoke.call(this, name, ...args);
+            };
+        })()`);
+        const last = () => page.eval(`window.__panes[window.__panes.length - 1] ?? ''`);
+        for (const [tab, want] of [['VFO-B', 'false,true'], ['Both', 'true,true'], ['VFO-A', 'true,false']]) {
+            await clickButton(page, '.rp-viewtabs', tab);
+            await sleep(1500);
+            const got = await last();
+            expect(got === want, `${tab} tab reported SpectrumPanels(${got}), want (${want})`);
+        }
+    } finally { await page.close(); }
+});
+
 test('/radio: M.STORE saves the selected VFO to IWC memories', async () => {
     const page = await radioPage();
     try {
