@@ -29,6 +29,7 @@ ${bc(500)}${bc(600)}${bc(700)}
 html,body{margin:0;background:${v('page')}}
 .rp-page{min-height:100vh;box-sizing:border-box;background:${v('page')};font-family:${SANS};color:${v('text')};overflow:hidden}
 .rp-scale{width:1600px;transform-origin:0 0;padding:20px;box-sizing:border-box}
+.rp-board-grip{position:absolute;right:0;bottom:0;width:26px;height:26px;cursor:nwse-resize;touch-action:none;z-index:50;background:linear-gradient(135deg,transparent 52%,${v('legend-dim')} 52% 58%,transparent 58% 68%,${v('legend-dim')} 68% 74%,transparent 74% 84%,${v('legend-dim')} 84% 90%,transparent 90%)}
 .rp-panel{box-sizing:border-box;padding:22px 26px 24px;border-radius:18px;background:${v('panel')};border:1px solid ${v('panel-border')};box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 18px 40px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:18px}
 .rp-panel *{box-sizing:border-box}
 .rp-panel button{font-family:${SANS}}

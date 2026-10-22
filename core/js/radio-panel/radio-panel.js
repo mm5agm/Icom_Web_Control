@@ -24,6 +24,7 @@ import { mountPanelWindows } from './panel-windows.js';
 
 const DESIGN_WIDTH = 1600;
 const SIZES = ['fit', '50', '67', '75', '90', '100', '110', '125', '150'];
+const MIN_SIZE = 30, MAX_SIZE = 200;   // percent, for the corner grip
 const METERS = ['PO', 'SWR', 'ALC', 'COMP', 'IDD'];
 
 const store = {
@@ -1229,6 +1230,7 @@ export function mountRadioPanel(root, opts = {}) {
         sizer.style.height = Math.floor(natH * scale) + 'px';
         sizer.style.margin = '0 auto';
         sizer.style.overflow = 'hidden';
+        sizer.style.position = 'relative';
         root.style.overflow = z === 'fit' ? 'hidden' : 'auto';
         root.style.height = '100vh';
     }
@@ -1254,8 +1256,49 @@ export function mountRadioPanel(root, opts = {}) {
             if (st.theme?.id === SYSTEM_THEME) { setTheme(SYSTEM_THEME); drawMeterFace(); }
         });
     } catch { /* no matchMedia: nothing to follow */ }
-    sizeSel.value = SIZES.includes(store.get(prefix + 'size', 'fit')) ? store.get(prefix + 'size', 'fit') : 'fit';
-    sizeSel.addEventListener('change', () => { store.set(prefix + 'size', sizeSel.value); rescale(); });
+    // A size from the corner grip is a percentage the list does not have: it
+    // gets an entry of its own, one at a time.
+    function setSize(z) {
+        if (![...sizeSel.options].some(o => o.value === z)) {
+            sizeSel.querySelector('option.custom')?.remove();
+            sizeSel.append(Object.assign(h('option', 'custom', z + '%'), { value: z }));
+        }
+        sizeSel.value = z;
+        store.set(prefix + 'size', z);
+        rescale();
+    }
+    const savedSize = store.get(prefix + 'size', 'fit');
+    const sizeOk = z => SIZES.includes(z) || (/^\d+$/.test(z) && +z >= MIN_SIZE && +z <= MAX_SIZE);
+    setSize(sizeOk(savedSize) ? savedSize : 'fit');
+    sizeSel.addEventListener('change', () => setSize(sizeSel.value));
+
+    // The corner grip scales the board by dragging. It keeps its shape, so the
+    // way the pointer has gone further, across or up and down, sets the size.
+    const grip = h('div', 'rp-board-grip');
+    grip.title = 'Drag to resize the panel';
+    sizer.append(grip);
+    grip.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        grip.setPointerCapture?.(e.pointerId);
+        const natH = scaler.offsetHeight;
+        const k0 = sizer.getBoundingClientRect().width / DESIGN_WIDTH;
+        const move = m => {
+            const rc = sizer.getBoundingClientRect(), page = root.getBoundingClientRect();
+            // Centred while it fits, the right edge moves half as far as the width.
+            const w = rc.width < page.width ? 2 * (m.clientX - (page.left + page.width / 2)) : m.clientX - rc.left;
+            const kw = w / DESIGN_WIDTH, kh = (m.clientY - rc.top) / natH;
+            const k = Math.abs(kw - k0) > Math.abs(kh - k0) ? kw : kh;
+            setSize(String(Math.round(Math.min(MAX_SIZE, Math.max(MIN_SIZE, 100 * k)))));
+        };
+        const up = () => {
+            grip.removeEventListener('pointermove', move);
+            grip.removeEventListener('pointerup', up);
+            grip.removeEventListener('pointercancel', up);
+        };
+        grip.addEventListener('pointermove', move);
+        grip.addEventListener('pointerup', up);
+        grip.addEventListener('pointercancel', up);
+    });
     window.addEventListener('resize', rescale);
 
     // The TX warning is fixed across the top of the browser window, outside the

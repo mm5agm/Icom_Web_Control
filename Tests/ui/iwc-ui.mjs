@@ -750,6 +750,31 @@ test('/radio: the main dial says which VFO it tunes, in the colour of that VFO',
     } finally { await page.close(); }
 });
 
+test('/radio: the corner grip scales the board and keeps the size', async () => {
+    const page = await radioPage();
+    try {
+        const got = await page.eval(`(() => {
+            const g = document.querySelector('.rp-board-grip'), sizer = document.querySelector('.rp-sizer');
+            if (!g) return 'no grip';
+            const sel = [...document.querySelectorAll('select.rp-select')].find(s => s.title === 'Size');
+            const before = sizer.getBoundingClientRect();
+            const ev = (type, x, y) => g.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, clientX: x, clientY: y }));
+            ev('pointerdown', before.right - 5, before.bottom - 5);
+            ev('pointermove', before.right - 5, before.top + before.height * 0.6);
+            ev('pointerup', 0, 0);
+            const after = sizer.getBoundingClientRect();
+            const size = sel.value, opt = sel.selectedOptions[0]?.textContent;
+            return JSON.stringify({ shrank: after.height < before.height * 0.8, ratio: Math.abs(after.width / after.height - before.width / before.height) < 0.02,
+                size, opt, saved: localStorage.getItem('iwc.radioPanel.size') });
+        })()`);
+        const r = JSON.parse(got.startsWith('{') ? got : '{}');
+        expect(got.startsWith('{'), got);
+        expect(r.shrank && r.ratio, `the board did not shrink in shape: ${got}`);
+        expect(/^\d+$/.test(r.size) && r.opt === r.size + '%' && r.saved === r.size, `the size picker and store say ${got}`);
+        await page.eval(`localStorage.setItem('iwc.radioPanel.size', 'fit')`);
+    } finally { await page.close(); }
+});
+
 test('/radio: M.STORE saves the selected VFO to IWC memories', async () => {
     const page = await radioPage();
     try {
