@@ -1149,6 +1149,58 @@ test('/RadioSpectrum: the corner grip resizes the window', async () => {
     } finally { await page.close(); }
 });
 
+test('/RadioSpectrum: SCOPE opens Range and the rest, saved for the board', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const got = await page.eval(`(() => {
+            const pane = document.querySelector('.rp-spop-body [data-pane="A"] .rp-pane');
+            const key = pane && [...pane.querySelectorAll('.rp-spop-key')].find(b => b.textContent === 'SCOPE');
+            if (!key) return 'no SCOPE key';
+            const sets = pane.querySelector('.rp-spec-settings');
+            if (getComputedStyle(sets).display !== 'none') return 'panel open before the click';
+            key.click();
+            if (getComputedStyle(sets).display === 'none' || !key.classList.contains('on')) return 'panel did not open';
+            const r = sets.querySelector('input[data-set=range]');
+            r.value = '42'; r.dispatchEvent(new Event('input'));
+            const saved = JSON.parse(localStorage.getItem('iwc.radioPanel.spectrum.A') ?? '{}');
+            if (saved.range !== 42) return 'saved ' + JSON.stringify(saved);
+            if (r.closest('.rp-spec-row').querySelector('.rp-spec-val').textContent !== '42 dB') return 'readout not 42 dB';
+            key.click();
+            return getComputedStyle(sets).display === 'none' ? 'ok' : 'panel did not close';
+        })()`);
+        expect(got === 'ok', got);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: pane text is screen colour on the screen, in every theme', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const bad = await page.eval(`(async () => {
+            const { THEMES, applyTheme } = await import('/js/radio-panel/radio-panel-themes.js');
+            const rgb = c => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+            const lum = c => { const [r, g, b] = rgb(c).map(x => x / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126 * r + .7152 * g + .0722 * b; };
+            const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+            const root = document.querySelector('.rp-spop');
+            const pane = root.querySelector('.rp-pane');
+            const out = [];
+            for (const id of Object.keys(THEMES)) {
+                if (id === 'night') continue; // dim on purpose
+                applyTheme(root, id);
+                const bg = getComputedStyle(pane).backgroundColor;
+                for (const sel of ['.rp-pane-label', '.rp-axis']) {
+                    const k = ratio(getComputedStyle(pane.querySelector(sel)).color, bg);
+                    if (k < 4.5) out.push(id + ' ' + sel + ' ' + k.toFixed(1));
+                }
+                const sets = pane.querySelector('.rp-spec-settings');
+                const k = ratio(getComputedStyle(sets).color, getComputedStyle(sets).backgroundColor);
+                if (k < 4.5) out.push(id + ' SCOPE panel ' + k.toFixed(1));
+            }
+            return out.join('; ');
+        })()`);
+        expect(!bad, bad);
+    } finally { await page.close(); }
+});
+
 // ---------------------------------------------------------------- Experimental UI (/flexui)
 
 // /flexui is Index moved into the shared dock (core/js/flex). These check the

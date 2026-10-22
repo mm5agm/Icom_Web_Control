@@ -15,7 +15,8 @@
 
 import { injectRadioPanelStyle } from './radio-panel-style.js';
 import { applyTheme, themeIds, resolveTheme, DEFAULT_THEME, SYSTEM_THEME } from './radio-panel-themes.js';
-import { SpectrumView, SPECTRUM_SPEEDS, cleanSpectrumSettings } from './spectrum-view.js';
+import { SpectrumView } from './spectrum-view.js';
+import { spectrumSettingsPanel, tidySpectrumSettings } from './spectrum-settings.js';
 import {
     formatFrequency, sMeterFraction, sMeterText, meterGeometry, LOWER_SCALES,
     passbandPercent, axisLabels, spanText, widthText, knobAngle,
@@ -697,47 +698,16 @@ export function mountRadioPanel(root, opts = {}) {
         const key = prefix + 'spectrum.' + id;
         let saved = {};
         try { saved = JSON.parse(store.get(key, '{}')) ?? {}; } catch { /* keep defaults */ }
-        let cur = { ...cleanSpectrumSettings(saved), passband: saved.passband !== false };
-        const el = h('div', 'rp-spec-settings');
-        for (const ev of ['pointerdown', 'click', 'wheel']) el.addEventListener(ev, e => e.stopPropagation());
-        const rows = {};
-        const slider = (name, label, min, max, toVal, fromVal, text, title) => {
-            const row = h('label', 'rp-spec-row');
-            row.title = title;
-            const inp = h('input');
-            inp.type = 'range'; inp.min = String(min); inp.max = String(max); inp.step = '1';
-            inp.dataset.set = name;
-            const out = h('span', 'rp-spec-val');
-            inp.addEventListener('input', () => change({ [name]: toVal(Number(inp.value)) }));
-            row.append(h('span', null, label), inp, out);
-            el.append(row);
-            rows[name] = () => { inp.value = String(fromVal(cur[name])); out.textContent = text(cur[name]); };
-        };
-        const same = x => x;
-        slider('range', 'Range', 5, 160, same, same, x => x + ' dB', 'dB from the bottom of the trace to the top');
-        slider('speed', 'Speed', 0, SPECTRUM_SPEEDS.length - 1, i => SPECTRUM_SPEEDS[i], x => SPECTRUM_SPEEDS.indexOf(x),
-            x => x === 1 ? 'Full' : '1/' + x, 'How fast the waterfall scrolls');
-        slider('bright', 'Bright', 0, 60, same, same, x => x ? '+' + x + ' dB' : 'Off', 'Lifts weak signals in the waterfall only');
-        slider('smooth', 'Smooth', 0, 8, same, same, x => x ? String(x) : 'Off', 'Averages neighbouring bins across the trace');
-        const pbRow = h('label', 'rp-spec-row');
-        const pbBox = h('input');
-        pbBox.type = 'checkbox';
-        pbBox.dataset.set = 'passband';
-        pbBox.addEventListener('change', () => change({ passband: pbBox.checked }));
-        pbRow.append(h('span', null, 'Passband'), pbBox, h('span', 'rp-spec-val', ''));
-        el.append(pbRow);
-        rows.passband = () => { pbBox.checked = cur.passband; };
-        const reset = h('button', 'rp-wkey', 'DEFAULTS');
-        reset.type = 'button';
-        reset.addEventListener('click', () => change({ ...cleanSpectrumSettings({}), passband: true }));
-        el.append(reset);
+        let cur = tidySpectrumSettings(saved);
+        const panel = spectrumSettingsPanel(p => change(p));
+        const el = panel.el;
         function change(p) {
-            cur = { ...cleanSpectrumSettings({ ...cur, ...p }), passband: (p.passband ?? cur.passband) !== false };
+            cur = tidySpectrumSettings({ ...cur, ...p });
             store.set(key, JSON.stringify(cur));
             apply();
         }
         function apply() {
-            for (const f of Object.values(rows)) f();
+            panel.show(cur);
             const pn = panes[id];
             if (!pn) return;
             pn.view?.setSettings(cur);
@@ -745,12 +715,12 @@ export function mountRadioPanel(root, opts = {}) {
             pn.box.classList.toggle('held', cur.hold);
             drawOverlays(id);
         }
-        // The pop-out window's HOLD writes the same key.
+        // The pop-out window's HOLD and SCOPE panel write the same key.
         window.addEventListener('storage', e => {
             if (e.key !== key) return;
             let s = {};
             try { s = JSON.parse(e.newValue ?? '{}') ?? {}; } catch { return; }
-            cur = { ...cleanSpectrumSettings(s), passband: s.passband !== false };
+            cur = tidySpectrumSettings(s);
             apply();
         });
         return { el, change, apply, get: () => cur };

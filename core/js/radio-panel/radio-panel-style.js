@@ -230,7 +230,7 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-spec-tools .rp-wkey.on{background:${v('tx')};border-color:${v('tx')};color:${v('tx-fg')}}
 .rp-specpane{position:relative}
 .rp-specpane.held .rp-spectrum{outline:2px solid ${v('tx')};outline-offset:-2px}
-.rp-spec-settings{display:none;position:absolute;left:6px;bottom:42px;z-index:6;padding:10px 12px;gap:6px;flex-direction:column;border-radius:6px;background:${v('bar-bg')};border:1px solid ${v('well-border')};color:${v('soft-fg')};font:500 13px ${SANS};box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:default}
+.rp-spec-settings{display:none;position:absolute;left:6px;bottom:42px;z-index:6;padding:10px 12px;gap:6px;flex-direction:column;border-radius:6px;background:${v('soft-bg')};border:1px solid ${v('soft-border')};color:${v('soft-fg')};font:500 13px ${SANS};box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:default}
 .rp-spec-settings.open{display:flex}
 .rp-spec-row{display:grid;grid-template-columns:64px 150px 56px;align-items:center;gap:8px}
 .rp-spec-row input[type=range]{width:150px}
@@ -335,13 +335,13 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 
 .rp-spop{height:100vh;display:flex;flex-direction:column;position:relative}
 .rp-spop-grip{position:absolute;right:0;bottom:0;width:24px;height:24px;cursor:nwse-resize;touch-action:none;z-index:5;background:linear-gradient(135deg,transparent 52%,${v('legend-dim')} 52% 58%,transparent 58% 68%,${v('legend-dim')} 68% 74%,transparent 74% 84%,${v('legend-dim')} 84% 90%,transparent 90%)}
-.rp-spop-top{height:40px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px;background:${v('key-bg')};border-bottom:1px solid ${v('key-border')}}
-.rp-spop-title{font:700 16px ${SANS};letter-spacing:.1em;color:${v('title')};white-space:nowrap}
+.rp-spop-top{height:46px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px;background:${v('key-bg')};border-bottom:1px solid ${v('key-border')}}
+.rp-spop-title{font:700 18px ${SANS};letter-spacing:.1em;color:${v('key-fg')};white-space:nowrap}
 .rp-spop-tabs{display:flex;gap:2px;padding:2px;border-radius:5px;background:${v('bar-bg')};border:1px solid ${v('well-border')}}
-.rp-spop-tab{font:600 14px ${SANS};letter-spacing:.1em;text-transform:uppercase;color:${v('legend-dim')};background:none;border:0;border-radius:3px;padding:3px 12px;cursor:pointer}
+.rp-spop-tab{font:600 16px ${SANS};letter-spacing:.1em;text-transform:uppercase;color:${v('legend-dim')};background:none;border:0;border-radius:3px;padding:3px 12px;cursor:pointer}
 .rp-spop-tab.on{background:${v('bar-on')};color:${v('title')}}
 .rp-spop-gap{flex:1}
-.rp-spop-key{appearance:none;border:1px solid ${v('soft-border')};background:${v('soft-bg')};color:${v('soft-fg')};border-radius:5px;min-height:28px;padding:2px 10px;font:600 14px ${SANS};letter-spacing:.06em;cursor:pointer}
+.rp-spop-key{appearance:none;border:1px solid ${v('soft-border')};background:${v('soft-bg')};color:${v('soft-fg')};border-radius:5px;min-height:32px;padding:2px 12px;font:600 16px ${SANS};letter-spacing:.06em;cursor:pointer}
 .rp-spop-key.on{background:${v('soft-on-bg')};border-color:${v('highlight')};color:${v('soft-on-fg')}}
 .rp-spop-x{min-width:30px;background:${v('accent-bg')};color:${v('accent-soft')};border-color:transparent}
 .rp-spop-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px}
@@ -357,9 +357,17 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-pane .rp-spectrum{flex:1;min-height:80px}
 .rp-pane .rp-waterfall{height:auto;flex:1.2;min-height:60px}
 .rp-pane.no-wf .rp-waterfall{display:none}
-.rp-pane-bar{display:flex;align-items:center;gap:10px;min-height:26px}
-.rp-pane-label{flex:1;font:400 15px ${MONO};color:${v('spec-label')};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* In the pop-out each pane sits on the radio's screen, as on the board: its
+   label and scale are screen colours, which on the page itself (grey in
+   Silver) could not be read */
+.rp-spop .rp-pane{position:relative;padding:6px 8px 8px;border-radius:6px;background:${v('screen')};border:1px solid ${v('screen-line')}}
+.rp-spop .rp-axis{font-size:17px;min-height:18px}
+.rp-pane>.rp-spec-settings{left:auto;right:8px;top:44px;bottom:auto;font-size:16px}
+.rp-pane>.rp-spec-settings .rp-spec-row{grid-template-columns:84px 180px 70px}
+.rp-pane>.rp-spec-settings .rp-spec-row input[type=range]{width:180px}
+.rp-pane-bar{display:flex;align-items:center;gap:10px;min-height:32px}
+.rp-pane-label{flex:1;font:400 18px ${MONO};color:${v('chip-fg')};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rp-pane-tools{display:flex;gap:6px}
-.rp-spop-span{font:500 14px ${SANS};background:${v('chipbtn-bg')};color:${v('chipbtn-fg')};border:1px solid ${v('key-border')};border-radius:4px;padding:2px 6px}
+.rp-spop-span{font:500 16px ${SANS};min-height:32px;background:${v('chipbtn-bg')};color:${v('chipbtn-fg')};border:1px solid ${v('key-border')};border-radius:4px;padding:2px 6px}
 `;
 }
