@@ -245,6 +245,9 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-sdrview.both .rp-specpane.sel{border-color:${v('highlight')}}
 .rp-sdrview.both .rp-spectrum{min-height:0}
 .rp-sdrview.both .rp-waterfall{height:56px}
+/* setWaterfall(id, false): a strip that keeps the span, HOLD and SCOPE keys */
+.rp-specpane.no-wf .rp-waterfall{height:36px;background:none;border-color:transparent}
+.rp-specpane.no-wf .rp-waterfall>:not(.rp-spec-tools){display:none}
 .rp-altview{flex:1;min-height:360px;position:relative;border:1px solid ${v('screen-line')};border-radius:4px;overflow:hidden;background:${v('spec-bg')}}
 .rp-viewtabs{position:absolute;right:6px;bottom:6px;display:flex;gap:2px;padding:2px;border-radius:5px;background:${v('bar-bg')};border:1px solid ${v('well-border')};z-index:3}
 .rp-viewtab{font:600 13px ${SANS};letter-spacing:.1em;text-transform:uppercase;color:${v('legend-dim')};background:none;border:0;border-radius:3px;padding:3px 9px;cursor:pointer}
@@ -253,6 +256,8 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-modes{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
 
 .rp-right{display:flex;flex-direction:column;align-items:center;gap:14px}
+.rp-dial-vfo{display:inline-block;margin-left:10px;padding:0 7px;border:1px solid currentColor;border-radius:4px;font:700 15px ${MONO};letter-spacing:0;color:${v('vfo-a')}}
+.rp-dial-vfo[data-vfo=B]{color:${v('vfo-b')}}
 .rp-dial{width:300px;height:300px;border-radius:50%;background:repeating-conic-gradient(${v('dial-a')} 0deg 2deg,${v('dial-b')} 2deg 4deg);box-shadow:0 10px 24px rgba(0,0,0,.7),inset 0 0 0 1px ${v('dial-rim')};display:flex;align-items:center;justify-content:center}
 .rp-dial-inner{width:250px;height:250px;border-radius:50%;background:${v('dial-inner')};box-shadow:inset 0 2px 0 rgba(255,255,255,.07),inset 0 -6px 14px rgba(0,0,0,.45);position:relative}
 .rp-dial-dimple{position:absolute;width:52px;height:52px;border-radius:50%;left:154px;top:42px;background:${v('dial-dimple')};box-shadow:inset 0 3px 6px rgba(0,0,0,.7)}
@@ -346,6 +351,7 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-pane{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px}
 .rp-pane .rp-spectrum{flex:1;min-height:80px}
 .rp-pane .rp-waterfall{height:auto;flex:1.2;min-height:60px}
+.rp-pane.no-wf .rp-waterfall{display:none}
 .rp-pane-bar{display:flex;align-items:center;gap:10px;min-height:26px}
 .rp-pane-label{flex:1;font:400 15px ${MONO};color:${v('spec-label')};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rp-pane-tools{display:flex;gap:6px}

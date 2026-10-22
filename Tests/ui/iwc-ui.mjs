@@ -657,6 +657,31 @@ test('/radio: with X-WATCH off and the VFOs on different bands, only the heard V
     } finally { await page.close(); }
 });
 
+// The watch VFO on another band gets one frame per peek, so its waterfall
+// would be a near-empty box: the trace is shown without it.
+test('/radio: a cross-band watch shows its trace without the waterfall', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        const bare = () => page.eval(`['A', 'B'].filter(v => document.querySelector('.rp-specpane-' + v)?.classList.contains('no-wf')).join()`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('CrossBandWatch', XW_ON);
+        await page.state('BandB', '6m');
+        await clickButton(page, '.rp-viewtabs', 'Both');
+        expect(await bare() === 'B', `X-WATCH on, two bands: no waterfall on "${await bare()}", want B`);
+        await page.state('ActiveVfo', 1);
+        expect(await bare() === 'A', `listening on B: no waterfall on "${await bare()}", want A`);
+        await page.state('BandB', '20m');
+        expect(await bare() === '', `one band: no waterfall on "${await bare()}", want none`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandB', '6m');
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(await bare() === '', `X-WATCH off: no waterfall on "${await bare()}", want none`);
+    } finally { await page.close(); }
+});
+
 test('Index: X-Watch switches cross-band watch, lists intervals, sits beside Listening', async note => {
     const page = await open('/', { settleMs: 2000 });
     try {
@@ -685,6 +710,24 @@ test('Index: X-Watch switches cross-band watch, lists intervals, sits beside Lis
         expect(await page.eval(`window.__iwcWatchCollapse()`) === true, 'off, on two bands: the watch panel is not collapsed');
         await page.state('CrossBandWatch', XW_ON);
         expect(await page.eval(`window.__iwcWatchCollapse()`) === false, 'on: the watch panel is still collapsed');
+        expect(await page.eval(`window.__iwcWatchPeeks()`) === true, 'on, on two bands: the watch is not peeked');
+        await page.state('BandB', '20m');
+        expect(await page.eval(`window.__iwcWatchPeeks()`) === false, 'on, one band: the watch is still peeked');
+    } finally { await page.close(); }
+});
+
+test('/radio: the main dial says which VFO it tunes, in the colour of that VFO', async () => {
+    const page = await radioPage();
+    try {
+        const tag = () => page.eval(`(() => { const t = document.querySelector('.rp-dial-vfo'); return t ? t.textContent + ' ' + getComputedStyle(t).color : 'none'; })()`);
+        await page.state('ActiveVfo', 0);
+        const a = await tag();
+        expect(a.startsWith('A '), `listening on A, the dial says "${a}"`);
+        await page.state('ActiveVfo', 1);
+        const b = await tag();
+        expect(b.startsWith('B '), `listening on B, the dial says "${b}"`);
+        expect(a.slice(2) !== b.slice(2), `A and B are the same colour (${a.slice(2)})`);
+        await page.state('ActiveVfo', 0);
     } finally { await page.close(); }
 });
 
@@ -994,6 +1037,27 @@ test('/RadioSpectrum: with X-WATCH off and the VFOs on different bands, only the
         await page.state('CrossBandWatch', { enabled: false, intervalSeconds: 15 });
         await page.state('BandB', '20m');
         expect(await shown() === 'A,B', `one band: panes ${await shown()}, want A,B`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: a cross-band watch pane shows its trace without the waterfall', async note => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        await page.eval(`[...document.querySelectorAll('.rp-spop-tab')].find(t => /both/i.test(t.textContent))?.click()`);
+        const shown = await page.eval(`[...document.querySelectorAll('.rp-spop-body [data-pane]')].filter(h => h.style.display !== 'none').map(h => h.dataset.pane).join()`);
+        if (shown !== 'A,B') { note(`no Both view (${shown}): pseudo-dual is off in Settings`); return; }
+        const bare = () => page.eval(`['A', 'B'].filter(v => document.querySelector('.rp-spop-body [data-pane="' + v + '"] .rp-pane')?.classList.contains('no-wf')).join()`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('CrossBandWatch', XW_ON);
+        await page.state('BandB', '6m');
+        expect(await bare() === 'B', `X-WATCH on, two bands: no waterfall on "${await bare()}", want B`);
+        await page.state('ActiveVfo', 1);
+        expect(await bare() === 'A', `listening on B: no waterfall on "${await bare()}", want A`);
+        await page.state('BandB', '20m');
+        expect(await bare() === '', `one band: no waterfall on "${await bare()}", want none`);
         expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
     } finally { await page.close(); }
 });

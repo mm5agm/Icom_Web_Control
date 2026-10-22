@@ -146,6 +146,11 @@ export class SpectrumPanel {
         this._splitRatio = this._loadSplitRatio();
         this._splitterDragging = false;
 
+        // A watch panel refreshed only by cross-band peeks gets one waterfall
+        // row per peek, so its waterfall stays all but empty: the trace takes
+        // the whole panel instead (setWaterfallHidden). The split is kept.
+        this._wfHidden = false;
+
         // dB range — vertical scale of the spectrum trace, in dBFS. These are the
         // actual render window; with auto-floor on (below) they are recomputed
         // every sweep. Default fallback only, used until the first frame arrives.
@@ -194,6 +199,18 @@ export class SpectrumPanel {
             localStorage.setItem('iwc.spectrumSplit.' + this._vfo, this._splitRatio.toFixed(3));
         } catch (e) { /* localStorage may be unavailable */ }
     }
+
+    /** Hide the waterfall and give the trace the whole panel, or bring it back. */
+    setWaterfallHidden(hidden) {
+        hidden = !!hidden;
+        if (hidden === this._wfHidden) return;
+        this._wfHidden = hidden;
+        this._splitterDragging = false;
+        this._waterfallData = null;  // starts afresh when it comes back
+        if (this._lastBins) this._render();
+    }
+
+    get waterfallHidden() { return this._wfHidden; }
 
     // ── Panel height ─────────────────────────────────────────────────────────
     //
@@ -1136,6 +1153,7 @@ export class SpectrumPanel {
 
     // Hit test for the splitter — ±6 internal pixels of the boundary.
     _isOnSplitter(canvasY, canvasH) {
+        if (this._wfHidden) return false;
         const splitY = Math.floor(canvasH * this._splitRatio);
         return Math.abs(canvasY - splitY) <= 6;
     }
@@ -1497,7 +1515,7 @@ export class SpectrumPanel {
         const ctx         = canvas.getContext('2d');
         const W           = canvas.width;
         const H           = canvas.height;
-        const specH       = Math.max(1, Math.floor(H * this._splitRatio));
+        const specH       = this._wfHidden ? H : Math.max(1, Math.floor(H * this._splitRatio));
         const wfH         = Math.max(1, H - specH);
         const bins        = this._lastBins;
         const centreHz    = this._lastCentreHz;
@@ -1512,11 +1530,11 @@ export class SpectrumPanel {
         this._drawVfoMarker(ctx, W, specH, spanHz);
         this._drawDxBadge(ctx, W);
         this._drawScopeModeBadge(ctx);
-        if (scrollWaterfall || !this._waterfallData) this._scrollWaterfall(ctx, bins, W, specH, wfH);
+        if (!this._wfHidden && (scrollWaterfall || !this._waterfallData)) this._scrollWaterfall(ctx, bins, W, specH, wfH);
         this._drawPinnedCursor(ctx, W, specH);
         this._drawCrosshair(ctx, W, specH, spanHz);
         this._drawHoldOverlay(ctx, W, specH);
-        this._drawSplitterHandle(ctx, W, specH);
+        if (!this._wfHidden) this._drawSplitterHandle(ctx, W, specH);
     }
 
     // Horizontal handle the user can grab to resize the spectrum vs waterfall.

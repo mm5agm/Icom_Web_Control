@@ -72,9 +72,14 @@ export function startIcomSpectrumPopout(root, cfg) {
     // could only say it was out of range, so only the VFO you hear shows,
     // and your own tab comes back when the bands meet or X-WATCH comes on.
     const watchVfo = () => (r.sel === 'A' ? 'B' : 'A');
-    const watchCollapsed = () => pseudoDual && !r.xwatch && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
+    const crossBand = () => pseudoDual && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
+    const watchCollapsed = () => crossBand() && !r.xwatch;
+    // With it on, the watch pane is refreshed only by the peeks, one waterfall
+    // row each, so it shows its trace without the waterfall.
+    const watchPeeked = () => (crossBand() && r.xwatch ? watchVfo() : null);
     function collapseWatch() {
         if (!pseudoDual) return;
+        for (const v of ['A', 'B']) pop.pane(v).setWaterfall(v !== watchPeeked());
         const view = pop.view;
         if (watchCollapsed()) {
             if (!r.forcedView) {

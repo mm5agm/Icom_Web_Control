@@ -2668,11 +2668,17 @@
                 let showB = (mode === 'B' || mode === 'Multi');
                 // Cross-band watch off with the VFOs on different bands: only the
                 // VFO you hear (wireCrossBandWatch). The saved mode is untouched.
+                const heard = window.__iwcActiveVfo?.() === 1 ? 'B' : 'A';
                 if (window.__iwcWatchCollapse?.()) {
-                    const heard = window.__iwcActiveVfo?.() === 1 ? 'B' : 'A';
                     showA = heard === 'A';
                     showB = heard === 'B';
                 }
+                // Cross-band watch on with the VFOs on different bands: the watch
+                // panel is refreshed only by the peeks, one waterfall row each,
+                // so it shows its trace alone.
+                const peeked = window.__iwcWatchPeeks?.() ? (heard === 'A' ? 'B' : 'A') : null;
+                spectrumPanelA.setWaterfallHidden(peeked === 'A');
+                spectrumPanelB.setWaterfallHidden(peeked === 'B');
                 document.getElementById('spectrumContainerA').style.display = showA ? '' : 'none';
                 document.getElementById('spectrumContainerB').style.display = showB ? '' : 'none';
                 document.querySelectorAll('.spectrum-mode-btn').forEach(b => {
@@ -3264,7 +3270,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body),
                 }).catch(() => {});
-                window.__iwcWatchCollapse = () => !on && !!band.A && !!band.B && band.A !== band.B;
+                const crossBand = () => !!band.A && !!band.B && band.A !== band.B;
+                window.__iwcWatchCollapse = () => !on && crossBand();
+                window.__iwcWatchPeeks = () => on && crossBand();
                 function refresh() {
                     btn.classList.toggle('active', on);
                     btn.setAttribute('aria-pressed', String(on));

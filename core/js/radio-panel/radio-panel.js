@@ -932,7 +932,16 @@ export function mountRadioPanel(root, opts = {}) {
         turnable(clarKnob.svg, { onStep: (_, dir) => act('knob', 'clar', undefined, dir) });
         clarKnob.svg.append(s('title', {}, 'Clarifier offset: mouse wheel or drag to turn'));
     }
-    rightCol.append(h('span', 'rp-legend', 'Main dial'), dial);
+    // A single dial tunes whichever VFO is selected: say which, in that VFO's
+    // display colour. A dual dial's tags say it instead.
+    const dialLegend = h('span', 'rp-legend', 'Main dial');
+    const dialVfo = h('span', 'rp-dial-vfo', 'A');
+    if (!dualDial) {
+        dialVfo.dataset.vfo = 'A';
+        dialVfo.title = 'The dial tunes VFO-A';
+        dialLegend.append(dialVfo);
+    }
+    rightCol.append(dialLegend, dial);
     if (dualDial) rightCol.append(dialTagRow);
     rightCol.append(stepRow, vfoKeys);
     if (memBox) rightCol.append(memBox);
@@ -1354,6 +1363,8 @@ export function mountRadioPanel(root, opts = {}) {
             // The dial part that tunes the selected receiver glows.
             dial.classList.toggle('sel-a', dualDial && st.sel === 'A');
             dial.classList.toggle('sel-b', dualDial && st.sel === 'B');
+            dialVfo.textContent = dialVfo.dataset.vfo = st.sel;
+            dialVfo.title = 'The dial tunes VFO-' + st.sel;
             for (const [id, t] of Object.entries(dialTags)) {
                 t.t.classList.toggle('on', id === st.sel);
                 t.lamp.classList.toggle('on', id === st.sel);
@@ -1509,6 +1520,10 @@ export function mountRadioPanel(root, opts = {}) {
         },
         // One pane, or every pane when `vfo` is left out.
         clearSpectrum(vfo) { for (const [id, pn] of Object.entries(panes)) if (!vfo || id === vfo) pn.view.clear(); },
+        // Show or hide a pane's waterfall. Hidden, it shrinks to a strip that
+        // keeps its keys, for a pane whose waterfall could not fill (e.g. one
+        // only refreshed by an occasional cross-band peek).
+        setWaterfall(vfo, show) { panes[vfo]?.box.classList.toggle('no-wf', !show); },
         setSpots(list) { st.spots = list ?? []; drawOverlays(); },
         // Band edges in Hz, and band-plan marks as { hz, label }, drawn on every pane.
         setBandMarks({ edges, ticks } = {}) { st.marks = { edges: edges ?? [], ticks: ticks ?? [] }; drawOverlays(); },

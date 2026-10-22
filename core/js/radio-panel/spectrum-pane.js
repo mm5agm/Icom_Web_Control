@@ -80,6 +80,9 @@ export class SpectrumPane {
 
     clear() { this._view.clear(); }
 
+    /** Show or hide the waterfall; hidden, the trace takes its room. */
+    setWaterfall(show) { this.el.classList.toggle('no-wf', !show); }
+
     _drawLabel() {
         const s = this._st;
         const p3 = n => String(n).padStart(3, '0');
