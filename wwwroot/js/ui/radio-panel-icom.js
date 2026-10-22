@@ -66,6 +66,8 @@ function post(url, body) {
 // the page before this module), so there is one table.
 const widthsForMode = mode => window.IfWidth?.widthsForMode?.(mode) ?? null;
 const VOICE_TITLE = 'Voice control: hold while you speak a command, release when you have finished. Right-click a mic button on Classic for the list of commands';
+// Cross-band watch only: same-band watch reads the one sweep and never retunes.
+const XWATCH_TITLE = 'Cross-band watch on / off: lit, VFO-B on another band is refreshed by briefly retuning the receiver, which dips your audio. Switch it off for a QSO. Same as Settings > Allow cross-band watch';
 const widthLabel = hz => (hz < 1000 ? hz + ' Hz' : (hz / 1000).toFixed(hz % 1000 ? (hz % 100 ? 2 : 1) : 1) + ' kHz');
 
 /**
@@ -105,6 +107,7 @@ export function startIcomRadioPanel(root, cfg) {
             // Classic's mic button, as a key: held while speaking, released to
             // end the command. Only with Settings > Voice Control on.
             ...(cfg.voice ? [{ id: 'voice', label: 'VOICE', hold: true, title: VOICE_TITLE }] : []),
+            ...(pseudoDual ? [{ id: 'xwatch', label: 'X-WATCH', title: XWATCH_TITLE }] : []),
         ],
         rxGroups: {
             knobs: [
@@ -198,6 +201,7 @@ export function startIcomRadioPanel(root, cfg) {
         rxClar: false, txClar: false, clarHz: { A: 0, B: 0 },
         notchPos: null, nrLevel: null, pbtIn: null, pbtOut: null,
         af: null, rf: null, sql: null,
+        xwatch: false,
         mic: null, procl: null, power: null, mon: null, speed: null, pitch: null,
         tx: false, txMeterRaw: {}, sel: 'A', split: 0, proc: false, moni: false, catOn: false,
     };
@@ -510,6 +514,7 @@ export function startIcomRadioPanel(root, cfg) {
             case 'key':
                 switch (id) {
                     case 'mainsub': return act('vfo', r.sel === 'A' ? 'B' : 'A');
+                    case 'xwatch': return post('/api/radio/crossband-watch', { enabled: !r.xwatch });
                     case 'preamp': return post(`/api/cat/ipo/${rx}`, { code: PREAMP_NEXT[r.preamp] ?? '0' });
                     case 'att': return post(`/api/cat/attenuator/${rx}`, { code: on(r.att) ? '00' : '20' });
                     case 'agc': return post(`/api/cat/agc/${rx}`, { code: AGC_NEXT[r.agcCode] ?? '2' });
@@ -801,6 +806,7 @@ export function startIcomRadioPanel(root, cfg) {
     // The receiver-wide settings arrive as A and B with the same value (the
     // server mirrors them), so the A copy is the one read.
     const handlers = {
+        CrossBandWatch: v => { r.xwatch = !!v; panel.setKey('xwatch', { on: r.xwatch, sub: r.xwatch ? 'ON' : 'OFF' }); },
         IsConnected: v => { r.catOn = on(v); panel.setLamp('cat', r.catOn ? 'on' : 'bad'); if (r.catOn) readPbt(); },
         FrequencyA: v => { if (wheelHolds('A')) return; r.freq.A = num(v); panel.setFrequency('A', r.freq.A); checkBand('A'); refreshSeg('A'); },
         FrequencyB: v => { if (wheelHolds('B')) return; r.freq.B = num(v); panel.setFrequency('B', r.freq.B); checkBand('B'); refreshSeg('B'); },

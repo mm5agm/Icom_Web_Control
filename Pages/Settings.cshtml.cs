@@ -259,6 +259,9 @@ namespace Icom_Web_Control.Pages
                         : "ZoomIn";
 
                 await _settingsService.SaveSettingsAsync(current);
+                // Open pages' X-WATCH keys follow the cross-band tick box.
+                await _hubContext.Clients.All.SendAsync("RadioStateUpdate",
+                    new { property = "CrossBandWatch", value = current.PseudoDualCrossBandEnabled });
 
                 // Only reconnect the radio if something that actually affects the
                 // CAT link changed — Radio Model (different init command set),

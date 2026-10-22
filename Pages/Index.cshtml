@@ -892,6 +892,7 @@
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="B" title="Listen to VFO B — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
                             <span class="badge bg-success small spectrum-audio-badge" data-vfo="B" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
+                            <button type="button" id="crossBandWatchBtn" class="btn btn-outline-light btn-sm" aria-pressed="false" title="Cross-band watch on / off. On, VFO B on another band is refreshed by briefly retuning the receiver, which dips your audio; switch it off for a QSO. Same as Settings &gt; Allow cross-band watch." style="display:none;">X-Watch</button>
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
@@ -3219,6 +3220,36 @@
                 // Authoritative updates from the radio (see site.js ActiveVfo).
                 window.onActiveVfoChanged = idx => { audioVfo = idx; refresh(); };
 
+                refresh();
+            })();
+
+            // Cross-band watch key on the VFO-B panel: Settings' "Allow
+            // cross-band watch" in reach, so the peek (it retunes the one
+            // receiver and dips the audio) can be stopped for a QSO without a
+            // trip to Settings. Same-band watch never retunes, so it stays on.
+            (function wireCrossBandWatch() {
+                const btn = document.getElementById('crossBandWatchBtn');
+                if (!_pseudoDual || !btn) return;
+                let on = @(Model.PseudoDualCrossBandEnabled ? "true" : "false");
+                function refresh() {
+                    btn.classList.toggle('active', on);
+                    btn.setAttribute('aria-pressed', String(on));
+                    btn.textContent = on ? 'X-Watch On' : 'X-Watch Off';
+                }
+                btn.addEventListener('click', () => {
+                    on = !on;
+                    refresh();
+                    fetch('/api/radio/crossband-watch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enabled: on }),
+                    }).catch(() => {});
+                });
+                // Another page's key, or Settings, switched it.
+                window.signalRConnection?.on('RadioStateUpdate', u => {
+                    if (u?.property === 'CrossBandWatch') { on = !!u.value; refresh(); }
+                });
+                btn.style.display = '';
                 refresh();
             })();
 

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Icom_Web_Control.Hubs;
 using Icom_Web_Control.Services;
 using System.Threading;
 
@@ -17,16 +19,21 @@ namespace Icom_Web_Control.Controllers
     public class RadioController : ControllerBase
     {
         private readonly IRadioController _radio;
+        private readonly ISettingsService _settings;
+        private readonly IHubContext<RadioHub> _hub;
         private readonly ILogger<RadioController> _logger;
 
-        public RadioController(IRadioController radio, ILogger<RadioController> logger)
+        public RadioController(IRadioController radio, ISettingsService settings, IHubContext<RadioHub> hub, ILogger<RadioController> logger)
         {
             _radio = radio;
+            _settings = settings;
+            _hub = hub;
             _logger = logger;
         }
 
         public sealed class IfWidthRequest { public int Hz { get; set; } }
         public sealed class FilterRequest { public int Fil { get; set; } }
+        public sealed class CrossBandWatchRequest { public bool Enabled { get; set; } }
 
         // -- IF passband filter width (CI-V 1A 03) -----------------------------
 
@@ -72,6 +79,23 @@ namespace Icom_Web_Control.Controllers
                 _logger.LogError(ex, "Error selecting filter for VFO {Vfo}", vfo);
                 return StatusCode(500, new { error = "Failed to select filter" });
             }
+        }
+
+        // -- Cross-band watch (pseudo-dual) ------------------------------------
+
+        // The X-WATCH key on Classic and the Radio panel: Settings' "Allow
+        // cross-band watch" without the trip to Settings, so the peek (which
+        // retunes the one receiver and dips the audio) can be stopped for a
+        // QSO. Sends nothing to the radio: CivRadioController re-reads the
+        // setting on its slow poll, so the peek stops within about a second.
+        [HttpPost("crossband-watch")]
+        public async Task<IActionResult> SetCrossBandWatch([FromBody] CrossBandWatchRequest request)
+        {
+            var s = await _settings.GetSettingsAsync();
+            s.PseudoDualCrossBandEnabled = request.Enabled;
+            await _settings.SaveSettingsAsync(s);
+            await _hub.Clients.All.SendAsync("RadioStateUpdate", new { property = "CrossBandWatch", value = request.Enabled });
+            return Ok(new { message = $"Cross-band watch {(request.Enabled ? "on" : "off")}" });
         }
 
         private static bool TryVfo(string receiver, out RadioVfo vfo)

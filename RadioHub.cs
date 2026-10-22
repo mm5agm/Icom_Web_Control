@@ -70,6 +70,11 @@ namespace Icom_Web_Control.Hubs
             // still-hidden card the whole time.
             _radio.RequestScopeStatusAnnounce();
 
+            // Not radio state but a setting: the X-WATCH keys show it, and the
+            // Radio panel has no server-rendered copy.
+            var settings = await _settings.GetSettingsAsync();
+            await Clients.Caller.SendAsync("RadioStateUpdate", new { property = "CrossBandWatch", value = settings.PseudoDualCrossBandEnabled });
+
             await base.OnConnectedAsync();
         }
 

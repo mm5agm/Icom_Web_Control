@@ -616,6 +616,39 @@ test('/radio: the spectrum tabs tell the hub which panes are on screen', async (
     } finally { await page.close(); }
 });
 
+// X-WATCH / X-Watch: Settings' "Allow cross-band watch" in reach for a QSO.
+// Only there with pseudo-dual on in Settings.
+test('/radio: X-WATCH switches cross-band watch and follows the hub', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        for (const [now, want] of [[true, false], [false, true]]) {
+            await page.state('CrossBandWatch', now);
+            await page.clearWrites();
+            await clickButton(page, '.rp-keys', 'X-WATCH');
+            const w = writesTo(await page.writes(), '/api/radio/crossband-watch');
+            expect(w.length === 1 && w[0].body.enabled === want, `with it ${now ? 'on' : 'off'}, X-WATCH wrote ${JSON.stringify(w)}`);
+        }
+    } finally { await page.close(); }
+});
+
+test('Index: X-Watch switches cross-band watch and follows the hub', async note => {
+    const page = await open('/', { settleMs: 2000 });
+    try {
+        // On the VFO-B panel, which this tab may have hidden (and then no peek runs).
+        const shown = await page.eval(`(document.getElementById('crossBandWatchBtn')?.style.display ?? 'none') !== 'none'`);
+        if (!shown) { note('no X-Watch key: pseudo-dual is off in Settings'); return; }
+        await page.state('CrossBandWatch', false);
+        expect(await text(page, '#crossBandWatchBtn') === 'X-Watch Off', `key says "${await text(page, '#crossBandWatchBtn')}" after CrossBandWatch false`);
+        await page.clearWrites();
+        await page.eval(`document.getElementById('crossBandWatchBtn').click()`);
+        const w = writesTo(await page.writes(), '/api/radio/crossband-watch');
+        expect(w.length === 1 && w[0].body.enabled === true, `X-Watch wrote ${JSON.stringify(w)}`);
+        expect(await text(page, '#crossBandWatchBtn') === 'X-Watch On', `key says "${await text(page, '#crossBandWatchBtn')}" after the click`);
+    } finally { await page.close(); }
+});
+
 test('/radio: M.STORE saves the selected VFO to IWC memories', async () => {
     const page = await radioPage();
     try {
