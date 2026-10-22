@@ -439,8 +439,8 @@
         public string AntennaB { get; set; } = "1";
 
         // IF Width/Shift
-        public string IfWidthA { get; set; } = "8";
-        public string IfWidthB { get; set; } = "8";
+        public string IfWidthA { get; set; } = "";
+        public string IfWidthB { get; set; } = "";
         public int IfShiftA { get; set; } = 0;
         public int IfShiftB { get; set; } = 0;
 
