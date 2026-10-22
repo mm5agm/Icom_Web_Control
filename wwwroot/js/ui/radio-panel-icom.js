@@ -25,6 +25,7 @@ import { BAND_PLANS, BAND_EDGES, nearestBandForHz, loadBandPlanFromServer, autoM
 import { calibrateNumeric, loadFromBackend } from '/js/calibration/calibration-engine.js';
 import { ICOM_WINDOWS, startIcomWindows } from '/js/ui/radio-panel-icom-windows.js';
 import { PopoutHost } from '/js/popout/popout.js';
+import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
 
 const BANDS = ['160m', '80m', '60m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m', '4m'];
 // The IC-7300's modes as IWC shows them (CW-L is CW-R, RTTY-U is RTTY-R,
@@ -65,6 +66,10 @@ function post(url, body) {
 // the page before this module), so there is one table.
 const widthsForMode = mode => window.IfWidth?.widthsForMode?.(mode) ?? null;
 const VOICE_TITLE = 'Voice control: hold while you speak a command, release when you have finished. Right-click a mic button on Classic for the list of commands';
+// Cross-band watch only: same-band watch reads the one sweep and never retunes.
+const XWATCH_TITLE = 'Cross-band watch: a press lists Off and how often to peek. On, the watch VFO on another band is refreshed by briefly retuning the receiver, which dips your audio. Switch it off for a QSO';
+const XWATCH_SECONDS = [5, 10, 15, 20, 30, 45, 60];
+const XWATCH_OFF_TEXT = 'Cross-band watch is off: X-WATCH switches it on';
 const widthLabel = hz => (hz < 1000 ? hz + ' Hz' : (hz / 1000).toFixed(hz % 1000 ? (hz % 100 ? 2 : 1) : 1) + ' kHz');
 
 /**
@@ -104,6 +109,7 @@ export function startIcomRadioPanel(root, cfg) {
             // Classic's mic button, as a key: held while speaking, released to
             // end the command. Only with Settings > Voice Control on.
             ...(cfg.voice ? [{ id: 'voice', label: 'VOICE', hold: true, title: VOICE_TITLE }] : []),
+            ...(pseudoDual ? [{ id: 'xwatch', label: 'X-WATCH', title: XWATCH_TITLE }] : []),
         ],
         rxGroups: {
             knobs: [
@@ -197,6 +203,8 @@ export function startIcomRadioPanel(root, cfg) {
         rxClar: false, txClar: false, clarHz: { A: 0, B: 0 },
         notchPos: null, nrLevel: null, pbtIn: null, pbtOut: null,
         af: null, rf: null, sql: null,
+        xwatch: false, xwatchSec: 15,
+        forcedView: null,      // { was, now }: the spectrum tab collapseWatch chose, and the one it replaced
         mic: null, procl: null, power: null, mon: null, speed: null, pitch: null,
         tx: false, txMeterRaw: {}, sel: 'A', split: 0, proc: false, moni: false, catOn: false,
     };
@@ -509,6 +517,14 @@ export function startIcomRadioPanel(root, cfg) {
             case 'key':
                 switch (id) {
                     case 'mainsub': return act('vfo', r.sel === 'A' ? 'B' : 'A');
+                    case 'xwatch': return panel.openKeyList('xwatch', [
+                        { label: 'Off', title: 'No cross-band peeks: your audio is never dipped', on: !r.xwatch, run: () => post('/api/radio/crossband-watch', { enabled: false }) },
+                        { group: 'Peek every' },
+                        ...XWATCH_SECONDS.map(sec => ({
+                            label: sec + ' s', on: r.xwatch && r.xwatchSec === sec,
+                            run: () => post('/api/radio/crossband-watch', { enabled: true, intervalSeconds: sec }),
+                        })),
+                    ]);
                     case 'preamp': return post(`/api/cat/ipo/${rx}`, { code: PREAMP_NEXT[r.preamp] ?? '0' });
                     case 'att': return post(`/api/cat/attenuator/${rx}`, { code: on(r.att) ? '00' : '20' });
                     case 'agc': return post(`/api/cat/agc/${rx}`, { code: AGC_NEXT[r.agcCode] ?? '2' });
@@ -774,11 +790,38 @@ export function startIcomRadioPanel(root, cfg) {
         panel.clearSpectrum(other);
         panel.setSpectrumSource({ label: 'SCOPE', status: 'The scope follows the selected VFO (pseudo-dual is off in Settings)' }, other);
     }
+    // With cross-band watch off, a watch VFO on another band can only ever say
+    // it is outside the scope span, so the spectrum shows the VFO you hear
+    // instead (as pseudo-dual off does), and goes back to your own tab when the
+    // bands meet or X-WATCH comes back on. Same-band watch reads the one
+    // sweep, so it stays.
+    const watchVfo = () => (r.sel === 'A' ? 'B' : 'A');
+    const watchCollapsed = () => pseudoDual && !r.xwatch && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
+    function collapseWatch() {
+        if (!pseudoDual) return;
+        const view = panel.spectrumView();
+        if (watchCollapsed()) {
+            if (!r.forcedView) {
+                if (view !== r.sel) { r.forcedView = { was: view, now: r.sel }; panel.setSpectrumView(r.sel); }
+            } else if (view === r.forcedView.now && view !== r.sel) {
+                // Listening moved to the other VFO: follow it.
+                r.forcedView.now = r.sel;
+                panel.setSpectrumView(r.sel);
+            }
+            panel.clearSpectrum(watchVfo());
+            panel.setSpectrumSource({ label: 'SCOPE', status: XWATCH_OFF_TEXT }, watchVfo());
+        } else if (r.forcedView) {
+            // Unless the operator has picked a tab since.
+            if (view === r.forcedView.now) panel.setSpectrumView(r.forcedView.was);
+            r.forcedView = null;
+        }
+    }
     function scopeStatus(id, st, detail) {
         const pane = paneFor(id);
         scopeState[pseudoDual ? id : 'A'] = st;
         refreshScopeLamp();
-        panel.setSpectrumSource({ label: 'SCOPE', status: detail || (st in SCOPE_MSG ? SCOPE_MSG[st] : st) }, pane);
+        const text = watchCollapsed() && pane === watchVfo() ? XWATCH_OFF_TEXT : detail || (st in SCOPE_MSG ? SCOPE_MSG[st] : st);
+        panel.setSpectrumSource({ label: 'SCOPE', status: text }, pane);
     }
 
     function addSpot(sp) {
@@ -800,11 +843,17 @@ export function startIcomRadioPanel(root, cfg) {
     // The receiver-wide settings arrive as A and B with the same value (the
     // server mirrors them), so the A copy is the one read.
     const handlers = {
+        CrossBandWatch: v => {
+            r.xwatch = !!v?.enabled;
+            r.xwatchSec = num(v?.intervalSeconds) || r.xwatchSec;
+            panel.setKey('xwatch', { on: r.xwatch, sub: r.xwatch ? r.xwatchSec + ' s' : 'OFF' });
+            collapseWatch();
+        },
         IsConnected: v => { r.catOn = on(v); panel.setLamp('cat', r.catOn ? 'on' : 'bad'); if (r.catOn) readPbt(); },
         FrequencyA: v => { if (wheelHolds('A')) return; r.freq.A = num(v); panel.setFrequency('A', r.freq.A); checkBand('A'); refreshSeg('A'); },
         FrequencyB: v => { if (wheelHolds('B')) return; r.freq.B = num(v); panel.setFrequency('B', r.freq.B); checkBand('B'); refreshSeg('B'); },
-        BandA: v => { if (v !== r.band.A) { r.band.A = v; panel.clearSpectrum('A'); } panel.setBand(r.band[r.sel]); refreshSeg('A'); },
-        BandB: v => { if (v !== r.band.B) { r.band.B = v; panel.clearSpectrum('B'); } panel.setBand(r.band[r.sel]); refreshSeg('B'); },
+        BandA: v => { if (v !== r.band.A) { r.band.A = v; panel.clearSpectrum('A'); } panel.setBand(r.band[r.sel]); refreshSeg('A'); collapseWatch(); },
+        BandB: v => { if (v !== r.band.B) { r.band.B = v; panel.clearSpectrum('B'); } panel.setBand(r.band[r.sel]); refreshSeg('B'); collapseWatch(); },
         ModeA: v => { const m = String(v ?? ''); if (m !== r.mode.A && r.sel === 'A') readPbt(); r.mode.A = m; panel.setMode('A', MODE_LABEL[m] ?? m); refreshWidth('A'); },
         ModeB: v => { const m = String(v ?? ''); if (m !== r.mode.B && r.sel === 'B') readPbt(); r.mode.B = m; panel.setMode('B', MODE_LABEL[m] ?? m); refreshWidth('B'); },
         IfWidthA: v => { r.widthHz.A = v === '' || v == null ? null : num(v); refreshWidth('A'); },
@@ -819,6 +868,7 @@ export function startIcomRadioPanel(root, cfg) {
             refreshFlags();
             refreshClar();
             showIdlePane();
+            collapseWatch();
             readPbt();
         },
         IpoA: v => { r.preamp = String(v); refreshFlags(); },
@@ -911,6 +961,13 @@ export function startIcomRadioPanel(root, cfg) {
     conn.onclose(() => panel.setLamp('cat', 'bad'));
     panel.setLamp('cat', 'warn');
     conn.start().catch(() => panel.setLamp('cat', 'bad'));
+    // The scope tab chosen (VFO-A, VFO-B or Both), while the spectrum is the
+    // view on screen and has not gone to its own window, which reports its own.
+    reportSpectrumPanes(conn, () => {
+        const on = !specAway && panel.screenView() === 'sdr';
+        const v = panel.spectrumView();
+        return { A: on && (v === 'A' || v === 'both'), B: on && (v === 'B' || v === 'both') };
+    });
 
     return panel;
 

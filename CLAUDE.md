@@ -120,6 +120,32 @@ minutes; it is not hung.
    same core. A push that only one app has is half a job.
 
 
+### Claude: the connected radio - change anything, never transmit
+
+Colin gave standing permission on 2026-10-22 for Claude to change any receive
+or operating setting on the connected radio while testing, through the running
+IWC (its API, its pages or the UI tests): frequency, band, mode, VFO, split,
+filters and widths, PBT, AGC, NR/NB/notch, preamp and attenuator, AF/RF/SQL,
+RIT, scope span and mode, memory recall, and stored levels such as RF power,
+mic gain and compressor. Restore what you changed when you finish, and say what
+you changed.
+
+**Never transmit.** No exceptions, and not to "just check" something. That rules
+out:
+
+- `/api/cat/tx` (PTT), `/api/cat/atu/tune` (the tuner keys the radio),
+  `/api/cat/cw/send` and `/api/cat/cw/messages` playback, voice macros or
+  anything else that plays audio into the transmitter, and switching VOX on;
+- raw CI-V that keys the radio: `1C 00` (TX), `1C 01` (tuner), `17` (send CW),
+  `28` (voice TX), sent through `SendRawCommandAsync` or anything else;
+- WSJT-X or any other program's TX path through IWC.
+
+Also leave alone: `/api/cat/radiopower` (do not switch the radio off), and
+writing or clearing memory channels (ask first). Choosing the TX VFO or split
+is fine; it does not transmit. If you are not sure whether something keys the
+radio, do not do it: ask Colin.
+
+
 ## Architecture Rules
 
 Before making changes, read `.claude/rules.md` and `.claude/project-overview.md`.

@@ -592,6 +592,102 @@ test('/radio: scope frames light the lamp and are drawn', async () => {
     } finally { await page.close(); }
 });
 
+// The cross-band peek only runs while some page reports the watch pane on
+// screen; the board must report its spectrum tab, not only Classic.
+test('/radio: the spectrum tabs tell the hub which panes are on screen', async () => {
+    const page = await radioPage();
+    try {
+        await page.eval(`(() => {
+            const conn = __rwcTest.handlers.find(h => h.name === 'radiostateupdate').conn;
+            const invoke = conn.invoke;
+            window.__panes = [];
+            conn.invoke = function (name, ...args) {
+                if (name === 'SpectrumPanels') window.__panes.push(args.join(','));
+                return invoke.call(this, name, ...args);
+            };
+        })()`);
+        const last = () => page.eval(`window.__panes[window.__panes.length - 1] ?? ''`);
+        for (const [tab, want] of [['VFO-B', 'false,true'], ['Both', 'true,true'], ['VFO-A', 'true,false']]) {
+            await clickButton(page, '.rp-viewtabs', tab);
+            await sleep(1500);
+            const got = await last();
+            expect(got === want, `${tab} tab reported SpectrumPanels(${got}), want (${want})`);
+        }
+    } finally { await page.close(); }
+});
+
+// X-WATCH / X-Watch: cross-band watch and its peek interval, which are no
+// longer in Settings. Only there with pseudo-dual on in Settings.
+const XW_ON = { enabled: true, intervalSeconds: 15 }, XW_OFF = { enabled: false, intervalSeconds: 15 };
+test('/radio: X-WATCH lists Off and the peek intervals and sets them', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        await page.state('CrossBandWatch', XW_ON);
+        const sub = await page.eval(`[...document.querySelectorAll('.rp-keys button')].find(b => b.textContent.startsWith('X-WATCH')).textContent`);
+        expect(/15 s/.test(sub), `the key says "${sub}" with it on at 15 s`);
+        for (const [item, want] of [['Off', { enabled: false }], ['30 s', { enabled: true, intervalSeconds: 30 }]]) {
+            await page.clearWrites();
+            await clickButton(page, '.rp-keys', 'X-WATCH');
+            await clickButton(page, '.rp-keylist', item);
+            const w = writesTo(await page.writes(), '/api/radio/crossband-watch');
+            expect(w.length === 1 && JSON.stringify(w[0].body) === JSON.stringify(want), `${item} wrote ${JSON.stringify(w)}, want ${JSON.stringify(want)}`);
+        }
+    } finally { await page.close(); }
+});
+
+test('/radio: with X-WATCH off and the VFOs on different bands, only the heard VFO shows', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        const view = () => page.eval(`[...document.querySelectorAll('.rp-viewtab.on')].map(t => t.textContent).join()`);
+        await page.state('CrossBandWatch', XW_ON);
+        await page.state('BandB', '6m');
+        await clickButton(page, '.rp-viewtabs', 'Both');
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(/VFO-A/.test(await view()), `with it off, the spectrum tab is "${await view()}", want VFO-A`);
+        await page.state('CrossBandWatch', XW_ON);
+        expect(/Both|both/.test(await view()), `with it back on, the spectrum tab is "${await view()}", want Both`);
+        // Same band: the watch costs nothing, so it stays.
+        await page.state('CrossBandWatch', XW_OFF);
+        await page.state('BandB', '20m');
+        expect(/Both|both/.test(await view()), `on one band, the spectrum tab is "${await view()}", want Both`);
+    } finally { await page.close(); }
+});
+
+test('Index: X-Watch switches cross-band watch, lists intervals, sits beside Listening', async note => {
+    const page = await open('/', { settleMs: 2000 });
+    try {
+        const shown = await page.eval(`(document.getElementById('crossBandWatchGroup')?.style.display ?? 'none') !== 'none'`);
+        if (!shown) { note('no X-Watch key: pseudo-dual is off in Settings'); return; }
+        const key = () => text(page, '#crossBandWatchBtn');
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(await key() === 'X-Watch Off', `key says "${await key()}" with it off`);
+        await page.clearWrites();
+        await page.eval(`document.getElementById('crossBandWatchBtn').click()`);
+        let w = writesTo(await page.writes(), '/api/radio/crossband-watch');
+        expect(w.length === 1 && w[0].body.enabled === true, `X-Watch wrote ${JSON.stringify(w)}`);
+        expect(await key() === 'X-Watch 15 s', `key says "${await key()}" after the click`);
+        await page.clearWrites();
+        await page.eval(`[...document.querySelectorAll('#crossBandWatchIntervals button')].find(b => b.dataset.sec === '45').click()`);
+        w = writesTo(await page.writes(), '/api/radio/crossband-watch');
+        expect(w.length === 1 && w[0].body.intervalSeconds === 45, `Peek every 45 s wrote ${JSON.stringify(w)}`);
+        for (const vfo of [1, 0]) {
+            await page.state('ActiveVfo', vfo);
+            const where = await page.eval(`document.getElementById('crossBandWatchGroup').previousElementSibling?.dataset.vfo`);
+            expect(where === (vfo ? 'B' : 'A'), `listening on ${vfo ? 'B' : 'A'}, X-Watch is beside panel ${where}`);
+        }
+        await page.state('BandA', '20m');
+        await page.state('BandB', '6m');
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(await page.eval(`window.__iwcWatchCollapse()`) === true, 'off, on two bands: the watch panel is not collapsed');
+        await page.state('CrossBandWatch', XW_ON);
+        expect(await page.eval(`window.__iwcWatchCollapse()`) === false, 'on: the watch panel is still collapsed');
+    } finally { await page.close(); }
+});
+
 test('/radio: M.STORE saves the selected VFO to IWC memories', async () => {
     const page = await radioPage();
     try {

@@ -892,6 +892,12 @@
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="B" title="Listen to VFO B — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
                             <span class="badge bg-success small spectrum-audio-badge" data-vfo="B" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
+                            @* Cross-band watch: moved beside whichever Listening badge is showing. *@
+                            <div id="crossBandWatchGroup" class="btn-group btn-group-sm" role="group" style="display:none;">
+                                <button type="button" id="crossBandWatchBtn" class="btn btn-outline-light btn-sm" aria-pressed="false" title="Cross-band watch on / off. On, the watch VFO on another band is refreshed by briefly retuning the receiver, which dips your audio; switch it off for a QSO.">X-Watch</button>
+                                <button type="button" class="btn btn-outline-light btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="How often cross-band watch peeks at the other band"><span class="visually-hidden">Peek interval</span></button>
+                                <ul id="crossBandWatchIntervals" class="dropdown-menu dropdown-menu-dark dropdown-menu-end"></ul>
+                            </div>
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
@@ -2658,8 +2664,15 @@
             function applyMode(mode) {
                 currentMode = mode;
                 localStorage.setItem(MODE_STORAGE_KEY, mode);
-                const showA = (mode === 'A' || mode === 'Multi');
-                const showB = (mode === 'B' || mode === 'Multi');
+                let showA = (mode === 'A' || mode === 'Multi');
+                let showB = (mode === 'B' || mode === 'Multi');
+                // Cross-band watch off with the VFOs on different bands: only the
+                // VFO you hear (wireCrossBandWatch). The saved mode is untouched.
+                if (window.__iwcWatchCollapse?.()) {
+                    const heard = window.__iwcActiveVfo?.() === 1 ? 'B' : 'A';
+                    showA = heard === 'A';
+                    showB = heard === 'B';
+                }
                 document.getElementById('spectrumContainerA').style.display = showA ? '' : 'none';
                 document.getElementById('spectrumContainerB').style.display = showB ? '' : 'none';
                 document.querySelectorAll('.spectrum-mode-btn').forEach(b => {
@@ -3202,6 +3215,12 @@
                     audioBadges.forEach(b => {
                         b.style.display = (idxOf(b) === audioVfo) ? '' : 'none';
                     });
+                    // X-Watch sits on the panel you hear: it stays on screen when
+                    // the watch panel is collapsed.
+                    const xw = document.getElementById('crossBandWatchGroup');
+                    const badge = audioBadges.find(b => idxOf(b) === audioVfo);
+                    if (xw && badge && badge.nextElementSibling !== xw) badge.after(xw);
+                    if (typeof applyMode === 'function') applyMode(currentMode);
                 }
 
                 listenBtns.forEach(btn => {
@@ -3218,7 +3237,65 @@
 
                 // Authoritative updates from the radio (see site.js ActiveVfo).
                 window.onActiveVfoChanged = idx => { audioVfo = idx; refresh(); };
+                window.__iwcActiveVfo = () => audioVfo;
 
+                refresh();
+            })();
+
+            // Cross-band watch key, beside Listening: the only place it is set.
+            // The main half switches it on and off in one click, so the peek (it
+            // retunes the one receiver and dips the audio) can be stopped for a
+            // QSO; the arrow lists how often it peeks. With it off and the VFOs
+            // on different bands the watch panel could only say "out of range",
+            // so it is collapsed and the panel you hear shows alone (applyMode
+            // asks __iwcWatchCollapse). Same-band watch never retunes, so it
+            // stays.
+            (function wireCrossBandWatch() {
+                const group = document.getElementById('crossBandWatchGroup');
+                const btn = document.getElementById('crossBandWatchBtn');
+                const list = document.getElementById('crossBandWatchIntervals');
+                if (!_pseudoDual || !group || !btn || !list) return;
+                let on = @(Model.PseudoDualCrossBandEnabled ? "true" : "false");
+                let sec = @Model.PseudoDualPeekIntervalSeconds;
+                const band = { A: '@Model.SelectedBandA', B: '@Model.SelectedBandB' };
+                const SECONDS = [5, 10, 15, 20, 30, 45, 60];
+                const post = body => fetch('/api/radio/crossband-watch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                }).catch(() => {});
+                window.__iwcWatchCollapse = () => !on && !!band.A && !!band.B && band.A !== band.B;
+                function refresh() {
+                    btn.classList.toggle('active', on);
+                    btn.setAttribute('aria-pressed', String(on));
+                    btn.textContent = on ? `X-Watch ${sec} s` : 'X-Watch Off';
+                    list.querySelectorAll('button').forEach(b => b.classList.toggle('active', on && Number(b.dataset.sec) === sec));
+                    applyMode(currentMode);
+                }
+                for (const s of SECONDS) {
+                    const li = document.createElement('li');
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'dropdown-item';
+                    b.dataset.sec = String(s);
+                    b.textContent = `Peek every ${s} s`;
+                    b.addEventListener('click', () => { on = true; sec = s; refresh(); post({ enabled: true, intervalSeconds: s }); });
+                    li.append(b);
+                    list.append(li);
+                }
+                btn.addEventListener('click', () => { on = !on; refresh(); post({ enabled: on }); });
+                // Another page's key switched it, or a VFO changed band.
+                window.signalRConnection?.on('RadioStateUpdate', u => {
+                    if (u?.property === 'CrossBandWatch') {
+                        on = !!u.value?.enabled;
+                        sec = Number(u.value?.intervalSeconds) || sec;
+                        refresh();
+                    } else if (u?.property === 'BandA' || u?.property === 'BandB') {
+                        const v = u.property.slice(-1);
+                        if (band[v] !== u.value) { band[v] = u.value; refresh(); }
+                    }
+                });
+                group.style.display = '';
                 refresh();
             })();
 

@@ -244,13 +244,9 @@ namespace Icom_Web_Control.Pages
 
                 // Pseudo-dual receiver (Phase 5)
                 current.PseudoDualReceiverEnabled = Settings.PseudoDualReceiverEnabled;
-                current.PseudoDualCrossBandEnabled = Settings.PseudoDualCrossBandEnabled;
-                // Clamp peek interval to the 5–60 s the UI offers; fall back to
-                // the 15 s default if an out-of-range value is posted.
-                current.PseudoDualPeekIntervalSeconds =
-                    (Settings.PseudoDualPeekIntervalSeconds >= 5 && Settings.PseudoDualPeekIntervalSeconds <= 60)
-                        ? Settings.PseudoDualPeekIntervalSeconds
-                        : 15;
+                // Cross-band watch and its peek interval are not on this page:
+                // the X-Watch keys set them (RadioController), so a save here
+                // leaves them as they are.
                 // Watch-panel (VFO B) span-button behaviour; fall back to the
                 // ZoomIn default for any unrecognised value.
                 current.PseudoDualWatchSpanMode =

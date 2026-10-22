@@ -129,6 +129,9 @@ namespace Icom_Web_Control.Pages
         // second "watch" spectrum panel even on the single-receiver IC-7300 —
         // this flag is what un-gates panel B despite data-single-receiver.
         public bool PseudoDualReceiverEnabled { get; set; } = false;
+        // Seeds the Cross-band key on the VFO-B panel; CrossBandWatch updates it.
+        public bool PseudoDualCrossBandEnabled { get; set; } = false;
+        public int PseudoDualPeekIntervalSeconds { get; set; } = 15;
 
         // Settings > Voice Control. The Radio panel (Layout = null, so no
         // window.iwcVoiceEnabled) reads it from here to show its VOICE key.
@@ -187,6 +190,8 @@ namespace Icom_Web_Control.Pages
             VoiceNudgeStepHzA = settings.VoiceNudgeStepHzA;
             VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
             PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
+            PseudoDualCrossBandEnabled = settings.PseudoDualCrossBandEnabled;
+            PseudoDualPeekIntervalSeconds = Math.Clamp(settings.PseudoDualPeekIntervalSeconds, 5, 60);
             VoiceControlEnabled = settings.VoiceControlEnabled;
             PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };

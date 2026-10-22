@@ -9,6 +9,7 @@
 
 import { mountSpectrumPopout } from '/js/radio-panel/spectrum-popout.js';
 import { alignBins, spanText } from '/js/radio-panel/panel-math.js';
+import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
 
 const SPANS_HZ = [5e3, 10e3, 20e3, 50e3, 100e3, 200e3, 500e3, 1e6];
 const SPOT_MAX_AGE_MS = 30 * 60 * 1000;
@@ -122,5 +123,9 @@ export function startIcomSpectrumPopout(root, cfg) {
         if (fn) try { fn(msg.value); } catch (e) { console.warn('spectrum:', msg.property, e); }
     });
     conn.start().catch(e => console.warn('spectrum: hub', e));
+    reportSpectrumPanes(conn, () => ({
+        A: pop.view === 'A' || pop.view === 'both',
+        B: pop.view === 'B' || pop.view === 'both',
+    }));
     return pop;
 }
