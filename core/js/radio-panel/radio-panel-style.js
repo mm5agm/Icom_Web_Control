@@ -344,6 +344,9 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-spop-x{min-width:30px;background:${v('accent-bg')};color:${v('accent-soft')};border-color:transparent}
 .rp-spop-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px}
 .rp-spop-holder{flex:1;min-height:0;display:flex}
+/* A pane with no waterfall needs room for its trace only: about what the
+   trace has in a pane with one (1 of the 1 + 1.2 below), the rest to that pane */
+.rp-spop-holder:has(>.rp-pane.no-wf){flex:.45}
 /* window-popout.js: one window group in a page of its own. The board's
    frame is undone; the panel boxes fill the page. */
 .rp-wpop-board{flex:1;min-height:0;padding:0;border:0;border-radius:0;box-shadow:none;gap:0}

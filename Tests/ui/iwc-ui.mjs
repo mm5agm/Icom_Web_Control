@@ -1054,6 +1054,9 @@ test('/RadioSpectrum: a cross-band watch pane shows its trace without the waterf
         await page.state('CrossBandWatch', XW_ON);
         await page.state('BandB', '6m');
         expect(await bare() === 'B', `X-WATCH on, two bands: no waterfall on "${await bare()}", want B`);
+        // It gives up the room its waterfall had, rather than a tall empty trace.
+        const tall = v => page.eval(`document.querySelector('.rp-spop-body [data-pane="${v}"]').getBoundingClientRect().height`);
+        expect(await tall('B') < (await tall('A')) * 0.6, `the trace-only pane is ${await tall('B')}px high beside ${await tall('A')}px`);
         await page.state('ActiveVfo', 1);
         expect(await bare() === 'A', `listening on B: no waterfall on "${await bare()}", want A`);
         await page.state('BandB', '20m');
