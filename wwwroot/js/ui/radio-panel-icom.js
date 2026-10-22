@@ -678,6 +678,7 @@ export function startIcomRadioPanel(root, cfg) {
         r.freq[v] = to;
         panel.setFrequency(v, to);
         checkBand(v);
+        refreshSeg(v);
         post(`/api/cat/frequency/${v.toLowerCase()}`, { frequencyHz: to });
         if (mode && mode !== r.mode[v]) post(`/api/cat/mode/${v.toLowerCase()}`, { mode });
     }
@@ -708,6 +709,7 @@ export function startIcomRadioPanel(root, cfg) {
         r.freq[v] = next;
         panel.setFrequency(v, next);
         checkBand(v);
+        refreshSeg(v);
         post(`/api/cat/frequency/${v.toLowerCase()}`, { frequencyHz: next });
     }
 
@@ -734,6 +736,9 @@ export function startIcomRadioPanel(root, cfg) {
         r.freq[vfo] = to;
         panel.setFrequency(vfo, to);
         checkBand(vfo);
+        // The radio's echo is held off while the wheel turns, so the segment
+        // chip follows the dial from here, as it does in tuneBy and spectrumTune.
+        refreshSeg(vfo);
         if (w.busy) return;
         w.busy = true;
         try {
