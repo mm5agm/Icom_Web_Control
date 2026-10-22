@@ -1158,8 +1158,11 @@ export function mountRadioPanel(root, opts = {}) {
             t.el.classList.toggle('on', t.view === st.screenView && (t.view !== 'sdr' || t.spec === st.specView));
     }
 
+    // setMode is given the mode as shown, which can be the key's label rather
+    // than its id (IWC's DATA-U key is labelled USB-D), so either one lights it.
     function markModeKeys() {
-        for (const [id, el] of Object.entries(modeEls)) el.classList.toggle('on', id === st.mode[st.sel]);
+        const m = st.mode[st.sel];
+        for (const [id, el] of Object.entries(modeEls)) el.classList.toggle('on', !!m && (id === m || el.textContent === m));
     }
 
     function setVfoText(vfo) {
