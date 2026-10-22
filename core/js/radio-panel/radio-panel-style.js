@@ -332,7 +332,8 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-spec-away{position:absolute;inset:0;z-index:4;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;border:1px dashed ${v('screen-line')};border-radius:4px;background:${v('spec-bg')};font:600 20px ${SANS};letter-spacing:.14em;text-transform:uppercase;color:${v('spec-label')}}
 .rp-spec-away.on{display:flex}
 
-.rp-spop{height:100vh;display:flex;flex-direction:column}
+.rp-spop{height:100vh;display:flex;flex-direction:column;position:relative}
+.rp-spop-grip{position:absolute;right:0;bottom:0;width:24px;height:24px;cursor:nwse-resize;touch-action:none;z-index:5;background:linear-gradient(135deg,transparent 52%,${v('legend-dim')} 52% 58%,transparent 58% 68%,${v('legend-dim')} 68% 74%,transparent 74% 84%,${v('legend-dim')} 84% 90%,transparent 90%)}
 .rp-spop-top{height:40px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px;background:${v('key-bg')};border-bottom:1px solid ${v('key-border')}}
 .rp-spop-title{font:700 16px ${SANS};letter-spacing:.1em;color:${v('title')};white-space:nowrap}
 .rp-spop-tabs{display:flex;gap:2px;padding:2px;border-radius:5px;background:${v('bar-bg')};border:1px solid ${v('well-border')}}

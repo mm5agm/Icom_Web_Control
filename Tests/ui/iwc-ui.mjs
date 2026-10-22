@@ -1065,6 +1065,27 @@ test('/RadioSpectrum: a cross-band watch pane shows its trace without the waterf
     } finally { await page.close(); }
 });
 
+test('/RadioSpectrum: the corner grip resizes the window', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const got = await page.eval(`(() => {
+            const g = document.querySelector('.rp-spop-grip');
+            if (!g) return 'no grip';
+            const r = g.getBoundingClientRect();
+            if (Math.abs(r.right - innerWidth) > 1 || Math.abs(r.bottom - innerHeight) > 1) return 'grip at ' + r.right + ',' + r.bottom;
+            let to = null;
+            window.resizeTo = (w, h) => { to = [w, h]; };
+            g.setPointerCapture = () => {};
+            const ev = (type, x, y) => g.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, screenX: x, screenY: y }));
+            ev('pointerdown', 500, 500); ev('pointermove', 560, 470); ev('pointerup', 560, 470);
+            const want = [outerWidth + 60, Math.max(300, outerHeight - 30)];
+            ev('pointermove', 900, 900);
+            return to && to[0] === want[0] && to[1] === want[1] ? 'ok' : 'resizeTo ' + JSON.stringify(to) + ', want ' + JSON.stringify(want);
+        })()`);
+        expect(got === 'ok', got);
+    } finally { await page.close(); }
+});
+
 // ---------------------------------------------------------------- Experimental UI (/flexui)
 
 // /flexui is Index moved into the shared dock (core/js/flex). These check the

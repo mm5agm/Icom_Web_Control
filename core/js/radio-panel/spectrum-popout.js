@@ -72,6 +72,27 @@ export function mountSpectrumPopout(root, opts) {
     const body = h('div', 'rp-spop-body');
     root.append(top, body);
 
+    // A grip in the bottom-right corner sizes the window from inside the page,
+    // for when its frame is hard to reach. Browsers let script resize a window
+    // that script opened, which this one is; elsewhere resizeTo does nothing.
+    const grip = h('div', 'rp-spop-grip');
+    grip.title = 'Drag to resize the window';
+    grip.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        grip.setPointerCapture(e.pointerId);
+        const x0 = e.screenX, y0 = e.screenY, w0 = window.outerWidth, h0 = window.outerHeight;
+        const move = m => window.resizeTo(Math.max(400, w0 + m.screenX - x0), Math.max(300, h0 + m.screenY - y0));
+        const up = () => {
+            grip.removeEventListener('pointermove', move);
+            grip.removeEventListener('pointerup', up);
+            grip.removeEventListener('pointercancel', up);
+        };
+        grip.addEventListener('pointermove', move);
+        grip.addEventListener('pointerup', up);
+        grip.addEventListener('pointercancel', up);
+    });
+    root.append(grip);
+
     const panes = {};
     const spanSel = {};
     const holdKeys = {};
