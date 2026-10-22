@@ -45,6 +45,7 @@ export function spectrumSettingsPanel(onChange) {
     slider('bright', 'Bright', 0, 60, same, same, x => x ? '+' + x + ' dB' : 'Off', 'Lifts weak signals in the waterfall only');
     slider('smooth', 'Smooth', 0, 8, same, same, x => x ? String(x) : 'Off', 'Averages neighbouring bins across the trace');
     const pbRow = h('label', 'rp-spec-row');
+    pbRow.title = 'Shades the part of the spectrum you are hearing: the width of the receive filter for the mode';
     const pbBox = h('input');
     pbBox.type = 'checkbox';
     pbBox.dataset.set = 'passband';

@@ -1165,6 +1165,8 @@ test('/RadioSpectrum: SCOPE opens Range and the rest, saved for the board', asyn
             const saved = JSON.parse(localStorage.getItem('iwc.radioPanel.spectrum.A') ?? '{}');
             if (saved.range !== 42) return 'saved ' + JSON.stringify(saved);
             if (r.closest('.rp-spec-row').querySelector('.rp-spec-val').textContent !== '42 dB') return 'readout not 42 dB';
+            const untitled = [...sets.querySelectorAll('.rp-spec-row')].filter(x => !x.title).map(x => x.textContent);
+            if (untitled.length) return 'no tooltip: ' + untitled.join();
             key.click();
             return getComputedStyle(sets).display === 'none' ? 'ok' : 'panel did not close';
         })()`);
