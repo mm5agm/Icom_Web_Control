@@ -106,6 +106,17 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
 
+### v1.6.0-pre3 (2026-10-22)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre2 and v1.6.0-pre1 below.
+>
+> **What needs testing:** the X-Watch key with pseudo-dual on, especially switching it off and on during a QSO.
+
+- **An X-Watch key switches cross-band watch, so the peek no longer chops a QSO.** With pseudo-dual on and VFO B on another band, IWC briefly retunes the receiver every few seconds to refresh the watch panel, and your audio dips each time. Switching that off used to mean a trip to Settings. Now there is an **X-Watch** key beside the **Listening** badge on the Classic page, on whichever panel you are hearing, and an **X-WATCH** key on the Radio panel. One click stops the peek within about a second, and another starts it again. The key shows the interval in use, such as **X-Watch 15 s**, or **X-Watch Off**. User Manual, [§5.4](USER_MANUAL.md#54-spectrum-display) and [§5.20](USER_MANUAL.md#520-radio-panel).
+- **The peek interval is on the X-Watch key, and both settings have left Settings.** The arrow beside **X-Watch** (or the **X-WATCH** list on the Radio panel) offers 5 s to 60 s. **Allow cross-band watch** and **Cross-band peek interval** are no longer in Settings, and the values you had are kept.
+- **With X-Watch off, the useless watch panel is hidden.** With cross-band watch off and the VFOs on different bands, the watch panel could only say *This VFO is outside the scope span*. Now only the VFO you are hearing is shown, on the Classic page, the Radio panel and its pop-out spectrum window. The watch panel comes back when you switch X-Watch on or put both VFOs on one band, and your own choice of view is kept. Same-band watch is unaffected.
+- **Fixed: cross-band watch never ran from the Radio panel.** The watch spectrum on the Radio panel stayed at *off-screen* unless a Classic page happened to be open as well. It now refreshes from the Radio panel and its spectrum window too.
+
 ### v1.6.0-pre2 (2026-10-20)
 
 > **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre1 below.
