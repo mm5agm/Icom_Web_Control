@@ -331,7 +331,7 @@ export function startIcomRadioPanel(root, cfg) {
         panel.setKey('preamp', { on: r.preamp !== '0', sub: PREAMP[r.preamp] ?? '' }, 'A');
         panel.setKey('att', { on: on(r.att), sub: on(r.att) ? '20 dB' : 'OFF' }, 'A');
         panel.setKey('agc', { on: !!r.agc, sub: r.agc }, 'A');
-        panel.setKey('fil', { on: !!r.fil[r.sel], sub: r.fil[r.sel] ? 'FIL' + r.fil[r.sel] : '' }, 'A');
+        panel.setKey('fil', { on: !!r.fil[r.sel], sub: filText(r.sel) }, 'A');
         panel.setKey('nb', { on: on(r.nb) }, 'A');
         panel.setKey('nr', { on: on(r.nr) }, 'A');
         panel.setKey('anf', { on: on(r.anf) }, 'A');
@@ -342,6 +342,14 @@ export function startIcomRadioPanel(root, cfg) {
 
     function refreshWidth(vfo) {
         panel.setWidth(vfo, r.widthHz[vfo]);
+        if (vfo === r.sel) refreshKeys();
+    }
+
+    // The slot and the width it holds, so a press shows which width it chose.
+    function filText(vfo) {
+        if (!r.fil[vfo]) return '';
+        const hz = r.widthHz[vfo];
+        return 'FIL' + r.fil[vfo] + (hz ? ' \u00b7 ' + widthLabel(hz) : '');
     }
 
     // ---- writes ----------------------------------------------------------
