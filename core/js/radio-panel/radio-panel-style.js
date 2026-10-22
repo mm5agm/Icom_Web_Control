@@ -112,7 +112,7 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-skey{appearance:none;border:1px solid ${v('key-border')};background:${v('key-bg')};color:${v('key-fg')};border-radius:6px;height:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;padding:0;box-shadow:0 2px 0 ${v('key-shadow')}}
 .rp-skey .rp-led{width:22px;height:4px}
 .rp-skey-label{font:600 14px ${SANS};letter-spacing:.06em;white-space:nowrap}
-.rp-skey .rp-sub{font-size:11px;min-height:11px;line-height:11px}
+.rp-skey .rp-sub{font-size:11px;min-height:11px;line-height:11px;color:${v('key-fg')};opacity:.75}
 .rp-skey.suits{border-color:${v('highlight')}}
 .rp-skey:active{transform:translateY(2px);box-shadow:none}
 .rp-win{position:absolute;z-index:10;border-radius:8px;overflow:hidden;background:${v('panel')};border:1px solid ${v('key-border')};box-shadow:0 18px 44px rgba(0,0,0,.75);display:flex;flex-direction:column;min-width:200px;min-height:120px}

@@ -528,6 +528,19 @@ test('/radio: live state reaches the VFO box', async () => {
     } finally { await page.close(); }
 });
 
+test('/radio: FILTER key shows the slot and its width', async () => {
+    const page = await radioPage();
+    try {
+        const sub = () => page.eval(`[...document.querySelectorAll('.rp-gkeys button')].find(b => /FILTER/.test(b.textContent))?.querySelector('.rp-sub')?.textContent ?? 'no key'`);
+        let t = await sub();
+        expect(/FIL1/.test(t) && /2\.4 kHz/.test(t), `FILTER key says "${t}"`);
+        await page.state('SelectedFilterA', '2');
+        await page.state('IfWidthA', '3600');
+        t = await sub();
+        expect(/FIL2/.test(t) && /3\.6 kHz/.test(t), `after FIL2 the key says "${t}"`);
+    } finally { await page.close(); }
+});
+
 test('/radio: band, mode and receiver keys send IWC bodies', async () => {
     const page = await radioPage();
     try {
