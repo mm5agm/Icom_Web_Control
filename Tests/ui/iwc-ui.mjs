@@ -953,6 +953,33 @@ test('/radio: band keys and mode keys each sit on one line, labels not clipped',
     } finally { await page.close(); }
 });
 
+test('/radio: the mode key lights for the mode in use, labelled or not', async () => {
+    const page = await radioPage();
+    try {
+        for (const [mode, label] of [['DATA-U', 'USB-D'], ['DATA-L', 'LSB-D'], ['CW-U', 'CW'], ['CW-L', 'CW-R'],
+            ['RTTY-L', 'RTTY'], ['RTTY-U', 'RTTY-R'], ['USB', 'USB'], ['AM', 'AM']]) {
+            await modeA(page, mode);
+            const lit = await page.eval(`[...document.querySelectorAll('.rp-modes button.on')].map(b => b.textContent).join(',')`);
+            expect(lit === label, `${mode}: lit keys "${lit}", want "${label}"`);
+        }
+    } finally { await page.close(); }
+});
+
+test('/radio: the segment chip follows the frequency wheel', async () => {
+    const page = await radioPage();
+    try {
+        const seg = () => page.eval(`[...document.querySelectorAll('.rp-chips')[0].children].map(c => c.textContent).find(t => t.startsWith('SEG')) ?? ''`);
+        expect(await seg() === 'SEG FT8', `on 14.074 the chip says "${await seg()}"`);
+        // Down one 10 kHz digit to 14.064, in the CW segment. The radio's echo
+        // lands while the wheel holds it off, so the chip has to follow the
+        // wheel itself.
+        await page.eval(`document.querySelector('.rp-freq [data-step="10000"]').dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true }))`);
+        await page.state('FrequencyA', 14_064_000);
+        await sleep(100);
+        expect(await seg() === 'SEG CW', `on 14.064 the chip says "${await seg()}"`);
+    } finally { await page.close(); }
+});
+
 // The window keys (CW, RTTY, MEMORIES, DX, METERS, RX SETUP) and their windows.
 const winShown = (page, id) => page.eval(`(() => {
     const f = document.querySelector('.rp-win[data-win="${id}"]');
