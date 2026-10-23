@@ -528,6 +528,19 @@ test('/radio: live state reaches the VFO box', async () => {
     } finally { await page.close(); }
 });
 
+test('/radio: FILTER key shows the slot and its width', async () => {
+    const page = await radioPage();
+    try {
+        const sub = () => page.eval(`[...document.querySelectorAll('.rp-gkeys button')].find(b => /FILTER/.test(b.textContent))?.querySelector('.rp-sub')?.textContent ?? 'no key'`);
+        let t = await sub();
+        expect(/FIL1/.test(t) && /2\.4 kHz/.test(t), `FILTER key says "${t}"`);
+        await page.state('SelectedFilterA', '2');
+        await page.state('IfWidthA', '3600');
+        t = await sub();
+        expect(/FIL2/.test(t) && /3\.6 kHz/.test(t), `after FIL2 the key says "${t}"`);
+    } finally { await page.close(); }
+});
+
 test('/radio: band, mode and receiver keys send IWC bodies', async () => {
     const page = await radioPage();
     try {
@@ -657,6 +670,50 @@ test('/radio: with X-WATCH off and the VFOs on different bands, only the heard V
     } finally { await page.close(); }
 });
 
+// The watch VFO gets one frame per peek, on one band or two, so its waterfall
+// would crawl: the trace is shown without it.
+test('/radio: the watch VFO shows its trace without the waterfall', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        const bare = () => page.eval(`['A', 'B'].filter(v => document.querySelector('.rp-specpane-' + v)?.classList.contains('no-wf')).join()`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('CrossBandWatch', XW_ON);
+        await page.state('BandB', '6m');
+        await clickButton(page, '.rp-viewtabs', 'Both');
+        expect(await bare() === 'B', `X-WATCH on, two bands: no waterfall on "${await bare()}", want B`);
+        await page.state('ActiveVfo', 1);
+        expect(await bare() === 'A', `listening on B: no waterfall on "${await bare()}", want A`);
+        // One band too: the peeks still refresh it, so it would still crawl.
+        await page.state('BandB', '20m');
+        expect(await bare() === 'A', `one band: no waterfall on "${await bare()}", want A`);
+        await page.state('ActiveVfo', 0);
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(await bare() === 'B', `X-WATCH off, one band: no waterfall on "${await bare()}", want B`);
+        await page.state('BandB', '6m');
+    } finally { await page.close(); }
+});
+
+test('/radio: out of range with X-WATCH on says Waiting for data', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        const msg = () => page.eval(`document.querySelector('.rp-specpane-B .rp-spec-empty')?.textContent ?? 'none'`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('BandB', '20m');
+        await page.state('SdrStatus', { sdrId: 'B', status: 'outofrange' });
+        await page.state('CrossBandWatch', XW_ON);
+        expect(await msg() === 'Waiting for data', `X-WATCH on after the status: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(/outside the scope span/.test(await msg()), `X-WATCH off: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_ON);
+    } finally { await page.close(); }
+});
+
 test('Index: X-Watch switches cross-band watch, lists intervals, sits beside Listening', async note => {
     const page = await open('/', { settleMs: 2000 });
     try {
@@ -685,6 +742,49 @@ test('Index: X-Watch switches cross-band watch, lists intervals, sits beside Lis
         expect(await page.eval(`window.__iwcWatchCollapse()`) === true, 'off, on two bands: the watch panel is not collapsed');
         await page.state('CrossBandWatch', XW_ON);
         expect(await page.eval(`window.__iwcWatchCollapse()`) === false, 'on: the watch panel is still collapsed');
+        expect(await page.eval(`window.__iwcWatchPeeks()`) === true, 'on, on two bands: the watch is not peeked');
+        await page.state('BandB', '20m');
+        expect(await page.eval(`window.__iwcWatchPeeks()`) === true, 'on, one band: the watch panel has its waterfall back');
+    } finally { await page.close(); }
+});
+
+test('/radio: the main dial says which VFO it tunes, in the colour of that VFO', async () => {
+    const page = await radioPage();
+    try {
+        const tag = () => page.eval(`(() => { const t = document.querySelector('.rp-dial-vfo'); return t ? t.textContent + ' ' + getComputedStyle(t).color : 'none'; })()`);
+        await page.state('ActiveVfo', 0);
+        const a = await tag();
+        expect(a.startsWith('A '), `listening on A, the dial says "${a}"`);
+        await page.state('ActiveVfo', 1);
+        const b = await tag();
+        expect(b.startsWith('B '), `listening on B, the dial says "${b}"`);
+        expect(a.slice(2) !== b.slice(2), `A and B are the same colour (${a.slice(2)})`);
+        await page.state('ActiveVfo', 0);
+    } finally { await page.close(); }
+});
+
+test('/radio: the corner grip scales the board and keeps the size', async () => {
+    const page = await radioPage();
+    try {
+        const got = await page.eval(`(() => {
+            const g = document.querySelector('.rp-board-grip'), sizer = document.querySelector('.rp-sizer');
+            if (!g) return 'no grip';
+            const sel = [...document.querySelectorAll('select.rp-select')].find(s => s.title === 'Size');
+            const before = sizer.getBoundingClientRect();
+            const ev = (type, x, y) => g.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, clientX: x, clientY: y }));
+            ev('pointerdown', before.right - 5, before.bottom - 5);
+            ev('pointermove', before.right - 5, before.top + before.height * 0.6);
+            ev('pointerup', 0, 0);
+            const after = sizer.getBoundingClientRect();
+            const size = sel.value, opt = sel.selectedOptions[0]?.textContent;
+            return JSON.stringify({ shrank: after.height < before.height * 0.8, ratio: Math.abs(after.width / after.height - before.width / before.height) < 0.02,
+                size, opt, saved: localStorage.getItem('iwc.radioPanel.size') });
+        })()`);
+        const r = JSON.parse(got.startsWith('{') ? got : '{}');
+        expect(got.startsWith('{'), got);
+        expect(r.shrank && r.ratio, `the board did not shrink in shape: ${got}`);
+        expect(/^\d+$/.test(r.size) && r.opt === r.size + '%' && r.saved === r.size, `the size picker and store say ${got}`);
+        await page.eval(`localStorage.setItem('iwc.radioPanel.size', 'fit')`);
     } finally { await page.close(); }
 });
 
@@ -995,6 +1095,124 @@ test('/RadioSpectrum: with X-WATCH off and the VFOs on different bands, only the
         await page.state('BandB', '20m');
         expect(await shown() === 'A,B', `one band: panes ${await shown()}, want A,B`);
         expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: the watch pane shows its trace without the waterfall', async note => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        await page.eval(`[...document.querySelectorAll('.rp-spop-tab')].find(t => /both/i.test(t.textContent))?.click()`);
+        const shown = await page.eval(`[...document.querySelectorAll('.rp-spop-body [data-pane]')].filter(h => h.style.display !== 'none').map(h => h.dataset.pane).join()`);
+        if (shown !== 'A,B') { note(`no Both view (${shown}): pseudo-dual is off in Settings`); return; }
+        const bare = () => page.eval(`['A', 'B'].filter(v => document.querySelector('.rp-spop-body [data-pane="' + v + '"] .rp-pane')?.classList.contains('no-wf')).join()`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('CrossBandWatch', XW_ON);
+        await page.state('BandB', '6m');
+        expect(await bare() === 'B', `X-WATCH on, two bands: no waterfall on "${await bare()}", want B`);
+        // It gives up the room its waterfall had, rather than a tall empty trace.
+        const tall = v => page.eval(`document.querySelector('.rp-spop-body [data-pane="${v}"]').getBoundingClientRect().height`);
+        expect(await tall('B') < (await tall('A')) * 0.6, `the trace-only pane is ${await tall('B')}px high beside ${await tall('A')}px`);
+        await page.state('ActiveVfo', 1);
+        expect(await bare() === 'A', `listening on B: no waterfall on "${await bare()}", want A`);
+        await page.state('BandB', '20m');
+        expect(await bare() === 'A', `one band: no waterfall on "${await bare()}", want A`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: out of range with X-WATCH on says Waiting for data', async note => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        await page.eval(`[...document.querySelectorAll('.rp-spop-tab')].find(t => /both/i.test(t.textContent))?.click()`);
+        const shown = await page.eval(`[...document.querySelectorAll('.rp-spop-body [data-pane]')].filter(h => h.style.display !== 'none').map(h => h.dataset.pane).join()`);
+        if (shown !== 'A,B') { note(`no Both view (${shown}): pseudo-dual is off in Settings`); return; }
+        const msg = () => page.eval(`document.querySelector('.rp-spop-body [data-pane="B"] .rp-spec-empty')?.textContent ?? 'none'`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('BandB', '20m');
+        await page.state('CrossBandWatch', XW_OFF);
+        await page.state('SdrStatus', { sdrId: 'B', status: 'outofrange' });
+        expect(/outside the scope span/.test(await msg()), `X-WATCH off: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_ON);
+        expect(await msg() === 'Waiting for data', `X-WATCH on: B says "${await msg()}"`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: the corner grip resizes the window', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const got = await page.eval(`(() => {
+            const g = document.querySelector('.rp-spop-grip');
+            if (!g) return 'no grip';
+            const r = g.getBoundingClientRect();
+            if (Math.abs(r.right - innerWidth) > 1 || Math.abs(r.bottom - innerHeight) > 1) return 'grip at ' + r.right + ',' + r.bottom;
+            let to = null;
+            window.resizeTo = (w, h) => { to = [w, h]; };
+            g.setPointerCapture = () => {};
+            const ev = (type, x, y) => g.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, screenX: x, screenY: y }));
+            ev('pointerdown', 500, 500); ev('pointermove', 560, 470); ev('pointerup', 560, 470);
+            const want = [outerWidth + 60, Math.max(300, outerHeight - 30)];
+            ev('pointermove', 900, 900);
+            return to && to[0] === want[0] && to[1] === want[1] ? 'ok' : 'resizeTo ' + JSON.stringify(to) + ', want ' + JSON.stringify(want);
+        })()`);
+        expect(got === 'ok', got);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: SCOPE opens Range and the rest, saved for the board', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const got = await page.eval(`(() => {
+            const pane = document.querySelector('.rp-spop-body [data-pane="A"] .rp-pane');
+            const key = pane && [...pane.querySelectorAll('.rp-spop-key')].find(b => b.textContent === 'SCOPE');
+            if (!key) return 'no SCOPE key';
+            const sets = pane.querySelector('.rp-spec-settings');
+            if (getComputedStyle(sets).display !== 'none') return 'panel open before the click';
+            key.click();
+            if (getComputedStyle(sets).display === 'none' || !key.classList.contains('on')) return 'panel did not open';
+            const r = sets.querySelector('input[data-set=range]');
+            r.value = '42'; r.dispatchEvent(new Event('input'));
+            const saved = JSON.parse(localStorage.getItem('iwc.radioPanel.spectrum.A') ?? '{}');
+            if (saved.range !== 42) return 'saved ' + JSON.stringify(saved);
+            if (r.closest('.rp-spec-row').querySelector('.rp-spec-val').textContent !== '42 dB') return 'readout not 42 dB';
+            const untitled = [...sets.querySelectorAll('.rp-spec-row')].filter(x => !x.title).map(x => x.textContent);
+            if (untitled.length) return 'no tooltip: ' + untitled.join();
+            key.click();
+            return getComputedStyle(sets).display === 'none' ? 'ok' : 'panel did not close';
+        })()`);
+        expect(got === 'ok', got);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: pane text is screen colour on the screen, in every theme', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const bad = await page.eval(`(async () => {
+            const { THEMES, applyTheme } = await import('/js/radio-panel/radio-panel-themes.js');
+            const rgb = c => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+            const lum = c => { const [r, g, b] = rgb(c).map(x => x / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126 * r + .7152 * g + .0722 * b; };
+            const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+            const root = document.querySelector('.rp-spop');
+            const pane = root.querySelector('.rp-pane');
+            const out = [];
+            for (const id of Object.keys(THEMES)) {
+                if (id === 'night') continue; // dim on purpose
+                applyTheme(root, id);
+                const bg = getComputedStyle(pane).backgroundColor;
+                for (const sel of ['.rp-pane-label', '.rp-axis']) {
+                    const k = ratio(getComputedStyle(pane.querySelector(sel)).color, bg);
+                    if (k < 4.5) out.push(id + ' ' + sel + ' ' + k.toFixed(1));
+                }
+                const sets = pane.querySelector('.rp-spec-settings');
+                const k = ratio(getComputedStyle(sets).color, getComputedStyle(sets).backgroundColor);
+                if (k < 4.5) out.push(id + ' SCOPE panel ' + k.toFixed(1));
+            }
+            return out.join('; ');
+        })()`);
+        expect(!bad, bad);
     } finally { await page.close(); }
 });
 

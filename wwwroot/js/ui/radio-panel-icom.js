@@ -331,7 +331,7 @@ export function startIcomRadioPanel(root, cfg) {
         panel.setKey('preamp', { on: r.preamp !== '0', sub: PREAMP[r.preamp] ?? '' }, 'A');
         panel.setKey('att', { on: on(r.att), sub: on(r.att) ? '20 dB' : 'OFF' }, 'A');
         panel.setKey('agc', { on: !!r.agc, sub: r.agc }, 'A');
-        panel.setKey('fil', { on: !!r.fil[r.sel], sub: r.fil[r.sel] ? 'FIL' + r.fil[r.sel] : '' }, 'A');
+        panel.setKey('fil', { on: !!r.fil[r.sel], sub: filText(r.sel) }, 'A');
         panel.setKey('nb', { on: on(r.nb) }, 'A');
         panel.setKey('nr', { on: on(r.nr) }, 'A');
         panel.setKey('anf', { on: on(r.anf) }, 'A');
@@ -342,6 +342,14 @@ export function startIcomRadioPanel(root, cfg) {
 
     function refreshWidth(vfo) {
         panel.setWidth(vfo, r.widthHz[vfo]);
+        if (vfo === r.sel) refreshKeys();
+    }
+
+    // The slot and the width it holds, so a press shows which width it chose.
+    function filText(vfo) {
+        if (!r.fil[vfo]) return '';
+        const hz = r.widthHz[vfo];
+        return 'FIL' + r.fil[vfo] + (hz ? ' \u00b7 ' + widthLabel(hz) : '');
     }
 
     // ---- writes ----------------------------------------------------------
@@ -775,6 +783,7 @@ export function startIcomRadioPanel(root, cfg) {
         disconnected: 'Radio not connected', blocked: 'The radio is not sending scope data',
         outofrange: 'This VFO is outside the scope span',
     };
+    const WAITING_TEXT = 'Waiting for data';
     function refreshScopeLamp() {
         const sts = Object.values(scopeState);
         panel.setLamp('sdr', sts.includes('streaming') ? 'on' : sts.includes('connecting') ? 'warn'
@@ -796,9 +805,14 @@ export function startIcomRadioPanel(root, cfg) {
     // bands meet or X-WATCH comes back on. Same-band watch reads the one
     // sweep, so it stays.
     const watchVfo = () => (r.sel === 'A' ? 'B' : 'A');
-    const watchCollapsed = () => pseudoDual && !r.xwatch && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
+    const crossBand = () => pseudoDual && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
+    const watchCollapsed = () => crossBand() && !r.xwatch;
+    // The VFO you are not hearing is refreshed only by the peeks, on one band
+    // or two, one waterfall row each: its pane shows the trace alone.
+    const watchPeeked = () => (pseudoDual ? watchVfo() : null);
     function collapseWatch() {
         if (!pseudoDual) return;
+        for (const v of ['A', 'B']) panel.setWaterfall(v, v !== watchPeeked());
         const view = panel.spectrumView();
         if (watchCollapsed()) {
             if (!r.forcedView) {
@@ -820,7 +834,10 @@ export function startIcomRadioPanel(root, cfg) {
         const pane = paneFor(id);
         scopeState[pseudoDual ? id : 'A'] = st;
         refreshScopeLamp();
-        const text = watchCollapsed() && pane === watchVfo() ? XWATCH_OFF_TEXT : detail || (st in SCOPE_MSG ? SCOPE_MSG[st] : st);
+        // Out of the sweep with X-WATCH on, the next peek fills it.
+        const text = watchCollapsed() && pane === watchVfo() ? XWATCH_OFF_TEXT
+            : st === 'outofrange' && r.xwatch ? WAITING_TEXT
+            : detail || (st in SCOPE_MSG ? SCOPE_MSG[st] : st);
         panel.setSpectrumSource({ label: 'SCOPE', status: text }, pane);
     }
 
@@ -848,6 +865,9 @@ export function startIcomRadioPanel(root, cfg) {
             r.xwatchSec = num(v?.intervalSeconds) || r.xwatchSec;
             panel.setKey('xwatch', { on: r.xwatch, sub: r.xwatch ? r.xwatchSec + ' s' : 'OFF' });
             collapseWatch();
+            // Out of range says Waiting for data or not by X-WATCH, which can
+            // arrive after it.
+            for (const id of ['A', 'B']) if (scopeState[id] === 'outofrange') scopeStatus(id, 'outofrange');
         },
         IsConnected: v => { r.catOn = on(v); panel.setLamp('cat', r.catOn ? 'on' : 'bad'); if (r.catOn) readPbt(); },
         FrequencyA: v => { if (wheelHolds('A')) return; r.freq.A = num(v); panel.setFrequency('A', r.freq.A); checkBand('A'); refreshSeg('A'); },

@@ -140,6 +140,21 @@ namespace Icom_Web_Control.Services
         // own selects go straight to the bus, so they must never take the gate.
         private readonly SemaphoreSlim _peekGate = new(1, 1);
 
+        // The other VFO's IF width. 1A 03 reads only the operating VFO, so the
+        // watch VFO's width is learned three ways: read during each cross-band
+        // peek while the receiver is on it; looked up by its mode and FIL slot
+        // (26 01 reads both without switching), since a mode's FIL slot holds
+        // one width whichever VFO uses it; and, failing both, one short borrow
+        // when X-Watch is on (MaybeBorrowWatchWidthAsync). Keyed by the 26
+        // reply's mode, data and filter bytes. Indexed by VfoIndex:
+        // _modeFilSeen is each VFO's mode/FIL at its last read, _widthKnownFor
+        // the mode/FIL its shown width belongs to.
+        private readonly Dictionary<(byte mode, byte data, byte fil), int> _widthByModeFil = new();
+        private readonly (byte mode, byte data, byte fil)?[] _modeFilSeen = new (byte, byte, byte)?[2];
+        private readonly (byte mode, byte data, byte fil)?[] _widthKnownFor = new (byte, byte, byte)?[2];
+        private long _watchBorrowAfterTicks;
+        private const int WatchBorrowRetryMs = 30000;   // a borrow that read nothing waits this long before dipping the audio again
+
         // Watch-panel span (Phase 5). The single scope has one span, so the watch
         // panel is a crop of that sweep; "ZoomIn" mode lets the operator narrow the
         // crop around the watch VFO in software without touching the physical scope.
@@ -970,8 +985,10 @@ namespace Icom_Web_Control.Services
             _peekWatchId = watchId;
             try
             {
-                await RawSelectVfoAsync(watch, ct);
-                await DelayQuiet(PeekWindowMs, ct);
+                long peekStart = Environment.TickCount64;
+                if (await RawSelectVfoAsync(watch, ct))
+                    await ReadBorrowedWidthAsync(watch, ct);   // its width, while the receiver is on it
+                await DelayQuiet(Math.Max(0, PeekWindowMs - (int)(Environment.TickCount64 - peekStart)), ct);
             }
             finally
             {
@@ -1116,6 +1133,12 @@ namespace Icom_Web_Control.Services
         /// </summary>
         private async Task PollIfWidthAndFilterAsync(CancellationToken ct)
         {
+            await PollActiveWidthAsync(ct);
+            await PollWatchWidthAsync(ct);
+        }
+
+        private async Task PollActiveWidthAsync(CancellationToken ct)
+        {
             var vfo = ActiveVfo;
             var m = await ReadVfoModeRawAsync(SelectorFor(vfo), ct);
             if (!m.ok) return;
@@ -1129,7 +1152,8 @@ namespace Icom_Web_Control.Services
             var group = FilterWidthCodec.GroupForModeByte(m.mode);
             if (group == FilterWidthCodec.Group.None)
             {
-                if (vfo == RadioVfo.A) _state.IfWidthA = ""; else _state.IfWidthB = "";
+                SetIfWidth(vfo, "");
+                NoteWidthFor(vfo, (m.mode, m.data, m.filter), null);
                 return;
             }
 
@@ -1137,7 +1161,140 @@ namespace Icom_Web_Control.Services
             if (code < 0) return;
             int hz = FilterWidthCodec.CodeToHz(group, code);
             if (hz < 0) return;
-            if (vfo == RadioVfo.A) _state.IfWidthA = hz.ToString(); else _state.IfWidthB = hz.ToString();
+            SetIfWidth(vfo, hz.ToString());
+            NoteWidthFor(vfo, (m.mode, m.data, m.filter), hz);
+        }
+
+        /// <summary>
+        /// The watch VFO's mode and FIL slot (26 01, no switching) and, when that
+        /// pair's width is known from the operating VFO or an earlier peek, its
+        /// width. A mode or FIL change with no known width blanks it rather than
+        /// leave the old one showing; MaybeBorrowWatchWidthAsync can then fetch it.
+        /// </summary>
+        private async Task PollWatchWidthAsync(CancellationToken ct)
+        {
+            var watch = ActiveVfo == RadioVfo.A ? RadioVfo.B : RadioVfo.A;
+            var m = await ReadVfoModeRawAsync(CivProtocol.VfoUnselected, ct);
+            if (!m.ok) return;
+
+            if (m.filter is >= 0x01 and <= 0x03)
+            {
+                string f = m.filter.ToString();
+                if (watch == RadioVfo.A) _state.SelectedFilterA = f; else _state.SelectedFilterB = f;
+            }
+
+            var key = (m.mode, m.data, m.filter);
+            int i = VfoIndex(watch);
+            _modeFilSeen[i] = key;
+            if (FilterWidthCodec.GroupForModeByte(m.mode) == FilterWidthCodec.Group.None)
+            {
+                SetIfWidth(watch, "");
+                _widthKnownFor[i] = key;
+                return;
+            }
+            int hz;
+            lock (_widthByModeFil)
+                if (!_widthByModeFil.TryGetValue(key, out hz)) hz = -1;
+            if (hz > 0)
+            {
+                SetIfWidth(watch, hz.ToString());
+                _widthKnownFor[i] = key;
+            }
+            else if (_widthKnownFor[i] != key)
+            {
+                SetIfWidth(watch, "");
+            }
+        }
+
+        /// <summary>Record that <paramref name="vfo"/> is on this mode/FIL and (unless null) that its width is <paramref name="hz"/>.</summary>
+        private void NoteWidthFor(RadioVfo vfo, (byte mode, byte data, byte fil) key, int? hz)
+        {
+            int i = VfoIndex(vfo);
+            _modeFilSeen[i] = key;
+            _widthKnownFor[i] = key;
+            if (hz is int w)
+                lock (_widthByModeFil) _widthByModeFil[key] = w;
+        }
+
+        private void SetIfWidth(RadioVfo vfo, string width)
+        {
+            if (vfo == RadioVfo.A) _state.IfWidthA = width; else _state.IfWidthB = width;
+        }
+
+        /// <summary>
+        /// With the receiver borrowed onto <paramref name="vfo"/> (the caller holds
+        /// _peekGate and has selected it), read its mode/FIL and width straight
+        /// from the bus and record them. Best-effort: a miss leaves things as they were.
+        /// </summary>
+        private async Task ReadBorrowedWidthAsync(RadioVfo vfo, CancellationToken ct)
+        {
+            var modeFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdVfoMode, CivProtocol.VfoSelected);
+            var mr = await _bus.TransactAsync(modeFrame, CivProtocol.CmdVfoMode, cancellationToken: ct);
+            if (mr == null || mr.Cmd != CivProtocol.CmdVfoMode || mr.Data.Length < 4 || mr.Data[0] != CivProtocol.VfoSelected)
+                return;
+            (byte mode, byte data, byte fil) key = (mr.Data[1], mr.Data[2], mr.Data[3]);
+            var group = FilterWidthCodec.GroupForModeByte(key.mode);
+            if (group == FilterWidthCodec.Group.None)
+            {
+                SetIfWidth(vfo, "");
+                NoteWidthFor(vfo, key, null);
+                return;
+            }
+            var widthFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubIfWidth);
+            var wr = await _bus.TransactAsync(widthFrame, CivProtocol.CmdMenu, cancellationToken: ct);
+            if (wr == null || wr.Cmd != CivProtocol.CmdMenu || wr.Data.Length < 2 || wr.Data[0] != CivProtocol.SubIfWidth)
+                return;
+            int hz = FilterWidthCodec.CodeToHz(group, CivProtocol.BcdByte(wr.Data[1]));
+            if (hz < 0) return;
+            SetIfWidth(vfo, hz.ToString());
+            NoteWidthFor(vfo, key, hz);
+        }
+
+        /// <summary>
+        /// With X-Watch on and both VFOs on the same band (cross-band, the peek
+        /// reads the width), borrow the receiver once for the watch VFO's width
+        /// when neither the operating VFO nor a peek has told us it: at switch-on,
+        /// or after its mode or FIL slot changed to a pair not seen before. Just
+        /// the select, two reads and the hand-back, about a tenth of a second
+        /// of audio dip. Never during TX (the caller guards).
+        /// </summary>
+        private async Task MaybeBorrowWatchWidthAsync(CancellationToken ct)
+        {
+            if (!_crossBandPeek || !_watchInRange)
+                return;
+            RadioVfo active = ActiveVfo;
+            RadioVfo watch = active == RadioVfo.A ? RadioVfo.B : RadioVfo.A;
+            int i = VfoIndex(watch);
+            if (_modeFilSeen[i] is not { } seen || _widthKnownFor[i] == seen)
+                return;
+            long now = Environment.TickCount64;
+            if (now < _watchBorrowAfterTicks)
+                return;
+            _watchBorrowAfterTicks = now + WatchBorrowRetryMs;
+
+            await _peekGate.WaitAsync(ct);
+            try
+            {
+                if (await RawSelectVfoAsync(watch, ct))
+                    await ReadBorrowedWidthAsync(watch, ct);
+            }
+            finally
+            {
+                // As the peek: always hand the receiver back, with retries.
+                try
+                {
+                    for (int n = 0; n < 3 && !await RawSelectVfoAsync(active, ct); n++)
+                        await DelayQuiet(30, ct);
+                }
+                finally
+                {
+                    _peekGate.Release();
+                }
+            }
+            _logger.LogInformation("[CivRadioController] Borrowed VFO {Vfo} for its IF width: {Width}",
+                watch, watch == RadioVfo.A ? _state.IfWidthA : _state.IfWidthB);
         }
 
         /// <summary>Read the attenuator (command 11) as its raw byte. -1 on a miss; 0x20 = 20 dB.</summary>
@@ -3066,7 +3223,10 @@ namespace Icom_Web_Control.Services
                     // watch VFO on a different band. Internally rate-limited and a
                     // no-op unless the operator enabled it; never during TX.
                     if (!transmitting)
+                    {
                         await MaybePeekWatchBandAsync(stoppingToken);
+                        await MaybeBorrowWatchWidthAsync(stoppingToken);
+                    }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {

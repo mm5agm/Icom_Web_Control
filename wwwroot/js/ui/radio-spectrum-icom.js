@@ -21,6 +21,8 @@ const STATUS_TEXT = {
     outofrange: 'This VFO is outside the scope span',
 };
 const XWATCH_OFF_TEXT = 'Cross-band watch is off: X-WATCH switches it on';
+// Out of the sweep with X-WATCH on: the next peek fills it.
+const WAITING_TEXT = 'Waiting for data';
 
 const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
@@ -56,6 +58,7 @@ export function startIcomSpectrumPopout(root, cfg) {
         sel: 'A', freq: { A: 0, B: 0 }, mode: { A: '', B: '' }, widthHz: { A: null, B: null },
         band: { A: '', B: '' },
         xwatch: true,          // until the hub says (it does on connect)
+        scope: { A: '', B: '' },   // the last SdrStatus for each
         forcedView: null,      // { was, now }: the tab collapseWatch chose, and the one it replaced
     };
     const paneFor = id => (pseudoDual ? id : r.sel);
@@ -72,9 +75,14 @@ export function startIcomSpectrumPopout(root, cfg) {
     // could only say it was out of range, so only the VFO you hear shows,
     // and your own tab comes back when the bands meet or X-WATCH comes on.
     const watchVfo = () => (r.sel === 'A' ? 'B' : 'A');
-    const watchCollapsed = () => pseudoDual && !r.xwatch && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
+    const crossBand = () => pseudoDual && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
+    const watchCollapsed = () => crossBand() && !r.xwatch;
+    // The VFO you are not hearing is refreshed only by the peeks, on one band
+    // or two, one waterfall row each: its pane shows the trace alone.
+    const watchPeeked = () => (pseudoDual ? watchVfo() : null);
     function collapseWatch() {
         if (!pseudoDual) return;
+        for (const v of ['A', 'B']) pop.pane(v).setWaterfall(v !== watchPeeked());
         const view = pop.view;
         if (watchCollapsed()) {
             if (!r.forcedView) {
@@ -93,6 +101,11 @@ export function startIcomSpectrumPopout(root, cfg) {
         }
     }
     const statusText = (vfo, text) => (watchCollapsed() && vfo === watchVfo() ? XWATCH_OFF_TEXT : text);
+    function scopeStatus(id, st) {
+        r.scope[id] = st;
+        const vfo = paneFor(id);
+        pop.pane(vfo).setStatus(statusText(vfo, st === 'outofrange' && r.xwatch ? WAITING_TEXT : st in STATUS_TEXT ? STATUS_TEXT[st] : st));
+    }
 
     const spots = new Map();       // callsign -> { call, hz, at }
     function addSpot(sp) {
@@ -121,13 +134,15 @@ export function startIcomSpectrumPopout(root, cfg) {
         ...perVfo('A'),
         ...perVfo('B'),
         ActiveVfo: v => { r.sel = num(v) === 1 ? 'B' : 'A'; showIdlePane(); collapseWatch(); },
-        CrossBandWatch: v => { r.xwatch = !!v?.enabled; collapseWatch(); },
+        CrossBandWatch: v => {
+            r.xwatch = !!v?.enabled;
+            collapseWatch();
+            // Out of range says Waiting for data or not by X-WATCH.
+            for (const id of ['A', 'B']) if (r.scope[id] === 'outofrange') scopeStatus(id, 'outofrange');
+        },
         SdrStatus: v => {
             const id = v?.sdrId;
-            if (id !== 'A' && id !== 'B') return;
-            const st = String(v.status ?? '');
-            const vfo = paneFor(id);
-            pop.pane(vfo).setStatus(statusText(vfo, st in STATUS_TEXT ? STATUS_TEXT[st] : st));
+            if (id === 'A' || id === 'B') scopeStatus(id, String(v.status ?? ''));
         },
         SdrError: v => {
             const id = v?.sdrId;

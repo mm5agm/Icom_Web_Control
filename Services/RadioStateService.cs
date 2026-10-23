@@ -63,8 +63,8 @@ namespace Icom_Web_Control.Services
             MicGain = _initialState.MicGain;
             ProcEnabled = _initialState.ProcEnabled;
             ProcLevel = _initialState.ProcLevel;
-            IfWidthA = _initialState.IfWidthA ?? "";
-            IfWidthB = _initialState.IfWidthB ?? "";
+            IfWidthA = SavedWidth(_initialState.IfWidthA);
+            IfWidthB = SavedWidth(_initialState.IfWidthB);
             SelectedFilterA = _initialState.SelectedFilterA ?? "";
             SelectedFilterB = _initialState.SelectedFilterB ?? "";
             IfShiftA = _initialState.IfShiftA;
@@ -293,6 +293,13 @@ namespace Icom_Web_Control.Services
         // IC-7300 IF passband filter width, in Hz as a string (CI-V 1A 03).
         // "" = unknown / mode has no adjustable width (FM).
         private string _ifWidthA = "";
+        // A saved width is in Hz. Older builds saved a filter code here ("8"),
+        // which read as Hz drew a hairline passband and showed "8 Hz" on the VFO
+        // that is not polled until it is selected. The IC-7300's narrowest filter
+        // is 50 Hz, so anything less is not a width: unknown until the radio says.
+        private static string SavedWidth(string? s) =>
+            int.TryParse(s, out var hz) && hz >= 50 ? s! : "";
+
         public string IfWidthA { get => _ifWidthA; set => SetField(ref _ifWidthA, value); }
         private string _ifWidthB = "";
         public string IfWidthB { get => _ifWidthB; set => SetField(ref _ifWidthB, value); }
