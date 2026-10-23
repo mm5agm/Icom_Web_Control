@@ -34,6 +34,7 @@
             conn,
             popout,
             pseudoDual: @(Model.PseudoDualReceiverEnabled ? "true" : "false"),
+            autoModeChangeOnTune: @(Model.AutoModeChangeOnTune ? "true" : "false"),
         });
         offerScreenPermission(root.querySelector('.rp-spop-body'));
     </script>

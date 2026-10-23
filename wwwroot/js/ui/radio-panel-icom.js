@@ -21,16 +21,16 @@
 
 import { mountRadioPanel } from '/js/radio-panel/radio-panel.js';
 import { alignBins, txMeterFraction, rangeLegends } from '/js/radio-panel/panel-math.js';
-import { BAND_PLANS, BAND_EDGES, nearestBandForHz, loadBandPlanFromServer, autoModeForHz, getSegments, segmentForHz } from '/js/ui/band-plan.js';
+import { BAND_PLANS, BAND_EDGES, nearestBandForHz, loadBandPlanFromServer, getSegments, segmentForHz } from '/js/ui/band-plan.js';
 import { calibrateNumeric, loadFromBackend } from '/js/calibration/calibration-engine.js';
 import { ICOM_WINDOWS, startIcomWindows } from '/js/ui/radio-panel-icom-windows.js';
 import { PopoutHost } from '/js/popout/popout.js';
 import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
+import { MODES, spectrumTarget as clickTarget } from '/js/ui/spectrum-tune-icom.js';
 
 const BANDS = ['160m', '80m', '60m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m', '4m'];
 // The IC-7300's modes as IWC shows them (CW-L is CW-R, RTTY-U is RTTY-R,
 // DATA-U / DATA-L are USB-D / LSB-D). The mode endpoint takes these names.
-const MODES = ['LSB', 'USB', 'CW-U', 'CW-L', 'RTTY-L', 'RTTY-U', 'AM', 'FM', 'DATA-L', 'DATA-U'];
 const MODE_LABEL = { 'CW-U': 'CW', 'CW-L': 'CW-R', 'RTTY-L': 'RTTY', 'RTTY-U': 'RTTY-R', 'DATA-L': 'LSB-D', 'DATA-U': 'USB-D' };
 const AGC = { '1': 'FAST', '2': 'MID', '3': 'SLOW' };
 const AGC_NEXT = { '1': '2', '2': '3', '3': '1' };
@@ -673,13 +673,8 @@ export function startIcomRadioPanel(root, cfg) {
     }
 
     // ---- click-to-tune on the scope ---------------------------------------
-    // Classic's rule: the band plan may pick the mode (unless Settings turns
-    // that off). IWC's Classic tunes to the clicked frequency in every mode.
-    function spectrumTarget(v, hz) {
-        const auto = autoModeForHz(hz);
-        const mode = auto && MODES.includes(auto) ? auto : null;
-        return { mode, to: Math.round(hz) };
-    }
+    // The rule is in spectrum-tune-icom.js, shared with the pop-out spectrum.
+    const spectrumTarget = (v, hz) => clickTarget(hz);
     function spectrumTune(v, hz) {
         if (!(hz > 0)) return;
         const { mode, to } = spectrumTarget(v, hz);

@@ -5,13 +5,18 @@
 // its bins arrive RF-ordered, so the only correction is shifting them so the
 // dial sits in the middle. Without pseudo-dual the server tags every frame
 // 'A' and the sweep follows the selected VFO, so frames go to that VFO's
-// pane. The span picker sets the radio's scope span - the one write here.
+// pane. The span picker sets the radio's scope span, and a click on a pane
+// tunes that VFO as a click on the board does (spectrum-tune-icom.js), and
+// the mouse wheel steps it by the board's STEP.
 // With X-WATCH off and the VFOs on different bands the watch pane is hidden,
 // as on the board (collapseWatch there).
 
 import { mountSpectrumPopout } from '/js/radio-panel/spectrum-popout.js';
 import { alignBins, spanText } from '/js/radio-panel/panel-math.js';
 import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
+import { loadBandPlanFromServer } from '/js/ui/band-plan.js';
+import { spectrumTarget } from '/js/ui/spectrum-tune-icom.js';
+import { dialStepper } from '/js/radio-panel/dial-stepper.js';
 
 const SPANS_HZ = [5e3, 10e3, 20e3, 50e3, 100e3, 200e3, 500e3, 1e6];
 const SPOT_MAX_AGE_MS = 30 * 60 * 1000;
@@ -24,14 +29,32 @@ const XWATCH_OFF_TEXT = 'Cross-band watch is off: X-WATCH switches it on';
 // Out of the sweep with X-WATCH on: the next peek fills it.
 const WAITING_TEXT = 'Waiting for data';
 
+// The board's STEP (radio-panel-icom.js), saved in this browser.
+const STEP_KEY = 'iwc.radioPanel.stepHz';
+const STEPS_HZ = [10, 50, 100, 500, 1000, 5000, 10000];
+
 const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+function boardStepHz() {
+    let hz = 0;
+    try { hz = num(localStorage.getItem(STEP_KEY)); } catch { /* private window */ }
+    return STEPS_HZ.includes(hz) ? hz : 100;
+}
+
+function post(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(res => { if (!res.ok) console.warn('spectrum:', url, res.status); return res; })
+        .catch(e => console.warn('spectrum:', url, e));
+}
 
 /**
  * @param {HTMLElement} root
- * @param {object} cfg  { conn, popout, pseudoDual }  popout: the page's PopoutChild
+ * @param {object} cfg  { conn, popout, pseudoDual, autoModeChangeOnTune }  popout: the page's PopoutChild
  */
 export function startIcomSpectrumPopout(root, cfg) {
     const pseudoDual = !!cfg.pseudoDual;
+    // band-plan.js reads this to decide whether a click may change mode.
+    if (cfg.autoModeChangeOnTune === false) globalThis.iwcAutoModeChangeOnTune = false;
+    loadBandPlanFromServer();
     const panes = [{ id: 'A', tab: 'VFO-A', name: 'VFO-A · SCOPE' }, { id: 'B', tab: 'VFO-B', name: 'VFO-B · SCOPE' }];
 
     const pop = mountSpectrumPopout(root, {
@@ -48,6 +71,13 @@ export function startIcomSpectrumPopout(root, cfg) {
                 .then(res => { if (!res.ok) console.warn('spectrum: span', res.status); })
                 .catch(e => console.warn('spectrum: span', e));
         },
+        onTune: (vfo, hz) => {
+            if (!(hz > 0)) return;
+            const { mode, to } = spectrumTarget(hz);
+            post(`/api/cat/frequency/${vfo.toLowerCase()}`, { frequencyHz: to });
+            if (mode && mode !== r.mode[vfo]) post(`/api/cat/mode/${vfo.toLowerCase()}`, { mode });
+        },
+        onStep: (vfo, dir) => stepper.turn(vfo, dir),
         onReattach: () => cfg.popout?.reattach(),
         onClose: () => window.close(),
         storagePrefix: 'iwc.radioPanel.',
@@ -62,6 +92,13 @@ export function startIcomSpectrumPopout(root, cfg) {
         forcedView: null,      // { was, now }: the tab collapseWatch chose, and the one it replaced
     };
     const paneFor = id => (pseudoDual ? id : r.sel);
+    const stepper = dialStepper({
+        stepHz: boardStepHz,
+        freq: vfo => r.freq[vfo],
+        show: (vfo, hz) => { r.freq[vfo] = hz; pop.pane(vfo).setFrequency(hz); },
+        write: (vfo, hz) => post(`/api/cat/frequency/${vfo.toLowerCase()}`, { frequencyHz: hz }),
+        maxHz: num(cfg.maxHz) || 74_800_000,
+    });
     const refreshPassband = vfo => pop.pane(vfo).setPassband(r.mode[vfo], r.widthHz[vfo]);
 
     function showIdlePane() {
@@ -125,7 +162,7 @@ export function startIcomSpectrumPopout(root, cfg) {
     setInterval(publishSpots, 60_000);
 
     const perVfo = vfo => ({
-        ['Frequency' + vfo]: v => { r.freq[vfo] = num(v); pop.pane(vfo).setFrequency(r.freq[vfo]); },
+        ['Frequency' + vfo]: v => { if (stepper.holds(vfo)) return; r.freq[vfo] = num(v); pop.pane(vfo).setFrequency(r.freq[vfo]); },
         ['Mode' + vfo]: v => { r.mode[vfo] = String(v ?? ''); refreshPassband(vfo); },
         ['IfWidth' + vfo]: v => { r.widthHz[vfo] = v === '' || v == null ? null : num(v); refreshPassband(vfo); },
         ['Band' + vfo]: v => { r.band[vfo] = String(v ?? ''); pop.pane(vfo).clear(); collapseWatch(); },
