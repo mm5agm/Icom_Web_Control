@@ -106,6 +106,22 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
 
+### v1.6.0-pre4 (2026-10-23)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre3, pre2 and pre1 below.
+>
+> **What needs testing:** the pop-out spectrum window: clicking and turning the mouse wheel on it, and the watch pane with X-Watch on and the VFOs on different bands.
+
+- **The pop-out spectrum window tunes like the Radio panel.** Click it to tune there, and turn the mouse wheel to move the dial by the panel's **STEP** a notch. A line and a readout follow the mouse and show the frequency a click would send. Each pane has the panel's **SCOPE** settings beside **HOLD**, the window can be resized from its corner, and the text is larger and readable in every theme. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+- **The cross-band watch shows its trace without the waterfall.** A watch VFO on another band only gets one scope sweep per X-Watch peek, so its waterfall was a near-empty box. With X-Watch on and the VFOs on different bands, that pane now shows its trace on its own, and in the pop-out window the other pane takes the room. While it waits for the next peek it says **Waiting for data** rather than that it is out of range. The Radio panel's main dial now shows **A** or **B** for the VFO it tunes.
+- **The other VFO's passband has its real width.** The radio only reports the IF width of the VFO in use, so the other VFO's passband was a hairline until you selected it. IWC now learns each filter slot's width per mode, reads it during each cross-band peek, and, with X-Watch on and both VFOs on one band, borrows the receiver once for about a tenth of a second when it can't know it any other way. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+- **The Radio panel's FILTER key shows the slot and its width**, and the labels under the keys are drawn in each key's own colour, so they can be read on the dark keys.
+- **A corner grip scales the Radio panel.** Drag it to any size; the size picker lists it as a percentage and keeps it.
+- **The manual explains the passband shading**: where the shaded passband sits for each mode, and why it can sit above or below the dial. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+- **Fixed: in USB-D and LSB-D the Radio panel drew the passband centred on the dial**, where the pop-out window drew it on the correct side. Both now agree.
+- **Fixed: the readout under the mouse went stale while the dial moved.** With the mouse held still over the spectrum, the readout now keeps showing the frequency under it as the trace moves, on the Radio panel and in the pop-out window.
+- **Fixed: a pop-out window on a screen too short for it never kept its size**, and opened at the default size every time, which didn't fit either. It now keeps the size you gave it.
+
 ### v1.6.0-pre3 (2026-10-22)
 
 > **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre2 and v1.6.0-pre1 below.
