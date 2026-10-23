@@ -5,13 +5,16 @@
 // its bins arrive RF-ordered, so the only correction is shifting them so the
 // dial sits in the middle. Without pseudo-dual the server tags every frame
 // 'A' and the sweep follows the selected VFO, so frames go to that VFO's
-// pane. The span picker sets the radio's scope span - the one write here.
+// pane. The span picker sets the radio's scope span, and a click on a pane
+// tunes that VFO as a click on the board does (spectrum-tune-icom.js).
 // With X-WATCH off and the VFOs on different bands the watch pane is hidden,
 // as on the board (collapseWatch there).
 
 import { mountSpectrumPopout } from '/js/radio-panel/spectrum-popout.js';
 import { alignBins, spanText } from '/js/radio-panel/panel-math.js';
 import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
+import { loadBandPlanFromServer } from '/js/ui/band-plan.js';
+import { spectrumTarget } from '/js/ui/spectrum-tune-icom.js';
 
 const SPANS_HZ = [5e3, 10e3, 20e3, 50e3, 100e3, 200e3, 500e3, 1e6];
 const SPOT_MAX_AGE_MS = 30 * 60 * 1000;
@@ -26,12 +29,21 @@ const WAITING_TEXT = 'Waiting for data';
 
 const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
+function post(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(res => { if (!res.ok) console.warn('spectrum:', url, res.status); return res; })
+        .catch(e => console.warn('spectrum:', url, e));
+}
+
 /**
  * @param {HTMLElement} root
- * @param {object} cfg  { conn, popout, pseudoDual }  popout: the page's PopoutChild
+ * @param {object} cfg  { conn, popout, pseudoDual, autoModeChangeOnTune }  popout: the page's PopoutChild
  */
 export function startIcomSpectrumPopout(root, cfg) {
     const pseudoDual = !!cfg.pseudoDual;
+    // band-plan.js reads this to decide whether a click may change mode.
+    if (cfg.autoModeChangeOnTune === false) globalThis.iwcAutoModeChangeOnTune = false;
+    loadBandPlanFromServer();
     const panes = [{ id: 'A', tab: 'VFO-A', name: 'VFO-A · SCOPE' }, { id: 'B', tab: 'VFO-B', name: 'VFO-B · SCOPE' }];
 
     const pop = mountSpectrumPopout(root, {
@@ -47,6 +59,12 @@ export function startIcomSpectrumPopout(root, cfg) {
             })
                 .then(res => { if (!res.ok) console.warn('spectrum: span', res.status); })
                 .catch(e => console.warn('spectrum: span', e));
+        },
+        onTune: (vfo, hz) => {
+            if (!(hz > 0)) return;
+            const { mode, to } = spectrumTarget(hz);
+            post(`/api/cat/frequency/${vfo.toLowerCase()}`, { frequencyHz: to });
+            if (mode && mode !== r.mode[vfo]) post(`/api/cat/mode/${vfo.toLowerCase()}`, { mode });
         },
         onReattach: () => cfg.popout?.reattach(),
         onClose: () => window.close(),
