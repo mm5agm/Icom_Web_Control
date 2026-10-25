@@ -1331,6 +1331,22 @@ If the connection drops, the app reconnects automatically after 15 seconds. Disa
 
 ### 6.6 Backup & Restore
 
+**Two different saves.** The Settings page has two ways to save, and they save different things:
+
+| | Backup & Restore | Radio Menu |
+|---|---|---|
+| **What it saves** | IWC's own settings: COM port, band plan, memories, DX cluster, per-band memory and the rest | The radio's own menu settings: what you see when you press **MENU** and touch **SET** on the radio |
+| **Where those settings live** | On this PC, in `%APPDATA%\MM5AGM\Icom Web Control` | Inside the radio |
+| **Button** | **Export full backup** | **Save radio menu to file** |
+| **File** | `iwc-backup-YYYYMMDD-HHMMSS.zip` | `IWC radio menu <model> <date> <time>.ini` |
+| **Open it with** | Unzip it; the files inside are JSON | Notepad, or any text editor |
+| **Putting it back** | **Import full backup…**, then restart IWC | Not available yet |
+| **Does it change the radio?** | No | No, it only reads the radio |
+
+Use **Backup & Restore** to move IWC to a new PC or undo a change to IWC's settings. Use **Radio Menu** to keep a record of how the radio itself is set up, for example before a factory reset or a firmware update, or to keep one file for contesting and another for everyday use. Neither save includes the other: the backup zip has no radio menu settings in it, and the radio menu file has none of IWC's settings.
+
+#### Backup & Restore
+
 At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete IWC user data as a **single zip file**. This rolls up everything you've customised across the app into one file:
 
 | File in the zip | What it contains |
@@ -1363,6 +1379,26 @@ Click **Import full backup…**, pick a previously exported zip, and confirm the
 - **Experimenting safely** — export before trying something risky; import the file to revert if it goes wrong.
 
 The files inside the zip are plain JSON; you can extract and inspect or hand-edit them if needed. They live at `%APPDATA%\MM5AGM\Icom Web Control\` and are also accessible directly without going through the export.
+
+#### Radio Menu
+
+Click **Save radio menu to file** in the **Radio Menu** section of the Settings page. IWC reads every item of the radio's menu, 270 items, several seconds, and downloads the file. Available for the IC-7300MK2.
+
+The file is grouped the way the radio's menu is. Each line shows the item and its value as the radio's screen shows it. After the `;` come the 1A 05 menu number and what the radio answered, which is what a future **Load** will use to put the item back exactly:
+
+```ini
+[SET > Tone Control/TBW > TX > SSB]
+TBW (MID) = 300-2700 Hz                  ; 00 15 = 14  [TX]
+
+[SET > Function]
+REF Adjust = 23%                         ; 00 68 = 00 59
+```
+
+- **`[TX]`** marks items that change how or when the radio transmits. When Load is added, these will be left alone unless you choose them.
+- **`(no answer)`** means the radio did not reply for that item, usually because it does not apply to the radio's current setup. On the IC-7300MK2, *Display Language* and *Japanese Morse Decode* may show this.
+- Save as many files as you like and rename them for how you use the radio, for example `IWC radio menu contest.ini`.
+
+Saving only reads the radio. Nothing on the radio changes.
 
 ---
 
