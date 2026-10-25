@@ -1338,10 +1338,11 @@ If the connection drops, the app reconnects automatically after 15 seconds. Disa
 | **What it saves** | IWC's own settings: COM port, band plan, memories, DX cluster, per-band memory and the rest | The radio's own menu settings: what you see when you press **MENU** and touch **SET** on the radio |
 | **Where those settings live** | On this PC, in `%APPDATA%\MM5AGM\Icom Web Control` | Inside the radio |
 | **Button** | **Export full backup** | **Save radio menu to file** |
-| **File** | `iwc-backup-YYYYMMDD-HHMMSS.zip`, in `%APPDATA%\MM5AGM\Icom Web Control\Backups` | `IWC radio menu <model> <date> <time>.ini` |
+| **File** | `iwc-backup-YYYYMMDD-HHMMSS.zip`, in `%APPDATA%\MM5AGM\Icom Web Control\Backups` | `IWC radio menu <model> <date> <time>.ini`, in `%APPDATA%\MM5AGM\Icom Web Control\Radio menus` |
 | **Open it with** | Unzip it; the files inside are JSON | Notepad, or any text editor |
-| **Putting it back** | **Import full backup…**, then restart IWC | Not available yet |
-| **Does it change the radio?** | No | No, it only reads the radio |
+| **Putting it back** | **Import full backup…**, then restart IWC | **Load this one** or **Load from another file…**, then tick what to send |
+| **Changing one setting** | Change it on the Settings page | **Change radio settings…**, pick the new value, then send |
+| **Does it change the radio?** | No | Saving only reads the radio. Loading changes only the items you tick |
 
 Use **Backup & Restore** to move IWC to a new PC or undo a change to IWC's settings. Use **Radio Menu** to keep a record of how the radio itself is set up, for example before a factory reset or a firmware update, or to keep one file for contesting and another for everyday use. Neither save includes the other: the backup zip has no radio menu settings in it, and the radio menu file has none of IWC's settings.
 
@@ -1382,23 +1383,60 @@ The files inside the zip are plain JSON; you can extract and inspect or hand-edi
 
 #### Radio Menu
 
-Click **Save radio menu to file** in the **Radio Menu** section of the Settings page. IWC reads every item of the radio's menu, 270 items, several seconds, and downloads the file. Available for the IC-7300MK2.
+**Change radio settings…**
 
-The file is grouped the way the radio's menu is. Each line shows the item and its value as the radio's screen shows it. After the `;` come the 1A 05 menu number and what the radio answered, which is what a future **Load** will use to put the item back exactly:
+The quickest way to change one of the radio's menu items is **Change radio settings…** in the **Radio Menu** section. IWC reads every item from the radio, several seconds, and lists them, grouped as the radio's menu is, each with its value now:
+
+- Pick a new value from the item's list. Every list holds only the settings the radio offers. The keyer's **Present Number** has too many settings for a list, so type the number instead; if the value is not one the radio takes, the Note column says so and nothing can be sent.
+- **My Call** is a box to type in: up to 10 letters, numbers and `/ @ . -`. **NTP Server Address** takes up to 64 characters.
+- Type in **Find an item** to show only matching items, for example `TX Delay` or `Beep`. Tick **Show only what I have changed** to check your changes before sending.
+- Each changed item is highlighted and its Note says what it was. **Undo my changes** puts them all back. Items marked **TX** change how or when the radio transmits.
+- The CI-V and network items, and the date and time, are shown but cannot be changed here. A wrong CI-V or network setting would cut IWC off from the radio, and the clock is set on the radio or by NTP.
+- A few items cannot be changed here. The colours can be edited in a saved file and loaded (below). The scope's fixed edges and the FM split offsets are changed on the radio; a saved file can only put them back as they were.
+
+**Nothing is sent until you press Send my changes to the radio** and confirm the list. IWC sends each change, reads it back, and shows **Sent and read back** or what went wrong. Then it saves a new radio menu file (below), so you have a record of the radio after the change. **Read the radio again** refreshes the list, for example after changing something on the radio itself.
+
+**Save radio menu to file**
+
+Click **Save radio menu to file** in the **Radio Menu** section of the Settings page. IWC reads every item of the radio's menu, 270 items, several seconds, and writes the file. Available for the IC-7300MK2.
+
+The file goes in `%APPDATA%\MM5AGM\Icom Web Control\Radio menus`, with IWC's other files, on the PC that runs IWC. The page shows the full path after each save, and **Open that folder** opens it in Explorer. If you use IWC from a browser on another PC, pick the file under **Saved files** and click **Download a copy** to get it on that PC.
+
+The file is grouped the way the radio's menu is. Each line shows the item and its value as the radio's screen shows it. After the `;` come the 1A 05 menu number and what the radio answered:
 
 ```ini
 [SET > Tone Control/TBW > TX > SSB]
 TBW (MID) = 300-2700 Hz                  ; 00 15 = 14  [TX]
 
 [SET > Function]
-REF Adjust = 23%                         ; 00 68 = 00 59
+Beep Level = 50%                         ; 00 22 = 01 28
 ```
 
-- **`[TX]`** marks items that change how or when the radio transmits. When Load is added, these will be left alone unless you choose them.
+- **`[TX]`** marks items that change how or when the radio transmits. Load leaves these unticked.
 - **`(no answer)`** means the radio did not reply for that item, usually because it does not apply to the radio's current setup. On the IC-7300MK2, *Display Language* and *Japanese Morse Decode* may show this.
 - Save as many files as you like and rename them for how you use the radio, for example `IWC radio menu contest.ini`.
 
 Saving only reads the radio. Nothing on the radio changes.
+
+**Loading a file**
+
+Pick a file from **Saved files** and click **Load this one**, or click **Load from another file…** to pick a file from anywhere else, such as one a friend emailed you. IWC reads the radio again and shows a table of what would change: the item, its value on the radio now, and its value in the file. **Nothing is sent at this point.**
+
+- Items that would change have a tick box. Items marked **TX** start unticked; tick them only if you want them.
+- Items already the same are hidden. Tick **Show items that are already the same** to see them.
+- Items that cannot be loaded say why in the Note column, for example a value the radio does not offer.
+- **The CI-V and network items are never loaded**, because a wrong one would cut IWC off from the radio, and nor are the date and time. Change them on the radio if you need to.
+
+Press **Send ticked items to the radio** and confirm. IWC sends each ticked item, reads it back, and shows **Sent and read back** or what went wrong.
+
+**Editing the file.** You can change a value in Notepad before loading it. Change the text after `=`, as the radio's screen would show it, and leave the part after `;` alone. For example, to set the HF TX Delay to 20 ms:
+
+```ini
+[SET > Function > TX Delay]
+HF = 20 ms                               ; 00 29 = 00  [TX]
+```
+
+The value after `=` is what counts; the numbers after `;` are only used when you have not changed the value. Capitals, spaces and a leading `+` do not matter, and you can leave the unit off (`20` works as well as `20 ms`). The value must be one the radio offers: `ON` is not, because this item's settings are OFF, 10, 15, 20, 25 and 30 ms. If you type something the radio does not offer, the Note column says so and lists what the item takes. A colour is written `R 255 G 128 B 0`, each from 0 to 255. The scope's fixed edges and the FM split offsets can only be put back as they were saved, not edited.
 
 ---
 

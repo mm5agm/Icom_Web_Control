@@ -2382,6 +2382,19 @@ namespace Icom_Web_Control.Services
             return reply.Data[3..];
         }
 
+        /// <summary>See <see cref="IRadioController.WriteMenuItemAsync"/>.</summary>
+        public async Task<bool?> WriteMenuItemAsync(int number, byte[] data, CancellationToken cancellationToken = default)
+        {
+            // No data after the item number is a read, not a write.
+            if (number is < 1 or > 9999 || data.Length == 0) return null;
+            byte hi = (byte)(((number / 1000) << 4) | (number / 100 % 10));
+            byte lo = (byte)(((number / 10 % 10) << 4) | (number % 10));
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                new byte[] { CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo }.Concat(data).ToArray());
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, 500, cancellationToken);
+            return reply?.Cmd == CivProtocol.AckOk ? true : reply?.Cmd == CivProtocol.AckNg ? false : null;
+        }
+
         /// <summary>Write a one-byte SET-menu item (1A 05 hi lo val), value 0–99 as BCD.</summary>
         private async Task WriteSetMenuByteAsync(byte hi, byte lo, int value, string what, CancellationToken ct)
         {

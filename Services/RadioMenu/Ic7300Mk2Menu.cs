@@ -27,8 +27,12 @@ public static class Ic7300Mk2Menu
         string section = "", group = "";
         void Section(string name) => section = name;
         void Group(string name) => group = name;
-        void Item(int number, string function, Func<byte[], string> decode, bool tx = false)
-            => items.Add(new RadioMenuItem(number, section, group, function, decode, tx));
+        void Item(int number, string function, RadioMenuCodec codec, bool tx = false, string? fix = null)
+            => items.Add(new RadioMenuItem(number, section, group, function, codec, tx, fix));
+
+        // Items Load and the editor leave alone, and why.
+        const string link = "This sets the CI-V or network link itself, so IWC leaves it alone. Change it on the radio.";
+        const string clock = "The clock is not a setting, so IWC leaves it alone. Set it on the radio or with NTP.";
 
         var onOff = Choice("OFF", "ON");
         var hpfLpf = HpfLpf();
@@ -36,7 +40,6 @@ public static class Ic7300Mk2Menu
         var percent = Percent();
         var rgb = Rgb();
         var ip = Ip();
-        var text = Text();
         string[] txDelay = { "OFF", "10 ms", "15 ms", "20 ms", "25 ms", "30 ms" };
         string[] outputSelect = { "AF", "IF" };
         string[] afSql = { "OFF (OPEN)", "ON" };
@@ -168,13 +171,13 @@ public static class Ic7300Mk2Menu
         Item(87, "KEYER", onOff, tx: true);
         Item(88, "RTTY", onOff, tx: true);
         Group("Connectors > CI-V");
-        Item(89, "CI-V Transceive", onOff);
-        Item(90, "USB/LAN→REMOTE Transceive Address", HexAddress());
-        Item(91, "CI-V Output (for ANT)", onOff);
-        Item(92, "CI-V USB (A) Echo Back", onOff);
-        Item(93, "CI-V USB (B) Echo Back", onOff);
+        Item(89, "CI-V Transceive", onOff, fix: link);
+        Item(90, "USB/LAN→REMOTE Transceive Address", HexAddress(), fix: link);
+        Item(91, "CI-V Output (for ANT)", onOff, fix: link);
+        Item(92, "CI-V USB (A) Echo Back", onOff, fix: link);
+        Item(93, "CI-V USB (B) Echo Back", onOff, fix: link);
         Group("Connectors");
-        Item(94, "USB (B) Function", Choice("RTTY Decode", "CI-V"));
+        Item(94, "USB (B) Function", Choice("RTTY Decode", "CI-V"), fix: link);
         Item(95, "SEND Relay Output", onOff, tx: true);
         Group("Connectors > USB SEND/Keying");
         Item(96, "USB SEND", Choice(usbLine), tx: true);
@@ -184,22 +187,22 @@ public static class Ic7300Mk2Menu
         Item(99, "PTT Port Function", Choice("PTT Input", "PTT Input + SEND Output"), tx: true);
 
         Group("Network");
-        Item(100, "DHCP", onOff);
-        Item(101, "IP Address", ip);
-        Item(102, "IP Address (from DHCP)", ip);
-        Item(103, "Subnet Mask", SubnetMask());
-        Item(104, "Default Gateway", ip);
-        Item(105, "Primary DNS Server", ip);
-        Item(106, "Secondary DNS Server", ip);
-        Item(107, "Network Name", text);
+        Item(100, "DHCP", onOff, fix: link);
+        Item(101, "IP Address", ip, fix: link);
+        Item(102, "IP Address (from DHCP)", ip, fix: link);
+        Item(103, "Subnet Mask", SubnetMask(), fix: link);
+        Item(104, "Default Gateway", ip, fix: link);
+        Item(105, "Primary DNS Server", ip, fix: link);
+        Item(106, "Secondary DNS Server", ip, fix: link);
+        Item(107, "Network Name", Text(15, "A-Z0-9_-"), fix: link);
         Group("Network > Remote Settings");
-        Item(108, "Network Control", onOff);
-        Item(109, "Power OFF Setting (for Remote Control)", Choice("Only Shutdown", "Standby/Shutdown"));
-        Item(110, "Control Port (UDP)", Number(""));
-        Item(111, "Serial Port (UDP)", Number(""));
-        Item(112, "Audio Port (UDP)", Number(""));
-        Item(113, "Internet Access Line", Choice("FTTH", "ADSL/CATV"));
-        Item(114, "Network Radio Name", text);
+        Item(108, "Network Control", onOff, fix: link);
+        Item(109, "Power OFF Setting (for Remote Control)", Choice("Only Shutdown", "Standby/Shutdown"), fix: link);
+        Item(110, "Control Port (UDP)", Number(""), fix: link);
+        Item(111, "Serial Port (UDP)", Number(""), fix: link);
+        Item(112, "Audio Port (UDP)", Number(""), fix: link);
+        Item(113, "Internet Access Line", Choice("FTTH", "ADSL/CATV"), fix: link);
+        Item(114, "Network Radio Name", Text(16, " -~"), fix: link);
 
         Group("Display");
         Item(115, "LCD Backlight", percent);
@@ -217,18 +220,18 @@ public static class Ic7300Mk2Menu
         Item(126, "Audio Output", onOff);
         Group("Display");
         Item(127, "Opening Message", onOff);
-        Item(128, "My Call", text);
+        Item(128, "My Call", Text(10, "A-Z0-9/@.-"));
         Item(129, "Power ON Check", onOff);
         Item(130, "Display Language", Choice("English", "Japanese"));
         Item(131, "System Language", Choice("English", "Japanese"));
 
         // The clock: saved so the file is complete, but it is not a setting
-        // and a Load must never write it back.
+        // and a Load never writes it back.
         Group("Time Set > Date/Time");
-        Item(132, "Date", Date());
-        Item(133, "Time", Time());
+        Item(132, "Date", Date(), fix: clock);
+        Item(133, "Time", Time(), fix: clock);
         Item(134, "NTP Function", onOff);
-        Item(135, "NTP Server Address", text);
+        Item(135, "NTP Server Address", Text(64, "A-Za-z0-9.-", upper: false));
         Group("Time Set");
         Item(136, "UTC Offset", UtcOffset());
 
@@ -274,13 +277,13 @@ public static class Ic7300Mk2Menu
         Item(208, "Number Style", Choice("Normal", "190→ANO", "190→ANT", "90→NO", "90→NT"));
         for (int m = 1; m <= 8; m++)
             Item(208 + m, $"Count Up Trigger (M{m})", onOff);
-        Item(217, "Present Number", Number(""));
+        Item(217, "Present Number", Number("", 1, 9999, 2));
 
         Section("SET");
         Group("CW-KEY Set");
         Item(218, "Side Tone Level", percent);
         Item(219, "Side Tone Level Limit", onOff);
-        Item(220, "Keyer Repeat Time", Number(" sec"));
+        Item(220, "Keyer Repeat Time", Number(" sec", 1, 60));
         Item(221, "Dot/Dash Ratio", DotDash(), tx: true);
         Item(222, "Rise Time", Choice("2 ms", "4 ms", "6 ms", "8 ms"), tx: true);
         Item(223, "Paddle Polarity", Choice("Normal", "Reverse"), tx: true);
@@ -306,7 +309,7 @@ public static class Ic7300Mk2Menu
         Group("RTTY DECODE > TX MEM > EDIT/SET > 001 SET");
         for (int m = 1; m <= 8; m++)
             Item(234 + m, $"Count Up Trigger (RT{m})", onOff);
-        Item(243, "Present Number", Number(""));
+        Item(243, "Present Number", Number("", 1, 9999, 2));
 
         Section("RTTY DECODE LOG");
         Group("RTTY DECODE > LOG");
@@ -334,7 +337,7 @@ public static class Ic7300Mk2Menu
         Item(255, "TX LEVEL", percent, tx: true);
         Group("VOICE > REC/SET > SET");
         Item(256, "Auto Monitor", onOff);
-        Item(257, "Repeat Time", Number(" sec"));
+        Item(257, "Repeat Time", Number(" sec", 1, 15));
 
         Section("RECORD");
         Group("Recorder Set");
@@ -352,27 +355,50 @@ public static class Ic7300Mk2Menu
 
         Section("FUNCTION");
         Group("NB");
-        Item(265, "DEPTH", Offset(1, ""));
+        Item(265, "DEPTH", Offset(1, "", 9));
         Item(266, "WIDTH", Scaled(1, 100, ""));
         Group("VOX");
-        Item(267, "Delay", Tenths(" sec"), tx: true);
+        Item(267, "Delay", Tenths(" sec", 20), tx: true);
         Item(268, "Voice Delay", Choice("OFF", "Short", "Mid", "Long"), tx: true);
         Group("APF");
         Item(269, "TYPE", Choice("SHARP", "SOFT"));
-        Item(270, "AF LEVEL", Number(" dB"));
+        Item(270, "AF LEVEL", Number(" dB", 0, 6));
 
         return items;
     }
 
-    // -- Decoders --------------------------------------------------------------
+    // -- Codecs ----------------------------------------------------------------
     // Every decoder falls back to the bytes in hex when the reply is not the
     // shape the manual gives, so an unexpected answer is still saved as sent.
+    // Values lists what Load and the editor may send; an item without them can
+    // only be put back as it was saved.
 
-    private static string Hex(byte[] d) => string.Join(" ", d.Select(b => b.ToString("X2")));
+    private static string Hex(byte[] d) => RadioMenuFile.Hex(d);
 
     private static int Bcd(byte b) => ((b >> 4) & 0x0F) * 10 + (b & 0x0F);
 
     private static bool IsBcd(byte b) => (b >> 4) <= 9 && (b & 0x0F) <= 9;
+
+    private static byte ToBcd(int v) => (byte)(((v / 10) << 4) | (v % 10));
+
+    /// <summary>A number as <paramref name="bytes"/> bytes of BCD, most significant first: 255 = 02 55.</summary>
+    private static byte[] BigBcdBytes(long v, int bytes)
+    {
+        var d = new byte[bytes];
+        for (int i = bytes - 1; i >= 0; i--)
+        {
+            d[i] = ToBcd((int)(v % 100));
+            v /= 100;
+        }
+        return d;
+    }
+
+    private static IReadOnlyList<byte[]> Range(long min, long max, int bytes)
+    {
+        var list = new List<byte[]>();
+        for (long v = min; v <= max; v++) list.Add(BigBcdBytes(v, bytes));
+        return list;
+    }
 
     /// <summary>The bytes as one decimal number, most significant first: 02 55 = 255.</summary>
     private static long? BigBcd(ReadOnlySpan<byte> d)
@@ -400,70 +426,98 @@ public static class Ic7300Mk2Menu
         return v * 100;
     }
 
-    private static Func<byte[], string> Choice(params string[] names) =>
-        d => d.Length == 1 && IsBcd(d[0]) && Bcd(d[0]) < names.Length ? names[Bcd(d[0])] : Hex(d);
+    private static RadioMenuCodec Choice(params string[] names) => new(
+        d => d.Length == 1 && IsBcd(d[0]) && Bcd(d[0]) < names.Length ? names[Bcd(d[0])] : Hex(d),
+        Range(0, names.Length - 1, 1));
 
-    private static Func<byte[], string> Number(string unit) =>
-        d => BigBcd(d) is long v ? $"{v}{unit}" : Hex(d);
+    /// <summary>A number with no range given: shown, never sent.</summary>
+    private static RadioMenuCodec Number(string unit) => new(
+        d => BigBcd(d) is long v ? $"{v}{unit}" : Hex(d));
 
-    private static Func<byte[], string> Offset(int first, string unit) =>
-        d => BigBcd(d) is long v ? $"{v + first}{unit}" : Hex(d);
+    private static RadioMenuCodec Number(string unit, int min, int max, int bytes = 1) => new(
+        d => d.Length == bytes && BigBcd(d) is long v && v >= min && v <= max ? $"{v}{unit}" : Hex(d),
+        Range(min, max, bytes));
 
-    private static Func<byte[], string> Tenths(string unit) =>
-        d => BigBcd(d) is long v ? $"{v / 10.0:0.0}{unit}" : Hex(d);
+    /// <summary>00–<paramref name="max"/> shown from <paramref name="first"/>: DEPTH 00–09 = 1–10.</summary>
+    private static RadioMenuCodec Offset(int first, string unit, int max) => new(
+        d => d.Length == 1 && BigBcd(d) is long v && v <= max ? $"{v + first}{unit}" : Hex(d),
+        Range(0, max, 1));
+
+    /// <summary>00–<paramref name="max"/> in tenths: VOX Delay 00–20 = 0.0–2.0 sec.</summary>
+    private static RadioMenuCodec Tenths(string unit, int max) => new(
+        d => d.Length == 1 && BigBcd(d) is long v && v <= max ? $"{v / 10.0:0.0}{unit}" : Hex(d),
+        Range(0, max, 1));
 
     /// <summary>00 00–02 55 shown on the radio as min–max.</summary>
-    private static Func<byte[], string> Scaled(int min, int max, string unit) =>
+    private static RadioMenuCodec Scaled(int min, int max, string unit) => new(
         d => d.Length == 2 && BigBcd(d) is long v && v <= 255
-            ? $"{Math.Round(min + v * (max - min) / 255.0)}{unit}" : Hex(d);
+            ? $"{Math.Round(min + v * (max - min) / 255.0)}{unit}" : Hex(d),
+        Range(0, 255, 2));
 
-    private static Func<byte[], string> Percent() => Scaled(0, 100, "%");
+    private static RadioMenuCodec Percent() => Scaled(0, 100, "%");
 
     /// <summary>00–10 = −5…+5.</summary>
-    private static Func<byte[], string> Tone() =>
-        d => d.Length == 1 && IsBcd(d[0]) && Bcd(d[0]) <= 10 ? (Bcd(d[0]) - 5).ToString("+0;-0;0") : Hex(d);
+    private static RadioMenuCodec Tone() => new(
+        d => d.Length == 1 && IsBcd(d[0]) && Bcd(d[0]) <= 10 ? (Bcd(d[0]) - 5).ToString("+0;-0;0") : Hex(d),
+        Range(0, 10, 1));
 
     /// <summary>HH LL: HPF 00 = Through, 01–20 = 100–2000 Hz; LPF 05–24 = 500–2400 Hz, 25 = Through.</summary>
-    private static Func<byte[], string> HpfLpf() => d =>
+    private static RadioMenuCodec HpfLpf()
     {
-        if (d.Length != 2 || !IsBcd(d[0]) || !IsBcd(d[1])) return Hex(d);
-        int h = Bcd(d[0]), l = Bcd(d[1]);
-        string hpf = h == 0 ? "Through" : $"{h * 100} Hz";
-        string lpf = l >= 25 ? "Through" : $"{l * 100} Hz";
-        return $"HPF {hpf} / LPF {lpf}";
-    };
+        var values = new List<byte[]>();
+        // The high-pass edge below the low-pass one, or the passband would be empty.
+        for (int h = 0; h <= 20; h++)
+            for (int l = 5; l <= 25; l++)
+                if (h < l) values.Add(new[] { ToBcd(h), ToBcd(l) });
+        return new(d =>
+        {
+            if (d.Length != 2 || !IsBcd(d[0]) || !IsBcd(d[1])) return Hex(d);
+            int h = Bcd(d[0]), l = Bcd(d[1]);
+            if (h > 20 || l is < 5 or > 25) return Hex(d);
+            string hpf = h == 0 ? "Through" : $"{h * 100} Hz";
+            string lpf = l == 25 ? "Through" : $"{l * 100} Hz";
+            return $"HPF {hpf} / LPF {lpf}";
+        }, values);
+    }
 
     /// <summary>
     /// One byte: high digit the higher edge, low digit the lower edge. The
     /// p. 20 diagram reads the other way round, but the radio's defaults
     /// (WIDE 100-2900, MID 300-2700, NAR 500-2500) come back as 30, 14, 05.
     /// </summary>
-    private static Func<byte[], string> Tbw() => d =>
+    private static RadioMenuCodec Tbw()
     {
         int[] low = { 100, 120, 150, 200, 300, 500 };
         int[] high = { 2500, 2700, 2800, 2900 };
-        if (d.Length != 1) return Hex(d);
-        int hi = d[0] >> 4, lo = d[0] & 0x0F;
-        return lo < low.Length && hi < high.Length ? $"{low[lo]}-{high[hi]} Hz" : Hex(d);
-    };
+        var values = new List<byte[]>();
+        for (int hi = 0; hi < high.Length; hi++)
+            for (int lo = 0; lo < low.Length; lo++)
+                values.Add(new[] { (byte)((hi << 4) | lo) });
+        return new(d =>
+        {
+            if (d.Length != 1) return Hex(d);
+            int hi = d[0] >> 4, lo = d[0] & 0x0F;
+            return lo < low.Length && hi < high.Length ? $"{low[lo]}-{high[hi]} Hz" : Hex(d);
+        }, values);
+    }
 
     /// <summary>Three bytes of frequency then a direction byte (00 = +, 01 = −).</summary>
-    private static Func<byte[], string> SplitOffset() => d =>
+    private static RadioMenuCodec SplitOffset() => new(d =>
     {
         if (d.Length != 4 || d[3] > 1 || FrequencyHz(d.AsSpan(0, 3)) is not long hz) return Hex(d);
         return $"{(d[3] == 1 ? "-" : "+")}{hz / 1_000_000.0:0.000} MHz";
-    };
+    });
 
     /// <summary>Two edges of three bytes each, lower then higher.</summary>
-    private static Func<byte[], string> Edges() => d =>
+    private static RadioMenuCodec Edges() => new(d =>
     {
         if (d.Length != 6 || FrequencyHz(d.AsSpan(0, 3)) is not long lo || FrequencyHz(d.AsSpan(3, 3)) is not long hi)
             return Hex(d);
         return $"{lo / 1_000_000.0:0.000}-{hi / 1_000_000.0:0.000} MHz";
-    };
+    });
 
     /// <summary>Four octets of two bytes each, 00 00–02 55; FF is blank.</summary>
-    private static Func<byte[], string> Ip() => d =>
+    private static RadioMenuCodec Ip() => new(d =>
     {
         if (d.Length == 0 || d.All(b => b == 0xFF)) return "(blank)";
         if (d.Length != 8) return Hex(d);
@@ -474,19 +528,23 @@ public static class Ic7300Mk2Menu
             octets[i] = o;
         }
         return string.Join(".", octets);
-    };
+    });
 
     /// <summary>01–30 = the number of mask bits.</summary>
-    private static Func<byte[], string> SubnetMask() => d =>
+    private static RadioMenuCodec SubnetMask() => new(d =>
     {
         if (d.Length != 1 || !IsBcd(d[0]) || Bcd(d[0]) is < 1 or > 30) return Hex(d);
         int bits = Bcd(d[0]);
         uint mask = uint.MaxValue << (32 - bits);
         return $"{mask >> 24}.{(mask >> 16) & 0xFF}.{(mask >> 8) & 0xFF}.{mask & 0xFF} ({bits} bit)";
-    };
+    });
 
-    /// <summary>R, G and B, two bytes each, 00 00–02 55.</summary>
-    private static Func<byte[], string> Rgb() => d =>
+    private static readonly System.Text.RegularExpressions.Regex RgbText = new(
+        @"^\s*R\s*(\d{1,3})\s*G\s*(\d{1,3})\s*B\s*(\d{1,3})\s*$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>R, G and B, two bytes each, 00 00–02 55. Typed back as "R 255 G 128 B 0".</summary>
+    private static RadioMenuCodec Rgb() => new(d =>
     {
         if (d.Length != 6) return Hex(d);
         var c = new long[3];
@@ -496,33 +554,50 @@ public static class Ic7300Mk2Menu
             c[i] = v;
         }
         return $"R {c[0]} G {c[1]} B {c[2]}";
-    };
+    }, Parse: t =>
+    {
+        var m = RgbText.Match(t);
+        if (!m.Success) return null;
+        var d = new List<byte>();
+        for (int i = 1; i <= 3; i++)
+        {
+            int v = int.Parse(m.Groups[i].Value);
+            if (v > 255) return null;
+            d.AddRange(BigBcdBytes(v, 2));
+        }
+        return d.ToArray();
+    });
 
     /// <summary>00 00–02 23 = 00h–DFh.</summary>
-    private static Func<byte[], string> HexAddress() =>
-        d => BigBcd(d) is long v && v <= 0xDF ? $"{v:X2}h" : Hex(d);
+    private static RadioMenuCodec HexAddress() => new(
+        d => BigBcd(d) is long v && v <= 0xDF ? $"{v:X2}h" : Hex(d));
 
     /// <summary>28–45 = 1:1:2.8–1:1:4.5.</summary>
-    private static Func<byte[], string> DotDash() =>
-        d => d.Length == 1 && IsBcd(d[0]) ? $"1:1:{Bcd(d[0]) / 10.0:0.0}" : Hex(d);
+    private static RadioMenuCodec DotDash() => new(
+        d => d.Length == 1 && IsBcd(d[0]) && Bcd(d[0]) is >= 28 and <= 45 ? $"1:1:{Bcd(d[0]) / 10.0:0.0}" : Hex(d),
+        Range(28, 45, 1));
 
-    private static Func<byte[], string> Text() => d =>
+    /// <summary>
+    /// ASCII, up to <paramref name="max"/> characters from <paramref name="chars"/>
+    /// (a regex character class body, '-' last, from the manual's p. 18 table).
+    /// </summary>
+    private static RadioMenuCodec Text(int max, string chars, bool upper = true) => new(d =>
     {
         if (!d.All(b => b is >= 0x20 and < 0x7F)) return Hex(d);
         var s = System.Text.Encoding.ASCII.GetString(d).Trim();
         return s.Length == 0 ? "(blank)" : s;
-    };
+    }, TextMax: max, TextChars: chars, Upper: upper);
 
     /// <summary>20 26 10 25 = 2026/10/25.</summary>
-    private static Func<byte[], string> Date() =>
-        d => d.Length == 4 && d.All(IsBcd) ? $"{Bcd(d[0]):00}{Bcd(d[1]):00}-{Bcd(d[2]):00}-{Bcd(d[3]):00}" : Hex(d);
+    private static RadioMenuCodec Date() => new(
+        d => d.Length == 4 && d.All(IsBcd) ? $"{Bcd(d[0]):00}{Bcd(d[1]):00}-{Bcd(d[2]):00}-{Bcd(d[3]):00}" : Hex(d));
 
     /// <summary>23 59 = 23:59.</summary>
-    private static Func<byte[], string> Time() =>
-        d => d.Length == 2 && d.All(IsBcd) ? $"{Bcd(d[0]):00}:{Bcd(d[1]):00}" : Hex(d);
+    private static RadioMenuCodec Time() => new(
+        d => d.Length == 2 && d.All(IsBcd) ? $"{Bcd(d[0]):00}:{Bcd(d[1]):00}" : Hex(d));
 
     /// <summary>Hours and minutes (00 00–14 00) then a direction byte (00 = +, 01 = −).</summary>
-    private static Func<byte[], string> UtcOffset() =>
+    private static RadioMenuCodec UtcOffset() => new(
         d => d.Length == 3 && IsBcd(d[0]) && IsBcd(d[1]) && d[2] <= 1
-            ? $"{(d[2] == 1 ? "-" : "+")}{Bcd(d[0]):00}:{Bcd(d[1]):00}" : Hex(d);
+            ? $"{(d[2] == 1 ? "-" : "+")}{Bcd(d[0]):00}:{Bcd(d[1]):00}" : Hex(d));
 }
