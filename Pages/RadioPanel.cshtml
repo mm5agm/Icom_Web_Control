@@ -37,25 +37,10 @@
             pseudoDual: @(Model.PseudoDualReceiverEnabled ? "true" : "false"),
             autoModeChangeOnTune: @(Model.AutoModeChangeOnTune ? "true" : "false"),
             voice: @(Model.VoiceControlEnabled ? "true" : "false"),
-            views: [
-                { label: 'Classic', href: '/' },
-                { label: 'Experimental', href: '/flexui' },
-                { label: 'Radio', href: '/radio', on: true },
-            ],
-            menu: [
-                { group: 'SETUP', items: [
-                    { label: 'Settings', href: '/Settings' },
-                    { label: 'Application Setup', href: '/ApplicationSetup' },
-                    { label: 'Memories', href: '/Memories' },
-                    { label: 'Labels', href: '/Labels' },
-                    { label: 'Meter Calibration', href: '/MeterCalibration' },
-                    { label: 'Diagnostics', href: '/Diagnostics' },
-                ] },
-                { group: 'HELP', items: [
-                    { label: 'User Manual', href: '/UserManual' },
-                    { label: 'About', href: '/About' },
-                ] },
-            ],
+            // The same lists as the other views' Views and Menu dropdowns
+            // (Models/AppViews.cs, Models/AppMenu.cs).
+            views: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Icom_Web_Control.Models.AppViews.All.Select(v => new { label = v.Label, href = v.Path, title = v.Title, on = v.Key == Icom_Web_Control.Models.AppViews.Radio }))),
+            menu: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Icom_Web_Control.Models.AppMenu.Groups.Select(g => new { group = g.Name.ToUpperInvariant(), items = g.Pages.Select(pg => new { label = pg.Label, href = pg.Path }) }))),
         });
     </script>
 </body>
