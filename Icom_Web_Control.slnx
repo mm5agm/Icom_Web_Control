@@ -7,4 +7,5 @@
     <Platform Name="x64" />
   </Configurations>
   <Project Path="Icom_Web_Control.csproj" />
+  <Project Path="Tests/IcomWebControl.Tests/IcomWebControl.Tests.csproj" />
 </Solution>
