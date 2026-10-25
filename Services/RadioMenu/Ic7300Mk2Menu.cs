@@ -11,7 +11,10 @@ namespace Icom_Web_Control.Services.RadioMenu;
 /// Language from 02 27's note). The p. 22 UTC offset box says 01 34, but the
 /// table puts the NTP switch there and the UTC offset at 01 36; the table is
 /// followed. [▲]/[▼] for 00 59/00 60 are from the Advanced manual, whose
-/// defaults (M-CH UP / M-CH DOWN) match. None of this is bench-checked yet.
+/// defaults (M-CH UP / M-CH DOWN) match. Read back from the radio on
+/// 2026-10-25: 268 of 270 answered; 01 30 (Display Language) and 02 27
+/// (Japanese Morse Decode) did not, the latter needing a Japanese system
+/// language per the manual.
 /// Unknown values fall back to the data bytes in hex.
 /// </summary>
 public static class Ic7300Mk2Menu
@@ -430,13 +433,17 @@ public static class Ic7300Mk2Menu
         return $"HPF {hpf} / LPF {lpf}";
     };
 
-    /// <summary>One byte: high digit the lower edge, low digit the higher edge.</summary>
+    /// <summary>
+    /// One byte: high digit the higher edge, low digit the lower edge. The
+    /// p. 20 diagram reads the other way round, but the radio's defaults
+    /// (WIDE 100-2900, MID 300-2700, NAR 500-2500) come back as 30, 14, 05.
+    /// </summary>
     private static Func<byte[], string> Tbw() => d =>
     {
         int[] low = { 100, 120, 150, 200, 300, 500 };
         int[] high = { 2500, 2700, 2800, 2900 };
         if (d.Length != 1) return Hex(d);
-        int lo = d[0] >> 4, hi = d[0] & 0x0F;
+        int hi = d[0] >> 4, lo = d[0] & 0x0F;
         return lo < low.Length && hi < high.Length ? $"{low[lo]}-{high[hi]} Hz" : Hex(d);
     };
 
@@ -499,8 +506,12 @@ public static class Ic7300Mk2Menu
     private static Func<byte[], string> DotDash() =>
         d => d.Length == 1 && IsBcd(d[0]) ? $"1:1:{Bcd(d[0]) / 10.0:0.0}" : Hex(d);
 
-    private static Func<byte[], string> Text() =>
-        d => d.All(b => b is >= 0x20 and < 0x7F) ? System.Text.Encoding.ASCII.GetString(d).Trim() : Hex(d);
+    private static Func<byte[], string> Text() => d =>
+    {
+        if (!d.All(b => b is >= 0x20 and < 0x7F)) return Hex(d);
+        var s = System.Text.Encoding.ASCII.GetString(d).Trim();
+        return s.Length == 0 ? "(blank)" : s;
+    };
 
     /// <summary>20 26 10 25 = 2026/10/25.</summary>
     private static Func<byte[], string> Date() =>
