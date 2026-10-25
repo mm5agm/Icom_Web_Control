@@ -1,0 +1,70 @@
+namespace Icom_Web_Control.Services.RadioMenu;
+
+/// <summary>
+/// One item of the radio's SET menu, reached over CI-V as 1A 05 hi lo.
+/// </summary>
+/// <param name="Number">The item number, 1–270 on the IC-7300MK2; sent as two BCD bytes (0123 → 01 23).</param>
+/// <param name="Section">The menu the item lives under, e.g. "SET" or "SCOPE SET".</param>
+/// <param name="Group">The path inside it, e.g. "Function > TX Delay".</param>
+/// <param name="Function">The item's name as the radio shows it.</param>
+/// <param name="Decode">Turns the reply's data bytes into what the radio displays.</param>
+/// <param name="Tx">True when the item changes how or when the radio transmits.
+/// Not used by Save; it marks the items a later Load must not write unasked.</param>
+public sealed record RadioMenuItem(
+    int Number,
+    string Section,
+    string Group,
+    string Function,
+    Func<byte[], string> Decode,
+    bool Tx = false)
+{
+    /// <summary>The item as the CI-V manual prints it, e.g. "01 23".</summary>
+    public string Address => $"{Number / 100:00} {Number % 100:00}";
+}
+
+/// <summary>An item and the data the radio answered with (null if it did not).</summary>
+public sealed record RadioMenuReading(RadioMenuItem Item, byte[]? Data)
+{
+    public string Value => Data is null ? "" : Item.Decode(Data);
+    public string Raw => Data is null ? "" : string.Join(" ", Data.Select(b => b.ToString("X2")));
+}
+
+/// <summary>Picks the menu table for a model and writes the save file.</summary>
+public static class RadioMenuFile
+{
+    /// <summary>The menu table for a model, or null if IWC has none for it yet.
+    /// The original IC-7300 numbers its items differently, so it is not this table.</summary>
+    public static IReadOnlyList<RadioMenuItem>? TableFor(string? radioModel) => radioModel switch
+    {
+        "IC-7300MK2" => Ic7300Mk2Menu.Items,
+        _ => null,
+    };
+
+    /// <summary>
+    /// The save file: one row per item, laid out like an operator's own menu
+    /// sheet (section, group, function, value), with the item number and the
+    /// reply's data bytes so a later Load can put each item back exactly.
+    /// </summary>
+    public static string ToCsv(string radioModel, DateTime takenLocal, IEnumerable<RadioMenuReading> readings)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# IWC radio menu,{Csv(radioModel)},{takenLocal:yyyy-MM-dd HH:mm}");
+        sb.AppendLine("Section,Group,Function,Value,1A 05,Raw,TX");
+        foreach (var r in readings)
+        {
+            sb.Append(Csv(r.Item.Section)).Append(',')
+              .Append(Csv(r.Item.Group)).Append(',')
+              .Append(Csv(r.Item.Function)).Append(',')
+              .Append(Csv(r.Data is null ? "(no answer)" : r.Value)).Append(',')
+              // Written as ="01 23" so Excel keeps it as text.
+              .Append($"=\"{r.Item.Address}\"").Append(',')
+              .Append(r.Data is null ? "" : $"=\"{r.Raw}\"").Append(',')
+              .Append(r.Item.Tx ? "yes" : "")
+              .AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    private static string Csv(string s) =>
+        s.IndexOfAny(new[] { ',', '"', '\n' }) >= 0 ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
+}
