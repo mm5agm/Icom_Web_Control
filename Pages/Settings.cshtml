@@ -2672,7 +2672,7 @@
         <summary><i class="bi bi-list-check" aria-hidden="true"></i>&nbsp;Radio Menu</summary>
         <div class="section-body">
             <p class="text-muted">
-                Save the radio's own menu settings — the items under MENU on the radio, such as Tone Control, TX Delay, Connectors, Display and the keyer — to a file that opens in a spreadsheet.
+                Save the radio's own menu settings — the items under MENU on the radio, such as Tone Control, TX Delay, Connectors, Display and the keyer — to a text file you can open in Notepad.
                 Save as many files as you like and name them for how you use the radio.
             </p>
             <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -2709,7 +2709,7 @@
                 const blob = await r.blob();
                 const cd = r.headers.get('Content-Disposition') || '';
                 const m = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(cd);
-                const name = m ? decodeURIComponent(m[1] || m[2]) : 'IWC radio menu.csv';
+                const name = m ? decodeURIComponent(m[1] || m[2]) : 'IWC radio menu.ini';
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = name;

@@ -41,30 +41,37 @@ public static class RadioMenuFile
     };
 
     /// <summary>
-    /// The save file: one row per item, laid out like an operator's own menu
-    /// sheet (section, group, function, value), with the item number and the
-    /// reply's data bytes so a later Load can put each item back exactly.
+    /// The save file, an .ini that reads in Notepad: one [section] per menu
+    /// group and one line per item, the value as the radio shows it, then a
+    /// comment with the 1A 05 item number and the reply's data bytes so a
+    /// later Load can put each item back exactly.
     /// </summary>
-    public static string ToCsv(string radioModel, DateTime takenLocal, IEnumerable<RadioMenuReading> readings)
+    public static string ToIni(string radioModel, DateTime takenLocal, IEnumerable<RadioMenuReading> readings)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"# IWC radio menu,{Csv(radioModel)},{takenLocal:yyyy-MM-dd HH:mm}");
-        sb.AppendLine("Section,Group,Function,Value,1A 05,Raw,TX");
+        sb.AppendLine("; IWC radio menu: the radio's own SET menu.")
+          .AppendLine("; Each line is: item = value as the radio shows it   ; 1A 05 item = what the radio answered")
+          .AppendLine("; [TX] marks items that change how or when the radio transmits.")
+          .AppendLine()
+          .AppendLine("[File]")
+          .AppendLine("Program = IWC")
+          .AppendLine($"Radio = {radioModel}")
+          .AppendLine($"Saved = {takenLocal:yyyy-MM-dd HH:mm}");
+        string? header = null;
         foreach (var r in readings)
         {
-            sb.Append(Csv(r.Item.Section)).Append(',')
-              .Append(Csv(r.Item.Group)).Append(',')
-              .Append(Csv(r.Item.Function)).Append(',')
-              .Append(Csv(r.Data is null ? "(no answer)" : r.Value)).Append(',')
-              // Written as ="01 23" so Excel keeps it as text.
-              .Append($"=\"{r.Item.Address}\"").Append(',')
-              .Append(r.Data is null ? "" : $"=\"{r.Raw}\"").Append(',')
-              .Append(r.Item.Tx ? "yes" : "")
-              .AppendLine();
+            var h = string.IsNullOrEmpty(r.Item.Group) ? $"[{r.Item.Section}]" : $"[{r.Item.Section} > {r.Item.Group}]";
+            if (h != header)
+            {
+                sb.AppendLine().AppendLine(h);
+                header = h;
+            }
+            var line = $"{r.Item.Function} = {(r.Data is null ? "(no answer)" : r.Value)}";
+            var note = r.Data is null ? r.Item.Address : $"{r.Item.Address} = {r.Raw}";
+            sb.Append(line.PadRight(40)).Append(" ; ").Append(note);
+            if (r.Item.Tx) sb.Append("  [TX]");
+            sb.AppendLine();
         }
         return sb.ToString();
     }
-
-    private static string Csv(string s) =>
-        s.IndexOfAny(new[] { ',', '"', '\n' }) >= 0 ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
 }

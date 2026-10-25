@@ -5,7 +5,7 @@ using Icom_Web_Control.Services.RadioMenu;
 namespace Icom_Web_Control.Controllers
 {
     /// <summary>
-    /// Saves the radio's own SET menu to a file that opens in a spreadsheet.
+    /// Saves the radio's own SET menu to a text file that opens in Notepad.
     /// Read-only: every item is fetched with a 1A 05 read and nothing is
     /// written to the radio. Phase 8 of docs/design/iwc-clone-split-plan.md,
     /// capture half.
@@ -28,7 +28,7 @@ namespace Icom_Web_Control.Controllers
         }
 
         /// <summary>
-        /// GET /api/radiomenu/export — reads every menu item and returns a CSV.
+        /// GET /api/radiomenu/export — reads every menu item and returns an .ini file.
         /// 270 reads on an IC-7300MK2, several seconds at 19200 baud.
         /// </summary>
         [HttpGet("export")]
@@ -52,12 +52,12 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(504, new { error = "The radio did not answer any menu reads." });
 
             var now = DateTime.Now;
-            var csv = RadioMenuFile.ToCsv(model, now, readings);
-            var name = $"IWC radio menu {model} {now:yyyy-MM-dd HHmm}.csv";
+            var ini = RadioMenuFile.ToIni(model, now, readings);
+            var name = $"IWC radio menu {model} {now:yyyy-MM-dd HHmm}.ini";
             Response.Headers["X-Menu-Missing"] = missing.ToString();
-            // UTF-8 with BOM so Excel opens it as UTF-8.
-            var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray();
-            return File(bytes, "text/csv", name);
+            // UTF-8 with BOM so older Notepad shows [▲] and [▼] properly.
+            var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(ini)).ToArray();
+            return File(bytes, "text/plain", name);
         }
 
         private async Task<byte[]?> ReadAsync(RadioMenuItem item, CancellationToken ct)
