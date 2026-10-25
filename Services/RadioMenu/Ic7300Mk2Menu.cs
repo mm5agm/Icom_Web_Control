@@ -220,6 +220,8 @@ public static class Ic7300Mk2Menu
         Item(126, "Audio Output", onOff);
         Group("Display");
         Item(127, "Opening Message", onOff);
+        // The radio answers this space-padded to 10, so Load sends it padded; on an
+        // IC-7300MK2, blank to MM5AGM was taken and read back (2026-10-25).
         Item(128, "My Call", Text(10, "A-Z0-9/@.-"));
         Item(129, "Power ON Check", onOff);
         Item(130, "Display Language", Choice("English", "Japanese"));
