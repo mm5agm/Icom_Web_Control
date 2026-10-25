@@ -2364,6 +2364,37 @@ namespace Icom_Web_Control.Services
             return CivProtocol.BcdByte(reply.Data[3]);
         }
 
+        /// <summary>See <see cref="IRadioController.ReadMenuItemAsync"/>.</summary>
+        public async Task<byte[]?> ReadMenuItemAsync(int number, CancellationToken cancellationToken = default)
+        {
+            if (number is < 1 or > 9999) return null;
+            byte hi = (byte)(((number / 1000) << 4) | (number / 100 % 10));
+            byte lo = (byte)(((number / 10 % 10) << 4) | (number % 10));
+            // A read is the item number and nothing after it; data here would be a write.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo);
+            var reply = await TransactAsync(frame, CivProtocol.CmdMenu, 300, cancellationToken);
+            // Reply body: 1A 05 hi lo <data…> → Data = [05, hi, lo, data…].
+            if (reply == null || reply.Cmd != CivProtocol.CmdMenu
+                || reply.Data.Length < 4 || reply.Data[0] != CivProtocol.SubSetMenu
+                || reply.Data[1] != hi || reply.Data[2] != lo)
+                return null;
+            return reply.Data[3..];
+        }
+
+        /// <summary>See <see cref="IRadioController.WriteMenuItemAsync"/>.</summary>
+        public async Task<bool?> WriteMenuItemAsync(int number, byte[] data, CancellationToken cancellationToken = default)
+        {
+            // No data after the item number is a read, not a write.
+            if (number is < 1 or > 9999 || data.Length == 0) return null;
+            byte hi = (byte)(((number / 1000) << 4) | (number / 100 % 10));
+            byte lo = (byte)(((number / 10 % 10) << 4) | (number % 10));
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                new byte[] { CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo }.Concat(data).ToArray());
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, 500, cancellationToken);
+            return reply?.Cmd == CivProtocol.AckOk ? true : reply?.Cmd == CivProtocol.AckNg ? false : null;
+        }
+
         /// <summary>Write a one-byte SET-menu item (1A 05 hi lo val), value 0–99 as BCD.</summary>
         private async Task WriteSetMenuByteAsync(byte hi, byte lo, int value, string what, CancellationToken ct)
         {

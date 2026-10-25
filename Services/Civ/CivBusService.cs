@@ -182,10 +182,7 @@ namespace Icom_Web_Control.Services.Civ
             // Only bites when the radio echoes on the USB path — MENU > SET >
             // Connectors > CI-V > "CI-V USB (A) Echo Back", which defaults to
             // OFF. Reproduced on an IC-7300MK2 by switching it ON.
-            if (frame.From == CivProtocol.ControllerAddress)
-                return;
-
-            if (frame.To != CivProtocol.ControllerAddress && frame.To != 0x00)
+            if (!IsForController(frame))
                 return;
 
             var pending = _pending;
@@ -197,6 +194,16 @@ namespace Icom_Web_Control.Services.Civ
 
             UnsolicitedFrame?.Invoke(this, frame);
         }
+
+        /// <summary>
+        /// Whether a frame off the wire is for us: not our own echo (From is never
+        /// the controller address on a genuine radio frame) and addressed to the
+        /// controller or to broadcast. See <see cref="OnFrameReceived"/> for why
+        /// both checks are needed.
+        /// </summary>
+        internal static bool IsForController(CivFrame frame)
+            => frame.From != CivProtocol.ControllerAddress
+               && (frame.To == CivProtocol.ControllerAddress || frame.To == CivProtocol.BroadcastAddress);
 
         public async Task<CivFrame?> TransactAsync(byte[] frame, byte expectedCmd, int timeoutMs = 500, CancellationToken cancellationToken = default)
         {
