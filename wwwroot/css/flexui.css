@@ -51,6 +51,24 @@ html.iwc-flex, .iwc-flex-body {
     color: #fff;
 }
 
+/* The View dropdown (Pages/Shared/_ViewPickerPartial.cshtml). Its button reads
+   as a nav link; its menu items keep Bootstrap's colours, not the link blue. */
+.iwc-flex-view-btn {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #fff;
+    font-weight: 700;
+}
+
+.iwc-flex-nav-links .dropdown-menu a {
+    color: var(--bs-dropdown-link-color);
+}
+
+.iwc-flex-nav-links .dropdown-menu a.active {
+    color: var(--bs-dropdown-link-active-color);
+}
+
 .iwc-flex-toolbar {
     margin-left: auto;
     display: flex;

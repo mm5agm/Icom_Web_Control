@@ -19,5 +19,8 @@ namespace Icom_Web_Control.Pages
             : base(radioStateService, settingsService)
         {
         }
+
+        // A pop-out, not a view: leaves the remembered view alone.
+        protected override string? ViewKey => null;
     }
 }

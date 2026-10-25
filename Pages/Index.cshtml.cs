@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Icom_Web_Control.Models;
 using Icom_Web_Control.Services;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -42,6 +43,13 @@ namespace Icom_Web_Control.Pages
         /// </summary>
         public bool IsFlexUi => string.Equals(
             HttpContext?.Request.Path.Value?.TrimEnd('/'), "/flexui", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Which <see cref="AppViews"/> view this page is, saved as the last view
+        /// when it loads. Null for the pop-out windows, which share this model
+        /// but are not a view anyone starts the app in.
+        /// </summary>
+        protected virtual string? ViewKey => IsFlexUi ? AppViews.Experimental : AppViews.Classic;
 
         public string SelectedBandA { get; set; } = string.Empty;
         public string SelectedBandB { get; set; } = string.Empty;
@@ -162,6 +170,13 @@ namespace Icom_Web_Control.Pages
 
             // Load app button visibility and names
             var settings = await _settingsService.GetSettingsAsync();
+
+            // Remember this view so the next start-up opens it (see /start).
+            if (ViewKey is { } view && settings.LastView != view)
+            {
+                settings.LastView = view;
+                await _settingsService.SaveSettingsAsync(settings);
+            }
             ShowApp1Button = settings.ShowWsjtxButton;
             ShowApp2Button = settings.ShowJtalertButton;
             ShowApp3Button = settings.ShowLog4omButton;
