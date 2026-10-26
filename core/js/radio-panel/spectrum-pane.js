@@ -39,6 +39,11 @@ export class SpectrumPane {
      *        the trace (fit), and this is told so the range can be kept
      * @param {boolean} [opts.dbScale=false]  label the trace in dB above the noise floor
      * @param {boolean} [opts.waterfallFirst=false]  the waterfall above the spectrum (setOrder)
+     * @param {(hz:number) => void} [opts.onJump]  arrows at the left and right edges of the
+     *        part on top: a click asks for the dial one span down or up, at hz
+     * @param {{hz:number, label:string}[]} [opts.spans]  with onSpan, the span in the
+     *        label is a list of these, styled as the label
+     * @param {(hz:number) => void} [opts.onSpan]  a span picked on that list
      */
     constructor(container, opts = {}) {
         this.el = h('div', 'rp-pane');
@@ -59,8 +64,10 @@ export class SpectrumPane {
         this._wfEl = wf;
         if (opts.grip) this._grip(opts.onSplit, opts.onFit);
         this._view = new SpectrumView(spec, wf, { dbScale: opts.dbScale });
-        if (opts.waterfallFirst) this.setOrder(true);
         this._st = { hz: 0, mode: '', widthHz: null, spanHz: 0, spots: [], showSpots: true, name: '', status: null, passband: true };
+        if (opts.spans?.length && opts.onSpan) this._spanList(opts.spans, opts.onSpan);
+        if (opts.onJump) this._jumps(opts.onJump);
+        if (opts.waterfallFirst) this.setOrder(true);
         if (opts.onTune) this._tunable(spec, wf, opts.onTune, opts.tuneTo);
         // The wheel steps the dial a notch at a time, as on the board.
         if (opts.onStep) {
@@ -125,6 +132,31 @@ export class SpectrumPane {
         }
     }
 
+    // A pair of arrows, one span down and one span up. They sit on the part
+    // on top (_placeJumps), and a click on them is theirs, not a tune.
+    _jumps(onJump) {
+        this._jumpEls = [-1, 1].map(dir => {
+            const b = h('button', 'rp-jump ' + (dir < 0 ? 'rp-jump-dn' : 'rp-jump-up'), dir < 0 ? '◀' : '▶');
+            b.type = 'button';
+            b.title = dir < 0 ? 'One span down' : 'One span up';
+            b.setAttribute('aria-label', b.title);
+            for (const ev of ['pointerdown', 'pointermove', 'dblclick']) b.addEventListener(ev, e => e.stopPropagation());
+            b.addEventListener('click', e => {
+                e.stopPropagation();
+                const s = this._st;
+                if (s.hz > 0 && s.spanHz > 0) onJump(s.hz + dir * s.spanHz);
+            });
+            return b;
+        });
+        this._placeJumps();
+    }
+    _placeJumps() {
+        if (!this._jumpEls) return;
+        const c = this.el.classList;
+        const wfTop = c.contains('no-spec') || (this._wfFirst && !c.contains('no-wf'));
+        (wfTop ? this._wfEl : this._specEl).append(...this._jumpEls);
+    }
+
     // The spectrum's share of the height the two share, 0.15..0.85. The grip
     // sits under the axis, so the axis stays with the trace it labels.
     _grip(onSplit, onFit) {
@@ -176,6 +208,7 @@ export class SpectrumPane {
             ? [this._wfEl, this._gripEl, this._axis, this._specEl]
             : [this._specEl, this._axis, this._gripEl, this._wfEl];
         this.el.append(...parts.filter(x => x instanceof HTMLElement));
+        this._placeJumps();
     }
 
     /** SpectrumView's levels: { auto, ref } in, { auto, ref, floor, lo, hi } out. */
@@ -193,6 +226,8 @@ export class SpectrumPane {
     }
 
     setTheme(theme) { this._view.setTheme(theme); }
+    /** The trace's width in CSS pixels (SpectrumView.setTraceWidth). */
+    setTraceWidth(px) { this._view.setTraceWidth(px); }
 
     /** What the label says before the frequency and span, e.g. 'MAIN · SDR A'. */
     setName(name) { this._st.name = name ?? ''; this._drawLabel(); }
@@ -203,6 +238,39 @@ export class SpectrumPane {
         if (s === this._st.spanHz) return;
         this._st.spanHz = s;
         this._draw();
+        this._showSpan();
+    }
+
+    // The span in the label as a list: the bar keeps the label's look, and
+    // the list is the label's last part, so 'SPAN 10 kHz ▾' reads as before.
+    _spanList(spans, onSpan) {
+        this.bar.classList.add('has-span');
+        const wrap = h('span', 'rp-pane-spanwrap');
+        const sel = h('select', 'rp-pane-span');
+        sel.title = 'Span';
+        for (const s of spans) sel.append(new Option('SPAN ' + s.label, String(s.hz)));
+        sel.addEventListener('change', () => onSpan(Number(sel.value)));
+        wrap.append(sel);
+        this._label.after(wrap);
+        this._spanSel = sel;
+        this._showSpan();
+    }
+
+    // A frame's span is whole bins: 20 kHz arrives as 19989 Hz, so a list
+    // span within 2% is the one shown. A span not on the list shows as itself.
+    _showSpan() {
+        const sel = this._spanSel;
+        if (!sel || document.activeElement === sel) return;
+        const n = this._st.spanHz;
+        sel.querySelector('.rp-span-other')?.remove();
+        if (!n) { sel.selectedIndex = -1; return; }
+        const o = [...sel.options].find(x => Math.abs(Number(x.value) - n) <= Number(x.value) * 0.02);
+        if (o) { sel.value = o.value; return; }
+        const other = new Option('SPAN ' + spanText(n), String(n));
+        other.className = 'rp-span-other';
+        other.disabled = true;
+        sel.append(other);
+        sel.value = other.value;
     }
     setSpots(list) { this._st.spots = list ?? []; this._drawSpots(); this._reread?.(); }
     setShowSpots(show) { this._st.showSpots = !!show; this._drawSpots(); this._reread?.(); }
@@ -222,7 +290,7 @@ export class SpectrumPane {
     clear() { this._view.clear(); }
 
     /** Show or hide the waterfall; hidden, the trace takes its room. */
-    setWaterfall(show) { this.el.classList.toggle('no-wf', !show); }
+    setWaterfall(show) { this.el.classList.toggle('no-wf', !show); this._placeJumps(); }
 
     /**
      * Which parts to draw: 'both', 'spectrum', 'waterfall' or 'none'. The
@@ -234,6 +302,7 @@ export class SpectrumPane {
         this.el.hidden = !spec && !wf;
         this.el.classList.toggle('no-wf', !wf);
         this.el.classList.toggle('no-spec', !spec);
+        this._placeJumps();
     }
 
     _drawLabel() {
@@ -241,7 +310,8 @@ export class SpectrumPane {
         const p3 = n => String(n).padStart(3, '0');
         const hz = Math.round(s.hz);
         const f = hz > 0 ? `${Math.floor(hz / 1e6)}.${p3(Math.floor(hz / 1000) % 1000)}.${p3(hz % 1000)}` : '';
-        this._label.textContent = [s.name, f, s.spanHz ? 'SPAN ' + spanText(s.spanHz) : ''].filter(Boolean).join(' · ');
+        const span = s.spanHz && !this._spanSel ? 'SPAN ' + spanText(s.spanHz) : '';
+        this._label.textContent = [s.name, f, span].filter(Boolean).join(' · ') + (this._spanSel ? ' ·' : '');
     }
 
     _draw() {
