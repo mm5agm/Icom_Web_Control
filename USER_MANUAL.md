@@ -286,6 +286,10 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.6.0**) are shown in the top-left corner.
 
+**Views** in the top bar chooses how you work the radio: **Classic** (this page), **Experimental** ([§5.19](#519-experimental-ui)) or **Radio** ([§5.20](#520-radio-panel)). The same **Views** list is on all three, and the one you are on is highlighted. IWC remembers the view you opened last and starts in it next time, from the desktop shortcut or the tray icon.
+
+The other pages (Settings, Application Setup, Memories, the User Manual and the rest) are links along the Classic page's top bar, which a screen reader announces as **Site pages**. On the Experimental UI they are under **Menu**, and on the Radio panel under its **MENU** key; from there each opens in a new tab, so the view keeps running behind it.
+
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears listing what has changed, with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the newest version or if the internet is not available.
 
 **What it offers you depends on which build you are running, and on nothing else.**
@@ -1048,7 +1052,7 @@ A panel on the main page can be dragged around and resized, but it can't leave t
 
 ### 5.19 Experimental UI
 
-**Experimental UI** in the top bar opens a second way of working the radio, at `http://localhost:8080/flexui`. Its dockable workspace was designed by Fabio Valente (CR7CDC) for Yaesu Web Control, and IWC uses the same one. The Classic page described in the rest of §5 is unchanged and is still where IWC opens; **Classic Home** in the Experimental UI's top bar takes you back, and both can be open in different tabs at once.
+**Experimental** under **Views** in the top bar ([§5.1](#51-top-bar)) opens a second way of working the radio, at `http://localhost:8080/flexui`. Its dockable workspace was designed by Fabio Valente (CR7CDC) for Yaesu Web Control, and IWC uses the same one. The Classic page described in the rest of §5 is unchanged; **Classic** under **Views** in the Experimental UI's top bar takes you back, and both can be open in different tabs at once. The other pages are under **Menu**, each opening in a new tab.
 
 ![The Experimental UI: the toolbar strip across the top, then the Levels, VFO Actions, Buttons and Clarifier panels, Linear Meters beside the Spectrum, and the VFO A and VFO B cards along the bottom](pictures/IWC_Experimental.png)
 
@@ -1082,7 +1086,7 @@ It is called experimental because it is new. If something works on the Classic p
 
 ![The Radio panel on 14.018.998 MHz CW: the frequency display and meters along the top, the scope and waterfall in the middle with a DX spot, and the front-panel style knobs and keys around them](pictures/Radio_GUI.png)
 
-**Radio** in the top bar, on both the Classic page and the Experimental UI, opens a third way of working the radio, at `http://localhost:8080/radio`. It is laid out like the front of a transceiver: the meter and the keys down the left, a screen in the middle with the VFOs, the band scope and the band and mode keys, the main dial on the right, and a row of knobs along the bottom. The **Classic**, **Experimental** and **Radio** buttons in its top strip move between the three, and they can all be open in different tabs at once.
+**Radio** under **Views**, on both the Classic page and the Experimental UI, opens a third way of working the radio, at `http://localhost:8080/radio`. It is laid out like the front of a transceiver: the meter and the keys down the left, a screen in the middle with the VFOs, the band scope and the band and mode keys, the main dial on the right, and a row of knobs along the bottom. **Views** in its top strip moves between the three, and they can all be open in different tabs at once.
 
 The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300's. Everything on it works the radio: the keys, the knobs, the main dial and the windows opened from the keys under the meter.
 
