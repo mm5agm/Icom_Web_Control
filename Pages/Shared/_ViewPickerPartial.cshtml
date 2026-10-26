@@ -1,0 +1,29 @@
+@model string
+@using Icom_Web_Control.Models
+@* The View dropdown: Classic, Experimental or Radio. The model is the
+   button's class, so it can match the nav bar it sits in. Opening a view
+   saves it as ApplicationSettings.LastView (IndexModel.OnGetAsync), and the
+   app opens that one at start-up through /start. The button always reads
+   "Views", never the current view's name, so it is plain there are others
+   to pick; the current one is highlighted in the list. *@
+@{
+    var current = AppViews.ForPath(Context.Request.Path.Value);
+}
+<button class="@Model dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+        title="Choose a view. The one you used last opens when the app starts.">
+    <i class="bi bi-window-stack" aria-hidden="true"></i> Views
+    @if (current != null)
+    {
+        <span class="visually-hidden">(now @current.Label)</span>
+    }
+</button>
+<ul class="dropdown-menu">
+    @foreach (var v in AppViews.All)
+    {
+        <li>
+            <a class="dropdown-item@(v == current ? " active" : "")" href="@v.Path" title="@v.Title" aria-current="@(v == current ? "page" : null)">
+                <i class="bi @v.Icon" aria-hidden="true"></i> @v.Label
+            </a>
+        </li>
+    }
+</ul>

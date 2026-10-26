@@ -106,6 +106,18 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
 
+### v1.6.0-pre5 (2026-10-26)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** the **Views** list, and IWC starting in the view you used last; and on an IC-7300MK2, saving the radio's menu to a file and loading it back.
+
+- **One Views list on every page.** Classic, Experimental and Radio are now picked from a **Views** list in the top bar, the same on all three, with the one you are on highlighted. IWC starts in the view you opened last. User Manual, [§5.1](USER_MANUAL.md#51-top-bar).
+- **A Menu on the Experimental UI.** Settings, Memories, the manual and the other pages are under **Menu**, each opening in a new tab so the workspace keeps running behind it. The Radio panel's **MENU** key lists the same pages. On the Classic page they stay as links along the top bar, which a screen reader now announces as **Site pages**.
+- **Save the radio's own menu to a file, and load it back (IC-7300MK2).** In Settings, **Radio Menu**: **Save radio menu to file** reads all 270 items of the radio's SET menu into an `.ini` file that reads in Notepad. **Change radio settings…** changes items one at a time. **Load this one** shows what a saved file would change and sends only the items you tick, reading each one back. Items that affect transmitting start unticked, and the CI-V, network, date and time items are never loaded. This is not the same as **Backup & Restore**, which saves IWC's own settings; the manual has a table of the differences. User Manual, [§6.6](USER_MANUAL.md#66-backup--restore).
+- **Export full backup saves into a Backups folder**, `%APPDATA%\MM5AGM\Icom Web Control\Backups`, and the page has **Open that folder** and **Download a copy**.
+- **Fixed: a radio reply that started with an extra FE byte was thrown away.** IWC read the extra byte as the address, decided the reply was not for it, and the command timed out. It now ignores any extra FEs before a reply.
+
 ### v1.6.0-pre4 (2026-10-23)
 
 > **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre3, pre2 and pre1 below.

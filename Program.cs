@@ -45,7 +45,7 @@ if (!createdNew)
 
     if (choice == DialogResult.Yes)
     {
-        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+        try { Process.Start(new ProcessStartInfo(url + "/start") { UseShellExecute = true }); } catch { }
         mutex.Dispose();
         return;
     }
@@ -566,6 +566,12 @@ try
     app.MapRazorPages();
     app.MapControllers();
 
+    // The view the operator last used (ApplicationSettings.LastView). This is
+    // what the app opens at start-up and from the tray, so it comes back up in
+    // Classic, Experimental or Radio, whichever was open last.
+    app.MapGet("/start", async (Icom_Web_Control.Services.ISettingsService settingsService) =>
+        Results.Redirect(Icom_Web_Control.Models.AppViews.For((await settingsService.GetSettingsAsync()).LastView).Path));
+
     // MAP SIGNALR HUB:
     app.MapHub<Icom_Web_Control.Hubs.RadioHub>("/radioHub");
 
@@ -633,7 +639,7 @@ try
 
     lifetime.ApplicationStarted.Register(() =>
     {
-        browserLauncher.OpenOnce(portInfo.RootUrl);
+        browserLauncher.OpenOnce(portInfo.RootUrl + "/start");
     });
 
     app.Run();
