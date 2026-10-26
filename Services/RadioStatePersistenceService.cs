@@ -23,6 +23,17 @@ namespace Icom_Web_Control.Services
             _filePath = Path.Combine(stateDir, "radio_state.json");
         }
 
+        /// <summary>
+        /// For tests: keep the state file in <paramref name="stateDir"/> so a
+        /// test never reads or overwrites the user's own radio_state.json.
+        /// </summary>
+        internal RadioStatePersistenceService(ILogger<RadioStatePersistenceService> logger, string stateDir)
+        {
+            _logger = logger;
+            Directory.CreateDirectory(stateDir);
+            _filePath = Path.Combine(stateDir, "radio_state.json");
+        }
+
         public RadioState Load()
         {
             try

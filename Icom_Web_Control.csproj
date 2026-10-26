@@ -16,6 +16,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="IcomWebControl.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="publish\**" />
     <Compile Remove="oldFiles\**" />
     <Compile Remove="oldFiles/Backup/**" />
@@ -36,6 +40,16 @@
     <Content Remove="core\**" />
     <EmbeddedResource Remove="core\**" />
     <None Remove="core\**" />
+    <!-- Tests/ holds the IWC test project (Tests/IcomWebControl.Tests),
+         which ProjectReferences this one. Same reason as core/ above: the Web
+         SDK globs **/*.cs, so without this removal the test classes compile
+         into the app as well, where the xunit attributes they carry cannot
+         resolve because the app has no xunit reference. The error that
+         produces names the attributes, not the glob. -->
+    <Compile Remove="Tests\**" />
+    <Content Remove="Tests\**" />
+    <EmbeddedResource Remove="Tests\**" />
+    <None Remove="Tests\**" />
   </ItemGroup>
 
   <!-- Radio-agnostic code shared with Yaesu Web Control. Pulled in as a git
