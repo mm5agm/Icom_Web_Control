@@ -13,10 +13,10 @@
 // plan never changes the mode on a click here (#169): the page sets
 // iwcAutoModeChangeOnTune false before this loads.
 //
-// A click puts the signal where the tuner listens. In RTTY the IC-7300
-// shows the mark frequency, so a click between the two traces lands the
-// dial half the shift above the click in RTTY (normal, RTTY-L here) and half
-// below in RTTY-R (RTTY-U here). In DATA the dial is the carrier, so the
+// A click puts the signal where the tuner listens. In RTTY and RTTY-R alike
+// the IC-7300 shows the higher tone of the pair (checked on DDK9,
+// 2026-10-28), so a click between the two traces lands the dial half the
+// shift above the click in both. In DATA the dial is the carrier, so the
 // click goes the tuner's Mark/Shift midpoint away from it: below the click
 // in DATA-U, above it in DATA-L. Either way the pair lands on the tuner's
 // Mark, which is where Auto puts it too in a DATA mode the tuner holds.
@@ -118,14 +118,14 @@ export function startIcomRttyContest(root, cfg) {
         onDecode: cfg.onDecode,
     });
 
-    // A click is the middle of the pair. In RTTY the dial goes on the mark,
-    // half the shift away; in DATA on the carrier, the pair's audio midpoint
-    // away. Never a mode change.
+    // A click is the middle of the pair. In RTTY the dial goes on the higher
+    // tone, half the shift up; in DATA on the carrier, the pair's audio
+    // midpoint away. Never a mode change.
     function clickTarget(_vfo, hz, mode) {
         const s = loadRttySettings();
         const half = num(s.shiftHz) / 2;
         const mid = afskMidpointAudioHz(s);
-        const off = { 'RTTY-L': half, 'RTTY-U': -half, 'DATA-L': mid, 'DATA-U': -mid }[mode] ?? 0;
+        const off = { 'RTTY-L': half, 'RTTY-U': half, 'DATA-L': mid, 'DATA-U': -mid }[mode] ?? 0;
         return { mode: null, to: Math.round(hz + off) };
     }
     const feed = startIcomSpectrumFeed({

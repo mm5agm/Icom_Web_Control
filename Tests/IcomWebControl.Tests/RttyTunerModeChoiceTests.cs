@@ -69,4 +69,17 @@ public class RttyTunerModeChoiceTests
     {
         Assert.Equal(expected, RttyTunerModeService.RungAtOrAbove(wanted, widest));
     }
+
+    [Theory]
+    // The menu mark is the low end of the pair in both modes (DDK9 and a
+    // noise sweep, 2026-10-28); the tuner's RTTY-R mark is the high end.
+    [InlineData("RTTY-L", 2125, 170, 2125)]
+    [InlineData("RTTY-U", 2125, 170, 2295)]
+    [InlineData("RTTY-U", 2125, 425, 2550)]
+    [InlineData("DATA-U", 2125, 425, 2125)]
+    public void RttyRMarkIsTheTopOfTheMenuPair(string mode, int menuMark, int shift, int tunerMark)
+    {
+        Assert.Equal(tunerMark, RttyTunerModeService.TunerMarkFromMenu(mode, menuMark, shift));
+        Assert.Equal(menuMark, RttyTunerModeService.MenuMarkFromTuner(mode, tunerMark, shift));
+    }
 }

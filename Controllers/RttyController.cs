@@ -275,10 +275,11 @@ namespace Icom_Web_Control.Controllers
                 var mode = _state.ModeA ?? "";
                 bool fsk = mode.StartsWith("RTTY", StringComparison.OrdinalIgnoreCase);
 
+                // In RTTY-R the tuner's mark is the other end of the menu pair.
                 return Ok(new
                 {
                     ok       = true,
-                    markHz   = tones.MarkHz,
+                    markHz   = RttyTunerModeService.TunerMarkFromMenu(mode, tones.MarkHz, tones.ShiftHz),
                     shiftHz  = tones.ShiftHz,
                     mode,
                     fsk,
@@ -356,14 +357,20 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                var w = await _radio.SetRttyToneSettingsAsync(req.MarkHz, req.ShiftHz,
-                                                              HttpContext.RequestAborted);
+                // In RTTY-R the tuner's mark is the top of the menu pair, so the
+                // menu mark is a shift below it, and the reply goes back the same way.
+                var w = await _radio.SetRttyToneSettingsAsync(
+                    RttyTunerModeService.MenuMarkFromTuner(mode, req.MarkHz, req.ShiftHz), req.ShiftHz,
+                    HttpContext.RequestAborted);
+                int? tookMark = w.MarkHz is { } m
+                    ? RttyTunerModeService.TunerMarkFromMenu(mode, m, w.ShiftHz ?? req.ShiftHz)
+                    : null;
                 return Ok(new
                 {
                     ok      = w.MarkHz != null || w.ShiftHz != null,
                     mode,
                     fsk     = true,
-                    markHz  = w.MarkHz,
+                    markHz  = tookMark,
                     shiftHz = w.ShiftHz,
                     reason  = w.MarkHz == null && w.ShiftHz == null
                         ? "The radio has no setting for those tones."

@@ -97,10 +97,12 @@ namespace Icom_Web_Control.Services.Rtty
 
         /// <summary>
         /// Where the IC-7300 centres its DATA passband, in Hz of audio, with
-        /// Twin PBT centred. <b>Assumed, not measured</b>: the middle of a
-        /// 2.4 kHz SSB filter that starts about 300 Hz up. Used only to judge
-        /// whether the filter is wide enough, never to narrow it, until a noise
-        /// sweep in DATA like the RTTY one below replaces it.
+        /// Twin PBT centred. Noise sweep, 2026-10-28, 10.106 MHz: 1494..1541 Hz
+        /// at -6 dB in DATA-U at 2400, 3000 and 3600 and DATA-L at 2400, and
+        /// DDK9 tuned to 1500 by the carrier came out centred at 1500. The
+        /// passband measured about 2.26 kHz at -6 dB whatever the width was
+        /// set to, so it is used only to judge whether the filter is wide
+        /// enough, never to narrow it.
         /// </summary>
         public const double DataCentreHz = 1500.0;
 
@@ -354,7 +356,7 @@ namespace Icom_Web_Control.Services.Rtty
 
                 _narrowOk = true;
                 _sizedFor = null;
-                return PassbandCentreHz(mode, menu);
+                return PassbandCentreHz(menu);
             }
             finally { _gate.Release(); }
         }
@@ -518,15 +520,29 @@ namespace Icom_Web_Control.Services.Rtty
         /// the other way round from the menu pair - its space was below the
         /// menu mark, so the passband looked as if it hugged the mark.</para>
         ///
-        /// <para><b>RTTY-R is not measured.</b> The pair is taken the other way up
-        /// (space below mark), which is what the mode means; a sweep in RTTY-R is
-        /// owed before that is trusted.</para>
+        /// <para>RTTY-R, 2026-10-28, 10.106 MHz, 500 Hz: the same place. 2125/425
+        /// centred at 2326 in both modes, 2125/170 at 2197 in both. The menu
+        /// pair is menu mark and menu mark + shift in either mode; what RTTY-R
+        /// changes is which end the higher RF lands on (see
+        /// <see cref="TunerMarkFromMenu"/>).</para>
         /// </summary>
-        private static double PassbandCentreHz(string? mode, RttyToneSettings menu)
-        {
-            var (m, s) = RttyTunerService.TonesFor(mode, menu.MarkHz, menu.ShiftHz, reverse: false);
-            return (m + s) / 2.0;
-        }
+        private static double PassbandCentreHz(RttyToneSettings menu) =>
+            menu.MarkHz + menu.ShiftHz / 2.0;
+
+        /// <summary>
+        /// The tuner's Mark for the radio's menu mark. The tuner puts space
+        /// below mark in RTTY-R (RTTY-U), as that sideband puts the higher RF
+        /// higher in the audio; the radio's menu mark is the lower end of the
+        /// pair in both modes, so in RTTY-R the tuner's mark is the menu mark
+        /// plus the shift. DDK9, 2026-10-28: dial on a tone, menu 2125/425,
+        /// that tone came out at 2552 Hz in RTTY-R and 2126 Hz in RTTY.
+        /// </summary>
+        public static int TunerMarkFromMenu(string? mode, int menuMarkHz, int shiftHz) =>
+            mode == "RTTY-U" ? menuMarkHz + shiftHz : menuMarkHz;
+
+        /// <summary>The other way: the menu mark for the tuner's Mark.</summary>
+        public static int MenuMarkFromTuner(string? mode, int tunerMarkHz, int shiftHz) =>
+            mode == "RTTY-U" ? tunerMarkHz - shiftHz : tunerMarkHz;
 
         private async Task<string?> CentrePbtAsync(int inner, int outer, CancellationToken ct)
         {
@@ -559,7 +575,7 @@ namespace Icom_Web_Control.Services.Rtty
             {
                 _menu ??= await _radio.GetRttyToneSettingsAsync(ct);
                 if (_menu is not { } menu) return null;
-                centre = PassbandCentreHz(mode, menu);
+                centre = PassbandCentreHz(menu);
             }
 
             int current = await _radio.GetIfFilterWidthHzAsync(RadioVfo.A, ct);
