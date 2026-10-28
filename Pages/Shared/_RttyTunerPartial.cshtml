@@ -44,6 +44,12 @@
     #rttyTunerDialog[open] { display:flex; flex-direction:column; }
     #rttyTunerDialog .rtty-header { flex:0 0 auto; cursor:move; }
     #rttyTunerDialog .rtty-body { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+    /* site.css's dialog buttons, here too: the RTTY Contest view leaves
+       site.css out (its floating-dialog rules would undock the tuner), and
+       without these From radio, Auto and Clear are dark on dark. */
+    #rttyTunerDialog .iwc-dialog-btn { background:#333; color:#eee; border:1px solid #666; font-size:0.8rem; line-height:1.2; padding:2px 8px; }
+    #rttyTunerDialog .iwc-dialog-btn:hover, #rttyTunerDialog .iwc-dialog-btn:focus { background:#444; color:#fff; border-color:#8ab; }
+    #rttyTunerDialog .iwc-dialog-btn:disabled { color:#888; border-color:#444; }
 
     /* The two columns. The tuner column is a fixed width because the scope is
        square and there is nothing to gain by stretching it; widening the panel
