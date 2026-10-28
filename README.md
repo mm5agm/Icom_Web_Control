@@ -21,6 +21,13 @@ If something has been biting you and a pre-release says it is fixed, or you want
 
 ## ✨ Added since the last release
 
+**Coming in the next pre-release.** These are on the `feature/rtty-contest` branch and are not in any installer yet:
+
+- **RTTY Contest, a GUI for RTTY contesting.** Only what a contest RTTY operator uses, on one screen: the frequency, band keys that land on each band's RTTY spot, the radio's scope over its waterfall, and the RTTY tuner docked at the side with its decoded text. Each part pops out into a window of its own, and named layouts put every window back on its own monitor. It is the page from Yaesu Web Control, shared between the two apps. Receive only for now. Pick it from **Views**, or go to `/rtty-contest`. [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **Choose your RTTY mode.** Settings → **RTTY mode** is RTTY-L, RTTY-U, DATA-L or DATA-U, and the tuner puts the radio in it and holds it there while it is open. Choose a DATA mode for AFSK, and the tuner no longer pulls you out of DATA. [§6.8](USER_MANUAL.md#68-rtty-tuner).
+- **RTTY-R fixed, measured on DDK9.** In RTTY-R the tuner had the tones the wrong way up, **From radio** showed the wrong mark, and a click on RTTY Contest landed a shift away. All three are right now, and the filter width is worked out from where the passband really is: midway between the tones of the radio's own RTTY menu, in both modes. [§20.2](USER_MANUAL.md#202-mark-shift-speed-and-rev).
+- **Auto never changes the radio's RTTY menu.** The radio transmits FSK on that shift, so Auto setting it to 425 for a station you were only listening to would have sent your next call on 425. Auto now leaves the menu alone, opens the filter to cover both tones, and says when the station's shift is not the menu's. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
+
 **v1.5.0 is the current release.** Its headline is three ways to run the radio — Classic, the Experimental UI and the Radio panel — and the RTTY panel now decodes. The first five are RTTY, and together they turn the tuner into a receive station:
 
 - **The RTTY panel decodes now.** What was the RTTY Tuner is one **RTTY** panel in two columns: the crossed-ellipse scope and its controls on the right, a **Decode** pane printing the text on the left, and a **Send** box underneath showing where sending will go — **Send is greyed out and does not transmit**, and [§20.6](USER_MANUAL.md#206-sending) says why it is harder than it looks. The decoder has no Mark, Shift, Speed or Rev of its own: it uses the ones in the Tune column beside it, so getting the cross upright is the whole of setting it up, and switching the radio between RTTY and RTTY-R needs nothing pressed. [§20.5](USER_MANUAL.md#205-decoding-the-text).

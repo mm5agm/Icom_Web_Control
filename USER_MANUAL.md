@@ -29,6 +29,7 @@
    - 5.18 [Pop-out windows](#518-pop-out-windows)
    - 5.19 [Experimental UI](#519-experimental-ui)
    - 5.20 [Radio panel](#520-radio-panel)
+   - 5.21 [RTTY Contest](#521-rtty-contest)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -1150,6 +1151,64 @@ The CW Reader, CW Send, the RTTY tuner and the DX spots each have a **⇱** key 
 
 The Radio panel has none of the screen-reader or voice-control work of the Classic page, and no launch buttons for WSJT-X or other programs. Those stay on the Classic page.
 
+### 5.21 RTTY Contest
+
+*New after v1.6.0-pre5, and still being tested.*
+
+**RTTY Contest** has only what a contest RTTY operator uses, on one screen: the frequency, the radio's band scope over its waterfall, and the RTTY tuner docked at the side. Pick it from **Views** on the Radio panel ([§5.20](#520-radio-panel)), or go to `http://localhost:8080/rtty-contest`. **Views** on the page itself goes back to the other GUIs. It is the RTTY Contest page from Yaesu Web Control, shared between the two apps. It receives; nothing on it transmits yet.
+
+While it is open, its tuner keeps the radio in the mode chosen in **MODE** (below). If something else changes the mode, CW Reader Mode or a band change, the tuner puts it back, so close the page, or use another GUI, for CW.
+
+**The top strip**
+
+- **The frequency** of the VFO on screen. Click it to type a frequency: `14.08` and `14080` and `14080000` all mean 14.080 MHz. Enter tunes there and Esc leaves it as it was. Hold the mouse over a digit and turn the wheel to move that digit up or down, as on the Radio panel.
+- **MODE** is a list of RTTY, RTTY-R, LSB-D and USB-D, as the radio's screen names them (IWC's RTTY-L, RTTY-U, DATA-L and DATA-U). LSB-D or USB-D is for AFSK, where your RTTY software makes the tones. A pick is kept (it is the same setting as **RTTY mode** in Settings, [§6.8](#68-rtty-tuner)), the tuner holds the radio in it, and the band keys use it. A mode outside the four shows as itself, greyed. Then the tuner's **MARK / SHIFT**, then **RX** or **TX**.
+- **Meters:** S, and PO, SWR and ALC while transmitting. **METERS** hides or shows them.
+- **VFO-A / VFO-B** chooses which VFO is on screen. The IC-7300's scope follows the selected VFO, so this selects it on the radio, as the VFO keys on the Radio panel do, and a VFO change on the radio moves the page with it.
+- **DX SPOTS** switches the spot tags on the spectrum on and off.
+- **SPAN** is a list in the label at the top of the spectrum, beside the frequency, and sets the scope's span.
+- **LAYOUT** saves and recalls named layouts (below).
+
+The frequency, the MODE list and the keys keep their colours readable in every Radio panel theme; the page takes its theme from the Radio panel.
+
+**The band keys**
+
+Under the strip is a row of band keys. A key tunes the radio to the RTTY part of the band and puts it in the mode chosen in **MODE**. The spot comes from your band plan's RTTY segment where it has one. Where it doesn't, the keys use 1.838, 3.580, 7.040, 10.140, 14.080, 18.105, 21.080, 24.925, 28.080 and 50.300 MHz. The band plan the other GUIs use is not changed. **60 m and 4 m** have no RTTY spot here: their keys go to the radio's own band memory, as the band keys on the other GUIs do, and then to that mode. The key for the band you are on is lit, however you got there.
+
+**BANDS**, in the scope row, opens a box with a tick for each band key. Untick the bands you don't work and their keys go. The choices are kept in this browser; they are not part of a layout.
+
+**The scope row**
+
+- **REF** moves the bottom of the trace up or down from the noise floor. **AUTO** lets the floor follow the noise; off, it stays where it is.
+- **RANGE** is how many dB the trace covers. **FIT** sets it so the strongest signal of the last few seconds just fits, as does a double-click on the bar between the spectrum and the waterfall.
+- **WF ON TOP** puts the waterfall above the spectrum.
+- **STEP** is how far one notch of the mouse wheel moves the dial over the spectrum, 1 Hz to 1 kHz.
+- **TRACE** is how thick the spectrum's line is.
+- **BANDS** chooses the band keys (above).
+- **POP OUT** opens the spectrum, the waterfall, or both, in a window of their own.
+
+**Tuning**
+
+Click a signal on the spectrum or on the waterfall to tune to it. The **arrows** at the left and right edges of the spectrum move the dial down or up by one span, to look along the band a screen at a time. The page never changes the mode when you click, whatever the band plan says about that part of the band.
+
+Click between a station's two traces. In **RTTY** and **RTTY-R** alike the IC-7300's dial shows the higher of the two tones, so the dial goes half the shift above where you clicked, and the pair lands on the tuner's Mark and Shift. That was checked on DDK9 on 10.1008 MHz in both modes. In **LSB-D** and **USB-D** the dial is the carrier, so the dial goes the tuner's Mark/Shift midpoint away from the click: with the software on Mark 1415 / 170, as MMTTY has them, 1500 Hz above the signal in LSB-D and 1500 Hz below it in USB-D.
+
+**The tuner**
+
+The RTTY tuner ([§20](#20-rtty)) is docked at the right, as in Contest Mode ([§20.10](#2010-contest-mode-the-tuner-on-its-own)), with **From radio**, **Auto** and **Clear** on it. The keys on its bar:
+
+- **DECODE** shows the decoded text in a box of its own under the tuner, and starts the decoder. Press it again to stop the decoder and hide the text. The text box has its own **POP OUT**.
+- **POP OUT** moves the tuner into a window of its own, the same window every GUI pops its tuner out to.
+- **ON TOP** puts it in a small window that stays above other programs, such as your logger, where the browser allows it (Chrome and Edge do).
+
+The docked tuner starts small; its grabs make it bigger. Under it is a box with **PWR**, 5 W to the radio's maximum, and **WIDTH**, the radio's IF widths for the mode. There is no SHIFT, because the IC-7300 has Twin PBT instead of an IF shift, and the tuner keeps PBT centred while it is open ([§20.9](#209-what-the-tuner-changes-on-your-radio)). A slider writes to the radio when you let go of it, or a moment after the last notch of the mouse wheel over it.
+
+**Sizes, windows and layouts**
+
+Drag the right edge, the bottom edge or the bottom-right corner of the spectrum, or of the docked tuner, to size it. A box you haven't sized fills the room it has. Each part that pops out leaves the page, and comes back with **DOCK** in its window, or when its window closes.
+
+**LAYOUT** saves all of this by name, on the computer running IWC: the sizes, the choices above, which parts are in windows of their own, and where each window is. Recalling a layout puts every window back where it was, so each can go on its own monitor. If the browser blocks some of the windows, a bar says so with a key for each: one click opens one window.
+
 ---
 
 ## 6. Settings Page
@@ -1479,28 +1538,39 @@ has any way of knowing that the audio is wrong.
 
 | Setting | What it does |
 |---|---|
-| **Set RTTY mode when the tuner starts** | Puts VFO A into **RTTY-L** if it was in a mode RTTY cannot be received in at all — CW, AM or FM — and opens the IF filter if it is too narrow to carry both of your tones. Your mode and filter are put back when the tuner stops. |
+| **Set RTTY mode when the tuner starts** | Puts VFO A into the **RTTY mode** below if it was in a mode of another kind, and keeps it there while the tuner is open, and opens the IF filter if it is too narrow to carry both of your tones. Your mode and filter are put back when the tuner stops. |
+| **RTTY mode** | **RTTY-L** (the radio's RTTY, the default) or **RTTY-U** (RTTY-R) for the radio's own FSK, or **DATA-L** or **DATA-U** if your software sends AFSK through the radio's audio. The **MODE** list on RTTY Contest ([§5.21](#521-rtty-contest)) is the same setting, and its band keys use it. |
 | **Auto also tunes the signal in** | When **Auto** is sure of what it heard, the dial moves so the mark tone arrives on the tuner's **Mark**, and the status line says which way it went and by how much. |
 
-**What the first one will not do.** It only ever takes the radio *out of* CW, AM,
-FM and DATA-FM. **RTTY, RTTY-R, LSB, USB, DATA-L and DATA-U are left exactly as
-they are** — the two FSK modes need nothing done to them, and in SSB or DATA the
-tones are being made by your own software with the radio as a plain SSB
-transceiver, which is a perfectly good way to run the tuner and one this
-switching would break. It also **never narrows a filter**, only widens one that
-could not have carried both tones: a narrow filter is how you dig a signal out of
-a crowded band, and only you know what else is on the band.
+**What the first one will not do.** It only switches between kinds. With
+**RTTY-L** or **RTTY-U** chosen, either of the radio's two FSK modes is left as
+it is, and anything else (CW, SSB, DATA, AM, FM) is switched to your choice.
+With **DATA-L** or **DATA-U** chosen, either DATA mode is left as it is, and
+RTTY is switched. Which sideband is right depends on the station, and the
+tuner's **Rev** is for that. If your software makes the tones, choose a DATA
+mode here, or the tuner will take the radio out of DATA.
 
-**How wide it asks for.** Not the shift plus a little, which is the figure most
-RTTY writing quotes. This radio holds its RTTY passband centred on the **mark**
-tone, so the space tone sits the whole shift away from the middle of the filter
-and is the first thing to be lost — measured on the bench, a 550 Hz filter put
-the space tone of a 450 Hz shift signal 33 dB down and decoded nothing at all,
-while 1200 Hz read it cleanly. So it asks for roughly twice the shift plus a
-little for the keying, and it reads the width back afterwards so the figure you
-are shown is the one the radio actually took. If the pair sits too far from the
-middle of the passband for even the widest filter, it tells you and asks you to
+**How wide it asks for.** The radio centres its RTTY passband midway between
+the two tones of **its own menu**, SET > Function > RTTY Mark Frequency and
+Shift Width: 2125 + 85 = 2210 Hz at the default 2125 / 170, in RTTY and RTTY-R
+alike. That was measured with a noise sweep, and again on DDK9 on 2026-10-28.
+A signal of the menu's shift sits in the middle, and the filter can come right
+down. A signal of another shift does not: at 2125 / 170 the space tone of a
+450 Hz station is 365 Hz from the middle, and on the bench a 550 Hz filter put
+it 33 dB down and decoded nothing at all, while 1200 Hz read it cleanly. So the
+width it asks for is twice the distance from the middle to the further tone,
+plus a little for the keying, and it reads the width back afterwards so the
+figure you are shown is the one the radio actually took. If the pair sits too
+far from the middle for even the widest filter, it tells you and asks you to
 move the dial.
+
+**When it narrows.** Before **Auto** has found a signal, the filter is only
+ever widened: a filter sized for where the dialog thinks the tones are can hide
+the station Auto is about to look for. Once Auto has found the signal and moved
+the dial so the pair is in the middle, in RTTY the filter comes down to the
+narrowest that carries it. In DATA it is only ever widened, because the DATA
+passband's centre (about 1500 Hz) is measured but its width does not follow
+the setting.
 
 **What the second one will not do.** It will not move the mark further than your
 IF filter is wide, and never less than 500 Hz whatever the filter — past the
@@ -3398,11 +3468,11 @@ Drag the panel narrower than about 640 pixels and the two columns fold into one,
 
 Nothing here transmits. It does change three things on the receiver, all of them so that the figure can be believed, and all of them undone when you close it:
 
-- **It puts the radio into RTTY** if it was in a mode RTTY cannot be received in at all — CW, AM or FM — and puts your mode back afterwards ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
-- **It opens the IF filter** if the filter is too narrow to carry both tones. It never narrows one. How wide is wide enough depends on where your tones sit in the audio and not only on the shift, because this radio centres its RTTY passband on the **mark** tone — so the space tone is the one that falls off the edge, and a 450 Hz shift needs about 1 kHz of filter rather than the 550 Hz the usual rule-of-thumb suggests. If even the widest filter cannot reach both tones the status line says so and asks you to move the dial, which is the only thing that can fix it.
+- **It puts the radio into your RTTY mode** (Settings, [§6.8](#68-rtty-tuner): RTTY by default, or a DATA mode for AFSK) if it was in a mode of another kind, holds it there while it is open, and puts your mode back afterwards ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
+- **It opens the IF filter** if the filter is too narrow to carry both tones. How wide is wide enough depends on where your tones sit in the audio and not only on the shift, because this radio centres its RTTY passband midway between the tones of its own RTTY menu — so a station on another shift has a tone off to one side, and a 450 Hz station with the menu on 170 needs about 1 kHz of filter rather than the 550 Hz the usual rule-of-thumb suggests. If even the widest filter cannot reach both tones the status line says so and asks you to move the dial, which is the only thing that can fix it. Once Auto has centred a signal, in RTTY it narrows the filter to fit.
 - **Auto moves the dial** to bring the signal onto the tones, when it is sure of what it heard, and says so ([§20.3](#203-auto-working-out-what-you-are-listening-to)).
 
-It will also put the radio's own **RTTY Mark Frequency** and **Shift Width** menu in step with what you choose, so its built-in decoder does not have to be set twice ([§20.2](#202-mark-shift-speed-and-rev)). Both of the automatic changes can be turned off on the Settings page, and fine-tuning by hand works exactly as it always did.
+When you type a Mark or Shift, or pick one, it also puts the radio's own **RTTY Mark Frequency** and **Shift Width** menu in step, so its built-in decoder does not have to be set twice ([§20.2](#202-mark-shift-speed-and-rev)). **Auto never does**: the radio transmits FSK on that shift, and a 425 written for a station you were only listening to would go out on your next call. Both of the automatic changes can be turned off on the Settings page, and fine-tuning by hand works exactly as it always did.
 
 It **does** decode RTTY into text — that is the Decode pane, and [§20.5](#205-decoding-the-text) is all of it. The decoder has no Mark, Shift, Speed or Rev of its own: it uses the ones in the Tune column beside it, so getting the cross upright is the whole of putting the decoder on the signal. **Sending is not built** — the Send box is there so you can see where it will go, and [§20.6](#206-sending) says why it is empty.
 
@@ -3509,6 +3579,8 @@ Two things about the reading itself are worth knowing:
 >
 > The same measurement settled something else worth knowing: **in RTTY the dial reads the mark frequency.** Put the dial on a station's mark and you are on it.
 >
+> **In RTTY-R the dial shows the higher tone too**, and that is the tone which arrives at the top of the pair: 2295 Hz with the menu at 2125 / 170, because the radio's menu mark is the lower tone of the pair in both modes. So in RTTY-R the tuner's **Mark** reads 2295, **From radio** shows 2295, and typing 2295 writes 2125 to the radio's menu. Checked on DDK9 on 2026-10-28, where the tone the dial was on came out at 2126 Hz in RTTY and 2552 Hz in RTTY-R with the menu at 2125 / 425. Before then the tuner put RTTY-R's tones the wrong way up, and a click on RTTY Contest landed a shift away.
+>
 > If you are running AFSK instead — DATA-L, DATA-U, LSB or USB, where your software makes the tones and the radio is just an SSB transceiver — the same 2125 / 2295 defaults apply, because that is what RTTY software uses. The radio's RTTY MARK menu plays no part there.
 
 ### 20.3 Auto: working out what you are listening to
@@ -3567,9 +3639,14 @@ because they call for different things:
 
 Auto measures rather than choosing from a list, so a station on no standard shift
 or speed is reported as it is, shown in the box labelled *measured*, and used
-that way. It will also tick or untick **Rev** for you, and push the mark and
-shift to the radio's menu where there is a rung for them, exactly as if you had
-typed them.
+that way. It will also tick or untick **Rev** for you. It does **not** write the
+mark or shift to the radio's own RTTY menu, as typing them does: the radio
+transmits FSK on that shift, so a 425 written for a utility station you were
+listening to would go out on your next contest call. When a station's shift is
+not the menu's, the status line says so — *"This signal is 451 Hz shift and the
+radio's RTTY menu is 170 Hz…"* — and the filter is opened to cover both tones.
+Set the menu yourself, by typing the shift, if you want the radio's own
+decoder on it. From radio puts the tuner back on the menu's figures.
 
 **And when it is sure of what it heard, it tunes the signal in.** The dial moves
 so that the mark tone arrives on the tuner's **Mark** — 2125 Hz unless you have
@@ -3595,14 +3672,17 @@ counts as the same station. It will not move at all unless it is sure, or if the
 answer is within about 25 Hz, which is the limit of what it can measure; move
 while you are transmitting; or move the dial in **LSB, USB or the DATA modes**,
 where your own RTTY software is making the tones and has its own tuning
-indicator. Turn it off altogether with *Auto also tunes the signal in* on the
+indicator. The exception is a DATA mode the tuner itself is holding the radio
+in (**RTTY mode** in Settings, or **MODE** on RTTY Contest): there Auto moves
+the dial so the mark lands on the tuner's **Mark**, the same place a click puts
+it, so set the Mark to match your RTTY software (1415 for MMTTY). Turn it off altogether with *Auto also tunes the signal in* on the
 Settings page.
 
 ### 20.4 Your first session, step by step
 
 1. **Set the audio device first.** The tuner uses the CW Reader's audio-device setting on the Settings page — there is only one, and on a USB-connected IC-7300 it is the radio's own USB codec. If the CW Reader works, so will this. See [§18.3](#183-choosing-the-audio-device).
-2. **Tune roughly onto a signal.** RTTY lives just below the FT8 frequencies on most bands — 14.080–14.099 on 20m is the usual hunting ground. You do not have to put the radio in RTTY first: if you are in CW, AM or FM, pressing **RTTY** does it for you and puts your mode back when you close the tuner ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
-3. **The filter looks after itself, within reason.** The tuner opens the IF if it is too narrow for the shift you are set to, but it will not narrow a wide one — a 2.4 kHz SSB filter puts half the band into the tuner at once and the figure will never settle, so if you are in SSB or DATA, narrow it yourself to something like 300–500 Hz ([§5.8](#58-if-width-if-shape-filter-slot-and-af-gain)).
+2. **Tune roughly onto a signal.** RTTY lives just below the FT8 frequencies on most bands — 14.080–14.099 on 20m is the usual hunting ground. You do not have to put the radio in RTTY first: pressing **RTTY** puts it in your RTTY mode (Settings, [§6.8](#68-rtty-tuner)) and puts your mode back when you close the tuner ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
+3. **The filter looks after itself, within reason.** The tuner opens the IF if it is too narrow for the shift you are set to, and in RTTY it narrows it to fit once **Auto** has centred a signal. Until then it will not narrow a wide one — a 2.4 kHz filter puts half the band into the tuner at once and the figure will never settle, so narrow it yourself to something like 300–500 Hz, or press **Auto** ([§5.8](#58-if-width-if-shape-filter-slot-and-af-gain)).
 4. **Press RTTY.** The figure starts drawing within a second or so.
 5. **If you do not know the station's shift or speed, press Auto** and let it work them out ([§20.3](#203-auto-working-out-what-you-are-listening-to)). On amateur RTTY you can skip this — the defaults are already right.
 6. **Tune slowly** — 10 Hz steps are about right — until the cross stands upright. On a strong signal this is unmistakable; on a weak one, aim for the most upright you can get and the most equal arm lengths. If you pressed **Auto** and it was sure, this is already done: it moves the dial itself and tells you it has.
@@ -3714,7 +3794,8 @@ Tuning and decoding together is the normal way to use the RTTY panel. Running th
 | It stops by itself after a while | It stops when nothing is asking it for sweeps — a minimised or backgrounded tab will do it. Bring the page back to the front and press **RTTY** again. |
 | **The radio changed mode, or the filter widened, when I opened the tuner** | That is meant to happen, and it is put back when you close the tuner. [§20.9](#209-what-the-tuner-changes-on-your-radio) says exactly what it does and how to turn it off. |
 | **Auto** moved my dial | Also meant to happen, when it is sure of the signal: it puts the mark tone onto the tuner's Mark so the figure stands upright and the speed can be measured. It says what it moved. Turn it off with *Auto also tunes the signal in* on the Settings page ([§20.3](#203-auto-working-out-what-you-are-listening-to)). |
-| **Auto** said the figures but did not move the dial | It only moves in **RTTY-L** or **RTTY-U** — never in SSB or DATA, where your own software owns the tuning — and only when it is sure, the correction is more than about 25 Hz, no further than your IF filter is wide (and never less than 500 Hz), and you are not transmitting. |
+| **Auto** changed the tuner's shift but the radio's menu still says 170 | Meant to happen. Auto never writes the radio's RTTY menu, because the radio transmits FSK on it ([§20.3](#203-auto-working-out-what-you-are-listening-to)). Type the shift if you want it there. |
+| **Auto** said the figures but did not move the dial | It only moves in **RTTY-L** or **RTTY-U**, or in a DATA mode the tuner is holding the radio in — never in SSB, or in DATA you chose yourself, where your own software owns the tuning — and only when it is sure, the correction is more than about 25 Hz, no further than your IF filter is wide (and never less than 500 Hz), and you are not transmitting. |
 | **The decoder prints nothing, and the status line says *nothing to decode*** | The squelch is holding because the two tones are not strong enough to be worth printing. Check the `signal` figure: a third or so is hiss. Tune for the cross, and narrow the IF filter so a neighbour is not sharing the passband. |
 | **The decoder prints, but it is gibberish** | Something is wrong in the Tune column rather than the Decode pane. In order of likelihood: the cross is not upright, **Rev** is wrong (try it both ways — reversed RTTY is common), or the shift does not match. Press **Auto** and let it measure. A `signal` figure below about 0.5 will produce rubbish whatever the settings. |
 | **Numbers decode correctly but punctuation does not** | Wrong figures table. Switch **Figures** between **ITA2** and **US TTY** ([§20.5](#205-decoding-the-text)). |
@@ -3735,9 +3816,11 @@ So the tuner sets up what it needs, and puts it back:
 
 | | |
 |---|---|
-| **Mode** | If VFO A is in **CW-U, CW-L, AM, FM or DATA-FM**, the tuner sets **RTTY-L**. Those are the modes a RTTY tone pair cannot survive. **RTTY-L, RTTY-U, LSB, USB, DATA-L and DATA-U are left exactly as they are** — the FSK modes need nothing, and in SSB and DATA your own software is making the tones, so the mode is yours. |
-| **IF filter** | Only if it is too narrow to have carried the shift you are set to — mark-to-space plus room for the keying either side, which for standard 170 Hz at 45.45 baud is about 260 Hz, and for a 450 Hz shift at 50 baud about 550 Hz. **It never narrows a filter.** A narrow filter is how you dig a signal out of a crowded band, and only you know the band. |
-| **Putting it back** | Both, when the tuner stops — closing the dialog, closing the tab, or the app shutting down. It is held on the server rather than in the browser, so reloading the page does not lose the record of what you had. |
+| **Mode** | If VFO A is in a mode of another kind from your **RTTY mode** (Settings, [§6.8](#68-rtty-tuner)), the tuner sets that mode, and while it is open it puts it back if a band change or anything else moves it. With RTTY chosen, **RTTY-L and RTTY-U** are both left as they are; with DATA chosen, **DATA-L and DATA-U** are. The default is RTTY-L. |
+| **Twin PBT** | Centred, because every width decision assumes the passband is where the noise sweep measured it. |
+| **IF filter** | Widened if it is too narrow to have carried the pair, judged from the middle of the radio's passband ([§6.8](#68-rtty-tuner) says where that is). In RTTY, once **Auto** has found a signal and centred it, narrowed to the narrowest that carries it; before that, and always in DATA, only ever widened. |
+| **The radio's RTTY menu** | Written when you type or pick a Mark or Shift in an FSK mode, so the radio's own decoder agrees. **Never by Auto**, and never restored, because it is yours: the radio transmits FSK on it. |
+| **Putting it back** | Mode, filter and PBT, when the tuner stops — closing the dialog, closing the tab, or the app shutting down. It is held on the server rather than in the browser, so reloading the page does not lose the record of what you had. |
 | **Turning it off** | *Set RTTY mode when the tuner starts*, on the Settings page under **RTTY Tuner**. |
 
 Whatever it changes, it tells you in the status line under the figure — *"Mode set
