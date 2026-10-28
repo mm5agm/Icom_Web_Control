@@ -1182,6 +1182,7 @@ Under the strip is a row of band keys. A key tunes the radio to the RTTY part of
 - **REF** moves the bottom of the trace up or down from the noise floor. **AUTO** lets the floor follow the noise; off, it stays where it is.
 - **RANGE** is how many dB the trace covers. **FIT** sets it so the strongest signal of the last few seconds just fits, as does a double-click on the bar between the spectrum and the waterfall.
 - **WF ON TOP** puts the waterfall above the spectrum.
+- **FIXED** holds the spectrum still while the dial moves. Click a signal and only the passband and the dial line move, so the stations stay where you saw them. The spectrum moves on only when the passband gets near an edge, or you change the span or the band. Off, the spectrum stays centred on the dial. The IC-7300 sends its scope centred on the dial, so with FIXED on, a strip at one edge can be blank, as wide as the dial has moved from the middle.
 - **STEP** is how far one notch of the mouse wheel moves the dial over the spectrum, 1 Hz to 1 kHz.
 - **TRACE** is how thick the spectrum's line is.
 - **BANDS** chooses the band keys (above).
@@ -3501,6 +3502,8 @@ That is the real thing: an amateur RTTY signal on 80m, 3598.3 kHz, standard 170 
 | **Arms opening into a fat X or an ellipse** | Still off tune, and far enough out that the tones are catching the skirts of the wrong filters. Keep going the same way the lean is pointing. |
 | **One strong line and one weak one** | Only one tone is arriving. Either the shift is wrong ([§20.2](#202-mark-shift-speed-and-rev)), or **Auto** ([§20.3](#203-auto-working-out-what-you-are-listening-to)) will tell you what it should be, or you are tuned so far off that only one tone is inside the filter. |
 | **A blur with no shape** | No RTTY there — noise, an SSB signal, or the wrong audio device. Check the line under the figure is showing a signal level at all. |
+
+On tune, mark lies flat and space stands upright at the same dial setting. Until v1.6.0 each arm leaned about 4 degrees even on tune, so straightening mark and then space could put the dial in two places about 50 Hz apart (Bruce VK2RT found it). The filters are now shaped so the other tone no longer tilts them.
 
 The line under the figure reports what the two filters are actually hearing, in dB, along with the overall input level. It is the quickest way to tell "nothing is arriving" from "something is arriving and it is not RTTY".
 
