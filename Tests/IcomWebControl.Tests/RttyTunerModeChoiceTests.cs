@@ -82,4 +82,17 @@ public class RttyTunerModeChoiceTests
         Assert.Equal(tunerMark, RttyTunerModeService.TunerMarkFromMenu(mode, menuMark, shift));
         Assert.Equal(menuMark, RttyTunerModeService.MenuMarkFromTuner(mode, tunerMark, shift));
     }
+
+    [Theory]
+    // Auto never writes the menu shift (the radio transmits FSK on it); it says
+    // when a signal's shift is not the menu's.
+    [InlineData(451, 170, true)]
+    [InlineData(200, 170, true)]
+    [InlineData(176, 170, false)]
+    [InlineData(445, 425, false)]
+    [InlineData(451, null, false)]
+    public void AutoSaysWhenTheShiftIsNotTheMenus(int signal, int? menu, bool said)
+    {
+        Assert.Equal(said, RttyAutoService.ShiftNote(signal, menu) is not null);
+    }
 }

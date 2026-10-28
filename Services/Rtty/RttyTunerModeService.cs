@@ -117,9 +117,6 @@ namespace Icom_Web_Control.Services.Rtty
         // no narrowing", which is the setting the noise sweep was done at.
         private const int PbtCentre = 128;
 
-        // The shifts the IC-7300's RTTY menu offers (CI-V 1A 05 00 40).
-        private static readonly int[] MenuShiftsHz = { 170, 200, 425 };
-
         private readonly IRadioController _radio;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;
@@ -153,6 +150,12 @@ namespace Icom_Web_Control.Services.Rtty
         // The radio's RTTY menu tones, which set where its passband sits. Read on
         // the first start and kept in step with what this service writes.
         private RttyToneSettings? _menu;
+
+        /// <summary>
+        /// The radio's RTTY menu shift as last read, or null before the tuner has
+        /// read it: for Auto to say when a signal's shift is not the menu's.
+        /// </summary>
+        public int? MenuShiftHz => _menu?.ShiftHz;
 
         public RttyTunerModeService(IRadioController radio,
                                     RadioStateService state,
@@ -312,14 +315,16 @@ namespace Icom_Web_Control.Services.Rtty
         /// <see cref="DataCentreHz"/> given, and the filter is still not allowed
         /// to narrow, because that centre is not measured.</para>
         ///
-        /// <para>Sets the menu shift to the nearest the radio offers, because the
-        /// passband centre follows the menu pair and a 425 menu shift under a 170
-        /// signal would leave the centre 128 Hz to one side of it. Leaves the
-        /// menu mark alone: it is the operator's choice, and any mark works once
-        /// the dial is moved to suit. Re-centres PBT if it has been moved since
+        /// <para>Leaves the RTTY menu alone, mark and shift. The radio transmits
+        /// FSK on that shift, so a 425 written for a 450 Hz station heard on
+        /// receive would go out on the operator's next contest call (DDK9,
+        /// 2026-10-28). The centre given is the menu pair's, and a signal of
+        /// another shift is centred on it anyway: the filter is sized to cover
+        /// both of its tones, and Auto says the shifts differ
+        /// (<see cref="MenuShiftHz"/>). Re-centres PBT if it has been moved since
         /// the start. Then allows the next start to narrow the filter.</para>
         /// </summary>
-        public async Task<double?> CentreForAsync(int signalShiftHz, CancellationToken ct = default)
+        public async Task<double?> CentreForAsync(CancellationToken ct = default)
         {
             if (_saved is null) return null;
             await _gate.WaitAsync(ct);
@@ -339,19 +344,6 @@ namespace Icom_Web_Control.Services.Rtty
                 _menu ??= await _radio.GetRttyToneSettingsAsync(ct);
                 if (_menu is not { } menu) return null;
 
-                int shift = MenuShiftsHz.MinBy(s => Math.Abs(s - signalShiftHz));
-                if (shift != menu.ShiftHz)
-                {
-                    var wrote = await _radio.SetRttyToneSettingsAsync(menu.MarkHz, shift, ct);
-                    if (wrote.ShiftHz is { } took)
-                    {
-                        _logger.LogInformation("RTTY Auto: radio menu shift {From} Hz set to {To} Hz for a {Signal} Hz signal",
-                                               menu.ShiftHz, took, signalShiftHz);
-                        menu = new RttyToneSettings(menu.MarkHz, took);
-                        _menu = menu;
-                    }
-                }
-
                 await CentrePbtAsync(await _radio.GetPbtInnerAsync(ct), await _radio.GetPbtOuterAsync(ct), ct);
 
                 _narrowOk = true;
@@ -368,8 +360,8 @@ namespace Icom_Web_Control.Services.Rtty
         /// operator's radio must not change it now.
         ///
         /// <para>The RTTY menu tones are not put back. The tuner's own Mark and
-        /// Shift controls write them too and never have, and the menu shift Auto
-        /// chose is the right one for the radio's own decoder on that station.</para>
+        /// Shift controls write them only when the operator presses the button
+        /// to, and Auto never does.</para>
         /// </summary>
         public async Task RestoreAsync(CancellationToken ct = default)
         {

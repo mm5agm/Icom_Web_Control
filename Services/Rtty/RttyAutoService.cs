@@ -79,9 +79,11 @@ namespace Icom_Web_Control.Services.Rtty
 
         /// <param name="wantedMarkHz">
         /// Where the tuner's mark filter is, for the centring in
-        /// <see cref="CentreAsync"/>. Null leaves the radio alone - which is what
-        /// a caller that does not know gets, because moving an operator's VFO
-        /// towards a guess would be worse than not moving it.
+        /// <see cref="CentreAsync"/>. Null asks for no particular mark. In RTTY
+        /// with the tuner running and RttyAutoCentreMark on, the dial is still
+        /// moved, to put the pair on the passband centre; otherwise null leaves
+        /// the radio alone, because moving an operator's VFO towards a guess
+        /// would be worse than not moving it. The RTTY menu is never written.
         /// </param>
         public async Task<RttyAutoResult> AnalyseAsync(double? wantedMarkHz = null,
                                                        CancellationToken ct = default)
@@ -495,8 +497,8 @@ namespace Icom_Web_Control.Services.Rtty
         /// is not something software should do on its own initiative.</para>
         /// </summary>
         /// <returns>
-        /// True when the radio has been set up for this pair - menu shift, PBT
-        /// and the passband centre known - so the tuner may size the filter to
+        /// True when the radio has been set up for this pair - PBT centred and
+        /// the passband centre known - so the tuner may size the filter to
         /// it. The dial itself may or may not have needed moving.
         /// </returns>
         private async Task<bool> CentreAsync(RttyAutoResult result, double? wantedMarkHz,
@@ -534,8 +536,10 @@ namespace Icom_Web_Control.Services.Rtty
             // centre would land somewhere that software is not listening.
             bool prepared = false;
             double? target = wantedMarkHz;
-            double? held = await _tunerMode.CentreForAsync(result.ShiftHz, ct);
+            double? held = await _tunerMode.CentreForAsync(ct);
             if (held is null && !fsk) return false;
+            if (fsk && held is not null && ShiftNote(result.ShiftHz, _tunerMode.MenuShiftHz) is { } note)
+                result.Advice = result.Advice is null ? note : result.Advice + " " + note;
             if (held is { } centre)
             {
                 prepared = true;
@@ -668,6 +672,22 @@ namespace Icom_Web_Control.Services.Rtty
         /// </summary>
         private double PassbandCapHz()
             => int.TryParse(_state.IfWidthA, out var hz) && hz > 0 ? hz : 0;
+
+        /// <summary>
+        /// Said when a signal's shift is not the radio's RTTY menu shift, which
+        /// Auto leaves alone because the radio transmits FSK on it. 20 Hz takes
+        /// in the measurement's wander (DDK9's 450 measured 445 to 451) and still
+        /// tells 170 from 200.
+        /// </summary>
+        internal static string? ShiftNote(int signalShiftHz, int? menuShiftHz)
+        {
+            if (menuShiftHz is not { } menu || signalShiftHz <= 0
+                || Math.Abs(signalShiftHz - menu) <= 20)
+                return null;
+            return $"This signal is {signalShiftHz} Hz shift and the radio's RTTY "
+                 + $"menu is {menu} Hz. Auto leaves the menu alone, because the radio "
+                 + "transmits FSK on it; the filter is opened to cover both tones.";
+        }
 
         private string? NarrowFilterNote()
         {
