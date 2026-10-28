@@ -131,7 +131,12 @@ export function startIcomSpectrumFeed(cfg) {
             cfg.onSpan?.(vfo, span);
             let bins = v.bins;
             const dial = r.freq[vfo];
-            if (dial > 0 && num(v.centreHz) > 0) bins = alignBins(bins, num(v.centreHz) - dial, span);
+            if (dial > 0 && num(v.centreHz) > 0) {
+                // Centred on the dial, unless the pane is holding still (setFixed).
+                const view = p.viewFor(0);
+                p.setViewOffset(view);
+                bins = alignBins(bins, num(v.centreHz) - dial - view, span);
+            }
             p.push(bins);
         },
         DxSpot: addSpot,
