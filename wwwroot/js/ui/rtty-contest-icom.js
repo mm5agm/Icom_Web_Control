@@ -13,16 +13,22 @@
 // plan never changes the mode on a click here (#169): the page sets
 // iwcAutoModeChangeOnTune false before this loads.
 //
-// A click puts the dial on the mark. In RTTY the IC-7300 shows the mark
-// frequency, so a click between the two traces lands the dial half the
-// shift above the click in RTTY (normal, RTTY-L here) and half below in
-// RTTY-R (RTTY-U here), as YWC's does in its RTTY modes.
+// A click puts the signal where the tuner listens. In RTTY the IC-7300
+// shows the mark frequency, so a click between the two traces lands the
+// dial half the shift above the click in RTTY (normal, RTTY-L here) and half
+// below in RTTY-R (RTTY-U here). In DATA the dial is the carrier, so the
+// click goes the tuner's Mark/Shift midpoint away from it: below the click
+// in DATA-U, above it in DATA-L. Either way the pair lands on the tuner's
+// Mark, which is where Auto puts it too in a DATA mode the tuner holds.
 //
 // The band keys land on the band's RTTY spot (the band plan's RTTY segment,
-// else RTTY_SPOTS below) in the RTTY mode picked on the strip. A band with no
-// spot (60 m, 4 m) goes to the radio's own band memory. MODE offers RTTY and
-// RTTY-R only for now: IWC's tuner puts the radio back in RTTY from any other
-// mode, DATA included, until it can hold a chosen mode as YWC's does.
+// else RTTY_SPOTS below) in the operator's RTTY mode. A band with no spot
+// (60 m, 4 m) goes to the radio's own band memory, then to that mode.
+//
+// The RTTY mode is RTTY-L, RTTY-U, DATA-L or DATA-U, kept in Settings
+// (RttyTunerMode) and picked on the strip's MODE list, which shows the mode
+// of the VFO on screen. The tuner holds the radio in it while it is open,
+// so AFSK has a DATA mode the tuner will leave alone, as on YWC.
 //
 // Under the tuner, PWR and WIDTH. There is no SHIFT: the IC-7300 has Twin
 // PBT instead of an IF shift.
@@ -31,7 +37,7 @@ import { mountContestView } from '/js/rtty-contest/contest-view.js';
 import { spanText, sMeterFraction, sMeterText, txMeterFraction } from '/js/radio-panel/panel-math.js';
 import { dialStepper } from '/js/radio-panel/dial-stepper.js';
 import { calibrateNumeric, loadFromBackend } from '/js/calibration/calibration-engine.js';
-import { loadRttySettings } from '/js/rtty/rtty-settings.js';
+import { afskMidpointAudioHz, loadRttySettings } from '/js/rtty/rtty-settings.js';
 import { post, startIcomSpectrumFeed } from '/js/ui/spectrum-feed-icom.js';
 import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
 import { BAND_EDGES, getSegments } from '/js/ui/band-plan.js';
@@ -47,28 +53,25 @@ const RTTY_SPOTS = {
     '17m': 18_105_000, '15m': 21_080_000, '12m': 24_925_000, '10m': 28_080_000, '6m': 50_300_000,
 };
 
-// The modes MODE offers: IWC's names, and what the radio's screen says.
-const RTTY_MODES = { 'RTTY-L': 'RTTY', 'RTTY-U': 'RTTY-R' };
-const MODE_KEY = 'iwc.rttyContest.mode';
+// The modes MODE offers: IWC's names, and what the radio's screen says, as
+// on the Radio panel (MODE_LABEL in radio-panel-icom.js).
+const RTTY_MODES = { 'RTTY-L': 'RTTY', 'RTTY-U': 'RTTY-R', 'DATA-L': 'LSB-D', 'DATA-U': 'USB-D' };
 
 const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const on = v => v === true || v === 'true' || v === 1 || (typeof v === 'string' && v !== '' && v !== '0' && v !== '00' && v !== 'false');
 const clamp = x => Math.max(0, Math.min(1, x));
-const store = {
-    get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window */ } },
-};
 // The IC-7300's widths for a mode (ic7300-if-width.js, loaded by the page).
 const widthsForMode = mode => window.IfWidth?.widthsForMode?.(mode) ?? [];
 const widthLabel = hz => (hz < 1000 ? hz + ' Hz' : (hz / 1000).toFixed(hz % 100 ? 2 : 1) + ' kHz');
 
 /**
  * @param {HTMLElement} root
- * @param {object} cfg  { conn, pseudoDual, maxPowerW, minHz, maxHz, bandPlan, views, tuner, decode, ... }
+ * @param {object} cfg  { conn, pseudoDual, maxPowerW, minHz, maxHz, bandPlan, rttyMode, views, tuner, decode, ... }
+ *        rttyMode: the operator's RTTY mode, from Settings
  */
 export function startIcomRttyContest(root, cfg) {
     const maxPowerW = num(cfg.maxPowerW) || 100;
-    let rttyMode = RTTY_MODES[store.get(MODE_KEY, '')] ? store.get(MODE_KEY, '') : 'RTTY-L';
+    let rttyMode = RTTY_MODES[cfg.rttyMode] ? cfg.rttyMode : 'RTTY-L';
     const receivers = [{ id: 'A', tab: 'VFO-A', name: 'VFO-A · SCOPE' }, { id: 'B', tab: 'VFO-B', name: 'VFO-B · SCOPE' }];
     const bandPlan = cfg.bandPlan || 'Region1';
     // One row of band keys, for the VFO on screen.
@@ -89,7 +92,7 @@ export function startIcomRttyContest(root, cfg) {
         onFrequencyEntry: (vfo, hz) => post(`/api/cat/frequency/${vfo.toLowerCase()}`, { frequencyHz: hz }),
         modes: Object.entries(RTTY_MODES).map(([id, label]) => ({ id, label })),
         onMode: (vfo, mode) => chooseMode(vfo, mode),
-        modeTitle: 'The mode of the VFO on screen. What you pick is also the mode the band keys use',
+        modeTitle: 'The mode of the VFO on screen. What you pick is also kept, in Settings, as the mode the band keys and the RTTY tuner use',
         controls: [
             { id: 'power', label: 'PWR', kind: 'range', min: 5, max: maxPowerW, step: 1, unit: ' W',
               title: 'RF power. Drag and let go, or turn the mouse wheel over it' },
@@ -115,11 +118,14 @@ export function startIcomRttyContest(root, cfg) {
         onDecode: cfg.onDecode,
     });
 
-    // A click: the dial goes on the mark, half the shift from the midpoint
-    // of the pair. Never a mode change.
+    // A click is the middle of the pair. In RTTY the dial goes on the mark,
+    // half the shift away; in DATA on the carrier, the pair's audio midpoint
+    // away. Never a mode change.
     function clickTarget(_vfo, hz, mode) {
-        const half = num(loadRttySettings().shiftHz) / 2;
-        const off = mode === 'RTTY-L' ? half : mode === 'RTTY-U' ? -half : 0;
+        const s = loadRttySettings();
+        const half = num(s.shiftHz) / 2;
+        const mid = afskMidpointAudioHz(s);
+        const off = { 'RTTY-L': half, 'RTTY-U': -half, 'DATA-L': mid, 'DATA-U': -mid }[mode] ?? 0;
         return { mode: null, to: Math.round(hz + off) };
     }
     const feed = startIcomSpectrumFeed({
@@ -156,11 +162,13 @@ export function startIcomRttyContest(root, cfg) {
             : await post(`/api/cat/band/${rx}`, { band });
         if (res?.ok) await post(`/api/cat/mode/${rx}`, { mode: rttyMode });
     }
-    function chooseMode(vfo, mode) {
+    // MODE: kept first, so a running tuner holds the new mode rather than
+    // putting the old one back, then written to the VFO on screen.
+    async function chooseMode(vfo, mode) {
         if (!RTTY_MODES[mode]) return;
         rttyMode = mode;
-        store.set(MODE_KEY, mode);
-        return post(`/api/cat/mode/${vfo.toLowerCase()}`, { mode });
+        const res = await post('/api/rtty/mode', { mode });
+        if (res?.ok) await post(`/api/cat/mode/${vfo.toLowerCase()}`, { mode });
     }
     // PWR and WIDTH. Power has no VFO; the URL names the one on screen, as
     // the Radio panel's knob names the selected one.

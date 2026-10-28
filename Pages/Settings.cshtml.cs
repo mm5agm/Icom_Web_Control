@@ -222,6 +222,8 @@ namespace Icom_Web_Control.Pages
                 // name is discarded on save behind a "saved successfully".
                 current.RttyContestMode    = Settings.RttyContestMode;
                 current.RttyTunerSetMode   = Settings.RttyTunerSetMode;
+                current.RttyTunerMode      = Icom_Web_Control.Services.Rtty.RttyTunerModeService.Normalise(Settings.RttyTunerMode)
+                                             ?? current.RttyTunerMode;
                 current.RttyAutoCentreMark = Settings.RttyAutoCentreMark;
 
                 // DX cluster settings — copy through. Normalise callsign to upper case.

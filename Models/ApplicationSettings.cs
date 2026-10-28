@@ -274,9 +274,17 @@
         // operator running AFSK from their own software owns their radio's mode,
         // and because anyone who would rather the software never touched the mode
         // is entitled to that. With it on, RttyTunerModeService switches from any
-        // mode that is not already RTTY, centres Twin PBT, and sizes the filter
-        // to the signal once Auto has found it; all of it is put back on close.
+        // mode that is not already of the RttyTunerMode kind, centres Twin PBT,
+        // and sizes the filter to the signal once Auto has found it; all of it is
+        // put back on close.
         public bool RttyTunerSetMode { get; set; } = true;
+
+        // The mode that switch puts the radio in, and that the RTTY Contest
+        // band keys use: RTTY-L, RTTY-U, DATA-L or DATA-U. YWC's since
+        // 2026-10-26, for Bruce VK2RT, who runs AFSK in DATA-L; here so that
+        // AFSK transmit has a mode the tuner will leave the radio in.
+        // Anything else reads as RTTY-L (RttyTunerModeService.TargetMode).
+        public string RttyTunerMode { get; set; } = "RTTY-L";
 
         // Whether a confident Auto answer also moves the VFO so the measured mark
         // lands on the tuner's mark.
