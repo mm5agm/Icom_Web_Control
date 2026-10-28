@@ -436,6 +436,17 @@ builder.Services.AddSingleton<RadioWebControl.Core.Services.Flex.IFlexLayoutStor
         msg => log.LogWarning("{Message}", msg));
 });
 
+// Named RTTY Contest view (/rtty-contest) layouts, apart from Experimental's:
+// RttyContestLayoutController asks for this store by its key.
+builder.Services.AddKeyedSingleton<RadioWebControl.Core.Services.Flex.IFlexLayoutStore>(
+    Icom_Web_Control.Controllers.RttyContestLayoutController.StoreKey, (sp, _) =>
+{
+    var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("RttyContestLayoutStore");
+    return new RadioWebControl.Core.Services.Flex.FlexLayoutStore(
+        Path.Combine(memoriesFolder, "rtty-contest-layouts.json"),
+        msg => log.LogWarning("{Message}", msg));
+});
+
 // Register DX cluster service — single instance shared between controllers and
 // the background hosted service so the API can read the spot buffer.
 builder.Services.AddSingleton<Icom_Web_Control.Services.DxClusterService>();

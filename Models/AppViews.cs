@@ -11,6 +11,7 @@ namespace Icom_Web_Control.Models
         public const string Classic = "classic";
         public const string Experimental = "experimental";
         public const string Radio = "radio";
+        public const string RttyContest = "rtty-contest";
 
         public sealed record View(string Key, string Label, string Path, string Icon, string Title);
 
@@ -19,6 +20,7 @@ namespace Icom_Web_Control.Models
             new View(Classic, "Classic", "/", "bi-house-door-fill", "The original control page"),
             new View(Experimental, "Experimental", "/flexui", "bi-grid-1x2-fill", "The same controls, in panels you can move, resize and pop out"),
             new View(Radio, "Radio", "/radio", "bi-broadcast", "Radio-style front panel"),
+            new View(RttyContest, "RTTY Contest", "/rtty-contest", "bi-type", "Spectrum, waterfall and RTTY tuner, for contest RTTY"),
         };
 
         /// <summary>The view with this key; Classic for an unknown or empty one.</summary>
