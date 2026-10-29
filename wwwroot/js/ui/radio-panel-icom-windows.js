@@ -28,7 +28,7 @@ import { calibrateNumeric } from '/js/calibration/calibration-engine.js';
 import { sMeterFraction, sMeterText, txMeterFraction } from '/js/radio-panel/panel-math.js';
 import { SMeterHistoryPanel } from '/js/guages/smeter-history-panel.js';
 import {
-    num, h, note, row, keys, framed, windowPopouts, openPopout, meterBars,
+    num, h, note, row, keys, framed, windowPopouts, openPopout, launchWithPopouts, meterBars,
     memoriesWindow, dxWatchWindow, frequencyEntryWindow, wheelSteps,
 } from '/js/radio-panel/window-kit.js';
 
@@ -259,5 +259,7 @@ export function startIcomWindows(windows, ctx) {
         },
         entry: vfo => entry.open(vfo),
         popout: (g, p) => openPopout(popouts, g, p),
+        /** A launcher key: true if its window is popped out and was dealt with here. */
+        launch: g => launchWithPopouts(popouts, windows, g),
     };
 }

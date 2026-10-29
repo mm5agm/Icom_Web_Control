@@ -172,6 +172,7 @@ export function startIcomRadioPanel(root, cfg) {
         windows: ICOM_WINDOWS,
         onWindowPanel: (g, p, shown) => { win?.onShow(g, p, shown); windowMode(g, p, shown); },
         onWindowPopout: (g, p) => { win?.popout(g, p); windowMode(g, p, true, true); },
+        onWindowLaunch: g => win?.launch(g) ?? false,
         // The spectrum's own window, for a second screen: /RadioSpectrum.
         onSpectrumPopout: () => {
             if (!specHost.open()) alert('The browser blocked the spectrum window. Allow pop-ups for this page and press the key again.');
