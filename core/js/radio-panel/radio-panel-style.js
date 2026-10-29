@@ -71,6 +71,7 @@ html,body{margin:0;background:${v('page')}}
 .rp-top{height:50px;display:flex;align-items:center;justify-content:space-between;gap:24px}
 .rp-brand{display:flex;align-items:baseline;gap:14px}
 .rp-brand-short{font-size:34px;font-weight:700;letter-spacing:.18em;color:${v('title')}}
+.rp-brand-ver{font:500 14px ${SANS};letter-spacing:.04em;color:${v('legend-dim')}}
 .rp-brand-model{font:600 23px ${SANS};letter-spacing:.1em;color:${v('accent')}}
 .rp-lamps{display:flex;align-items:center;gap:18px}
 .rp-lamps>span,.rp-lampkey{display:flex;align-items:center;gap:7px}
@@ -130,7 +131,9 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-wpanel-title{font:700 14px ${SANS};letter-spacing:.14em;color:${v('lcd-fg')};white-space:nowrap;margin-right:auto;overflow:hidden;text-overflow:ellipsis}
 .rp-wbtn{appearance:none;border:1px solid ${v('chip-border')};background:${v('soft-bg')};color:${v('soft-fg')};border-radius:3px;width:22px;height:18px;font:600 12px sans-serif;cursor:pointer;padding:0;line-height:1;flex:none}
 .rp-wbtn[hidden]{display:none}
-.rp-wbtn.rp-wx{border-color:${v('key-border')};background:${v('key-bg')};color:${v('chipbtn-fg')}}
+.rp-wbtn.rp-wx{border-color:${v('key-border')};background:${v('key-bg')};position:relative;font-size:0}
+.rp-wbtn.rp-wx::before,.rp-wbtn.rp-wx::after{content:'';position:absolute;left:50%;top:50%;width:12px;height:2px;border-radius:1px;background:${v('tx')};transform:translate(-50%,-50%) rotate(45deg)}
+.rp-wbtn.rp-wx::after{transform:translate(-50%,-50%) rotate(-45deg)}
 .rp-wnote{font:500 14px ${SANS};color:${v('legend-dim')}}
 .rp-wpanel-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:7px;padding:8px 10px;overflow:auto;font:500 15px ${SANS};color:${v('text')}}
 /* What goes in a window panel: the adapter builds these, the theme colours them. */
@@ -210,6 +213,7 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-spectrum{flex:1;min-height:200px;position:relative;border:1px solid ${v('screen-line')};border-radius:4px;overflow:hidden;background:${v('spec-bg')}}
 .rp-spectrum canvas,.rp-waterfall canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .rp-passband{position:absolute;top:0;bottom:0;background:${v('passband')};border-left:1px solid ${v('passband-edge')};border-right:1px solid ${v('passband-edge')};display:none}
+.rp-pbcentre{position:absolute;top:0;bottom:0;width:1px;background:${v('passband-edge')};display:none}
 .rp-cursor{position:absolute;top:0;bottom:0;left:50%;width:1px;background:${v('cursor')}}
 .rp-spot{position:absolute;transform:translateX(-50%);font:600 16px ${SANS};letter-spacing:.06em;color:${v('spot-fg')};background:${v('spot-bg')};border-radius:3px;padding:2px 7px;white-space:nowrap}
 .rp-spec-label{position:absolute;left:10px;top:8px;font:400 15px ${MONO};color:${v('spec-label')}}
@@ -364,6 +368,10 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-pane.no-spec .rp-spectrum,.rp-pane.no-spec .rp-axis,.rp-pane.no-spec .rp-pane-grip{display:none}
 .rp-pane.no-spec .rp-waterfall{flex:1 1 0 !important}
 .rp-pane.no-wf .rp-spectrum{flex:1 1 0 !important}
+.rp-jump{position:absolute;top:50%;transform:translateY(-50%);z-index:4;width:30px;height:48px;padding:0;border:1px solid ${v('screen-line')};border-radius:4px;background:${v('spec-bg')};color:${v('spec-label')};font:700 18px ${SANS};line-height:1;cursor:pointer;opacity:.6}
+.rp-jump:hover,.rp-jump:focus-visible{opacity:1}
+.rp-jump-dn{left:4px}
+.rp-jump-up{right:4px}
 /* In the pop-out each pane sits on the radio's screen, as on the board: its
    label and scale are screen colours, which on the page itself (grey in
    Silver) could not be read */
@@ -375,6 +383,13 @@ button.rp-menu-item{background:none;border:0;text-align:left;cursor:pointer}
 .rp-pane-bar{display:flex;align-items:center;gap:10px;min-height:32px}
 .rp-pane-label{flex:1;font:400 18px ${MONO};color:${v('chip-fg')};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rp-pane-tools{display:flex;gap:6px}
+.rp-pane-bar.has-span .rp-pane-label{flex:0 1 auto}
+.rp-pane-bar.has-span .rp-pane-tools{margin-left:auto}
+.rp-pane-spanwrap{position:relative;flex:none;display:inline-flex}
+.rp-pane-spanwrap::after{content:'▾';position:absolute;right:4px;top:50%;transform:translateY(-50%);pointer-events:none;font:400 14px ${MONO};color:${v('chip-fg')}}
+.rp-pane-span{appearance:none;-webkit-appearance:none;background:transparent;border:0;border-radius:4px;margin:0;padding:1px 20px 1px 4px;font:400 18px ${MONO};color:${v('chip-fg')};cursor:pointer}
+.rp-pane-span:hover,.rp-pane-span:focus-visible{background:${v('accent-bg')};outline:none}
+.rp-pane-span option{background:${v('chipbtn-bg')};color:${v('chipbtn-fg')};font:500 15px ${SANS}}
 .rp-spop-span{font:500 16px ${SANS};min-height:32px;background:${v('chipbtn-bg')};color:${v('chipbtn-fg')};border:1px solid ${v('key-border')};border-radius:4px;padding:2px 6px}
 `;
 }

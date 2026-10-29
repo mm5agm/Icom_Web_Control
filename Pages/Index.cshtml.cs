@@ -111,6 +111,10 @@ namespace Icom_Web_Control.Pages
 
         public string BandPlan { get; set; } = "Region1";
 
+        /// <summary>The operator's RTTY mode: what the tuner switches to, and
+        /// what the RTTY Contest band keys use.</summary>
+        public string RttyMode { get; set; } = Services.Rtty.RttyTunerModeService.RttyMode;
+
         /// <summary>
         /// Rendered into the page as <c>window.iwcAutoModeChangeOnTune</c> and
         /// read only by <c>autoModeForHz</c> in band-plan.js.
@@ -211,6 +215,7 @@ namespace Icom_Web_Control.Pages
             PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             AutoModeChangeOnTune = settings.AutoModeChangeOnTune;
+            RttyMode = Services.Rtty.RttyTunerModeService.TargetMode(settings);
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;
 

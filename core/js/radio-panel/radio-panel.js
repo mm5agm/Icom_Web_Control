@@ -13,13 +13,15 @@
 // No accessibility layer by design (Colin, 2026-10-13): this page starts from
 // scratch; Classic keeps the screen-reader and voice work.
 
+import { appVersion } from './app-version.js';
+import { dropKey } from './drop-key.js';
 import { injectRadioPanelStyle } from './radio-panel-style.js';
 import { applyTheme, themeIds, resolveTheme, DEFAULT_THEME, SYSTEM_THEME } from './radio-panel-themes.js';
 import { SpectrumView } from './spectrum-view.js';
 import { spectrumSettingsPanel, tidySpectrumSettings } from './spectrum-settings.js';
 import {
     formatFrequency, sMeterFraction, sMeterText, meterGeometry, LOWER_SCALES,
-    passbandPercent, axisLabels, spanText, widthText, knobAngle,
+    passbandPercent, passbandCentrePercent, dialPercent, axisLabels, spanText, widthText, knobAngle,
 } from './panel-math.js';
 import { mountPanelWindows } from './panel-windows.js';
 import { freqDigits, wheelDigits } from './freq-digits.js';
@@ -203,6 +205,8 @@ function turnable(el, { deg = 15, partAt = () => undefined, onStep, onTurn }) {
  *                                          api.windows.slot(groupId, panelId)
  *   onWindowPanel(groupId, panelId, shown) told when a window panel shows or hides
  *   onWindowPopout(groupId, panelId)       a window panel's ⇱ key (panels with popout set)
+ *   onWindowLaunch(groupId) -> boolean     a launcher key; true if the adapter dealt
+ *                                          with it (the window is popped out)
  *   onSpectrumPopout(), onSpectrumBack()   optional: a ⧉ key on the spectrum, and the
  *                                          BRING BACK key shown while setSpectrumAway(true)
  *   spectrumTuneTo(hz, paneId)             optional: the Hz a spectrum click at hz will put
@@ -302,44 +306,8 @@ export function mountRadioPanel(root, opts = {}) {
     const brand = h('div', 'rp-brand');
     const model = h('span', 'rp-brand-model', opts.model ?? '');
     brand.append(h('span', 'rp-brand-short', opts.brandShort ?? ''), Object.assign(h('span', 'rp-legend', opts.brandName ?? ''), { style: 'color:var(--rp-legend-dim)' }), model);
-
-    // A key that drops down a list of links: the view switch and MENU.
-    // Closes on a pick, a click anywhere else, or Esc. `newTab` opens the
-    // links in a new tab, so the panel keeps running behind them.
-    const dropKey = (label, title, groups, { newTab = false, alignLeft = false } = {}) => {
-        const wrap = h('div', 'rp-menu');
-        const key = h('button', 'rp-viewbtn', label);
-        key.type = 'button';
-        key.title = title;
-        key.setAttribute('aria-haspopup', 'true');
-        key.setAttribute('aria-expanded', 'false');
-        const list = h('div', 'rp-menu-list' + (alignLeft ? ' rp-menu-left' : ''));
-        list.hidden = true;
-        for (const g of groups) {
-            if (g.group) list.append(h('div', 'rp-menu-group', g.group));
-            for (const it of g.items ?? []) {
-                const a = h('a', 'rp-menu-item' + (it.on ? ' on' : ''), it.label);
-                a.href = it.href;
-                if (newTab) { a.target = '_blank'; a.rel = 'noopener'; }
-                if (it.on) a.setAttribute('aria-current', 'page');
-                if (it.title) a.title = it.title;
-                a.addEventListener('click', () => show(false));
-                list.append(a);
-            }
-        }
-        const show = on => {
-            list.hidden = !on;
-            key.classList.toggle('on', on);
-            key.setAttribute('aria-expanded', String(on));
-        };
-        key.addEventListener('click', () => show(list.hidden));
-        document.addEventListener('pointerdown', e => { if (!list.hidden && !wrap.contains(e.target)) show(false); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape' && !list.hidden) show(false); });
-        wrap.append(key, list);
-        const bar = h('div', 'rp-bar');
-        bar.append(wrap);
-        return bar;
-    };
+    const version = appVersion();
+    if (version) brand.append(Object.assign(h('span', 'rp-brand-ver', 'v' + version), { title: 'The version running' }));
 
     // Reads VIEWS, never the current view's name, so it is plain there
     // are others to pick.
@@ -567,7 +535,9 @@ export function mountRadioPanel(root, opts = {}) {
         const label = h('div', 'rp-spec-label', '');
         const empty = h('div', 'rp-spec-empty', 'Waiting for data');
         const oob = h('div', 'rp-spec-oob', 'OUT OF BAND');
-        spec.append(pb, marksEl, h('div', 'rp-cursor'), spotsEl, label, oob, empty);
+        const pbMid = h('div', 'rp-pbcentre');
+        const cursor = h('div', 'rp-cursor');
+        spec.append(pb, pbMid, marksEl, cursor, spotsEl, label, oob, empty);
         const axis = h('div', 'rp-axis');
         const wf = h('div', 'rp-waterfall');
         // The span picker, HOLD and the settings key sit in the waterfall's
@@ -608,7 +578,8 @@ export function mountRadioPanel(root, opts = {}) {
         setKey.addEventListener('click', () => { sets.el.classList.toggle('open'); setKey.classList.toggle('on', sets.el.classList.contains('open')); });
         // A click on the spectrum or waterfall names the frequency under it,
         // or a DX spot's own frequency when the click is within 8 px of its
-        // marker: act('spectrum', Hz, pane id). The pane's centre is its dial.
+        // marker: act('spectrum', Hz, pane id). The pane's centre is its dial,
+        // or as far from it as setViewOffset says (centreOf).
         // The readout below names exactly what a click there would send: both
         // come from hzAt, and from the same x. A click's clientX is whole CSS
         // pixels while a pointer's is fractional (display scaling), and at a
@@ -617,7 +588,7 @@ export function mountRadioPanel(root, opts = {}) {
         // disagree by a few hundred Hz (Colin, 2026-10-15: 14.815.690 read,
         // 14.815.439 tuned).
         const hzAt = (el, clientX) => {
-            const span = st.spanHz[d.id], f = st.freq[d.id];
+            const span = st.spanHz[d.id], f = centreOf(d.id);
             const rc = el.getBoundingClientRect();
             if (!(span > 0 && f > 0) || !rc.width) return null;
             const frac = Math.max(0, Math.min(1, (clientX - rc.left) / rc.width));
@@ -647,7 +618,7 @@ export function mountRadioPanel(root, opts = {}) {
                         const pn = panes[d.id], span = st.spanHz[d.id];
                         const w = el.getBoundingClientRect().width || 1;
                         pn.pinHz = pn.pinHz != null && Math.abs(pn.pinHz - at.hz) <= 8 / w * span ? null : at.hz;
-                        drawPin(pn, st.freq[d.id], span);
+                        drawPin(pn, centreOf(d.id), span);
                         return;
                     }
                     act('spectrum', String(at.hz), d.id);
@@ -700,7 +671,7 @@ export function mountRadioPanel(root, opts = {}) {
         const pinRead = h('div', 'rp-pin-read');
         spec.append(pinRead);
         sdrView.append(box);
-        panes[d.id] = { box, spec, pb, spots: spotsEl, marks: marksEl, label, empty, oob, spanSel, holdKey, sets, axis, wf, name: d.name ?? '', text: '',
+        panes[d.id] = { box, spec, pb, pbMid, cursor, spots: spotsEl, marks: marksEl, label, empty, oob, spanSel, holdKey, sets, axis, wf, name: d.name ?? '', text: '',
             pinHz: null, pinLines, pinRead, reread: xReread };
         drawPin(panes[d.id], 0, 0);
     }
@@ -798,7 +769,7 @@ export function mountRadioPanel(root, opts = {}) {
     for (const m of opts.modes ?? []) { const el = button('rp-soft', 'mode', m.id); el.textContent = m.label; el.title = m.title ?? `${m.label} mode`; modesRow.append(el); modeEls[m.id] = el; }
 
     // One row each, however many the radio has: IWC has 12 bands and 10 modes,
-    // YWC 11 and 8.
+    // YWC 11 and 10.
     bandsRow.style.gridTemplateColumns = `repeat(${Math.max(1, bandsRow.childElementCount)},minmax(0,1fr))`;
     modesRow.style.gridTemplateColumns = `repeat(${Math.max(1, modesRow.childElementCount)},minmax(0,1fr))`;
     screen.append(vfos, viewArea, bandsRow, modesRow);
@@ -1034,7 +1005,7 @@ export function mountRadioPanel(root, opts = {}) {
 
     // ---- state ---------------------------------------------------------
     const st = {
-        freq: { A: 0, B: 0 }, mode: { A: '', B: '' }, widthHz: { A: null, B: null },
+        freq: { A: 0, B: 0 }, view: { A: 0, B: 0 }, mode: { A: '', B: '' }, widthHz: { A: null, B: null }, dataCentreHz: 0,
         s: { A: 0, B: 0 }, tx: false, meter: store.get(prefix + 'meter', 'PO'),
         txMeters: {}, spanHz: { A: 0, B: 0 }, theme: null, spots: [], marks: { edges: [], ticks: [] }, sel: 'A',
         specView: specViews[0],
@@ -1073,15 +1044,26 @@ export function mountRadioPanel(root, opts = {}) {
     function chooseMeter(m) { st.meter = m; store.set(prefix + 'meter', m); drawMeterFace(); }
 
     // ---- spectrum overlays ---------------------------------------------
-    // Each pane's passband, axis and spots come from its own VFO.
+    // The frequency at a pane's centre: its dial, moved by setViewOffset.
+    function centreOf(vfo) {
+        return st.freq[vfo] > 0 ? st.freq[vfo] + (st.view[vfo] || 0) : 0;
+    }
+    // Each pane's passband, axis and spots come from its own VFO, placed
+    // from the pane's centre; the dial's line is wherever the dial falls.
     function drawOverlays(vfo) {
         if (!vfo) { for (const id of Object.keys(panes)) drawOverlays(id); return; }
         const pn = panes[vfo];
         if (!pn) return;
-        const span = st.spanHz[vfo], f = st.freq[vfo];
-        const pct = pn.sets.get().passband && passbandPercent(st.mode[vfo], st.widthHz[vfo], span);
+        const span = st.spanHz[vfo], f = centreOf(vfo);
+        const pct = pn.sets.get().passband && passbandPercent(st.mode[vfo], st.widthHz[vfo], span, st.dataCentreHz, st.view[vfo]);
         if (pct) { pn.pb.style.display = 'block'; pn.pb.style.left = pct.left + '%'; pn.pb.style.width = pct.width + '%'; }
         else pn.pb.style.display = 'none';
+        const mid = pn.sets.get().passband ? passbandCentrePercent(st.mode[vfo], span, st.dataCentreHz, st.view[vfo]) : null;
+        pn.pbMid.style.display = mid == null ? 'none' : 'block';
+        if (mid != null) pn.pbMid.style.left = mid + '%';
+        const dial = dialPercent(st.view[vfo], span);
+        pn.cursor.style.display = dial == null ? 'none' : '';
+        if (dial != null) pn.cursor.style.left = dial + '%';
         pn.axis.textContent = '';
         if (span > 0 && f > 0) for (const t of axisLabels(f, span)) pn.axis.append(h('span', null, t));
         drawMarks(pn, f, span);
@@ -1292,6 +1274,7 @@ export function mountRadioPanel(root, opts = {}) {
         board: panel, launcher, groups: opts.windows ?? [], store, prefix,
         onShow: opts.onWindowPanel,
         onPopout: opts.onWindowPopout,
+        onLaunch: opts.onWindowLaunch,
     });
 
     setTheme(store.get(prefix + 'theme', DEFAULT_THEME));
@@ -1310,6 +1293,16 @@ export function mountRadioPanel(root, opts = {}) {
             setVfoText(vfo);
             drawOverlays(vfo);
         },
+        /**
+         * How far that VFO's pane centre sits from its dial, in Hz: 0 (the
+         * default) when the bins are centred on the dial.
+         */
+        setViewOffset(vfo, hz) {
+            const v = Number(hz) || 0;
+            if (v === st.view[vfo]) return;
+            st.view[vfo] = v;
+            drawOverlays(vfo);
+        },
         setMode(vfo, mode) {
             st.mode[vfo] = String(mode ?? '');
             flagsFor(vfo).mode.textContent = st.mode[vfo];
@@ -1321,6 +1314,11 @@ export function mountRadioPanel(root, opts = {}) {
             st.widthHz[vfo] = hz;
             flagsFor(vfo).width.textContent = widthText(hz);
             drawOverlays(vfo);
+        },
+        /** Where the radio centres its DATA filter from the dial, in Hz; 0 for none. See passbandHz. */
+        setDataShift(hz) {
+            st.dataCentreHz = Number(hz) || 0;
+            drawOverlays();
         },
         setAgc(vfo, text) { flagsFor(vfo).agc.textContent = text ? 'AGC ' + text : ''; },
         // A vfoChips chip's text; empty hides it.

@@ -79,9 +79,11 @@ namespace Icom_Web_Control.Services.Rtty
 
         /// <param name="wantedMarkHz">
         /// Where the tuner's mark filter is, for the centring in
-        /// <see cref="CentreAsync"/>. Null leaves the radio alone - which is what
-        /// a caller that does not know gets, because moving an operator's VFO
-        /// towards a guess would be worse than not moving it.
+        /// <see cref="CentreAsync"/>. Null asks for no particular mark. In RTTY
+        /// with the tuner running and RttyAutoCentreMark on, the dial is still
+        /// moved, to put the pair on the passband centre; otherwise null leaves
+        /// the radio alone, because moving an operator's VFO towards a guess
+        /// would be worse than not moving it. The RTTY menu is never written.
         /// </param>
         public async Task<RttyAutoResult> AnalyseAsync(double? wantedMarkHz = null,
                                                        CancellationToken ct = default)
@@ -484,9 +486,10 @@ namespace Icom_Web_Control.Services.Rtty
         ///
         /// <para><b>What it will not do.</b> The arithmetic, the distance limit
         /// and the confidence floor are all <see cref="RttyMarkCentre"/>'s, and
-        /// the mode test is too: only the radio's own FSK modes qualify, because
-        /// an operator in an AFSK mode is running their own software with its own
-        /// tuning indicator and their own idea of where the dial belongs. On top
+        /// the mode test is too: only the radio's own FSK modes qualify, and a
+        /// DATA mode the tuner is holding, because an operator in any other AFSK
+        /// mode is running their own software with its own tuning indicator and
+        /// their own idea of where the dial belongs. On top
         /// of that this reads the VFO back from the radio rather than trusting the
         /// cached frequency - the poll is six or seven times a second and the
         /// operator may have turned the knob since - and it refuses while the
@@ -494,8 +497,8 @@ namespace Icom_Web_Control.Services.Rtty
         /// is not something software should do on its own initiative.</para>
         /// </summary>
         /// <returns>
-        /// True when the radio has been set up for this pair - menu shift, PBT
-        /// and the passband centre known - so the tuner may size the filter to
+        /// True when the radio has been set up for this pair - PBT centred and
+        /// the passband centre known - so the tuner may size the filter to
         /// it. The dial itself may or may not have needed moving.
         /// </returns>
         private async Task<bool> CentreAsync(RttyAutoResult result, double? wantedMarkHz,
@@ -504,7 +507,10 @@ namespace Icom_Web_Control.Services.Rtty
             var settings = await _settings.GetSettingsAsync();
             if (!settings.RttyAutoCentreMark) return false;
 
-            if (RttyMarkCentre.SidebandForFskMode(result.Mode) is not { } lowerSideband)
+            // DATA-L and DATA-U count only while this app's tuner holds them
+            // (checked below): then the tuner is the operator's tuning aid.
+            bool fsk = RttyMarkCentre.SidebandForFskMode(result.Mode) is not null;
+            if (RttyMarkCentre.SidebandForMode(result.Mode) is not { } lowerSideband)
             {
                 // Not logged as a refusal. The mode advisory has already told the
                 // operator that the radio is not in RTTY, which is the useful
@@ -519,18 +525,29 @@ namespace Icom_Web_Control.Services.Rtty
             // the mark that puts the middle of the pair on the middle of the
             // passband - that is what lets the filter come down to shift plus
             // twice the baud. Without it, the old behaviour: the dialog's mark.
+            // In a DATA mode with no tuner holding it, the dial is the AFSK
+            // software's, and is left alone.
+            //
+            // In a DATA mode the tuner holds, the mark goes on the tuner's Mark
+            // instead, the same place a click on the RTTY Contest spectrum puts
+            // it, as on YWC. There the operator is matching the Mark of the
+            // software they will decode or send with (MMTTY's 1415 Hz, YWC
+            // Discussion #250, 2026-10-27), and a pair moved to the passband
+            // centre would land somewhere that software is not listening.
             bool prepared = false;
             double? target = wantedMarkHz;
-            if (await _tunerMode.CentreForAsync(result.ShiftHz, ct) is { } centre)
+            double? held = await _tunerMode.CentreForAsync(ct);
+            if (held is null && !fsk) return false;
+            if (fsk && held is not null && ShiftNote(result.ShiftHz, _tunerMode.MenuShiftHz) is { } note)
+                result.Advice = result.Advice is null ? note : result.Advice + " " + note;
+            if (held is { } centre)
             {
                 prepared = true;
-                if (RttyMarkCentre.MarkForCentredPair(result.MarkHz, result.SpaceHz, centre) is { } m)
-                {
-                    target = m;
-                    _logger.LogInformation(
-                        "RTTY Auto: passband centre {Centre:F0} Hz, pair {Mark:F0}/{Space:F0} - mark wanted at {Target:F0} Hz",
-                        centre, result.MarkHz, result.SpaceHz, m);
-                }
+                if (fsk || target is null)
+                    target = RttyMarkCentre.MarkForCentredPair(result.MarkHz, result.SpaceHz, centre) ?? target;
+                _logger.LogInformation(
+                    "RTTY Auto: passband centre {Centre:F0} Hz, pair {Mark:F0}/{Space:F0} - mark wanted at {Target:F0} Hz",
+                    centre, result.MarkHz, result.SpaceHz, target);
             }
             if (target is not { } wanted || wanted <= 0) return prepared;
 
@@ -614,8 +631,11 @@ namespace Icom_Web_Control.Services.Rtty
             // station - and said so with a straight face. Nothing in the audio can
             // reveal that the receiver is in the wrong mode, because the audio is
             // all the analyser gets.
+            // Not said when the tuner itself is holding the radio in that DATA
+            // mode: the operator chose it, and Auto centres there as in RTTY.
             var mode = _state.ModeA ?? "";
-            if (!mode.StartsWith("RTTY", StringComparison.OrdinalIgnoreCase))
+            if (!mode.StartsWith("RTTY", StringComparison.OrdinalIgnoreCase)
+             && !string.Equals(mode, _tunerMode.HeldMode, StringComparison.OrdinalIgnoreCase))
                 notes.Add($"The radio is in {mode}, not RTTY, so the tones you are "
                         + "hearing are not where RTTY would put them. Switch to RTTY "
                         + "and press Auto again.");
@@ -652,6 +672,22 @@ namespace Icom_Web_Control.Services.Rtty
         /// </summary>
         private double PassbandCapHz()
             => int.TryParse(_state.IfWidthA, out var hz) && hz > 0 ? hz : 0;
+
+        /// <summary>
+        /// Said when a signal's shift is not the radio's RTTY menu shift, which
+        /// Auto leaves alone because the radio transmits FSK on it. 20 Hz takes
+        /// in the measurement's wander (DDK9's 450 measured 445 to 451) and still
+        /// tells 170 from 200.
+        /// </summary>
+        internal static string? ShiftNote(int signalShiftHz, int? menuShiftHz)
+        {
+            if (menuShiftHz is not { } menu || signalShiftHz <= 0
+                || Math.Abs(signalShiftHz - menu) <= 20)
+                return null;
+            return $"This signal is {signalShiftHz} Hz shift and the radio's RTTY "
+                 + $"menu is {menu} Hz. Auto leaves the menu alone, because the radio "
+                 + "transmits FSK on it; the filter is opened to cover both tones.";
+        }
 
         private string? NarrowFilterNote()
         {

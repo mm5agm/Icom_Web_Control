@@ -1,0 +1,121 @@
+@page "/rtty-contest"
+@model Icom_Web_Control.Pages.RttyContestModel
+@{
+    Layout = null;
+    ViewData["RttyTunerDocked"] = true;
+}
+@* The RTTY Contest view draws its own page, as /radio does. Bootstrap is here
+   only for the RTTY tuner's markup, which is the same partial as Classic's.
+   No site.css: its floating-dialog rules would undock the tuner. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Display">
+    <title>RTTY Contest - Icom Web Control</title>
+    <link rel="icon" href="~/favicon.ico" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <style>html, body { margin: 0; height: 100%; background: #0b0d10; overflow: hidden; }</style>
+</head>
+<body>
+    <div id="rttyContest"></div>
+    <partial name="_RttyTunerPartial" model="false" />
+    <div id="rttyTunerAnnounce" class="visually-hidden" role="status" aria-live="polite"></div>
+
+    @* The band plan never changes the mode on a click here, whatever Settings
+       says (#169): the operator has picked RTTY and means to stay in it. *@
+    <script>window.iwcAutoModeChangeOnTune = false;</script>
+    <script src="~/js/ui/ic7300-if-width.js" asp-append-version="true"></script>
+    <script src="~/lib/microsoft-signalr/signalr.min.js"></script>
+    <script src="~/js/hub/hub-connection.js" asp-append-version="true"></script>
+    <script type="module">
+        import { RttyTuner } from "/js/rtty/rtty-tuner.js?v=@Icom_Web_Control.AppVersion.Current";
+        import { RttyReader } from "/js/rtty/rtty-reader.js?v=@Icom_Web_Control.AppVersion.Current";
+        import { startModePausedPopout } from "/js/popout/popout-mode-pause.js?v=@Icom_Web_Control.AppVersion.Current";
+        import { startIcomRttyContest } from "/js/ui/rtty-contest-icom.js?v=@Icom_Web_Control.AppVersion.Current";
+
+        // Layout = null, so no site.js: this connection is what tells the host
+        // a browser is still here, as well as feeding the view.
+        const conn = window.rwcHubConnection('/radioHub');
+
+        // The docked tuner stops while the tuner has a window of its own
+        // (POP OUT on its bar), as well as while the radio is out of its modes.
+        const tunerState = { out: false, decodeOut: false, modePaused: false, decode: false };
+        let tuner = null;
+        const pauseTuner = msg => tuner?.setPaused(tunerState.out || tunerState.modePaused, msg);
+
+        // The reader in the tuner's Decode section, which the view shows in a
+        // box of its own under the tuner, only with DECODE on. It reads only
+        // then, and only while the text is here: in the text's own window,
+        // that window's reader shows it.
+        const reader = new RttyReader();
+        reader.init();
+        const pauseReader = () => reader.setPaused(tunerState.decodeOut || tunerState.modePaused || !tunerState.decode);
+        pauseReader();
+
+        startIcomRttyContest(document.getElementById('rttyContest'), {
+            conn,
+            pseudoDual: @(Model.PseudoDualReceiverEnabled ? "true" : "false"),
+            maxPowerW: @Model.MaxPowerW,
+            minHz: @Model.MinHz,
+            maxHz: @Model.MaxHz,
+            bandPlan: '@Model.BandPlan',
+            rttyMode: '@Model.RttyMode',
+            tuner: document.getElementById('rttyTunerDialog'),
+            decode: document.querySelector('#rttyTunerDialog .rtty-decode'),
+            // The tuner's window is the one every GUI pops its tuner out to,
+            // and the decoded text's is the same page showing only that.
+            windowUrl: p => p === 'tuner' ? '/RttyTuner?contest=true'
+                : p === 'decode' ? '/RttyTuner?contest=true&decode=true'
+                : '/rtty-contest/window?p=' + p,
+            // Named layouts, kept on the server apart from Experimental's.
+            layoutsApi: '/api/rttycontestlayouts',
+            onTunerOut: out => {
+                tunerState.out = out;
+                pauseTuner(out ? 'The tuner is in its own window.' : '');
+            },
+            onDecodeOut: out => {
+                tunerState.decodeOut = out;
+                pauseReader();
+            },
+            // DECODE: off stops the decoder too, so none is left running on
+            // the server with nothing showing it.
+            onDecode: on => {
+                tunerState.decode = on;
+                document.getElementById('rttyTunerDialog').classList.toggle('rtty-decoding', on);
+                pauseReader();
+                if (on) reader.start(); else reader.stop();
+            },
+            // The same list as the other views' (Models/AppViews.cs).
+            views: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Icom_Web_Control.Models.AppViews.All.Select(v => new { label = v.Label, href = v.Path, title = v.Title, on = v.Key == Icom_Web_Control.Models.AppViews.RttyContest }))),
+        });
+
+        // The tuner, docked. It pauses rather than closes when the radio
+        // leaves the modes it works in, as the pop-out tuner does, and starts
+        // again when the radio comes back.
+        tuner = new RttyTuner();
+        tuner.init();
+        const tunerPanel = {
+            get isPaused() { return tunerState.modePaused; },
+            setPaused(paused, msg) { tunerState.modePaused = paused; pauseTuner(msg); pauseReader(); },
+        };
+        const modePause = startModePausedPopout({
+            name: 'RTTY tuner',
+            panel: tunerPanel,
+            belongs: m => typeof m === 'string'
+                && (m.startsWith('RTTY') || m.startsWith('DATA') || m === 'LSB' || m === 'USB'),
+            pausedText: m =>
+                `Not in an RTTY or data mode (the radio is in ${m}), so the tuner is paused. ` +
+                'It starts again when you go back to RTTY, DATA, LSB or USB.',
+            startNow: () => tunerState.out ? pauseTuner('The tuner is in its own window.') : tuner.start(),
+            initialMode: '@(Model.RadioState.ModeA ?? "")',
+            announceEl: document.getElementById('rttyTunerAnnounce'),
+        });
+        conn.on('RadioStateUpdate', update => {
+            if (update.property === 'ModeA') modePause.setMode(update.value);
+        });
+    </script>
+</body>
+</html>
