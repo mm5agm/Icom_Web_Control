@@ -1145,7 +1145,7 @@ The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300'
 - **METERS**: all the meters, and the S-meter history.
 - **RX SETUP**: Twin PBT and the receive levels.
 
-The CW Reader, CW Send, the RTTY tuner and the DX spots each have a **⇱** key that opens them in a browser window of their own. Unlike a window on the panel, that one can go on another screen. In the CW and RTTY windows, **⇱ WINDOW** in the title bar does the same for the whole window. CW Send's Send key and keyer memories make the radio transmit, and are marked in red.
+**⇱ WINDOW** in the title bar of the CW and RTTY windows opens the whole window in a browser window of its own, and the DX spots have a **⇱** key that does the same for them. Unlike a window on the panel, that one can go on another screen. While it is open, the window's key under the meter brings it to the front instead of opening a second copy on the panel. CW Send's Send key and keyer memories make the radio transmit, and are marked in red.
 
 **Theme and size.** The two boxes at the right of the top strip choose the colours and the size. **Dark console** is the usual look; **Night (red)**, **Silver classic**, **Daylight**, **Green display** and **High contrast** are the others, and **Match computer** follows Windows' light or dark setting. **Fit** makes the whole panel fit the window; the percentages fix its size and let you scroll. Or drag the grip in the panel's bottom-right corner to any size; the size box then lists it as a percentage and keeps it. Both are remembered by this browser, so a tablet and a PC can each have their own.
 
@@ -3189,12 +3189,13 @@ Set your CW pitch in the CW Keyer panel ([§5.12](#512-cw-keyer-panel)) and tune
 
 ### 18.5 The panel controls
 
-Along the top of the panel are six buttons and two switches. The switches — **Follow** and **Tune** — are easy to miss because they do not look like the buttons beside them, and both are worth knowing about.
+Along the top of the panel are seven buttons and two switches. The switches — **Follow** and **Tune** — are easy to miss because they do not look like the buttons beside them, and both are worth knowing about.
 
 | Control | What it does |
 |---|---|
 | **Start / Stop** | Runs the decoder. Stop also restores your radio settings if Reader Mode is on. |
 | **Clear** | Empties the on-screen text. The transcript file on disk is not touched, so this is safe to press when you move to a new station. |
+| **Save** | Saves the text in the panel to a `.txt` file, headed with the UTC time. In Chrome and Edge on the PC running IWC it opens a Save dialog in the folder you saved to last time; in other browsers, or from another PC, the file goes to your browser's download folder. The panel keeps the last 20,000 characters, so for a whole session use the transcript ([§18.9](#189-transcripts)), which IWC writes for you. |
 | **Reader Mode** | Sets the radio up for decoding, and puts your settings back afterwards — see [§18.7](#187-reader-mode). |
 | **ZIN** | Tunes the signal onto your CW pitch — see [§18.8](#188-zin---zero-in-on-the-signal). |
 | **Auto** | Moves the dial onto a station keying in your filter and sets the filter for its speed — see [Auto](#auto-tune-the-station-in-for-you) in §18.7. |

@@ -21,13 +21,14 @@ If something has been biting you and a pre-release says it is fixed, or you want
 
 ## ✨ Added since the last release
 
-**Coming in the next pre-release.** These are on the `feature/rtty-contest` branch and are not in any installer yet:
+**In v1.6.0-pre6**, a pre-release (see [Release notes](#release-notes) for how to get it):
 
 - **RTTY Contest, a GUI for RTTY contesting.** Only what a contest RTTY operator uses, on one screen: the frequency, band keys that land on each band's RTTY spot, the radio's scope over its waterfall, and the RTTY tuner docked at the side with its decoded text. Each part pops out into a window of its own, and named layouts put every window back on its own monitor. It is the page from Yaesu Web Control, shared between the two apps. Receive only for now. Pick it from **Views**, or go to `/rtty-contest`. [§5.21](USER_MANUAL.md#521-rtty-contest).
 - **Three changes from Bruce VK2RT's testing.** **From radio** and **Auto** are in the RTTY Tuner heading, so **Tones only** keeps them. The scope's arms no longer lean when the signal is on tune, so mark and space straighten at the same dial setting (they could be 50 Hz apart). And **FIXED** on RTTY Contest holds the spectrum still while the dial moves.
 - **Choose your RTTY mode.** Settings → **RTTY mode** is RTTY-L, RTTY-U, DATA-L or DATA-U, and the tuner puts the radio in it and holds it there while it is open. Choose a DATA mode for AFSK, and the tuner no longer pulls you out of DATA. [§6.8](USER_MANUAL.md#68-rtty-tuner).
 - **RTTY-R fixed, measured on DDK9.** In RTTY-R the tuner had the tones the wrong way up, **From radio** showed the wrong mark, and a click on RTTY Contest landed a shift away. All three are right now, and the filter width is worked out from where the passband really is: midway between the tones of the radio's own RTTY menu, in both modes. [§20.2](USER_MANUAL.md#202-mark-shift-speed-and-rev).
 - **Auto never changes the radio's RTTY menu.** The radio transmits FSK on that shift, so Auto setting it to 425 for a station you were only listening to would have sent your next call on 425. Auto now leaves the menu alone, opens the filter to cover both tones, and says when the station's shift is not the menu's. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
+- **Save in the CW Reader.** Writes the text in the panel to a `.txt` file; in Chrome and Edge the Save dialog opens in the folder you used last. Asked for by diane903 ([Discussion #86](https://github.com/mm5agm/Icom_Web_Control/discussions/86)). [§18.5](USER_MANUAL.md#185-the-panel-controls).
 
 **v1.5.0 is the current release.** Its headline is three ways to run the radio — Classic, the Experimental UI and the Radio panel — and the RTTY panel now decodes. The first five are RTTY, and together they turn the tuner into a receive station:
 
@@ -113,6 +114,18 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [RELEASE_HISTORY.md](RELEASE_HISTORY.md); their installers are still on the
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
+
+### v1.6.0-pre6 (2026-10-29)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre5, pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** the CW Reader's **Save** button; the RTTY Contest view; and on the Radio panel, popping the CW or RTTY window out and pressing its key again.
+
+- **Save in the CW Reader.** A **Save** button writes the text in the panel to a `.txt` file headed with the UTC time. In Chrome and Edge on the radio's PC it opens a Save dialog in the folder you used last time. For a whole session, IWC already writes every session to a transcript file as it decodes, in `%APPDATA%\MM5AGM\Icom Web Control\CW Transcripts\`. Asked for by diane903 ([Discussion #86](https://github.com/mm5agm/Icom_Web_Control/discussions/86)). User Manual, [§18.5](USER_MANUAL.md#185-the-panel-controls), [§18.9](USER_MANUAL.md#189-transcripts).
+- **RTTY Contest, a GUI for RTTY contesting.** Only what a contest RTTY operator uses, on one screen: the frequency, band keys that land on each band's RTTY spot, the radio's scope over its waterfall, and the RTTY tuner docked at the side with its decoded text. Each part pops out into a window of its own, and named layouts put every window back on its own monitor. Receive only. Pick it from **Views**, or go to `/rtty-contest`. User Manual, [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **Choose your RTTY mode.** Settings → **RTTY mode** is RTTY-L, RTTY-U, DATA-L or DATA-U, and the tuner puts the radio in it and holds it there while it is open. [§6.8](USER_MANUAL.md#68-rtty-tuner).
+- **RTTY fixes from testing:** RTTY-R had the tones the wrong way up; **Auto** no longer changes the radio's RTTY menu shift; **From radio** and **Auto** stay in the tuner heading with **Tones only**; the scope's arms no longer lean when on tune.
+- **Radio panel:** a popped-out CW or RTTY window is no longer drawn a second time on the panel when you press its key; the key brings the window to the front. The duplicate ⇱ inside those windows has gone (use **⇱ WINDOW**), the panel close **×** is red, and the version is shown. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
 
 ### v1.6.0-pre5 (2026-10-26)
 
