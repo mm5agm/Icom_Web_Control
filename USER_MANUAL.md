@@ -1206,6 +1206,8 @@ The docked tuner starts small; its grabs make it bigger. Under it is a box with 
 
 **WIDTH is kept.** A width you set while the tuner is open is kept for that mode (RTTY-L, RTTY-U, DATA-L or DATA-U), and the tuner uses it each time it starts in that mode instead of working one out. The status line says *"IF filter 350 Hz, as you set it."* Closing the tuner leaves the width where you put it, rather than putting back the one from before. Until now the tuner worked out its own width each time it started.
 
+**AUTO**, at the end of the WIDTH row, is lit while the tuner works the width out itself, and dark while a width you set is kept; hold the mouse over it to see which width and mode. Press it to go back to the tuner's own width for the mode VFO A is in: the kept width is forgotten, the tuner sizes the filter again straight away if it is open, and closing it puts back the width from before it opened. Setting WIDTH by hand while the tuner is open keeps a width again. AUTO is only for VFO A, because the tuner only sets VFO A.
+
 **Starting on RTTY Contest.** Add the page's name after the program in a desktop shortcut's **Target**, and IWC opens on it:
 
     "C:\Program Files\MM5AGM\Icom Web Control\Icom_Web_Control.exe" rtty-contest
@@ -3834,7 +3836,7 @@ So the tuner sets up what it needs, and puts it back:
 | **Twin PBT** | Centred, because every width decision assumes the passband is where the noise sweep measured it. |
 | **IF filter** | Widened if it is too narrow to have carried the pair, judged from the middle of the radio's passband ([§6.8](#68-rtty-tuner) says where that is). In RTTY, once **Auto** has found a signal and centred it, narrowed to the narrowest that carries it; before that, and always in DATA, only ever widened. |
 | **The radio's RTTY menu** | Written when you type or pick a Mark or Shift in an FSK mode, so the radio's own decoder agrees. **Never by Auto**, and never restored, because it is yours: the radio transmits FSK on it. |
-| **Putting it back** | Mode, filter and PBT, when the tuner stops (not a filter width you set by hand while it was open, [§5.21](#521-rtty-contest)) — closing the dialog, closing the tab, or the app shutting down. It is held on the server rather than in the browser, so reloading the page does not lose the record of what you had. |
+| **Putting it back** | Mode, filter and PBT, when the tuner stops (not a filter width you set by hand while it was open, until you press **AUTO** beside WIDTH, [§5.21](#521-rtty-contest)) — closing the dialog, closing the tab, or the app shutting down. It is held on the server rather than in the browser, so reloading the page does not lose the record of what you had. |
 | **Turning it off** | *Set RTTY mode when the tuner starts*, on the Settings page under **RTTY Tuner**. |
 
 Whatever it changes, it tells you in the status line under the figure — *"Mode set
