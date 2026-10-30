@@ -97,7 +97,8 @@ export function startIcomRttyContest(root, cfg) {
             { id: 'power', label: 'PWR', kind: 'range', min: 5, max: maxPowerW, step: 1, unit: ' W',
               title: 'RF power. Drag and let go, or turn the mouse wheel over it' },
             { id: 'width', label: 'WIDTH', kind: 'list', perReceiver: true,
-              title: 'IF filter width of the VFO on screen' },
+              title: 'IF filter width of the VFO on screen',
+              auto: 'The RTTY tuner works the width out for the signal. A width you set on VFO A while the tuner is open is kept for the mode' },
         ],
         onControl: (id, value, vfo) => setControl(id, value, vfo),
         meters: [{ id: 'S', label: 'S' }, { id: 'PO', label: 'PO' }, { id: 'SWR', label: 'SWR' }, { id: 'ALC', label: 'ALC' }],
@@ -176,15 +177,44 @@ export function startIcomRttyContest(root, cfg) {
     function setControl(id, value, vfo) {
         const rx = (vfo ?? view.receiver).toLowerCase();
         if (id === 'power') return post(`/api/cat/power/${rx}`, { Watts: Math.round(num(value)) });
-        if (id === 'width') return post(`/api/radio/ifwidth/${rx}`, { hz: parseInt(value, 10) });
+        if (id === 'width' && value === 'auto') return widthToAuto();
+        if (id === 'width') return post(`/api/radio/ifwidth/${rx}`, { hz: parseInt(value, 10) }).then(r => { checkKept(); return r; });
     }
     // WIDTH's choices change with the mode: in FM there are none.
     const widthOf = { A: null, B: null }, modeOf = { A: '', B: '' };
     function showWidth(vfo) {
         const opts = widthsForMode(modeOf[vfo]) ?? [];
         view.setControl('width', widthOf[vfo] == null ? null : String(widthOf[vfo]),
-            { vfo, options: opts.map(hz => ({ id: String(hz), label: widthLabel(hz) })) });
+            { vfo, options: opts.map(hz => ({ id: String(hz), label: widthLabel(hz) })),
+              kept: vfo === 'A' ? keptA : false });
     }
+    // WIDTH's AUTO, VFO A only (the one the tuner sets): lit while the tuner
+    // works the width out, dark while a width set by hand is kept for the
+    // mode. Pressing it forgets the kept width and the tuner sizes the filter
+    // again.
+    let keptA = null, keptTimer = 0;
+    function checkKept() {
+        clearTimeout(keptTimer);
+        keptTimer = setTimeout(async () => {
+            try {
+                const r = await fetch('/api/rtty/tuner/width');
+                if (!r.ok) return;
+                const { mode, hz } = await r.json();
+                keptA = hz == null ? null
+                    : `WIDTH ${widthLabel(hz)} is kept for ${mode}, as you set it. Press AUTO for the tuner to work the width out again`;
+                showWidth('A');
+            } catch { /* the key stays as it was */ }
+        }, 300);
+    }
+    async function widthToAuto() {
+        try {
+            const r = await fetch('/api/rtty/tuner/width', { method: 'DELETE' });
+            const body = await r.json().catch(() => null);
+            if (body?.message) console.info('rtty contest:', body.message);
+        } catch (e) { console.warn('rtty contest: WIDTH AUTO', e); }
+        checkKept();
+    }
+    checkKept();
 
     // Which band key is lit follows the frequency of the VFO on screen.
     const bandAt = hz => (BAND_EDGES[bandPlan] ?? BAND_EDGES.Region1).find(e => hz >= e.lo && hz <= e.hi)?.name ?? null;
@@ -227,7 +257,7 @@ export function startIcomRttyContest(root, cfg) {
     const handlers = {
         FrequencyA: v => { if (view.receiver === 'A') showBand(); if (!stepper.holds('A')) view.setFrequency('A', num(v)); },
         FrequencyB: v => { if (view.receiver === 'B') showBand(); if (!stepper.holds('B')) view.setFrequency('B', num(v)); },
-        ModeA: v => { modeOf.A = String(v ?? ''); view.setMode('A', modeOf.A); showWidth('A'); },
+        ModeA: v => { modeOf.A = String(v ?? ''); view.setMode('A', modeOf.A); showWidth('A'); checkKept(); },
         ModeB: v => { modeOf.B = String(v ?? ''); view.setMode('B', modeOf.B); showWidth('B'); },
         IfWidthA: v => { widthOf.A = v === '' || v == null ? null : num(v); showWidth('A'); },
         IfWidthB: v => { widthOf.B = v === '' || v == null ? null : num(v); showWidth('B'); },
