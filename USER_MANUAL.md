@@ -1155,7 +1155,7 @@ The Radio panel has none of the screen-reader or voice-control work of the Class
 
 *New after v1.6.0-pre5, and still being tested.*
 
-**RTTY Contest** has only what a contest RTTY operator uses, on one screen: the frequency, the radio's band scope over its waterfall, and the RTTY tuner docked at the side. Pick it from **Views** on the Radio panel ([§5.20](#520-radio-panel)), or go to `http://localhost:8080/rtty-contest`. **Views** on the page itself goes back to the other GUIs. It is the RTTY Contest page from Yaesu Web Control, shared between the two apps. It receives; nothing on it transmits yet.
+**RTTY Contest** has only what a contest RTTY operator uses, on one screen: the frequency, the radio's band scope over its waterfall, and the RTTY tuner docked at the side. Pick it from **Views** on the Radio panel ([§5.20](#520-radio-panel)), or go to `http://localhost:8080/rtty-contest`. **VIEWS** beside the title on the page itself goes back to the other GUIs, and **MENU** beside it has Settings, the other setup pages, the manual and About, each opening in a new tab so RTTY Contest keeps running. It is the RTTY Contest page from Yaesu Web Control, shared between the two apps. It receives; nothing on it transmits yet.
 
 While it is open, its tuner keeps the radio in the mode chosen in **MODE** (below). If something else changes the mode, CW Reader Mode or a band change, the tuner puts it back, so close the page, or use another GUI, for CW.
 
@@ -1182,7 +1182,7 @@ Under the strip is a row of band keys. A key tunes the radio to the RTTY part of
 - **REF** moves the bottom of the trace up or down from the noise floor. **AUTO** lets the floor follow the noise; off, it stays where it is.
 - **RANGE** is how many dB the trace covers. **FIT** sets it so the strongest signal of the last few seconds just fits, as does a double-click on the bar between the spectrum and the waterfall.
 - **WF ON TOP** puts the waterfall above the spectrum.
-- **FIXED** holds the spectrum still while the dial moves. Click a signal and only the passband and the dial line move, so the stations stay where you saw them. The spectrum moves on only when the passband gets near an edge, or you change the span or the band. Off, the spectrum stays centred on the dial. The IC-7300 sends its scope centred on the dial, so with FIXED on, a strip at one edge can be blank, as wide as the dial has moved from the middle.
+- **FIXED** holds the spectrum still while the dial moves. Click a signal and only the passband and the dial line move, so the stations stay where you saw them. The spectrum moves on only when the passband reaches the edge of the screen, or you change the span or the band. Off, the spectrum stays centred on the dial. The IC-7300 sends its scope centred on the dial, so with FIXED on, a strip at one edge can be blank, as wide as the dial has moved from the middle.
 - **STEP** is how far one notch of the mouse wheel moves the dial over the spectrum, 1 Hz to 1 kHz.
 - **TRACE** is how thick the spectrum's line is.
 - **BANDS** chooses the band keys (above).

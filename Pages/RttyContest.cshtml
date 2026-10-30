@@ -90,6 +90,7 @@
             },
             // The same list as the other views' (Models/AppViews.cs).
             views: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Icom_Web_Control.Models.AppViews.All.Select(v => new { label = v.Label, href = v.Path, title = v.Title, on = v.Key == Icom_Web_Control.Models.AppViews.RttyContest }))),
+            menu: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Icom_Web_Control.Models.AppMenu.Groups.Select(g => new { group = g.Name.ToUpperInvariant(), items = g.Pages.Select(pg => new { label = pg.Label, href = pg.Path }) }))),
         });
 
         // The tuner, docked. It pauses rather than closes when the radio
