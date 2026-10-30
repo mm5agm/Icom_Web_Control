@@ -30,6 +30,10 @@ If something has been biting you and a pre-release says it is fixed, or you want
 - **Auto never changes the radio's RTTY menu.** The radio transmits FSK on that shift, so Auto setting it to 425 for a station you were only listening to would have sent your next call on 425. Auto now leaves the menu alone, opens the filter to cover both tones, and says when the station's shift is not the menu's. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
 - **Save in the CW Reader.** Writes the text in the panel to a `.txt` file; in Chrome and Edge the Save dialog opens in the folder you used last. Asked for by diane903 ([Discussion #86](https://github.com/mm5agm/Icom_Web_Control/discussions/86)). [§18.5](USER_MANUAL.md#185-the-panel-controls).
 
+**Since v1.6.0-pre6**, on the development branch:
+
+- **More from Bruce VK2RT's testing on RTTY Contest.** A **MENU** key beside **VIEWS** opens Settings, the setup pages, the manual and About in a new tab. **FIXED** now holds the spectrum until the passband reaches the edge of the screen. [§5.21](USER_MANUAL.md#521-rtty-contest).
+
 **v1.5.0 is the current release.** Its headline is three ways to run the radio — Classic, the Experimental UI and the Radio panel — and the RTTY panel now decodes. The first five are RTTY, and together they turn the tuner into a receive station:
 
 - **The RTTY panel decodes now.** What was the RTTY Tuner is one **RTTY** panel in two columns: the crossed-ellipse scope and its controls on the right, a **Decode** pane printing the text on the left, and a **Send** box underneath showing where sending will go — **Send is greyed out and does not transmit**, and [§20.6](USER_MANUAL.md#206-sending) says why it is harder than it looks. The decoder has no Mark, Shift, Speed or Rev of its own: it uses the ones in the Tune column beside it, so getting the cross upright is the whole of setting it up, and switching the radio between RTTY and RTTY-R needs nothing pressed. [§20.5](USER_MANUAL.md#205-decoding-the-text).

@@ -102,6 +102,7 @@ export function startIcomRttyContest(root, cfg) {
         onControl: (id, value, vfo) => setControl(id, value, vfo),
         meters: [{ id: 'S', label: 'S' }, { id: 'PO', label: 'PO' }, { id: 'SWR', label: 'SWR' }, { id: 'ALC', label: 'ALC' }],
         views: cfg.views ?? [],
+        menu: cfg.menu ?? [],
         tuner: cfg.tuner,
         decode: cfg.decode,
         storagePrefix: 'iwc.rttyContest.',
