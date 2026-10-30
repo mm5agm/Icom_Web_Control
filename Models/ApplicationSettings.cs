@@ -286,6 +286,21 @@
         // Anything else reads as RTTY-L (RttyTunerModeService.TargetMode).
         public string RttyTunerMode { get; set; } = "RTTY-L";
 
+        // IF widths in Hz the operator set by hand while the tuner was open,
+        // keyed "model|mode". The tuner uses one in place of the width it would
+        // work out (RttyTunerModeService.WidthSetByHandAsync). YWC's since
+        // v2.5.4-pre8, for Bruce VK2RT. Not on the Settings page; that page's
+        // save leaves it as it is.
+        public Dictionary<string, int> RttyTunerWidths { get; set; } = new();
+
+        // The tones the RTTY tuner last ran on. Browser storage is kept per
+        // address - http and https, localhost and 127.0.0.1, another browser -
+        // so a window on an address that had never been set could start the
+        // shared tuner on 2125 and every other window followed it (Bruce VK2RT,
+        // YWC Discussion #250). Each tuner now starts from these. Null until
+        // the tuner has run.
+        public RttyTones? RttyTunerTones { get; set; }
+
         // Whether a confident Auto answer also moves the VFO so the measured mark
         // lands on the tuner's mark.
         //
@@ -464,6 +479,15 @@
         // Squelch (read from radio on connect — default 0 = open)
         public int SquelchA { get; set; } = 0;
         public int SquelchB { get; set; } = 0;
+    }
+
+    // The RTTY tuner's tones, as ApplicationSettings.RttyTunerTones keeps them.
+    public class RttyTones
+    {
+        public double MarkHz { get; set; }
+        public int ShiftHz { get; set; }
+        public bool Reverse { get; set; }
+        public double Baud { get; set; }
     }
 
     // Per-band "stacking register": remembers where you were on each band

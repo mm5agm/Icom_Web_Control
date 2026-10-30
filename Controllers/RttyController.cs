@@ -68,6 +68,7 @@ namespace Icom_Web_Control.Controllers
             {
                 var error = await _tuner.StartAsync(req.MarkHz, req.ShiftHz, req.Reverse, req.Baud, id);
                 if (error != null) return BadRequest(new { error });
+                await KeepTonesAsync(req, id);
                 return Ok(_tuner.Frame(0, id));
             }
             catch (Exception ex)
@@ -75,6 +76,41 @@ namespace Icom_Web_Control.Controllers
                 _logger.LogError(ex, "Failed to start the RTTY tuner");
                 return StatusCode(500, new { error = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// The tones the tuner last ran on, which a tuner opening in any window
+        /// starts from (ApplicationSettings.RttyTunerTones). 204 before the
+        /// tuner has ever run.
+        /// </summary>
+        [HttpGet("tuner/tones")]
+        public async Task<IActionResult> Tones()
+        {
+            var t = (await _settings.GetSettingsAsync()).RttyTunerTones;
+            if (t is null) return NoContent();
+            return Ok(new { markHz = t.MarkHz, shiftHz = t.ShiftHz, reverse = t.Reverse, baud = t.Baud });
+        }
+
+        // Keep the tones a start was given, when they are new. Logged with the
+        // page that sent them, so a mark that changes when nobody changed it
+        // can be traced to the window that did it.
+        private async Task KeepTonesAsync(StartRequest req, string? client)
+        {
+            var settings = await _settings.GetSettingsAsync();
+            var was = settings.RttyTunerTones;
+            if (was is not null && was.MarkHz == req.MarkHz && was.ShiftHz == req.ShiftHz
+                && was.Reverse == req.Reverse && was.Baud == req.Baud) return;
+
+            _logger.LogInformation(
+                "RTTY tuner tones now mark {Mark} Hz, shift {Shift} Hz, {Baud} baud{Rev} (were {Was}), from {Page}, client {Client}",
+                req.MarkHz, req.ShiftHz, req.Baud, req.Reverse ? ", reversed" : "",
+                was is null ? "none" : $"{was.MarkHz}/{was.ShiftHz}",
+                Request.Headers.Referer.ToString(), client ?? "shared");
+            settings.RttyTunerTones = new Models.RttyTones
+            {
+                MarkHz = req.MarkHz, ShiftHz = req.ShiftHz, Reverse = req.Reverse, Baud = req.Baud,
+            };
+            await _settings.SaveSettingsAsync(settings);
         }
 
         /// <summary>

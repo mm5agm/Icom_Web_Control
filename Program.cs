@@ -11,6 +11,10 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows.Forms;
 
+// A page named on the command line (Icom_Web_Control.exe rtty-contest) is
+// opened in place of /start, here or by the copy already running.
+Icom_Web_Control.Services.LaunchPage.ReadFrom(args);
+
 // ── Single-instance guard ────────────────────────────────────────────────────
 const string MutexName = "Global\\Icom_Web_Control_SingleInstance";
 var mutex = new Mutex(initiallyOwned: true, name: MutexName, out bool createdNew);
@@ -45,7 +49,7 @@ if (!createdNew)
 
     if (choice == DialogResult.Yes)
     {
-        try { Process.Start(new ProcessStartInfo(url + "/start") { UseShellExecute = true }); } catch { }
+        try { Process.Start(new ProcessStartInfo(Icom_Web_Control.Services.LaunchPage.At(url)) { UseShellExecute = true }); } catch { }
         mutex.Dispose();
         return;
     }
@@ -650,7 +654,7 @@ try
 
     lifetime.ApplicationStarted.Register(() =>
     {
-        browserLauncher.OpenOnce(portInfo.RootUrl + "/start");
+        browserLauncher.OpenOnce(Icom_Web_Control.Services.LaunchPage.At(portInfo.RootUrl));
     });
 
     app.Run();

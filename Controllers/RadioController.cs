@@ -42,7 +42,8 @@ namespace Icom_Web_Control.Controllers
         // -- IF passband filter width (CI-V 1A 03) -----------------------------
 
         [HttpPost("ifwidth/{receiver}")]
-        public async Task<IActionResult> SetIfWidth(string receiver, [FromBody] IfWidthRequest request)
+        public async Task<IActionResult> SetIfWidth(string receiver, [FromBody] IfWidthRequest request,
+                                                    [FromServices] Icom_Web_Control.Services.Rtty.RttyTunerModeService tunerMode)
         {
             if (!TryVfo(receiver, out var vfo))
                 return BadRequest(new { error = "Unknown receiver" });
@@ -52,6 +53,9 @@ namespace Icom_Web_Control.Controllers
             try
             {
                 await _radio.SetIfFilterWidthHzAsync(vfo, request.Hz, CancellationToken.None);
+                // The RTTY tuner keeps a width set by hand while it holds the
+                // radio, rather than sizing over it (VFO A is the one it holds).
+                if (vfo == RadioVfo.A) await tunerMode.WidthSetByHandAsync(request.Hz);
                 return Ok(new { message = $"IF width {request.Hz} Hz set for VFO {vfo}" });
             }
             catch (Exception ex)

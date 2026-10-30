@@ -1204,6 +1204,16 @@ The RTTY tuner ([§20](#20-rtty)) is docked at the right, as in Contest Mode ([�
 
 The docked tuner starts small; its grabs make it bigger. Under it is a box with **PWR**, 5 W to the radio's maximum, and **WIDTH**, the radio's IF widths for the mode. There is no SHIFT, because the IC-7300 has Twin PBT instead of an IF shift, and the tuner keeps PBT centred while it is open ([§20.9](#209-what-the-tuner-changes-on-your-radio)). A slider writes to the radio when you let go of it, or a moment after the last notch of the mouse wheel over it.
 
+**WIDTH is kept.** A width you set while the tuner is open is kept for that mode (RTTY-L, RTTY-U, DATA-L or DATA-U), and the tuner uses it each time it starts in that mode instead of working one out. The status line says *"IF filter 350 Hz, as you set it."* Closing the tuner leaves the width where you put it, rather than putting back the one from before. Until now the tuner worked out its own width each time it started.
+
+**Starting on RTTY Contest.** Add the page's name after the program in a desktop shortcut's **Target**, and IWC opens on it:
+
+    "C:\Program Files\MM5AGM\Icom Web Control\Icom_Web_Control.exe" rtty-contest
+
+`radio`, `classic`, `experimental` and `settings` work the same way. With no name, IWC opens the view you used last, as before. If IWC is already running, choosing **Yes** in the *Already Running* box opens the named page.
+
+**The Mark and Shift** are kept by IWC itself, not just by the browser, and every window's tuner starts from the last ones used. Each browser, and each address (localhost or the PC's name), keeps its own, so before this a window that had never had its Mark set could start the tuner on 2125. If the Mark ever changes when you didn't change it, IWC's log has a line starting *RTTY tuner tones now mark* that names the page that changed it.
+
 **Sizes, windows and layouts**
 
 Drag the right edge, the bottom edge or the bottom-right corner of the spectrum, or of the docked tuner, to size it. A box you haven't sized fills the room it has. Each part that pops out leaves the page, and comes back with **DOCK** in its window, or when its window closes.
@@ -3824,7 +3834,7 @@ So the tuner sets up what it needs, and puts it back:
 | **Twin PBT** | Centred, because every width decision assumes the passband is where the noise sweep measured it. |
 | **IF filter** | Widened if it is too narrow to have carried the pair, judged from the middle of the radio's passband ([§6.8](#68-rtty-tuner) says where that is). In RTTY, once **Auto** has found a signal and centred it, narrowed to the narrowest that carries it; before that, and always in DATA, only ever widened. |
 | **The radio's RTTY menu** | Written when you type or pick a Mark or Shift in an FSK mode, so the radio's own decoder agrees. **Never by Auto**, and never restored, because it is yours: the radio transmits FSK on it. |
-| **Putting it back** | Mode, filter and PBT, when the tuner stops — closing the dialog, closing the tab, or the app shutting down. It is held on the server rather than in the browser, so reloading the page does not lose the record of what you had. |
+| **Putting it back** | Mode, filter and PBT, when the tuner stops (not a filter width you set by hand while it was open, [§5.21](#521-rtty-contest)) — closing the dialog, closing the tab, or the app shutting down. It is held on the server rather than in the browser, so reloading the page does not lose the record of what you had. |
 | **Turning it off** | *Set RTTY mode when the tuner starts*, on the Settings page under **RTTY Tuner**. |
 
 Whatever it changes, it tells you in the status line under the figure — *"Mode set
