@@ -32,7 +32,7 @@ If something has been biting you and a pre-release says it is fixed, or you want
 
 **Since v1.6.0-pre6**, on the development branch:
 
-- **More from Bruce VK2RT's testing on RTTY Contest.** A **MENU** key beside **VIEWS** opens Settings, the setup pages, the manual and About in a new tab. **FIXED** now holds the spectrum until the passband reaches the edge of the screen. [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **More from Bruce VK2RT's testing on RTTY Contest.** A **MENU** key beside **VIEWS** opens Settings, the setup pages, the manual and About in a new tab. **FIXED** now holds the spectrum until the passband reaches the edge of the screen. From Yaesu Web Control v2.5.4-pre8: a **WIDTH** you set while the tuner is open is kept for that mode and not undone when it closes; IWC keeps the tuner's last Mark and Shift so every window starts from them; and a shortcut can open IWC straight on a page, e.g. `Icom_Web_Control.exe rtty-contest`. [§5.21](USER_MANUAL.md#521-rtty-contest).
 
 **v1.5.0 is the current release.** Its headline is three ways to run the radio — Classic, the Experimental UI and the Radio panel — and the RTTY panel now decodes. The first five are RTTY, and together they turn the tuner into a receive station:
 
