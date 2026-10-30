@@ -96,10 +96,10 @@ that gets missed.
 ./scripts/core-sync.ps1 -Pull    # bring the sibling's core work down
 ```
 
-`-Push` refuses on a dirty tree, because `git subtree split` only sees
-committed content and would silently leave uncommitted `core/` work behind.
-The split walks the whole repo history and prints nothing for a couple of
-minutes; it is not hung.
+`-Push` refuses on a dirty tree, because only committed content is sent and
+uncommitted `core/` work would silently be left behind. It merges core main
+into `core/`, then sends `core/` up as one commit on top of core main, naming
+the app commits it carries. Seconds; it does not use `git subtree split`.
 
 ### Claude: your standing instructions
 
