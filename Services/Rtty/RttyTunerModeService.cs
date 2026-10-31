@@ -26,14 +26,15 @@ namespace Icom_Web_Control.Services.Rtty
     /// <para><b>What it sets, and in what order.</b></para>
     ///
     /// <para>1. <i>The mode: the operator's RTTY mode</i>
-    /// (<see cref="ApplicationSettings.RttyTunerMode"/>), from anything that is
-    /// not already of the same kind - see <see cref="NeedsSwitching"/>. Until
+    /// (<see cref="ApplicationSettings.RttyTunerMode"/>), from any other mode,
+    /// the other sideband included - see <see cref="NeedsSwitching"/>. Until
     /// 2026-10-13 DATA, LSB and USB were left alone for AFSK operators; I decided
     /// then that opening RTTY means RTTY, the same as opening the CW reader means
     /// CW. Since 2026-10-28 an AFSK operator can choose DATA-L or DATA-U
     /// instead, as on YWC since 2026-10-26: the tuner then puts the radio in
-    /// DATA and holds it there. Either sideband of the chosen kind is left as
-    /// it is - Reverse is the tuner's business.</para>
+    /// DATA and holds it there. While the tuner runs, a change to the other
+    /// sideband of the chosen kind is left as it is - Reverse is the tuner's
+    /// business.</para>
     ///
     /// <para>2. <i>Twin PBT, centred.</i> PBT slides the passband about 100 Hz
     /// for 30 steps, and every width decision below assumes it is where the
@@ -584,11 +585,15 @@ namespace Icom_Web_Control.Services.Rtty
 
         /// <summary>
         /// Whether the tuner has to change the radio's mode to
-        /// <paramref name="target"/>: when it is not already of the same kind
-        /// (<see cref="SameKind"/>).
+        /// <paramref name="target"/> when it starts: whenever it is not that
+        /// mode. Until 2026-10-31 the other sideband of the same kind was left
+        /// alone (<see cref="SameKind"/>), from before the operator could choose
+        /// the sideband; on YWC Bruce VK2RT, in DATA-L, came back from the Radio
+        /// panel in DATA-U and it stayed there (YWC #250). While the tuner runs,
+        /// the hold still accepts either sideband.
         /// </summary>
         public static bool NeedsSwitching(string? mode, string target) =>
-            !SameKind(mode, target);
+            !string.Equals(mode?.Trim(), target, StringComparison.OrdinalIgnoreCase);
 
         // ---- the passband ----------------------------------------------------
 
