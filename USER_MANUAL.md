@@ -1182,7 +1182,7 @@ Under the strip is a row of band keys. A key tunes the radio to the RTTY part of
 - **REF** moves the bottom of the trace up or down from the noise floor. **AUTO** lets the floor follow the noise; off, it stays where it is.
 - **RANGE** is how many dB the trace covers. **FIT** sets it so the strongest signal of the last few seconds just fits, as does a double-click on the bar between the spectrum and the waterfall.
 - **WF ON TOP** puts the waterfall above the spectrum.
-- **FIXED** holds the spectrum still while the dial moves. Click a signal and only the passband and the dial line move, so the stations stay where you saw them. The spectrum moves on only when the passband reaches the edge of the screen, or you change the span or the band. Off, the spectrum stays centred on the dial. The IC-7300 sends its scope centred on the dial, so with FIXED on, a strip at one edge can be blank, as wide as the dial has moved from the middle.
+- **FIXED** holds the spectrum still while the dial moves. Click a signal and only the passband and the dial line move, so the stations stay where you saw them. The spectrum moves on only when the passband goes past the edge of the screen, or you change the span or the band. Tuning past an edge turns the page: the next stretch of band comes up with the passband near the opposite edge, so tuning up the band carries on from left to right. A jump of more than a screen width, such as a band change or a typed frequency, centres the passband instead. Off, the spectrum stays centred on the dial. The IC-7300 sends its scope centred on the dial, so with FIXED on, a strip at one edge can be blank, as wide as the dial has moved from the middle.
 - **STEP** is how far one notch of the mouse wheel moves the dial over the spectrum, 1 Hz to 1 kHz.
 - **TRACE** is how thick the spectrum's line is.
 - **BANDS** chooses the band keys (above).
@@ -1207,6 +1207,8 @@ The docked tuner starts small; its grabs make it bigger. Under it is a box with 
 **WIDTH is kept.** A width you set while the tuner is open is kept for that mode (RTTY-L, RTTY-U, DATA-L or DATA-U), and the tuner uses it each time it starts in that mode instead of working one out. The status line says *"IF filter 350 Hz, as you set it."* Closing the tuner leaves the width where you put it, rather than putting back the one from before. Until now the tuner worked out its own width each time it started.
 
 **AUTO**, at the end of the WIDTH row, is lit while the tuner works the width out itself, and dark while a width you set is kept; hold the mouse over it to see which width and mode. Press it to go back to the tuner's own width for the mode VFO A is in: the kept width is forgotten, the tuner sizes the filter again straight away if it is open, and closing it puts back the width from before it opened. Setting WIDTH by hand while the tuner is open keeps a width again. AUTO is only for VFO A, because the tuner only sets VFO A.
+
+**The tuning dial.** Under those controls is the Radio panel's tuning dial, made smaller. Both parts tune VFO A: the outer ring in big steps and the inner knob in small ones. Turn the mouse wheel over a part, or drag it round. Pick each part's step in the lists beside the dial, **OUTER** (100 Hz to start with) and **INNER** (10 Hz). The steps are kept in this browser. *New after v1.6.0-pre6.*
 
 **Starting on RTTY Contest.** Add the page's name after the program in a desktop shortcut's **Target**, and IWC opens on it:
 
@@ -1551,7 +1553,7 @@ has any way of knowing that the audio is wrong.
 
 | Setting | What it does |
 |---|---|
-| **Set RTTY mode when the tuner starts** | Puts VFO A into the **RTTY mode** below if it was in a mode of another kind, and keeps it there while the tuner is open, and opens the IF filter if it is too narrow to carry both of your tones. Your mode and filter are put back when the tuner stops. |
+| **Set RTTY mode when the tuner starts** | Puts VFO A into the **RTTY mode** below if it was in any other mode, and keeps it in that kind of mode while the tuner is open, and opens the IF filter if it is too narrow to carry both of your tones. Your mode and filter are put back when the tuner stops. |
 | **RTTY mode** | **RTTY-L** (the radio's RTTY, the default) or **RTTY-U** (RTTY-R) for the radio's own FSK, or **DATA-L** or **DATA-U** if your software sends AFSK through the radio's audio. The **MODE** list on RTTY Contest ([§5.21](#521-rtty-contest)) is the same setting, and its band keys use it. |
 | **Auto also tunes the signal in** | When **Auto** is sure of what it heard, the dial moves so the mark tone arrives on the tuner's **Mark**, and the status line says which way it went and by how much. |
 
@@ -3832,7 +3834,7 @@ So the tuner sets up what it needs, and puts it back:
 
 | | |
 |---|---|
-| **Mode** | If VFO A is in a mode of another kind from your **RTTY mode** (Settings, [§6.8](#68-rtty-tuner)), the tuner sets that mode, and while it is open it puts it back if a band change or anything else moves it. With RTTY chosen, **RTTY-L and RTTY-U** are both left as they are; with DATA chosen, **DATA-L and DATA-U** are. The default is RTTY-L. |
+| **Mode** | When the tuner starts, VFO A goes to your **RTTY mode** (Settings, [§6.8](#68-rtty-tuner)) from any other mode, the other sideband included. While it is open it puts it back if a band change or anything else moves it to another kind of mode, but a change to the other sideband (RTTY-U for RTTY-L, DATA-U for DATA-L) is left as you set it. Until now the other sideband was left alone when the tuner started too. The default is RTTY-L. |
 | **Twin PBT** | Centred, because every width decision assumes the passband is where the noise sweep measured it. |
 | **IF filter** | Widened if it is too narrow to have carried the pair, judged from the middle of the radio's passband ([§6.8](#68-rtty-tuner) says where that is). In RTTY, once **Auto** has found a signal and centred it, narrowed to the narrowest that carries it; before that, and always in DATA, only ever widened. |
 | **The radio's RTTY menu** | Written when you type or pick a Mark or Shift in an FSK mode, so the radio's own decoder agrees. **Never by Auto**, and never restored, because it is yours: the radio transmits FSK on it. |
