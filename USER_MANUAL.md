@@ -1208,7 +1208,7 @@ The docked tuner starts small; its grabs make it bigger. Under it is a box with 
 
 **AUTO**, at the end of the WIDTH row, is lit while the tuner works the width out itself, and dark while a width you set is kept; hold the mouse over it to see which width and mode. Press it to go back to the tuner's own width for the mode VFO A is in: the kept width is forgotten, the tuner sizes the filter again straight away if it is open, and closing it puts back the width from before it opened. Setting WIDTH by hand while the tuner is open keeps a width again. AUTO is only for VFO A, because the tuner only sets VFO A.
 
-**The tuning dial.** Under those controls is the Radio panel's tuning dial, made smaller. Both parts tune VFO A: the outer ring in big steps and the inner knob in small ones. Turn the mouse wheel over a part, or drag it round. Pick each part's step in the lists beside the dial, **OUTER** (100 Hz to start with) and **INNER** (10 Hz). The steps are kept in this browser. *New after v1.6.0-pre6.*
+**The tuning dial.** Under those controls is the Radio panel's tuning dial, made smaller. Both parts tune VFO A: the outer ring in big steps and the inner knob in small ones. Turn the mouse wheel over a part, or drag it round. Pick each part's step in the lists beside the dial, **OUTER** (100 Hz to start with) and **INNER** (10 Hz). The steps are kept in this browser. *New in v1.6.0-pre7.*
 
 **Starting on RTTY Contest.** Add the page's name after the program in a desktop shortcut's **Target**, and IWC opens on it:
 

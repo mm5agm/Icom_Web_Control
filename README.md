@@ -30,7 +30,7 @@ If something has been biting you and a pre-release says it is fixed, or you want
 - **Auto never changes the radio's RTTY menu.** The radio transmits FSK on that shift, so Auto setting it to 425 for a station you were only listening to would have sent your next call on 425. Auto now leaves the menu alone, opens the filter to cover both tones, and says when the station's shift is not the menu's. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
 - **Save in the CW Reader.** Writes the text in the panel to a `.txt` file; in Chrome and Edge the Save dialog opens in the folder you used last. Asked for by diane903 ([Discussion #86](https://github.com/mm5agm/Icom_Web_Control/discussions/86)). [§18.5](USER_MANUAL.md#185-the-panel-controls).
 
-**Since v1.6.0-pre6**, on the development branch:
+**New in v1.6.0-pre7**, a pre-release:
 
 - **More from Bruce VK2RT's testing on RTTY Contest.** A **MENU** key beside **VIEWS** opens Settings, the setup pages, the manual and About in a new tab. **FIXED** now holds the spectrum until the passband reaches the edge of the screen. From Yaesu Web Control v2.5.4-pre8: a **WIDTH** you set while the tuner is open is kept for that mode and not undone when it closes; IWC keeps the tuner's last Mark and Shift so every window starts from them; and a shortcut can open IWC straight on a page, e.g. `Icom_Web_Control.exe rtty-contest`. **AUTO** beside WIDTH goes back to the tuner's own width. [§5.21](USER_MANUAL.md#521-rtty-contest).
 - **From Yaesu Web Control v2.5.4-pre9: a tuning dial on RTTY Contest, and FIXED turns a page at the edge.** The Radio panel's dial, made smaller, sits under PWR and WIDTH: the outer ring tunes in big steps and the inner knob in small ones, each with its own step list. Tune off the edge of a FIXED spectrum and the passband comes back near the other edge, so you carry on tuning the same way. And the tuner now goes to the exact RTTY mode you chose when it starts, the other sideband included. [§5.21](USER_MANUAL.md#521-rtty-contest).
@@ -119,6 +119,17 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [RELEASE_HISTORY.md](RELEASE_HISTORY.md); their installers are still on the
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
+
+### v1.6.0-pre7 (2026-10-31)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre6, pre5, pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** on RTTY Contest, the **MENU** key, a **WIDTH** you set being kept, **AUTO** beside WIDTH, the tuning dial, **FIXED** turning a page at the edge, and the tuner starting in the exact RTTY mode chosen in Settings.
+
+- **More from Bruce VK2RT's testing on RTTY Contest.** A **MENU** key beside **VIEWS** opens Settings, the setup pages, the manual and About in a new tab. **FIXED** holds the spectrum until the passband reaches the edge of the screen. User Manual, [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **From Yaesu Web Control v2.5.4-pre8:** a **WIDTH** you set while the tuner is open is kept for that mode and not undone when it closes, and **AUTO** beside WIDTH goes back to the tuner's own width. IWC keeps the tuner's last Mark and Shift so every window starts from them. A shortcut can open IWC straight on a page, e.g. `Icom_Web_Control.exe rtty-contest`.
+- **From Yaesu Web Control v2.5.4-pre9:** a tuning dial on RTTY Contest, under PWR and WIDTH: the outer ring tunes VFO A in big steps and the inner knob in small ones, each with its own step list. Tune off the edge of a FIXED spectrum and the passband comes back near the other edge, so you carry on tuning the same way.
+- **The tuner starts in the exact RTTY mode you chose**, the other sideband included (RTTY-U to RTTY-L, DATA-U to DATA-L). [§20.9](USER_MANUAL.md#209-what-the-tuner-changes-on-your-radio).
 
 ### v1.6.0-pre6 (2026-10-29)
 
