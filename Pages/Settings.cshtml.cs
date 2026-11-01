@@ -194,6 +194,9 @@ namespace Icom_Web_Control.Pages
                 // restart -- and it is deliberately not in the restart reasons
                 // below for that reason.
                 current.AutoShutdownWhenNoBrowsers = Settings.AutoShutdownWhenNoBrowsers;
+                // Read at connect and at stop, so these apply without a restart too.
+                current.PowerOnAtStart    = Settings.PowerOnAtStart;
+                current.PowerOffAtExit    = Settings.PowerOffAtExit;
                 // External-SDR spectrum config was removed from the Settings page
                 // (the IC-7300's scope comes over CI-V, not an IF-tapped SDR).
                 // The Sdr* fields are left untouched here so their persisted
@@ -379,6 +382,9 @@ namespace Icom_Web_Control.Pages
             {
                 _logger.LogError(ex, "Failed to schedule IWC relaunch — user will need to relaunch manually");
             }
+
+            // A restart is not the operator closing the app: leave the radio on.
+            Icom_Web_Control.Services.AppLifecycle.RestartRequested = true;
 
             // Stop the host. Hosted services (MeterPollingService, the tray icon,
             // etc.) get their StopAsync calls; the multiplexer's serial port is
