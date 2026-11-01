@@ -118,6 +118,12 @@ export function startIcomRttyContest(root, cfg) {
         onDecodeOut: cfg.onDecodeOut,
         layoutsApi: cfg.layoutsApi,
         onDecode: cfg.onDecode,
+        // MEM next to BANDS: the memories, and a click tunes the VFO on screen.
+        memories: {
+            list: async () => { const r = await fetch('/api/memory'); return r.ok ? r.json() : null; },
+            recall: m => post(`/api/memory/${m.id}/recall?vfo=${view.receiver}`),
+            editHref: '/Memories',
+        },
     });
 
     // A click is the middle of the pair. In RTTY the dial goes on the higher
