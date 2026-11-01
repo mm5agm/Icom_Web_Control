@@ -55,6 +55,15 @@ namespace Icom_Web_Control.Services
         // must not open the configured port under the probe, or one of them
         // reads "in use" and the answer is wrong either way.
         private volatile bool _findInProgress;
+
+        // PowerOnAtStart is tried once per run, the first time the port opens:
+        // after that a radio that stops answering was switched off on purpose.
+        private bool _startPowerOnTried;
+        private const int StartPowerOnWaitMs = 8000;   // the radio's boot, with margin
+
+        // PowerOffAtExit is sent the moment the host starts stopping: by the time
+        // StopAsync runs, the other services have used up the 2 s shutdown cap.
+        private Task? _exitPowerOff;
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly ILogger<CivRadioController> _logger;
@@ -360,7 +369,8 @@ namespace Icom_Web_Control.Services
             ISettingsService settings,
             IHubContext<RadioHub> hubContext,
             RadioFinder finder,
-            ILogger<CivRadioController> logger)
+            ILogger<CivRadioController> logger,
+            IHostApplicationLifetime? lifetime = null)
         {
             _state = state;
             _bus = bus;
@@ -368,6 +378,8 @@ namespace Icom_Web_Control.Services
             _hubContext = hubContext;
             _finder = finder;
             _logger = logger;
+
+            lifetime?.ApplicationStopping.Register(() => _exitPowerOff = Task.Run(PowerOffAtExitAsync));
 
             // The radio pushes 27 00 scope frames unsolicited (they never match a
             // pending transaction), so they arrive here rather than through the
@@ -449,7 +461,10 @@ namespace Icom_Web_Control.Services
             // instead of flashing the power button green↔red as each reconnect
             // flags "connected" only to drop on the very next read miss.
             await IdentifyAsync(cancellationToken); // learn address/model if it answers; best-effort
-            if (await ReadOperatingFrequencyAsync(cancellationToken) <= 0)
+            bool firstOpen = !_startPowerOnTried;
+            _startPowerOnTried = true;
+            if (await ReadOperatingFrequencyAsync(cancellationToken) <= 0
+                && !(firstOpen && settings.PowerOnAtStart && await PowerOnAtStartAsync(cancellationToken)))
             {
                 await _bus.CloseAsync();
                 _state.ConnectionStatusText =
@@ -2762,10 +2777,9 @@ namespace Icom_Web_Control.Services
         /// <summary>
         /// Power the radio up (18 01). The asleep CI-V circuit is woken with a
         /// burst of 0xFE bytes sized to the baud rate, sent in one write with the
-        /// frame appended so no inter-byte gap lets it doze off again. Over USB
-        /// the port is unpowered while the radio is off, so this can only succeed
-        /// over a separately-powered CI-V remote-jack link; on USB the front-panel
-        /// switch is the only way up. On success the poll loop reconnects and
+        /// frame appended so no inter-byte gap lets it doze off again. The USB
+        /// port stays present while the radio is in standby (tested on the
+        /// IC-7300MK2: up about 4 s after 18 01). On success the poll loop reconnects and
         /// re-identifies once the radio's bus starts answering.
         /// </summary>
         private async Task PowerOnAsync(CancellationToken ct)
@@ -2788,6 +2802,62 @@ namespace Icom_Web_Control.Services
             await _bus.SendRawAsync(burst, ct);
             _state.RadioPowerOn = true;
             _logger.LogInformation("[CivRadioController] Power ON (18 01) sent with {Wake}× FE wake preamble", wake);
+        }
+
+        /// <summary>
+        /// PowerOnAtStart: the port is open and the radio is silent, so send
+        /// 18 01 and wait for the operating-frequency read to answer. True
+        /// once it does; false if it never comes up in StartPowerOnWaitMs.
+        /// </summary>
+        private async Task<bool> PowerOnAtStartAsync(CancellationToken ct)
+        {
+            _logger.LogInformation("[CivRadioController] Radio not answering at start — sending power ON");
+            _state.ConnectionStatusText = "Turning the radio on…";
+            await PowerOnAsync(ct);
+            var until = DateTime.UtcNow.AddMilliseconds(StartPowerOnWaitMs);
+            while (DateTime.UtcNow < until)
+            {
+                await Task.Delay(500, ct);
+                if (await ReadOperatingFrequencyAsync(ct) > 0)
+                {
+                    _logger.LogInformation("[CivRadioController] Radio came up after power ON");
+                    await IdentifyAsync(ct);
+                    return true;
+                }
+            }
+            _state.RadioPowerOn = false;
+            _logger.LogWarning("[CivRadioController] Radio did not answer within {Ms} ms of power ON", StartPowerOnWaitMs);
+            return false;
+        }
+
+        /// <summary>
+        /// PowerOffAtExit: switch the radio off as the host starts stopping,
+        /// while the poll loop and port are still up. Skipped for Settings'
+        /// Restart Now, and best-effort with its own short timeout so a silent
+        /// radio cannot hold shutdown up.
+        /// </summary>
+        private async Task PowerOffAtExitAsync()
+        {
+            try
+            {
+                var settings = await _settings.GetSettingsAsync();
+                if (settings.PowerOffAtExit && !AppLifecycle.RestartRequested && _bus.IsOpen && _state.IsConnected)
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                    await PowerOffAsync(cts.Token);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[CivRadioController] Power OFF on exit failed — non-fatal");
+            }
+        }
+
+        /// <summary>Let an exit power-off finish before the port closes.</summary>
+        public override async Task StopAsync(CancellationToken cancellationToken)
+        {
+            if (_exitPowerOff != null) await _exitPowerOff;
+            await base.StopAsync(cancellationToken);
         }
 
         // -- Radio memory channels (CI-V 1A 00) --------------------------------

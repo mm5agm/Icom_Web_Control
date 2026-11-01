@@ -2018,6 +2018,30 @@
                                 rates &mdash; only the spectrum display is affected.
                             </div>
                         </div>
+                        <div class="mb-3 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" asp-for="Settings.PowerOnAtStart" />
+                            <label class="form-check-label" asp-for="Settings.PowerOnAtStart">
+                                Turn the radio on when Icom Web Control starts
+                            </label>
+                            <div class="form-text">
+                                When enabled (default), and the radio does not answer as the app starts, the app
+                                sends the CI-V power-on command and waits a few seconds for the radio to come up.
+                                It tries once per start, so switching the radio off at its front panel later does
+                                not switch it straight back on. The radio must still have its DC supply on.
+                            </div>
+                        </div>
+                        <div class="mb-3 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" asp-for="Settings.PowerOffAtExit" />
+                            <label class="form-check-label" asp-for="Settings.PowerOffAtExit">
+                                Turn the radio off when Icom Web Control closes
+                            </label>
+                            <div class="form-text">
+                                Off by default. When enabled, the app sends the CI-V power-off command as it
+                                closes &mdash; from the tray, or on its own after the last browser tab closes &mdash;
+                                but not when <strong>Restart</strong> on this page restarts it.
+                                Both settings take effect straight away; no restart needed.
+                            </div>
+                        </div>
                         <script>
                             // Live warning for the IC-7300 (original) + sub-115200 combination.
                             // Runs on change of either control and once on load, so an existing

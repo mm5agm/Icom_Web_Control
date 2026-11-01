@@ -30,6 +30,14 @@
         // Quit it from the system tray instead.
         public bool AutoShutdownWhenNoBrowsers { get; set; } = true;
 
+        // CI-V power (command 18). PowerOnAtStart: when the radio does not
+        // answer the first time the port opens, send 18 01 behind the wake
+        // preamble and wait for it to come up - once per run, so a radio
+        // switched off at the front panel later is left off. PowerOffAtExit:
+        // send 18 00 as the host stops, except for Settings' Restart Now.
+        public bool PowerOnAtStart { get; set; } = true;
+        public bool PowerOffAtExit { get; set; } = false;
+
         public string RadioModel { get; set; } = "IC-7300MK2"; // Icom single-receiver HF+6m(+4m EU)
 
 
