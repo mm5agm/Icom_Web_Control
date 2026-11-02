@@ -30,6 +30,11 @@ If something has been biting you and a pre-release says it is fixed, or you want
 - **Auto never changes the radio's RTTY menu.** The radio transmits FSK on that shift, so Auto setting it to 425 for a station you were only listening to would have sent your next call on 425. Auto now leaves the menu alone, opens the filter to cover both tones, and says when the station's shift is not the menu's. [§20.3](USER_MANUAL.md#203-auto-working-out-what-you-are-listening-to).
 - **Save in the CW Reader.** Writes the text in the panel to a `.txt` file; in Chrome and Edge the Save dialog opens in the folder you used last. Asked for by diane903 ([Discussion #86](https://github.com/mm5agm/Icom_Web_Control/discussions/86)). [§18.5](USER_MANUAL.md#185-the-panel-controls).
 
+**New in v1.6.0-pre8**, a pre-release:
+
+- **From Yaesu Web Control v2.5.4-pre13 and pre14, as Bruce VK2RT asked: on RTTY Contest,** a **MEM** key beside **BANDS** lists your memories, and a click tunes the VFO on screen. **MONI**, under INNER on the tuning dial, switches the monitor on and off and sets its level, kept and put back each time the page opens. The dial and the decoded text share one place, each with its own **POP OUT**, and the dial runs on when spun. The tuner's key reads **RTTY TUNER**, and the dial's box reaches the bottom of the window. [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **IWC switches the radio on when it starts**, if it is off, and can switch it off when IWC closes. Both are in Settings; the first is on by default, the second off.
+
 **New in v1.6.0-pre7**, a pre-release:
 
 - **More from Bruce VK2RT's testing on RTTY Contest.** A **MENU** key beside **VIEWS** opens Settings, the setup pages, the manual and About in a new tab. **FIXED** now holds the spectrum until the passband reaches the edge of the screen. From Yaesu Web Control v2.5.4-pre8: a **WIDTH** you set while the tuner is open is kept for that mode and not undone when it closes; IWC keeps the tuner's last Mark and Shift so every window starts from them; and a shortcut can open IWC straight on a page, e.g. `Icom_Web_Control.exe rtty-contest`. **AUTO** beside WIDTH goes back to the tuner's own width. [§5.21](USER_MANUAL.md#521-rtty-contest).
@@ -119,6 +124,16 @@ Other Icom CI-V radios (IC-705, IC-7610, IC-9700, …) share the same protocol f
 [RELEASE_HISTORY.md](RELEASE_HISTORY.md); their installers are still on the
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
+
+### v1.6.0-pre8 (2026-11-02)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre7, pre6, pre5, pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** on RTTY Contest, **MEM** and **MONI**, swapping the dial and the decoded text, and popping each out. IWC switching the radio on when it starts.
+
+- **From Yaesu Web Control v2.5.4-pre13 and pre14, as Bruce VK2RT asked:** on RTTY Contest, a **MEM** key beside **BANDS** lists your memories, and a click tunes the VFO on screen; the list scrolls when there are more than fit. **MONI**, under INNER on the tuning dial, switches the radio's monitor on and off and sets its level. It is kept in the browser, on unless you turn it off, and put back each time the page opens. It doesn't transmit. User Manual, [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **The tuning dial and the decoded text share one place** under the tuner, with a **VFO WHEEL** heading. **DECODE** and **VFO WHEEL** swap them, each has its own **POP OUT**, and there is no DOCK left on the page. The dial speeds up when dragged fast and runs on when let go mid-spin. Its box reaches the bottom of the window. The tuner's key reads **RTTY TUNER**.
+- **Radio power at start and exit.** Settings has **Turn the radio on when Icom Web Control starts** (on by default) and **Turn the radio off when Icom Web Control closes** (off by default).
 
 ### v1.6.0-pre7 (2026-10-31)
 
