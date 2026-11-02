@@ -99,6 +99,10 @@ export function startIcomRttyContest(root, cfg) {
             { id: 'width', label: 'WIDTH', kind: 'list', perReceiver: true,
               title: 'IF filter width of the VFO on screen',
               auto: 'The RTTY tuner works the width out for the signal. A width you set on VFO A while the tuner is open is kept for the mode' },
+            // MONI under INNER on the VFO WHEEL, as on YWC (Bruce VK2RT, YWC #250).
+            { id: 'moni', label: 'MONI', kind: 'range', box: 'wheel', min: 0, max: 100, step: 1,
+              toggle: 'Monitor on or off: hear your own transmit audio. It does not transmit. Kept, and put back each time this page opens',
+              title: 'Monitor level. Drag and let go, or turn the mouse wheel over it. Kept, and put back each time this page opens' },
         ],
         onControl: (id, value, vfo) => setControl(id, value, vfo),
         meters: [{ id: 'S', label: 'S' }, { id: 'PO', label: 'PO' }, { id: 'SWR', label: 'SWR' }, { id: 'ALC', label: 'ALC' }],
@@ -178,13 +182,37 @@ export function startIcomRttyContest(root, cfg) {
         const res = await post('/api/rtty/mode', { mode });
         if (res?.ok) await post(`/api/cat/mode/${vfo.toLowerCase()}`, { mode });
     }
-    // PWR and WIDTH. Power has no VFO; the URL names the one on screen, as
+    // MONI: on or off and the level, kept here and put back when the page
+    // opens: on unless the operator turns it off, and held either way.
+    // The radio has one monitor, for both VFOs.
+    const MONI_KEY = 'iwc.rttyContest.moni';
+    const readMoni = () => { try { return JSON.parse(localStorage.getItem(MONI_KEY)) || {}; } catch { return {}; } };
+    function keepMoni(change) {
+        try { localStorage.setItem(MONI_KEY, JSON.stringify({ ...readMoni(), ...change })); } catch { /* private window */ }
+    }
+    async function putBackMoni() {
+        const kept = readMoni();
+        await post('/api/cat/monitoron', { on: kept.on !== false });
+        if (kept.level != null) await post('/api/cat/monitorlevel/a', { level: kept.level });
+    }
+    const moni = { on: null, level: null };
+    const showMoni = () => view.setControl('moni', moni.level, { on: moni.on });
+    // PWR, WIDTH and MONI. Power has no VFO; the URL names the one on screen, as
     // the Radio panel's knob names the selected one.
     function setControl(id, value, vfo) {
         const rx = (vfo ?? view.receiver).toLowerCase();
         if (id === 'power') return post(`/api/cat/power/${rx}`, { Watts: Math.round(num(value)) });
         if (id === 'width' && value === 'auto') return widthToAuto();
         if (id === 'width') return post(`/api/radio/ifwidth/${rx}`, { hz: parseInt(value, 10) }).then(r => { checkKept(); return r; });
+        if (id === 'moni' && (value === 'on' || value === 'off')) {
+            keepMoni({ on: value === 'on' });
+            return post('/api/cat/monitoron', { on: value === 'on' });
+        }
+        if (id === 'moni') {
+            const level = Math.max(0, Math.min(100, Math.round(num(value))));
+            keepMoni({ level });
+            return post('/api/cat/monitorlevel/a', { level });
+        }
     }
     // WIDTH's choices change with the mode: in FM there are none.
     const widthOf = { A: null, B: null }, modeOf = { A: '', B: '' };
@@ -268,6 +296,8 @@ export function startIcomRttyContest(root, cfg) {
         IfWidthA: v => { widthOf.A = v === '' || v == null ? null : num(v); showWidth('A'); },
         IfWidthB: v => { widthOf.B = v === '' || v == null ? null : num(v); showWidth('B'); },
         Power: v => view.setControl('power', num(v)),
+        MonitorOn: v => { moni.on = on(v); showMoni(); },
+        MonitorLevelA: v => { moni.level = num(v); showMoni(); },
         SMeterA: v => { sValue = calibrateNumeric('SMETER', num(v)); drawS(); },
         IsTransmitting: v => {
             tx.on = on(v);
@@ -290,6 +320,7 @@ export function startIcomRttyContest(root, cfg) {
     drawS();
     drawTx();
     cfg.conn.start().catch(e => console.warn('rtty contest: hub', e));
+    if (!cfg.part) putBackMoni();
     // Only the VFO on screen is showing, so the server never peeks the other.
     reportSpectrumPanes(cfg.conn, () => ({ A: view.receiver === 'A', B: view.receiver === 'B' }));
     return view;

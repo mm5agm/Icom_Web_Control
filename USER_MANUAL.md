@@ -1179,6 +1179,8 @@ Under the strip is a row of band keys. A key tunes the radio to the RTTY part of
 
 **BANDS**, in the scope row, opens a box with a tick for each band key. Untick the bands you don't work and their keys go. The choices are kept in this browser; they are not part of a layout.
 
+**MEM**, next to BANDS, opens a list of your memories, the same ones the Memories page keeps ([§8](#8-radio-memories)). Click one to tune the VFO on screen, A or B, to it. The list stays open while you work, so you can hop between your spots. **EDIT** opens the Memories page in a new tab, to add, change or delete them; the list catches up when you come back. **×**, Escape or MEM again closes it. With more memories than fit on the screen, the list scrolls. *New in v1.6.0-pre8, as Bruce VK2RT asked for Yaesu Web Control.*
+
 **The scope row**
 
 - **REF** moves the bottom of the trace up or down from the noise floor. **AUTO** lets the floor follow the noise; off, it stays where it is.
@@ -1188,6 +1190,7 @@ Under the strip is a row of band keys. A key tunes the radio to the RTTY part of
 - **STEP** is how far one notch of the mouse wheel moves the dial over the spectrum, 1 Hz to 1 kHz.
 - **TRACE** is how thick the spectrum's line is.
 - **BANDS** chooses the band keys (above).
+- **MEM** lists your memories, to tune to one (above).
 - **POP OUT** opens the spectrum, the waterfall, or both, in a window of their own.
 
 **Tuning**
@@ -1201,7 +1204,7 @@ Click between a station's two traces. In **RTTY** and **RTTY-R** alike the IC-73
 The RTTY tuner ([§20](#20-rtty)) is docked at the right, as in Contest Mode ([§20.10](#2010-contest-mode-the-tuner-on-its-own)), with **From radio**, **Auto** and **Clear** on it. The keys on its bar:
 
 - **DECODE** puts the decoded text in the tuning dial's place, under the tuner, and starts the decoder. The key then reads **VFO WHEEL**: press it to put the dial back, which stops the decoder. The text box has its own **POP OUT** (see *The tuning dial* below for how the two windows behave).
-- **POP OUT** moves the tuner into a window of its own, the same window every GUI pops its tuner out to.
+- **RTTY TUNER** moves the tuner into a window of its own, the same window every GUI pops its tuner out to. It sits under the **POP OUT** keys for the spectrum and waterfall. *Called POP OUT until v1.6.0-pre8.*
 - **ON TOP** puts it in a small window that stays above other programs, such as your logger, where the browser allows it (Chrome and Edge do).
 
 The docked tuner starts small; its grabs make it bigger. Under it is a box with **PWR**, 5 W to the radio's maximum, and **WIDTH**, the radio's IF widths for the mode. There is no SHIFT, because the IC-7300 has Twin PBT instead of an IF shift, and the tuner keeps PBT centred while it is open ([§20.9](#209-what-the-tuner-changes-on-your-radio)). A slider writes to the radio when you let go of it, or a moment after the last notch of the mouse wheel over it.
@@ -1210,9 +1213,11 @@ The docked tuner starts small; its grabs make it bigger. Under it is a box with 
 
 **AUTO**, at the end of the WIDTH row, is lit while the tuner works the width out itself, and dark while a width you set is kept; hold the mouse over it to see which width and mode. Press it to go back to the tuner's own width for the mode VFO A is in: the kept width is forgotten, the tuner sizes the filter again straight away if it is open, and closing it puts back the width from before it opened. Setting WIDTH by hand while the tuner is open keeps a width again. AUTO is only for VFO A, because the tuner only sets VFO A.
 
-**The tuning dial.** Under those controls is the Radio panel's tuning dial, made smaller, in a box headed **VFO WHEEL**. Both parts tune VFO A: the outer ring in big steps and the inner knob in small ones. Turn the mouse wheel over a part, or drag it round. Pick each part's step in the lists beside the dial, **OUTER** (100 Hz to start with) and **INNER** (10 Hz). The steps are kept in this browser. *New in v1.6.0-pre7.* Dragged fast it speeds up, and runs on when let go mid-spin, as the Radio panel's dial does (section 5.20). *New in v1.6.0-pre8.*
+**The tuning dial.** Under those controls is the Radio panel's tuning dial, made smaller, in a box headed **VFO WHEEL**. Both parts tune VFO A: the outer ring in big steps and the inner knob in small ones. Turn the mouse wheel over a part, or drag it round. Pick each part's step in the lists beside the dial, **OUTER** (100 Hz to start with) and **INNER** (10 Hz). The steps are kept in this browser. *New in v1.6.0-pre7.* Dragged fast it speeds up, and runs on when let go mid-spin, as the Radio panel's dial does (section 5.20). *New in v1.6.0-pre8.* The box reaches down to the bottom of the window. *Since v1.6.0-pre8.*
 
 The dial and the decoded text share that place, one at a time: **DECODE** on the tuner's bar shows the text, and **VFO WHEEL** shows the dial again. Each has its own **POP OUT**, so either can go to a window of its own, on another monitor if you like, and the other then has the place to itself. A window stays out whichever is showing on the page. **DOCK** in a window puts it back on the page if its place is showing there; if the other one is showing, DOCK just closes the window. The decoder runs while the text is showing, on the page or in its window. *Heading, POP OUT and the swap new in v1.6.0-pre8, as Bruce VK2RT asked.*
+
+**MONI**, at the foot of the VFO WHEEL box under INNER, switches the radio's monitor on and off and sets its level, so you can keep your own transmit audio quieter than the receiver and never wonder which you are hearing. It doesn't transmit. Your choice is kept in this browser: MONI is on each time the page opens unless you turned it off, and the level you last set is put back. The radio has one monitor, for VFO A and VFO B alike. MONI stays on the page while the dial is in a window of its own, and hides with the dial while the decoded text has its place. *New in v1.6.0-pre8, as Bruce VK2RT asked for Yaesu Web Control.*
 
 **Starting on RTTY Contest.** Add the page's name after the program in a desktop shortcut's **Target**, and IWC opens on it:
 
