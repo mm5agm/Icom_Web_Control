@@ -85,8 +85,10 @@ namespace Icom_Web_Control.Controllers
 
         // ── Recall (tune the active VFO to a memory) ────────────────────────
 
+        // vfo ("A" or "B") names the VFO to tune, for a page with VFO tabs of
+        // its own (RTTY Contest's MEM); left out, the active VFO, as before.
         [HttpPost("{id:int}/recall")]
-        public async Task<IActionResult> Recall(int id)
+        public async Task<IActionResult> Recall(int id, [FromQuery] string? vfo = null)
         {
             var memory = _memoryService.GetById(id);
             if (memory == null) return NotFound();
@@ -94,7 +96,7 @@ namespace Icom_Web_Control.Controllers
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
-            // Recall tunes the currently-active VFO to the stored memory. IWC
+            // Recall tunes the VFO asked for, else the active one, to the memory. IWC
             // drives the IC-7300 through the CI-V seam (IRadioController), so the
             // two universal fields — mode and frequency — are pushed here and that
             // is what "recall a memory" means on this radio. The Yaesu-specific
@@ -102,7 +104,8 @@ namespace Icom_Web_Control.Controllers
             // filter, NB/NR/AGC, per-memory power) are not part of the IC-7300
             // memory model; they remain stored in the app memory but are not
             // applied. A later CI-V Memories block can extend this if wanted.
-            var vfo = _radioStateService.ActiveVfo == 1 ? RadioVfo.B : RadioVfo.A;
+            var target = vfo is "A" or "B" ? vfo : _radioStateService.ActiveVfo == 1 ? "B" : "A";
+            var rvfo = target == "B" ? RadioVfo.B : RadioVfo.A;
 
             try
             {
@@ -111,20 +114,20 @@ namespace Icom_Web_Control.Controllers
                 // error on the first read-back.
                 if (!string.IsNullOrEmpty(memory.Mode))
                 {
-                    await _radio.SetModeAsync(vfo, memory.Mode, CancellationToken.None);
-                    if (vfo == RadioVfo.B) _radioStateService.ModeB = memory.Mode;
+                    await _radio.SetModeAsync(rvfo, memory.Mode, CancellationToken.None);
+                    if (rvfo == RadioVfo.B) _radioStateService.ModeB = memory.Mode;
                     else _radioStateService.ModeA = memory.Mode;
                     await Task.Delay(50);
                 }
 
-                await _radio.SetFrequencyHzAsync(vfo, memory.FrequencyHz, CancellationToken.None);
-                if (vfo == RadioVfo.B) _radioStateService.FrequencyB = memory.FrequencyHz;
+                await _radio.SetFrequencyHzAsync(rvfo, memory.FrequencyHz, CancellationToken.None);
+                if (rvfo == RadioVfo.B) _radioStateService.FrequencyB = memory.FrequencyHz;
                 else _radioStateService.FrequencyA = memory.FrequencyHz;
 
                 _logger.LogInformation("Recalled memory {Id} ('{Label}') to VFO-{Vfo}: {Freq} Hz {Mode}",
-                    id, memory.Label, vfo, memory.FrequencyHz, memory.Mode);
+                    id, memory.Label, rvfo, memory.FrequencyHz, memory.Mode);
 
-                return Ok(new { recalled = true, vfo = vfo.ToString(), frequencyHz = memory.FrequencyHz, mode = memory.Mode });
+                return Ok(new { recalled = true, vfo = rvfo.ToString(), frequencyHz = memory.FrequencyHz, mode = memory.Mode });
             }
             catch (Exception ex)
             {
