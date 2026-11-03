@@ -17,5 +17,7 @@ namespace Icom_Web_Control.Pages
             : base(radioStateService, settingsService)
         {
         }
+
+        protected override string? ViewKey => Models.AppViews.Radio;
     }
 }

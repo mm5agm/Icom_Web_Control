@@ -106,6 +106,7 @@ namespace Icom_Web_Control.Pages
         {
             // DX cluster host/callsign also allowed empty (empty = feature disabled).
             ModelState.Remove("Settings.DxClusterHost");
+            ModelState.Remove("Settings.HttpsSanHosts");
             ModelState.Remove("Settings.DxClusterLoginCallsign");
             ModelState.Remove("Settings.DxClusterPostLoginCommands");
             // Accessibility TX shortcut is optional — empty = disabled.
@@ -171,6 +172,8 @@ namespace Icom_Web_Control.Pages
                 var oldRadioModel = current.RadioModel;
                 var oldWebAddress = current.WebAddress;
                 var oldHttpPort   = current.HttpPort;
+                var oldHttpsEnabled = current.HttpsEnabled;
+                var oldHttpsPort    = current.HttpsPort;
 
                 // Capture pre-change CAT connection values so the radio reconnect
                 // below only fires when something that actually affects the CAT
@@ -187,6 +190,11 @@ namespace Icom_Web_Control.Pages
                 current.HttpPort          = (Settings.HttpPort >= 1 && Settings.HttpPort <= 65535)
                     ? Settings.HttpPort
                     : 8080;
+                current.HttpsEnabled      = Settings.HttpsEnabled;
+                current.HttpsPort         = (Settings.HttpsPort >= 1 && Settings.HttpsPort <= 65535)
+                    ? Settings.HttpsPort
+                    : 8444;
+                current.HttpsSanHosts     = Settings.HttpsSanHosts ?? "";
                 current.SerialPort        = Settings.SerialPort;
                 current.BaudRate          = Settings.BaudRate;
                 current.WebAddress        = Settings.WebAddress;
@@ -194,6 +202,9 @@ namespace Icom_Web_Control.Pages
                 // restart -- and it is deliberately not in the restart reasons
                 // below for that reason.
                 current.AutoShutdownWhenNoBrowsers = Settings.AutoShutdownWhenNoBrowsers;
+                // Read at connect and at stop, so these apply without a restart too.
+                current.PowerOnAtStart    = Settings.PowerOnAtStart;
+                current.PowerOffAtExit    = Settings.PowerOffAtExit;
                 // External-SDR spectrum config was removed from the Settings page
                 // (the IC-7300's scope comes over CI-V, not an IF-tapped SDR).
                 // The Sdr* fields are left untouched here so their persisted
@@ -222,6 +233,8 @@ namespace Icom_Web_Control.Pages
                 // name is discarded on save behind a "saved successfully".
                 current.RttyContestMode    = Settings.RttyContestMode;
                 current.RttyTunerSetMode   = Settings.RttyTunerSetMode;
+                current.RttyTunerMode      = Icom_Web_Control.Services.Rtty.RttyTunerModeService.Normalise(Settings.RttyTunerMode)
+                                             ?? current.RttyTunerMode;
                 current.RttyAutoCentreMark = Settings.RttyAutoCentreMark;
 
                 // DX cluster settings — copy through. Normalise callsign to upper case.
@@ -244,13 +257,9 @@ namespace Icom_Web_Control.Pages
 
                 // Pseudo-dual receiver (Phase 5)
                 current.PseudoDualReceiverEnabled = Settings.PseudoDualReceiverEnabled;
-                current.PseudoDualCrossBandEnabled = Settings.PseudoDualCrossBandEnabled;
-                // Clamp peek interval to the 5–60 s the UI offers; fall back to
-                // the 15 s default if an out-of-range value is posted.
-                current.PseudoDualPeekIntervalSeconds =
-                    (Settings.PseudoDualPeekIntervalSeconds >= 5 && Settings.PseudoDualPeekIntervalSeconds <= 60)
-                        ? Settings.PseudoDualPeekIntervalSeconds
-                        : 15;
+                // Cross-band watch and its peek interval are not on this page:
+                // the X-Watch keys set them (RadioController), so a save here
+                // leaves them as they are.
                 // Watch-panel (VFO B) span-button behaviour; fall back to the
                 // ZoomIn default for any unrecognised value.
                 current.PseudoDualWatchSpanMode =
@@ -301,6 +310,8 @@ namespace Icom_Web_Control.Pages
                     reasons.Add($"web server address ({oldWebAddress} → {current.WebAddress})");
                 if (oldHttpPort != current.HttpPort)
                     reasons.Add($"HTTP port ({oldHttpPort} → {current.HttpPort})");
+                if (oldHttpsEnabled != current.HttpsEnabled || oldHttpsPort != current.HttpsPort)
+                    reasons.Add("HTTPS settings");
                 if (reasons.Count > 0)
                 {
                     RestartRequiredReason = string.Join(" and ", reasons);
@@ -381,6 +392,9 @@ namespace Icom_Web_Control.Pages
             {
                 _logger.LogError(ex, "Failed to schedule IWC relaunch — user will need to relaunch manually");
             }
+
+            // A restart is not the operator closing the app: leave the radio on.
+            Icom_Web_Control.Services.AppLifecycle.RestartRequested = true;
 
             // Stop the host. Hosted services (MeterPollingService, the tray icon,
             // etc.) get their StopAsync calls; the multiplexer's serial port is

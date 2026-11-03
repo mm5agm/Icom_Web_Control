@@ -67,10 +67,18 @@ namespace Icom_Web_Control.Services.Civ
                 if (start > 0)
                     _buffer.RemoveRange(0, start);
 
-                // Find the FD terminator after the two preamble bytes. (Some
-                // radios emit three or more FEs; searching from index 2 skips
-                // the guaranteed pair and any extras are harmless leading body
-                // bytes that Parse rejects.)
+                // A longer run of FEs (a stray FE just before a real preamble,
+                // or a radio that sends three) must not become the address:
+                // FE FE FE E0 B6 … would read as To FE, From E0, and the reply
+                // would be dropped as not for us. No address is ever FE, so
+                // keep only the last pair of the run.
+                int extra = 0;
+                while (extra + 2 < _buffer.Count && _buffer[extra + 2] == CivProtocol.Preamble)
+                    extra++;
+                if (extra > 0)
+                    _buffer.RemoveRange(0, extra);
+
+                // Find the FD terminator after the two preamble bytes.
                 int end = -1;
                 for (int i = 2; i < _buffer.Count; i++)
                 {

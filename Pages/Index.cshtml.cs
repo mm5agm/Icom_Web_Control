@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Icom_Web_Control.Models;
 using Icom_Web_Control.Services;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -42,6 +43,13 @@ namespace Icom_Web_Control.Pages
         /// </summary>
         public bool IsFlexUi => string.Equals(
             HttpContext?.Request.Path.Value?.TrimEnd('/'), "/flexui", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Which <see cref="AppViews"/> view this page is, saved as the last view
+        /// when it loads. Null for the pop-out windows, which share this model
+        /// but are not a view anyone starts the app in.
+        /// </summary>
+        protected virtual string? ViewKey => IsFlexUi ? AppViews.Experimental : AppViews.Classic;
 
         public string SelectedBandA { get; set; } = string.Empty;
         public string SelectedBandB { get; set; } = string.Empty;
@@ -103,6 +111,10 @@ namespace Icom_Web_Control.Pages
 
         public string BandPlan { get; set; } = "Region1";
 
+        /// <summary>The operator's RTTY mode: what the tuner switches to, and
+        /// what the RTTY Contest band keys use.</summary>
+        public string RttyMode { get; set; } = Services.Rtty.RttyTunerModeService.RttyMode;
+
         /// <summary>
         /// Rendered into the page as <c>window.iwcAutoModeChangeOnTune</c> and
         /// read only by <c>autoModeForHz</c> in band-plan.js.
@@ -129,6 +141,13 @@ namespace Icom_Web_Control.Pages
         // second "watch" spectrum panel even on the single-receiver IC-7300 —
         // this flag is what un-gates panel B despite data-single-receiver.
         public bool PseudoDualReceiverEnabled { get; set; } = false;
+        // Seeds the Cross-band key on the VFO-B panel; CrossBandWatch updates it.
+        public bool PseudoDualCrossBandEnabled { get; set; } = false;
+        public int PseudoDualPeekIntervalSeconds { get; set; } = 15;
+
+        // Settings > Voice Control. The Radio panel (Layout = null, so no
+        // window.iwcVoiceEnabled) reads it from here to show its VOICE key.
+        public bool VoiceControlEnabled { get; set; } = false;
 
         // How the watch panel's (VFO B) span buttons behave: "ZoomIn" (software
         // crop, B independent), "Shared" (both drive the one physical span), or
@@ -155,6 +174,13 @@ namespace Icom_Web_Control.Pages
 
             // Load app button visibility and names
             var settings = await _settingsService.GetSettingsAsync();
+
+            // Remember this view so the next start-up opens it (see /start).
+            if (ViewKey is { } view && settings.LastView != view)
+            {
+                settings.LastView = view;
+                await _settingsService.SaveSettingsAsync(settings);
+            }
             ShowApp1Button = settings.ShowWsjtxButton;
             ShowApp2Button = settings.ShowJtalertButton;
             ShowApp3Button = settings.ShowLog4omButton;
@@ -183,9 +209,13 @@ namespace Icom_Web_Control.Pages
             VoiceNudgeStepHzA = settings.VoiceNudgeStepHzA;
             VoiceNudgeStepHzB = settings.VoiceNudgeStepHzB;
             PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
+            PseudoDualCrossBandEnabled = settings.PseudoDualCrossBandEnabled;
+            PseudoDualPeekIntervalSeconds = Math.Clamp(settings.PseudoDualPeekIntervalSeconds, 5, 60);
+            VoiceControlEnabled = settings.VoiceControlEnabled;
             PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             AutoModeChangeOnTune = settings.AutoModeChangeOnTune;
+            RttyMode = Services.Rtty.RttyTunerModeService.TargetMode(settings);
             RadioModel = settings.RadioModel;
             InstalledRoofingFilters = settings.InstalledRoofingFilters;
 

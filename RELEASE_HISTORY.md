@@ -13,6 +13,137 @@ a different and much older format.
 
 ---
 
+### v1.6.0-pre9 (2026-11-02)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre8, pre7, pre6, pre5, pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** on RTTY Contest, the theme list and the MODE list.
+
+- **RTTY Contest has its own theme list**, beside LAYOUT. It used to take the Radio panel's theme; it still starts from it, but a theme picked here is kept for this page alone. [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **The MODE list on RTTY Contest is labelled**, and turns amber when the radio is in a mode outside the four RTTY ones, such as CW from the last time it was used, so it is clear where to change it.
+
+### v1.6.0-pre8 (2026-11-02)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre7, pre6, pre5, pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** on RTTY Contest, **MEM** and **MONI**, swapping the dial and the decoded text, and popping each out. IWC switching the radio on when it starts.
+
+- **From Yaesu Web Control v2.5.4-pre13 and pre14, as Bruce VK2RT asked:** on RTTY Contest, a **MEM** key beside **BANDS** lists your memories, and a click tunes the VFO on screen; the list scrolls when there are more than fit. **MONI**, under INNER on the tuning dial, switches the radio's monitor on and off and sets its level. It is kept in the browser, on unless you turn it off, and put back each time the page opens. It doesn't transmit. User Manual, [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **The tuning dial and the decoded text share one place** under the tuner, with a **VFO WHEEL** heading. **DECODE** and **VFO WHEEL** swap them, each has its own **POP OUT**, and there is no DOCK left on the page. The dial speeds up when dragged fast and runs on when let go mid-spin. Its box reaches the bottom of the window. The tuner's key reads **RTTY TUNER**.
+- **Radio power at start and exit.** Settings has **Turn the radio on when Icom Web Control starts** (on by default) and **Turn the radio off when Icom Web Control closes** (off by default).
+
+### v1.6.0-pre7 (2026-10-31)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre6, pre5, pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** on RTTY Contest, the **MENU** key, a **WIDTH** you set being kept, **AUTO** beside WIDTH, the tuning dial, **FIXED** turning a page at the edge, and the tuner starting in the exact RTTY mode chosen in Settings.
+
+- **More from Bruce VK2RT's testing on RTTY Contest.** A **MENU** key beside **VIEWS** opens Settings, the setup pages, the manual and About in a new tab. **FIXED** holds the spectrum until the passband reaches the edge of the screen. User Manual, [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **From Yaesu Web Control v2.5.4-pre8:** a **WIDTH** you set while the tuner is open is kept for that mode and not undone when it closes, and **AUTO** beside WIDTH goes back to the tuner's own width. IWC keeps the tuner's last Mark and Shift so every window starts from them. A shortcut can open IWC straight on a page, e.g. `Icom_Web_Control.exe rtty-contest`.
+- **From Yaesu Web Control v2.5.4-pre9:** a tuning dial on RTTY Contest, under PWR and WIDTH: the outer ring tunes VFO A in big steps and the inner knob in small ones, each with its own step list. Tune off the edge of a FIXED spectrum and the passband comes back near the other edge, so you carry on tuning the same way.
+- **The tuner starts in the exact RTTY mode you chose**, the other sideband included (RTTY-U to RTTY-L, DATA-U to DATA-L). [§20.9](USER_MANUAL.md#209-what-the-tuner-changes-on-your-radio).
+
+### v1.6.0-pre6 (2026-10-29)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre5, pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** the CW Reader's **Save** button; the RTTY Contest view; and on the Radio panel, popping the CW or RTTY window out and pressing its key again.
+
+- **Save in the CW Reader.** A **Save** button writes the text in the panel to a `.txt` file headed with the UTC time. In Chrome and Edge on the radio's PC it opens a Save dialog in the folder you used last time. For a whole session, IWC already writes every session to a transcript file as it decodes, in `%APPDATA%\MM5AGM\Icom Web Control\CW Transcripts\`. Asked for by diane903 ([Discussion #86](https://github.com/mm5agm/Icom_Web_Control/discussions/86)). User Manual, [§18.5](USER_MANUAL.md#185-the-panel-controls), [§18.9](USER_MANUAL.md#189-transcripts).
+- **RTTY Contest, a GUI for RTTY contesting.** Only what a contest RTTY operator uses, on one screen: the frequency, band keys that land on each band's RTTY spot, the radio's scope over its waterfall, and the RTTY tuner docked at the side with its decoded text. Each part pops out into a window of its own, and named layouts put every window back on its own monitor. Receive only. Pick it from **Views**, or go to `/rtty-contest`. User Manual, [§5.21](USER_MANUAL.md#521-rtty-contest).
+- **Choose your RTTY mode.** Settings → **RTTY mode** is RTTY-L, RTTY-U, DATA-L or DATA-U, and the tuner puts the radio in it and holds it there while it is open. [§6.8](USER_MANUAL.md#68-rtty-tuner).
+- **RTTY fixes from testing:** RTTY-R had the tones the wrong way up; **Auto** no longer changes the radio's RTTY menu shift; **From radio** and **Auto** stay in the tuner heading with **Tones only**; the scope's arms no longer lean when on tune.
+- **Radio panel:** a popped-out CW or RTTY window is no longer drawn a second time on the panel when you press its key; the key brings the window to the front. The duplicate ⇱ inside those windows has gone (use **⇱ WINDOW**), the panel close **×** is red, and the version is shown. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+
+### v1.6.0-pre5 (2026-10-26)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre4, pre3, pre2 and pre1 below.
+>
+> **What needs testing:** the **Views** list, and IWC starting in the view you used last; and on an IC-7300MK2, saving the radio's menu to a file and loading it back.
+
+- **One Views list on every page.** Classic, Experimental and Radio are now picked from a **Views** list in the top bar, the same on all three, with the one you are on highlighted. IWC starts in the view you opened last. User Manual, [§5.1](USER_MANUAL.md#51-top-bar).
+- **A Menu on the Experimental UI.** Settings, Memories, the manual and the other pages are under **Menu**, each opening in a new tab so the workspace keeps running behind it. The Radio panel's **MENU** key lists the same pages. On the Classic page they stay as links along the top bar, which a screen reader now announces as **Site pages**.
+- **Save the radio's own menu to a file, and load it back (IC-7300MK2).** In Settings, **Radio Menu**: **Save radio menu to file** reads all 270 items of the radio's SET menu into an `.ini` file that reads in Notepad. **Change radio settings…** changes items one at a time. **Load this one** shows what a saved file would change and sends only the items you tick, reading each one back. Items that affect transmitting start unticked, and the CI-V, network, date and time items are never loaded. This is not the same as **Backup & Restore**, which saves IWC's own settings; the manual has a table of the differences. User Manual, [§6.6](USER_MANUAL.md#66-backup--restore).
+- **Export full backup saves into a Backups folder**, `%APPDATA%\MM5AGM\Icom Web Control\Backups`, and the page has **Open that folder** and **Download a copy**.
+- **Fixed: a radio reply that started with an extra FE byte was thrown away.** IWC read the extra byte as the address, decided the reply was not for it, and the command timed out. It now ignores any extra FEs before a reply.
+
+### v1.6.0-pre4 (2026-10-23)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre3, pre2 and pre1 below.
+>
+> **What needs testing:** the pop-out spectrum window: clicking and turning the mouse wheel on it, and the watch pane with X-Watch on and the VFOs on different bands.
+
+- **The pop-out spectrum window tunes like the Radio panel.** Click it to tune there, and turn the mouse wheel to move the dial by the panel's **STEP** a notch. A line and a readout follow the mouse and show the frequency a click would send. Each pane has the panel's **SCOPE** settings beside **HOLD**, the window can be resized from its corner, and the text is larger and readable in every theme. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+- **The cross-band watch shows its trace without the waterfall.** A watch VFO on another band only gets one scope sweep per X-Watch peek, so its waterfall was a near-empty box. With X-Watch on and the VFOs on different bands, that pane now shows its trace on its own, and in the pop-out window the other pane takes the room. While it waits for the next peek it says **Waiting for data** rather than that it is out of range. The Radio panel's main dial now shows **A** or **B** for the VFO it tunes.
+- **The other VFO's passband has its real width.** The radio only reports the IF width of the VFO in use, so the other VFO's passband was a hairline until you selected it. IWC now learns each filter slot's width per mode, reads it during each cross-band peek, and, with X-Watch on and both VFOs on one band, borrows the receiver once for about a tenth of a second when it can't know it any other way. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+- **The Radio panel's FILTER key shows the slot and its width**, and the labels under the keys are drawn in each key's own colour, so they can be read on the dark keys.
+- **A corner grip scales the Radio panel.** Drag it to any size; the size picker lists it as a percentage and keeps it.
+- **The manual explains the passband shading**: where the shaded passband sits for each mode, and why it can sit above or below the dial. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+- **Fixed: in USB-D and LSB-D the Radio panel drew the passband centred on the dial**, where the pop-out window drew it on the correct side. Both now agree.
+- **Fixed: the readout under the mouse went stale while the dial moved.** With the mouse held still over the spectrum, the readout now keeps showing the frequency under it as the trace moves, on the Radio panel and in the pop-out window.
+- **Fixed: a pop-out window on a screen too short for it never kept its size**, and opened at the default size every time, which didn't fit either. It now keeps the size you gave it.
+
+### v1.6.0-pre3 (2026-10-22)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre2 and v1.6.0-pre1 below.
+>
+> **What needs testing:** the X-Watch key with pseudo-dual on, especially switching it off and on during a QSO.
+
+- **An X-Watch key switches cross-band watch, so the peek no longer chops a QSO.** With pseudo-dual on and VFO B on another band, IWC briefly retunes the receiver every few seconds to refresh the watch panel, and your audio dips each time. Switching that off used to mean a trip to Settings. Now there is an **X-Watch** key beside the **Listening** badge on the Classic page, on whichever panel you are hearing, and an **X-WATCH** key on the Radio panel. One click stops the peek within about a second, and another starts it again. The key shows the interval in use, such as **X-Watch 15 s**, or **X-Watch Off**. User Manual, [§5.4](USER_MANUAL.md#54-spectrum-display) and [§5.20](USER_MANUAL.md#520-radio-panel).
+- **The peek interval is on the X-Watch key, and both settings have left Settings.** The arrow beside **X-Watch** (or the **X-WATCH** list on the Radio panel) offers 5 s to 60 s. **Allow cross-band watch** and **Cross-band peek interval** are no longer in Settings, and the values you had are kept.
+- **With X-Watch off, the useless watch panel is hidden.** With cross-band watch off and the VFOs on different bands, the watch panel could only say *This VFO is outside the scope span*. Now only the VFO you are hearing is shown, on the Classic page, the Radio panel and its pop-out spectrum window. The watch panel comes back when you switch X-Watch on or put both VFOs on one band, and your own choice of view is kept. Same-band watch is unaffected.
+- **Fixed: cross-band watch never ran from the Radio panel.** The watch spectrum on the Radio panel stayed at *off-screen* unless a Classic page happened to be open as well. It now refreshes from the Radio panel and its spectrum window too.
+
+### v1.6.0-pre2 (2026-10-20)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build. It includes everything in v1.6.0-pre1 below.
+>
+> **What needs testing:** voice control from the Radio panel.
+
+- **The Radio panel has a VOICE key for voice control.** Until now the only way to use voice control was the mic button on the Classic page. With voice control switched on, the Radio panel has a **VOICE** key next to **MONI**. Hold it down while you speak a command and let go when you have finished; the command works on the selected VFO. While it listens the key lights and shows **LISTENING**, then shows what it heard. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+
+### v1.6.0-pre1 (2026-10-20)
+
+> **A pre-release.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The ⬇ Download link at the top of this README still points at v1.5.0, which is the current full release, so you have to go to the releases page for this build.
+>
+> **What needs testing:** the Experimental UI's new panels on your own radio. Please report anything that works on the Classic page but not here, and say which page you were on.
+
+- **The Experimental UI gets Fabio Valente's (CR7CDC) dark look from Yaesu Web Control.** In v1.5.0, **Experimental UI** showed the light Classic controls in dock panels. It is now dark, and the panels are rebuilt the way Fabio laid them out for YWC:
+  - The toolbar is a strip across the top.
+  - **Levels** has POWER, MIC, PROC and MONI keys.
+  - **VFO Actions** has A↔B, B→A, A→B, Split and +5k.
+  - **Buttons** has ATU, Tune, FM Rep, VOX and the keys that open the CW, RTTY, DX and Voice panels.
+  - **Linear Meters** shows PWR, SWR, COMP, ALC, IDD and VDD as bars beside the Spectrum.
+  - **VFO A** and **VFO B** are three-column cards, each with a bar S-meter.
+
+  They are still the Classic page's own controls underneath, so they behave as they do there, and the Classic page itself is unchanged. If you rearranged **Default** in v1.5.0, it starts again from the new arrangement. User Manual, [§5.19](USER_MANUAL.md#519-experimental-ui).
+- **Fixed: the VOX and PROC buttons did not follow the radio.** Switching VOX or the speech processor on at the radio, or from another page, left IWC's buttons showing the old state. They now follow the radio, on Classic and in the Experimental UI.
+- **The Windows Security section of this README explains the Defender warning.** Edge and Defender flagged v1.5.0 as `Trojan:Win32/Wacatac.B!ml`, which is a false positive, and it has been reported to Microsoft. That section now explains how to check the download and keep it. This build is unsigned in the same way and may be flagged too.
+
+### v1.5.0 (2026-10-18)
+
+> **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept.
+
+**The headline is three ways to run the radio.** Classic is unchanged and is still where IWC opens; the Experimental UI and the Radio panel are new, and the top bar of each reaches the other two.
+
+- **The Radio panel.** **Radio** in the top bar opens the IC-7300 laid out like the front of a transceiver, at `/radio`: meter and keys down the left, VFO-A and VFO-B over the radio's own band scope, the main dial and the knobs, and windows for CW, RTTY, memories, DX spots, meters and receive setup that drag, resize, tear off and pop out onto a second screen. **M▸VFO** and **VFO▸M** work with the radio's own 99 memory channels, the CW keyer's speed and pitch step with the mouse wheel, and there are six colour themes, including Night (red) for operating in the dark. It is the panel from Yaesu Web Control, shared between the two apps. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+
+- **The Experimental UI.** The main page as a workspace of panels — Toolbar, Clarifier, Meters, Spectrum, VFO A and VFO B — that you can drag, dock side by side or as tabs, resize, hide and pop out, with named layouts saved in IWC. It is the Classic page's own controls rearranged, not a copy, so everything behaves as it does there. The workspace is Fabio Valente's (CR7CDC), from Yaesu Web Control. User Manual, [§5.19](USER_MANUAL.md#519-experimental-ui).
+
+- **The RTTY panel decodes.** What was the RTTY Tuner is now one **RTTY** panel: the crossed-ellipse tuner beside a **Decode** pane printing the text. **Auto** listens for four seconds and reports the shift and speed it actually measured — not the nearest entry on the radio's short list — and refuses rather than guesses when what it heard does not add up; when it is confident it tunes the signal in. The panel sets the radio up for RTTY and puts your mode and filter back when you close it, and **RTTY Contest Mode** in Settings leaves just the tuner for use beside a logger. **Send** is greyed out and does not transmit. User Manual, [§20](USER_MANUAL.md#20-rtty).
+
+- **CW Auto, and a CW Reader that prints less junk.** **Auto** in the CW Reader moves the dial so the station you are hearing sits on your pitch and sets the filter for the speed it is sending, through Reader Mode so **Stop** puts your filter back. The reader also splits characters the sender ran together, judges word gaps at the current speed, and no longer prints the stray E, I and T that noise produces between overs. User Manual, [§18.7](USER_MANUAL.md#auto-tune-the-station-in-for-you).
+
+- **Keyboard shortcuts on the main page.** Single keys for tuning, bands, modes, IF width, filter slot, span and the panels, on Classic and the Experimental UI — the same keys as Yaesu Web Control. Press **?** for the list. User Manual, [§13](USER_MANUAL.md#13-keyboard-shortcuts).
+
+- **"Set it up" buttons.** When the CW Reader has no audio device, or the DX Spots list has no cluster, the message now has a button that opens a small window for just that setting, instead of sending you off to find it in Settings. User Manual, [§18.3](USER_MANUAL.md#183-choosing-the-audio-device), [§5.17](USER_MANUAL.md#517-dx-spots-list).
+
+- **A test log you can send me.** **Diagnostics → Start fresh test log**, do the test, then **Download test log**: you get just that test's part of the log, ready to drag into a GitHub issue. User Manual, [§11](USER_MANUAL.md#11-diagnostics).
+
+- **Fixed: closing a pop-out could shut IWC down with the Radio panel still open.** IWC only counted pages that sent a regular "still here" signal, and the Radio panel did not send one — so with the Radio panel open and one pop-out window, closing the pop-out stopped the app 30 seconds later. Every open page now counts.
+
+- **Fixed: the MIC gain slider did not follow a change made elsewhere.** Moving it on the Radio panel, or in another tab, left the Classic and Experimental sliders where they were. They now follow. The IC-7300's own MIC knob still does not reach IWC: nothing reads the radio's mic gain yet.
+
 ### v1.4.0 (2026-10-07)
 
 > **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept.

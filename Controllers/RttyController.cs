@@ -22,6 +22,7 @@ namespace Icom_Web_Control.Controllers
         private readonly RttyAutoService _auto;
         private readonly IRadioController _radio;
         private readonly RadioStateService _state;
+        private readonly ISettingsService _settings;
         private readonly ILogger<RttyController> _logger;
 
         public RttyController(RttyTunerService tuner,
@@ -29,6 +30,7 @@ namespace Icom_Web_Control.Controllers
                               RttyAutoService auto,
                               IRadioController radio,
                               RadioStateService state,
+                              ISettingsService settings,
                               ILogger<RttyController> logger)
         {
             _tuner = tuner;
@@ -36,6 +38,7 @@ namespace Icom_Web_Control.Controllers
             _auto = auto;
             _radio = radio;
             _state = state;
+            _settings = settings;
             _logger = logger;
         }
 
@@ -65,6 +68,7 @@ namespace Icom_Web_Control.Controllers
             {
                 var error = await _tuner.StartAsync(req.MarkHz, req.ShiftHz, req.Reverse, req.Baud, id);
                 if (error != null) return BadRequest(new { error });
+                await KeepTonesAsync(req, id);
                 return Ok(_tuner.Frame(0, id));
             }
             catch (Exception ex)
@@ -72,6 +76,67 @@ namespace Icom_Web_Control.Controllers
                 _logger.LogError(ex, "Failed to start the RTTY tuner");
                 return StatusCode(500, new { error = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// The tones the tuner last ran on, which a tuner opening in any window
+        /// starts from (ApplicationSettings.RttyTunerTones). 204 before the
+        /// tuner has ever run.
+        /// </summary>
+        [HttpGet("tuner/tones")]
+        public async Task<IActionResult> Tones()
+        {
+            var t = (await _settings.GetSettingsAsync()).RttyTunerTones;
+            if (t is null) return NoContent();
+            return Ok(new { markHz = t.MarkHz, shiftHz = t.ShiftHz, reverse = t.Reverse, baud = t.Baud });
+        }
+
+        /// <summary>
+        /// The width in Hz kept for the mode VFO A is in, or null when the
+        /// tuner works it out: what WIDTH's AUTO key shows.
+        /// </summary>
+        [HttpGet("tuner/width")]
+        public async Task<IActionResult> KeptWidth([FromServices] RttyTunerModeService tunerMode)
+        {
+            var (mode, hz) = await tunerMode.KeptWidthNowAsync();
+            return Ok(new { mode, hz });
+        }
+
+        /// <summary>AUTO on WIDTH: forget the kept width, so the tuner sizes the filter again.</summary>
+        [HttpDelete("tuner/width")]
+        public async Task<IActionResult> ForgetWidth([FromServices] RttyTunerModeService tunerMode)
+        {
+            try
+            {
+                return Ok(new { message = await tunerMode.ForgetWidthAsync(HttpContext.RequestAborted) });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to put the RTTY tuner's width back to automatic");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // Keep the tones a start was given, when they are new. Logged with the
+        // page that sent them, so a mark that changes when nobody changed it
+        // can be traced to the window that did it.
+        private async Task KeepTonesAsync(StartRequest req, string? client)
+        {
+            var settings = await _settings.GetSettingsAsync();
+            var was = settings.RttyTunerTones;
+            if (was is not null && was.MarkHz == req.MarkHz && was.ShiftHz == req.ShiftHz
+                && was.Reverse == req.Reverse && was.Baud == req.Baud) return;
+
+            _logger.LogInformation(
+                "RTTY tuner tones now mark {Mark} Hz, shift {Shift} Hz, {Baud} baud{Rev} (were {Was}), from {Page}, client {Client}",
+                req.MarkHz, req.ShiftHz, req.Baud, req.Reverse ? ", reversed" : "",
+                was is null ? "none" : $"{was.MarkHz}/{was.ShiftHz}",
+                Request.Headers.Referer.ToString(), client ?? "shared");
+            settings.RttyTunerTones = new Models.RttyTones
+            {
+                MarkHz = req.MarkHz, ShiftHz = req.ShiftHz, Reverse = req.Reverse, Baud = req.Baud,
+            };
+            await _settings.SaveSettingsAsync(settings);
         }
 
         /// <summary>
@@ -272,10 +337,11 @@ namespace Icom_Web_Control.Controllers
                 var mode = _state.ModeA ?? "";
                 bool fsk = mode.StartsWith("RTTY", StringComparison.OrdinalIgnoreCase);
 
+                // In RTTY-R the tuner's mark is the other end of the menu pair.
                 return Ok(new
                 {
                     ok       = true,
-                    markHz   = tones.MarkHz,
+                    markHz   = RttyTunerModeService.TunerMarkFromMenu(mode, tones.MarkHz, tones.ShiftHz),
                     shiftHz  = tones.ShiftHz,
                     mode,
                     fsk,
@@ -290,6 +356,32 @@ namespace Icom_Web_Control.Controllers
                 _logger.LogError(ex, "Failed to read the radio's RTTY tone settings");
                 return Ok(new { ok = false, reason = ex.Message });
             }
+        }
+
+        public sealed record ModeRequest(string? Mode);
+
+        /// <summary>
+        /// The operator picked an RTTY mode - RTTY-L, RTTY-U, DATA-L or DATA-U -
+        /// and is about to put the radio in it. Saved as the mode the tuner
+        /// switches to and the RTTY Contest band keys use, and handed to a
+        /// running tuner so it holds the new mode rather than putting the old
+        /// one back. Writes nothing to the radio: the page does that next, for
+        /// whichever VFO is on screen. The same route as YWC's.
+        /// </summary>
+        [HttpPost("mode")]
+        public async Task<IActionResult> SetMode([FromBody] ModeRequest? req)
+        {
+            if (RttyTunerModeService.Normalise(req?.Mode) is not { } mode)
+                return BadRequest(new { error = "Mode must be one of " + string.Join(", ", RttyTunerModeService.Modes) + "." });
+
+            var settings = await _settings.GetSettingsAsync();
+            if (settings.RttyTunerMode != mode)
+            {
+                settings.RttyTunerMode = mode;
+                await _settings.SaveSettingsAsync(settings);
+            }
+            await _tuner.ChooseModeAsync(mode, HttpContext.RequestAborted);
+            return Ok(new { mode });
         }
 
         public sealed record RadioTonesRequest(int MarkHz, int ShiftHz);
@@ -327,14 +419,20 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                var w = await _radio.SetRttyToneSettingsAsync(req.MarkHz, req.ShiftHz,
-                                                              HttpContext.RequestAborted);
+                // In RTTY-R the tuner's mark is the top of the menu pair, so the
+                // menu mark is a shift below it, and the reply goes back the same way.
+                var w = await _radio.SetRttyToneSettingsAsync(
+                    RttyTunerModeService.MenuMarkFromTuner(mode, req.MarkHz, req.ShiftHz), req.ShiftHz,
+                    HttpContext.RequestAborted);
+                int? tookMark = w.MarkHz is { } m
+                    ? RttyTunerModeService.TunerMarkFromMenu(mode, m, w.ShiftHz ?? req.ShiftHz)
+                    : null;
                 return Ok(new
                 {
                     ok      = w.MarkHz != null || w.ShiftHz != null,
                     mode,
                     fsk     = true,
-                    markHz  = w.MarkHz,
+                    markHz  = tookMark,
                     shiftHz = w.ShiftHz,
                     reason  = w.MarkHz == null && w.ShiftHz == null
                         ? "The radio has no setting for those tones."

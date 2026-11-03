@@ -62,10 +62,18 @@ export class MeterPanel {
      * The caller is responsible for calibrating and clamping the value
      * to the gauge's display scale before calling update().
      *
+     * A meter with a bar sibling (`<key>Linear`, on /flexui) gets the same
+     * value: each bar is configured on its radial's display scale.
+     *
      * @param {string} key    Logical meter name matching a key in the config
      * @param {number} value  Display-scale value for the gauge needle
      */
     update(key, value) {
+        this._updateOne(key, value);
+        this._updateOne(`${key}Linear`, value);
+    }
+
+    _updateOne(key, value) {
         const gauge = this.gauges[key];
         if (!gauge) return;
         updateGaugeValue(gauge, value);

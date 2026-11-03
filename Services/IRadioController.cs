@@ -604,6 +604,28 @@ namespace Icom_Web_Control.Services
         /// <summary>Clear (blank) memory channel <paramref name="channel"/> (1–99) via CI-V 1A 00 … FF. Returns false if not acknowledged.</summary>
         Task<bool> ClearMemoryChannelAsync(int channel, CancellationToken cancellationToken = default);
 
+        // -- Radio menu save and load (CI-V 1A 05) ------------------------------
+        // The SET menu walked item by item for Settings → Radio Menu. The write
+        // is only for Load and Change radio settings, which check each value
+        // against the menu table first and read it back after.
+
+        /// <summary>
+        /// Read SET-menu item <paramref name="number"/> (1–9999, sent as 1A 05 hi lo
+        /// in BCD) and return the data bytes that follow the item number in the
+        /// reply, or null on a miss or a rejection. Default: no radio, no menu.
+        /// </summary>
+        Task<byte[]?> ReadMenuItemAsync(int number, CancellationToken cancellationToken = default)
+            => Task.FromResult<byte[]?>(null);
+
+        /// <summary>
+        /// Write SET-menu item <paramref name="number"/> as 1A 05 hi lo <paramref name="data"/>.
+        /// True when the radio acknowledged (FB), false when it refused (FA),
+        /// null on no reply or when <paramref name="data"/> is empty, which would
+        /// be a read. Default: no radio, nothing written.
+        /// </summary>
+        Task<bool?> WriteMenuItemAsync(int number, byte[] data, CancellationToken cancellationToken = default)
+            => Task.FromResult<bool?>(null);
+
         // -- Raw command escape hatch ------------------------------------------
         // Every other member above is semantic by design. This one is not, and
         // it exists for exactly one caller: user-defined voice macros (Settings →

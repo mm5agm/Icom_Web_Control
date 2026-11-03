@@ -19,9 +19,14 @@ namespace Icom_Web_Control.Services
         /// <summary>Convenience: e.g. <c>http://localhost:8080</c>.</summary>
         public string RootUrl => $"http://localhost:{Port}";
 
-        public HttpPortInfo(int port)
+        /// <summary>The HTTPS port, when HTTPS is on and listening (Settings, with a certificate).</summary>
+        public int? HttpsPort { get; }
+        public bool HttpsActive => HttpsPort is not null;
+
+        public HttpPortInfo(int port, int? httpsPort = null)
         {
             Port = port;
+            HttpsPort = httpsPort;
         }
     }
 }

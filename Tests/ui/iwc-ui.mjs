@@ -528,6 +528,19 @@ test('/radio: live state reaches the VFO box', async () => {
     } finally { await page.close(); }
 });
 
+test('/radio: FILTER key shows the slot and its width', async () => {
+    const page = await radioPage();
+    try {
+        const sub = () => page.eval(`[...document.querySelectorAll('.rp-gkeys button')].find(b => /FILTER/.test(b.textContent))?.querySelector('.rp-sub')?.textContent ?? 'no key'`);
+        let t = await sub();
+        expect(/FIL1/.test(t) && /2\.4 kHz/.test(t), `FILTER key says "${t}"`);
+        await page.state('SelectedFilterA', '2');
+        await page.state('IfWidthA', '3600');
+        t = await sub();
+        expect(/FIL2/.test(t) && /3\.6 kHz/.test(t), `after FIL2 the key says "${t}"`);
+    } finally { await page.close(); }
+});
+
 test('/radio: band, mode and receiver keys send IWC bodies', async () => {
     const page = await radioPage();
     try {
@@ -589,6 +602,189 @@ test('/radio: scope frames light the lamp and are drawn', async () => {
         for (let i = 0; i < 5; i++) await page.state('SpectrumUpdate', { sdrId: 'A', bins, centreHz: 14_074_000, spanHz: 50_000, mode: 'Center' });
         const lamp = await page.eval(`[...document.querySelectorAll('.rp-lamp')].map(l => l.parentElement.textContent.trim() + ':' + l.className)`);
         expect(lamp.some(l => /SCOPE:.*\bon\b/.test(l)), `lamps: ${lamp.join(', ')}`);
+    } finally { await page.close(); }
+});
+
+// The cross-band peek only runs while some page reports the watch pane on
+// screen; the board must report its spectrum tab, not only Classic.
+test('/radio: the spectrum tabs tell the hub which panes are on screen', async () => {
+    const page = await radioPage();
+    try {
+        await page.eval(`(() => {
+            const conn = __rwcTest.handlers.find(h => h.name === 'radiostateupdate').conn;
+            const invoke = conn.invoke;
+            window.__panes = [];
+            conn.invoke = function (name, ...args) {
+                if (name === 'SpectrumPanels') window.__panes.push(args.join(','));
+                return invoke.call(this, name, ...args);
+            };
+        })()`);
+        const last = () => page.eval(`window.__panes[window.__panes.length - 1] ?? ''`);
+        for (const [tab, want] of [['VFO-B', 'false,true'], ['Both', 'true,true'], ['VFO-A', 'true,false']]) {
+            await clickButton(page, '.rp-viewtabs', tab);
+            await sleep(1500);
+            const got = await last();
+            expect(got === want, `${tab} tab reported SpectrumPanels(${got}), want (${want})`);
+        }
+    } finally { await page.close(); }
+});
+
+// X-WATCH / X-Watch: cross-band watch and its peek interval, which are no
+// longer in Settings. Only there with pseudo-dual on in Settings.
+const XW_ON = { enabled: true, intervalSeconds: 15 }, XW_OFF = { enabled: false, intervalSeconds: 15 };
+test('/radio: X-WATCH lists Off and the peek intervals and sets them', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        await page.state('CrossBandWatch', XW_ON);
+        const sub = await page.eval(`[...document.querySelectorAll('.rp-keys button')].find(b => b.textContent.startsWith('X-WATCH')).textContent`);
+        expect(/15 s/.test(sub), `the key says "${sub}" with it on at 15 s`);
+        for (const [item, want] of [['Off', { enabled: false }], ['30 s', { enabled: true, intervalSeconds: 30 }]]) {
+            await page.clearWrites();
+            await clickButton(page, '.rp-keys', 'X-WATCH');
+            await clickButton(page, '.rp-keylist', item);
+            const w = writesTo(await page.writes(), '/api/radio/crossband-watch');
+            expect(w.length === 1 && JSON.stringify(w[0].body) === JSON.stringify(want), `${item} wrote ${JSON.stringify(w)}, want ${JSON.stringify(want)}`);
+        }
+    } finally { await page.close(); }
+});
+
+test('/radio: with X-WATCH off and the VFOs on different bands, only the heard VFO shows', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        const view = () => page.eval(`[...document.querySelectorAll('.rp-viewtab.on')].map(t => t.textContent).join()`);
+        await page.state('CrossBandWatch', XW_ON);
+        await page.state('BandB', '6m');
+        await clickButton(page, '.rp-viewtabs', 'Both');
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(/VFO-A/.test(await view()), `with it off, the spectrum tab is "${await view()}", want VFO-A`);
+        await page.state('CrossBandWatch', XW_ON);
+        expect(/Both|both/.test(await view()), `with it back on, the spectrum tab is "${await view()}", want Both`);
+        // Same band: the watch costs nothing, so it stays.
+        await page.state('CrossBandWatch', XW_OFF);
+        await page.state('BandB', '20m');
+        expect(/Both|both/.test(await view()), `on one band, the spectrum tab is "${await view()}", want Both`);
+    } finally { await page.close(); }
+});
+
+// The watch VFO gets one frame per peek, on one band or two, so its waterfall
+// would crawl: the trace is shown without it.
+test('/radio: the watch VFO shows its trace without the waterfall', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        const bare = () => page.eval(`['A', 'B'].filter(v => document.querySelector('.rp-specpane-' + v)?.classList.contains('no-wf')).join()`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('CrossBandWatch', XW_ON);
+        await page.state('BandB', '6m');
+        await clickButton(page, '.rp-viewtabs', 'Both');
+        expect(await bare() === 'B', `X-WATCH on, two bands: no waterfall on "${await bare()}", want B`);
+        await page.state('ActiveVfo', 1);
+        expect(await bare() === 'A', `listening on B: no waterfall on "${await bare()}", want A`);
+        // One band too: the peeks still refresh it, so it would still crawl.
+        await page.state('BandB', '20m');
+        expect(await bare() === 'A', `one band: no waterfall on "${await bare()}", want A`);
+        await page.state('ActiveVfo', 0);
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(await bare() === 'B', `X-WATCH off, one band: no waterfall on "${await bare()}", want B`);
+        await page.state('BandB', '6m');
+    } finally { await page.close(); }
+});
+
+test('/radio: out of range with X-WATCH on says Waiting for data', async note => {
+    const page = await radioPage();
+    try {
+        const has = await page.eval(`[...document.querySelectorAll('.rp-keys button')].some(b => b.textContent.startsWith('X-WATCH'))`);
+        if (!has) { note('no X-WATCH key: pseudo-dual is off in Settings'); return; }
+        const msg = () => page.eval(`document.querySelector('.rp-specpane-B .rp-spec-empty')?.textContent ?? 'none'`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('BandB', '20m');
+        await page.state('SdrStatus', { sdrId: 'B', status: 'outofrange' });
+        await page.state('CrossBandWatch', XW_ON);
+        expect(await msg() === 'Waiting for data', `X-WATCH on after the status: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(/outside the scope span/.test(await msg()), `X-WATCH off: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_ON);
+    } finally { await page.close(); }
+});
+
+test('Index: X-Watch switches cross-band watch, lists intervals, sits beside Listening', async note => {
+    const page = await open('/', { settleMs: 2000 });
+    try {
+        const shown = await page.eval(`(document.getElementById('crossBandWatchGroup')?.style.display ?? 'none') !== 'none'`);
+        if (!shown) { note('no X-Watch key: pseudo-dual is off in Settings'); return; }
+        const key = () => text(page, '#crossBandWatchBtn');
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(await key() === 'X-Watch Off', `key says "${await key()}" with it off`);
+        await page.clearWrites();
+        await page.eval(`document.getElementById('crossBandWatchBtn').click()`);
+        let w = writesTo(await page.writes(), '/api/radio/crossband-watch');
+        expect(w.length === 1 && w[0].body.enabled === true, `X-Watch wrote ${JSON.stringify(w)}`);
+        expect(await key() === 'X-Watch 15 s', `key says "${await key()}" after the click`);
+        await page.clearWrites();
+        await page.eval(`[...document.querySelectorAll('#crossBandWatchIntervals button')].find(b => b.dataset.sec === '45').click()`);
+        w = writesTo(await page.writes(), '/api/radio/crossband-watch');
+        expect(w.length === 1 && w[0].body.intervalSeconds === 45, `Peek every 45 s wrote ${JSON.stringify(w)}`);
+        for (const vfo of [1, 0]) {
+            await page.state('ActiveVfo', vfo);
+            const where = await page.eval(`document.getElementById('crossBandWatchGroup').previousElementSibling?.dataset.vfo`);
+            expect(where === (vfo ? 'B' : 'A'), `listening on ${vfo ? 'B' : 'A'}, X-Watch is beside panel ${where}`);
+        }
+        await page.state('BandA', '20m');
+        await page.state('BandB', '6m');
+        await page.state('CrossBandWatch', XW_OFF);
+        expect(await page.eval(`window.__iwcWatchCollapse()`) === true, 'off, on two bands: the watch panel is not collapsed');
+        await page.state('CrossBandWatch', XW_ON);
+        expect(await page.eval(`window.__iwcWatchCollapse()`) === false, 'on: the watch panel is still collapsed');
+        expect(await page.eval(`window.__iwcWatchPeeks()`) === true, 'on, on two bands: the watch is not peeked');
+        await page.state('BandB', '20m');
+        expect(await page.eval(`window.__iwcWatchPeeks()`) === true, 'on, one band: the watch panel has its waterfall back');
+    } finally { await page.close(); }
+});
+
+test('/radio: the main dial says which VFO it tunes, in the colour of that VFO', async () => {
+    const page = await radioPage();
+    try {
+        const tag = () => page.eval(`(() => { const t = document.querySelector('.rp-dial-vfo'); return t ? t.textContent + ' ' + getComputedStyle(t).color : 'none'; })()`);
+        await page.state('ActiveVfo', 0);
+        const a = await tag();
+        expect(a.startsWith('A '), `listening on A, the dial says "${a}"`);
+        await page.state('ActiveVfo', 1);
+        const b = await tag();
+        expect(b.startsWith('B '), `listening on B, the dial says "${b}"`);
+        expect(a.slice(2) !== b.slice(2), `A and B are the same colour (${a.slice(2)})`);
+        await page.state('ActiveVfo', 0);
+    } finally { await page.close(); }
+});
+
+test('/radio: the corner grip scales the board and keeps the size', async () => {
+    const page = await radioPage();
+    try {
+        const got = await page.eval(`(() => {
+            const g = document.querySelector('.rp-board-grip'), sizer = document.querySelector('.rp-sizer');
+            if (!g) return 'no grip';
+            const sel = [...document.querySelectorAll('select.rp-select')].find(s => s.title === 'Size');
+            const before = sizer.getBoundingClientRect();
+            const ev = (type, x, y) => g.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, clientX: x, clientY: y }));
+            ev('pointerdown', before.right - 5, before.bottom - 5);
+            ev('pointermove', before.right - 5, before.top + before.height * 0.6);
+            ev('pointerup', 0, 0);
+            const after = sizer.getBoundingClientRect();
+            const size = sel.value, opt = sel.selectedOptions[0]?.textContent;
+            return JSON.stringify({ shrank: after.height < before.height * 0.8, ratio: Math.abs(after.width / after.height - before.width / before.height) < 0.02,
+                size, opt, saved: localStorage.getItem('iwc.radioPanel.size') });
+        })()`);
+        const r = JSON.parse(got.startsWith('{') ? got : '{}');
+        expect(got.startsWith('{'), got);
+        expect(r.shrank && r.ratio, `the board did not shrink in shape: ${got}`);
+        expect(/^\d+$/.test(r.size) && r.opt === r.size + '%' && r.saved === r.size, `the size picker and store say ${got}`);
+        await page.eval(`localStorage.setItem('iwc.radioPanel.size', 'fit')`);
     } finally { await page.close(); }
 });
 
@@ -721,6 +917,27 @@ test('/radio: has no key that transmits, and nothing clicked here wrote one', as
     } finally { await page.close(); }
 });
 
+test('/radio: VOICE key listens while held and shows what the recogniser is doing', async note => {
+    const page = await radioPage();
+    try {
+        const sel = `[...document.querySelectorAll('button.rp-key')].find(b => b.textContent.includes('VOICE'))`;
+        if (!await page.eval(`!!${sel}`)) { note('voice control is off in this install, so there is no VOICE key'); return; }
+        const press = type => page.eval(`${sel}.dispatchEvent(new PointerEvent('${type}', { bubbles: true, button: 0, pointerId: 1 }))`);
+        const look = () => page.eval(`(() => { const b = ${sel}; return b.querySelector('.rp-led').className + '|' + b.querySelector('.rp-sub').textContent; })()`);
+        const voice = state => page.emit('VoiceStatusUpdate', { state, lastHeard: null, lastIntent: null, errorMessage: null, vfo: 'A' });
+        await press('pointerdown');
+        expect(writesTo(await page.writes(), '/api/voice/').map(w => w.path).join() === '/api/voice/start?vfo=A',
+            `press sent ${JSON.stringify(await page.writes())}`);
+        await voice('Listening');
+        expect(await look() === 'rp-led on|LISTENING', `while listening the key shows "${await look()}"`);
+        await press('pointerup');
+        const paths = writesTo(await page.writes(), '/api/voice/').map(w => w.path);
+        expect(paths.join() === '/api/voice/start?vfo=A,/api/voice/stop', `press and release sent ${paths.join(', ')}`);
+        await voice('Idle');
+        expect(await look() === 'rp-led|', `back at idle the key shows "${await look()}"`);
+    } finally { await page.close(); }
+});
+
 test('/radio: band keys and mode keys each sit on one line, labels not clipped', async () => {
     const page = await radioPage();
     try {
@@ -733,6 +950,33 @@ test('/radio: band keys and mode keys each sit on one line, labels not clipped',
             expect(r.n > 0 && r.tops === 1, `${row}: ${r.n} keys on ${r.tops} lines`);
             expect(r.clipped.length === 0, `${row}: clipped labels ${r.clipped.join(', ')}`);
         }
+    } finally { await page.close(); }
+});
+
+test('/radio: the mode key lights for the mode in use, labelled or not', async () => {
+    const page = await radioPage();
+    try {
+        for (const [mode, label] of [['DATA-U', 'USB-D'], ['DATA-L', 'LSB-D'], ['CW-U', 'CW'], ['CW-L', 'CW-R'],
+            ['RTTY-L', 'RTTY'], ['RTTY-U', 'RTTY-R'], ['USB', 'USB'], ['AM', 'AM']]) {
+            await modeA(page, mode);
+            const lit = await page.eval(`[...document.querySelectorAll('.rp-modes button.on')].map(b => b.textContent).join(',')`);
+            expect(lit === label, `${mode}: lit keys "${lit}", want "${label}"`);
+        }
+    } finally { await page.close(); }
+});
+
+test('/radio: the segment chip follows the frequency wheel', async () => {
+    const page = await radioPage();
+    try {
+        const seg = () => page.eval(`[...document.querySelectorAll('.rp-chips')[0].children].map(c => c.textContent).find(t => t.startsWith('SEG')) ?? ''`);
+        expect(await seg() === 'SEG FT8', `on 14.074 the chip says "${await seg()}"`);
+        // Down one 10 kHz digit to 14.064, in the CW segment. The radio's echo
+        // lands while the wheel holds it off, so the chip has to follow the
+        // wheel itself.
+        await page.eval(`document.querySelector('.rp-freq [data-step="10000"]').dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true }))`);
+        await page.state('FrequencyA', 14_064_000);
+        await sleep(100);
+        expect(await seg() === 'SEG CW', `on 14.064 the chip says "${await seg()}"`);
     } finally { await page.close(); }
 });
 
@@ -856,6 +1100,206 @@ test('/RadioSpectrum: span picker sets the radio scope span (half-width)', async
     } finally { await page.close(); }
 });
 
+test('/RadioSpectrum: a click tunes there, and the readout names it first', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        await page.state('FrequencyA', 14_074_000);
+        const bins = Array.from({ length: 475 }, () => -110);
+        await page.state('SpectrumUpdate', { sdrId: 'A', bins, centreHz: 14_074_000, spanHz: 10_000, mode: 'Center' });
+        // Three quarters of the way across a 10 kHz span on 14.074 is 14.0765.
+        const read = await page.eval(`(() => {
+            const el = document.querySelector('[data-pane="A"] .rp-spectrum');
+            const rc = el.getBoundingClientRect(), x = rc.left + rc.width * 0.75, y = rc.top + rc.height / 2;
+            el.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: x, clientY: y }));
+            const t = el.querySelector('.rp-xread').textContent;
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y }));
+            return t;
+        })()`);
+        expect(read === '14.076.500', `the readout said "${read}"`);
+        await sleep(300);
+        const w = writesTo(await page.writes(), '/api/cat/frequency/a');
+        expect(w.length === 1 && w[0].body?.frequencyHz === 14_076_500, `frequency wrote ${JSON.stringify(w)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: the mouse wheel steps the dial by the board STEP', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        await page.state('FrequencyA', 12_000_550);
+        const bins = Array.from({ length: 475 }, () => -110);
+        await page.state('SpectrumUpdate', { sdrId: 'A', bins, centreHz: 12_000_550, spanHz: 10_000, mode: 'Center' });
+        await page.eval(`localStorage.setItem('iwc.radioPanel.stepHz', '1000')`);
+        // Off the bands, so no DX spot is near to snap to. The pointer stays
+        // mid-pane: the readout follows the trace as it slides.
+        const reads = await page.eval(`(() => {
+            const el = document.querySelector('[data-pane="A"] .rp-spectrum');
+            const rc = el.getBoundingClientRect(), x = rc.left + rc.width / 2, y = rc.top + rc.height / 2;
+            el.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: x, clientY: y }));
+            const before = el.querySelector('.rp-xread').textContent;
+            el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: x, clientY: y, deltaY: -100 }));
+            return [before, el.querySelector('.rp-xread').textContent];
+        })()`);
+        expect(reads[0] === '12.000.550' && reads[1] === '12.001.000', `the readout said ${JSON.stringify(reads)}`);
+        await sleep(300);
+        let w = writesTo(await page.writes(), '/api/cat/frequency/a');
+        expect(w.length === 1 && w[0].body?.frequencyHz === 12_001_000, `a notch up wrote ${JSON.stringify(w)}`);
+        await page.eval(`(() => {
+            const el = document.querySelector('[data-pane="A"] .rp-waterfall');
+            el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 100 }));
+        })()`);
+        await sleep(300);
+        w = writesTo(await page.writes(), '/api/cat/frequency/a');
+        expect(w.length === 2 && w[1].body?.frequencyHz === 12_000_000, `a notch down wrote ${JSON.stringify(w)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.eval(`localStorage.removeItem('iwc.radioPanel.stepHz')`).catch(() => {}); await page.close(); }
+});
+
+test('/RadioSpectrum: with X-WATCH off and the VFOs on different bands, only the heard VFO shows', async note => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        const shown = () => page.eval(`[...document.querySelectorAll('.rp-spop-body [data-pane]')].filter(h => h.style.display !== 'none').map(h => h.dataset.pane).join()`);
+        await page.eval(`[...document.querySelectorAll('.rp-spop-tab')].find(t => /both/i.test(t.textContent))?.click()`);
+        if (await shown() !== 'A,B') { note(`no Both view (${await shown()}): pseudo-dual is off in Settings`); return; }
+        await page.state('ActiveVfo', 0);
+        await page.state('CrossBandWatch', { enabled: true, intervalSeconds: 15 });
+        await page.state('BandA', '20m');
+        await page.state('BandB', '6m');
+        expect(await shown() === 'A,B', `X-WATCH on: panes ${await shown()}, want A,B`);
+        await page.state('CrossBandWatch', { enabled: false, intervalSeconds: 15 });
+        expect(await shown() === 'A', `X-WATCH off, two bands: panes ${await shown()}, want A`);
+        await page.state('ActiveVfo', 1);
+        expect(await shown() === 'B', `listening on B: panes ${await shown()}, want B`);
+        await page.state('CrossBandWatch', { enabled: true, intervalSeconds: 15 });
+        expect(await shown() === 'A,B', `X-WATCH back on: panes ${await shown()}, want A,B`);
+        await page.state('CrossBandWatch', { enabled: false, intervalSeconds: 15 });
+        await page.state('BandB', '20m');
+        expect(await shown() === 'A,B', `one band: panes ${await shown()}, want A,B`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: the watch pane shows its trace without the waterfall', async note => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        await page.eval(`[...document.querySelectorAll('.rp-spop-tab')].find(t => /both/i.test(t.textContent))?.click()`);
+        const shown = await page.eval(`[...document.querySelectorAll('.rp-spop-body [data-pane]')].filter(h => h.style.display !== 'none').map(h => h.dataset.pane).join()`);
+        if (shown !== 'A,B') { note(`no Both view (${shown}): pseudo-dual is off in Settings`); return; }
+        const bare = () => page.eval(`['A', 'B'].filter(v => document.querySelector('.rp-spop-body [data-pane="' + v + '"] .rp-pane')?.classList.contains('no-wf')).join()`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('CrossBandWatch', XW_ON);
+        await page.state('BandB', '6m');
+        expect(await bare() === 'B', `X-WATCH on, two bands: no waterfall on "${await bare()}", want B`);
+        // It gives up the room its waterfall had, rather than a tall empty trace.
+        const tall = v => page.eval(`document.querySelector('.rp-spop-body [data-pane="${v}"]').getBoundingClientRect().height`);
+        expect(await tall('B') < (await tall('A')) * 0.6, `the trace-only pane is ${await tall('B')}px high beside ${await tall('A')}px`);
+        await page.state('ActiveVfo', 1);
+        expect(await bare() === 'A', `listening on B: no waterfall on "${await bare()}", want A`);
+        await page.state('BandB', '20m');
+        expect(await bare() === 'A', `one band: no waterfall on "${await bare()}", want A`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: out of range with X-WATCH on says Waiting for data', async note => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        await page.waitFor('__rwcTest.handlers.some(h => h.name === "radiostateupdate")', { what: 'the spectrum hub handler' });
+        await page.eval(`[...document.querySelectorAll('.rp-spop-tab')].find(t => /both/i.test(t.textContent))?.click()`);
+        const shown = await page.eval(`[...document.querySelectorAll('.rp-spop-body [data-pane]')].filter(h => h.style.display !== 'none').map(h => h.dataset.pane).join()`);
+        if (shown !== 'A,B') { note(`no Both view (${shown}): pseudo-dual is off in Settings`); return; }
+        const msg = () => page.eval(`document.querySelector('.rp-spop-body [data-pane="B"] .rp-spec-empty')?.textContent ?? 'none'`);
+        await page.state('ActiveVfo', 0);
+        await page.state('BandA', '20m');
+        await page.state('BandB', '20m');
+        await page.state('CrossBandWatch', XW_OFF);
+        await page.state('SdrStatus', { sdrId: 'B', status: 'outofrange' });
+        expect(/outside the scope span/.test(await msg()), `X-WATCH off: B says "${await msg()}"`);
+        await page.state('CrossBandWatch', XW_ON);
+        expect(await msg() === 'Waiting for data', `X-WATCH on: B says "${await msg()}"`);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: the corner grip resizes the window', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const got = await page.eval(`(() => {
+            const g = document.querySelector('.rp-spop-grip');
+            if (!g) return 'no grip';
+            const r = g.getBoundingClientRect();
+            if (Math.abs(r.right - innerWidth) > 1 || Math.abs(r.bottom - innerHeight) > 1) return 'grip at ' + r.right + ',' + r.bottom;
+            let to = null;
+            window.resizeTo = (w, h) => { to = [w, h]; };
+            g.setPointerCapture = () => {};
+            const ev = (type, x, y) => g.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, screenX: x, screenY: y }));
+            ev('pointerdown', 500, 500); ev('pointermove', 560, 470); ev('pointerup', 560, 470);
+            const want = [outerWidth + 60, Math.max(300, outerHeight - 30)];
+            ev('pointermove', 900, 900);
+            return to && to[0] === want[0] && to[1] === want[1] ? 'ok' : 'resizeTo ' + JSON.stringify(to) + ', want ' + JSON.stringify(want);
+        })()`);
+        expect(got === 'ok', got);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: SCOPE opens Range and the rest, saved for the board', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const got = await page.eval(`(() => {
+            const pane = document.querySelector('.rp-spop-body [data-pane="A"] .rp-pane');
+            const key = pane && [...pane.querySelectorAll('.rp-spop-key')].find(b => b.textContent === 'SCOPE');
+            if (!key) return 'no SCOPE key';
+            const sets = pane.querySelector('.rp-spec-settings');
+            if (getComputedStyle(sets).display !== 'none') return 'panel open before the click';
+            key.click();
+            if (getComputedStyle(sets).display === 'none' || !key.classList.contains('on')) return 'panel did not open';
+            const r = sets.querySelector('input[data-set=range]');
+            r.value = '42'; r.dispatchEvent(new Event('input'));
+            const saved = JSON.parse(localStorage.getItem('iwc.radioPanel.spectrum.A') ?? '{}');
+            if (saved.range !== 42) return 'saved ' + JSON.stringify(saved);
+            if (r.closest('.rp-spec-row').querySelector('.rp-spec-val').textContent !== '42 dB') return 'readout not 42 dB';
+            const untitled = [...sets.querySelectorAll('.rp-spec-row')].filter(x => !x.title).map(x => x.textContent);
+            if (untitled.length) return 'no tooltip: ' + untitled.join();
+            key.click();
+            return getComputedStyle(sets).display === 'none' ? 'ok' : 'panel did not close';
+        })()`);
+        expect(got === 'ok', got);
+    } finally { await page.close(); }
+});
+
+test('/RadioSpectrum: pane text is screen colour on the screen, in every theme', async () => {
+    const page = await open('/RadioSpectrum', { settleMs: 1500 });
+    try {
+        const bad = await page.eval(`(async () => {
+            const { THEMES, applyTheme } = await import('/js/radio-panel/radio-panel-themes.js');
+            const rgb = c => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+            const lum = c => { const [r, g, b] = rgb(c).map(x => x / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126 * r + .7152 * g + .0722 * b; };
+            const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+            const root = document.querySelector('.rp-spop');
+            const pane = root.querySelector('.rp-pane');
+            const out = [];
+            for (const id of Object.keys(THEMES)) {
+                if (id === 'night') continue; // dim on purpose
+                applyTheme(root, id);
+                const bg = getComputedStyle(pane).backgroundColor;
+                for (const sel of ['.rp-pane-label', '.rp-axis']) {
+                    const k = ratio(getComputedStyle(pane.querySelector(sel)).color, bg);
+                    if (k < 4.5) out.push(id + ' ' + sel + ' ' + k.toFixed(1));
+                }
+                const sets = pane.querySelector('.rp-spec-settings');
+                const k = ratio(getComputedStyle(sets).color, getComputedStyle(sets).backgroundColor);
+                if (k < 4.5) out.push(id + ' SCOPE panel ' + k.toFixed(1));
+            }
+            return out.join('; ');
+        })()`);
+        expect(!bad, bad);
+    } finally { await page.close(); }
+});
+
 // ---------------------------------------------------------------- Experimental UI (/flexui)
 
 // /flexui is Index moved into the shared dock (core/js/flex). These check the
@@ -871,10 +1315,10 @@ const openFlex = async () => {
 test('flexui: every section is docked, with gauges sized', async () => {
     const page = await openFlex();
     try {
-        for (const c of ['toolbar', 'meters', 'spectrum', 'vfoA', 'vfoB']) {
+        for (const c of ['vfoActions', 'meters', 'spectrum', 'vfoA', 'vfoB']) {
             expect(await flexWhere(page, c) === 'docked', `${c} is ${await flexWhere(page, c)}, not docked`);
         }
-        expect(await flexWhere(page, 'clarifier') === 'docked', 'clarifier is not in the dock (it is a tab behind Toolbar)');
+        expect(await flexWhere(page, 'clarifier') === 'docked', 'clarifier is not in the dock');
         expect(!await page.eval(`document.body.classList.contains('iwc-flex-pending')`), 'the page is still marked pending');
         const unsized = await page.eval(`[...document.querySelectorAll('#ywcFlexHost [data-ywc-component="meters"] canvas')].filter(c => !c.width || !c.height).map(c => c.id)`);
         expect(unsized.length === 0, `meter canvases with no size: ${unsized.join(', ')}`);
@@ -937,6 +1381,206 @@ test('Index: MIC gain slider follows a MicGain update', async () => {
         await page.waitFor(`document.getElementById('micGainSlider').value === '37' && document.getElementById('micGainValue').textContent === '37'`,
             { timeoutMs: 2000, what: 'slider and label at 37' });
         expect(writesTo(await page.writes(), '/api/cat/micgain').length === 0, 'the update was written back to the radio');
+    } finally { await page.close(); }
+});
+
+// Fabio's dark theme. A Classic rule loaded after it, or an inline
+// !important in Index.cshtml, puts a white key back on a dark page.
+test('flexui: dark theme, and Classic keys inside it are dark too', async () => {
+    const page = await openFlex();
+    try {
+        const r = await page.eval(`(() => {
+            const bg = s => { const e = document.querySelector(s); return e ? getComputedStyle(e).backgroundColor : 'missing'; };
+            const fg = s => { const e = document.querySelector(s); return e ? getComputedStyle(e).color : 'missing'; };
+            return {
+                theme: document.documentElement.dataset.bsTheme,
+                body: bg('body'), nav: bg('.iwc-flex-nav'),
+                band: bg('.band-radio-label:not(:has(input:checked))'),
+                label: fg('.vfo-control-label'), saveMem: fg('#saveMemBtnA'),
+            };
+        })()`);
+        const level = c => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(c); return m ? (+m[1] + +m[2] + +m[3]) / 3 : NaN; };
+        const light = c => level(c) > 180;
+        const dark = c => level(c) < 80;
+        expect(r.theme === 'dark', `data-bs-theme is ${r.theme}`);
+        expect(dark(r.body) && dark(r.nav) && dark(r.band), `light background: ${JSON.stringify(r)}`);
+        expect(light(r.label) && light(r.saveMem), `dark text on dark: ${JSON.stringify(r)}`);
+    } finally { await page.close(); }
+});
+
+// Fabio's bar meters. Each one is fed by MeterPanel mirroring its radial,
+// so a bar that is drawn but never moves is the failure to catch.
+test('flexui: Linear Meters panel shows, and each bar follows its radial', async () => {
+    const page = await openFlex();
+    try {
+        const r = await page.eval(`(() => {
+            const mp = window.meterPanel;
+            mp.update('power', 50);
+            mp.update('vdd', 13.8);
+            updateMeterDomLabel('PowerMeter', { displayValue: { watts: 50, rawAvg: 0 } });
+            const tab = [...document.querySelectorAll('.flexlayout__tab_button_content')].map(e => e.textContent.trim());
+            return {
+                tabs: tab,
+                bars: ['power', 'swr', 'compression', 'alc', 'idd', 'vdd'].filter(k => !mp.getGauge(k + 'Linear')),
+                width: document.getElementById('powerLinearCanvas')?.width ?? 0,
+                power: mp.getGauge('powerLinear')?.gauge.value,
+                vdd: mp.getGauge('vddLinear')?.gauge.value,
+                chip: document.getElementById('powerLinearValue')?.textContent,
+            };
+        })()`);
+        expect(r.tabs.includes('Linear Meters'), `no Linear Meters tab: ${r.tabs.join(', ')}`);
+        expect(r.bars.length === 0, `no bar gauge for: ${r.bars.join(', ')}`);
+        expect(r.width > 100, `power bar is ${r.width}px wide`);
+        expect(r.power === 50 && r.vdd === 13.8, `bars did not follow: power ${r.power}, vdd ${r.vdd}`);
+        expect(r.chip === '50 W', `power chip reads "${r.chip}"`);
+    } finally { await page.close(); }
+});
+
+// Fabio's VFO cards: the Classic controls moved into his three columns, and
+// a bar S-meter that follows the receiving VFO (one receiver on the IC-7300).
+test('flexui: VFO cards are three columns, and the S bar follows the receiving VFO', async () => {
+    const page = await openFlex();
+    try {
+        const layout = await page.eval(`(() => {
+            const col = (v, c) => document.querySelector('#vfo' + v + 'Col .vfo-col--' + c);
+            const has = (v, c, id) => !!col(v, c)?.querySelector('#' + id + v);
+            const out = {};
+            for (const v of ['A', 'B']) {
+                out[v] = {
+                    cols: [...document.querySelectorAll('#vfo' + v + 'Col .vfo-body-grid > .vfo-col')].length,
+                    tune: ['freq', 'sMeterLinearCanvas', 'rfGainSlider', 'afGainSlider', 'bandRadioGroup', 'segmentSelect', 'modeSelect', 'saveMemBtn'].filter(id => !has(v, 'tune', id)),
+                    band: ['ifWidthSelect', 'filGroup', 'ifShapeGroup', 'apfSelect', 'audioFilterBtn', 'rxFilterBtn'].filter(id => !has(v, 'band', id)),
+                    keys: ['agcGroup', 'ipoGroup', 'attGroup', 'nrGroup', 'nbGroup', 'notchGroup', 'manualNotchFreq'].filter(id => !has(v, 'keys', id)),
+                    leftover: !!document.querySelector('#vfo' + v + 'Col .receiver-controls-group'),
+                    status: document.getElementById('vfo' + v + 'StatusLine')?.previousElementSibling?.className,
+                    barWidth: document.getElementById('sMeterLinearCanvas' + v)?.width ?? 0,
+                };
+            }
+            return out;
+        })()`);
+        for (const v of ['A', 'B']) {
+            const l = layout[v];
+            expect(l.cols === 3, `VFO ${v} has ${l.cols} columns`);
+            expect(!l.tune.length && !l.band.length && !l.keys.length, `VFO ${v} misplaced: ${JSON.stringify(l)}`);
+            expect(!l.leftover, `VFO ${v} still has the Classic controls group`);
+            expect(l.status === 'vfo-body-grid', `VFO ${v} status line is not below the grid (after ${l.status})`);
+            expect(l.barWidth > 100, `VFO ${v} S bar is ${l.barWidth}px wide`);
+        }
+
+        const read = () => page.eval(`(() => {
+            const mp = window.meterPanel;
+            const r = v => ({ value: mp.getGauge('smeterBar' + v)?.gauge.value,
+                              chip: document.getElementById('sMeterLinearValue' + v)?.textContent,
+                              grey: document.getElementById('sMeterLinearRow' + v)?.classList.contains('linear-smeter-inactive') });
+            return { A: r('A'), B: r('B') };
+        })()`);
+        // The 500 ms status poll feeds the meter too (0 here, no radio), so
+        // each reading is set and read back in one evaluation.
+        const readWith = (raw) => page.eval(`(() => { updateSMeter('A', ${raw}); updateSMeter('B', 0); return 0; })()`).then(read);
+        await page.state('ActiveVfo', 0); await sleep(200);
+        let r = await readWith(120);
+        expect(r.A.value > 0 && !r.A.grey && r.A.chip !== 'S0', `A receiving, A bar: ${JSON.stringify(r.A)}`);
+        expect(r.B.value === 0 && r.B.grey && r.B.chip === 'S0', `A receiving, B bar: ${JSON.stringify(r.B)}`);
+        // A/B alone moves the greying, before any new reading.
+        await page.state('ActiveVfo', 1); await sleep(200);
+        r = await read();
+        expect(!r.B.grey && r.A.grey, `after A/B the grey bar did not swap: ${JSON.stringify(r)}`);
+        r = await readWith(120);
+        expect(r.B.value > 0 && !r.B.grey && r.B.chip !== 'S0', `B receiving, B bar: ${JSON.stringify(r.B)}`);
+        expect(r.A.value === 0 && r.A.grey && r.A.chip === 'S0', `B receiving, A bar: ${JSON.stringify(r.A)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('flexui: Levels keys follow the radio and write through the Classic controls', async () => {
+    const page = await openFlex();
+    try {
+        expect(await flexWhere(page, 'levels') === 'docked', 'Levels panel is not docked');
+        const keys = await page.eval(`[...document.querySelectorAll('#levelsSection .toggle-dd__btn')].length`);
+        expect(keys >= 4, `Levels has ${keys} keys, not 4`);
+        // Radio -> key, silently.
+        await page.state('ProcEnabled', true);
+        await page.state('ProcLevel', 42);
+        await page.state('MonitorLevelA', 17);
+        await sleep(300);
+        let s = await page.eval(`({ proc: window.procCycleButton.getState(), mon: window.monitorCycleButton.getState() })`);
+        expect(s.proc.selectedId === '1' && s.proc.value === 42, `PROC key did not follow: ${JSON.stringify(s.proc)}`);
+        expect(s.mon.value === 17, `MONI key did not follow: ${JSON.stringify(s.mon)}`);
+        // Key -> Classic slider (whose change handler does the write).
+        await page.eval(`window.powerCycleButton.setState({ value: 30 })`);
+        await sleep(400);
+        const w = await page.eval(`({ slider: document.getElementById('powerSlider').value, label: document.getElementById('powerValue').textContent })`);
+        expect(w.slider === '30' && /30/.test(w.label), `POWER key did not reach the Classic slider: ${JSON.stringify(w)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('flexui: Buttons keys follow the Classic buttons and press them', async () => {
+    const page = await openFlex();
+    try {
+        expect(await flexWhere(page, 'buttons') === 'docked', 'Buttons panel is not docked');
+        const k = await page.eval(`(() => {
+            const sec = document.getElementById('buttonsSection');
+            const strip = document.querySelector('.iwc-flex-toolbar-row');
+            return {
+                labels: [...sec.querySelectorAll(':scope > .toggle-dd__btn .toggle-dd__label')].map(l => l.textContent),
+                leftInStrip: ['atuBtn', 'atuTuneBtn', 'voxBtn', 'voiceBtn', 'dxSpotsOpenBtn'].filter(id => strip?.contains(document.getElementById(id))),
+                classicHidden: !!document.getElementById('atuBtn')?.closest('.iwc-flex-buttons-classic[hidden]'),
+            };
+        })()`);
+        const want = ['ATU', 'Tune', 'FM Rep', 'VOX', 'CW', 'CW Read', 'CW Send', 'RTTY', 'DX Spots', 'DX Watch', 'Voice'];
+        expect(JSON.stringify(k.labels) === JSON.stringify(want), `keys: ${JSON.stringify(k.labels)}`);
+        expect(!k.leftInStrip.length && k.classicHidden, `Classic buttons not parked: ${JSON.stringify(k)}`);
+        // Radio -> LEDs. ATU, Tune and VOX are never pressed here: no TX.
+        const leds = () => page.eval(`({ atu: document.querySelector('#atuBtnKey .toggle-dd__led').classList.contains('is-on'),
+                                         vox: document.querySelector('#voxBtnKey .toggle-dd__led').classList.contains('is-on') })`);
+        await page.state('AtuEnabled', true); await page.state('VoxOn', true); await sleep(300);
+        let l = await leds();
+        expect(l.atu && l.vox, `LEDs did not follow on: ${JSON.stringify(l)}`);
+        await page.state('AtuEnabled', false); await page.state('VoxOn', false); await sleep(300);
+        l = await leds();
+        expect(!l.atu && !l.vox, `LEDs did not follow off: ${JSON.stringify(l)}`);
+        // A key presses its Classic button: FM Rep opens the FM dialog.
+        const open = await page.eval(`(() => {
+            const key = [...document.querySelectorAll('#buttonsSection .toggle-dd__btn')].find(b => b.textContent.trim() === 'FM Rep');
+            key.click();
+            const d = document.getElementById('fmDialog'); const o = d.open; d.close(); return o;
+        })()`);
+        expect(open, 'FM Rep key did not open the FM dialog');
+        const bad = (await page.writes()).filter(w => FORBIDDEN.test(w.path));
+        expect(!bad.length, `transmit writes: ${JSON.stringify(bad)}`);
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally { await page.close(); }
+});
+
+test('flexui: toolbar is a strip above the dock, and VFO Actions is a panel', async () => {
+    const page = await openFlex();
+    try {
+        const t = await page.eval(`(() => {
+            const strip = document.querySelector('.iwc-flex-toolbar-row');
+            const host = document.getElementById('ywcFlexHost');
+            const inStrip = ids => ids.filter(id => !strip?.contains(document.getElementById(id)));
+            const actions = document.querySelector('#ywcFlexHost [data-ywc-component="vfoActions"]');
+            const vb = document.getElementById('vfoBToggleBtn');
+            return {
+                strip: !!strip,
+                inDock: !!strip?.closest('#ywcFlexHost'),
+                above: !!strip && strip.getBoundingClientRect().bottom <= host.getBoundingClientRect().top + 1,
+                visible: !!strip && strip.getBoundingClientRect().height > 10,
+                missing: inStrip(['utcClock', 'memBtn', 'sMeterHistoryToggleBtn', 'flexPanelsBtn', 'flexLayoutsBtn', 'flexLayoutScale', 'flexResetLayoutBtn', 'connectBtn', 'radioPowerBtn']),
+                dockBeforeConnect: !!document.querySelector('.iwc-flex-toolbar-row .iwc-flex-toolbar + #connectBtn'),
+                headerEmpty: !document.querySelector('.iwc-flex-nav .iwc-flex-toolbar'),
+                notInActions: ['swapVfoBtn', 'copyBtoABtn', 'copyAtoBBtn', 'splitBtn', 'quickSplitBtn'].filter(id => !actions?.contains(document.getElementById(id))),
+                vfoBHidden: !vb || getComputedStyle(vb).display === 'none',
+            };
+        })()`);
+        expect(t.strip && !t.inDock, `toolbar strip: ${JSON.stringify(t)}`);
+        expect(t.above && t.visible, `the strip is not shown above the dock: ${JSON.stringify(t)}`);
+        expect(!t.missing.length, `not in the strip: ${t.missing.join(', ')}`);
+        expect(t.dockBeforeConnect && t.headerEmpty, `dock controls not moved in front of Connect: ${JSON.stringify(t)}`);
+        expect(!t.notInActions.length, `not in VFO Actions: ${t.notInActions.join(', ')}`);
+        expect(t.vfoBHidden, 'the VFO-B show/hide key is still showing (the tab does that here)');
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
     } finally { await page.close(); }
 });
 

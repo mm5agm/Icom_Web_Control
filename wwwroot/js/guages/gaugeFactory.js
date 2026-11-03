@@ -10,6 +10,9 @@
 // handles every future change; this query only exists to shift the copies that
 // were already cached before that header existed. Do not bump it.
 import { SMeterGauge, PowerGauge, SWRGauge, ALCGauge, CompressionGauge, IDDGauge, VDDGauge } from './gauge.js?v=1';
+// Fabio Valente's bar meters from YWC's Experimental UI, shared through core
+// (core/js/meters/linear-gauge.js). Used on /flexui only; see Index.cshtml.
+import { LinearSMeterGauge, LinearPowerGauge, LinearSWRGauge, LinearALCGauge, LinearCompressionGauge, LinearIDDGauge, LinearVDDGauge } from '/js/meters/linear-gauge.js';
 
 // Registry of gauge constructors.
 // Add new meter types here as your UI grows.
@@ -20,7 +23,14 @@ const gaugeRegistry = {
     alc:    ALCGauge,
     compression: CompressionGauge,
     idd: IDDGauge,
-    vdd: VDDGauge
+    vdd: VDDGauge,
+    smeterLinear:      LinearSMeterGauge,
+    powerLinear:      LinearPowerGauge,
+    swrLinear:         LinearSWRGauge,
+    alcLinear:         LinearALCGauge,
+    compressionLinear: LinearCompressionGauge,
+    iddLinear:         LinearIDDGauge,
+    vddLinear:         LinearVDDGauge
 };
 
 // High-contrast colour overrides applied when Windows High Contrast mode is active.

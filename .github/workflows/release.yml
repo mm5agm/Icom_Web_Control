@@ -73,6 +73,13 @@ jobs:
           }
         shell: pwsh
 
+      # The app's own tests reference the Windows project, so they run here
+      # rather than in the Linux job: CI-V framing, the controller replayed
+      # against frames recorded off an IC-7300MK2, and the radio menu file.
+      - name: Run IWC tests
+        run: dotnet test Tests/IcomWebControl.Tests/IcomWebControl.Tests.csproj --configuration Release --verbosity normal
+        shell: pwsh
+
       - name: Install NSIS
         run: choco install nsis --yes
         shell: pwsh

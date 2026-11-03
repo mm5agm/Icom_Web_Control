@@ -55,6 +55,15 @@ namespace Icom_Web_Control.Services
         // must not open the configured port under the probe, or one of them
         // reads "in use" and the answer is wrong either way.
         private volatile bool _findInProgress;
+
+        // PowerOnAtStart is tried once per run, the first time the port opens:
+        // after that a radio that stops answering was switched off on purpose.
+        private bool _startPowerOnTried;
+        private const int StartPowerOnWaitMs = 8000;   // the radio's boot, with margin
+
+        // PowerOffAtExit is sent the moment the host starts stopping: by the time
+        // StopAsync runs, the other services have used up the 2 s shutdown cap.
+        private Task? _exitPowerOff;
         private readonly ISettingsService _settings;
         private readonly IHubContext<RadioHub> _hubContext;
         private readonly ILogger<CivRadioController> _logger;
@@ -139,6 +148,21 @@ namespace Icom_Web_Control.Services
         // waits behind it (at most ~PeekWindowMs plus two selects). The peek's
         // own selects go straight to the bus, so they must never take the gate.
         private readonly SemaphoreSlim _peekGate = new(1, 1);
+
+        // The other VFO's IF width. 1A 03 reads only the operating VFO, so the
+        // watch VFO's width is learned three ways: read during each cross-band
+        // peek while the receiver is on it; looked up by its mode and FIL slot
+        // (26 01 reads both without switching), since a mode's FIL slot holds
+        // one width whichever VFO uses it; and, failing both, one short borrow
+        // when X-Watch is on (MaybeBorrowWatchWidthAsync). Keyed by the 26
+        // reply's mode, data and filter bytes. Indexed by VfoIndex:
+        // _modeFilSeen is each VFO's mode/FIL at its last read, _widthKnownFor
+        // the mode/FIL its shown width belongs to.
+        private readonly Dictionary<(byte mode, byte data, byte fil), int> _widthByModeFil = new();
+        private readonly (byte mode, byte data, byte fil)?[] _modeFilSeen = new (byte, byte, byte)?[2];
+        private readonly (byte mode, byte data, byte fil)?[] _widthKnownFor = new (byte, byte, byte)?[2];
+        private long _watchBorrowAfterTicks;
+        private const int WatchBorrowRetryMs = 30000;   // a borrow that read nothing waits this long before dipping the audio again
 
         // Watch-panel span (Phase 5). The single scope has one span, so the watch
         // panel is a crop of that sweep; "ZoomIn" mode lets the operator narrow the
@@ -345,7 +369,8 @@ namespace Icom_Web_Control.Services
             ISettingsService settings,
             IHubContext<RadioHub> hubContext,
             RadioFinder finder,
-            ILogger<CivRadioController> logger)
+            ILogger<CivRadioController> logger,
+            IHostApplicationLifetime? lifetime = null)
         {
             _state = state;
             _bus = bus;
@@ -353,6 +378,8 @@ namespace Icom_Web_Control.Services
             _hubContext = hubContext;
             _finder = finder;
             _logger = logger;
+
+            lifetime?.ApplicationStopping.Register(() => _exitPowerOff = Task.Run(PowerOffAtExitAsync));
 
             // The radio pushes 27 00 scope frames unsolicited (they never match a
             // pending transaction), so they arrive here rather than through the
@@ -434,7 +461,10 @@ namespace Icom_Web_Control.Services
             // instead of flashing the power button green↔red as each reconnect
             // flags "connected" only to drop on the very next read miss.
             await IdentifyAsync(cancellationToken); // learn address/model if it answers; best-effort
-            if (await ReadOperatingFrequencyAsync(cancellationToken) <= 0)
+            bool firstOpen = !_startPowerOnTried;
+            _startPowerOnTried = true;
+            if (await ReadOperatingFrequencyAsync(cancellationToken) <= 0
+                && !(firstOpen && settings.PowerOnAtStart && await PowerOnAtStartAsync(cancellationToken)))
             {
                 await _bus.CloseAsync();
                 _state.ConnectionStatusText =
@@ -970,8 +1000,10 @@ namespace Icom_Web_Control.Services
             _peekWatchId = watchId;
             try
             {
-                await RawSelectVfoAsync(watch, ct);
-                await DelayQuiet(PeekWindowMs, ct);
+                long peekStart = Environment.TickCount64;
+                if (await RawSelectVfoAsync(watch, ct))
+                    await ReadBorrowedWidthAsync(watch, ct);   // its width, while the receiver is on it
+                await DelayQuiet(Math.Max(0, PeekWindowMs - (int)(Environment.TickCount64 - peekStart)), ct);
             }
             finally
             {
@@ -1116,6 +1148,12 @@ namespace Icom_Web_Control.Services
         /// </summary>
         private async Task PollIfWidthAndFilterAsync(CancellationToken ct)
         {
+            await PollActiveWidthAsync(ct);
+            await PollWatchWidthAsync(ct);
+        }
+
+        private async Task PollActiveWidthAsync(CancellationToken ct)
+        {
             var vfo = ActiveVfo;
             var m = await ReadVfoModeRawAsync(SelectorFor(vfo), ct);
             if (!m.ok) return;
@@ -1129,7 +1167,8 @@ namespace Icom_Web_Control.Services
             var group = FilterWidthCodec.GroupForModeByte(m.mode);
             if (group == FilterWidthCodec.Group.None)
             {
-                if (vfo == RadioVfo.A) _state.IfWidthA = ""; else _state.IfWidthB = "";
+                SetIfWidth(vfo, "");
+                NoteWidthFor(vfo, (m.mode, m.data, m.filter), null);
                 return;
             }
 
@@ -1137,7 +1176,140 @@ namespace Icom_Web_Control.Services
             if (code < 0) return;
             int hz = FilterWidthCodec.CodeToHz(group, code);
             if (hz < 0) return;
-            if (vfo == RadioVfo.A) _state.IfWidthA = hz.ToString(); else _state.IfWidthB = hz.ToString();
+            SetIfWidth(vfo, hz.ToString());
+            NoteWidthFor(vfo, (m.mode, m.data, m.filter), hz);
+        }
+
+        /// <summary>
+        /// The watch VFO's mode and FIL slot (26 01, no switching) and, when that
+        /// pair's width is known from the operating VFO or an earlier peek, its
+        /// width. A mode or FIL change with no known width blanks it rather than
+        /// leave the old one showing; MaybeBorrowWatchWidthAsync can then fetch it.
+        /// </summary>
+        private async Task PollWatchWidthAsync(CancellationToken ct)
+        {
+            var watch = ActiveVfo == RadioVfo.A ? RadioVfo.B : RadioVfo.A;
+            var m = await ReadVfoModeRawAsync(CivProtocol.VfoUnselected, ct);
+            if (!m.ok) return;
+
+            if (m.filter is >= 0x01 and <= 0x03)
+            {
+                string f = m.filter.ToString();
+                if (watch == RadioVfo.A) _state.SelectedFilterA = f; else _state.SelectedFilterB = f;
+            }
+
+            var key = (m.mode, m.data, m.filter);
+            int i = VfoIndex(watch);
+            _modeFilSeen[i] = key;
+            if (FilterWidthCodec.GroupForModeByte(m.mode) == FilterWidthCodec.Group.None)
+            {
+                SetIfWidth(watch, "");
+                _widthKnownFor[i] = key;
+                return;
+            }
+            int hz;
+            lock (_widthByModeFil)
+                if (!_widthByModeFil.TryGetValue(key, out hz)) hz = -1;
+            if (hz > 0)
+            {
+                SetIfWidth(watch, hz.ToString());
+                _widthKnownFor[i] = key;
+            }
+            else if (_widthKnownFor[i] != key)
+            {
+                SetIfWidth(watch, "");
+            }
+        }
+
+        /// <summary>Record that <paramref name="vfo"/> is on this mode/FIL and (unless null) that its width is <paramref name="hz"/>.</summary>
+        private void NoteWidthFor(RadioVfo vfo, (byte mode, byte data, byte fil) key, int? hz)
+        {
+            int i = VfoIndex(vfo);
+            _modeFilSeen[i] = key;
+            _widthKnownFor[i] = key;
+            if (hz is int w)
+                lock (_widthByModeFil) _widthByModeFil[key] = w;
+        }
+
+        private void SetIfWidth(RadioVfo vfo, string width)
+        {
+            if (vfo == RadioVfo.A) _state.IfWidthA = width; else _state.IfWidthB = width;
+        }
+
+        /// <summary>
+        /// With the receiver borrowed onto <paramref name="vfo"/> (the caller holds
+        /// _peekGate and has selected it), read its mode/FIL and width straight
+        /// from the bus and record them. Best-effort: a miss leaves things as they were.
+        /// </summary>
+        private async Task ReadBorrowedWidthAsync(RadioVfo vfo, CancellationToken ct)
+        {
+            var modeFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdVfoMode, CivProtocol.VfoSelected);
+            var mr = await _bus.TransactAsync(modeFrame, CivProtocol.CmdVfoMode, cancellationToken: ct);
+            if (mr == null || mr.Cmd != CivProtocol.CmdVfoMode || mr.Data.Length < 4 || mr.Data[0] != CivProtocol.VfoSelected)
+                return;
+            (byte mode, byte data, byte fil) key = (mr.Data[1], mr.Data[2], mr.Data[3]);
+            var group = FilterWidthCodec.GroupForModeByte(key.mode);
+            if (group == FilterWidthCodec.Group.None)
+            {
+                SetIfWidth(vfo, "");
+                NoteWidthFor(vfo, key, null);
+                return;
+            }
+            var widthFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubIfWidth);
+            var wr = await _bus.TransactAsync(widthFrame, CivProtocol.CmdMenu, cancellationToken: ct);
+            if (wr == null || wr.Cmd != CivProtocol.CmdMenu || wr.Data.Length < 2 || wr.Data[0] != CivProtocol.SubIfWidth)
+                return;
+            int hz = FilterWidthCodec.CodeToHz(group, CivProtocol.BcdByte(wr.Data[1]));
+            if (hz < 0) return;
+            SetIfWidth(vfo, hz.ToString());
+            NoteWidthFor(vfo, key, hz);
+        }
+
+        /// <summary>
+        /// With X-Watch on and both VFOs on the same band (cross-band, the peek
+        /// reads the width), borrow the receiver once for the watch VFO's width
+        /// when neither the operating VFO nor a peek has told us it: at switch-on,
+        /// or after its mode or FIL slot changed to a pair not seen before. Just
+        /// the select, two reads and the hand-back, about a tenth of a second
+        /// of audio dip. Never during TX (the caller guards).
+        /// </summary>
+        private async Task MaybeBorrowWatchWidthAsync(CancellationToken ct)
+        {
+            if (!_crossBandPeek || !_watchInRange)
+                return;
+            RadioVfo active = ActiveVfo;
+            RadioVfo watch = active == RadioVfo.A ? RadioVfo.B : RadioVfo.A;
+            int i = VfoIndex(watch);
+            if (_modeFilSeen[i] is not { } seen || _widthKnownFor[i] == seen)
+                return;
+            long now = Environment.TickCount64;
+            if (now < _watchBorrowAfterTicks)
+                return;
+            _watchBorrowAfterTicks = now + WatchBorrowRetryMs;
+
+            await _peekGate.WaitAsync(ct);
+            try
+            {
+                if (await RawSelectVfoAsync(watch, ct))
+                    await ReadBorrowedWidthAsync(watch, ct);
+            }
+            finally
+            {
+                // As the peek: always hand the receiver back, with retries.
+                try
+                {
+                    for (int n = 0; n < 3 && !await RawSelectVfoAsync(active, ct); n++)
+                        await DelayQuiet(30, ct);
+                }
+                finally
+                {
+                    _peekGate.Release();
+                }
+            }
+            _logger.LogInformation("[CivRadioController] Borrowed VFO {Vfo} for its IF width: {Width}",
+                watch, watch == RadioVfo.A ? _state.IfWidthA : _state.IfWidthB);
         }
 
         /// <summary>Read the attenuator (command 11) as its raw byte. -1 on a miss; 0x20 = 20 dB.</summary>
@@ -2207,6 +2379,37 @@ namespace Icom_Web_Control.Services
             return CivProtocol.BcdByte(reply.Data[3]);
         }
 
+        /// <summary>See <see cref="IRadioController.ReadMenuItemAsync"/>.</summary>
+        public async Task<byte[]?> ReadMenuItemAsync(int number, CancellationToken cancellationToken = default)
+        {
+            if (number is < 1 or > 9999) return null;
+            byte hi = (byte)(((number / 1000) << 4) | (number / 100 % 10));
+            byte lo = (byte)(((number / 10 % 10) << 4) | (number % 10));
+            // A read is the item number and nothing after it; data here would be a write.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo);
+            var reply = await TransactAsync(frame, CivProtocol.CmdMenu, 300, cancellationToken);
+            // Reply body: 1A 05 hi lo <data…> → Data = [05, hi, lo, data…].
+            if (reply == null || reply.Cmd != CivProtocol.CmdMenu
+                || reply.Data.Length < 4 || reply.Data[0] != CivProtocol.SubSetMenu
+                || reply.Data[1] != hi || reply.Data[2] != lo)
+                return null;
+            return reply.Data[3..];
+        }
+
+        /// <summary>See <see cref="IRadioController.WriteMenuItemAsync"/>.</summary>
+        public async Task<bool?> WriteMenuItemAsync(int number, byte[] data, CancellationToken cancellationToken = default)
+        {
+            // No data after the item number is a read, not a write.
+            if (number is < 1 or > 9999 || data.Length == 0) return null;
+            byte hi = (byte)(((number / 1000) << 4) | (number / 100 % 10));
+            byte lo = (byte)(((number / 10 % 10) << 4) | (number % 10));
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                new byte[] { CivProtocol.CmdMenu, CivProtocol.SubSetMenu, hi, lo }.Concat(data).ToArray());
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, 500, cancellationToken);
+            return reply?.Cmd == CivProtocol.AckOk ? true : reply?.Cmd == CivProtocol.AckNg ? false : null;
+        }
+
         /// <summary>Write a one-byte SET-menu item (1A 05 hi lo val), value 0–99 as BCD.</summary>
         private async Task WriteSetMenuByteAsync(byte hi, byte lo, int value, string what, CancellationToken ct)
         {
@@ -2574,10 +2777,9 @@ namespace Icom_Web_Control.Services
         /// <summary>
         /// Power the radio up (18 01). The asleep CI-V circuit is woken with a
         /// burst of 0xFE bytes sized to the baud rate, sent in one write with the
-        /// frame appended so no inter-byte gap lets it doze off again. Over USB
-        /// the port is unpowered while the radio is off, so this can only succeed
-        /// over a separately-powered CI-V remote-jack link; on USB the front-panel
-        /// switch is the only way up. On success the poll loop reconnects and
+        /// frame appended so no inter-byte gap lets it doze off again. The USB
+        /// port stays present while the radio is in standby (tested on the
+        /// IC-7300MK2: up about 4 s after 18 01). On success the poll loop reconnects and
         /// re-identifies once the radio's bus starts answering.
         /// </summary>
         private async Task PowerOnAsync(CancellationToken ct)
@@ -2600,6 +2802,62 @@ namespace Icom_Web_Control.Services
             await _bus.SendRawAsync(burst, ct);
             _state.RadioPowerOn = true;
             _logger.LogInformation("[CivRadioController] Power ON (18 01) sent with {Wake}× FE wake preamble", wake);
+        }
+
+        /// <summary>
+        /// PowerOnAtStart: the port is open and the radio is silent, so send
+        /// 18 01 and wait for the operating-frequency read to answer. True
+        /// once it does; false if it never comes up in StartPowerOnWaitMs.
+        /// </summary>
+        private async Task<bool> PowerOnAtStartAsync(CancellationToken ct)
+        {
+            _logger.LogInformation("[CivRadioController] Radio not answering at start — sending power ON");
+            _state.ConnectionStatusText = "Turning the radio on…";
+            await PowerOnAsync(ct);
+            var until = DateTime.UtcNow.AddMilliseconds(StartPowerOnWaitMs);
+            while (DateTime.UtcNow < until)
+            {
+                await Task.Delay(500, ct);
+                if (await ReadOperatingFrequencyAsync(ct) > 0)
+                {
+                    _logger.LogInformation("[CivRadioController] Radio came up after power ON");
+                    await IdentifyAsync(ct);
+                    return true;
+                }
+            }
+            _state.RadioPowerOn = false;
+            _logger.LogWarning("[CivRadioController] Radio did not answer within {Ms} ms of power ON", StartPowerOnWaitMs);
+            return false;
+        }
+
+        /// <summary>
+        /// PowerOffAtExit: switch the radio off as the host starts stopping,
+        /// while the poll loop and port are still up. Skipped for Settings'
+        /// Restart Now, and best-effort with its own short timeout so a silent
+        /// radio cannot hold shutdown up.
+        /// </summary>
+        private async Task PowerOffAtExitAsync()
+        {
+            try
+            {
+                var settings = await _settings.GetSettingsAsync();
+                if (settings.PowerOffAtExit && !AppLifecycle.RestartRequested && _bus.IsOpen && _state.IsConnected)
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                    await PowerOffAsync(cts.Token);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[CivRadioController] Power OFF on exit failed — non-fatal");
+            }
+        }
+
+        /// <summary>Let an exit power-off finish before the port closes.</summary>
+        public override async Task StopAsync(CancellationToken cancellationToken)
+        {
+            if (_exitPowerOff != null) await _exitPowerOff;
+            await base.StopAsync(cancellationToken);
         }
 
         // -- Radio memory channels (CI-V 1A 00) --------------------------------
@@ -3066,7 +3324,10 @@ namespace Icom_Web_Control.Services
                     // watch VFO on a different band. Internally rate-limited and a
                     // no-op unless the operator enabled it; never during TX.
                     if (!transmitting)
+                    {
                         await MaybePeekWatchBandAsync(stoppingToken);
+                        await MaybeBorrowWatchWidthAsync(stoppingToken);
+                    }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {

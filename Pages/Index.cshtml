@@ -461,6 +461,47 @@
 
     <!-- (Status line moved inside each VFO panel — see #vfoAStatusLine / #vfoBStatusLine) -->
 
+    @if (Model.IsFlexUi)
+    {
+        @* Experimental UI only: Fabio Valente's bar meters (YWC's Linear
+           Meters panel, same ids and classes). MeterPanel.update mirrors each
+           radial to its `<key>Linear` bar, so nothing else feeds them; site.js
+           writes the value chips beside the chips under the radials. The
+           IC-7300 has no TEMP meter over CI-V, so there is no TEMP row. *@
+        <div id="linearMetersSection" class="op-col op-col--linear-meters">
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">PWR</span>
+                <canvas id="powerLinearCanvas" role="img" aria-hidden="true" aria-label="Power output meter (linear)"></canvas>
+                <span id="powerLinearValue" class="linear-meter-value linear-meter-value--pwr">0 W</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">SWR</span>
+                <canvas id="swrLinearCanvas" role="img" aria-hidden="true" aria-label="SWR meter (linear)"></canvas>
+                <span id="swrLinearValue" class="linear-meter-value linear-meter-value--swr">1.0:1</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">COMP</span>
+                <canvas id="compressionLinearCanvas" role="img" aria-hidden="true" aria-label="Compression meter (linear)"></canvas>
+                <span id="compressionLinearValue" class="linear-meter-value linear-meter-value--comp">0 dB</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">ALC</span>
+                <canvas id="alcLinearCanvas" role="img" aria-hidden="true" aria-label="ALC meter (linear)"></canvas>
+                <span id="alcLinearValue" class="linear-meter-value linear-meter-value--alc">0%</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">IDD</span>
+                <canvas id="iddLinearCanvas" role="img" aria-hidden="true" aria-label="Drain current meter (linear)"></canvas>
+                <span id="iddLinearValue" class="linear-meter-value linear-meter-value--idd">0.0 A</span>
+            </div>
+            <div class="linear-meter-row">
+                <span class="linear-meter-label">VDD</span>
+                <canvas id="vddLinearCanvas" role="img" aria-hidden="true" aria-label="Amplifier supply voltage meter (linear)"></canvas>
+                <span id="vddLinearValue" class="linear-meter-value linear-meter-value--vdd">--.- V</span>
+            </div>
+        </div>
+    }
+
     <!-- Power and SWR Meters -->
     <div class="row mt-3">
         <div class="col-12">
@@ -851,6 +892,12 @@
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-hold-btn" data-vfo="B" title="Freeze this spectrum at the current frame so you can study it. Click again to resume live streaming.">Hold</button>
                             <button type="button" class="btn btn-outline-light btn-sm spectrum-listen-btn" data-vfo="B" title="Listen to VFO B — route the radio's audio to this VFO. The other panel becomes the silent watch." style="display:none;"><i class="bi bi-volume-up" aria-hidden="true"></i> Listen</button>
                             <span class="badge bg-success small spectrum-audio-badge" data-vfo="B" title="You are listening to this VFO" style="display:none;"><i class="bi bi-volume-up-fill" aria-hidden="true"></i> Listening</span>
+                            @* Cross-band watch: moved beside whichever Listening badge is showing. *@
+                            <div id="crossBandWatchGroup" class="btn-group btn-group-sm" role="group" style="display:none;">
+                                <button type="button" id="crossBandWatchBtn" class="btn btn-outline-light btn-sm" aria-pressed="false" title="Cross-band watch on / off. On, the watch VFO on another band is refreshed by briefly retuning the receiver, which dips your audio; switch it off for a QSO.">X-Watch</button>
+                                <button type="button" class="btn btn-outline-light btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="How often cross-band watch peeks at the other band"><span class="visually-hidden">Peek interval</span></button>
+                                <ul id="crossBandWatchIntervals" class="dropdown-menu dropdown-menu-dark dropdown-menu-end"></ul>
+                            </div>
                             <span id="spectrumStatusBadgeB" class="badge bg-secondary small">—</span>
                         </div>
                     </div>
@@ -1165,6 +1212,17 @@
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
                                oninput="document.getElementById('afGainValueA').innerText = this.value">
                     </div>
+                    @if (Model.IsFlexUi)
+                    {
+                        @* Experimental UI only: Fabio Valente's per-VFO bar S-meter. The
+                           IC-7300 has one receiver, so site.js updateSMeter puts the one
+                           reading on the receiving VFO's bar and greys the other. *@
+                        <div class="linear-meter-row linear-meter-row--vfo" id="sMeterLinearRowA">
+                            <span class="linear-meter-label">S</span>
+                            <canvas id="sMeterLinearCanvasA" role="img" aria-hidden="true" aria-label="VFO A S-meter (linear)"></canvas>
+                            <span id="sMeterLinearValueA" class="linear-meter-value linear-meter-value--smeter">S0</span>
+                        </div>
+                    }
 
                     <!-- Twin PBT (Digital Passband Tuning) + RX Tone Control -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
@@ -1453,6 +1511,17 @@
                                style="width: clamp(70px, 8vw, 120px); height: 18px;"
                                oninput="document.getElementById('afGainValueB').innerText = this.value">
                     </div>
+                    @if (Model.IsFlexUi)
+                    {
+                        @* Experimental UI only: Fabio Valente's per-VFO bar S-meter. The
+                           IC-7300 has one receiver, so site.js updateSMeter puts the one
+                           reading on the receiving VFO's bar and greys the other. *@
+                        <div class="linear-meter-row linear-meter-row--vfo" id="sMeterLinearRowB">
+                            <span class="linear-meter-label">S</span>
+                            <canvas id="sMeterLinearCanvasB" role="img" aria-hidden="true" aria-label="VFO B S-meter (linear)"></canvas>
+                            <span id="sMeterLinearValueB" class="linear-meter-value linear-meter-value--smeter">S0</span>
+                        </div>
+                    }
 
                     <!-- Twin PBT (Digital Passband Tuning) + RX Tone Control -->
                     <div class="d-flex align-items-center gap-2 mb-0" style="flex-wrap: wrap;">
@@ -2245,7 +2314,29 @@
                 compression: { canvasId: 'compressionMeterCanvas' },
                 alc:         { canvasId: 'alcMeterCanvas' },
                 idd:         { canvasId: 'iddMeterCanvas' },
-                vdd:         { canvasId: 'vddMeterCanvas' }
+                vdd:         { canvasId: 'vddMeterCanvas' },
+                // /flexui's bar meters (no canvas on Classic, so skipped there).
+                // update('power', v) also sets powerLinear, so each bar is set
+                // to its radial's scale here; SWR's 0-255 face is the default.
+                powerLinear:       { type: 'powerLinear', canvasId: 'powerLinearCanvas', maxValue: 100,
+                                     majorTicks: ['0', '25', '50', '75', '100'] },
+                swrLinear:         { type: 'swrLinear', canvasId: 'swrLinearCanvas' },
+                compressionLinear: { type: 'compressionLinear', canvasId: 'compressionLinearCanvas', maxValue: 30,
+                                     majorTicks: ['0', '5', '10', '15', '20', '25', '30'],
+                                     highlights: [{ from: 0, to: 10, color: 'rgba(0,255,0,.25)' },
+                                                  { from: 10, to: 20, color: 'rgba(255,255,0,.25)' },
+                                                  { from: 20, to: 30, color: 'rgba(255,0,0,.25)' }] },
+                alcLinear:         { type: 'alcLinear', canvasId: 'alcLinearCanvas', maxValue: 100,
+                                     majorTicks: ['0', '20', '40', '60', '80', '100'],
+                                     highlights: [{ from: 0, to: 70, color: 'rgba(0,255,0,.25)' },
+                                                  { from: 70, to: 90, color: 'rgba(255,255,0,.25)' },
+                                                  { from: 90, to: 100, color: 'rgba(255,0,0,.25)' }] },
+                iddLinear:         { type: 'iddLinear', canvasId: 'iddLinearCanvas' },
+                vddLinear:         { type: 'vddLinear', canvasId: 'vddLinearCanvas', minValue: 10, maxValue: 16, nominal: 13.8 },
+                // /flexui's per-VFO S bars. Not `smeterLinear`: site.js
+                // updateSMeter chooses which bar the one reading goes to.
+                smeterBarA:        { type: 'smeterLinear', canvasId: 'sMeterLinearCanvasA' },
+                smeterBarB:        { type: 'smeterLinear', canvasId: 'sMeterLinearCanvasB' }
             });
             window.ic7300Meters = new Ic7300Meters(window.meterPanel, window.calibrationEngine);
 
@@ -2573,8 +2664,21 @@
             function applyMode(mode) {
                 currentMode = mode;
                 localStorage.setItem(MODE_STORAGE_KEY, mode);
-                const showA = (mode === 'A' || mode === 'Multi');
-                const showB = (mode === 'B' || mode === 'Multi');
+                let showA = (mode === 'A' || mode === 'Multi');
+                let showB = (mode === 'B' || mode === 'Multi');
+                // Cross-band watch off with the VFOs on different bands: only the
+                // VFO you hear (wireCrossBandWatch). The saved mode is untouched.
+                const heard = window.__iwcActiveVfo?.() === 1 ? 'B' : 'A';
+                if (window.__iwcWatchCollapse?.()) {
+                    showA = heard === 'A';
+                    showB = heard === 'B';
+                }
+                // The watch panel (the VFO you are not hearing) is refreshed only
+                // by the peeks, on one band or two, one waterfall row each, so it
+                // shows its trace alone.
+                const peeked = window.__iwcWatchPeeks?.() ? (heard === 'A' ? 'B' : 'A') : null;
+                spectrumPanelA.setWaterfallHidden(peeked === 'A');
+                spectrumPanelB.setWaterfallHidden(peeked === 'B');
                 document.getElementById('spectrumContainerA').style.display = showA ? '' : 'none';
                 document.getElementById('spectrumContainerB').style.display = showB ? '' : 'none';
                 document.querySelectorAll('.spectrum-mode-btn').forEach(b => {
@@ -3117,6 +3221,12 @@
                     audioBadges.forEach(b => {
                         b.style.display = (idxOf(b) === audioVfo) ? '' : 'none';
                     });
+                    // X-Watch sits on the panel you hear: it stays on screen when
+                    // the watch panel is collapsed.
+                    const xw = document.getElementById('crossBandWatchGroup');
+                    const badge = audioBadges.find(b => idxOf(b) === audioVfo);
+                    if (xw && badge && badge.nextElementSibling !== xw) badge.after(xw);
+                    if (typeof applyMode === 'function') applyMode(currentMode);
                 }
 
                 listenBtns.forEach(btn => {
@@ -3133,7 +3243,68 @@
 
                 // Authoritative updates from the radio (see site.js ActiveVfo).
                 window.onActiveVfoChanged = idx => { audioVfo = idx; refresh(); };
+                window.__iwcActiveVfo = () => audioVfo;
 
+                refresh();
+            })();
+
+            // Cross-band watch key, beside Listening: the only place it is set.
+            // The main half switches it on and off in one click, so the peek (it
+            // retunes the one receiver and dips the audio) can be stopped for a
+            // QSO; the arrow lists how often it peeks. With it off and the VFOs
+            // on different bands the watch panel could only say "out of range",
+            // so it is collapsed and the panel you hear shows alone (applyMode
+            // asks __iwcWatchCollapse). Same-band watch never retunes, so it
+            // stays.
+            (function wireCrossBandWatch() {
+                const group = document.getElementById('crossBandWatchGroup');
+                const btn = document.getElementById('crossBandWatchBtn');
+                const list = document.getElementById('crossBandWatchIntervals');
+                if (!_pseudoDual || !group || !btn || !list) return;
+                let on = @(Model.PseudoDualCrossBandEnabled ? "true" : "false");
+                let sec = @Model.PseudoDualPeekIntervalSeconds;
+                const band = { A: '@Model.SelectedBandA', B: '@Model.SelectedBandB' };
+                const SECONDS = [5, 10, 15, 20, 30, 45, 60];
+                const post = body => fetch('/api/radio/crossband-watch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                }).catch(() => {});
+                const crossBand = () => !!band.A && !!band.B && band.A !== band.B;
+                window.__iwcWatchCollapse = () => !on && crossBand();
+                window.__iwcWatchPeeks = () => true;
+                window.__iwcWatchOn = () => on;
+                function refresh() {
+                    btn.classList.toggle('active', on);
+                    btn.setAttribute('aria-pressed', String(on));
+                    btn.textContent = on ? `X-Watch ${sec} s` : 'X-Watch Off';
+                    list.querySelectorAll('button').forEach(b => b.classList.toggle('active', on && Number(b.dataset.sec) === sec));
+                    applyMode(currentMode);
+                }
+                for (const s of SECONDS) {
+                    const li = document.createElement('li');
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'dropdown-item';
+                    b.dataset.sec = String(s);
+                    b.textContent = `Peek every ${s} s`;
+                    b.addEventListener('click', () => { on = true; sec = s; refresh(); post({ enabled: true, intervalSeconds: s }); });
+                    li.append(b);
+                    list.append(li);
+                }
+                btn.addEventListener('click', () => { on = !on; refresh(); post({ enabled: on }); });
+                // Another page's key switched it, or a VFO changed band.
+                window.signalRConnection?.on('RadioStateUpdate', u => {
+                    if (u?.property === 'CrossBandWatch') {
+                        on = !!u.value?.enabled;
+                        sec = Number(u.value?.intervalSeconds) || sec;
+                        refresh();
+                    } else if (u?.property === 'BandA' || u?.property === 'BandB') {
+                        const v = u.property.slice(-1);
+                        if (band[v] !== u.value) { band[v] = u.value; refresh(); }
+                    }
+                });
+                group.style.display = '';
                 refresh();
             })();
 
@@ -3859,6 +4030,8 @@
         // --- MONITOR ON/OFF + LEVEL ---
         let _monitorOn = @(Model.MonitorOn ? "true" : "false");
         function _updateMonitorBtn(on) {
+            // Keep the toggle's idea of the state in step with the radio too.
+            _monitorOn = on;
             const btn = document.getElementById('monitorOnBtn');
             if (!btn) return;
             btn.classList.toggle('btn-warning', on);
@@ -5247,6 +5420,8 @@
         window.setMicGain    = setMicGain;
         window.toggleProc    = toggleProc;
         window.setProcLevel  = setProcLevel;
+        // site.js calls this on ProcEnabled; without it the key never followed the radio.
+        window.updateProcButton = updateProcButton;
         window.toggleAtu        = toggleAtu;
         window.startAtuTune     = startAtuTune;
         window.stopAtuTune      = stopAtuTune;
@@ -5266,6 +5441,9 @@
         _updateSquelchVisibility('B', '@Model.RadioState.ModeB');
         window.toggleCatConnection = toggleCatConnection;
         window.toggleVox       = toggleVox;
+        // site.js calls this on every VoxOn push; without it the radio's VOX
+        // state never reached the button or the dialog.
+        window.updateVoxButton = updateVoxButton;
         window.setVoxGain      = setVoxGain;
         window.setVoxDelay     = setVoxDelay;
         window.setAntiVoxGain  = setAntiVoxGain;

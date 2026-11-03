@@ -16,6 +16,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="IcomWebControl.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="publish\**" />
     <Compile Remove="oldFiles\**" />
     <Compile Remove="oldFiles/Backup/**" />
@@ -36,6 +40,16 @@
     <Content Remove="core\**" />
     <EmbeddedResource Remove="core\**" />
     <None Remove="core\**" />
+    <!-- Tests/ holds the IWC test project (Tests/IcomWebControl.Tests),
+         which ProjectReferences this one. Same reason as core/ above: the Web
+         SDK globs **/*.cs, so without this removal the test classes compile
+         into the app as well, where the xunit attributes they carry cannot
+         resolve because the app has no xunit reference. The error that
+         produces names the attributes, not the glob. -->
+    <Compile Remove="Tests\**" />
+    <Content Remove="Tests\**" />
+    <EmbeddedResource Remove="Tests\**" />
+    <None Remove="Tests\**" />
   </ItemGroup>
 
   <!-- Radio-agnostic code shared with Yaesu Web Control. Pulled in as a git
@@ -99,9 +113,9 @@
   <PropertyGroup>
     <!-- Fresh IWC version line starting at 1.0.0; keep in step with Models/AppVersion.cs.
          AssemblyVersion/FileVersion must stay numeric; Version carries any label. -->
-    <Version>1.5.0</Version>
-    <FileVersion>1.5.0.0</FileVersion>
-    <AssemblyVersion>1.5.0.0</AssemblyVersion>
+    <Version>1.6.0</Version>
+    <FileVersion>1.6.0.0</FileVersion>
+    <AssemblyVersion>1.6.0.0</AssemblyVersion>
     <AssemblyTitle>Icom Web Control</AssemblyTitle>
     <Product>Icom Web Control</Product>
     <Description>Browser-based CI-V controller for Icom HF transceivers</Description>
@@ -171,6 +185,27 @@
                       Lines="# Generated at build time from the Radio_Web_Control_Core subtree.;# core/js is the single source of truth - see core/js/README.md.;# Edit these in core/js and push the subtree. Never edit the copy here.;.gitignore;@(_SharedCoreJs-&gt;'%(Filename)%(Extension)')" />
     <ItemGroup>
       <Content Include="@(_SharedCoreJs->'wwwroot\js\%(RecursiveDir)%(Filename)%(Extension)')"
+               Exclude="@(Content)">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
+  <!-- The ESP32-S3 paddle adapter firmware, built in core and flashed from the
+       CW Paddle page. Copied like the core JS above, for the same reasons. -->
+  <Target Name="CopyCoreFirmware" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_CoreFirmware Include="core\firmware\paddle-adapter\dist\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_CoreFirmware)"
+          DestinationFolder="wwwroot\firmware\paddle-adapter"
+          SkipUnchangedFiles="true" />
+    <WriteLinesToFile File="wwwroot\firmware\paddle-adapter\.gitignore"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true"
+                      Lines="# Generated at build time from core/firmware/paddle-adapter/dist.;# Never edit the copy here.;.gitignore;@(_CoreFirmware-&gt;'%(Filename)%(Extension)')" />
+    <ItemGroup>
+      <Content Include="@(_CoreFirmware->'wwwroot\firmware\paddle-adapter\%(Filename)%(Extension)')"
                Exclude="@(Content)">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>

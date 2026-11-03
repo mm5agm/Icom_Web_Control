@@ -12,6 +12,7 @@ namespace Icom_Web_Control.Hubs
         private readonly RadioStateService _radioState;
         private readonly IRadioController _radio;
         private readonly ISettingsService _settings;
+        private readonly Icom_Web_Control.Services.Cw.CwKeyingService _cwKeying;
 
         // Every currently open SignalR connection, and the whole of what the
         // host means by "a browser is watching". Presence used to mean a
@@ -37,13 +38,15 @@ namespace Icom_Web_Control.Hubs
 
         public RadioHub(ILogger<RadioHub> logger, IHostApplicationLifetime lifetime,
                         RadioStateService radioState, IRadioController radio,
-                        ISettingsService settings)
+                        ISettingsService settings,
+                        Icom_Web_Control.Services.Cw.CwKeyingService cwKeying)
         {
             _logger   = logger;
             _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
             _radioState = radioState;
             _radio = radio;
             _settings = settings;
+            _cwKeying = cwKeying;
         }
 
         public override async Task OnConnectedAsync()
@@ -70,6 +73,12 @@ namespace Icom_Web_Control.Hubs
             // still-hidden card the whole time.
             _radio.RequestScopeStatusAnnounce();
 
+            // Not radio state but settings: the X-Watch keys show them, and the
+            // Radio panel has no server-rendered copy.
+            var settings = await _settings.GetSettingsAsync();
+            await Clients.Caller.SendAsync("RadioStateUpdate", new { property = "CrossBandWatch",
+                value = Controllers.RadioController.CrossBandWatchState(settings) });
+
             await base.OnConnectedAsync();
         }
 
@@ -77,6 +86,7 @@ namespace Icom_Web_Control.Hubs
         {
             _connections.TryRemove(Context.ConnectionId, out _);
             _spectrumPanels.TryRemove(Context.ConnectionId, out _);
+            _cwKeying.Disconnected(Context.ConnectionId);
 
             // A navigation or a closed tab arrives with no exception. A
             // connection the server gave up on -- one that sent nothing within
@@ -112,6 +122,22 @@ namespace Icom_Web_Control.Hubs
                     ShutdownGrace.TotalSeconds);
                 ScheduleShutdown();
             }
+        }
+
+        // The CW Paddle page: its keyer's packets, and the key line. Packets
+        // are sent fire-and-forget; CwKeyingService plays them after its
+        // jitter buffer and reports back on CwKeyReport.
+        public void CwKey(RadioWebControl.Core.Services.Cw.CwKeyPacket packet) => _cwKeying.Receive(Context.ConnectionId, packet);
+        public object CwKeyLineStatus() => _cwKeying.LineStatus();
+        public string? CwSetKeyLine(string? port) => _cwKeying.SetKeyPort(port);
+
+        // What the paddle page's keyer sent, read back as text there, passed
+        // to the other pages for the CW Send log. Whether it reached the radio
+        // is the server's word, not the page's: is a key line chosen.
+        public Task CwPaddleText(string? text)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length > 16) return Task.CompletedTask;
+            return Clients.Others.SendAsync("CwPaddleText", text, _cwKeying.Live);
         }
 
         // Called every 5 seconds by site.js and by the Classic pop-outs.

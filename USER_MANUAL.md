@@ -29,6 +29,7 @@
    - 5.18 [Pop-out windows](#518-pop-out-windows)
    - 5.19 [Experimental UI](#519-experimental-ui)
    - 5.20 [Radio panel](#520-radio-panel)
+   - 5.21 [RTTY Contest](#521-rtty-contest)
 6. [Settings Page](#6-settings-page)
    - 6.1 [Radio Connection](#61-radio-connection)
    - 6.2 [Web Server Settings](#62-web-server-settings)
@@ -120,6 +121,14 @@
     - 20.8 [Troubleshooting](#208-troubleshooting)
     - 20.9 [What the tuner changes on your radio](#209-what-the-tuner-changes-on-your-radio)
     - 20.10 [Contest Mode: the tuner on its own](#2010-contest-mode-the-tuner-on-its-own)
+21. [CW Paddle](#21-cw-paddle)
+    - 21.1 [What you need](#211-what-you-need)
+    - 21.2 [The HaliKey MIDI](#212-the-halikey-midi)
+    - 21.3 [An ESP32-S3 board as the adapter](#213-an-esp32-s3-board-as-the-adapter)
+    - 21.4 [Keyer and sidetone](#214-keyer-and-sidetone)
+    - 21.5 [Keying the radio](#215-keying-the-radio)
+    - 21.6 [Troubleshooting](#216-troubleshooting)
+    - 21.7 [HTTPS for a browser on another computer](#217-https-for-a-browser-on-another-computer)
 
 ---
 
@@ -168,7 +177,7 @@ The application was written for operators who want a large, clean, touchscreen-f
 - TX monitor on/off toggle and level control
 - Radio memory channels — recall saved frequencies and modes at a click; save and load named memory banks for different operating scenarios (e.g. Daily, Contest)
 - Real-time spectrum display and waterfall using the **IC-7300's built-in band scope**, delivered over CI-V — no external SDR or IF tap needed
-- **Pseudo-dual receiver** — an optional second spectrum panel for VFO B, cropped from the same sweep when both VFOs share a band, or refreshed by a brief cross-band peek when they do not ([§5.4](#54-spectrum-display))
+- **Pseudo-dual receiver** — an optional second spectrum panel for VFO B, cropped from the same sweep when both VFOs share a band, or refreshed by a brief cross-band peek when they do not, which the **X-Watch** key switches off for a QSO ([§5.4](#54-spectrum-display))
 - **DX cluster spots** overlaid on the spectrum — click a callsign to QSY straight to that frequency; user-selectable cluster server with live connection-status badge
 - **DX watch list** — get a popup alert and a beep when watched callsigns or prefixes appear in the cluster feed (e.g. `P29*` for a DXpedition); persisted across app restarts
 - **TX timeout warning** — visible red banner + audible tone if TX has been on too long (configurable threshold), as a safety net against open mics, stuck PTTs and VOX false-triggers
@@ -284,7 +293,11 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.5.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.6.0**) are shown in the top-left corner.
+
+**Views** in the top bar chooses how you work the radio: **Classic** (this page), **Experimental** ([§5.19](#519-experimental-ui)) or **Radio** ([§5.20](#520-radio-panel)). The same **Views** list is on all three, and the one you are on is highlighted. IWC remembers the view you opened last and starts in it next time, from the desktop shortcut or the tray icon.
+
+The other pages (Settings, Application Setup, Memories, the User Manual and the rest) are links along the Classic page's top bar, which a screen reader announces as **Site pages**. On the Experimental UI they are under **Menu**, and on the Radio panel under its **MENU** key; from there each opens in a new tab, so the view keeps running behind it.
 
 **Update notification** — on startup the app silently checks GitHub for a newer version. If one is available, a small banner appears listing what has changed, with a **Download** link that opens the releases page in your browser, and a **Dismiss** button. No banner appears if you are already on the newest version or if the internet is not available.
 
@@ -484,7 +497,7 @@ The three sliders under the panel header shape the display. All three are per-VF
 
 **Scope mode** (top-left of the canvas) — shows the scope mode the radio is actually in, read from the sweep data itself: **CENT**, **FIX**, **SCROLL-C** or **SCROLL-F**. **CENT** is green and the other three are amber, so you can see at a glance whether the display is following your VFO or holding a fixed segment; the frequency axis is correct either way. **Clicking the badge switches the radio between Centre and Fixed** — it does exactly what the **Centre / Fixed** button in the panel header does, so use whichever is nearer. The button is the one to reach for with a keyboard or a screen reader.
 
-**Scope status** (right-hand end of the panel header) — **Scope off** (no sweeps; the scope is switched off, or the radio isn't up yet), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show), or **Scope blocked** (red — the radio understood the request for scope data and refused it; the panel prints the reason and what to change, see §14.2).
+**Scope status** (right-hand end of the panel header) — **Scope off** (no sweeps; the scope is switched off, or the radio isn't up yet), **Connecting…**, **Live** (green — sweeps are arriving), **Hold** (yellow — frozen, see above), **Disconnected**, **Off-screen** (amber — the watch panel described below is pointed at a frequency the single scope cannot currently show; with **X-Watch** off and the VFOs on different bands the watch panel is hidden instead), or **Scope blocked** (red — the radio understood the request for scope data and refused it; the panel prints the reason and what to change, see §14.2).
 
 **DX cluster** (top-right of the canvas) — the cluster connection state: green for *connected*, amber for *connecting*, red for *disconnected*, grey for *off*. See Section 6.5 for cluster setup and troubleshooting.
 
@@ -508,7 +521,7 @@ On crowded bands (the lower end of 20m on a contest weekend, for example) labels
 
 By default IWC shows **one** spectrum panel, for VFO A. The IC-7300 has a single receiver and a single scope, so that is the honest picture.
 
-Switching on **Enable pseudo-dual receiver** in **Settings → Spectrum Display** adds a second panel for VFO B — a *watch* panel — by time-sharing the one scope between them. On the **same band** both panels update live and your audio is never interrupted, because the single sweep covers both frequencies. Watching a **different** band is only possible by briefly borrowing the receiver, so it is off unless you also tick **Allow cross-band watch**; with that on, IWC retunes for a moment every few seconds (interval configurable, default 15 s) and your listening audio dips for about 0.4 s per peek. With cross-band watch off, a watch panel pointed at another band simply shows **Off-screen**. The peek only runs while a browser is actually showing the watch panel: choose **VFO A** (or **VFO B**) alone in the spectrum strip, or switch the scope off, and the retuning stops until you go back to **Both**. Commands you send during a peek — a voice **Band up**, a click on the spectrum, a memory recall — are held for the fraction of a second the receiver is borrowed and then applied to your own VFO, never to the one being watched.
+Switching on **Enable pseudo-dual receiver** in **Settings → Spectrum Display** adds a second panel for VFO B — a *watch* panel — by time-sharing the one scope between them. On the **same band** both panels update live and your audio is never interrupted, because the single sweep covers both frequencies. Watching a **different** band is only possible by briefly borrowing the receiver: that is *cross-band watch*. With it on, IWC retunes for a moment every few seconds and your listening audio dips for about 0.4 s per peek. It is set with the **X-Watch** key beside the **Listening** badge, on whichever panel you are hearing, and with **X-WATCH** on the Radio panel ([§5.20](#520-radio-panel)); it is not in Settings. Click **X-Watch** to switch it on or off in one go, for instance when a QSO starts: the peek stops within about a second. The arrow beside it lists **Peek every 5 s** to **Peek every 60 s** (default 15 s); larger means fewer audio dips but a staler watch trace, and picking one also switches it on. The key reads **X-Watch 15 s** when on and **X-Watch Off** when off. With cross-band watch off and the VFOs on different bands, the watch panel could only say it was out of range, so it is hidden and the panel you are hearing shows alone; it comes back when you switch X-Watch on or put both VFOs on one band, and your Single/Dual choice is kept. Same-band watch carries on whatever X-Watch says, because it never retunes. The peek only runs while a browser is actually showing the watch panel, on the Classic page, the Radio panel ([§5.20](#520-radio-panel)) or its spectrum window: show only your own VFO's panel, switch the Radio panel to another view, minimise the page, or switch the scope off, and the retuning stops until the watch panel is back on screen. Commands you send during a peek — a voice **Band up**, a click on the spectrum, a memory recall — are held for the fraction of a second the receiver is borrowed and then applied to your own VFO, never to the one being watched.
 
 ![Both spectrum panels side by side — VFO A listening, VFO B as the silent watch panel, each with its own tuning step: 1 Hz on A, 1 kHz on B](pictures/Spectrum_Scope_Both.png)
 
@@ -1048,16 +1061,33 @@ A panel on the main page can be dragged around and resized, but it can't leave t
 
 ### 5.19 Experimental UI
 
-**Experimental UI** in the top bar opens a second way of working the radio, at `http://localhost:8080/flexui`. Its dockable workspace was designed by Fabio Valente (CR7CDC) for Yaesu Web Control, and IWC uses the same one. The Classic page described in the rest of §5 is unchanged and is still where IWC opens; **Classic Home** in the Experimental UI's top bar takes you back, and both can be open in different tabs at once.
+**Experimental** under **Views** in the top bar ([§5.1](#51-top-bar)) opens a second way of working the radio, at `http://localhost:8080/flexui`. Its dockable workspace was designed by Fabio Valente (CR7CDC) for Yaesu Web Control, and IWC uses the same one. The Classic page described in the rest of §5 is unchanged; **Classic** under **Views** in the Experimental UI's top bar takes you back, and both can be open in different tabs at once. The other pages are under **Menu**, each opening in a new tab.
 
-The Experimental UI is the Classic page itself, rearranged into panels: **Toolbar**, **Clarifier**, **Meters**, **Spectrum**, **VFO A** and **VFO B**. Every button, slider and readout is the one on the Classic page, so they behave exactly the same; only where they sit is different.
+![The Experimental UI: the toolbar strip across the top, then the Levels, VFO Actions, Buttons and Clarifier panels, Linear Meters beside the Spectrum, and the VFO A and VFO B cards along the bottom](pictures/IWC_Experimental.png)
 
-- **Arranging panels.** Drag a panel by its tab to move it. Drop it on the edge of another panel to dock it beside it, or in the middle to put the two together as tabs. Drag the dividers between panels to resize them. **Clarifier** starts as a tab behind **Toolbar**; click its tab to see it.
+The Experimental UI has a dark look, also Fabio's. Its controls are the Classic page's own controls, rearranged: every button, slider and readout behaves exactly as it does on the Classic page; only where it sits and how it looks are different. Underneath the toolbar strip it has these panels:
+
+- **The toolbar strip** runs across the top, under the menu bar, and is not a panel. It holds the UTC clock, **Mem**, **S-hist**, the logger buttons and **Connect** / **POWER**. The dock's own controls are in front of Connect: **Panels**, the layouts menu, the UI size and **Reset**.
+- **Levels** — **POWER**, **MIC**, **PROC** and **MONI** keys. Each one shows its current setting and follows the radio.
+- **VFO Actions** — **A↔B**, **B→A**, **A→B**, **Split** and **+5k**.
+- **Buttons** — **ATU**, **Tune**, **FM Rep** and **VOX**, plus the keys that open the CW, CW Reader, CW Send, RTTY, DX Spots, DX Watch and Voice panels. ATU works as it does on Classic: tap it to switch the tuner in or out, and hold it to start a tune.
+- **Clarifier** — the same as on the Classic page.
+- **Linear Meters** — PWR, SWR, COMP, ALC, IDD and VDD as bars in a narrow column beside the Spectrum. Each bar reads the same as the dial meter on the **Meters** tab behind it. The IC-7300 doesn't report temperature over CI-V, so there is no TEMP bar.
+- **Spectrum** — the radio's band scope, as on the Classic page.
+- **VFO A** and **VFO B** — one card per VFO, in three columns:
+  - Tuning: frequency, a bar S-meter, RF and AF gain, band, mode and Save to Mem.
+  - Filter: IF width, filter slot, IF shape, APF, Twin PBT and RX Tone.
+  - Keys: the voice mic button, AGC, preamp, ATT, NR, NB and notch.
+
+  The IC-7300 has one receiver, so only the VFO you are listening on shows a reading. The other S-meter shows S0, greyed out. Showing and hiding VFO B is done with its tab, so the Classic VFO-B key is hidden here.
+
+- **Arranging panels.** Drag a panel by its tab to move it. Drop it on the edge of another panel to dock it beside it, or in the middle to put the two together as tabs. Drag the dividers between panels to resize them.
 - **Popping a panel out.** The pop-out button at the right of a panel's tab bar moves the panel into a window of its own, which you can put on another screen. It keeps working there, meters and scope included. Close the window to bring the panel back into the main page.
 - **Showing and hiding panels.** The **Panels** menu shows or hides each one, so a panel you have closed can be brought back. A hidden panel keeps up with the radio, so it is current the moment you show it again.
 - **UI size.** The size box (X-Small to Large) changes the size of the text and controls without moving the panels.
 - **Layouts.** The layouts menu, which shows the name of the layout in use, holds named arrangements. **Save current as…** saves what is on screen under a name, and **Manage layouts…** renames or deletes them. Layouts are saved in IWC itself (`flex-layouts.json`, in the same folder as your settings), not in the browser, so another browser or PC using the same IWC sees the same list. Once a named layout is chosen, changes to it are saved as you make them. **Default** is the built-in arrangement and is never overwritten: changes made to it are kept by this browser only, until you save them under a name.
 - **Reset** puts the panels back where the Default arrangement has them.
+- **Coming from v1.5.0.** If you rearranged **Default** in v1.5.0, those changes are set back the first time you open this version, because the old **Toolbar** panel has gone. Your named layouts are still in the layouts menu, but they were saved before the new panels existed. Add the new panels from the **Panels** menu, or press **Reset** and save the new arrangement under a name.
 
 It is called experimental because it is new. If something works on the Classic page and not here, please report it and say which page you were on.
 
@@ -1065,18 +1095,25 @@ It is called experimental because it is new. If something works on the Classic p
 
 ![The Radio panel on 14.018.998 MHz CW: the frequency display and meters along the top, the scope and waterfall in the middle with a DX spot, and the front-panel style knobs and keys around them](pictures/Radio_GUI.png)
 
-**Radio** in the top bar, on both the Classic page and the Experimental UI, opens a third way of working the radio, at `http://localhost:8080/radio`. It is laid out like the front of a transceiver: the meter and the keys down the left, a screen in the middle with the VFOs, the band scope and the band and mode keys, the main dial on the right, and a row of knobs along the bottom. The **Classic**, **Experimental** and **Radio** buttons in its top strip move between the three, and they can all be open in different tabs at once.
+**Radio** under **Views**, on both the Classic page and the Experimental UI, opens a third way of working the radio, at `http://localhost:8080/radio`. It is laid out like the front of a transceiver: the meter and the keys down the left, a screen in the middle with the VFOs, the band scope and the band and mode keys, the main dial on the right, and a row of knobs along the bottom. **Views** in its top strip moves between the three, and they can all be open in different tabs at once.
 
 The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300's. Everything on it works the radio: the keys, the knobs, the main dial and the windows opened from the keys under the meter.
 
 **The screen.**
 
 - **VFO-A** and **VFO-B** show each VFO's frequency, mode, IF width, AGC and filter, and anything switched on, such as P.AMP, ATT, NB, NR, AN, MN or APF. **SPLIT** appears beside VFO-A when split is on. The **SEG** chip shows the band segment, and clicking it gives a list to change it. **ENT** opens a keypad for typing in a frequency.
-- **The band scope** is the radio's own scope, the same one as the spectrum on the Classic page ([§5.4](#54-spectrum-display)), with the passband shaded, the band edges and band-plan marks, the frequency along the bottom and DX cluster spots ([§5.17](#517-dx-spots-list)) marked on it. **OUT OF BAND** appears when the dial is outside the band. The **VFO-A** and **VFO-B** tabs choose which VFO's scope you see; with pseudo-dual off in Settings ([§6.3](#63-spectrum-scope)) the scope follows the selected VFO. If the radio has stopped sending scope data, the scope says why.
-  - **Click** to tune there, or turn the **mouse wheel** to tune one step a notch. A thin line and a readout follow the mouse and show exactly the frequency a click would send.
+- **The band scope** is the radio's own scope, the same one as the spectrum on the Classic page ([§5.4](#54-spectrum-display)), with the passband shaded, the band edges and band-plan marks, the frequency along the bottom and DX cluster spots ([§5.17](#517-dx-spots-list)) marked on it. **OUT OF BAND** appears when the dial is outside the band. The **VFO-A**, **VFO-B** and **Both** tabs choose which VFO's scope you see. With pseudo-dual on, VFO-B on another band is the cross-band watch, and it is kept fresh while its tab (or **Both**) is showing, as on the Classic page ([§5.4](#54-spectrum-display)). **X-WATCH** (below) switches it; with it off, only the VFO you are hearing is shown until X-WATCH comes back on or the VFOs share a band; with pseudo-dual off in Settings ([§6.3](#63-spectrum-scope)) the scope follows the selected VFO. If the radio has stopped sending scope data, the scope says why.
+  - **Click** to tune there, or turn the **mouse wheel** to tune one step a notch. A thin line and a readout follow the mouse and show exactly the frequency a click would send. While the dial moves under a still mouse, the readout keeps showing the frequency now under it.
   - **Shift+click** drops a marker; Shift+click on it again to clear it. Markers are not saved.
+  - **Why the passband is not centred on the dial.** The dial shows the carrier frequency, not the middle of what you hear. In **USB** and **USB-D** the radio passes the band just above the dial, so the shading starts 100 Hz above the dial and runs upward for the IF width. On 14.074 with a 3 kHz width it covers roughly 14.0741 to 14.0771, which is where the FT8 signals are, and a signal 1,500 Hz above the dial comes out of the speaker as a 1,500 Hz tone. **LSB** and **LSB-D** are the mirror image, with the shading just below the dial. **CW**, **RTTY**, **AM** and **FM** are shaded evenly either side of the dial. The 100 Hz gap is drawn as the usual low edge of a voice filter, not read from the radio. The span (5 kHz, 10 kHz and so on) is the width of the whole display, not the passband.
   - In the scope's bottom-left corner are the **span** list, **HOLD**, and **SCOPE**, which sets the range, speed, brightness and passband shading.
-  - The **⇱** key opens the scope in a browser window of its own, for a second screen.
+  - **The other VFO's span on the same band.** There is one scope, centred on the VFO you are hearing. When the other VFO is on the same band, its scope is cut from that one sweep: the widest window, centred on that VFO, that fits inside the sweep. So its caption can show a span the list does not offer, such as **SPAN 7 kHz**, and the nearer the two VFOs are to each other, the wider it is. The caption is the true width. The span list shows the nearest span the radio has, and choosing one sets the radio's scope, so both VFOs' scopes change.
+  - **The other VFO's passband.** The radio only reports the IF width of the VFO in use, so IWC works out the other VFO's width:
+    - Each filter slot (FIL1, FIL2, FIL3) in each mode has one width, whichever VFO uses it. IWC can read the other VFO's mode and slot without switching, so if VFO A has used the same mode and slot, VFO B shows that width.
+    - With **X-Watch** on and the VFOs on different bands, each peek also reads the other VFO's width.
+    - With **X-Watch** on and both VFOs on the same band, if the width is still not known (just after switching X-Watch on, or after the other VFO moved to a new mode or slot), IWC switches to the other VFO once to read it. You hear a dip of about a tenth of a second.
+    - Otherwise the other VFO shows no width and no passband shading until it is selected.
+  - The **⇱** key opens the scope in a browser window of its own, for a second screen. It works as the scope on the panel does: **click** to tune there, and turn the **mouse wheel** to move the dial by the panel's **STEP** a notch. The line and readout follow the mouse there too.
 - **The top strip** has lamps for the radio's CI-V link (**CI-V**), the band scope (**SCOPE**) and the DX cluster (**DX**): green is working, amber is connecting, red is a fault. **Click CI-V** to disconnect from the radio, and again to connect, as **Connect** does on the Classic page; while it is disconnected IWC lets go of the COM port, so another program can use it. Beside the lamps are WSJT-X's transmit state and a UTC clock. **F** fills the screen with the panel; Esc goes back. **MENU**, at the right-hand end, drops down IWC's other pages: Settings, Application Setup, Memories, Labels, Meter Calibration and Diagnostics, then the User Manual and About. Each opens in a new tab, so the panel keeps running behind it.
 
 **Changing things in the VFO boxes.** Click the mode, the IF width or the AGC in a VFO box to get a list, and click one to change it; click anywhere else or press Esc to close the list. Click P.AMP, ATT, NB and the other words in a box to switch them, as their keys do. Hold the mouse over a digit of a frequency and turn the mouse wheel to move that digit up or down. Only the VFO the radio is on can be changed this way; the other one is shown but cannot be changed from its box.
@@ -1086,6 +1123,8 @@ The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300'
 **The main dial and the knobs.** Turn the mouse wheel over a knob, or drag it round, to turn it.
 
 - **The main dial** tunes the selected VFO one step at a time. The **−** and **+** keys under it tune down or up by one step, landing on a whole step as the radio's dial does. Press **STEP** to go through 10 Hz, 50 Hz, 100 Hz, 500 Hz, 1 kHz, 5 kHz and 10 kHz; this browser remembers it.
+
+  Dragged, the dial behaves like a weighted knob. Turned slowly, each tenth of a turn is one step, so fine tuning is exact. Spin it faster than about one and a half turns a second and each step goes further, up to eight times as far at four turns a second. Let go while spinning fast and it runs on for a moment, slowing down; click it, or turn the mouse wheel over it, to stop it. After a slow turn it stops dead. The mouse wheel is always one step a notch. The idea comes from the tuning dial in Brian Clark's IC-7300-Scope. *New in v1.6.0.*
 - **AF / RF·SQL**: the inner knob is the AF gain (volume), the outer ring the RF gain.
 - **TWIN PBT**: inner and outer passband tuning. Both at the centre is no shift.
 - **NOTCH / NR**: the inner knob is the manual notch position, the outer ring the noise reduction level.
@@ -1095,9 +1134,10 @@ The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300'
 **The keys.** Each key's light shows whether that function is on, and the small text under some of them shows the setting.
 
 - **P.AMP** steps through off, P.AMP1 and P.AMP2. **ATT** switches the 20 dB attenuator.
-- **AGC** steps through FAST, MID and SLOW. **FILTER** steps through FIL1, FIL2 and FIL3.
+- **AGC** steps through FAST, MID and SLOW. **FILTER** steps through FIL1, FIL2 and FIL3. Under each key is what it is set to, and under **FILTER** that is the slot and its width.
 - **NB**, **NR** and **AN** (auto notch) switch on and off. **MN** switches the manual notch on; each press while it is on steps its width. **APF** steps through OFF, WIDE, MID and NAR.
-- **COMP** switches the speech compressor, which only affects transmit audio. **MONI** switches the monitor on and off; it does not transmit.
+- **COMP** switches the speech compressor, which only affects transmit audio. **MONI** switches the monitor on and off; it does not transmit. With pseudo-dual on, **X-WATCH** sets cross-band watch ([§5.4](#54-spectrum-display)): it lists **Off** and the peek intervals, **5 s** to **60 s**, and shows the one in use (or **OFF**) under its label. On, the other VFO on another band is refreshed by briefly retuning the receiver, which dips your audio; pick **Off** for a QSO. With it off and the VFOs on different bands, the scope (and its pop-out spectrum window) shows only the VFO you are hearing, and goes back to the tab you had when X-Watch comes on again.
+- **VOICE** is voice control's mic button ([§17](#17-voice-control)). It is only there when voice control is switched on. Hold it down while you speak a command and let go when you have finished; the command works on the selected VFO. While it listens the key lights and shows **LISTENING**, then shows what it heard, **???** if it didn't recognise it, or **ERROR** in red if something went wrong.
 - **A▸B**, **B▸A**, **A⇄B** and **SPLIT** copy, swap and split the VFOs. **Q.SPLIT** puts the other VFO 5 kHz up and turns split on.
 - **M.STORE** adds the selected VFO to IWC's memory list, the one on the Memories page ([§8](#8-radio-memories)), and shows **SAVED** under it. It does not write to the radio's own memories.
 - **M▸VFO** and **VFO▸M** work with the radio's own 99 memory channels. The IC-7300 cannot tell IWC which channel it is on, so both keys drop down a list to pick from. **M▸VFO** lists the channels that have something in them; click one and the selected VFO tunes to it. **VFO▸M** lists all 99, empty ones included; click one, and the key names it, such as **M013?**. Press **VFO▸M** again within four seconds to write the selected VFO over that channel, or leave it and nothing is written. This writes to the radio's memory, not to IWC's memory list.
@@ -1115,11 +1155,92 @@ The panel itself is shared with Yaesu Web Control; what is on it is the IC-7300'
 - **METERS**: all the meters, and the S-meter history.
 - **RX SETUP**: Twin PBT and the receive levels.
 
-The CW Reader, CW Send, the RTTY tuner and the DX spots each have a **⇱** key that opens them in a browser window of their own. Unlike a window on the panel, that one can go on another screen. In the CW and RTTY windows, **⇱ WINDOW** in the title bar does the same for the whole window. CW Send's Send key and keyer memories make the radio transmit, and are marked in red.
+**⇱ WINDOW** in the title bar of the CW and RTTY windows opens the whole window in a browser window of its own, and the DX spots have a **⇱** key that does the same for them. Unlike a window on the panel, that one can go on another screen. While it is open, the window's key under the meter brings it to the front instead of opening a second copy on the panel. CW Send's Send key and keyer memories make the radio transmit, and are marked in red.
 
-**Theme and size.** The two boxes at the right of the top strip choose the colours and the size. **Dark console** is the usual look; **Night (red)**, **Silver classic**, **Daylight**, **Green display** and **High contrast** are the others, and **Match computer** follows Windows' light or dark setting. **Fit** makes the whole panel fit the window; the percentages fix its size and let you scroll. Both are remembered by this browser, so a tablet and a PC can each have their own.
+**Theme and size.** The two boxes at the right of the top strip choose the colours and the size. **Dark console** is the usual look; **Night (red)**, **Silver classic**, **Daylight**, **Green display** and **High contrast** are the others, and **Match computer** follows Windows' light or dark setting. **Fit** makes the whole panel fit the window; the percentages fix its size and let you scroll. Or drag the grip in the panel's bottom-right corner to any size; the size box then lists it as a percentage and keeps it. Both are remembered by this browser, so a tablet and a PC can each have their own.
 
 The Radio panel has none of the screen-reader or voice-control work of the Classic page, and no launch buttons for WSJT-X or other programs. Those stay on the Classic page.
+
+### 5.21 RTTY Contest
+
+*New in v1.6.0, and still being tested.*
+
+**RTTY Contest** has only what a contest RTTY operator uses, on one screen: the frequency, the radio's band scope over its waterfall, and the RTTY tuner docked at the side. Pick it from **Views** on the Radio panel ([§5.20](#520-radio-panel)), or go to `http://localhost:8080/rtty-contest`. **VIEWS** beside the title on the page itself goes back to the other GUIs, and **MENU** beside it has Settings, the other setup pages, the manual and About, each opening in a new tab so RTTY Contest keeps running. It is the RTTY Contest page from Yaesu Web Control, shared between the two apps. It receives only: nothing on it transmits. Transmit from your logger, or from MMTTY.
+
+While it is open, its tuner keeps the radio in the mode chosen in **MODE** (below). If something else changes the mode, CW Reader Mode or a band change, the tuner puts it back, so close the page, or use another GUI, for CW.
+
+**The top strip**
+
+- **The frequency** of the VFO on screen. Click it to type a frequency: `14.08` and `14080` and `14080000` all mean 14.080 MHz. Enter tunes there and Esc leaves it as it was. Hold the mouse over a digit and turn the wheel to move that digit up or down, as on the Radio panel.
+- **MODE** is a list of RTTY, RTTY-R, LSB-D and USB-D, as the radio's screen names them (IWC's RTTY-L, RTTY-U, DATA-L and DATA-U). LSB-D or USB-D is for AFSK, where your RTTY software makes the tones. A pick is kept (it is the same setting as **RTTY mode** in Settings, [§6.8](#68-rtty-tuner)), the tuner holds the radio in it, and the band keys use it. A mode outside the four, CW say, shows as itself in amber, so you can see at a glance that the radio isn't in RTTY: open the list to pick one. Then the tuner's **MARK / SHIFT**, then **RX** or **TX**.
+- **Meters:** S, and PO, SWR and ALC while transmitting. **METERS** hides or shows them.
+- **VFO-A / VFO-B** chooses which VFO is on screen. The IC-7300's scope follows the selected VFO, so this selects it on the radio, as the VFO keys on the Radio panel do, and a VFO change on the radio moves the page with it.
+- **DX SPOTS** switches the spot tags on the spectrum on and off.
+- **SPAN** is a list in the label at the top of the spectrum, beside the frequency, and sets the scope's span.
+- **LAYOUT** saves and recalls named layouts (below).
+- **The theme list**, beside LAYOUT, is this page's colour theme, the same themes as the Radio panel. Until you pick one here the page follows the Radio panel's theme; once you have, the two are separate. The page's windows follow it, and it is kept in this browser, not in a layout.
+
+The frequency, the MODE list and the keys keep their colours readable in every Radio panel theme; the page takes its theme from the Radio panel.
+
+**The band keys**
+
+Under the strip is a row of band keys. A key tunes the radio to the RTTY part of the band and puts it in the mode chosen in **MODE**. The spot comes from your band plan's RTTY segment where it has one. Where it doesn't, the keys use 1.838, 3.580, 7.040, 10.140, 14.080, 18.105, 21.080, 24.925, 28.080 and 50.300 MHz. The band plan the other GUIs use is not changed. **60 m and 4 m** have no RTTY spot here: their keys go to the radio's own band memory, as the band keys on the other GUIs do, and then to that mode. The key for the band you are on is lit, however you got there.
+
+**BANDS**, in the scope row, opens a box with a tick for each band key. Untick the bands you don't work and their keys go. The choices are kept in this browser; they are not part of a layout.
+
+**MEM**, next to BANDS, opens a list of your memories, the same ones the Memories page keeps ([§8](#8-radio-memories)). Click one to tune the VFO on screen, A or B, to it. The list stays open while you work, so you can hop between your spots. **EDIT** opens the Memories page in a new tab, to add, change or delete them; the list catches up when you come back. **×**, Escape or MEM again closes it. With more memories than fit on the screen, the list scrolls. *As Bruce VK2RT asked for Yaesu Web Control.*
+
+**The scope row**
+
+- **REF** moves the bottom of the trace up or down from the noise floor. **AUTO** lets the floor follow the noise; off, it stays where it is.
+- **RANGE** is how many dB the trace covers. **FIT** sets it so the strongest signal of the last few seconds just fits, as does a double-click on the bar between the spectrum and the waterfall.
+- **WF ON TOP** puts the waterfall above the spectrum.
+- **FIXED** holds the spectrum still while the dial moves. Click a signal and only the passband and the dial line move, so the stations stay where you saw them. The spectrum moves on only when the passband goes past the edge of the screen, or you change the span or the band. Tuning past an edge turns the page: the next stretch of band comes up with the passband near the opposite edge, so tuning up the band carries on from left to right. A jump of more than a screen width, such as a band change or a typed frequency, centres the passband instead. Off, the spectrum stays centred on the dial. The IC-7300 sends its scope centred on the dial, so with FIXED on, a strip at one edge can be blank, as wide as the dial has moved from the middle.
+- **STEP** is how far one notch of the mouse wheel moves the dial over the spectrum, 1 Hz to 1 kHz.
+- **TRACE** is how thick the spectrum's line is.
+- **BANDS** chooses the band keys (above).
+- **MEM** lists your memories, to tune to one (above).
+- **POP OUT** opens the spectrum, the waterfall, or both, in a window of their own.
+
+**Tuning**
+
+Click a signal on the spectrum or on the waterfall to tune to it. The **arrows** at the left and right edges of the spectrum move the dial down or up by one span, to look along the band a screen at a time. The page never changes the mode when you click, whatever the band plan says about that part of the band.
+
+Click between a station's two traces. In **RTTY** and **RTTY-R** alike the IC-7300's dial shows the higher of the two tones, so the dial goes half the shift above where you clicked, and the pair lands on the tuner's Mark and Shift. That was checked on DDK9 on 10.1008 MHz in both modes. In **LSB-D** and **USB-D** the dial is the carrier, so the dial goes the tuner's Mark/Shift midpoint away from the click: with the software on Mark 1415 / 170, as MMTTY has them, 1500 Hz above the signal in LSB-D and 1500 Hz below it in USB-D.
+
+**The tuner**
+
+The RTTY tuner ([§20](#20-rtty)) is docked at the right, as in Contest Mode ([§20.10](#2010-contest-mode-the-tuner-on-its-own)), with **From radio**, **Auto** and **Clear** on it. The keys on its bar:
+
+- **DECODE** puts the decoded text in the tuning dial's place, under the tuner, and starts the decoder. The key then reads **VFO WHEEL**: press it to put the dial back, which stops the decoder. The text box has its own **POP OUT** (see *The tuning dial* below for how the two windows behave).
+- **RTTY TUNER** moves the tuner into a window of its own, the same window every GUI pops its tuner out to. It sits under the **POP OUT** keys for the spectrum and waterfall.
+- **ON TOP** puts it in a small window that stays above other programs, such as your logger, where the browser allows it (Chrome and Edge do).
+
+The docked tuner starts small; its grabs make it bigger. Under it is a box with **PWR**, 5 W to the radio's maximum, and **WIDTH**, the radio's IF widths for the mode. There is no SHIFT, because the IC-7300 has Twin PBT instead of an IF shift, and the tuner keeps PBT centred while it is open ([§20.9](#209-what-the-tuner-changes-on-your-radio)). A slider writes to the radio when you let go of it, or a moment after the last notch of the mouse wheel over it.
+
+**WIDTH is kept.** A width you set while the tuner is open is kept for that mode (RTTY-L, RTTY-U, DATA-L or DATA-U), and the tuner uses it each time it starts in that mode instead of working one out. The status line says *"IF filter 350 Hz, as you set it."* Closing the tuner leaves the width where you put it, rather than putting back the one from before. Until now the tuner worked out its own width each time it started.
+
+**AUTO**, at the end of the WIDTH row, is lit while the tuner works the width out itself, and dark while a width you set is kept; hold the mouse over it to see which width and mode. Press it to go back to the tuner's own width for the mode VFO A is in: the kept width is forgotten, the tuner sizes the filter again straight away if it is open, and closing it puts back the width from before it opened. Setting WIDTH by hand while the tuner is open keeps a width again. AUTO is only for VFO A, because the tuner only sets VFO A.
+
+**The tuning dial.** Under those controls is the Radio panel's tuning dial, made smaller, in a box headed **VFO WHEEL**. Both parts tune VFO A: the outer ring in big steps and the inner knob in small ones. Turn the mouse wheel over a part, or drag it round. Pick each part's step in the lists beside the dial, **OUTER** (100 Hz to start with) and **INNER** (10 Hz). The steps are kept in this browser. Dragged fast it speeds up, and runs on when let go mid-spin, as the Radio panel's dial does (section 5.20). The box reaches down to the bottom of the window.
+
+The dial and the decoded text share that place, one at a time: **DECODE** on the tuner's bar shows the text, and **VFO WHEEL** shows the dial again. Each has its own **POP OUT**, so either can go to a window of its own, on another monitor if you like, and the other then has the place to itself. A window stays out whichever is showing on the page. **DOCK** in a window puts it back on the page if its place is showing there; if the other one is showing, DOCK just closes the window. The decoder runs while the text is showing, on the page or in its window. *As Bruce VK2RT asked.*
+
+**MONI**, under PWR in the box below the tuner, switches the radio's monitor on and off and sets its level, so you can keep your own transmit audio quieter than the receiver and never wonder which you are hearing. It doesn't transmit. Your choice is kept in this browser: MONI is on each time the page opens unless you turned it off, and the level you last set is put back. The radio has one monitor, for VFO A and VFO B alike. It stays on the page while the tuner is in a window of its own, as PWR does. *As Bruce VK2RT asked for Yaesu Web Control.*
+
+**Starting on RTTY Contest.** Add the page's name after the program in a desktop shortcut's **Target**, and IWC opens on it:
+
+    "C:\Program Files\MM5AGM\Icom Web Control\Icom_Web_Control.exe" rtty-contest
+
+`radio`, `classic`, `experimental` and `settings` work the same way. With no name, IWC opens the view you used last, as before. If IWC is already running, choosing **Yes** in the *Already Running* box opens the named page.
+
+**The Mark and Shift** are kept by IWC itself, not just by the browser, and every window's tuner starts from the last ones used. Each browser, and each address (localhost or the PC's name), keeps its own, so before this a window that had never had its Mark set could start the tuner on 2125. If the Mark ever changes when you didn't change it, IWC's log has a line starting *RTTY tuner tones now mark* that names the page that changed it.
+
+**Sizes, windows and layouts**
+
+Drag the right edge, the bottom edge or the bottom-right corner of the spectrum, or of the docked tuner, to size it. A box you haven't sized fills the room it has. Each part that pops out leaves the page, and comes back with **DOCK** in its window, or when its window closes.
+
+**LAYOUT** saves all of this by name, on the computer running IWC: the sizes, the choices above, which parts are in windows of their own, and where each window is. Recalling a layout puts every window back where it was, so each can go on its own monitor. If the browser blocks some of the windows, a bar says so with a key for each: one click opens one window.
 
 ---
 
@@ -1157,6 +1278,8 @@ Clicking **Restart Now** stops IWC and (when running as the installed exe) autom
 | Serial Port | COM port the IC-7300 presents over its USB cable (Type-C on the MkII, Type-B on the original). The box lists every port your PC has right now; **Refresh** re-reads the list if you plug the radio in while the page is open, and **Other…** lets you type a port the list cannot see. If you don't know which port is the radio, press **Find my radio** (below). **Diagnostics → COM Ports** shows the same list. |
 | Find my radio | Asks IWC to look for the radio instead of you. It opens each COM port in turn and asks any Icom on it to identify itself, at 19200 first, then 115200, then the remaining speeds; the first radio that answers wins, and its model, port and baud rate are filled into this page for you to **Save**. Nothing is saved or changed on the radio. If a port is held open by another program (WSJT-X, Log4OM, another CAT program) it says so rather than guessing — close that program and press it again. A radio that is switched off, or whose USB cable is out, cannot answer and will not be found. |
 | Baud Rate | The rate IWC opens the serial port at. Default: **19200**. If you used **Find my radio**, this is already the rate the radio answered at. **IC-7300 MkII:** leave it at 19200 — the MkII has no **CI-V USB Baud Rate** menu, and its **CI-V Baud Rate** item applies to the **[REMOTE]** socket only, so there is nothing to match and raising this will not speed the band scope up (measured: the same ~4 sweeps per second at 19200 and at 115200). **Original IC-7300 (not MkII): use 115200** — the original will not send band scope data at any lower rate. Settings warns you if you choose a combination that disables the scope. |
+| Turn the radio on when Icom Web Control starts | On by default. If the radio is switched off when IWC starts, IWC switches it on and connects once it has booted, about 4 seconds later. It does this once, at start; if you switch the radio off while IWC is running, IWC leaves it off. *New in v1.6.0.* |
+| Turn the radio off when Icom Web Control closes | Off by default. Switches the radio off when IWC closes, whether you choose **Exit** from the tray icon or IWC closes itself after the last browser has gone. **Restart Now** on this page leaves the radio on. *New in v1.6.0.* |
 | Band Plan | **IARU Region 1** (Europe, Africa, Middle East — includes 4m), **IARU Region 2** (Americas), **IARU Region 3** (Asia-Pacific), or **Japan** (JARL). Affects which bands and segment frequencies are shown. UK is Region 1; USA, Canada, and South America are Region 2; Australia, New Zealand, and most of Asia (except Japan) are Region 3. |
 | Change mode automatically when tuning from the band plan | On by default. Clicking the spectrum or a DX spot also sets the mode the band plan gives for that frequency. Turn it **off** for contest or off-band-plan work — RTTY above 14.100 and 40m SSB around 7.050 both fight the automatic change, RTTY has no band-plan segment of its own, and an unwanted change can move transmit audio away from your data software (**SET → Connectors → MOD Input**). Picking a named segment from a VFO band dropdown still sets that segment’s mode either way. See §5.4. |
 
@@ -1189,13 +1312,11 @@ The spectrum comes from the **IC-7300's own built-in band scope**, streamed to t
 > **Original IC-7300 owners: the scope needs 115200 baud.** The original model only sends scope data when the radio's **CI-V USB Port** is **Unlink from [REMOTE]** and its **CI-V USB Baud Rate** is **115200**, with 115200 also set in Settings (§6.1). At any lower rate the radio refuses, and the panel says so — everything else, including the radio connection itself, carries on working normally. The **IC-7300 MkII has no such restriction** and streams the scope at any baud rate.
  Span, Range, waterfall Speed and Brightness are all driven from the panel itself; see Section 5.4 for those. This section covers the handful of settings that decide **how many panels you get**.
 
-The radio has one receiver and one scope, so a second panel can only ever be made by time-sharing that one scope. These settings control whether IWC does that, and how far it is allowed to go:
+The radio has one receiver and one scope, so a second panel can only ever be made by time-sharing that one scope. These settings control whether IWC does that. Cross-band watch and how often it peeks are set on the **X-Watch** key ([§5.4](#54-spectrum-display)), not here, so they can be changed mid-QSO:
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | **Enable pseudo-dual receiver (two spectrum panels)** | Off | Adds a second, *watch* panel for VFO B, with a **Listen** button on each panel to choose which one you hear. Off gives the plain single-panel layout. |
-| **Allow cross-band watch (dips audio to peek at the other band)** | Off | Off = same-band only, and your audio is never interrupted; a watch panel on another band shows **Off-screen**. On = IWC briefly borrows the receiver to refresh the other band, dipping your listening audio for about 0.4 s each time. |
-| **Cross-band peek interval (seconds)** | 15 | How often that borrow happens (5–60 s). Larger means fewer audio dips but a staler watch trace. Ignored unless cross-band watch is on. |
 | **Watch panel (VFO B) span buttons** | Zoom in independently | Whether VFO B's span buttons crop its own view in software, share the one physical span with VFO A, or are hidden entirely. VFO B can never be *wider* than VFO A. |
 
 Section 5.4 shows what each of these looks like in use.
@@ -1308,6 +1429,23 @@ If the connection drops, the app reconnects automatically after 15 seconds. Disa
 
 ### 6.6 Backup & Restore
 
+**Two different saves.** The Settings page has two ways to save, and they save different things:
+
+| | Backup & Restore | Radio Menu |
+|---|---|---|
+| **What it saves** | IWC's own settings: COM port, band plan, memories, DX cluster, per-band memory and the rest | The radio's own menu settings: what you see when you press **MENU** and touch **SET** on the radio |
+| **Where those settings live** | On this PC, in `%APPDATA%\MM5AGM\Icom Web Control` | Inside the radio |
+| **Button** | **Export full backup** | **Save radio menu to file** |
+| **File** | `iwc-backup-YYYYMMDD-HHMMSS.zip`, in `%APPDATA%\MM5AGM\Icom Web Control\Backups` | `IWC radio menu <model> <date> <time>.ini`, in `%APPDATA%\MM5AGM\Icom Web Control\Radio menus` |
+| **Open it with** | Unzip it; the files inside are JSON | Notepad, or any text editor |
+| **Putting it back** | **Import full backup…**, then restart IWC | **Load this one** or **Load from another file…**, then tick what to send |
+| **Changing one setting** | Change it on the Settings page | **Change radio settings…**, pick the new value, then send |
+| **Does it change the radio?** | No | Saving only reads the radio. Loading changes only the items you tick |
+
+Use **Backup & Restore** to move IWC to a new PC or undo a change to IWC's settings. Use **Radio Menu** to keep a record of how the radio itself is set up, for example before a factory reset or a firmware update, or to keep one file for contesting and another for everyday use. Neither save includes the other: the backup zip has no radio menu settings in it, and the radio menu file has none of IWC's settings.
+
+#### Backup & Restore
+
 At the bottom of the Settings page (below the Save Settings button) are two buttons for exporting and importing your complete IWC user data as a **single zip file**. This rolls up everything you've customised across the app into one file:
 
 | File in the zip | What it contains |
@@ -1324,11 +1462,11 @@ Plus a small `README.txt` recording when the backup was taken and which IWC vers
 
 **Export full backup**
 
-Click **Export full backup** to download a single file named `iwc-backup-YYYYMMDD-HHMMSS.zip`. Keep it somewhere safe — OneDrive, a USB stick, or your shack laptop. Re-export occasionally as your setup evolves.
+Click **Export full backup** to save a single file named `iwc-backup-YYYYMMDD-HHMMSS.zip` in `%APPDATA%\MM5AGM\Icom Web Control\Backups`. The page shows where it went. **Open that folder** opens it in Explorer on the PC that runs IWC, and **Download a copy** fetches the zip to the browser you are using, which helps when that is another PC. Copy it somewhere safe as well — OneDrive, a USB stick, or your shack laptop — because a backup on the same PC is lost with that PC. Re-export occasionally as your setup evolves.
 
 **Import full backup…**
 
-Click **Import full backup…**, pick a previously exported zip, and confirm the replacement. Each replaced file is preserved as a `.bak` in `%APPDATA%\MM5AGM\Icom Web Control\` so you can recover if the import causes problems. If anything goes wrong mid-import, every file written so far is rolled back automatically.
+Click **Import full backup…**, pick a previously exported zip (they are in the `Backups` folder unless you moved them), and confirm the replacement. Each replaced file is preserved as a `.bak` in `%APPDATA%\MM5AGM\Icom Web Control\` so you can recover if the import causes problems. If anything goes wrong mid-import, every file written so far is rolled back automatically.
 
 **You must restart IWC after importing.** Most services (radio connection, DX cluster, SDR streaming, rigctld server) only read their files at startup, so changes only take full effect after a restart. The app displays a reminder when the import completes.
 
@@ -1340,6 +1478,63 @@ Click **Import full backup…**, pick a previously exported zip, and confirm the
 - **Experimenting safely** — export before trying something risky; import the file to revert if it goes wrong.
 
 The files inside the zip are plain JSON; you can extract and inspect or hand-edit them if needed. They live at `%APPDATA%\MM5AGM\Icom Web Control\` and are also accessible directly without going through the export.
+
+#### Radio Menu
+
+**Change radio settings…**
+
+The quickest way to change one of the radio's menu items is **Change radio settings…** in the **Radio Menu** section. IWC reads every item from the radio, several seconds, and lists them, grouped as the radio's menu is, each with its value now:
+
+- Pick a new value from the item's list. Every list holds only the settings the radio offers. The keyer's **Present Number** has too many settings for a list, so type the number instead; if the value is not one the radio takes, the Note column says so and nothing can be sent.
+- **My Call** is a box to type in: up to 10 letters, numbers and `/ @ . -`. **NTP Server Address** takes up to 64 characters.
+- Type in **Find an item** to show only matching items, for example `TX Delay` or `Beep`. Tick **Show only what I have changed** to check your changes before sending.
+- Each changed item is highlighted and its Note says what it was. **Undo my changes** puts them all back. Items marked **TX** change how or when the radio transmits.
+- The CI-V and network items, and the date and time, are shown but cannot be changed here. A wrong CI-V or network setting would cut IWC off from the radio, and the clock is set on the radio or by NTP.
+- A few items cannot be changed here. The colours can be edited in a saved file and loaded (below). The scope's fixed edges and the FM split offsets are changed on the radio; a saved file can only put them back as they were.
+
+**Nothing is sent until you press Send my changes to the radio** and confirm the list. IWC sends each change, reads it back, and shows **Sent and read back** or what went wrong. Then it saves a new radio menu file (below), so you have a record of the radio after the change. **Read the radio again** refreshes the list, for example after changing something on the radio itself.
+
+**Save radio menu to file**
+
+Click **Save radio menu to file** in the **Radio Menu** section of the Settings page. IWC reads every item of the radio's menu, 270 items, several seconds, and writes the file. Available for the IC-7300MK2.
+
+The file goes in `%APPDATA%\MM5AGM\Icom Web Control\Radio menus`, with IWC's other files, on the PC that runs IWC. The page shows the full path after each save, and **Open that folder** opens it in Explorer. If you use IWC from a browser on another PC, pick the file under **Saved files** and click **Download a copy** to get it on that PC.
+
+The file is grouped the way the radio's menu is. Each line shows the item and its value as the radio's screen shows it. After the `;` come the 1A 05 menu number and what the radio answered:
+
+```ini
+[SET > Tone Control/TBW > TX > SSB]
+TBW (MID) = 300-2700 Hz                  ; 00 15 = 14  [TX]
+
+[SET > Function]
+Beep Level = 50%                         ; 00 22 = 01 28
+```
+
+- **`[TX]`** marks items that change how or when the radio transmits. Load leaves these unticked.
+- **`(no answer)`** means the radio did not reply for that item, usually because it does not apply to the radio's current setup. On the IC-7300MK2, *Display Language* and *Japanese Morse Decode* may show this.
+- Save as many files as you like and rename them for how you use the radio, for example `IWC radio menu contest.ini`.
+
+Saving only reads the radio. Nothing on the radio changes.
+
+**Loading a file**
+
+Pick a file from **Saved files** and click **Load this one**, or click **Load from another file…** to pick a file from anywhere else, such as one a friend emailed you. IWC reads the radio again and shows a table of what would change: the item, its value on the radio now, and its value in the file. **Nothing is sent at this point.**
+
+- Items that would change have a tick box. Items marked **TX** start unticked; tick them only if you want them.
+- Items already the same are hidden. Tick **Show items that are already the same** to see them.
+- Items that cannot be loaded say why in the Note column, for example a value the radio does not offer.
+- **The CI-V and network items are never loaded**, because a wrong one would cut IWC off from the radio, and nor are the date and time. Change them on the radio if you need to.
+
+Press **Send ticked items to the radio** and confirm. IWC sends each ticked item, reads it back, and shows **Sent and read back** or what went wrong.
+
+**Editing the file.** You can change a value in Notepad before loading it. Change the text after `=`, as the radio's screen would show it, and leave the part after `;` alone. For example, to set the HF TX Delay to 20 ms:
+
+```ini
+[SET > Function > TX Delay]
+HF = 20 ms                               ; 00 29 = 00  [TX]
+```
+
+The value after `=` is what counts; the numbers after `;` are only used when you have not changed the value. Capitals, spaces and a leading `+` do not matter, and you can leave the unit off (`20` works as well as `20 ms`). The value must be one the radio offers: `ON` is not, because this item's settings are OFF, 10, 15, 20, 25 and 30 ms. If you type something the radio does not offer, the Note column says so and lists what the item takes. A colour is written `R 255 G 128 B 0`, each from 0 to 255. The scope's fixed edges and the FM split offsets can only be put back as they were saved, not edited.
 
 ---
 
@@ -1378,28 +1573,39 @@ has any way of knowing that the audio is wrong.
 
 | Setting | What it does |
 |---|---|
-| **Set RTTY mode when the tuner starts** | Puts VFO A into **RTTY-L** if it was in a mode RTTY cannot be received in at all — CW, AM or FM — and opens the IF filter if it is too narrow to carry both of your tones. Your mode and filter are put back when the tuner stops. |
+| **Set RTTY mode when the tuner starts** | Puts VFO A into the **RTTY mode** below if it was in any other mode, and keeps it in that kind of mode while the tuner is open, and opens the IF filter if it is too narrow to carry both of your tones. Your mode and filter are put back when the tuner stops. |
+| **RTTY mode** | **RTTY-L** (the radio's RTTY, the default) or **RTTY-U** (RTTY-R) for the radio's own FSK, or **DATA-L** or **DATA-U** if your software sends AFSK through the radio's audio. The **MODE** list on RTTY Contest ([§5.21](#521-rtty-contest)) is the same setting, and its band keys use it. |
 | **Auto also tunes the signal in** | When **Auto** is sure of what it heard, the dial moves so the mark tone arrives on the tuner's **Mark**, and the status line says which way it went and by how much. |
 
-**What the first one will not do.** It only ever takes the radio *out of* CW, AM,
-FM and DATA-FM. **RTTY, RTTY-R, LSB, USB, DATA-L and DATA-U are left exactly as
-they are** — the two FSK modes need nothing done to them, and in SSB or DATA the
-tones are being made by your own software with the radio as a plain SSB
-transceiver, which is a perfectly good way to run the tuner and one this
-switching would break. It also **never narrows a filter**, only widens one that
-could not have carried both tones: a narrow filter is how you dig a signal out of
-a crowded band, and only you know what else is on the band.
+**What the first one will not do.** It only switches between kinds. With
+**RTTY-L** or **RTTY-U** chosen, either of the radio's two FSK modes is left as
+it is, and anything else (CW, SSB, DATA, AM, FM) is switched to your choice.
+With **DATA-L** or **DATA-U** chosen, either DATA mode is left as it is, and
+RTTY is switched. Which sideband is right depends on the station, and the
+tuner's **Rev** is for that. If your software makes the tones, choose a DATA
+mode here, or the tuner will take the radio out of DATA.
 
-**How wide it asks for.** Not the shift plus a little, which is the figure most
-RTTY writing quotes. This radio holds its RTTY passband centred on the **mark**
-tone, so the space tone sits the whole shift away from the middle of the filter
-and is the first thing to be lost — measured on the bench, a 550 Hz filter put
-the space tone of a 450 Hz shift signal 33 dB down and decoded nothing at all,
-while 1200 Hz read it cleanly. So it asks for roughly twice the shift plus a
-little for the keying, and it reads the width back afterwards so the figure you
-are shown is the one the radio actually took. If the pair sits too far from the
-middle of the passband for even the widest filter, it tells you and asks you to
+**How wide it asks for.** The radio centres its RTTY passband midway between
+the two tones of **its own menu**, SET > Function > RTTY Mark Frequency and
+Shift Width: 2125 + 85 = 2210 Hz at the default 2125 / 170, in RTTY and RTTY-R
+alike. That was measured with a noise sweep, and again on DDK9 on 2026-10-28.
+A signal of the menu's shift sits in the middle, and the filter can come right
+down. A signal of another shift does not: at 2125 / 170 the space tone of a
+450 Hz station is 365 Hz from the middle, and on the bench a 550 Hz filter put
+it 33 dB down and decoded nothing at all, while 1200 Hz read it cleanly. So the
+width it asks for is twice the distance from the middle to the further tone,
+plus a little for the keying, and it reads the width back afterwards so the
+figure you are shown is the one the radio actually took. If the pair sits too
+far from the middle for even the widest filter, it tells you and asks you to
 move the dial.
+
+**When it narrows.** Before **Auto** has found a signal, the filter is only
+ever widened: a filter sized for where the dialog thinks the tones are can hide
+the station Auto is about to look for. Once Auto has found the signal and moved
+the dial so the pair is in the middle, in RTTY the filter comes down to the
+narrowest that carries it. In DATA it is only ever widened, because the DATA
+passband's centre (about 1500 Hz) is measured but its width does not follow
+the setting.
 
 **What the second one will not do.** It will not move the mark further than your
 IF filter is wide, and never less than 500 Hz whatever the filter — past the
@@ -2836,11 +3042,11 @@ This is a primary accessibility feature: a partially-sighted operator can drive 
 
    > **Windows "Voice Clarity" and other microphone enhancements.** IWC works with them on or off — the recogniser only needs a clean level, and IWC sets that itself. Clarity's noise suppression can help in a noisy shack but is tuned for calls and can soften consonants, so if you want to try it, use **Test this pack** (§17.6) with a few commands each way and keep whichever is rejected less. Whatever you choose, **don't toggle it while IWC is running** if you can help it: Windows re-initialises the microphone underneath the app, and the next press of the mic button spends a moment reopening it (you'll see *"stopped delivering audio — reopening it"* in the log) before it can listen.
 
-After restart, you should see a **mic button on the Index page beside the VFO panel**, next to the band/mode controls. If you don't see it, jump to [§17.4 Troubleshooting](#174-troubleshooting).
+After restart, you should see a **mic button on the Index page beside the VFO panel**, next to the band/mode controls. The Radio panel has a **VOICE** key next to **MONI** that does the same job ([§5.20](#520-radio-panel)). If you don't see either, jump to [§17.4 Troubleshooting](#174-troubleshooting).
 
 ### 17.3 Using the mic button
 
-The mic button is a **press-and-hold** control — it doesn't latch. Hold it to listen, release to process.
+The mic button is a **press-and-hold** control — it doesn't latch. Hold it to listen, release to process. The **VOICE** key on the Radio panel works the same way.
 
 1. **Press and hold** the mic button. The button colour changes to indicate the speech engine is listening.
 2. **Speak the command clearly** at a normal volume.
@@ -3017,12 +3223,13 @@ Set your CW pitch in the CW Keyer panel ([§5.12](#512-cw-keyer-panel)) and tune
 
 ### 18.5 The panel controls
 
-Along the top of the panel are six buttons and two switches. The switches — **Follow** and **Tune** — are easy to miss because they do not look like the buttons beside them, and both are worth knowing about.
+Along the top of the panel are seven buttons and two switches. The switches — **Follow** and **Tune** — are easy to miss because they do not look like the buttons beside them, and both are worth knowing about.
 
 | Control | What it does |
 |---|---|
 | **Start / Stop** | Runs the decoder. Stop also restores your radio settings if Reader Mode is on. |
 | **Clear** | Empties the on-screen text. The transcript file on disk is not touched, so this is safe to press when you move to a new station. |
+| **Save** | Saves the text in the panel to a `.txt` file, headed with the UTC time. In Chrome and Edge on the PC running IWC it opens a Save dialog in the folder you saved to last time; in other browsers, or from another PC, the file goes to your browser's download folder. The panel keeps the last 20,000 characters, so for a whole session use the transcript ([§18.9](#189-transcripts)), which IWC writes for you. |
 | **Reader Mode** | Sets the radio up for decoding, and puts your settings back afterwards — see [§18.7](#187-reader-mode). |
 | **ZIN** | Tunes the signal onto your CW pitch — see [§18.8](#188-zin---zero-in-on-the-signal). |
 | **Auto** | Moves the dial onto a station keying in your filter and sets the filter for its speed — see [Auto](#auto-tune-the-station-in-for-you) in §18.7. |
@@ -3297,11 +3504,11 @@ Drag the panel narrower than about 640 pixels and the two columns fold into one,
 
 Nothing here transmits. It does change three things on the receiver, all of them so that the figure can be believed, and all of them undone when you close it:
 
-- **It puts the radio into RTTY** if it was in a mode RTTY cannot be received in at all — CW, AM or FM — and puts your mode back afterwards ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
-- **It opens the IF filter** if the filter is too narrow to carry both tones. It never narrows one. How wide is wide enough depends on where your tones sit in the audio and not only on the shift, because this radio centres its RTTY passband on the **mark** tone — so the space tone is the one that falls off the edge, and a 450 Hz shift needs about 1 kHz of filter rather than the 550 Hz the usual rule-of-thumb suggests. If even the widest filter cannot reach both tones the status line says so and asks you to move the dial, which is the only thing that can fix it.
+- **It puts the radio into your RTTY mode** (Settings, [§6.8](#68-rtty-tuner): RTTY by default, or a DATA mode for AFSK) if it was in a mode of another kind, holds it there while it is open, and puts your mode back afterwards ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
+- **It opens the IF filter** if the filter is too narrow to carry both tones. How wide is wide enough depends on where your tones sit in the audio and not only on the shift, because this radio centres its RTTY passband midway between the tones of its own RTTY menu — so a station on another shift has a tone off to one side, and a 450 Hz station with the menu on 170 needs about 1 kHz of filter rather than the 550 Hz the usual rule-of-thumb suggests. If even the widest filter cannot reach both tones the status line says so and asks you to move the dial, which is the only thing that can fix it. Once Auto has centred a signal, in RTTY it narrows the filter to fit.
 - **Auto moves the dial** to bring the signal onto the tones, when it is sure of what it heard, and says so ([§20.3](#203-auto-working-out-what-you-are-listening-to)).
 
-It will also put the radio's own **RTTY Mark Frequency** and **Shift Width** menu in step with what you choose, so its built-in decoder does not have to be set twice ([§20.2](#202-mark-shift-speed-and-rev)). Both of the automatic changes can be turned off on the Settings page, and fine-tuning by hand works exactly as it always did.
+When you type a Mark or Shift, or pick one, it also puts the radio's own **RTTY Mark Frequency** and **Shift Width** menu in step, so its built-in decoder does not have to be set twice ([§20.2](#202-mark-shift-speed-and-rev)). **Auto never does**: the radio transmits FSK on that shift, and a 425 written for a station you were only listening to would go out on your next call. Both of the automatic changes can be turned off on the Settings page, and fine-tuning by hand works exactly as it always did.
 
 It **does** decode RTTY into text — that is the Decode pane, and [§20.5](#205-decoding-the-text) is all of it. The decoder has no Mark, Shift, Speed or Rev of its own: it uses the ones in the Tune column beside it, so getting the cross upright is the whole of putting the decoder on the signal. **Sending is not built** — the Send box is there so you can see where it will go, and [§20.6](#206-sending) says why it is empty.
 
@@ -3330,6 +3537,8 @@ That is the real thing: an amateur RTTY signal on 80m, 3598.3 kHz, standard 170 
 | **Arms opening into a fat X or an ellipse** | Still off tune, and far enough out that the tones are catching the skirts of the wrong filters. Keep going the same way the lean is pointing. |
 | **One strong line and one weak one** | Only one tone is arriving. Either the shift is wrong ([§20.2](#202-mark-shift-speed-and-rev)), or **Auto** ([§20.3](#203-auto-working-out-what-you-are-listening-to)) will tell you what it should be, or you are tuned so far off that only one tone is inside the filter. |
 | **A blur with no shape** | No RTTY there — noise, an SSB signal, or the wrong audio device. Check the line under the figure is showing a signal level at all. |
+
+On tune, mark lies flat and space stands upright at the same dial setting. Until v1.6.0 each arm leaned about 4 degrees even on tune, so straightening mark and then space could put the dial in two places about 50 Hz apart (Bruce VK2RT found it). The filters are now shaped so the other tone no longer tilts them.
 
 The line under the figure reports what the two filters are actually hearing, in dB, along with the overall input level. It is the quickest way to tell "nothing is arriving" from "something is arriving and it is not RTTY".
 
@@ -3408,6 +3617,8 @@ Two things about the reading itself are worth knowing:
 >
 > The same measurement settled something else worth knowing: **in RTTY the dial reads the mark frequency.** Put the dial on a station's mark and you are on it.
 >
+> **In RTTY-R the dial shows the higher tone too**, and that is the tone which arrives at the top of the pair: 2295 Hz with the menu at 2125 / 170, because the radio's menu mark is the lower tone of the pair in both modes. So in RTTY-R the tuner's **Mark** reads 2295, **From radio** shows 2295, and typing 2295 writes 2125 to the radio's menu. Checked on DDK9 on 2026-10-28, where the tone the dial was on came out at 2126 Hz in RTTY and 2552 Hz in RTTY-R with the menu at 2125 / 425. Before then the tuner put RTTY-R's tones the wrong way up, and a click on RTTY Contest landed a shift away.
+>
 > If you are running AFSK instead — DATA-L, DATA-U, LSB or USB, where your software makes the tones and the radio is just an SSB transceiver — the same 2125 / 2295 defaults apply, because that is what RTTY software uses. The radio's RTTY MARK menu plays no part there.
 
 ### 20.3 Auto: working out what you are listening to
@@ -3466,9 +3677,14 @@ because they call for different things:
 
 Auto measures rather than choosing from a list, so a station on no standard shift
 or speed is reported as it is, shown in the box labelled *measured*, and used
-that way. It will also tick or untick **Rev** for you, and push the mark and
-shift to the radio's menu where there is a rung for them, exactly as if you had
-typed them.
+that way. It will also tick or untick **Rev** for you. It does **not** write the
+mark or shift to the radio's own RTTY menu, as typing them does: the radio
+transmits FSK on that shift, so a 425 written for a utility station you were
+listening to would go out on your next contest call. When a station's shift is
+not the menu's, the status line says so — *"This signal is 451 Hz shift and the
+radio's RTTY menu is 170 Hz…"* — and the filter is opened to cover both tones.
+Set the menu yourself, by typing the shift, if you want the radio's own
+decoder on it. From radio puts the tuner back on the menu's figures.
 
 **And when it is sure of what it heard, it tunes the signal in.** The dial moves
 so that the mark tone arrives on the tuner's **Mark** — 2125 Hz unless you have
@@ -3494,14 +3710,17 @@ counts as the same station. It will not move at all unless it is sure, or if the
 answer is within about 25 Hz, which is the limit of what it can measure; move
 while you are transmitting; or move the dial in **LSB, USB or the DATA modes**,
 where your own RTTY software is making the tones and has its own tuning
-indicator. Turn it off altogether with *Auto also tunes the signal in* on the
+indicator. The exception is a DATA mode the tuner itself is holding the radio
+in (**RTTY mode** in Settings, or **MODE** on RTTY Contest): there Auto moves
+the dial so the mark lands on the tuner's **Mark**, the same place a click puts
+it, so set the Mark to match your RTTY software (1415 for MMTTY). Turn it off altogether with *Auto also tunes the signal in* on the
 Settings page.
 
 ### 20.4 Your first session, step by step
 
 1. **Set the audio device first.** The tuner uses the CW Reader's audio-device setting on the Settings page — there is only one, and on a USB-connected IC-7300 it is the radio's own USB codec. If the CW Reader works, so will this. See [§18.3](#183-choosing-the-audio-device).
-2. **Tune roughly onto a signal.** RTTY lives just below the FT8 frequencies on most bands — 14.080–14.099 on 20m is the usual hunting ground. You do not have to put the radio in RTTY first: if you are in CW, AM or FM, pressing **RTTY** does it for you and puts your mode back when you close the tuner ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
-3. **The filter looks after itself, within reason.** The tuner opens the IF if it is too narrow for the shift you are set to, but it will not narrow a wide one — a 2.4 kHz SSB filter puts half the band into the tuner at once and the figure will never settle, so if you are in SSB or DATA, narrow it yourself to something like 300–500 Hz ([§5.8](#58-if-width-if-shape-filter-slot-and-af-gain)).
+2. **Tune roughly onto a signal.** RTTY lives just below the FT8 frequencies on most bands — 14.080–14.099 on 20m is the usual hunting ground. You do not have to put the radio in RTTY first: pressing **RTTY** puts it in your RTTY mode (Settings, [§6.8](#68-rtty-tuner)) and puts your mode back when you close the tuner ([§20.9](#209-what-the-tuner-changes-on-your-radio)).
+3. **The filter looks after itself, within reason.** The tuner opens the IF if it is too narrow for the shift you are set to, and in RTTY it narrows it to fit once **Auto** has centred a signal. Until then it will not narrow a wide one — a 2.4 kHz filter puts half the band into the tuner at once and the figure will never settle, so narrow it yourself to something like 300–500 Hz, or press **Auto** ([§5.8](#58-if-width-if-shape-filter-slot-and-af-gain)).
 4. **Press RTTY.** The figure starts drawing within a second or so.
 5. **If you do not know the station's shift or speed, press Auto** and let it work them out ([§20.3](#203-auto-working-out-what-you-are-listening-to)). On amateur RTTY you can skip this — the defaults are already right.
 6. **Tune slowly** — 10 Hz steps are about right — until the cross stands upright. On a strong signal this is unmistakable; on a weak one, aim for the most upright you can get and the most equal arm lengths. If you pressed **Auto** and it was sure, this is already done: it moves the dial itself and tells you it has.
@@ -3613,7 +3832,8 @@ Tuning and decoding together is the normal way to use the RTTY panel. Running th
 | It stops by itself after a while | It stops when nothing is asking it for sweeps — a minimised or backgrounded tab will do it. Bring the page back to the front and press **RTTY** again. |
 | **The radio changed mode, or the filter widened, when I opened the tuner** | That is meant to happen, and it is put back when you close the tuner. [§20.9](#209-what-the-tuner-changes-on-your-radio) says exactly what it does and how to turn it off. |
 | **Auto** moved my dial | Also meant to happen, when it is sure of the signal: it puts the mark tone onto the tuner's Mark so the figure stands upright and the speed can be measured. It says what it moved. Turn it off with *Auto also tunes the signal in* on the Settings page ([§20.3](#203-auto-working-out-what-you-are-listening-to)). |
-| **Auto** said the figures but did not move the dial | It only moves in **RTTY-L** or **RTTY-U** — never in SSB or DATA, where your own software owns the tuning — and only when it is sure, the correction is more than about 25 Hz, no further than your IF filter is wide (and never less than 500 Hz), and you are not transmitting. |
+| **Auto** changed the tuner's shift but the radio's menu still says 170 | Meant to happen. Auto never writes the radio's RTTY menu, because the radio transmits FSK on it ([§20.3](#203-auto-working-out-what-you-are-listening-to)). Type the shift if you want it there. |
+| **Auto** said the figures but did not move the dial | It only moves in **RTTY-L** or **RTTY-U**, or in a DATA mode the tuner is holding the radio in — never in SSB, or in DATA you chose yourself, where your own software owns the tuning — and only when it is sure, the correction is more than about 25 Hz, no further than your IF filter is wide (and never less than 500 Hz), and you are not transmitting. |
 | **The decoder prints nothing, and the status line says *nothing to decode*** | The squelch is holding because the two tones are not strong enough to be worth printing. Check the `signal` figure: a third or so is hiss. Tune for the cross, and narrow the IF filter so a neighbour is not sharing the passband. |
 | **The decoder prints, but it is gibberish** | Something is wrong in the Tune column rather than the Decode pane. In order of likelihood: the cross is not upright, **Rev** is wrong (try it both ways — reversed RTTY is common), or the shift does not match. Press **Auto** and let it measure. A `signal` figure below about 0.5 will produce rubbish whatever the settings. |
 | **Numbers decode correctly but punctuation does not** | Wrong figures table. Switch **Figures** between **ITA2** and **US TTY** ([§20.5](#205-decoding-the-text)). |
@@ -3634,9 +3854,11 @@ So the tuner sets up what it needs, and puts it back:
 
 | | |
 |---|---|
-| **Mode** | If VFO A is in **CW-U, CW-L, AM, FM or DATA-FM**, the tuner sets **RTTY-L**. Those are the modes a RTTY tone pair cannot survive. **RTTY-L, RTTY-U, LSB, USB, DATA-L and DATA-U are left exactly as they are** — the FSK modes need nothing, and in SSB and DATA your own software is making the tones, so the mode is yours. |
-| **IF filter** | Only if it is too narrow to have carried the shift you are set to — mark-to-space plus room for the keying either side, which for standard 170 Hz at 45.45 baud is about 260 Hz, and for a 450 Hz shift at 50 baud about 550 Hz. **It never narrows a filter.** A narrow filter is how you dig a signal out of a crowded band, and only you know the band. |
-| **Putting it back** | Both, when the tuner stops — closing the dialog, closing the tab, or the app shutting down. It is held on the server rather than in the browser, so reloading the page does not lose the record of what you had. |
+| **Mode** | When the tuner starts, VFO A goes to your **RTTY mode** (Settings, [§6.8](#68-rtty-tuner)) from any other mode, the other sideband included. While it is open it puts it back if a band change or anything else moves it to another kind of mode, but a change to the other sideband (RTTY-U for RTTY-L, DATA-U for DATA-L) is left as you set it. Until now the other sideband was left alone when the tuner started too. The default is RTTY-L. |
+| **Twin PBT** | Centred, because every width decision assumes the passband is where the noise sweep measured it. |
+| **IF filter** | Widened if it is too narrow to have carried the pair, judged from the middle of the radio's passband ([§6.8](#68-rtty-tuner) says where that is). In RTTY, once **Auto** has found a signal and centred it, narrowed to the narrowest that carries it; before that, and always in DATA, only ever widened. |
+| **The radio's RTTY menu** | Written when you type or pick a Mark or Shift in an FSK mode, so the radio's own decoder agrees. **Never by Auto**, and never restored, because it is yours: the radio transmits FSK on it. |
+| **Putting it back** | Mode, filter and PBT, when the tuner stops (not a filter width you set by hand while it was open, until you press **AUTO** beside WIDTH, [§5.21](#521-rtty-contest)) — closing the dialog, closing the tab, or the app shutting down. It is held on the server rather than in the browser, so reloading the page does not lose the record of what you had. |
 | **Turning it off** | *Set RTTY mode when the tuner starts*, on the Settings page under **RTTY Tuner**. |
 
 Whatever it changes, it tells you in the status line under the figure — *"Mode set
@@ -3674,6 +3896,114 @@ out into a window of its own ([§5.18](#518-pop-out-windows)) at whatever size
 you leave it. The same switch, under the same name, is in Yaesu Web Control —
 where there is no decode pane to leave out, so it hides the hint text and
 steadies the two lines.
+
+---
+
+## 21. CW Paddle
+
+Send CW with your own paddle. The paddle goes into a small USB adapter that shows up as a MIDI device, and the adapter plugs into the computer the browser runs on. That can be the shack PC, or a laptop somewhere else in the house. The keyer and the sidetone run in the browser, so what you hear never waits on the network. IWC on the shack PC gets the keying and plays it on DTR of the radio's USB COM port, which keys the radio.
+
+**It is for operating away from the radio.** If you sit at the radio, plug the paddle into the radio's KEY jack and use its own keyer: that has no delay and needs nothing from IWC. CW Paddle is for when the radio is somewhere else, such as a remote station, the shack at the bottom of the garden, or a laptop in another room, and you still want to send with a paddle.
+
+Open it with **CW Paddle** in the Classic top bar, or **Menu → CW → CW Paddle** in the other views (**MENU** on the Radio panel and RTTY Contest). The address is `/CwPaddle`.
+
+> **New in v1.6.0, and still being tested.** It came from Yaesu Web Control, where it has been tested on an FTdx101MP with an ESP32-S3 adapter. It has not yet keyed an IC-7300 or IC-7300MK2. Please tell us how it works with your paddle and radio.
+
+### 21.1 What you need
+
+- **A paddle.** Any iambic paddle, or a single-lever paddle.
+- **A paddle-to-MIDI adapter**, one of these two:
+  - a **HaliKey MIDI** ([§21.2](#212-the-halikey-midi)). It is hard to get outside the USA.
+  - an **ESP32-S3 board** that you program from this page ([§21.3](#213-an-esp32-s3-board-as-the-adapter)). The boards are cheap and sold everywhere, and you need no tools beyond the browser and three wires.
+
+  You can have both plugged in at once, for example while you make an ESP32 adapter for a friend. Each one appears in **Device** once connected. Pick one, or leave *All MIDI inputs* and either paddle keys.
+- **Chrome or Edge.** Firefox and Safari have no Web MIDI.
+- **HTTPS if the browser is on another computer.** Browsers allow MIDI only on `https://` pages and on `localhost`. Set up HTTPS as in [§21.7](#217-https-for-a-browser-on-another-computer) and open `https://<shack-PC>:8444/CwPaddle`.
+- **The radio's USB cable to the shack PC**, the one IWC already uses for CI-V. The keying goes over the same cable.
+
+### 21.2 The HaliKey MIDI
+
+Plug the HaliKey in, press **Connect paddle**, and let the browser use MIDI devices. It sends note 20 for dit and note 21 for dah, which are the page's defaults, so it works straight away. **Device** can stay on *All MIDI inputs*, or be set to the HaliKey if you have other MIDI devices.
+
+### 21.3 An ESP32-S3 board as the adapter
+
+**Which boards.** An **ESP32-S3** board whose native USB port is on a socket. On boards with two USB sockets, such as the ESP32-S3-DevKitC-1 and its many copies, the native one is marked **USB** and the other is marked **COM** or **UART**. Original ESP32 boards (ESP-WROOM-32, such as ELEGOO's) and ESP32-C3 boards can't be adapters. Their USB socket is a serial chip only, and they can't be a MIDI device.
+
+**Wiring.** Connect the dit contact to **GPIO4**, the dah contact to **GPIO5**, and the paddle's common to **GND**. You need no resistors, because the board's own pull-ups are used. A 3.5 mm socket wired the same way lets you unplug the paddle.
+
+**Programming it.**
+
+1. Plug the board in by its **USB** socket.
+2. On the CW Paddle page, press **Install / Update** in the *Paddle adapter firmware* box.
+3. A panel says the browser will ask about MIDI devices. Press **Continue**, then **Allow** in the browser.
+4. A second panel says the browser will list the ESP32 boards. Press **Continue**, choose **USB JTAG/serial debug unit**, and press **Connect**. The list shows only ESP32 boards, never the radio's COM ports.
+5. Programming takes about a minute. Don't unplug the board. When it is done, the board restarts, and the page says *Done: YWC Paddle Adapter is running firmware 1.0.*
+
+A new board goes straight to step 4. If the list is empty, press **Cancel** in the list. Then hold the board's **BOOT** button while you plug it in, let go, and press **Install / Update** again.
+
+**Updates.** **Check adapter** asks the adapter which firmware it has, and says whether IWC carries a newer one. To update, press **Install / Update** again. The adapter restarts itself for the update, so BOOT isn't needed.
+
+Once programmed, the board is the MIDI device **YWC Paddle Adapter**. The firmware is shared with Yaesu Web Control and keeps that name; an adapter programmed from either app works with both. It sends the same notes as a HaliKey (20 and 21), so **Connect paddle** works with it straight away.
+
+### 21.4 Keyer and sidetone
+
+| Setting | What it does |
+|---|---|
+| **WPM** | Keyer speed, 5 to 50 words per minute. |
+| **Iambic** | **Mode B** (the default) or **Mode A**: what happens when you let go of both paddles while squeezing. |
+| **Swap paddles** | For left-handed operators, or a paddle wired the other way round. |
+| **Paddle stuck after** | A paddle held down this long (5 s by default) is treated as let go until it is released, so a paddle knocked over doesn't key the radio forever. |
+| **Sidetone, Pitch, Volume** | The tone made in the browser, with no delay. If the radio's monitor is on as well, you will hear the radio's own monitor a moment later, so most operators turn one of them off. |
+| **Dit note, Dah note, Channel** | The MIDI notes the adapter sends. Leave them at 20 and 21 unless you use some other MIDI adapter. |
+
+The settings are kept in the browser.
+
+What you send appears in the page's **What the keyer sent** box, and in the **CW Send** log on the main page ([section 19](#19-cw-send)), so the log shows both what you typed and what you keyed. Paddle lines are tagged *paddle*, or *paddle, dry run* while no key line is chosen. A pause of 3 seconds starts a new line.
+
+### 21.5 Keying the radio
+
+**The page starts in dry run every time IWC starts.** In dry run the keyer and the sidetone work, and nothing reaches the radio. With **Send to the shack PC** ticked, IWC writes the keying to its log but keys nothing. That is the place to practise, and to check the link over the network.
+
+To go on the air:
+
+1. **On the radio:** set **USB Keying (CW)** to **DTR**. On the IC-7300 it is under **MENU → SET → Connectors → USB SEND/Keying**; check your radio's manual if the menu differs.
+2. Put the radio in **CW**.
+3. Tick **Send to the shack PC**.
+4. In **Key line**, choose the COM port the radio keys from:
+   - **IC-7300:** the radio has one USB COM port, which IWC already uses for CI-V. It is listed as *the CI-V port*. Choose it: IWC raises DTR on the port it already has open, so CI-V carries on as before.
+   - **IC-7300MK2:** the radio has two USB COM ports. Choose the one its USB Keying (CW) menu names. That may be the CI-V port, or the other one.
+
+> ⚠️ **Choosing a COM port in Key line may transmit at once.** With USB Keying (CW) set to DTR the radio can go to transmit as soon as DTR is raised, whatever break-in is set to. Connect a dummy load, or be ready to be on the air. Choose **Dry run: log only** to stop keying.
+
+**The delay.** IWC holds the keying for 150 ms before playing it, so that network hiccups don't chop up your Morse. The radio therefore follows your sidetone by about 150 ms plus the network time. That doesn't matter for sending, but with full break-in you hear the band later by the same amount. The log under the page shows how much of the 150 ms the network used. *Some keying played late* means the network needed more than 150 ms.
+
+### 21.6 Troubleshooting
+
+| Symptom | What to try |
+|---|---|
+| *This browser has no Web MIDI* | Use Chrome or Edge, and open the page on `https://`, or on `localhost` on the shack PC. |
+| The browser never asks about MIDI, or says it is blocked | Click the icon left of the address, set **MIDI devices** to **Allow**, and reload the page. |
+| The DIT and DAH lamps don't light | Check **Device** and the notes. For an ESP32 adapter, check the wiring to GPIO4, GPIO5 and GND, and that the board is plugged in by its **USB** socket, not COM. |
+| *No paddle adapter found over MIDI* on a new board | A new board has no adapter firmware yet. Go straight to **Install / Update**. |
+| The board list is empty when installing | Hold **BOOT** while you plug the board in, let go, and press **Install / Update** again. If it is still empty, try another USB cable: some cables carry power only. |
+| *The board did not answer* | Unplug the board, plug it back in, and press **Install / Update** again. If that fails, use BOOT as above. |
+| The adapter stops answering after sitting idle | Unplug it and plug it back in. If it keeps happening, turn off USB selective suspend in the Windows power plan. |
+| Keying arrives but the radio doesn't transmit | Set **USB Keying (CW) = DTR** on the radio, check that the radio is in CW, and on an IC-7300MK2 try the other COM port. |
+| *... is in use by another program* | WSJT-X or a logger may have the port open for PTT. Close it, or choose another port. |
+| Morse on the air is choppy | The log says when the network went over the 150 ms buffer. Use a wired connection or a closer Wi-Fi access point. |
+
+### 21.7 HTTPS for a browser on another computer
+
+Browsers allow MIDI only on a secure page: `https://`, or `http://localhost` on the shack PC itself. To use CW Paddle from another computer, turn on IWC's HTTPS:
+
+1. Open **Settings**. Under the **HTTP Port**, tick **Enable HTTPS**. The **HTTPS Port** is 8444 by default (Yaesu Web Control uses 8443, so both can run on one PC).
+2. In **Certificate SAN hostnames / IPs**, type the address you will use in the other computer's browser, such as the shack PC's name or its LAN or VPN address, one per line. `localhost` is always included.
+3. Press **Generate self-signed certificate**, then **Save Settings**, and restart IWC.
+4. On the other computer, open `https://<shack-PC>:8444/CwPaddle`. The browser warns that the certificate isn't trusted, because IWC made it itself. Choose to continue; the browser remembers that for the address.
+
+HTTP carries on as before on the HTTP port, so nothing else changes. If the HTTPS port is in use when IWC starts, or no certificate has been generated, IWC stays HTTP-only and says so in its log. The line beside the generate button says whether HTTPS is listening now.
+
+If you change the addresses, generate the certificate again and restart.
 
 ---
 

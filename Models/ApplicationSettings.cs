@@ -20,6 +20,18 @@
         // know 8080 always clashes on their machine (e.g. Plex, Jenkins).
         public int HttpPort { get; set; } = 8080;
 
+        // Optional HTTPS (self-signed; restart to apply), beside HTTP. A browser
+        // on another computer needs it for Web MIDI on the CW Paddle page.
+        // 8444 rather than YWC's 8443, so both apps can run on one PC.
+        public bool HttpsEnabled { get; set; } = false;
+        public int HttpsPort { get; set; } = 8444;
+
+        /// <summary>
+        /// Extra SAN hostnames/IPs (newline or comma separated) baked into the
+        /// self-signed cert, e.g. the shack PC's LAN name or a VPN address.
+        /// </summary>
+        public string? HttpsSanHosts { get; set; } = "";
+
         // When true (the default, and until now the only behaviour), the host
         // exits about 30 seconds after the last browser tab disconnects, so
         // closing the last tab closes the app. Set false to keep the process
@@ -29,6 +41,14 @@
         // shack PC you drive over RDP and would rather not have to restart.
         // Quit it from the system tray instead.
         public bool AutoShutdownWhenNoBrowsers { get; set; } = true;
+
+        // CI-V power (command 18). PowerOnAtStart: when the radio does not
+        // answer the first time the port opens, send 18 01 behind the wake
+        // preamble and wait for it to come up - once per run, so a radio
+        // switched off at the front panel later is left off. PowerOffAtExit:
+        // send 18 00 as the host stops, except for Settings' Restart Now.
+        public bool PowerOnAtStart { get; set; } = true;
+        public bool PowerOffAtExit { get; set; } = false;
 
         public string RadioModel { get; set; } = "IC-7300MK2"; // Icom single-receiver HF+6m(+4m EU)
 
@@ -97,6 +117,11 @@
         // when it is picked from the segment dropdown: that is an explicit
         // choice of a segment, not a mode inferred from a frequency.
         public bool AutoModeChangeOnTune { get; set; } = true;
+
+        // The view last opened (an AppViews key: "classic", "experimental" or
+        // "radio"). Written when one of those pages loads; read by /start, which
+        // the app opens at start-up so the operator lands back where they were.
+        public string LastView { get; set; } = AppViews.Classic;
 
         // SDR Spectrum Display — per-VFO device assignment (v2.3.0+).
         //
@@ -269,9 +294,32 @@
         // operator running AFSK from their own software owns their radio's mode,
         // and because anyone who would rather the software never touched the mode
         // is entitled to that. With it on, RttyTunerModeService switches from any
-        // mode that is not already RTTY, centres Twin PBT, and sizes the filter
-        // to the signal once Auto has found it; all of it is put back on close.
+        // mode that is not already of the RttyTunerMode kind, centres Twin PBT,
+        // and sizes the filter to the signal once Auto has found it; all of it is
+        // put back on close.
         public bool RttyTunerSetMode { get; set; } = true;
+
+        // The mode that switch puts the radio in, and that the RTTY Contest
+        // band keys use: RTTY-L, RTTY-U, DATA-L or DATA-U. YWC's since
+        // 2026-10-26, for Bruce VK2RT, who runs AFSK in DATA-L; here so that
+        // AFSK transmit has a mode the tuner will leave the radio in.
+        // Anything else reads as RTTY-L (RttyTunerModeService.TargetMode).
+        public string RttyTunerMode { get; set; } = "RTTY-L";
+
+        // IF widths in Hz the operator set by hand while the tuner was open,
+        // keyed "model|mode". The tuner uses one in place of the width it would
+        // work out (RttyTunerModeService.WidthSetByHandAsync). YWC's since
+        // v2.5.4-pre8, for Bruce VK2RT. Not on the Settings page; that page's
+        // save leaves it as it is.
+        public Dictionary<string, int> RttyTunerWidths { get; set; } = new();
+
+        // The tones the RTTY tuner last ran on. Browser storage is kept per
+        // address - http and https, localhost and 127.0.0.1, another browser -
+        // so a window on an address that had never been set could start the
+        // shared tuner on 2125 and every other window followed it (Bruce VK2RT,
+        // YWC Discussion #250). Each tuner now starts from these. Null until
+        // the tuner has run.
+        public RttyTones? RttyTunerTones { get; set; }
 
         // Whether a confident Auto answer also moves the VFO so the measured mark
         // lands on the tuner's mark.
@@ -439,8 +487,8 @@
         public string AntennaB { get; set; } = "1";
 
         // IF Width/Shift
-        public string IfWidthA { get; set; } = "8";
-        public string IfWidthB { get; set; } = "8";
+        public string IfWidthA { get; set; } = "";
+        public string IfWidthB { get; set; } = "";
         public int IfShiftA { get; set; } = 0;
         public int IfShiftB { get; set; } = 0;
 
@@ -451,6 +499,15 @@
         // Squelch (read from radio on connect — default 0 = open)
         public int SquelchA { get; set; } = 0;
         public int SquelchB { get; set; } = 0;
+    }
+
+    // The RTTY tuner's tones, as ApplicationSettings.RttyTunerTones keeps them.
+    public class RttyTones
+    {
+        public double MarkHz { get; set; }
+        public int ShiftHz { get; set; }
+        public bool Reverse { get; set; }
+        public double Baud { get; set; }
     }
 
     // Per-band "stacking register": remembers where you were on each band
