@@ -109,6 +109,7 @@
             if (update.property === 'ModeB')     panel.setMode('B', update.value);
             if (update.property === 'TxVfo')     panel.setTxVfo(update.value);
         });
+        conn.on('CwPaddleText', (text, live) => panel.paddleText(text, live));
         // IWC's host decides when to shut down by the connections that send
         // the heartbeat, which the main page does from site.js. This window has
         // no site.js, so it sends its own: a pop-out left open on its own then

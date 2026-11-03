@@ -32,6 +32,8 @@ const CURSOR_MS = 40;
 // here is silence between pieces, so it is small on purpose.
 const TIMING_MARGIN_MS = 250;
 const TIMING_MARGIN_FRAC = 0.03;
+// A pause this long in the paddle's text starts a new line in the log.
+const PADDLE_LINE_GAP_MS = 3000;
 
 // The same character set the server keeps (CivRadioController.IsCwSendable):
 // the chunk lengths have to agree with what the radio will actually key, or
@@ -90,6 +92,8 @@ export class CwSendPanel {
         this._lineNo = 0;
         this._cursor = null;       // interval moving the highlight along the piece on air
         this._wait = null;         // { resolve } for the wait between pieces, so Stop can cut it short
+        this._paddleRow = null;    // the log line the paddle's text is going onto
+        this._paddleTimer = null;
         // Called with true when a line starts going out and false once the
         // queue has drained. The queue lives in one page only, so the pages
         // use it to hold Pop out / Reattach while a line is on its way, and
@@ -326,6 +330,33 @@ export class CwSendPanel {
 
     clearLog() {
         if (this._log) this._log.textContent = '';
+        this._paddleRow = null;
+    }
+
+    // ── The paddle ───────────────────────────────────────────────────────
+    //
+    // What the CW Paddle page's keyer sent, read back as text there and
+    // passed on by the hub a character at a time, so the log shows the whole
+    // exchange, typed and keyed. It goes on a line of its own, tagged
+    // "paddle", or "paddle, dry run" while no key line is chosen and nothing
+    // reached the radio. A pause, or a typed line, starts a new one.
+    paddleText(text, live) {
+        if (!this._log || !text) return;
+        clearTimeout(this._paddleTimer);
+        const state = live ? 'paddle' : 'paddle-dry';
+        let row = this._paddleRow;
+        if (row && row.dataset.state !== state) row = null;
+        if (!row) {
+            if (text === ' ') return;   // no line starts with a word space
+            row = this._paddleRow = this._logLine('', state);
+            this._tag(row, state, live ? 'paddle' : 'paddle, dry run');
+        }
+        const sp = document.createElement('span');
+        sp.className = 'cws-ch cws-done';
+        sp.textContent = text;
+        row.querySelector('.cws-text')?.appendChild(sp);
+        this._log.scrollTop = this._log.scrollHeight;
+        this._paddleTimer = setTimeout(() => { this._paddleRow = null; }, PADDLE_LINE_GAP_MS);
     }
 
     // ── Sequencing ───────────────────────────────────────────────────────
@@ -513,6 +544,7 @@ export class CwSendPanel {
 
     _logLine(text, state) {
         if (!this._log) return null;
+        this._paddleRow = null;    // a typed line ends the paddle's
         const row = document.createElement('div');
         row.className = 'cws-line';
         const t = document.createElement('span');
