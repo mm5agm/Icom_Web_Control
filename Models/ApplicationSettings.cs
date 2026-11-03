@@ -20,6 +20,18 @@
         // know 8080 always clashes on their machine (e.g. Plex, Jenkins).
         public int HttpPort { get; set; } = 8080;
 
+        // Optional HTTPS (self-signed; restart to apply), beside HTTP. A browser
+        // on another computer needs it for Web MIDI on the CW Paddle page.
+        // 8444 rather than YWC's 8443, so both apps can run on one PC.
+        public bool HttpsEnabled { get; set; } = false;
+        public int HttpsPort { get; set; } = 8444;
+
+        /// <summary>
+        /// Extra SAN hostnames/IPs (newline or comma separated) baked into the
+        /// self-signed cert, e.g. the shack PC's LAN name or a VPN address.
+        /// </summary>
+        public string? HttpsSanHosts { get; set; } = "";
+
         // When true (the default, and until now the only behaviour), the host
         // exits about 30 seconds after the last browser tab disconnects, so
         // closing the last tab closes the app. Set false to keep the process
