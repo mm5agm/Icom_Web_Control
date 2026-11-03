@@ -916,6 +916,9 @@ async function checkTxStatus() {
 // ---------------------------------------------------------------------------
 const connection = window.rwcHubConnection("/radioHub");
 
+// What the CW Paddle page sent, for the CW Send log.
+connection.on("CwPaddleText", (text, live) => window.cwSendPanel?.paddleText?.(text, live));
+
 // Redirect to Settings page if the backend signals an init failure
 connection.on("ShowSettingsPage", function () {
     window.location.href = "/Settings";

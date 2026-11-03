@@ -131,6 +131,15 @@ namespace Icom_Web_Control.Hubs
         public object CwKeyLineStatus() => _cwKeying.LineStatus();
         public string? CwSetKeyLine(string? port) => _cwKeying.SetKeyPort(port);
 
+        // What the paddle page's keyer sent, read back as text there, passed
+        // to the other pages for the CW Send log. Whether it reached the radio
+        // is the server's word, not the page's: is a key line chosen.
+        public Task CwPaddleText(string? text)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length > 16) return Task.CompletedTask;
+            return Clients.Others.SendAsync("CwPaddleText", text, _cwKeying.Live);
+        }
+
         // Called every 5 seconds by site.js and by the Classic pop-outs.
         // Presence is the connection itself now, so this no longer decides
         // whether the host lives -- but it still cancels a pending shutdown,
