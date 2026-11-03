@@ -16,6 +16,16 @@ namespace Icom_Web_Control.Services.Civ
     {
         bool IsOpen { get; }
 
+        /// <summary>The CI-V port's name while it is open, else null.</summary>
+        string? PortName => null;
+
+        /// <summary>
+        /// Raises or drops DTR on the open CI-V port: the CW Paddle's key line
+        /// on an original IC-7300, whose one USB port carries both CI-V and
+        /// USB Keying (CW). Throws if the port is not open.
+        /// </summary>
+        void SetDtr(bool on) => throw new NotSupportedException("This CI-V client has no DTR line.");
+
         Task<bool> OpenAsync(string portName, int baudRate);
         Task CloseAsync();
 

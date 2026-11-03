@@ -12,6 +12,7 @@ namespace Icom_Web_Control.Hubs
         private readonly RadioStateService _radioState;
         private readonly IRadioController _radio;
         private readonly ISettingsService _settings;
+        private readonly Icom_Web_Control.Services.Cw.CwKeyingService _cwKeying;
 
         // Every currently open SignalR connection, and the whole of what the
         // host means by "a browser is watching". Presence used to mean a
@@ -37,13 +38,15 @@ namespace Icom_Web_Control.Hubs
 
         public RadioHub(ILogger<RadioHub> logger, IHostApplicationLifetime lifetime,
                         RadioStateService radioState, IRadioController radio,
-                        ISettingsService settings)
+                        ISettingsService settings,
+                        Icom_Web_Control.Services.Cw.CwKeyingService cwKeying)
         {
             _logger   = logger;
             _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
             _radioState = radioState;
             _radio = radio;
             _settings = settings;
+            _cwKeying = cwKeying;
         }
 
         public override async Task OnConnectedAsync()
@@ -83,6 +86,7 @@ namespace Icom_Web_Control.Hubs
         {
             _connections.TryRemove(Context.ConnectionId, out _);
             _spectrumPanels.TryRemove(Context.ConnectionId, out _);
+            _cwKeying.Disconnected(Context.ConnectionId);
 
             // A navigation or a closed tab arrives with no exception. A
             // connection the server gave up on -- one that sent nothing within
@@ -119,6 +123,13 @@ namespace Icom_Web_Control.Hubs
                 ScheduleShutdown();
             }
         }
+
+        // The CW Paddle page: its keyer's packets, and the key line. Packets
+        // are sent fire-and-forget; CwKeyingService plays them after its
+        // jitter buffer and reports back on CwKeyReport.
+        public void CwKey(RadioWebControl.Core.Services.Cw.CwKeyPacket packet) => _cwKeying.Receive(Context.ConnectionId, packet);
+        public object CwKeyLineStatus() => _cwKeying.LineStatus();
+        public string? CwSetKeyLine(string? port) => _cwKeying.SetKeyPort(port);
 
         // Called every 5 seconds by site.js and by the Classic pop-outs.
         // Presence is the connection itself now, so this no longer decides

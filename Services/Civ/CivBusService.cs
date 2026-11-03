@@ -46,6 +46,23 @@ namespace Icom_Web_Control.Services.Civ
             get { lock (_portLock) { return _port?.IsOpen ?? false; } }
         }
 
+        public string? PortName
+        {
+            get { lock (_portLock) { return _port?.IsOpen == true ? _port.PortName : null; } }
+        }
+
+        // Only the CW Paddle's key line calls this, and only once the operator
+        // has chosen this port as the key line (CwKeyingService). Reopening the
+        // port starts with DTR low again.
+        public void SetDtr(bool on)
+        {
+            lock (_portLock)
+            {
+                if (_port?.IsOpen != true) throw new InvalidOperationException("The CI-V port is not open.");
+                _port.DtrEnable = on;
+            }
+        }
+
         public event EventHandler<CivFrame>? UnsolicitedFrame;
 
         public Task<bool> OpenAsync(string portName, int baudRate)
