@@ -190,6 +190,26 @@ static int LoadConfiguredHttpPort()
     return 8080;
 }
 
+// The optional HTTPS listener (Settings), read the same way and for the same reason.
+static (bool enabled, int port) LoadConfiguredHttps()
+{
+    try
+    {
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "MM5AGM", "Icom Web Control", "appsettings.user.json");
+        if (!File.Exists(path)) return (false, 8444);
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        bool enabled = doc.RootElement.TryGetProperty("HttpsEnabled", out var e) && e.ValueKind == JsonValueKind.True;
+        int port = 8444;
+        if (doc.RootElement.TryGetProperty("HttpsPort", out var p) && p.TryGetInt32(out int hp) && hp >= 1 && hp <= 65535)
+            port = hp;
+        return (enabled, port);
+    }
+    catch { }
+    return (false, 8444);
+}
+
 // ── Serilog file logging ────────────────────────────────────────────────────
 // IWC is a WinExe (no console window) so stdout-based loggers are invisible.
 // Wire up Serilog with a rolling-daily file sink under %APPDATA% so we have a
@@ -399,11 +419,37 @@ if (chosenPort < 0)
     return;
 }
 
+// Optional HTTPS (self-signed) listens beside HTTP when it is switched on in
+// Settings and a certificate has been generated there. A browser on another
+// computer needs it for Web MIDI (the CW Paddle page).
+var (httpsWanted, httpsPortCfg) = LoadConfiguredHttps();
+int? httpsListenPort = null;
+if (httpsWanted)
+{
+    if (!HttpsCertificateService.CertificateExists)
+        Log.Warning("HTTPS enabled but no certificate at {Path}; generate one in Settings and restart",
+            HttpsCertificateService.CertificatePath);
+    else if (httpsPortCfg == chosenPort || !IsPortFree(httpsPortCfg))
+        Log.Warning("HTTPS enabled but port {Port} is in use ({Owner}); staying HTTP-only",
+            httpsPortCfg, httpsPortCfg == chosenPort ? "the HTTP port" : GetPortOwner(httpsPortCfg) ?? "unknown");
+    else
+        httpsListenPort = httpsPortCfg;
+}
+
 // Force the web host to use the chosen port on all interfaces.
-builder.WebHost.UseUrls($"http://0.0.0.0:{chosenPort}");
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(chosenPort);
+    if (httpsListenPort is int hp)
+    {
+        options.ListenAnyIP(hp, listen => listen.UseHttps(
+            HttpsCertificateService.CertificatePath, HttpsCertificateService.PfxPassword));
+        Log.Information("HTTPS listening on 0.0.0.0:{Port}", hp);
+    }
+});
 
 // Publish the chosen port so every consumer reads from one source of truth.
-builder.Services.AddSingleton(new HttpPortInfo(chosenPort));
+builder.Services.AddSingleton(new HttpPortInfo(chosenPort, httpsListenPort));
 
 builder.Services.AddSingleton<BrowserLauncher>();
 // System tray icon — gives operators a visible "IWC is running" indicator
@@ -482,6 +528,9 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwQsoLogService>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwReaderModeService>();
 // The CW reader's Auto button: dial onto pitch, then the filter for the speed.
 builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwAutoService>();
+// The CW Paddle page's keying: plays the browser keyer's elements onto DTR
+// (dry run until the operator chooses a key line; never saved).
+builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.CwKeyingService>();
 
 // RTTY tuning scope. Nothing runs until the operator opens the dialog;
 // the service takes its audio hold on the first start and drops it a
@@ -558,8 +607,13 @@ try
     // revalidates it, so an unchanged file costs one conditional GET answered
     // with a 304 and no body. On a localhost or LAN app that is free, and it is
     // the price of never shipping a fix that fails to arrive.
+    // .bin is not in the default MIME map: the paddle adapter firmware
+    // (wwwroot/firmware/paddle-adapter) would 404 without it.
+    var contentTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+    contentTypes.Mappings[".bin"] = "application/octet-stream";
     app.UseStaticFiles(new StaticFileOptions
     {
+        ContentTypeProvider = contentTypes,
         OnPrepareResponse = ctx =>
         {
             ctx.Context.Response.Headers.CacheControl = "no-cache, must-revalidate";

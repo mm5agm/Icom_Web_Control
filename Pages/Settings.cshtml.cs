@@ -106,6 +106,7 @@ namespace Icom_Web_Control.Pages
         {
             // DX cluster host/callsign also allowed empty (empty = feature disabled).
             ModelState.Remove("Settings.DxClusterHost");
+            ModelState.Remove("Settings.HttpsSanHosts");
             ModelState.Remove("Settings.DxClusterLoginCallsign");
             ModelState.Remove("Settings.DxClusterPostLoginCommands");
             // Accessibility TX shortcut is optional — empty = disabled.
@@ -171,6 +172,8 @@ namespace Icom_Web_Control.Pages
                 var oldRadioModel = current.RadioModel;
                 var oldWebAddress = current.WebAddress;
                 var oldHttpPort   = current.HttpPort;
+                var oldHttpsEnabled = current.HttpsEnabled;
+                var oldHttpsPort    = current.HttpsPort;
 
                 // Capture pre-change CAT connection values so the radio reconnect
                 // below only fires when something that actually affects the CAT
@@ -187,6 +190,11 @@ namespace Icom_Web_Control.Pages
                 current.HttpPort          = (Settings.HttpPort >= 1 && Settings.HttpPort <= 65535)
                     ? Settings.HttpPort
                     : 8080;
+                current.HttpsEnabled      = Settings.HttpsEnabled;
+                current.HttpsPort         = (Settings.HttpsPort >= 1 && Settings.HttpsPort <= 65535)
+                    ? Settings.HttpsPort
+                    : 8444;
+                current.HttpsSanHosts     = Settings.HttpsSanHosts ?? "";
                 current.SerialPort        = Settings.SerialPort;
                 current.BaudRate          = Settings.BaudRate;
                 current.WebAddress        = Settings.WebAddress;
@@ -302,6 +310,8 @@ namespace Icom_Web_Control.Pages
                     reasons.Add($"web server address ({oldWebAddress} → {current.WebAddress})");
                 if (oldHttpPort != current.HttpPort)
                     reasons.Add($"HTTP port ({oldHttpPort} → {current.HttpPort})");
+                if (oldHttpsEnabled != current.HttpsEnabled || oldHttpsPort != current.HttpsPort)
+                    reasons.Add("HTTPS settings");
                 if (reasons.Count > 0)
                 {
                     RestartRequiredReason = string.Join(" and ", reasons);

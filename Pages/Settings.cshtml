@@ -2254,6 +2254,70 @@
                             </div>
                             <span asp-validation-for="Settings.HttpPort" class="text-danger"></span>
                         </div>
+                        <h6 class="mt-4">Optional HTTPS (for a browser on another computer)</h6>
+                        <p class="text-muted small">
+                            Browsers allow MIDI (the CW Paddle page) only on a <strong>secure page</strong>: HTTPS, or
+                            http://localhost on this PC. To use it from another computer, enable HTTPS here, generate a
+                            self-signed certificate, save, and <strong>restart Icom Web Control</strong>. Then open
+                            https://&lt;this PC&gt;:@Model.Settings.HttpsPort and accept the certificate warning once.
+                        </p>
+                        <div class="mb-3 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" asp-for="Settings.HttpsEnabled" />
+                            <label class="form-check-label" asp-for="Settings.HttpsEnabled">Enable HTTPS</label>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Settings.HttpsPort" class="form-label">HTTPS Port</label>
+                            <input asp-for="Settings.HttpsPort" type="number" min="1" max="65535" class="form-control" style="max-width: 12em;" />
+                            <div class="form-text">Default <strong>8444</strong> (YWC uses 8443, so both can run on one PC). HTTP stays on the HTTP port above.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Settings.HttpsSanHosts" class="form-label">Certificate SAN hostnames / IPs</label>
+                            <textarea asp-for="Settings.HttpsSanHosts" class="form-control" rows="2"
+                                      placeholder="e.g. 192.168.1.20&#10;shack-pc"></textarea>
+                            <div class="form-text">
+                                Extra names or IP addresses for the certificate, one per line. localhost is always included.
+                                Use the address you type in the other computer's browser.
+                            </div>
+                        </div>
+                        <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                            <button type="button" class="btn btn-outline-secondary" id="btnGenerateHttpsCert">
+                                Generate self-signed certificate
+                            </button>
+                            <span class="form-text" id="httpsCertInfo">Checking…</span>
+                        </div>
+                        <script>
+                            (function () {
+                                async function refreshHttpsInfo() {
+                                    const el = document.getElementById('httpsCertInfo');
+                                    try {
+                                        const data = await (await fetch('/api/https/status')).json();
+                                        el.textContent = (data.active ? 'Listening on port ' + data.port + '. ' : 'Not listening now. ')
+                                            + data.certificateInfo;
+                                    } catch (e) {
+                                        el.textContent = 'Could not read certificate status.';
+                                    }
+                                }
+                                document.getElementById('btnGenerateHttpsCert').addEventListener('click', async function () {
+                                    if (!confirm('Generate a new self-signed certificate? This overwrites any existing one. Restart Icom Web Control afterwards if HTTPS is enabled.'))
+                                        return;
+                                    const san = document.querySelector('[name="Settings.HttpsSanHosts"]')?.value || '';
+                                    try {
+                                        const res = await fetch('/api/https/generate', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ sanHosts: san })
+                                        });
+                                        const data = await res.json();
+                                        if (!res.ok) throw new Error(data.error || 'Generate failed');
+                                        alert('Certificate generated.\n\n' + (data.info || '') + '\n\nSave Settings if you changed the HTTPS options, then restart Icom Web Control.');
+                                        refreshHttpsInfo();
+                                    } catch (e) {
+                                        alert('Certificate generation failed: ' + e.message);
+                                    }
+                                });
+                                refreshHttpsInfo();
+                            })();
+                        </script>
                         <div class="mb-3 form-check form-switch">
                             <input class="form-check-input" type="checkbox" asp-for="Settings.AutoShutdownWhenNoBrowsers" />
                             <label class="form-check-label" asp-for="Settings.AutoShutdownWhenNoBrowsers">

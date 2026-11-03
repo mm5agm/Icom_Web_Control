@@ -23,6 +23,10 @@ namespace Icom_Web_Control.Models
                 new Page("Meter Calibration", "/MeterCalibration", "bi-speedometer2"),
                 new Page("Diagnostics", "/Diagnostics", "bi-activity"),
             }),
+            new Group("CW", new[]
+            {
+                new Page("CW Paddle", "/CwPaddle", "bi-soundwave"),
+            }),
             new Group("Help", new[]
             {
                 new Page("User Manual", "/UserManual", "bi-book-fill"),

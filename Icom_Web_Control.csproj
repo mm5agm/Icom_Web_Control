@@ -191,6 +191,27 @@
     </ItemGroup>
   </Target>
 
+  <!-- The ESP32-S3 paddle adapter firmware, built in core and flashed from the
+       CW Paddle page. Copied like the core JS above, for the same reasons. -->
+  <Target Name="CopyCoreFirmware" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_CoreFirmware Include="core\firmware\paddle-adapter\dist\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_CoreFirmware)"
+          DestinationFolder="wwwroot\firmware\paddle-adapter"
+          SkipUnchangedFiles="true" />
+    <WriteLinesToFile File="wwwroot\firmware\paddle-adapter\.gitignore"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true"
+                      Lines="# Generated at build time from core/firmware/paddle-adapter/dist.;# Never edit the copy here.;.gitignore;@(_CoreFirmware-&gt;'%(Filename)%(Extension)')" />
+    <ItemGroup>
+      <Content Include="@(_CoreFirmware->'wwwroot\firmware\paddle-adapter\%(Filename)%(Extension)')"
+               Exclude="@(Content)">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
 </Project>
 
 
