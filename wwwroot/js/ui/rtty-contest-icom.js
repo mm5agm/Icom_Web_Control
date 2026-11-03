@@ -96,13 +96,13 @@ export function startIcomRttyContest(root, cfg) {
         controls: [
             { id: 'power', label: 'PWR', kind: 'range', min: 5, max: maxPowerW, step: 1, unit: ' W',
               title: 'RF power. Drag and let go, or turn the mouse wheel over it' },
+            // MONI under PWR, the other transmit control, as on YWC (Bruce VK2RT, YWC #250).
+            { id: 'moni', label: 'MONI', kind: 'range', min: 0, max: 100, step: 1,
+              toggle: 'Monitor on or off: hear your own transmit audio. It does not transmit. Kept, and put back each time this page opens',
+              title: 'Monitor level. Drag and let go, or turn the mouse wheel over it. Kept, and put back each time this page opens' },
             { id: 'width', label: 'WIDTH', kind: 'list', perReceiver: true,
               title: 'IF filter width of the VFO on screen',
               auto: 'The RTTY tuner works the width out for the signal. A width you set on VFO A while the tuner is open is kept for the mode' },
-            // MONI under INNER on the VFO WHEEL, as on YWC (Bruce VK2RT, YWC #250).
-            { id: 'moni', label: 'MONI', kind: 'range', box: 'wheel', min: 0, max: 100, step: 1,
-              toggle: 'Monitor on or off: hear your own transmit audio. It does not transmit. Kept, and put back each time this page opens',
-              title: 'Monitor level. Drag and let go, or turn the mouse wheel over it. Kept, and put back each time this page opens' },
         ],
         onControl: (id, value, vfo) => setControl(id, value, vfo),
         meters: [{ id: 'S', label: 'S' }, { id: 'PO', label: 'PO' }, { id: 'SWR', label: 'SWR' }, { id: 'ALC', label: 'ALC' }],
