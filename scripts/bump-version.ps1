@@ -137,5 +137,5 @@ Write-Host "All version markers bumped to $vtag (release date $ReleaseDate)." -F
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "  1. git diff                                       # review the changes"
-Write-Host "  2. Verify a v2.2.0-style release-notes section already exists in README.md"
+Write-Host "  2. Verify a v2.2.0-style section already exists at the top of RELEASE_HISTORY.md"
 Write-Host "  3. .\scripts\finish-release.ps1 -Version $vtag    # commit, merge, tag, GitHub release"

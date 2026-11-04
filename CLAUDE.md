@@ -191,18 +191,18 @@ release. `finish-release.ps1` now refuses to run unless all five agree.
 **Then update the documentation — mandatory, pre-releases included. See rules 13
 and 14 in `.claude/rules.md`.**
 
-- `README.md` — add the release-notes entry, and bump the per-release download
-  badge **only for a full release**, never a pre-release.
-  `finish-release.ps1` lifts the notes from there into the GitHub release. Once a
-  version is out, move its notes to `RELEASE_HISTORY.md` and leave a short summary
-  and a link under `## Release notes`, so the README stays short.
+- `RELEASE_HISTORY.md` — add the release-notes entry at the top, pre-releases
+  included. `finish-release.ps1` lifts the notes from there into the GitHub release.
+- `README.md` — **for a full release only**, never a pre-release, bump the
+  download badge and replace the short summary and link under `## Release notes`.
+  The notes themselves stay out of the README, so it stays short.
 - `USER_MANUAL.md` — bring every section the release touches in line with what
   the app now does, and re-capture any screenshot the change makes wrong.
 
 Do not start the git steps until both documents are done. The script helps with
 the mechanical half — it rewrites the version strings in both documents, and
 the download badge on a full release — but it refuses to release at all unless
-you have written the README release-notes entry yourself, and it can only
+you have written the `RELEASE_HISTORY.md` entry yourself, and it can only
 *warn* that the manual looks stale, never judge whether a section is right.
 
 ```powershell
@@ -213,7 +213,7 @@ git merge develop --no-ff -m "Release vX.Y.Z"
 git tag vX.Y.Z
 git checkout develop
 git push origin develop; git push origin main; git push origin vX.Y.Z
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "See README.md for full release notes."
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "See RELEASE_HISTORY.md for full release notes."
 ```
 
 **The `gh release create` step is required** — the build workflow triggers on
@@ -228,7 +228,7 @@ which is exactly how v1.0.3 first shipped v1.0.0's code.
 **Install the hooks in every clone.** `.githooks/pre-push` refuses to push
 `main` anything that is neither a release merge (a commit whose subject is
 `Release vX.Y.Z`, which is what `finish-release.ps1` makes) nor a
-documentation-only change (`README.md`, `USER_MANUAL.md`, `docs/`,
+documentation-only change (`README.md`, `RELEASE_HISTORY.md`, `USER_MANUAL.md`, `docs/`,
 `pictures/`, which is how manual and README corrections have always reached
 `main` between releases). That guard was missing on 2026-09-19, when a
 mistyped `cd` ran this repo's docs merge in YWC instead and pushed 31

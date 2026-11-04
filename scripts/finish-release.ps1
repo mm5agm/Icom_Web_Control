@@ -8,8 +8,8 @@
 #
 # Documentation (rules 13/14 in .claude/rules.md):
 #   The script rewrites the version strings in README.md and USER_MANUAL.md to
-#   match the release, and refuses to release at all if README.md has no
-#   release-notes entry for it. It will not write those notes for you -- see
+#   match the release, and refuses to release at all if RELEASE_HISTORY.md has
+#   no entry for it. It will not write those notes for you -- see
 #   the long comment at the preflight for why. -NoDocUpdate leaves the docs
 #   alone; -SkipVersionCheck skips the lot.
 #
@@ -43,7 +43,7 @@ param(
     [switch]$PreRelease,
 
     # Skip the preflight that checks the version in the source files and the
-    # README release notes. Use only when you know why they disagree.
+    # release notes. Use only when you know why they disagree.
     [switch]$SkipVersionCheck,
 
     # By default the script rewrites the version strings in README.md and
@@ -165,7 +165,7 @@ function Set-FileTextPreservingEncoding {
     [System.IO.File]::WriteAllText($Path, $Text, $utf8NoBom)
 }
 
-# The README section for this version, lifted out below and used as the body of
+# The RELEASE_HISTORY.md section for this version, lifted out below and used as the body of
 # the GitHub release. Declared here because -SkipVersionCheck skips the block
 # that fills it, and Set-StrictMode makes reading an unset variable an error.
 # Empty means "fall back to the boilerplate".
@@ -173,17 +173,17 @@ $ReleaseNotesBody = ''
 
 if (-not $SkipVersionCheck) {
     # --- the part a script must not invent, checked FIRST ----------------
-    # Rules 13/14: README release notes are mandatory, pre-releases included.
+    # Rule 14: release notes are mandatory, pre-releases included.
     # This runs before the doc rewriting below so that a release refused for
     # missing notes leaves the working tree exactly as it found it.
-    $readme = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'README.md'))
+    $history = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'RELEASE_HISTORY.md'))
     $headingRe = "(?m)^(#{2,4})\s+v$([regex]::Escape($VersionCore))\b"
-    $heading = [regex]::Match($readme, $headingRe)
+    $heading = [regex]::Match($history, $headingRe)
     if (-not $heading.Success) {
         throw @"
-README.md has no release-notes entry for v$VersionCore (rule 13).
+RELEASE_HISTORY.md has no entry for v$VersionCore (rule 14).
 
-Add one under '## Release notes', above the previous version:
+Add one above the previous version:
 
     ### v$VersionCore ($(Get-Date -Format 'yyyy-MM-dd'))
 
@@ -202,22 +202,23 @@ Re-run with -SkipVersionCheck to release without them.
     # it would otherwise leave "-pre1 (2026-09-22)" sitting at the top of the
     # notes -- which nobody noticed while the notes were only being counted, and
     # which would now be the first line of the published release body.
-    $lineEnd = $readme.IndexOf("`n", $heading.Index)
+    $lineEnd = $history.IndexOf("`n", $heading.Index)
     if ($lineEnd -lt 0) { $lineEnd = $heading.Index + $heading.Length }
-    $afterHeading = $readme.Substring($lineEnd + 1)
+    $afterHeading = $history.Substring($lineEnd + 1)
     $nextHeading = [regex]::Match($afterHeading, "(?m)^#{1,4}\s")
     $body = $afterHeading
     if ($nextHeading.Success) { $body = $afterHeading.Substring(0, $nextHeading.Index) }
     if ($body.Trim().Length -lt 40) {
-        throw "README.md has a v$VersionCore heading but essentially nothing under it (rule 13). Write the notes, or re-run with -SkipVersionCheck."
+        throw "RELEASE_HISTORY.md has a v$VersionCore heading but essentially nothing under it (rule 14). Write the notes, or re-run with -SkipVersionCheck."
     }
 
     # These notes are the only thing most users ever read about a release, and
-    # until now they stayed in README.md: the GitHub release said "see README.md"
+    # for a long time they stayed in the README: the GitHub release said "see README.md"
     # and so did the API, which is what IWC's own update banner reads. So the
     # banner could only ever say "a newer version is available" and the releases
     # page showed a pointer instead of the notes. Carry them across instead.
-    $ReleaseNotesBody = $body.Trim()
+    # A rule between versions in the history file is not part of the notes.
+    $ReleaseNotesBody = $body.Trim() -replace '\s*---$', ''
 
     # --- version strings, rewritten in place -----------------------------
     # Pattern must capture the version in group 1. Fixable = the script can
@@ -486,7 +487,7 @@ else {
     $notesBody = "Please send bug reports to mm5agm@outlook.com"
 }
 
-# The README section goes under whichever preamble applies. It is passed in a
+# The notes go under whichever preamble applies. It is passed in a
 # file rather than on the command line: the notes are long, contain newlines,
 # backticks and quotes, and every one of those is a way for a release body to
 # arrive mangled -- or for the command to fail after the tag has been pushed.
@@ -494,7 +495,7 @@ if ($ReleaseNotesBody) {
     $notesBody = "$notesBody`n`n---`n`n$ReleaseNotesBody"
 }
 else {
-    $notesBody = "$notesBody`n`nSee README.md for the full release notes."
+    $notesBody = "$notesBody`n`nSee RELEASE_HISTORY.md for the full release notes."
 }
 
 $notesFile = Join-Path ([System.IO.Path]::GetTempPath()) "release-notes-$Version.md"
