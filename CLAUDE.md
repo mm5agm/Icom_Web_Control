@@ -225,6 +225,9 @@ anything is wrong. Prefer it to the raw commands: run by hand, the merge can
 conflict and leave `main` unmerged while the tag and release go out anyway,
 which is exactly how v1.0.3 first shipped v1.0.0's code.
 
+**Do not use `.\scripts\create-release.ps1`.** It is an older route to the same
+place, it has none of those checks, and it generates release notes from git log.
+
 **Install the hooks in every clone.** `.githooks/pre-push` refuses to push
 `main` anything that is neither a release merge (a commit whose subject is
 `Release vX.Y.Z`, which is what `finish-release.ps1` makes) nor a
