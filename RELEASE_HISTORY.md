@@ -1,8 +1,7 @@
 # Icom Web Control - release history
 
-The notes for the version currently being installed are in
-[README.md](README.md#release-notes). Everything before it is kept here, so the
-README stays short. The installers are all still on the
+Every version's notes are kept here, newest first, so the README stays short. The
+installers are all still on the
 [releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
 
 This file exists because most of those release pages carry no notes of their own -
@@ -12,6 +11,32 @@ unchanged, and it is not [CHANGELOG.md](CHANGELOG.md), which is a closed archive
 a different and much older format.
 
 ---
+
+### v1.6.0 (2026-11-03)
+
+> **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept. It includes everything in the v1.6.0 pre-releases, whose notes are in [RELEASE_HISTORY.md](RELEASE_HISTORY.md). Like v1.5.0 it is unsigned, and Edge or Defender may flag it; the README's Windows Security section says what to do.
+
+**The headline is RTTY Contest and the CW Paddle.**
+
+- **RTTY Contest, a GUI for RTTY contesting** *(still being tested)*. Only what a contest RTTY operator uses, on one screen: the frequency, band keys that land on each band's RTTY spot, the radio's scope over its waterfall, and the RTTY tuner docked at the side with its decoded text. **MODE** holds the radio in the RTTY mode you choose and turns amber when it is in another. A tuning dial (outer ring for big steps, inner knob for small ones) shares a place with the decoded text. **MEM** lists your memories, **MONI** sets the monitor, **WIDTH** and **AUTO** set the filter, and **FIXED** holds the spectrum still and turns a page at the edge. **MENU** opens Settings and the other pages in a new tab, and the page has its own theme list. Each part pops out into a window of its own, and named layouts put every window back on its own monitor. It is the page from Yaesu Web Control, shared between the two apps, and much of it came from Bruce VK2RT's testing there. Receive only: transmit from your logger, or from MMTTY. User Manual, [§5.21](USER_MANUAL.md#521-rtty-contest).
+
+- **CW Paddle** *(new and still being tested)*. Send CW from your own paddle when you operate the radio remotely. The paddle goes into a USB adapter that shows up as a MIDI device: a **HaliKey MIDI**, or an **ESP32-S3 board** that you program from the page with one button. The keyer and sidetone run in the browser, and IWC keys the radio by DTR: through the CI-V port on an original IC-7300, or the second USB port on an IC-7300MK2. It starts in dry run every time, so you can practise without transmitting; choosing a key line can put the radio in transmit at once. What you send shows in the CW Send log, on lines tagged *paddle*. **Enable HTTPS** in Settings lets a browser on another computer use the adapter. Tested in Yaesu Web Control on an FTdx101MP; it has not yet keyed an IC-7300, so please tell me how it goes. At the radio, plug the paddle into its KEY jack as usual. User Manual, [§21](USER_MANUAL.md#21-cw-paddle).
+
+- **RTTY.** Settings → **RTTY mode** chooses RTTY-L, RTTY-U, DATA-L or DATA-U, and the tuner goes to that exact mode and holds it. In RTTY-R the tones are the right way up now; **Auto** never changes the radio's RTTY menu shift; **From radio** and **Auto** stay in the heading with **Tones only**; and the scope's arms straighten at the same dial setting. IWC keeps the tuner's last Mark and Shift. User Manual, [§20](USER_MANUAL.md#20-rtty).
+
+- **Radio power at start and exit.** **Turn the radio on when Icom Web Control starts** (on by default) and **Turn the radio off when Icom Web Control closes** (off by default), in Settings.
+
+- **Save in the CW Reader.** A **Save** button writes the text in the panel to a `.txt` file headed with the UTC time. Asked for by diane903 ([Discussion #86](https://github.com/mm5agm/Icom_Web_Control/discussions/86)). User Manual, [§18.5](USER_MANUAL.md#185-the-panel-controls).
+
+- **X-Watch.** An **X-Watch** key beside the **Listening** badge, and an **X-WATCH** key on the Radio panel, switch cross-band watch on and off, so the peek no longer chops a QSO, and carry the peek interval. With X-Watch off the useless watch panel is hidden, and with it on and the VFOs on different bands the watch pane shows its trace without the empty waterfall. User Manual, [§5.4](USER_MANUAL.md#54-spectrum-display).
+
+- **Radio panel.** A **VOICE** key for voice control. A corner grip scales the panel to any size, and the main dial spins like a weighted knob (the idea is from the tuning dial in Brian Clark's IC-7300-Scope). The pop-out spectrum window tunes on a click or the mouse wheel and has the **SCOPE** settings on each pane. The other VFO's passband has its real width, and the **FILTER** key shows the slot and its width. User Manual, [§5.20](USER_MANUAL.md#520-radio-panel).
+
+- **Views and menus.** One **Views** list on every page, and IWC starts in the view you used last. The Experimental UI has a **Menu**, and Fabio Valente's (CR7CDC) dark look and panels from Yaesu Web Control. A shortcut can open IWC straight on a page, e.g. `Icom_Web_Control.exe rtty-contest`. User Manual, [§5.1](USER_MANUAL.md#51-top-bar), [§5.19](USER_MANUAL.md#519-experimental-ui).
+
+- **The radio's own menu to a file, and back (IC-7300MK2).** Settings → **Radio Menu** saves all 270 items of the radio's SET menu to an `.ini` file and loads a file back, sending only the items you tick. Items that affect transmitting start unticked. **Export full backup** saves into a Backups folder. User Manual, [§6.6](USER_MANUAL.md#66-backup--restore).
+
+- **Fixed:** a radio reply with an extra FE byte in front was thrown away; cross-band watch never ran from the Radio panel; a popped-out CW or RTTY window was drawn twice; in USB-D and LSB-D the Radio panel drew the passband centred on the dial; the readout under the mouse went stale while the dial moved; a pop-out window on a short screen never kept its size; the VOX and PROC buttons did not follow the radio.
 
 ### v1.6.0-pre9 (2026-11-02)
 
