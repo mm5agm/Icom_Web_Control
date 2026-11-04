@@ -193,6 +193,9 @@ and 14 in `.claude/rules.md`.**
 
 - `README.md` — add the release-notes entry, and bump the per-release download
   badge **only for a full release**, never a pre-release.
+  `finish-release.ps1` lifts the notes from there into the GitHub release. Once a
+  version is out, move its notes to `RELEASE_HISTORY.md` and leave a short summary
+  and a link under `## Release notes`, so the README stays short.
 - `USER_MANUAL.md` — bring every section the release touches in line with what
   the app now does, and re-capture any screenshot the change makes wrong.
 
