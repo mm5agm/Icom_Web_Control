@@ -176,16 +176,21 @@ if (-not $SkipVersionCheck) {
     # Rule 14: release notes are mandatory, pre-releases included.
     # This runs before the doc rewriting below so that a release refused for
     # missing notes leaves the working tree exactly as it found it.
+    #
+    # A full release looks for the bare core version; the trailing lookahead is
+    # what stops "v1.6.0" being satisfied by an existing "v1.6.0-pre9" heading.
+    # A pre-release looks for its own full tag.
+    $notesVersion = $Version.TrimStart('v')
     $history = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'RELEASE_HISTORY.md'))
-    $headingRe = "(?m)^(#{2,4})\s+v$([regex]::Escape($VersionCore))\b"
+    $headingRe = "(?m)^(#{2,4})\s+v$([regex]::Escape($notesVersion))(?![\w.\-])"
     $heading = [regex]::Match($history, $headingRe)
     if (-not $heading.Success) {
         throw @"
-RELEASE_HISTORY.md has no entry for v$VersionCore (rule 14).
+RELEASE_HISTORY.md has no entry for v$notesVersion (rule 14).
 
 Add one above the previous version:
 
-    ### v$VersionCore ($(Get-Date -Format 'yyyy-MM-dd'))
+    ### v$notesVersion ($(Get-Date -Format 'yyyy-MM-dd'))
 
     <what changed, written for an operator: what was wrong, what they will
      notice, and anything they must do differently>
@@ -198,8 +203,8 @@ Re-run with -SkipVersionCheck to release without them.
 
     # A heading with nothing under it is the same failure wearing a hat.
     # Start after the whole heading LINE, not after the regex match: the match
-    # ends at the numeric core, so on a pre-release "### v1.2.0-pre1 (2026-09-22)"
-    # it would otherwise leave "-pre1 (2026-09-22)" sitting at the top of the
+    # ends at the version, so on a heading like "### v1.2.0-pre1 (2026-09-22)"
+    # it would otherwise leave " (2026-09-22)" sitting at the top of the
     # notes -- which nobody noticed while the notes were only being counted, and
     # which would now be the first line of the published release body.
     $lineEnd = $history.IndexOf("`n", $heading.Index)
@@ -209,7 +214,7 @@ Re-run with -SkipVersionCheck to release without them.
     $body = $afterHeading
     if ($nextHeading.Success) { $body = $afterHeading.Substring(0, $nextHeading.Index) }
     if ($body.Trim().Length -lt 40) {
-        throw "RELEASE_HISTORY.md has a v$VersionCore heading but essentially nothing under it (rule 14). Write the notes, or re-run with -SkipVersionCheck."
+        throw "RELEASE_HISTORY.md has a v$notesVersion heading but essentially nothing under it (rule 14). Write the notes, or re-run with -SkipVersionCheck."
     }
 
     # These notes are the only thing most users ever read about a release, and
