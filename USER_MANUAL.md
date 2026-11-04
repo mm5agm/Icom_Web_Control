@@ -204,6 +204,36 @@ The application was written for operators who want a large, clean, touchscreen-f
    > **Upgrading from v1.0.4 or earlier?** Those versions filed the Start Menu entry inside a folder named **MM5AGM**, which sorts it under **M** rather than **I** and makes it invisible to anyone searching for "Icom". Installing v1.0.5 moves it out to the top level and removes the old one, so you end up with a single entry where you would expect it. If Windows Search does not find a brand-new shortcut immediately, give it a minute to index.
 4. The first time you run the app, Windows may show a **Smart App Control** or **Unknown Publisher** warning. Click **More info → Run anyway** to proceed. This warning appears because the installer is not signed with a commercial certificate.
 
+#### Windows security warnings
+
+Because the installer is not code-signed, Windows and third-party antivirus tools treat it as an unknown, newly downloaded executable and may warn about it or block it. This is expected — the file is not malware. The installer is built by GitHub Actions directly from the source in this repository, and GitHub shows a SHA-256 digest beside each file on the release page — run `Get-FileHash Icom_Web_Control_Setup.exe` in PowerShell and the two should match. Follow whichever of these matches what you see:
+
+**Microsoft Edge or Defender blocks the download, or Defender quarantines it, and says it contains a virus or "This program is dangerous and executes commands from an attacker"**
+This is Defender's cloud/machine-learning classifier (the detection name ends in `!ml` — with v1.5.0 it was `Trojan:Win32/Wacatac.B!ml` on the installer itself, caught by Edge while it was still downloading). It is a false positive that hits many unsigned .NET applications, and it can appear on a build that scanned clean the day before. To recover:
+
+- **If Edge blocked the download:** open Downloads (**Ctrl+J**), click **…** on the Icom Web Control entry, choose **Keep**, then **Show more → Keep anyway**.
+- **If Defender quarantined it:** open **Windows Security → Virus & threat protection → Protection history**, click the entry, choose **Actions → Allow on device**, then download the installer again (or simply start IWC again if it was the installed program that was taken). Choose *Allow*, not just *Restore* — Restore puts the file back but Defender may take it again at the next scan.
+
+Don't switch Defender off — allowing this one file is enough. If this happens to you, please post the detection name shown in Protection history in a [Discussion](https://github.com/mm5agm/Icom_Web_Control/discussions) or an issue; I report each one to Microsoft as a false positive, and that is what makes it stop happening for the next person.
+
+**"Windows protected your PC" (SmartScreen) or an Unknown Publisher prompt when you run the installer**
+Click **More info → Run anyway**.
+
+**Norton (or other antivirus) flags the file as malware**
+This is the same false positive, caused by the executable being unsigned and newly downloaded. In Norton, go to **Security → History**, find the quarantined file, and choose **Restore & Exclude** (or the equivalent Allow option in your antivirus).
+
+**Right-click → Properties → Unblock**
+Windows marks files downloaded from the internet as untrusted. Before running the installer, right-click the file, choose **Properties**, and if you see an **Unblock** checkbox at the bottom of the General tab, tick it and click OK.
+
+**"This app can't run on your PC" — Smart App Control**
+If Smart App Control is enabled it will block unsigned apps entirely. Go to **Settings → Privacy & Security → Windows Security → App & Browser Control → Smart App Control** and switch it to **Off**, then restart your PC and try again.
+
+The screenshot below shows the Smart App Control setting:
+
+![Smart App Control Screenshot](pictures/SmartAppControl.png)
+
+These are one-time steps — once the app is installed you won't see them again.
+
 ---
 
 ## 3. First-Time Setup
@@ -1164,6 +1194,10 @@ The Radio panel has none of the screen-reader or voice-control work of the Class
 ### 5.21 RTTY Contest
 
 *New in v1.6.0, and still being tested.*
+
+![The RTTY Contest screen on the German weather station DDK9: the spectrum over the waterfall with the two tones, the RTTY tuner docked at the side with a sharp cross at Mark 2448, Shift 450, 50 baud, reversed, and decoded text giving the callsign, the frequencies and a gale warning for the German Bight](pictures/RTTY_DDK9_RTTY_Contest.png)
+
+*The German weather station DDK9 on 10.1008 MHz. The decoded text is the station giving its callsign and frequencies, then a gale warning. The picture is from YWC, the Yaesu program, so its band keys and receiver names differ a little from IWC.*
 
 **RTTY Contest** has only what a contest RTTY operator uses, on one screen: the frequency, the radio's band scope over its waterfall, and the RTTY tuner docked at the side. Pick it from **Views** on the Radio panel ([§5.20](#520-radio-panel)), or go to `http://localhost:8080/rtty-contest`. **VIEWS** beside the title on the page itself goes back to the other GUIs, and **MENU** beside it has Settings, the other setup pages, the manual and About, each opening in a new tab so RTTY Contest keeps running. It is the RTTY Contest page from Yaesu Web Control, shared between the two apps. It receives only: nothing on it transmits. Transmit from your logger, or from MMTTY.
 
