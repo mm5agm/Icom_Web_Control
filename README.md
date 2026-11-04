@@ -40,7 +40,7 @@ I can't see my radio's controls without a magnifying glass, and Icom has tucked 
 
 ## Supported radios
 
-**`v1.6.0` is the current release.** Development and bench testing has been on one IC-7300 MkII, and an owner of an original IC-7300 has confirmed it on their radio. That is still only two radios, so if anything behaves unexpectedly on either, please report it.
+**`v1.6.0` is the current release**. Development and bench testing has been on one IC-7300 MkII, and an owner of an original IC-7300 has confirmed it on their radio. That is still only two radios, so if anything behaves unexpectedly on either, please report it.
 
 - **IC-7300 MkII**: CI-V over USB Type-C, default address `B6`.
 - **IC-7300** (original): CI-V over USB Type-B, default address `94`. It only streams its scope with **CI-V USB Port** set to **Unlink from [REMOTE]** and **CI-V USB Baud Rate** at **115200**. Confirmed by Gerry M9YKD ([#5](https://github.com/mm5agm/Icom_Web_Control/issues/5)). See [§15.7](USER_MANUAL.md#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).
