@@ -1,0 +1,38 @@
+// Words people might search for that aren't on the Settings page, for the
+// shared search in core/js/settings/settings-search.js. Keyed by the setting's
+// name, which is its form field in kebab case; the UI test fails on a name the
+// page no longer has.
+window.RWC_SETTINGS_KEYWORDS = {
+    'spectrum-display': 'waterfall panadapter scope',
+    'pseudo-dual-receiver-enabled': 'sub vfo b second waterfall scope',
+    'pseudo-dual-watch-span-mode': 'width zoom',
+    'tx-toggle-key': 'ptt transmit keyboard shortcut hotkey space bar',
+    'show-frequency-arrow-buttons': 'screen reader blind tuning vfo',
+    'voice-control-enabled': 'speech talk commands microphone ptt push to talk mic button',
+    'voice-active-locale': 'locale translation',
+    'voice-input-device': 'mic input',
+    'voice-output-device': 'output tts speech',
+    'radio-model': 'rig transceiver',
+    'serial-port-select': 'com usb cat civ ci-v rig connection',
+    'baud-rate': 'speed serial civ ci-v',
+    'power-on-at-start': 'switch on startup',
+    'power-off-at-exit': 'shutdown switch off',
+    'band-plan': 'itu usa',
+    'auto-mode-change-on-tune': 'usb lsb sideband',
+    'web-address': 'ip address lan bind remote',
+    'http-port': '8080 browser url',
+    'auto-shutdown-when-no-browsers': 'close quit',
+    'https-enabled': 'ssl tls certificate secure mic microphone',
+    'https-port': 'ssl tls',
+    'https-san-hosts': 'ssl tls certificate tailscale domain',
+    'dx-cluster-enabled': 'spots telnet',
+    'dx-cluster-host': 'telnet server',
+    'dx-spot-age-minutes': 'expire timeout old spots',
+    'cw-memory-messages-m1-m5': 'morse keyer macro contest',
+    'cw-audio-device-name': 'morse sound usb codec',
+    'cw-reader-filter-hz': 'morse decoder width',
+    'rtty-tuner': 'fsk decoder mark space',
+    'rtty-contest-mode': 'cq ww wae',
+    'backup-restore': 'export import save copy',
+    'radio-menu': 'eeprom backup',
+};
