@@ -313,7 +313,7 @@ Claude must follow these rules for every change in this repository.
 
 # 14. Release Documentation (Non-Negotiable)
 
-**Before any release or pre-release, `README.md` and `USER_MANUAL.md` must both
+**Before any release or pre-release, `RELEASE_HISTORY.md` and `USER_MANUAL.md` must both
 be updated. Every time. No exceptions, and no "if needed".**
 
 A release is any of: bumping `Models/AppVersion.cs` or `installer.nsi`, tagging,
@@ -323,8 +323,10 @@ and read the same two documents.
 
 Claude must, before the first commit of the release:
 
-1. **`README.md`** — add the release-notes entry for the new version, and bump
-   the per-release download badge near the top **if this is a full release**.
+1. **`RELEASE_HISTORY.md`** — add the release-notes entry for the new version at
+   the top. **If this is a full release**, also bump the download badge near the
+   top of `README.md` and replace the short summary and link under its
+   `## Release notes`.
    The badge is the front page's "get this one" button, so it tracks the newest
    **full** release only — never a pre-release. That is the same call rule 15
    makes for the in-app banner, for the same reason: an operator who lands on
@@ -340,7 +342,7 @@ Claude must, before the first commit of the release:
 3. Tell the operator which sections of each document changed, and why.
 
 If a release genuinely changes nothing user-visible, say so in one line and
-still add the README release-notes entry — that entry is never optional.
+still add the `RELEASE_HISTORY.md` entry — that entry is never optional.
 
 Claude must not start the release steps until both documents are updated, and
 must never defer this to "after the release". A shipped version whose manual
