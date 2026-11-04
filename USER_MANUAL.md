@@ -1165,6 +1165,10 @@ The Radio panel has none of the screen-reader or voice-control work of the Class
 
 *New in v1.6.0, and still being tested.*
 
+![The RTTY Contest screen on the German weather station DDK9: the spectrum over the waterfall with the two tones, the RTTY tuner docked at the side with a sharp cross at Mark 2448, Shift 450, 50 baud, reversed, and decoded text giving the callsign, the frequencies and a gale warning for the German Bight](pictures/RTTY_DDK9_RTTY_Contest.png)
+
+*The German weather station DDK9 on 10.1008 MHz. The decoded text is the station giving its callsign and frequencies, then a gale warning. The picture is from YWC, the Yaesu program, so its band keys and receiver names differ a little from IWC.*
+
 **RTTY Contest** has only what a contest RTTY operator uses, on one screen: the frequency, the radio's band scope over its waterfall, and the RTTY tuner docked at the side. Pick it from **Views** on the Radio panel ([§5.20](#520-radio-panel)), or go to `http://localhost:8080/rtty-contest`. **VIEWS** beside the title on the page itself goes back to the other GUIs, and **MENU** beside it has Settings, the other setup pages, the manual and About, each opening in a new tab so RTTY Contest keeps running. It is the RTTY Contest page from Yaesu Web Control, shared between the two apps. It receives only: nothing on it transmits. Transmit from your logger, or from MMTTY.
 
 While it is open, its tuner keeps the radio in the mode chosen in **MODE** (below). If something else changes the mode, CW Reader Mode or a band change, the tuner puts it back, so close the page, or use another GUI, for CW.
