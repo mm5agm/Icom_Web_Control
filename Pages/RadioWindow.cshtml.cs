@@ -13,7 +13,6 @@ namespace Icom_Web_Control.Pages
     {
         // Same figures as RadioPanelModel: the IC-7300 family.
         public int MaxPowerW => 100;
-        public long MaxHz => 74_800_000;
 
         public RadioWindowModel(RadioStateService radioStateService, ISettingsService settingsService)
             : base(radioStateService, settingsService)

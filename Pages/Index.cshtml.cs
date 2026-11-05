@@ -156,6 +156,13 @@ namespace Icom_Web_Control.Pages
 
         public RadioStateService RadioState => _radioStateService;
 
+        // The radio that answered if there is one, else the one in Settings.
+        public Services.Civ.RadioProfile Profile => Services.Civ.RadioProfile.OrDefault(
+            string.IsNullOrEmpty(RadioState.RadioModel) ? RadioModel : RadioState.RadioModel);
+
+        public long MinHz => Profile.MinHz;
+        public long MaxHz => Profile.MaxHz;
+
         public RadioStateViewModel State { get; set; } = new RadioStateViewModel();
 
         public async Task<IActionResult> OnGetAsync()

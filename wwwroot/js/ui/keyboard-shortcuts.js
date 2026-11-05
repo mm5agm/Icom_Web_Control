@@ -18,7 +18,8 @@ import {
 } from '../keys/shortcut-shell.js';
 
 const MIN_FREQ_HZ = 30_000;
-const MAX_FREQ_HZ = 74_800_000;   // IC-7300 receive range tops out at 74.8 MHz
+// The page sets the radio's limit (Pages/Index.cshtml).
+const maxFreqHz = () => window._radioMaxHz || 74_800_000;
 
 const announce = createAnnouncer('kbShortcutAnnounce');
 let autoModeForHz = () => null;
@@ -134,7 +135,7 @@ function stepFrequency(deltaHz) {
     const vfo = activeVfo();
     const cur = currentFrequencyHz(vfo);
     if (!cur || !window.radioControl?.setFrequency) return;
-    const next = Math.max(MIN_FREQ_HZ, Math.min(MAX_FREQ_HZ, Math.round(cur + deltaHz)));
+    const next = Math.max(MIN_FREQ_HZ, Math.min(maxFreqHz(), Math.round(cur + deltaHz)));
     if (next !== cur) window.radioControl.setFrequency(vfo, next);
 }
 

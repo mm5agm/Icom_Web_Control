@@ -18,7 +18,7 @@
     var allModes = new[] {
         "LSB", "USB", "CW-U", "CW-L", "FM", "AM", "RTTY-L", "RTTY-U",
         "DATA-L", "DATA-U", "DATA-FM"
-    };
+    }.Concat(Model.Profile.Frequencies.ExtraModes).ToArray();
     // Display label shown in the dropdown — value stays as the CAT mode string.
     string ModeLabel(string m) => m;
 
@@ -987,7 +987,7 @@
                         </div>
                         <!-- Middle: Band buttons + Mode/Antenna below + filter scope -->
                         <div class="flex-grow-1 d-flex flex-column gap-1">
-                            @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create("unused", "A", Model.SelectedBandA))
+                            @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create(string.Join(",", Model.Profile.Frequencies.ExtraBands), "A", Model.SelectedBandA))
                             <div class="d-flex align-items-center gap-2 mt-1">
                                 <label class="vfo-control-label" for="modeSelectA">Mode</label>
                                 <select class="form-select form-select-sm vfo-mode-select" id="modeSelectA" data-a11y-key="vfo.a.mode"
@@ -1285,7 +1285,7 @@
                         </div>
                         <!-- Middle: Band buttons + Mode/Antenna below -->
                         <div class="flex-grow-1 band-buttons-shifted d-flex flex-column gap-1">
-                            @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create("unused", "B", Model.SelectedBandB))
+                            @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create(string.Join(",", Model.Profile.Frequencies.ExtraBands), "B", Model.SelectedBandB))
                             <div class="d-flex align-items-center gap-2 mt-1">
                                 <label class="vfo-control-label" for="modeSelectB">Mode</label>
                                 <select class="form-select form-select-sm vfo-mode-select" id="modeSelectB" data-a11y-key="vfo.b.mode"
@@ -3115,6 +3115,7 @@
             // removed for the IC-7300 (direct-sampling SDR — no roofing filters,
             // no Yaesu-style IF width/shift, no Contour). See the clone-split plan.
             window._radioModel = '@Model.RadioModel';
+            window._radioMaxHz = @Model.MaxHz;
 
             // Hold button — toggles whether the panel updates from incoming
             // SDR frames. While held the spectrum + waterfall freeze at the

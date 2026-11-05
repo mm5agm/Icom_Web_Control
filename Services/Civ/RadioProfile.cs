@@ -17,12 +17,13 @@ namespace Icom_Web_Control.Services.Civ
         private readonly IReadOnlyDictionary<byte, CommandRule>? _allowed;
 
         private RadioProfile(string model, byte civAddress, byte attenuatorOn, bool hasScope,
-            IReadOnlyDictionary<byte, CommandRule>? allowed)
+            RadioFrequencies frequencies, IReadOnlyDictionary<byte, CommandRule>? allowed)
         {
             Model = model;
             CivAddress = civAddress;
             AttenuatorOn = attenuatorOn;
             HasScope = hasScope;
+            Frequencies = frequencies;
             _allowed = allowed;
         }
 
@@ -41,11 +42,47 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>Whether the radio has a spectrum scope it can send over CI-V.</summary>
         public bool HasScope { get; }
 
+        /// <summary>What the radio tunes and transmits on, and the bands and modes it adds to the HF set.</summary>
+        public RadioFrequencies Frequencies { get; }
+
+        /// <summary>The name and model number Hamlib knows this radio by, for rigctld clients.</summary>
+        public (string Name, int Id) Hamlib => Model == "IC-7100" ? ("IC-7100", 3070) : ("IC-7300", 3073);
+
+        /// <summary>The lowest frequency the radio receives.</summary>
+        public long MinHz => Frequencies.Receive[0].LoHz;
+
+        /// <summary>The highest frequency the radio receives. There can be a gap below it: see <see cref="CanTune"/>.</summary>
+        public long MaxHz => Frequencies.Receive[^1].HiHz;
+
+        /// <summary>True when the radio can receive on this frequency.</summary>
+        public bool CanTune(long hz)
+        {
+            foreach (var range in Frequencies.Receive)
+                if (hz >= range.LoHz && hz <= range.HiHz)
+                    return true;
+            return false;
+        }
+
+        /// <summary>
+        /// True when the radio has this mode. Only the modes one model adds need
+        /// asking about: an IC-7300 would refuse WFM and DV, so it is never sent them.
+        /// </summary>
+        public bool HasMode(string mode) =>
+            !RadioFrequencies.ModesOnlySomeHave.Contains(mode) || Contains(Frequencies.ExtraModes, mode);
+
+        private static bool Contains(IReadOnlyList<string> list, string value)
+        {
+            foreach (var item in list)
+                if (string.Equals(item, value, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+
         /// <summary>The MkII: IWC's reference radio, with every command available.</summary>
-        public static readonly RadioProfile Ic7300Mk2 = new("IC-7300MK2", 0xB6, CivProtocol.AttOn20dB, true, null);
+        public static readonly RadioProfile Ic7300Mk2 = new("IC-7300MK2", 0xB6, CivProtocol.AttOn20dB, true, RadioFrequencies.Ic7300Family, null);
 
         /// <summary>The original IC-7300, which takes the same commands from IWC as the MkII.</summary>
-        public static readonly RadioProfile Ic7300 = new("IC-7300", 0x94, CivProtocol.AttOn20dB, true, null);
+        public static readonly RadioProfile Ic7300 = new("IC-7300", 0x94, CivProtocol.AttOn20dB, true, RadioFrequencies.Ic7300Family, null);
 
         /// <summary>
         /// IC-7100, from section 20 of its manual. It has no scope commands (27) and
@@ -54,7 +91,7 @@ namespace Icom_Web_Control.Services.Civ
         /// unavailable. Memories (08, 1A 00) have their own layout and are blocked
         /// until that has been written.
         /// </summary>
-        public static readonly RadioProfile Ic7100 = new("IC-7100", 0x88, 0x12, false,
+        public static readonly RadioProfile Ic7100 = new("IC-7100", 0x88, 0x12, false, RadioFrequencies.Ic7100,
             new Dictionary<byte, CommandRule>
             {
                 [0x03] = CommandRule.Any,                                   // read frequency
@@ -90,6 +127,12 @@ namespace Icom_Web_Control.Services.Civ
                     return profile;
             return null;
         }
+
+        /// <summary>
+        /// The profile for a model name, and for anything unknown the MkII, because
+        /// that is what IWC's limits have always been.
+        /// </summary>
+        public static RadioProfile OrDefault(string? model) => ForModel(model) ?? Ic7300Mk2;
 
         /// <summary>The model name for the ID byte in a radio's 19 00 reply.</summary>
         public static string ModelNameForId(byte idByte)

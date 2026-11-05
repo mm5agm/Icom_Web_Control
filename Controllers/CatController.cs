@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Icom_Web_Control.Services;
+using Icom_Web_Control.Services.Civ;
 using Icom_Web_Control.Models;
 using System.Text.Json;
 using System.Threading;
@@ -302,8 +303,12 @@ namespace Icom_Web_Control.Controllers
             { "160m", 1840000 }, { "80m", 3700000 }, { "60m", 5357000 },
             { "40m", 7100000 }, { "30m", 10136000 }, { "20m", 14074000 },
             { "17m", 18110000 }, { "15m", 21074000 }, { "12m", 24915000 },
-            { "10m", 28074000 }, { "6m", 50313000 }, { "4m", 70100000 }
+            { "10m", 28074000 }, { "6m", 50313000 }, { "4m", 70100000 },
+            { "2m", 144174000 }, { "70cm", 432174000 }
         };
+
+        // Limits come from the radio that answered, not from Settings.
+        private RadioProfile Profile => RadioProfile.OrDefault(_radio.ModelId);
 
         private static readonly Dictionary<string, string> CatCodeToMode = new()
         {
@@ -321,7 +326,9 @@ namespace Icom_Web_Control.Controllers
             { "C", "DATA-U" },
             { "D", "AM-N" },
             { "E", "PSK" },
-            { "F", "DATA-FM-N" }
+            { "F", "DATA-FM-N" },
+            { "G", "WFM" },
+            { "H", "DV" }
         };
 
         public CatController(
@@ -406,7 +413,7 @@ namespace Icom_Web_Control.Controllers
             try
             {
                 var freq = request.FrequencyHz;
-                if (freq < 30000 || freq > 75000000)
+                if (!Profile.CanTune(freq))
                     return BadRequest(new { error = "Frequency out of range" });
 
                 if (!_radio.IsConnected)
@@ -442,7 +449,7 @@ namespace Icom_Web_Control.Controllers
             try
             {
                 var freq = request.FrequencyHz;
-                if (freq < 30000 || freq > 75000000)
+                if (!Profile.CanTune(freq))
                     return BadRequest(new { error = "Frequency out of range" });
 
                 if (!_radio.IsConnected)
@@ -489,7 +496,8 @@ namespace Icom_Web_Control.Controllers
             _logger.LogInformation("[API] SetBand{Recv} called: band={Band}", recv, band);
             try
             {
-                if (string.IsNullOrWhiteSpace(band) || !BandFreqs.TryGetValue(band, out var defaultFreq))
+                if (string.IsNullOrWhiteSpace(band) || !BandFreqs.TryGetValue(band, out var defaultFreq)
+                    || !Profile.CanTune(defaultFreq))
                     return BadRequest(new { error = "Invalid band" });
 
                 if (!_radio.IsConnected)
@@ -1137,7 +1145,7 @@ namespace Icom_Web_Control.Controllers
                     long freqA = _radioStateService.FrequencyA;
                     if (freqA > 0)
                     {
-                        long freqB = Math.Min(freqA + 5000, 75_000_000);
+                        long freqB = Math.Min(freqA + 5000, Profile.MaxHz);
                         await _radio.SetFrequencyHzAsync(RadioVfo.B, freqB, CancellationToken.None);
                     }
                     await _radio.SetSplitAsync(true, CancellationToken.None);
@@ -1820,7 +1828,7 @@ namespace Icom_Web_Control.Controllers
                     long freqA = _radioStateService.FrequencyA;
                     if (freqA > 0)
                     {
-                        long txHz = Math.Clamp(freqA + signedOffset, 30_000, 74_800_000);
+                        long txHz = Math.Clamp(freqA + signedOffset, Profile.MinHz, Profile.MaxHz);
                         await _radio.SetFrequencyHzAsync(RadioVfo.B, txHz, ct);
                     }
                     await _radio.SetSplitAsync(true, ct);
