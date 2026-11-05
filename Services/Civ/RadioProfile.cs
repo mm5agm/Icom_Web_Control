@@ -16,12 +16,13 @@ namespace Icom_Web_Control.Services.Civ
     {
         private readonly IReadOnlyDictionary<byte, CommandRule>? _allowed;
 
-        private RadioProfile(string model, byte civAddress, byte attenuatorOn,
+        private RadioProfile(string model, byte civAddress, byte attenuatorOn, bool hasScope,
             IReadOnlyDictionary<byte, CommandRule>? allowed)
         {
             Model = model;
             CivAddress = civAddress;
             AttenuatorOn = attenuatorOn;
+            HasScope = hasScope;
             _allowed = allowed;
         }
 
@@ -37,11 +38,14 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>The data byte for attenuator on, which is its size in dB as BCD: 20 dB is 0x20.</summary>
         public byte AttenuatorOn { get; }
 
+        /// <summary>Whether the radio has a spectrum scope it can send over CI-V.</summary>
+        public bool HasScope { get; }
+
         /// <summary>The MkII: IWC's reference radio, with every command available.</summary>
-        public static readonly RadioProfile Ic7300Mk2 = new("IC-7300MK2", 0xB6, CivProtocol.AttOn20dB, null);
+        public static readonly RadioProfile Ic7300Mk2 = new("IC-7300MK2", 0xB6, CivProtocol.AttOn20dB, true, null);
 
         /// <summary>The original IC-7300, which takes the same commands from IWC as the MkII.</summary>
-        public static readonly RadioProfile Ic7300 = new("IC-7300", 0x94, CivProtocol.AttOn20dB, null);
+        public static readonly RadioProfile Ic7300 = new("IC-7300", 0x94, CivProtocol.AttOn20dB, true, null);
 
         /// <summary>
         /// IC-7100, from section 20 of its manual. It has no scope commands (27) and
@@ -50,7 +54,7 @@ namespace Icom_Web_Control.Services.Civ
         /// unavailable. Memories (08, 1A 00) have their own layout and are blocked
         /// until that has been written.
         /// </summary>
-        public static readonly RadioProfile Ic7100 = new("IC-7100", 0x88, 0x12,
+        public static readonly RadioProfile Ic7100 = new("IC-7100", 0x88, 0x12, false,
             new Dictionary<byte, CommandRule>
             {
                 [0x03] = CommandRule.Any,                                   // read frequency

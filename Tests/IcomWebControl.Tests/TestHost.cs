@@ -23,15 +23,23 @@ internal static class TestHost
 
     public static (CivRadioController Controller, RadioStateService State) NewController(ICivClient bus)
     {
+        var (controller, state, _, _) = NewControllerWithHub(bus);
+        return (controller, state);
+    }
+
+    /// <summary>As above, with the settings and the record of what browsers were sent.</summary>
+    public static (CivRadioController Controller, RadioStateService State, MemorySettings Settings, SilentHubContext Hub) NewControllerWithHub(ICivClient bus)
+    {
         var dir = Path.Combine(Path.GetTempPath(), "IcomWebControl.Tests", Guid.NewGuid().ToString("N"));
         var persistence = new RadioStatePersistenceService(NullLogger<RadioStatePersistenceService>.Instance, dir);
         var hub = new SilentHubContext();
         var state = new RadioStateService(NullLogger<RadioStateService>.Instance, persistence, hub, new UnknownBandPlan());
+        var settings = new MemorySettings();
         var controller = new CivRadioController(
-            state, bus, new MemorySettings(), hub,
+            state, bus, settings, hub,
             new RadioFinder(NullLogger<RadioFinder>.Instance),
             NullLogger<CivRadioController>.Instance);
-        return (controller, state);
+        return (controller, state, settings, hub);
     }
 
     internal sealed class MemorySettings : ISettingsService
@@ -46,13 +54,19 @@ internal static class TestHost
 
     internal sealed class SilentHubContext : IHubContext<RadioHub>
     {
-        public IHubClients Clients { get; } = new SilentClients();
+        private readonly SilentProxy _proxy = new();
+        public SilentHubContext() => Clients = new SilentClients(_proxy);
+        public IHubClients Clients { get; }
+
+        /// <summary>The status of every SdrStatus sent to browsers, as "A:noscope".</summary>
+        public string[] ScopeStatuses => _proxy.ScopeStatuses();
         public IGroupManager Groups => throw new NotSupportedException();
     }
 
     private sealed class SilentClients : IHubClients
     {
-        private static readonly IClientProxy Proxy = new SilentProxy();
+        private readonly IClientProxy Proxy;
+        public SilentClients(IClientProxy proxy) => Proxy = proxy;
         public IClientProxy All => Proxy;
         public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => Proxy;
         public IClientProxy Client(string connectionId) => Proxy;
@@ -66,8 +80,21 @@ internal static class TestHost
 
     private sealed class SilentProxy : IClientProxy
     {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<object> _sent = new();
+
         public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+        {
+            if (method == "RadioStateUpdate" && args.Length > 0 && args[0] is { } message)
+                _sent.Enqueue(message);
+            return Task.CompletedTask;
+        }
+
+        public string[] ScopeStatuses() => _sent
+            .Select(m => System.Text.Json.JsonSerializer.SerializeToElement(m))
+            .Where(m => m.GetProperty("property").GetString() == "SdrStatus")
+            .Select(m => m.GetProperty("value"))
+            .Select(v => $"{v.GetProperty("sdrId").GetString()}:{v.GetProperty("status").GetString()}")
+            .ToArray();
     }
 
     private sealed class UnknownBandPlan : IBandPlanService

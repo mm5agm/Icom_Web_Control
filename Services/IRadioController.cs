@@ -714,11 +714,15 @@ namespace Icom_Web_Control.Services
     /// counters: with no sweep ever assembled they are all zero and say nothing,
     /// while this says exactly what to do.
     /// </param>
+    /// <param name="NoScope">
+    /// The connected radio has no spectrum scope, so there is nothing to switch on.
+    /// </param>
     public record ScopeDiagnostics(
         bool Enabled,
         long SweepsCompleted,
         long SweepsDiscarded,
         double? SecondsSinceLastSweep,
         double? SweepsPerSecond,
-        string? BlockedReason = null);
+        string? BlockedReason = null,
+        bool NoScope = false);
 }

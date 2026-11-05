@@ -272,6 +272,7 @@ namespace Icom_Web_Control.Services
             // the scope on and the port is open, so it sits below both of those.
             var blocked = _scopeOutputBlocked;
             string status = !_bus.IsOpen      ? "disconnected"
+                          : !HasScope         ? "noscope"
                           : _operatorScopeOff ? "unconfigured"
                           : blocked != null   ? "blocked"
                                               : "connecting";
@@ -352,7 +353,7 @@ namespace Icom_Web_Control.Services
             double? measured = (age is <= ScopeRateStaleSeconds && rate > 0) ? rate : null;
 
             return new ScopeDiagnostics(
-                Enabled: !_operatorScopeOff,
+                Enabled: HasScope && !_operatorScopeOff,
                 SweepsCompleted: _scope.SweepsCompleted,
                 SweepsDiscarded: _scope.SweepsDiscarded,
                 SecondsSinceLastSweep: age,
@@ -360,7 +361,8 @@ namespace Icom_Web_Control.Services
                 // Only meaningful while the operator wants the scope on, matching
                 // the precedence in AnnounceScopeStatus — a stale refusal from
                 // before they switched it off would otherwise outrank "off".
-                BlockedReason: _operatorScopeOff ? null : _scopeOutputBlocked);
+                BlockedReason: _operatorScopeOff ? null : _scopeOutputBlocked,
+                NoScope: !HasScope);
         }
 
         public CivRadioController(
@@ -392,6 +394,9 @@ namespace Icom_Web_Control.Services
 
         /// <summary>The byte for attenuator on. "20" stays the app's own word for on, whatever the size.</summary>
         private byte AttenuatorOnCode => RadioProfile.ForModel(ModelId)?.AttenuatorOn ?? CivProtocol.AttOn20dB;
+
+        /// <summary>False once a radio with no spectrum scope has identified itself. Nothing scope-related is sent to it.</summary>
+        private bool HasScope => RadioProfile.ForModel(ModelId)?.HasScope ?? true;
 
         // -- IRadioController ---------------------------------------------------
 
@@ -511,7 +516,7 @@ namespace Icom_Web_Control.Services
         {
             // Respect a manual scope-off from an earlier session — don't switch the
             // scope back on under the operator on reconnect.
-            if (_operatorScopeOff)
+            if (_operatorScopeOff || !HasScope)
                 return;
 
             // Pick up a Fixed choice made in an earlier run before asserting a
@@ -536,6 +541,8 @@ namespace Icom_Web_Control.Services
         /// </summary>
         public async Task SetScopeEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
         {
+            if (!HasScope)
+                return;
             _operatorScopeOff = !enabled;
             if (enabled)
             {
@@ -568,6 +575,9 @@ namespace Icom_Web_Control.Services
         /// </summary>
         public async Task SetScopeModeAsync(bool center, CancellationToken cancellationToken = default)
         {
+            // Before the setting is saved: this choice belongs to a radio with a scope.
+            if (!HasScope)
+                return;
             // Remember a manual Fixed choice so a later reconnect respects it
             // instead of forcing Center (see EnableScopeAsync), and mirror it to
             // settings so a restart does too.
@@ -707,6 +717,8 @@ namespace Icom_Web_Control.Services
         /// </summary>
         public async Task SetScopeSpanAsync(int spanHz, CancellationToken cancellationToken = default)
         {
+            if (!HasScope)
+                return;
             // The radio stores the span field as the sent value ÷ 100 (verified
             // on the IC-7300 MkII: sending 250000 yields span field 2500). So to
             // set span field F (the ± half-width in Hz the waveform reports), send
@@ -3306,8 +3318,10 @@ namespace Icom_Web_Control.Services
                     if (loop % SplitPollEveryNLoops == 1)
                     {
                         var s = await _settings.GetSettingsAsync();
-                        _pseudoDual = s.PseudoDualReceiverEnabled;
-                        _crossBandPeek = s.PseudoDualReceiverEnabled && s.PseudoDualCrossBandEnabled;
+                        // Pseudo-dual shares out the scope, so with no scope it is off.
+                        // Otherwise a peek would retune the receiver for nothing.
+                        _pseudoDual = HasScope && s.PseudoDualReceiverEnabled;
+                        _crossBandPeek = _pseudoDual && s.PseudoDualCrossBandEnabled;
                         _peekIntervalMs = Math.Clamp(s.PseudoDualPeekIntervalSeconds, 5, 60) * 1000;
                         _watchZoomIn = string.Equals(s.PseudoDualWatchSpanMode, "ZoomIn", StringComparison.OrdinalIgnoreCase);
                     }
