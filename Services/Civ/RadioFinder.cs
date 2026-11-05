@@ -197,12 +197,7 @@ namespace Icom_Web_Control.Services.Civ
         }
 
         /// <summary>Same mapping as CivRadioController.MapModel, on the settings-page value.</summary>
-        public static string MapModel(byte idByte) => idByte switch
-        {
-            0xB6 => "IC-7300MK2",
-            0x94 => "IC-7300",
-            _ => $"Icom({idByte:X2})",
-        };
+        public static string MapModel(byte idByte) => RadioProfile.ModelNameForId(idByte);
 
         private static int PortNumber(string name)
             => int.TryParse(name.AsSpan(3), out var n) ? n : int.MaxValue;

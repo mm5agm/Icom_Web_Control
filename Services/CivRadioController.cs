@@ -373,7 +373,7 @@ namespace Icom_Web_Control.Services
             IHostApplicationLifetime? lifetime = null)
         {
             _state = state;
-            _bus = bus;
+            _bus = new CivFrameGuard(bus, () => ModelId, logger);
             _settings = settings;
             _hubContext = hubContext;
             _finder = finder;
@@ -389,6 +389,9 @@ namespace Icom_Web_Control.Services
 
         public bool IsConnected => _bus.IsOpen;
         public string? ModelId { get; private set; }
+
+        /// <summary>The byte for attenuator on. "20" stays the app's own word for on, whatever the size.</summary>
+        private byte AttenuatorOnCode => RadioProfile.ForModel(ModelId)?.AttenuatorOn ?? CivProtocol.AttOn20dB;
 
         // -- IRadioController ---------------------------------------------------
 
@@ -1110,7 +1113,7 @@ namespace Icom_Web_Control.Services
                 case 3:  { int v = await ReadFunc16Async(CivProtocol.SubNoiseReduction, ct); if (v >= 0) { _state.NrA = v == 1 ? "1" : "0"; _state.NrB = _state.NrA; } break; }
                 case 4:  { int v = await ReadFunc16Async(CivProtocol.SubAutoNotch, ct);   if (v >= 0) { _state.AutoNotchA = v == 1 ? "1" : "0"; _state.AutoNotchB = _state.AutoNotchA; } break; }
                 case 5:  { int v = await ReadFunc16Async(CivProtocol.SubManualNotch, ct); if (v >= 0) { _state.ManualNotchA = v == 1 ? "1" : "0"; _state.ManualNotchB = _state.ManualNotchA; } break; }
-                case 6:  { int v = await ReadAttenuatorRawAsync(ct); if (v >= 0) { _state.AttA = v == CivProtocol.AttOn20dB ? "20" : "00"; _state.AttB = _state.AttA; } break; }
+                case 6:  { int v = await ReadAttenuatorRawAsync(ct); if (v >= 0) { _state.AttA = v == AttenuatorOnCode ? "20" : "00"; _state.AttB = _state.AttA; } break; }
                 case 7:  { int v = await GetRfGainAsync(ct);        if (v >= 0) { _state.RfGainA = v;   _state.RfGainB = v; } break; }
                 case 8:  { int v = await GetSquelchAsync(ct);       if (v >= 0) { _state.SquelchA = v;  _state.SquelchB = v; } break; }
                 case 9:  { int v = await GetNrLevelAsync(ct);       if (v >= 0) { _state.NrLevelA = v;  _state.NrLevelB = v; } break; }
@@ -2164,12 +2167,12 @@ namespace Icom_Web_Control.Services
             // Reply body: 11 <val> → Data = [val]; 0x20 = 20 dB on.
             if (reply == null || reply.Cmd != CivProtocol.CmdAttenuator || reply.Data.Length < 1)
                 return false;
-            return reply.Data[0] == CivProtocol.AttOn20dB;
+            return reply.Data[0] == AttenuatorOnCode;
         }
 
         public async Task SetAttenuatorAsync(bool on, CancellationToken ct = default)
         {
-            byte val = on ? CivProtocol.AttOn20dB : CivProtocol.AttOff;
+            byte val = on ? AttenuatorOnCode : CivProtocol.AttOff;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdAttenuator, val);
             var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
@@ -3077,12 +3080,7 @@ namespace Icom_Web_Control.Services
             return true;
         }
 
-        private static string MapModel(byte idByte) => idByte switch
-        {
-            0xB6 => "IC-7300MK2",
-            0x94 => "IC-7300",
-            _ => $"Icom({idByte:X2})",
-        };
+        private static string MapModel(byte idByte) => RadioProfile.ModelNameForId(idByte);
 
         public async Task<RadioDiscovery> FindRadioAsync(CancellationToken cancellationToken = default)
         {
