@@ -1524,7 +1524,7 @@ namespace Icom_Web_Control.Services
         // the dial - the opposite of Yaesu's CW-U. Anything that needs the
         // physics (CwReaderService.IsLowerSideband) must not read it off the
         // name.
-        private static string NameForMode(byte baseByte, bool data) => baseByte switch
+        internal static string NameForMode(byte baseByte, bool data) => baseByte switch
         {
             0x00 => data ? "DATA-L" : "LSB",
             0x01 => data ? "DATA-U" : "USB",
@@ -2908,7 +2908,18 @@ namespace Icom_Web_Control.Services
 
         public async Task<RadioMemoryChannel?> ReadMemoryChannelAsync(int channel, CancellationToken cancellationToken = default)
         {
-            if (channel is < 1 or > 99) return null;
+            var profile = RadioProfile.OrDefault(ModelId);
+            if (channel < 1 || channel > profile.MemoryChannels) return null;
+            if (profile.MemoryBanks > 0)
+            {
+                var ask = Ic7100MemoryCodec.ReadData(channel);
+                var readFrame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                    CivProtocol.CmdMenu, ask[0], ask[1], ask[2], ask[3]);
+                var answer = await TransactAsync(readFrame, CivProtocol.CmdMenu, cancellationToken: cancellationToken);
+                return answer == null || answer.Cmd != CivProtocol.CmdMenu
+                    ? null
+                    : Ic7100MemoryCodec.Parse(channel, answer.Data);
+            }
             byte chLo = (byte)(((channel / 10) << 4) | (channel % 10));
 
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
@@ -2964,6 +2975,7 @@ namespace Icom_Web_Control.Services
 
         public async Task<bool> WriteMemoryChannelAsync(RadioMemoryChannel memory, CancellationToken cancellationToken = default)
         {
+            if (!RadioProfile.OrDefault(ModelId).CanWriteMemories) return false;
             if (memory.Channel is < 1 or > 99) return false;
             byte chLo = (byte)(((memory.Channel / 10) << 4) | (memory.Channel % 10));
 
@@ -2991,6 +3003,7 @@ namespace Icom_Web_Control.Services
 
         public async Task<bool> ClearMemoryChannelAsync(int channel, CancellationToken cancellationToken = default)
         {
+            if (!RadioProfile.OrDefault(ModelId).CanWriteMemories) return false;
             if (channel is < 1 or > 99) return false;
             byte chLo = (byte)(((channel / 10) << 4) | (channel % 10));
 
@@ -3050,7 +3063,7 @@ namespace Icom_Web_Control.Services
         }
 
         /// <summary>Decode a fixed-width memory name, trimming trailing spaces and nulls.</summary>
-        private static string DecodeName(ReadOnlySpan<byte> raw)
+        internal static string DecodeName(ReadOnlySpan<byte> raw)
         {
             Span<char> chars = stackalloc char[raw.Length];
             int n = 0;

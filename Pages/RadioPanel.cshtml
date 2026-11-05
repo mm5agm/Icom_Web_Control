@@ -39,6 +39,8 @@
             txRanges: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.Transmit)),
             onePreampFromHz: @Model.Profile.Frequencies.OnePreampFromHz,
             attDb: @Model.Profile.AttenuatorDb,
+            memoryBanks: @Model.Profile.MemoryBanks,
+            canWriteMemories: @(Model.Profile.CanWriteMemories ? "true" : "false"),
             hasApf: @(Model.Profile.HasApf ? "true" : "false"),
             hasDeltaTx: @(Model.Profile.HasDeltaTx ? "true" : "false"),
             bandPlan: '@Model.BandPlan',

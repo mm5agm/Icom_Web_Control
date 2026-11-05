@@ -36,11 +36,10 @@ namespace Icom_Web_Control.Controllers
         private readonly MemoryBankService _bankService;
         private readonly IRadioController _radio;
 
-        // Reading nothing from a radio IWC can't read must not look like an empty
-        // radio: Load (Replace) would then clear the user's list.
-        private const string NoRadioMemoriesText =
-            "IWC can't read or write this radio's own memory channels yet. Your memory list in IWC still works.";
-        private bool NoRadioMemories => !RadioProfile.OrDefault(_radio.ModelId).HasRadioMemories;
+        // A 7300's record written to another radio's layout would corrupt the channel.
+        private const string NoMemoryWritesText =
+            "IWC can't write this radio's own memory channels yet. It can read them, and your memory list in IWC still works.";
+        private bool NoMemoryWrites => !RadioProfile.OrDefault(_radio.ModelId).CanWriteMemories;
 
         public MemoryController(
             MemoryService memoryService,
@@ -194,13 +193,12 @@ namespace Icom_Web_Control.Controllers
         // name), frequency and mode — because that is all the radio's channel model
         // holds that maps to an app memory. The app's advanced fields (NB/NR/AGC,
         // per-memory power, notes) stay app-side. Memory read/write never keys TX.
-        private const int RadioChannelCount = 99;
+        private int RadioChannelCount => RadioProfile.OrDefault(_radio.ModelId).MemoryChannels;
 
         [HttpPost("import-radio")]
         [RequestSizeLimit(1_000_000)]
         public async Task<IActionResult> ImportFromRadio([FromBody] ImportRequest request)
         {
-            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
@@ -211,12 +209,17 @@ namespace Icom_Web_Control.Controllers
             for (int ch = 1; ch <= RadioChannelCount; ch++)
             {
                 var channel = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
-                if (channel == null) { misses++; continue; }   // transaction miss — skip
+                if (channel == null)
+                {
+                    // A radio that never answers isn't worth waiting out, channel by channel.
+                    if (++misses == ch && ch >= 5) break;
+                    continue;
+                }
                 if (channel.IsEmpty || channel.FrequencyHz <= 0) continue;
 
                 imported.Add(new AppMemory
                 {
-                    Label       = string.IsNullOrWhiteSpace(channel.Name) ? $"CH {ch:000}" : channel.Name.Trim(),
+                    Label       = string.IsNullOrWhiteSpace(channel.Name) ? RadioProfile.OrDefault(_radio.ModelId).ChannelLabel(ch) : channel.Name.Trim(),
                     FrequencyHz = channel.FrequencyHz,
                     Mode        = string.IsNullOrWhiteSpace(channel.Mode) ? "USB" : channel.Mode,
                 });
@@ -244,7 +247,7 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("export-radio")]
         public async Task<IActionResult> ExportToRadio()
         {
-            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
+            if (NoMemoryWrites) return Conflict(new { error = NoMemoryWritesText });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
@@ -272,7 +275,7 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("export-radio-add")]
         public async Task<IActionResult> ExportToRadioAdd()
         {
-            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
+            if (NoMemoryWrites) return Conflict(new { error = NoMemoryWritesText });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
@@ -304,7 +307,6 @@ namespace Icom_Web_Control.Controllers
         [HttpGet("radio-channels")]
         public async Task<IActionResult> RadioChannels()
         {
-            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
@@ -313,7 +315,12 @@ namespace Icom_Web_Control.Controllers
             for (int ch = 1; ch <= RadioChannelCount; ch++)
             {
                 var c = await _radio.ReadMemoryChannelAsync(ch, CancellationToken.None);
-                if (c == null) { misses++; continue; }
+                if (c == null)
+                {
+                    // A radio that never answers isn't worth waiting out, channel by channel.
+                    if (++misses == ch && ch >= 5) break;
+                    continue;
+                }
                 list.Add(c.IsEmpty || c.FrequencyHz <= 0
                     ? new { channel = ch, isEmpty = true, frequencyHz = 0L, mode = "", name = "" }
                     : new { channel = ch, isEmpty = false, frequencyHz = c.FrequencyHz, mode = c.Mode, name = c.Name.Trim() });
@@ -324,7 +331,6 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("radio-channel/{ch:int}/to-vfo/{vfo}")]
         public async Task<IActionResult> RadioChannelToVfo(int ch, string vfo)
         {
-            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (ch < 1 || ch > RadioChannelCount) return BadRequest(new { error = "No such channel." });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
@@ -358,7 +364,7 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("radio-channel/{ch:int}/from-vfo/{vfo}")]
         public async Task<IActionResult> VfoToRadioChannel(int ch, string vfo, [FromBody] ChannelSeen? seen)
         {
-            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
+            if (NoMemoryWrites) return Conflict(new { error = NoMemoryWritesText });
             if (ch < 1 || ch > RadioChannelCount) return BadRequest(new { error = "No such channel." });
             if (seen == null) return BadRequest(new { error = "Say what the channel held when it was chosen." });
             if (!_radio.IsConnected)
