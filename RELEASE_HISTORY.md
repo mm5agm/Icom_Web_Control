@@ -12,6 +12,24 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre2 (2026-11-05)
+
+> **A pre-release, for Windows.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build.
+>
+> **What needs testing:** everything listed for v1.7.0-pre1 below, and now the voice test window:
+>
+> - **IC-7300 and IC-7300 MkII owners:** does everything still work as it did in v1.6.0?
+> - **IC-7100 owners:** choose "IC-7100 (under test)" in Settings. Section 15.9 of the manual has the setup. Try connecting, tuning, band and mode changes, meters and reading memories. **Stay on receive. Don't press transmit, Tune or the CW keys on an IC-7100**, because those commands have never reached a real one.
+> - **Voice control:** in Settings > Voice Control > Test this pack, leave Dry run ticked, hold Hold to speak and say a command. The Trace shows what was heard and how sure the recogniser was. Does "transmit on" need a clear phrase, without the other commands getting harder to use?
+
+**This build fixes the voice test window. Everything else is as v1.7.0-pre1.**
+
+- **Test this pack works.** Hold to speak did nothing, in every earlier version as well, so no phrase could be tried out there.
+- **A dry run stays dry when you let go.** Letting go of the button used to end the dry run straight away, but the recogniser carries on with what it is still hearing. A command finishing just after you let go would have gone to the radio for real. The dead button meant this could not happen until now, and it is fixed before the button came back to life.
+- **If the speech recogniser fails to start, the window says so** in the Trace, rather than claiming to be listening.
+
+---
+
 ### v1.7.0-pre1 (2026-11-05)
 
 > **A pre-release, for Windows.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build.
