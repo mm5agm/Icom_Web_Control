@@ -498,6 +498,9 @@ namespace Icom_Web_Control.Services.Voice
             return new DispatchResult(true, on ? "Antenna tuner on" : "Antenna tuner off");
         }
 
+        /// <summary>A tuner cycle is running, so the tune phrase would stop it rather than start one.</summary>
+        public bool AtuTuning => _state.AtuTuning;
+
         /// <summary>
         /// Start an auto-tune cycle, or stop the one that is already running.
         /// CI-V 1C 01 02 starts a cycle and 1C 01 01 stops it and leaves the
