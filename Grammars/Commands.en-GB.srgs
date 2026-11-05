@@ -85,12 +85,17 @@
       </item>
       <item>
         <one-of>
-          <item>key transmitter</item>
           <item>start transmitting</item>
           <item>transmit now</item>
           <item>transmit on</item>
         </one-of>
         <tag>out="TxOn";</tag>
+      </item>
+      <item>
+        <one-of>
+          <item>confirm</item>
+        </one-of>
+        <tag>out="ConfirmTransmit";</tag>
       </item>
       <item>
         <one-of>

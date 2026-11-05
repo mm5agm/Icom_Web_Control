@@ -942,7 +942,7 @@ namespace Icom_Web_Control.Controllers
             ["SwapVFO"] = "Tuning", ["NudgeUp"] = "Tuning", ["NudgeDown"] = "Tuning",
             ["BandUp"] = "Tuning", ["BandDown"] = "Tuning",
             ["NudgeIfWidthUp"] = "Radio Controls", ["NudgeIfWidthDown"] = "Radio Controls",
-            ["TxOn"] = "Transmit", ["TxOff"] = "Transmit", ["SplitOn"] = "Transmit", ["SplitOff"] = "Transmit",
+            ["TxOn"] = "Transmit", ["ConfirmTransmit"] = "Transmit", ["TxOff"] = "Transmit", ["SplitOn"] = "Transmit", ["SplitOff"] = "Transmit",
             ["AtuOn"] = "Transmit", ["AtuOff"] = "Transmit", ["AtuTune"] = "Transmit",
             ["StatusFrequency"] = "Status & Help", ["StatusMode"] = "Status & Help",
             ["StatusBand"] = "Status & Help", ["Help"] = "Status & Help",

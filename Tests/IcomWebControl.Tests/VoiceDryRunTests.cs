@@ -40,6 +40,13 @@ public class VoiceDryRunTests
         Assert.NotEmpty(await RadioCallsFrom(intent, value, macroCat, dryRun: false));
     }
 
+    // "Confirm" is settled before the dispatcher, and is not a command of its own.
+    [Fact]
+    public async Task ConfirmItselfSendsNothingToTheRadio()
+    {
+        Assert.Empty(await RadioCallsFrom(VoiceTransmitConfirm.ConfirmIntent, null, null, dryRun: false));
+    }
+
     // The recogniser can deliver a phrase after the button is released, so the end
     // of listening must not turn the dry run off.
     [Fact]
@@ -51,6 +58,66 @@ public class VoiceDryRunTests
         await voice.StopListeningAsync();
 
         Assert.True(voice.CurrentStatus.DryRun);
+    }
+
+    [Fact]
+    public void TheShippedPhrasesAskForConfirmAndDropKeyTransmitter()
+    {
+        var commands = VoicePhraseStore.BuildDefaults().SimpleCommands;
+
+        Assert.Equal(new[] { "confirm" }, commands[VoiceTransmitConfirm.ConfirmIntent]);
+        Assert.DoesNotContain("key transmitter", commands["TxOn"]);
+    }
+
+    [Fact]
+    public void AnOlderPackLosesKeyTransmitterAndGainsConfirm()
+    {
+        var pack = VoicePhraseStore.BuildDefaults();
+        pack.Version = 11;
+        pack.SimpleCommands.Remove(VoiceTransmitConfirm.ConfirmIntent);
+        pack.SimpleCommands["TxOn"] = new List<string> { "Key Transmitter", "my own phrase" };
+
+        VoicePhraseStore.MigrateToV12(pack);
+
+        Assert.Equal(12, pack.Version);
+        Assert.Equal(new[] { "my own phrase" }, pack.SimpleCommands["TxOn"]);
+        Assert.Equal(new[] { "confirm" }, pack.SimpleCommands[VoiceTransmitConfirm.ConfirmIntent]);
+    }
+
+    [Fact]
+    public void APackWithOnlyKeyTransmitterGetsTheShippedPhrases()
+    {
+        var pack = VoicePhraseStore.BuildDefaults();
+        pack.Version = 11;
+        pack.SimpleCommands["TxOn"] = new List<string> { "key transmitter" };
+
+        VoicePhraseStore.MigrateToV12(pack);
+
+        Assert.Equal(VoicePhraseStore.BuildDefaults().SimpleCommands["TxOn"], pack.SimpleCommands["TxOn"]);
+    }
+
+    // Saying it would then run the macro, not confirm a transmit. Nothing can be
+    // confirmed, which is the safe way round.
+    [Fact]
+    public void APackThatUsesConfirmForAMacroKeepsIt()
+    {
+        var pack = VoicePhraseStore.BuildDefaults();
+        pack.Version = 11;
+        pack.SimpleCommands.Remove(VoiceTransmitConfirm.ConfirmIntent);
+        pack.Macros!.Add(new() { Name = "Mine", Phrases = ["Confirm"], Cat = "1C 00 00;" });
+
+        VoicePhraseStore.MigrateToV12(pack);
+
+        Assert.False(pack.SimpleCommands.ContainsKey(VoiceTransmitConfirm.ConfirmIntent));
+    }
+
+    [Fact]
+    public void TheShippedGrammarFileMatchesThePhrases()
+    {
+        var srgs = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Grammars", "Commands.en-GB.srgs"));
+
+        Assert.DoesNotContain("key transmitter", srgs);
+        Assert.Contains("out=\"ConfirmTransmit\";", srgs);
     }
 
     [Fact]

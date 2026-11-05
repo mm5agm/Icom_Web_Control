@@ -12,6 +12,16 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre3 (2026-11-05)
+
+> **A pre-release, for Windows.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. Linux, macOS and Docker are not in this build.
+>
+> **What needs testing:** everything listed for v1.7.0-pre1 and pre2 below, and now the voice confirm step. Use the Test this pack window in Settings with Dry run ticked, so nothing reaches the radio.
+
+- **Voice commands that transmit now wait for "confirm".** Testing showed that a score can't keep a wrong word off the air: "transmission" scored 0.92 as "transmit on". So "transmit on", "tune antenna" and any custom macro that keys the radio now ask *"Are you sure?"*, and only go ahead if you say "confirm" within 6 seconds. Any other command, or saying nothing, drops it and the radio stays on receive. Both need a score of 0.85 or better. "Stop transmitting" still works straight away.
+- **"Key transmitter" is no longer a voice phrase,** including in phrases you have already saved. "Transmit on", "start transmitting" and "transmit now" remain.
+- **The test window's Trace is easier to read.** No more "Heard heard", and a refused or unrecognised phrase no longer shows the previous phrase and score beside it.
+
 ### v1.7.0-pre2 (2026-11-05)
 
 > **A pre-release, for Windows.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build.

@@ -1029,6 +1029,7 @@ export function startIcomRadioPanel(root, cfg) {
             case 'Heard':
             case 'Executing':    panel.setKey('voice', { on: true, sub: short, title }); break;
             case 'Unrecognised': panel.setKey('voice', { sub: '???', title }); break;
+            case 'ConfirmNeeded': panel.setKey('voice', { on: true, sub: 'CONFIRM?', title: 'Say confirm to go ahead' }); break;
             case 'Error':        panel.setKey('voice', { tx: true, sub: 'ERROR', title }); break;
             case 'Idle':         panel.setKey('voice', { sub: '', title }); break;
         }
