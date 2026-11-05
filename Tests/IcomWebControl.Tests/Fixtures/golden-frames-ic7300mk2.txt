@@ -1,0 +1,324 @@
+ConnectAsync()
+  FE FE 00 E0 19 00 FD
+  FE FE B6 E0 03 FD
+  FE FE B6 E0 14 01 FD
+  FE FE B6 E0 14 02 FD
+  FE FE B6 E0 14 03 FD
+  FE FE B6 E0 14 06 FD
+  FE FE B6 E0 14 12 FD
+  FE FE B6 E0 14 0D FD
+  FE FE B6 E0 16 02 FD
+  FE FE B6 E0 16 12 FD
+  FE FE B6 E0 16 22 FD
+  FE FE B6 E0 16 40 FD
+  FE FE B6 E0 16 41 FD
+  FE FE B6 E0 16 48 FD
+  FE FE B6 E0 16 57 FD
+  FE FE B6 E0 16 56 FD
+  FE FE B6 E0 11 FD
+  FE FE B6 E0 27 10 01 FD
+  FE FE B6 E0 27 11 01 FD
+  FE FE B6 E0 27 14 00 00 FD
+  FE FE B6 E0 27 14 00 00 FD
+  FE FE B6 E0 27 14 00 00 FD
+ClearMemoryChannelAsync(5)
+  FE FE B6 E0 1A 00 00 05 FF FD
+EqualizeVfosAsync()
+  FE FE B6 E0 07 A0 FD
+ExchangeVfosAsync()
+  FE FE B6 E0 07 B0 FD
+GetAfGainAsync()
+  FE FE B6 E0 14 01 FD
+GetAgcAsync()
+  FE FE B6 E0 16 12 FD
+GetAntiVoxPercentAsync()
+  FE FE B6 E0 14 17 FD
+GetApfAsync()
+  FE FE B6 E0 16 32 FD
+GetAttenuatorAsync()
+  FE FE B6 E0 11 FD
+GetAutoNotchAsync()
+  FE FE B6 E0 16 41 FD
+GetCompressorLevelPercentAsync()
+  FE FE B6 E0 14 0E FD
+GetCwBreakInAsync()
+  FE FE B6 E0 16 47 FD
+GetCwBreakInDelayDotsAsync()
+  FE FE B6 E0 14 0F FD
+GetCwPitchHzAsync()
+  FE FE B6 E0 14 09 FD
+GetCwSpeedWpmAsync()
+  FE FE B6 E0 14 0C FD
+GetDeltaTxEnabledAsync()
+  FE FE B6 E0 21 02 FD
+GetFmSplitOffsetHzAsync()
+  FE FE B6 E0 03 FD
+  FE FE B6 E0 1A 05 00 34 FD
+GetFrequencyHzAsync(A)
+  FE FE B6 E0 03 FD
+GetIfFilterShapeAsync()
+  FE FE B6 E0 16 56 FD
+GetIfFilterWidthHzAsync(A)
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 1A 03 FD
+GetManualNotchAsync()
+  FE FE B6 E0 16 48 FD
+GetManualNotchWidthAsync()
+  FE FE B6 E0 16 57 FD
+GetMicGainPercentAsync()
+  FE FE B6 E0 14 0B FD
+GetModeAsync(A)
+  FE FE B6 E0 26 00 FD
+GetMonitorAsync()
+  FE FE B6 E0 16 45 FD
+GetMonitorLevelPercentAsync()
+  FE FE B6 E0 14 15 FD
+GetNbLevelAsync()
+  FE FE B6 E0 14 12 FD
+GetNoiseBlankerAsync()
+  FE FE B6 E0 16 22 FD
+GetNoiseReductionAsync()
+  FE FE B6 E0 16 40 FD
+GetNotchPositionAsync()
+  FE FE B6 E0 14 0D FD
+GetNrLevelAsync()
+  FE FE B6 E0 14 06 FD
+GetPbtInnerAsync()
+  FE FE B6 E0 14 07 FD
+GetPbtOuterAsync()
+  FE FE B6 E0 14 08 FD
+GetPreampAsync()
+  FE FE B6 E0 16 02 FD
+GetRepeaterToneAsync()
+  FE FE B6 E0 16 42 FD
+GetRepeaterToneTenthsHzAsync()
+  FE FE B6 E0 1B 00 FD
+GetRfGainAsync()
+  FE FE B6 E0 14 02 FD
+GetRfPowerPercentAsync()
+  FE FE B6 E0 14 0A FD
+GetRitEnabledAsync()
+  FE FE B6 E0 21 01 FD
+GetRitOffsetHzAsync()
+  FE FE B6 E0 21 00 FD
+GetRttyToneSettingsAsync()
+  FE FE B6 E0 1A 05 00 39 FD
+  FE FE B6 E0 1A 05 00 40 FD
+GetRxFilterAsync(A)
+  FE FE B6 E0 26 00 FD
+GetRxFilterAsync(A) in USB
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 1A 05 00 01 FD
+GetRxToneAsync(A)
+  FE FE B6 E0 26 00 FD
+GetRxToneAsync(A) in USB
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 1A 05 00 02 FD
+  FE FE B6 E0 1A 05 00 03 FD
+GetSelectedFilterAsync(A)
+  FE FE B6 E0 26 00 FD
+GetSpeechCompressorAsync()
+  FE FE B6 E0 16 44 FD
+GetSplitAsync()
+  FE FE B6 E0 0F FD
+GetSquelchAsync()
+  FE FE B6 E0 14 03 FD
+GetToneSquelchAsync()
+  FE FE B6 E0 16 43 FD
+GetToneSquelchTenthsHzAsync()
+  FE FE B6 E0 1B 01 FD
+GetTransmitAsync()
+GetTunerAsync()
+  FE FE B6 E0 1C 01 FD
+GetVoxAsync()
+  FE FE B6 E0 16 46 FD
+GetVoxDelayMsAsync()
+  FE FE B6 E0 1A 05 02 67 FD
+GetVoxGainPercentAsync()
+  FE FE B6 E0 14 16 FD
+NudgeIfFilterWidthAsync(A, 1)
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 1A 03 FD
+  FE FE B6 E0 1A 03 35 FD
+ReadMemoryChannelAsync(5)
+  FE FE B6 E0 1A 00 00 05 FD
+ReadMenuItemAsync(5)
+  FE FE B6 E0 1A 05 00 05 FD
+ReadSMeterAsync(A)
+  FE FE B6 E0 15 02 FD
+SelectVfoAsync(A)
+  FE FE B6 E0 07 00 FD
+SendCwMessageAsync(CQ)
+  FE FE B6 E0 17 43 51 FD
+SendRawCommandAsync(03)
+  FE FE B6 E0 03 FD
+SetAfGainAsync(1)
+  FE FE B6 E0 14 01 00 01 FD
+SetAgcAsync(1)
+  FE FE B6 E0 16 12 01 FD
+SetAntiVoxPercentAsync(50)
+  FE FE B6 E0 14 17 01 28 FD
+SetApfAsync(1)
+  FE FE B6 E0 16 32 01 FD
+SetAttenuatorAsync(True)
+  FE FE B6 E0 11 20 FD
+SetAttenuatorAsync(False)
+  FE FE B6 E0 11 00 FD
+SetAutoNotchAsync(True)
+  FE FE B6 E0 16 41 01 FD
+SetAutoNotchAsync(False)
+  FE FE B6 E0 16 41 00 FD
+SetCompressorLevelPercentAsync(50)
+  FE FE B6 E0 14 0E 01 28 FD
+SetCwBreakInAsync(1)
+  FE FE B6 E0 16 47 01 FD
+SetCwBreakInDelayDotsAsync(7.5)
+  FE FE B6 E0 14 0F 01 28 FD
+SetCwPitchHzAsync(500)
+  FE FE B6 E0 14 09 00 85 FD
+SetCwSpeedWpmAsync(20)
+  FE FE B6 E0 14 0C 00 85 FD
+SetDeltaTxEnabledAsync(True)
+  FE FE B6 E0 21 02 01 FD
+SetDeltaTxEnabledAsync(False)
+  FE FE B6 E0 21 02 00 FD
+SetFmSplitOffsetHzAsync(500)
+  FE FE B6 E0 03 FD
+  FE FE B6 E0 1A 05 00 34 00 00 00 00 FD
+SetFrequencyHzAsync(A, 14074000)
+  FE FE B6 E0 05 00 40 07 14 00 FD
+SetIfFilterShapeAsync(1)
+  FE FE B6 E0 16 56 01 FD
+SetIfFilterWidthHzAsync(A, 500)
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 1A 03 09 FD
+SetManualNotchAsync(True)
+  FE FE B6 E0 16 48 01 FD
+SetManualNotchAsync(False)
+  FE FE B6 E0 16 48 00 FD
+SetManualNotchWidthAsync(1)
+  FE FE B6 E0 16 57 01 FD
+SetMicGainPercentAsync(50)
+  FE FE B6 E0 14 0B 01 28 FD
+SetModeAsync(A, USB)
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 26 00 01 00 01 FD
+SetMonitorAsync(True)
+  FE FE B6 E0 16 45 01 FD
+SetMonitorAsync(False)
+  FE FE B6 E0 16 45 00 FD
+SetMonitorLevelPercentAsync(50)
+  FE FE B6 E0 14 15 01 28 FD
+SetNbLevelAsync(1)
+  FE FE B6 E0 14 12 00 01 FD
+SetNoiseBlankerAsync(True)
+  FE FE B6 E0 16 22 01 FD
+SetNoiseBlankerAsync(False)
+  FE FE B6 E0 16 22 00 FD
+SetNoiseReductionAsync(True)
+  FE FE B6 E0 16 40 01 FD
+SetNoiseReductionAsync(False)
+  FE FE B6 E0 16 40 00 FD
+SetNotchPositionAsync(1)
+  FE FE B6 E0 14 0D 00 01 FD
+SetNrLevelAsync(1)
+  FE FE B6 E0 14 06 00 01 FD
+SetPbtInnerAsync(1)
+  FE FE B6 E0 14 07 00 01 FD
+SetPbtOuterAsync(1)
+  FE FE B6 E0 14 08 00 01 FD
+SetPowerAsync(True)
+  FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE FE B6 E0 18 01 FD
+SetPowerAsync(False)
+  FE FE B6 E0 18 00 FD
+SetPreampAsync(1)
+  FE FE B6 E0 16 02 01 FD
+SetRepeaterToneAsync(True)
+  FE FE B6 E0 16 42 01 FD
+SetRepeaterToneAsync(False)
+  FE FE B6 E0 16 42 00 FD
+SetRepeaterToneTenthsHzAsync(885)
+  FE FE B6 E0 1B 00 00 08 85 FD
+SetRfGainAsync(1)
+  FE FE B6 E0 14 02 00 01 FD
+SetRfPowerPercentAsync(50)
+  FE FE B6 E0 14 0A 01 28 FD
+SetRitEnabledAsync(True)
+  FE FE B6 E0 21 01 01 FD
+SetRitEnabledAsync(False)
+  FE FE B6 E0 21 01 00 FD
+SetRitOffsetHzAsync(500)
+  FE FE B6 E0 21 00 00 05 00 FD
+SetRttyToneSettingsAsync(2125, 170)
+  FE FE B6 E0 1A 05 00 39 02 FD
+  FE FE B6 E0 1A 05 00 40 00 FD
+SetRxFilterAsync(A, 500, 2500)
+  FE FE B6 E0 26 00 FD
+SetRxFilterAsync(A, 500, 2500) in USB
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 1A 05 00 01 05 24 FD
+SetRxToneAsync(A, 1, 1)
+  FE FE B6 E0 26 00 FD
+SetRxToneAsync(A, 1, 1) in USB
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 1A 05 00 02 06 FD
+  FE FE B6 E0 1A 05 00 03 06 FD
+SetScopeEnabledAsync(True)
+  FE FE B6 E0 27 10 01 FD
+  FE FE B6 E0 27 11 01 FD
+  FE FE B6 E0 27 14 00 00 FD
+  FE FE B6 E0 27 14 00 00 FD
+  FE FE B6 E0 27 14 00 00 FD
+SetScopeEnabledAsync(False)
+  FE FE B6 E0 27 11 00 FD
+  FE FE B6 E0 27 10 00 FD
+SetScopeModeAsync(True)
+  FE FE B6 E0 27 14 00 00 FD
+  FE FE B6 E0 27 14 00 00 FD
+  FE FE B6 E0 27 14 00 00 FD
+SetScopeModeAsync(False)
+  FE FE B6 E0 27 14 00 01 FD
+  FE FE B6 E0 27 14 00 01 FD
+  FE FE B6 E0 27 14 00 01 FD
+SetScopeSpanAsync(2500)
+  FE FE B6 E0 27 15 00 00 25 00 00 FD
+SetSelectedFilterAsync(A, 1)
+  FE FE B6 E0 26 00 FD
+  FE FE B6 E0 26 00 01 01 01 FD
+SetSpeechCompressorAsync(True)
+  FE FE B6 E0 16 44 01 FD
+SetSpeechCompressorAsync(False)
+  FE FE B6 E0 16 44 00 FD
+SetSplitAsync(True)
+  FE FE B6 E0 0F 01 FD
+SetSplitAsync(False)
+  FE FE B6 E0 0F 00 FD
+SetSquelchAsync(1)
+  FE FE B6 E0 14 03 00 01 FD
+SetToneSquelchAsync(True)
+  FE FE B6 E0 16 43 01 FD
+SetToneSquelchAsync(False)
+  FE FE B6 E0 16 43 00 FD
+SetToneSquelchTenthsHzAsync(885)
+  FE FE B6 E0 1B 01 00 08 85 FD
+SetTransmitAsync(True)
+  FE FE B6 E0 1C 00 01 FD
+SetTransmitAsync(False)
+  FE FE B6 E0 1C 00 00 FD
+SetTunerAsync(1)
+  FE FE B6 E0 1C 01 01 FD
+SetVoxAsync(True)
+  FE FE B6 E0 16 46 01 FD
+SetVoxAsync(False)
+  FE FE B6 E0 16 46 00 FD
+SetVoxDelayMsAsync(500)
+  FE FE B6 E0 1A 05 02 67 05 FD
+SetVoxGainPercentAsync(50)
+  FE FE B6 E0 14 16 01 28 FD
+SetWatchCropSpanAsync(2500)
+StopCwAsync()
+  FE FE B6 E0 17 FF FD
+WriteMemoryChannelAsync(memory 5)
+  FE FE B6 E0 1A 00 00 05 00 00 40 07 14 00 01 01 00 00 08 85 00 08 85 00 40 07 14 00 01 01 00 00 08 85 00 08 85 54 45 53 54 20 20 20 20 20 20 20 20 20 20 20 20 FD
+WriteMenuItemAsync(5, 01)
+  FE FE B6 E0 1A 05 00 05 01 FD

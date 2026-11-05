@@ -42,6 +42,14 @@ shared with Yaesu Web Control. It is not a vendored copy and it is not a snapsho
 tree "for now", not "until it settles", not "until the other app needs it".
 The exception is code that genuinely cannot be shared - see the table.
 
+**One exception, for now: Docker, macOS and Linux / Raspberry Pi host code.**
+Colin's decision, 2026-11-05. That code stays in this repo's own tree until
+Fabio has tested it and approved it on issue #111. It then moves to `core/`
+together with YWC's matching code, and this paragraph is removed. Keep each such
+file free of anything Icom-specific so the move is simple, and list it here with
+the YWC commit it was copied from. IC-7100 tables and CI-V stay here for good,
+like every other radio's. Waiting to move: nothing yet.
+
 This rule exists because it was broken. The whole CW decoder - six services and
 five test files - was authored inside `core/` and then sat in one branch of one
 repo for weeks with no second copy anywhere, and the reader panel was written

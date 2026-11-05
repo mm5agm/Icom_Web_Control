@@ -17,6 +17,12 @@ internal static class TestHost
     public static (CivRadioController Controller, ReplayCivClient Bus, RadioStateService State) NewController(CivRecording? recording = null)
     {
         var bus = new ReplayCivClient(recording ?? CivRecording.Load());
+        var (controller, state) = NewController(bus);
+        return (controller, bus, state);
+    }
+
+    public static (CivRadioController Controller, RadioStateService State) NewController(ICivClient bus)
+    {
         var dir = Path.Combine(Path.GetTempPath(), "IcomWebControl.Tests", Guid.NewGuid().ToString("N"));
         var persistence = new RadioStatePersistenceService(NullLogger<RadioStatePersistenceService>.Instance, dir);
         var hub = new SilentHubContext();
@@ -25,7 +31,7 @@ internal static class TestHost
             state, bus, new MemorySettings(), hub,
             new RadioFinder(NullLogger<RadioFinder>.Instance),
             NullLogger<CivRadioController>.Instance);
-        return (controller, bus, state);
+        return (controller, state);
     }
 
     internal sealed class MemorySettings : ISettingsService
