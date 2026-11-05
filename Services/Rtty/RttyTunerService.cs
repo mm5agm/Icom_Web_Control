@@ -204,7 +204,7 @@ namespace Icom_Web_Control.Services.Rtty
                 var (m, s) = TonesFor(_state.ModeA, _markHz, _shiftHz, _reverse);
                 if (_scope == null)
                 {
-                    _scope = new RttyTuningScope(WaveInCwAudioSource.Rate, m, s);
+                    _scope = new RttyTuningScope(ReceiveAudioSource.Rate, m, s);
                     _state.PropertyChanged += OnRadioStateChanged;
                     _audio.Source.FrameAvailable += OnRxFrame;
                     _timer = new System.Threading.Timer(_ => OnTimer(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));

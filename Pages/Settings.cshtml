@@ -293,7 +293,10 @@
         </div>
     </details>
 
-    <!-- Voice Control section -->
+    <!-- Voice Control section. It uses Windows speech recognition, so it isn't
+         in the Linux and macOS builds. -->
+    @if (OperatingSystem.IsWindows())
+    {
     <details class="settings-section" @(ViewContext.ModelState.IsValid ? "" : "open")>
         <summary><i class="bi bi-mic-fill" aria-hidden="true"></i>&nbsp;Voice Control</summary>
         <div class="section-body">
@@ -1897,6 +1900,7 @@
             })();
         </script>
     </details>
+    }
 
     <!-- Radio & CAT. Open when the radio is not connected: that is the
          state the main page's "port not found" banner sends people here

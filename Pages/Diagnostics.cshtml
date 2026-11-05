@@ -29,7 +29,7 @@
             aria-expanded="false" aria-controls="diag-ports-panel">COM Ports</button>
     <button type="button" id="diag-toggle-cat" class="btn btn-sm btn-outline-secondary"
             aria-expanded="false" aria-controls="diag-cat-panel">CAT Status JSON</button>
-    <button type="button" id="diag-toggle-voice" class="btn btn-sm btn-outline-secondary"
+    <button type="button" id="diag-toggle-voice" class="btn btn-sm btn-outline-secondary" hidden="@(!OperatingSystem.IsWindows())"
             aria-expanded="false" aria-controls="diag-voice-panel">Voice Control Log</button>
 </div>
 

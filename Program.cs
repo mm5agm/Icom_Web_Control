@@ -9,7 +9,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+#if WINDOWS
 using System.Windows.Forms;
+#endif
 
 // A page named on the command line (Icom_Web_Control.exe rtty-contest) is
 // opened in place of /start, here or by the copy already running.
@@ -21,6 +23,7 @@ var mutex = new Mutex(initiallyOwned: true, name: MutexName, out bool createdNew
 
 if (!createdNew)
 {
+#if WINDOWS
     // This used to be an OK-only "already running" box, which is a dead end when
     // the running copy is a stuck one: the operator sees no window, closes
     // nothing, and every relaunch hits this same box. That is exactly what
@@ -89,12 +92,18 @@ if (!createdNew)
         return;
     }
 #pragma warning restore CA1416
+#else
+    Console.Error.WriteLine("Icom Web Control is already running.");
+    mutex.Dispose();
+    return;
+#endif
 }
 
 // Keep the mutex alive for the lifetime of the process
 AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { mutex.ReleaseMutex(); } catch { } mutex.Dispose(); };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+#if WINDOWS
 static bool IsPortInUseException(Exception ex)
 {
     var full = ex.ToString();
@@ -102,6 +111,7 @@ static bool IsPortInUseException(Exception ex)
         || full.Contains("Only one usage of each socket address", StringComparison.OrdinalIgnoreCase)
         || full.Contains("WSAEADDRINUSE", StringComparison.OrdinalIgnoreCase);
 }
+#endif
 
 static string? GetPortOwner(int port)
 {
@@ -402,6 +412,7 @@ for (int candidate = basePort; candidate < basePort + 10 && candidate <= 65535; 
 }
 if (chosenPort < 0)
 {
+#if WINDOWS
 #pragma warning disable CA1416
     var diag = string.Join("\n",
         triedPorts.Select(p => $"  {p,5} — {GetPortOwner(p) ?? "unknown / Windows-reserved"}"));
@@ -416,6 +427,9 @@ if (chosenPort < 0)
         MessageBoxButtons.OK,
         MessageBoxIcon.Error);
 #pragma warning restore CA1416
+#else
+    Console.Error.WriteLine($"Icom Web Control couldn't find a free TCP port. Tried {triedPorts.First()} to {triedPorts.Last()}.");
+#endif
     return;
 }
 
@@ -452,9 +466,11 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddSingleton(new HttpPortInfo(chosenPort, httpsListenPort));
 
 builder.Services.AddSingleton<BrowserLauncher>();
+#if WINDOWS
 // System tray icon — gives operators a visible "IWC is running" indicator
 // and a clean Exit menu. Implemented as an STA-threaded hosted service.
 builder.Services.AddHostedService<SystemTrayService>();
+#endif
 
 // Register WSJT-X UDP listener as a singleton so it can be injected into controllers
 builder.Services.AddSingleton<WsjtxUdpService>();
@@ -502,6 +518,7 @@ builder.Services.AddKeyedSingleton<RadioWebControl.Core.Services.Flex.IFlexLayou
 builder.Services.AddSingleton<Icom_Web_Control.Services.DxClusterService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.Services.DxClusterService>());
 
+#if WINDOWS
 // Voice control (in-process SAPI). VoiceControlService is the IHostedService
 // that owns the SpeechRecognitionEngine; IntentDispatcher maps recognised
 // intents to CAT actions; VoiceTtsService speaks confirmation phrases;
@@ -511,6 +528,7 @@ builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoiceTtsService>()
 builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoicePhraseStore>();
 builder.Services.AddSingleton<Icom_Web_Control.Services.Voice.VoiceControlService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.Services.Voice.VoiceControlService>());
+#endif
 
 // CW reader. Singletons, all four: one recording device, one decoder, one
 // piece of decoded text however many browser tabs are open. Reader Mode in
@@ -518,7 +536,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Icom_Web_Control.S
 // used to be would be per-request, which is the same bug as keeping it in the
 // browser tab. Nothing here starts until the operator presses Start - the
 // device is not opened at boot.
-builder.Services.AddSingleton<Icom_Web_Control.Services.Cw.WaveInCwAudioSource>();
+builder.Services.AddSingleton<ReceiveAudioSource>();
 // One WinMM capture device, two features that want it. The hold is what
 // lets the CW reader and the RTTY tuner run at the same time - and, more
 // to the point, stops either one's Stop from deafening the other.
@@ -725,6 +743,7 @@ catch (Exception ex)
     Log.Fatal(ex, "Application failed to start");
     Log.CloseAndFlush();
 
+#if WINDOWS
 #pragma warning disable CA1416
     if (IsPortInUseException(ex))
     {
@@ -747,6 +766,7 @@ catch (Exception ex)
             MessageBoxIcon.Error);
     }
 #pragma warning restore CA1416
+#endif
 
     throw;
 }

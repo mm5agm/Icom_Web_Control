@@ -5,10 +5,11 @@
        need a radio. The radio-agnostic code is tested separately in
        core/tests/RadioWebControl.Core.Tests. -->
   <PropertyGroup>
-    <!-- Same target and platform as the app it references (x64 only). -->
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <PlatformTarget>x64</PlatformTarget>
-    <Platforms>x64</Platforms>
+    <!-- The same targets as the app it references. Windows is x64 only. -->
+    <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <PlatformTarget Condition="'$(TargetFramework)' == 'net10.0-windows'">x64</PlatformTarget>
+    <Platforms Condition="'$(TargetFramework)' == 'net10.0-windows'">x64</Platforms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>

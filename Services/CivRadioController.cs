@@ -414,7 +414,9 @@ namespace Icom_Web_Control.Services
             if (string.IsNullOrWhiteSpace(port))
             {
                 var present = System.IO.Ports.SerialPort.GetPortNames();
-                if (present.Length == 1)
+                // Off Windows a lone port may be the console or some other device,
+                // so it has to be chosen by hand.
+                if (present.Length == 1 && OperatingSystem.IsWindows())
                 {
                     port = present[0];
                     settings.SerialPort = port;

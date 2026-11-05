@@ -92,6 +92,9 @@ namespace Icom_Web_Control.Controllers
 
         private async Task<IActionResult> LaunchExternalApp(string appName, string processName, Func<Task<string>> getCommandLine)
         {
+            if (!OperatingSystem.IsWindows())
+                return BadRequest(new { error = $"IWC can't start {appName} on this system yet." });
+
             // Check if the app is already running
             var existingProcesses = Process.GetProcessesByName(processName);
             if (existingProcesses.Length > 0)

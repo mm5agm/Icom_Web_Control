@@ -218,7 +218,7 @@ namespace Icom_Web_Control.Pages
             PseudoDualReceiverEnabled = settings.PseudoDualReceiverEnabled;
             PseudoDualCrossBandEnabled = settings.PseudoDualCrossBandEnabled;
             PseudoDualPeekIntervalSeconds = Math.Clamp(settings.PseudoDualPeekIntervalSeconds, 5, 60);
-            VoiceControlEnabled = settings.VoiceControlEnabled;
+            VoiceControlEnabled = settings.VoiceControlEnabled && OperatingSystem.IsWindows();
             PseudoDualWatchSpanMode = settings.PseudoDualWatchSpanMode;
             BandPlan = settings.BandPlan switch { "UK" => "Region1", "USA" => "Region2", var v => v };
             AutoModeChangeOnTune = settings.AutoModeChangeOnTune;

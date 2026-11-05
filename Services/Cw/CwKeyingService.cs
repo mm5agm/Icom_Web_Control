@@ -167,6 +167,8 @@ namespace Icom_Web_Control.Services.Cw
                     _logger.LogInformation("CW keying: key line is the dry run.");
                     return null;
                 }
+                if (!OperatingSystem.IsWindows())
+                    return "Keying by DTR isn't available on this system yet. The dry run still works.";
                 if (!SerialPort.GetPortNames().Contains(port, StringComparer.OrdinalIgnoreCase))
                     return $"{port} is not on this PC.";
                 try

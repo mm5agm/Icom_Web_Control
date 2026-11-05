@@ -107,7 +107,8 @@ namespace Icom_Web_Control.Hubs
             if (_connections.IsEmpty)
             {
                 var settings = await _settings.GetSettingsAsync();
-                if (!settings.AutoShutdownWhenNoBrowsers)
+                // A container is a headless controller: it stays up with no tabs open.
+                if (!settings.AutoShutdownWhenNoBrowsers || HostRuntime.IsContainer)
                 {
                     _logger.LogInformation(
                         "All browser tabs closed — auto-shutdown disabled; host keeps running.");
