@@ -39,7 +39,8 @@ namespace Icom_Web_Control.Services.Voice
             ["StatusFrequency"]  = "Ask the current frequency",
             ["StatusMode"]       = "Ask the current mode",
             ["StatusBand"]       = "Ask the current band",
-            ["TxOn"]             = "Start transmitting",
+            ["TxOn"]             = "Start transmitting (asks you to confirm)",
+            [VoiceTransmitConfirm.ConfirmIntent] = "Go ahead with a command that transmits",
             ["TxOff"]            = "Stop transmitting (back to receive)",
             ["SplitOn"]          = "Turn split on",
             ["SplitOff"]         = "Turn split off",
@@ -107,6 +108,7 @@ namespace Icom_Web_Control.Services.Voice
 
             Group("Transmit",
                 Simple("TxOn", cfg),
+                Simple(VoiceTransmitConfirm.ConfirmIntent, cfg),
                 Simple("TxOff", cfg),
                 Simple("SplitOn", cfg),
                 Simple("SplitOff", cfg),
