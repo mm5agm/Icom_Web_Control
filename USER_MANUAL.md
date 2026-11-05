@@ -74,6 +74,7 @@
     - 15.6 [Can I hear the radio from another room?](#156-can-i-hear-the-radio-from-another-room-i-have-iwc-working-downstairs-but-theres-no-sound)
     - 15.7 [I have the original IC-7300, not the MkII — what do I need to set differently?](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently)
     - 15.8 [I set a 1 Hz tuning step and the radio's display doesn't change](#158-i-set-a-1-hz-tuning-step-and-the-radios-display-doesnt-change)
+    - 15.9 [I have an IC-7100: what works, and what should I avoid?](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -138,7 +139,7 @@
 
 ## 1. Introduction
 
-Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 and IC-7300 MkII HF/50 MHz transceivers.
+Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 and IC-7300 MkII HF/50 MHz transceivers. Support for the IC-7100 is being added and is under test: see [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid).
 
 > **Windows only.** IWC runs on Windows 10 or 11 (64-bit). There is no Linux or macOS build, and none is planned. The app is hosted by a small WinForms process and uses a Windows serial-port driver to reach the radio. You can still access the browser interface itself from any device on your home network (tablet, phone, Linux laptop) — but the IWC server must be running on a Windows PC.
 
@@ -152,8 +153,11 @@ Supported radio:
 |-------|-------|----------|-----------|--------------|
 | IC-7300 MkII | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-C | `B6` (default) |
 | IC-7300 (original) | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-B | `94` |
+| IC-7100 (under test) | 100 W HF and 6m, 50 W 4m and 2m, 35 W 70cm | Single (VFO A / VFO B) | CI-V over USB | `88` |
 
 The MkII is the radio IWC is developed and bench-tested on. The original IC-7300 speaks near-identical CI-V and is **confirmed working by two owners independently** (most recently on v1.0.6); it needs a few settings the MkII does not, and they are collected in one place in [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently) — the short version is Icom's USB driver installed, **CI-V USB Port** unlinked from **[REMOTE]**, and the baud rate at **115200** — see also [§3](#3-first-time-setup) and [§6.1](#61-radio-connection). The CI-V address needs no setting on either radio; IWC detects it.
+
+The IC-7100 has **not yet been tried on a real radio**, and it has no band scope over CI-V, so it does not have everything the sentence below describes. Read [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) before using IWC with one.
 
 IWC connects to the radio over its CI-V computer-control interface, carried on the radio's single USB cable. No extra hardware is required — the spectrum scope, meters, and all controls come over that one connection.
 
@@ -244,7 +248,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 
 1. Open a browser and go to **http://localhost:8080**. If port 8080 was already in use on your PC (e.g. Plex, Jenkins, MiniTool ShadowMaker), IWC will have automatically picked the next free port from 8081–8089. **Hover over the IWC tray icon** down by the Windows clock to see the actual URL — or simply double-click the tray icon to have IWC open the right URL in your default browser.
 2. Click the **Settings** link in the navigation bar.
-3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver.
+3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver. The third choice, **IC-7100 (under test)**, is explained in [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid).
 4. Set **Serial Port**. The box is a list of every COM port your PC has at that moment, so you choose rather than type. **If you don't know which one is the radio, switch the radio on and press "Find my radio"** — IWC tries each port at each speed until an Icom answers, then fills in the Radio Model, Serial Port and Baud Rate for you, and tells you what it found. It takes a couple of seconds, longer if the radio is on an unusual speed. Nothing is saved until you press **Save Settings**, so it is safe to press as often as you like.
 
    The port is the USB serial port the radio presents when you plug its USB cable in. **On the MkII that is the USB Type-C socket, and Windows creates the port by itself. On the original IC-7300 it is the USB Type-B socket, and you must install Icom's USB driver first** — until you do, Windows creates no port at all, so the list will not have it and Find my radio cannot see it either. The driver is on Icom's support site under the radio's downloads. **Diagnostics → COM Ports** shows the same list if you want to check it elsewhere.
@@ -254,6 +258,7 @@ Before the app can communicate with your radio you need to tell it which serial 
    |---|---|---|
    | **IC-7300 MkII** | **19200** | Nothing to change. The MkII has no **CI-V USB Baud Rate** menu, and the **CI-V Baud Rate** item under **Menu → Set → Connectors → CI-V** governs the round **[REMOTE]** socket only — leave it on "Auto". IWC's box alone decides the rate. |
    | **IC-7300 (original)** | **115200** | **Menu → Set → Connectors → CI-V**: set **CI-V USB Port** to **Unlink from [REMOTE]** *first*, then **CI-V USB Baud Rate** to **115200**. The order matters — see the warning below. |
+   | **IC-7100** | **19200** | **Menu → Set → Connectors → CI-V**: leave **CI-V Baud Rate** on **Auto**, its default. 19200 is the fastest it offers. |
 
    > **If the only speeds you are offered are 4800, 9600, 19200 and Auto, you are in the wrong menu item.** That one is **CI-V Baud Rate**, which belongs to the round **[REMOTE]** socket on the back panel and has no effect on a USB connection. Leave it alone. The item you want is **CI-V USB Baud Rate**, and it only becomes settable once **CI-V USB Port** is set to **Unlink from [REMOTE]** — which is why that has to be done first. This has caught a first-time user, who quite reasonably concluded their radio did not offer 115200 at all.
 
@@ -323,7 +328,7 @@ If the radio is switched **off**, the panel clears straight away and leaves you 
 
 ### 5.1 Top Bar
 
-The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.6.0**) are shown in the top-left corner.
+The top bar contains navigation links, external application buttons, and the radio power button. The app name and current version number (e.g., **Icom Web Control v1.7.0**) are shown in the top-left corner.
 
 **Views** in the top bar chooses how you work the radio: **Classic** (this page), **Experimental** ([§5.19](#519-experimental-ui)) or **Radio** ([§5.20](#520-radio-panel)). The same **Views** list is on all three, and the one you are on is highlighted. IWC remembers the view you opened last and starts in it next time, from the desktop shortcut or the tray icon.
 
@@ -433,6 +438,8 @@ The slider snaps to 5 W steps for ease of dragging, but the numerical label show
 ---
 
 ### 5.4 Spectrum Display
+
+*The IC-7100 sends no band scope over CI-V, so on that radio the spectrum and waterfall stay empty ([§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid)).*
 
 The spectrum comes from the **IC-7300's own built-in band scope**, streamed to the app over CI-V — there is no external SDR and nothing extra to plug in. It shows a real-time spectrum and scrolling waterfall of the band around the current VFO A frequency, and appears automatically once the radio is connected.
 
@@ -966,6 +973,8 @@ The list of watched calls is saved across app restarts in your user settings fil
 ### 5.15 Memory Panel
 
 The **Mem** button in the toolbar (bold black text) opens a floating memory panel showing all your saved memory channels as clickable tiles. Each tile shows the label, frequency, and mode. **Click a tile to QSY VFO A to that frequency** — and any of the memory's saved advanced settings (mode, AGC, NB, NR, power, IF Width) are sent to the radio at the same time. Fields that aren't set in the memory are left as-is on the radio.
+
+*On the IC-7100, IWC can read the radio's own memory channels (495 channels in 5 banks, though not its scan edges or call channels) but can't write them yet ([§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid)).*
 
 ![Floating memory panel with the Banks dropdown open — tile grid on the left, banks list on the right, plus the four Load-from-Rig / Save-to-Rig action buttons across the top](pictures/Memories_Floating_Panel.png)
 
@@ -2731,6 +2740,27 @@ The radio really has moved. IWC does not assume the frequency it just sent; it r
 **To make the radio show it,** touch the **Hz digits** on the radio's own screen and hold for about a second. That turns on the **1 Hz step Fine Tuning function** and the eighth digit appears; holding them again turns it off. On the **original IC-7300** this is available in SSB, CW and RTTY only — in AM and FM there is no Fine Tuning to turn on, though IWC can still set the frequency to the hertz. The **MkII** places no restriction on it.
 
 It is worth turning on whenever you are zero-beating CW or chasing a drifting RTTY signal, which is what the 1 Hz step is there for in the first place ([§5.4](#54-spectrum-display)).
+
+### 15.9 I have an IC-7100: what works, and what should I avoid?
+
+**The IC-7100 is under test.** It is written from Icom's manual and has only been run against a simulated radio. Nothing has been tried on a real IC-7100 yet, so please treat every part of it as unproven.
+
+**Until an owner has confirmed it, stay on receive.** Tuning, changing band and mode, reading the meters and reading memories are the things to try first. **Don't press transmit, Tune, or the CW keys on an IC-7100, and don't use voice commands that transmit.** Those commands have never reached a real radio, so nobody knows yet that they do only what they should.
+
+**To set it up:**
+
+1. Install Icom's USB driver from their support site before plugging the radio in.
+2. On the radio, under **Menu → Set → Connectors → CI-V**, leave **CI-V Baud Rate** on **Auto** and **CI-V Address** on **88h**. Those are its defaults.
+3. In Settings, set **Radio Model** to **IC-7100 (under test)** and **Baud Rate** to **19200**, and save.
+
+**What is different from an IC-7300:**
+
+- **No band scope.** The radio sends no spectrum over CI-V, so the Spectrum panels stay empty. Views built around the scope, such as RTTY Contest, are still offered for now.
+- **Memories are read-only.** IWC reads the 495 channels in 5 banks, but can't write them, and doesn't read the scan edges or call channels.
+- **Controls it lacks are hidden.** That includes the voice keyer, APF, delta TX and the 20 dB attenuator. Its attenuator is 12 dB.
+- **Power, preamp and attenuator follow the radio** on each band, because the IC-7100's values vary across its bands.
+
+If you have an IC-7100 and would like to help, please open an issue on GitHub and say what worked and what didn't.
 
 ---
 

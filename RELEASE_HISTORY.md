@@ -12,6 +12,30 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre1 (2026-11-05)
+
+> **A pre-release, for Windows.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build.
+>
+> **What needs testing:**
+>
+> - **IC-7300 and IC-7300 MkII owners:** does everything still work as it did in v1.6.0? A lot changed underneath, so please say if anything has got worse.
+> - **IC-7100 owners:** connecting, tuning, band and mode changes, meters and reading memories. **Stay on receive. Don't press transmit, Tune or the CW keys on an IC-7100, and don't use voice commands that transmit.** Those commands have never reached a real IC-7100.
+> - **Voice control:** with Dry run on, do the commands that transmit now need a clear phrase, without getting in the way of the others?
+
+**The headline is the IC-7100, under test.**
+
+- **IC-7100 added to Settings, as "IC-7100 (under test)".** It is written from Icom's manual and has only run against a simulated radio. Nothing has been tried on a real IC-7100, so this build is a first look, not support for that radio. The Settings page lists what to check on the radio, and section 15.9 of the manual explains the rest.
+- **What it does on an IC-7100:** its bands and modes including 2m and 70cm, the controls it has, and power, preamp and attenuator that follow the radio on each band. Controls it lacks are hidden. It reads the radio's memory channels (495 in 5 banks) but can't write them yet.
+- **What it can't do:** the IC-7100 sends no band scope over CI-V, so the Spectrum panels stay empty. RTTY Contest and the other views built around the scope are still offered for now; sorting those out is later work.
+- **Windows only.** This build is for Windows. Linux, macOS and Docker builds are being worked on and are not part of this release.
+
+**Also in this build:**
+
+- **Voice commands that transmit need a much clearer match.** Saying "transmit on", starting a tune, or a macro that keys the radio now needs far more confidence than other commands, so a misheard word is much less likely to put you on the air. If the match isn't clear enough you'll hear "Not transmitting, not heard clearly". Commands that stop transmitting are as easy as before. Dry run follows the same rule. The new level is a first estimate and hasn't been tried on the air, so tell me if it refuses too often.
+- **A search box on the Settings page.** It finds a setting by its name, by words in its help text, or by a word you might try for it, and takes you straight to it. Each setting also has its own link.
+
+---
+
 ### v1.6.0 (2026-11-03)
 
 > **A full release.** Download `Icom_Web_Control_Setup.exe` below and install it over the top — nothing to uninstall first, and your settings, memories, calibration and voice phrases are all kept. It includes everything in the v1.6.0 pre-releases, whose notes are in [RELEASE_HISTORY.md](RELEASE_HISTORY.md). Like v1.5.0 it is unsigned, and Edge or Defender may flag it; the README's Windows Security section says what to do.
