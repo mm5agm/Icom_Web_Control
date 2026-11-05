@@ -491,6 +491,7 @@ namespace Icom_Web_Control.Services
                 1 => new() { Channel = 1, FrequencyHz = 14_074_000, Mode = "USB", Name = "20m FT8" },
                 2 => new() { Channel = 2, FrequencyHz =  7_074_000, Mode = "USB", Name = "40m FT8" },
                 3 => new() { Channel = 3, FrequencyHz =  3_573_000, Mode = "USB", Name = "80m FT8" },
+                100 => new() { Channel = 100, FrequencyHz = 145_500_000, Mode = "FM", Name = "2m call" },   // IC-7100, bank B
                 _ => new() { Channel = channel, IsEmpty = true },
             };
             return Task.FromResult<RadioMemoryChannel?>(ch);

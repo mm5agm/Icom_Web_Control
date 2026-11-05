@@ -1,11 +1,9 @@
 using System.Text.Json;
-using Icom_Web_Control.Services.Civ;
 
 namespace IcomWebControl.Tests;
 
 /// <summary>
-/// What picking an IC-7100 in Settings brings with it: the meter table from its
-/// manual, and radio memories refused until their layout has been written.
+/// What picking an IC-7100 in Settings brings with it: the meter table from its manual.
 /// </summary>
 public class Ic7100SettingsTests
 {
@@ -55,16 +53,5 @@ public class Ic7100SettingsTests
             .Select(p => p.GetProperty("raw").GetInt32()).ToList();
         Assert.Equal(0, raws[0]);
         Assert.Equal(raws.OrderBy(r => r).Distinct(), raws);
-    }
-
-    [Fact]
-    public void Ic7100MemoriesAreRefusedForNow() =>
-        Assert.False(RadioProfile.Ic7100.HasRadioMemories);
-
-    [Fact]
-    public void Ic7300MemoriesStillWork()
-    {
-        Assert.True(RadioProfile.Ic7300.HasRadioMemories);
-        Assert.True(RadioProfile.Ic7300Mk2.HasRadioMemories);
     }
 }

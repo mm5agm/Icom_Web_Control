@@ -54,8 +54,18 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>True when the radio has the CW audio peak filter (16 32).</summary>
         public bool HasApf => AllowsCommand(0x16, 0x32);
 
-        /// <summary>True when IWC can read and write the radio's own memory channels (1A 00).</summary>
-        public bool HasRadioMemories => AllowsCommand(0x1A, 0x00);
+        /// <summary>How many memory banks the radio has. 0 means one plain list of 99.</summary>
+        public int MemoryBanks => Model == "IC-7100" ? Ic7100MemoryCodec.Banks : 0;
+
+        /// <summary>How many memory channels IWC can read, numbered from 1 through the banks.</summary>
+        public int MemoryChannels => MemoryBanks > 0 ? MemoryBanks * Ic7100MemoryCodec.ChannelsPerBank : 99;
+
+        /// <summary>True when IWC knows how to write this radio's memory channels.</summary>
+        public bool CanWriteMemories => MemoryBanks == 0;
+
+        /// <summary>A channel's name when it has none of its own: "CH 001", or "A-01" on a radio with banks.</summary>
+        public string ChannelLabel(int channel) =>
+            MemoryBanks > 0 ? Ic7100MemoryCodec.Label(channel) : $"CH {channel:000}";
 
         /// <summary>True when the radio can offset its transmit frequency (21 02).</summary>
         public bool HasDeltaTx => AllowsCommand(0x21, 0x02);
@@ -130,8 +140,8 @@ namespace Icom_Web_Control.Services.Civ
         /// IC-7100, from section 20 of its manual. It has no scope commands (27) and
         /// no voice keyer (28). Its whole 1A 05 table differs from the 7300's, so no
         /// item is allowed until it has been mapped; features that use one read as
-        /// unavailable. Memories (08, 1A 00) have their own layout and are blocked
-        /// until that has been written.
+        /// unavailable. Memories (1A 00) have their own layout: they can be read, and
+        /// Allows refuses any 1A 00 frame that could write or clear one.
         /// </summary>
         public static readonly RadioProfile Ic7100 = new("IC-7100", 0x88, 0x12, false, RadioFrequencies.Ic7100,
             new Dictionary<byte, CommandRule>
@@ -151,7 +161,7 @@ namespace Icom_Web_Control.Services.Civ
                 [0x17] = CommandRule.Any,                                   // CW send
                 [0x18] = CommandRule.Subs(0x00, 0x01),                      // power off, on
                 [0x19] = CommandRule.Subs(0x00),                            // read ID
-                [0x1A] = CommandRule.Subs(0x03, 0x04, 0x06),                // filter width, AGC time, data mode
+                [0x1A] = CommandRule.Subs(0x00, 0x03, 0x04, 0x06),          // memory read, filter width, AGC time, data mode
                 [0x1B] = CommandRule.Subs(0x00, 0x01),                      // repeater and TSQL tone
                 [0x1C] = CommandRule.Subs(0x00, 0x01),                      // TX status, tuner
                 [0x21] = CommandRule.Subs(0x00, 0x01),                      // RIT (no delta TX, 02)
@@ -201,6 +211,11 @@ namespace Icom_Web_Control.Services.Civ
 
             if (!_allowed.TryGetValue(frame[cmdAt], out var rule)) return false;
             bool hasData = cmdAt + 1 < frame.Length - 1;
+            // Memories are read-only here: only a well-formed read of one channel.
+            if (!CanWriteMemories && hasData && frame[cmdAt] == CivProtocol.CmdMenu
+                && frame[cmdAt + 1] == CivProtocol.SubMemoryChannel
+                && !Ic7100MemoryCodec.IsRead(frame.AsSpan(cmdAt + 1, frame.Length - 1 - (cmdAt + 1))))
+                return false;
             return rule.Allows(hasData, hasData ? frame[cmdAt + 1] : (byte)0);
         }
 

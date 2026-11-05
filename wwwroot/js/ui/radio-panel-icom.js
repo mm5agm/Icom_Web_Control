@@ -399,7 +399,7 @@ export function startIcomRadioPanel(root, cfg) {
     }
 
     // ---- the radio's own memory channels ---------------------------------
-    // Reading all 99 takes a few seconds, so the key says READING meanwhile.
+    // Reading them all takes a few seconds, so the key says READING meanwhile.
     // VFO▸M is two presses: pick a channel from the list, then press VFO▸M
     // again within 4 s. The server re-reads the channel and refuses if it no
     // longer holds what the list showed.
@@ -409,7 +409,10 @@ export function startIcomRadioPanel(root, cfg) {
         panel.setKey(id, { on: lit, sub: text }, 'mem');
         if (text && holdMs) memSays[id] = setTimeout(() => memKeySays(id, ''), holdMs);
     }
-    const chName = ch => 'M' + String(ch).padStart(2, '0');
+    // With banks, channel 100 is the first of bank B: B-01.
+    const chName = ch => (cfg.memoryBanks
+        ? 'ABCDE'[Math.floor((ch - 1) / 99)] + '-' + String((ch - 1) % 99 + 1).padStart(2, '0')
+        : 'M' + String(ch).padStart(2, '0'));
     const chLine = c => (c.isEmpty ? `${chName(c.channel)}  (empty)`
         : `${chName(c.channel)}  ${(c.frequencyHz / 1e6).toFixed(3)} ${c.mode}${c.name ? '  ' + c.name : ''}`);
     let memReading = false;
@@ -419,7 +422,7 @@ export function startIcomRadioPanel(root, cfg) {
         memKeySays(id, 'READING', true, 0);
         try {
             const res = await fetch('/api/memory/radio-channels');
-            if (!res.ok) { memKeySays(id, res.status === 503 ? 'NO RADIO' : res.status === 409 ? 'NOT YET' : 'FAILED'); return null; }
+            if (!res.ok) { memKeySays(id, res.status === 503 ? 'NO RADIO' : 'FAILED'); return null; }
             memKeySays(id, '');
             return (await res.json())?.channels ?? [];
         } catch {
@@ -462,6 +465,7 @@ export function startIcomRadioPanel(root, cfg) {
         memKeySays('vfotom', '');
     }
     async function vfoToMemory(rx) {
+        if (cfg.canWriteMemories === false) return memKeySays('vfotom', 'NOT YET');
         if (vfoToMemArm) {
             const { c, rx: armedRx } = vfoToMemArm;
             vfoToMemDisarm();

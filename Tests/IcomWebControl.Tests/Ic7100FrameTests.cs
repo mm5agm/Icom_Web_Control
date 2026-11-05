@@ -24,7 +24,6 @@ public class Ic7100FrameTests
             "27 ",      // scope: no such command
             "28 ",      // voice keyer
             "1A 05 ",   // menu items: every number means something else
-            "1A 00 ",   // memories: its own layout
             "11 20 ",   // 20 dB attenuator: it has 12 dB
             "16 32 ",   // APF
             "21 02 ",   // delta TX
@@ -35,6 +34,14 @@ public class Ic7100FrameTests
         foreach (var action in actions)
             foreach (var frame in action.Frames)
                 Assert.False(forbidden.Any(Body(frame).StartsWith), $"{action.Label} sent {frame}");
+
+        // Memories have their own layout, and may only be read: 1A 00, bank 1 to 5, 00, channel.
+        var memoryFrames = actions.SelectMany(a => a.Frames.Select(f => (a.Label, Body: Body(f))))
+            .Where(x => x.Body.StartsWith("1A 00 ")).ToList();
+        Assert.NotEmpty(memoryFrames);
+        foreach (var (label, body) in memoryFrames)
+            Assert.True(System.Text.RegularExpressions.Regex.IsMatch(body, "^1A 00 0[1-5] 00 [0-9]{2} FD$"),
+                $"{label} sent {body}");
     }
 
     [Fact]
