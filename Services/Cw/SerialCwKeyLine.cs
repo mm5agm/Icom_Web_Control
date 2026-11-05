@@ -51,6 +51,9 @@ namespace Icom_Web_Control.Services.Cw
         /// </summary>
         public static List<(string Name, string Description)> Ports()
         {
+            // None to offer until keying is proven off Windows; the dry run still works.
+            if (!OperatingSystem.IsWindows()) return new();
+
             var names = SerialPort.GetPortNames().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             var described = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             try

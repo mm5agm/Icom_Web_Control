@@ -56,6 +56,9 @@ namespace Icom_Web_Control.Services.Civ
         // port starts with DTR low again.
         public void SetDtr(bool on)
         {
+            // Not proven safe off Windows: the lines haven't been measured there yet.
+            if (on && !OperatingSystem.IsWindows())
+                throw new InvalidOperationException("Keying by DTR isn't available on this system yet.");
             lock (_portLock)
             {
                 if (_port?.IsOpen != true) throw new InvalidOperationException("The CI-V port is not open.");

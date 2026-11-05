@@ -50,6 +50,33 @@ jobs:
       - name: Run unit tests
         run: dotnet test core/tests/RadioWebControl.Core.Tests/RadioWebControl.Core.Tests.csproj --configuration Release --verbosity normal
 
+  # The Linux and macOS build, radio control only. Its tests are the same IWC
+  # tests as the Windows job, including the golden frames and the checks that
+  # nothing raises DTR or opens ports by itself off Windows. Nothing is published.
+  off-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run IWC tests
+        run: dotnet test Tests/IcomWebControl.Tests/IcomWebControl.Tests.csproj --framework net10.0 --configuration Release --verbosity normal
+
+      - name: Start with the simulated radio and load the pages
+        run: bash scripts/ci/off-windows-smoke.sh
+
   build:
     runs-on: windows-latest
     permissions:
@@ -77,7 +104,7 @@ jobs:
       # rather than in the Linux job: CI-V framing, the controller replayed
       # against frames recorded off an IC-7300MK2, and the radio menu file.
       - name: Run IWC tests
-        run: dotnet test Tests/IcomWebControl.Tests/IcomWebControl.Tests.csproj --configuration Release --verbosity normal
+        run: dotnet test Tests/IcomWebControl.Tests/IcomWebControl.Tests.csproj --framework net10.0-windows --configuration Release --verbosity normal
         shell: pwsh
 
       - name: Install NSIS
@@ -87,6 +114,7 @@ jobs:
       - name: Publish 64-bit self-contained app
         run: |
           dotnet publish Icom_Web_Control.csproj `
+            --framework net10.0-windows `
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `

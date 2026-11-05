@@ -163,13 +163,18 @@ They are non-negotiable and override default behaviour.
 
 ## Build & Run
 
-**Target:** .NET 10, x64 Windows only (`net10.0-windows`, `OutputType=WinExe`,
-`UseWindowsForms=true` — a WinForms host process running Kestrel).
+**Targets:** .NET 10. `net10.0-windows` is what ships: x64, `OutputType=WinExe`,
+`UseWindowsForms=true`, a WinForms host process running Kestrel. `net10.0` is the
+Linux and macOS build, under test and not released: radio control only, no audio,
+no Voice, and nothing there raises DTR or opens a port by itself until the lines
+have been measured. See `docs/ic7100-cross-platform-plan.md`.
+
+With two targets, `run` and `publish` have to name one:
 
 ```bash
-dotnet build Icom_Web_Control.csproj
-dotnet run --project Icom_Web_Control.csproj      # WinForms host + Kestrel on http://0.0.0.0:8080
-dotnet publish -c Release -r win-x64 --self-contained
+dotnet build Icom_Web_Control.csproj -f net10.0-windows
+dotnet run --project Icom_Web_Control.csproj -f net10.0-windows   # WinForms host + Kestrel on http://0.0.0.0:8080
+dotnet publish -f net10.0-windows -c Release -r win-x64 --self-contained
 ```
 
 There are **no automated tests** — `Tests/test-api.ps1` is a manual API-poking

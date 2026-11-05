@@ -96,6 +96,8 @@ namespace Icom_Web_Control.Pages
 
         private static string ReadCpuInfo()
         {
+            if (!OperatingSystem.IsWindows())
+                return $"(unknown), {System.Environment.ProcessorCount} logical cores";
             try
             {
                 // Same key Task Manager uses for the CPU name shown in

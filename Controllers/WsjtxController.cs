@@ -52,6 +52,9 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("launch")]
         public async Task<IActionResult> Launch()
         {
+            if (!OperatingSystem.IsWindows())
+                return BadRequest(new { error = "IWC can't start WSJT-X on this system yet." });
+
             // Check if WSJT-X is already running
             var existingProcesses = Process.GetProcessesByName("wsjtx");
             if (existingProcesses.Length > 0)

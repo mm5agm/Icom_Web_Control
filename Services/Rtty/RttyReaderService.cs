@@ -59,7 +59,7 @@ namespace Icom_Web_Control.Services.Rtty
         private const int MaxTextLength = 24000;
 
         private readonly ReceiveAudioHold _audio;
-        private readonly WaveInCwAudioSource _source;
+        private readonly ReceiveAudioSource _source;
         private readonly RttyTunerService _tuner;
         private readonly RadioStateService _state;
         private readonly ILogger<RttyReaderService> _logger;
@@ -249,7 +249,7 @@ namespace Icom_Web_Control.Services.Rtty
             try
             {
                 _demod = new RttyDemodulator(
-                    WaveInCwAudioSource.Rate, mark, space, listening.Baud, _figures, _usos);
+                    ReceiveAudioSource.Rate, mark, space, listening.Baud, _figures, _usos);
             }
             catch (ArgumentOutOfRangeException ex)
             {

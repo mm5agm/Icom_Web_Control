@@ -10,6 +10,9 @@ namespace Icom_Web_Control.Services
 
         public void OpenOnce(string url)
         {
+            // A container has no browser to open.
+            if (HostRuntime.IsContainer) return;
+
             lock (_lock)
             {
                 if (_opened) return;

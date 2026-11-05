@@ -6,7 +6,7 @@ namespace Icom_Web_Control.Services.Audio
     /// Reference-counted sharing of the one receive-audio capture device.
     ///
     /// IWC opens a single WinMM recording device, in
-    /// <see cref="WaveInCwAudioSource"/>, and until the RTTY tuner arrived the
+    /// <c>WaveInCwAudioSource</c>, and until the RTTY tuner arrived the
     /// CW reader was its only user, so it could own it outright: start on Start,
     /// stop on Stop. Two users cannot work that way. <c>StopAsync</c> is
     /// absolute - it tears the device down whoever else is listening - so a
@@ -29,19 +29,19 @@ namespace Icom_Web_Control.Services.Audio
     /// </summary>
     public sealed class ReceiveAudioHold
     {
-        private readonly WaveInCwAudioSource _source;
+        private readonly ReceiveAudioSource _source;
         private readonly ILogger<ReceiveAudioHold> _logger;
         private readonly SemaphoreSlim _gate = new(1, 1);
         private int _holds;
 
-        public ReceiveAudioHold(WaveInCwAudioSource source, ILogger<ReceiveAudioHold> logger)
+        public ReceiveAudioHold(ReceiveAudioSource source, ILogger<ReceiveAudioHold> logger)
         {
             _source = source;
             _logger = logger;
         }
 
         /// <summary>The shared source, for its frames and its status fields.</summary>
-        public WaveInCwAudioSource Source => _source;
+        public ReceiveAudioSource Source => _source;
 
         /// <summary>Holds outstanding. Diagnostics only.</summary>
         public int Holds => Volatile.Read(ref _holds);

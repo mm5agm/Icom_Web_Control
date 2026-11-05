@@ -61,6 +61,12 @@ namespace Icom_Web_Control.Services.Civ
         /// </summary>
         public async Task<Result> FindAsync(string? skipPort, CancellationToken ct)
         {
+            // This opens every port it can see. Off Windows that isn't proven safe
+            // yet: opening a port may raise DTR and RTS, and the list includes the
+            // console port and anything else plugged in. The port is chosen by hand.
+            if (!OperatingSystem.IsWindows())
+                return new Result(false, null, 0, null, 0, Array.Empty<string>(), Array.Empty<string>());
+
             var ports = SerialPort.GetPortNames()
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(PortNumber)

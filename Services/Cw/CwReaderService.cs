@@ -43,7 +43,7 @@ namespace Icom_Web_Control.Services.Cw
         // hold on it rather than starting and stopping it. _source stays for
         // the frames and the status fields; only the lifetime moved.
         private readonly ReceiveAudioHold _audio;
-        private readonly WaveInCwAudioSource _source;
+        private readonly ReceiveAudioSource _source;
         private readonly IRadioController _radio;
         private readonly RadioStateService _state;
         private readonly ISettingsService _settings;

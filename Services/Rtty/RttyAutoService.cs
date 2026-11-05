@@ -114,7 +114,7 @@ namespace Icom_Web_Control.Services.Rtty
                 // is the only thing that catches a spurious speed. See the method's
                 // own notes for the bench readings that put it there.
                 var checkd = RttySignalAnalyser.AnalyseAgreed(
-                    audio, WaveInCwAudioSource.Rate);
+                    audio, ReceiveAudioSource.Rate);
 
                 // Every press keeps its four seconds, named after what Auto made of
                 // them, so a surprising answer can be examined instead of argued
@@ -206,7 +206,7 @@ namespace Icom_Web_Control.Services.Rtty
 
                 try
                 {
-                    using var wav = new CwWavRecorder(path, WaveInCwAudioSource.Rate);
+                    using var wav = new CwWavRecorder(path, ReceiveAudioSource.Rate);
 
                     // The frames arrive on the WinMM callback thread, so the writer is
                     // the one thing two threads touch. CwWavRecorder locks internally -
@@ -290,7 +290,7 @@ namespace Icom_Web_Control.Services.Rtty
                 var path = Path.Combine(
                     dir, $"rtty-{DateTime.Now:yyyyMMdd-HHmmss}-{verdict}.wav");
 
-                using (var wav = new CwWavRecorder(path, WaveInCwAudioSource.Rate))
+                using (var wav = new CwWavRecorder(path, ReceiveAudioSource.Rate))
                     wav.Write(audio);
 
                 _logger.LogInformation("RTTY Auto capture saved: {Path}", path);
@@ -354,7 +354,7 @@ namespace Icom_Web_Control.Services.Rtty
         /// </summary>
         private async Task<(float[]? audio, string? error)> ListenAsync(CancellationToken ct)
         {
-            var wanted = (int)(WaveInCwAudioSource.Rate * ListenSeconds);
+            var wanted = (int)(ReceiveAudioSource.Rate * ListenSeconds);
             var buffer = new float[wanted];
             var filled = 0;
             var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -395,7 +395,7 @@ namespace Icom_Web_Control.Services.Rtty
                 // needs two FFT windows and a page of keying, and two seconds is
                 // both. Below that, say so rather than report a guess made from a
                 // handful of frames.
-                if (got < WaveInCwAudioSource.Rate * 2)
+                if (got < ReceiveAudioSource.Rate * 2)
                 {
                     _logger.LogWarning("RTTY Auto heard only {Samples} samples in {Seconds} s",
                         got, ListenSeconds + 1);
