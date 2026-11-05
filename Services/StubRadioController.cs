@@ -530,6 +530,14 @@ namespace Icom_Web_Control.Services
         // runs from app start rather than from connect.
         private int _announceScopeStatus;
 
+        // IWC_STUB_NO_SCOPE=1: stand in for a radio with no scope, such as the
+        // IC-7100, to check the pages without one.
+        private static readonly bool NoScope = string.Equals(
+            Environment.GetEnvironmentVariable("IWC_STUB_NO_SCOPE"), "1", StringComparison.Ordinal);
+
+        /// <inheritdoc />
+        public ScopeDiagnostics GetScopeDiagnostics() => new(false, 0, 0, null, null, NoScope: NoScope);
+
         /// <inheritdoc />
         public void RequestScopeStatusAnnounce() => Interlocked.Exchange(ref _announceScopeStatus, 1);
 
@@ -605,7 +613,17 @@ namespace Icom_Web_Control.Services
                 // Canned dual-panel spectrum (Phase 5). Feed A always and B too
                 // (frontend hides B unless pseudo-dual is on). Re-assert streaming
                 // status periodically so late-connecting clients pick it up.
-                if (_scopeEnabled)
+                if (NoScope)
+                {
+                    try
+                    {
+                        await _hubContext.Clients.All.SendAsync("RadioStateUpdate",
+                            new { property = "SdrStatus", value = new { sdrId = "A", status = "noscope" } }, stoppingToken);
+                    }
+                    catch (OperationCanceledException) { break; }
+                    catch { /* no clients / hub busy — ignore in the stub */ }
+                }
+                else if (_scopeEnabled)
                 {
                     FillCannedSpectrum(_binsA, phase);
                     FillCannedSpectrum(_binsB, phase * 1.1 + 0.5);

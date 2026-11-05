@@ -779,23 +779,25 @@ export function startIcomRadioPanel(root, cfg) {
 
     // ---- the scope ---------------------------------------------------------
     const scopeState = { A: '', B: '' };
+    let noScope = false;   // the radio has none, so both panes say that
     const SCOPE_MSG = {
         streaming: null, connecting: 'Scope starting…', unconfigured: 'Scope switched off',
         disconnected: 'Radio not connected', blocked: 'The radio is not sending scope data',
         outofrange: 'This VFO is outside the scope span',
+        noscope: 'This radio has no spectrum scope',
     };
     const WAITING_TEXT = 'Waiting for data';
     function refreshScopeLamp() {
         const sts = Object.values(scopeState);
         panel.setLamp('sdr', sts.includes('streaming') ? 'on' : sts.includes('connecting') ? 'warn'
-            : sts.every(x => x === '' || x === 'unconfigured') ? 'off' : 'bad');
+            : sts.every(x => x === '' || x === 'unconfigured' || x === 'noscope') ? 'off' : 'bad');
     }
     // Without pseudo-dual the server tags everything 'A' and the sweep is
     // centred on the selected VFO, so it goes to the selected VFO's pane, and
     // the other pane says why it is empty.
     const paneFor = id => (pseudoDual ? id : r.sel);
     function showIdlePane() {
-        if (pseudoDual) return;
+        if (pseudoDual || noScope) return;
         const other = r.sel === 'A' ? 'B' : 'A';
         panel.clearSpectrum(other);
         panel.setSpectrumSource({ label: 'SCOPE', status: 'The scope follows the selected VFO (pseudo-dual is off in Settings)' }, other);
@@ -807,7 +809,7 @@ export function startIcomRadioPanel(root, cfg) {
     // sweep, so it stays.
     const watchVfo = () => (r.sel === 'A' ? 'B' : 'A');
     const crossBand = () => pseudoDual && !!r.band.A && !!r.band.B && r.band.A !== r.band.B;
-    const watchCollapsed = () => crossBand() && !r.xwatch;
+    const watchCollapsed = () => crossBand() && !r.xwatch && !noScope;
     // The VFO you are not hearing is refreshed only by the peeks, on one band
     // or two, one waterfall row each: its pane shows the trace alone.
     const watchPeeked = () => (pseudoDual ? watchVfo() : null);
@@ -835,6 +837,13 @@ export function startIcomRadioPanel(root, cfg) {
         const pane = paneFor(id);
         scopeState[pseudoDual ? id : 'A'] = st;
         refreshScopeLamp();
+        const hadNoScope = noScope;
+        noScope = st === 'noscope';
+        if (noScope) {
+            for (const v of ['A', 'B']) panel.setSpectrumSource({ label: 'SCOPE', status: SCOPE_MSG.noscope }, v);
+            return;
+        }
+        if (hadNoScope) showIdlePane();
         // Out of the sweep with X-WATCH on, the next peek fills it.
         const text = watchCollapsed() && pane === watchVfo() ? XWATCH_OFF_TEXT
             : st === 'outofrange' && r.xwatch ? WAITING_TEXT

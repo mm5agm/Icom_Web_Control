@@ -627,6 +627,11 @@
                 scopeDetail.textContent = 'Radio not connected.';
                 return;
             }
+            if (s.noScope) {
+                scopeRate.textContent = '—';
+                scopeDetail.textContent = 'This radio has no spectrum scope.';
+                return;
+            }
             if (!s.enabled) {
                 scopeRate.textContent = '—';
                 scopeDetail.textContent = 'Scope switched off.';

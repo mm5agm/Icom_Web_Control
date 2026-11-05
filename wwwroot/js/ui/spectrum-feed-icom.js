@@ -22,6 +22,7 @@ const STATUS_TEXT = {
     streaming: null, connecting: 'Scope starting…', unconfigured: 'Scope switched off',
     disconnected: 'Radio not connected', blocked: 'The radio is not sending scope data',
     outofrange: 'This VFO is outside the scope span',
+    noscope: 'This radio has no spectrum scope',
 };
 // Out of the sweep with X-WATCH on: the next peek fills it.
 const WAITING_TEXT = 'Waiting for data';
@@ -61,18 +62,26 @@ export function startIcomSpectrumFeed(cfg) {
         band: { A: '', B: '' },
         xwatch: true,          // until the hub says (it does on connect)
         scope: { A: '', B: '' },   // the last SdrStatus for each
+        noScope: false,        // the radio has none, so both panes say that
     };
     const paneFor = id => (pseudoDual ? id : r.sel);
     const refreshPassband = vfo => pane(vfo)?.setPassband(r.mode[vfo], r.widthHz[vfo]);
 
     function showIdlePane() {
-        if (pseudoDual) return;
+        if (pseudoDual || r.noScope) return;
         const other = r.sel === 'A' ? 'B' : 'A';
         pane(other)?.clear();
         pane(other)?.setStatus(statusText(other, IDLE_TEXT));
     }
     function scopeStatus(id, st) {
         r.scope[id] = st;
+        const hadNoScope = r.noScope;
+        r.noScope = st === 'noscope';
+        if (r.noScope) {
+            for (const v of ['A', 'B']) pane(v)?.setStatus(STATUS_TEXT.noscope);
+            return;
+        }
+        if (hadNoScope) showIdlePane();
         const vfo = paneFor(id);
         const text = st === 'outofrange' && r.xwatch ? WAITING_TEXT : st in STATUS_TEXT ? STATUS_TEXT[st] : st;
         pane(vfo)?.setStatus(statusText(vfo, text));

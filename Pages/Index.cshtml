@@ -2622,8 +2622,15 @@
                 }
 
                 // Outer container visible if either VFO has an SDR configured.
+                // A radio with no scope has no card: nothing to show and nothing
+                // to switch on. In Flex the panel's note says why it is empty.
+                const noScope = sdrState.A === 'noscope';
                 document.getElementById('spectrumContainer').style.display =
-                    (aConfigured || bConfigured) ? '' : 'none';
+                    (!noScope && (aConfigured || bConfigured)) ? '' : 'none';
+                if (noScope) {
+                    const flexNote = document.querySelector('.iwc-flex-empty-note');
+                    if (flexNote) flexNote.textContent = 'This radio has no spectrum scope.';
+                }
 
                 // Mono/Multi toggle only meaningful when BOTH are configured.
                 // Note: spectrumModeToggle has Bootstrap's d-flex class which
@@ -2764,7 +2771,7 @@
                 setStatusBadge('A', status);
                 updateContainerVisibility();
                 if (status === 'streaming') markScopeStreaming();
-                else if (status === 'blocked') markSpectrumReady();
+                else if (status === 'blocked' || status === 'noscope') markSpectrumReady();
             });
             spectrumPipeline.onStatusChange('B', status => {
                 sdrState.B = status;

@@ -71,6 +71,7 @@ namespace Icom_Web_Control.Pages
             // this used to carry put the last arm off the right of the screen.
             BandScope =
                 !IsConnected                    ? "radio not connected"
+              : scope.NoScope                   ? "none on this radio"
               : !scope.Enabled                  ? "switched off by the operator"
               : scope.BlockedReason is { } why  ? $"BLOCKED by the radio — {why}"
               : age is null                     ? $"on, but NO sweep has ever arrived (discarded {scope.SweepsDiscarded})"
