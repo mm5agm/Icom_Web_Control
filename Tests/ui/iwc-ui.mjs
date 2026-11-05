@@ -1657,6 +1657,33 @@ test('Saving during a settings search shows every section again', async () => {
     }
 });
 
+// Voice "Test this pack". The harness stubs the writes, so the recogniser never
+// starts and nothing can reach the radio.
+test('Test this pack: holding the button starts a dry run, letting go stops it', async () => {
+    const page = await open('/Settings');
+    try {
+        await page.eval(`bootstrap.Modal.getOrCreateInstance(document.getElementById('voiceTestPackModal')).show()`);
+        await page.waitFor(`document.getElementById('voiceTestPackModal').classList.contains('show')`, { what: 'the test window to open' });
+        await sleep(500);
+        expect(await page.eval(`document.getElementById('voiceTestDryRun').checked`), 'dry run should be on when the window opens');
+
+        await page.clearWrites();
+        const { x, y } = await page.pointOf('#voiceTestHoldBtn');
+        await page.mouse('mouseMoved', x, y);
+        await page.mouse('mousePressed', x, y);
+        await page.waitFor(`document.getElementById('voiceTestTrace').textContent.includes('Listening')`, { what: 'the Trace to say Listening' });
+        await page.mouse('mouseReleased', x, y);
+        await sleep(300);
+
+        const paths = (await page.writes()).map(w => w.path);
+        expect(paths.some(p => p.includes('/api/voice/start?dryRun=true')), `no dry run start in: ${paths.join(', ')}`);
+        expect(paths.some(p => p.includes('/api/voice/stop')), `no stop in: ${paths.join(', ')}`);
+        expect(!paths.some(p => p.includes('dryRun=false')), `a live start was sent: ${paths.join(', ')}`);
+    } finally {
+        await page.close();
+    }
+});
+
 // ----------------------------------------------------------------
 
 try {
