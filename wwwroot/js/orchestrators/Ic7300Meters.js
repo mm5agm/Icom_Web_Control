@@ -105,7 +105,9 @@ export class Ic7300Meters {
         if (this._powerHistory.length > this._powerHistoryLength) this._powerHistory.shift();
         const rawAvg      = this._powerHistory.reduce((s, v) => s + v, 0) / this._powerHistory.length;
         const watts       = this._calibration.calibrateNumeric('PWR', rawAvg);
-        const clampedWatts = Math.round(Math.max(0, Math.min(watts, 100)));
+        // The radio reads a percent of the band's most power (100 W on a 7300).
+        const fullScale    = window._radioWattsHere || 100;
+        const clampedWatts = Math.round(Math.max(0, Math.min(watts * fullScale / 100, fullScale)));
         this._meterPanel.update('power', clampedWatts);
         return { skip: false, gaugeKey: 'power', displayValue: { watts: clampedWatts, rawAvg } };
     }

@@ -228,7 +228,7 @@ export function startIcomRadioPanel(root, cfg) {
     const spots = new Map();       // callsign -> { call, hz, at }
 
     win = startIcomWindows(panel.windows, {
-        maxPowerW, maxHz, post,
+        maxPowerW, maxHz, post, wattsHere,
         selected: () => r.sel,
         freq: vfo => r.freq[vfo] ?? 0,
     });
@@ -419,7 +419,7 @@ export function startIcomRadioPanel(root, cfg) {
         memKeySays(id, 'READING', true, 0);
         try {
             const res = await fetch('/api/memory/radio-channels');
-            if (!res.ok) { memKeySays(id, res.status === 503 ? 'NO RADIO' : 'FAILED'); return null; }
+            if (!res.ok) { memKeySays(id, res.status === 503 ? 'NO RADIO' : res.status === 409 ? 'NOT YET' : 'FAILED'); return null; }
             memKeySays(id, '');
             return (await res.json())?.channels ?? [];
         } catch {
@@ -778,11 +778,11 @@ export function startIcomRadioPanel(root, cfg) {
         panel.setKey('txclar', { on: r.txClar });
     }
 
-    // The radio's meter scales: the band's most power, Id to 25 A, Vd 10-16 V.
+    // The radio's meter scales: PO as a percent of the band's most power, Id to 25 A, Vd 10-16 V.
     function refreshTxMeters() {
         const raw = r.txMeterRaw;
         const clamp = x => Math.max(0, Math.min(1, x));
-        panel.setTxMeter('PO', clamp(calibrateNumeric('PWR', num(raw.PO)) / wattsHere()));
+        panel.setTxMeter('PO', clamp(calibrateNumeric('PWR', num(raw.PO)) / 100));
         panel.setTxMeter('SWR', txMeterFraction('SWR', calibrateNumeric('SWR', num(raw.SWR))));
         panel.setTxMeter('ALC', clamp(calibrateNumeric('ALC', num(raw.ALC)) / 100));
         panel.setTxMeter('COMP', txMeterFraction('COMP', Math.max(0, Math.min(20, calibrateNumeric('Compression', num(raw.COMP))))));

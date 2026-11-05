@@ -1915,12 +1915,27 @@
                             <select asp-for="Settings.RadioModel" class="form-select w-auto" style="max-width: 100%;">
                                 <option value="IC-7300MK2">IC-7300 MkII</option>
                                 <option value="IC-7300">IC-7300</option>
+                                <option value="IC-7100">IC-7100 (under test)</option>
                             </select>
                             <div class="form-text">
                                 <strong>IC-7300 MkII:</strong> 100W output, single receiver, HF + 6m + 4m (EU), built-in real-time scope over CI-V<br />
                                 <strong>IC-7300:</strong> 100W output, single receiver, HF + 6m, built-in real-time scope over CI-V
+                                <br />
+                                <strong>IC-7100 (under test):</strong> 100W on HF and 6m, 50W on 4m and 2m, 35W on 70cm. Single receiver, no scope over CI-V. Not yet tried on a real radio.
                             </div>
                             <span asp-validation-for="Settings.RadioModel" class="text-danger"></span>
+                            <div id="ic7100MenuChecklist" class="alert alert-info mt-2 mb-0 py-2 px-3" style="display:none;" role="status">
+                                <strong>IC-7100: check these on the radio.</strong>
+                                They are under <em>MENU &rarr; SET &rarr; Connectors &rarr; CI-V</em>.
+                                <ol class="mb-1 mt-1 ps-3">
+                                    <li><em>CI-V Baud Rate</em> &rarr; <strong>Auto</strong> (the default).</li>
+                                    <li><em>CI-V Address</em> &rarr; <strong>88h</strong> (the default).</li>
+                                </ol>
+                                Then set <strong>19200</strong> in Baud Rate below and save.
+                                Also install Icom&rsquo;s USB driver from their support site before plugging the radio in.
+                                This radio sends no spectrum over CI-V, so the band scope stays empty. IWC can&rsquo;t read or
+                                write the radio&rsquo;s own memory channels yet, but IWC&rsquo;s memory list works.
+                            </div>
                             @* The original IC-7300 needs four menu items set that the MkII does
                                not have or does not need, and the order matters: the USB baud item
                                is only offered once the USB port is unlinked from [REMOTE]. The
@@ -1998,8 +2013,12 @@
                                 up: the radio delivers about 4 sweeps per second over its USB port regardless of this setting
                                 (measured on a MkII at 19200 and at 115200 &mdash; identical).
                                 <br /><strong>IC-7300 (original):</strong> use <strong>115200</strong>. The original model will not send band scope data at any lower rate.
+                                <br /><strong>IC-7100:</strong> use <strong>19200</strong>, the fastest it offers.
                             </div>
                             <span asp-validation-for="Settings.BaudRate" class="text-danger"></span>
+                            <div id="ic7100BaudWarning" class="alert alert-warning mt-2 mb-0 py-2 px-3" style="display:none;" role="alert">
+                                The IC-7100 goes no faster than 19200, so it won&rsquo;t answer at this rate. Choose 19200.
+                            </div>
                             @* The original IC-7300 only accepts the "scope waveform output" command
                                (CI-V 27 11) when its CI-V USB Port is "Unlink from [REMOTE]" AND its
                                CI-V USB Baud Rate is 115200 — see the IC-7300 Advanced Manual, CI-V
@@ -2054,6 +2073,8 @@
                                 if (!model || !baud || !warn) return;
 
                                 const checklist = document.getElementById('ic7300MenuChecklist');
+                                const checklist7100 = document.getElementById('ic7100MenuChecklist');
+                                const baud7100 = document.getElementById('ic7100BaudWarning');
 
                                 function refresh() {
                                     // Match the original only — "IC-7300MK2" must not trip this.
@@ -2061,6 +2082,9 @@
                                     const rate = parseInt(baud.value, 10) || 0;
                                     warn.style.display = (isOriginal && rate < 115200) ? '' : 'none';
                                     if (checklist) checklist.style.display = isOriginal ? '' : 'none';
+                                    const is7100 = model.value === 'IC-7100';
+                                    if (checklist7100) checklist7100.style.display = is7100 ? '' : 'none';
+                                    if (baud7100) baud7100.style.display = (is7100 && rate > 19200) ? '' : 'none';
                                 }
 
                                 model.addEventListener('change', refresh);

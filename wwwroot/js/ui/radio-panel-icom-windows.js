@@ -82,7 +82,7 @@ html, body { background: #111 !important; }
  * Fill the window panels. Each panel's body is handed out once and kept for
  * the page's life.
  * @param {object} windows  the panel's windows API (panel-windows.js)
- * @param {object} ctx      { maxPowerW, maxHz, post(url, body), selected() -> 'A'|'B', freq(vfo),
+ * @param {object} ctx      { maxPowerW, wattsHere(), maxHz, post(url, body), selected() -> 'A'|'B', freq(vfo),
  *                            popouts - false in a window group's own page (/RadioWindow), which opens none }
  * @returns {{ onShow(g, p, shown), onRadioState(msg), entry(vfo), popout(g, p) }}
  */
@@ -171,7 +171,8 @@ export function startIcomWindows(windows, ctx) {
                 bars.set('SA', sMeterFraction(s), sMeterText(s));
                 history?.push(num(v));
             },
-            PowerMeter: tx('PO', r => Math.min(ctx.maxPowerW, calibrateNumeric('PWR', r)), x => x / ctx.maxPowerW, x => Math.round(x) + ' W'),
+            // The radio reads a percent of the band's most power.
+            PowerMeter: tx('PO', r => Math.min(100, calibrateNumeric('PWR', r)) * ctx.wattsHere() / 100, x => x / ctx.wattsHere(), x => Math.round(x) + ' W'),
             SWRMeter: tx('SWR', r => calibrateNumeric('SWR', r), x => txMeterFraction('SWR', x), x => (x > 0 ? x.toFixed(1) : '--')),
             ALCMeter: tx('ALC', r => calibrateNumeric('ALC', r), x => x / 100, x => Math.round(x) + ' %'),
             CompressionMeter: tx('COMP', r => Math.max(0, Math.min(20, calibrateNumeric('Compression', r))), x => txMeterFraction('COMP', x), x => x.toFixed(0) + ' dB'),

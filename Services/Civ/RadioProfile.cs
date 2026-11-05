@@ -54,6 +54,9 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>True when the radio has the CW audio peak filter (16 32).</summary>
         public bool HasApf => AllowsCommand(0x16, 0x32);
 
+        /// <summary>True when IWC can read and write the radio's own memory channels (1A 00).</summary>
+        public bool HasRadioMemories => AllowsCommand(0x1A, 0x00);
+
         /// <summary>True when the radio can offset its transmit frequency (21 02).</summary>
         public bool HasDeltaTx => AllowsCommand(0x21, 0x02);
 

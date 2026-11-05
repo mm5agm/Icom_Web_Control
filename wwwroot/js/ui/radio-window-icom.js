@@ -18,7 +18,7 @@ function post(url, body) {
 
 /**
  * @param {HTMLElement} root
- * @param {object} cfg  { conn, popout, group, maxPowerW, maxHz }  popout: the page's PopoutChild
+ * @param {object} cfg  { conn, popout, group, maxPowerW, maxHz, txRanges }  popout: the page's PopoutChild
  */
 export function startIcomRadioWindow(root, cfg) {
     const g = ICOM_WINDOWS.find(x => x.id === cfg.group && x.popout);
@@ -39,6 +39,10 @@ export function startIcomRadioWindow(root, cfg) {
     const r = { sel: 'A', freq: { A: 0, B: 0 } };
     const win = startIcomWindows(windowPageApi(pop, g.id), {
         maxPowerW: num(cfg.maxPowerW) || 100,
+        wattsHere: () => {
+            const hz = r.freq[r.sel];
+            return (cfg.txRanges ?? []).find(t => hz >= t.LoHz && hz <= t.HiHz)?.MaxWatts ?? (num(cfg.maxPowerW) || 100);
+        },
         maxHz: num(cfg.maxHz) || 74_800_000,
         post,
         selected: () => r.sel,

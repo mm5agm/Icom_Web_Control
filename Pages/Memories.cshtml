@@ -753,7 +753,9 @@
                 }
             } else {
                 statusEl.className = 'alert alert-danger';
-                statusEl.textContent = 'Load failed. Check that the radio is connected.';
+                statusEl.textContent = resp.status === 409
+                    ? (await resp.json()).error
+                    : 'Load failed. Check that the radio is connected.';
             }
         } catch (e) {
             statusEl.className = 'alert alert-danger';
@@ -785,7 +787,9 @@
                 statusEl.textContent = `✓ Saved ${data.written} to rig.`;
             } else {
                 statusEl.className = 'alert alert-danger';
-                statusEl.textContent = 'Save failed. Check that the radio is connected.';
+                statusEl.textContent = resp.status === 409
+                    ? (await resp.json()).error
+                    : 'Save failed. Check that the radio is connected.';
             }
         } catch (e) {
             statusEl.className = 'alert alert-danger';

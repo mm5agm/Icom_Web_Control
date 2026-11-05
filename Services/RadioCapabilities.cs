@@ -2,8 +2,8 @@ namespace Icom_Web_Control.Services;
 
 // Capability lookup for per-model behaviour differences.
 //
-// Both models IWC offers (IC-7300 and IC-7300 MkII) are single-receiver with
-// one antenna jack, so every method here currently returns the same answer for
+// Every model IWC offers (IC-7300, IC-7300 MkII, IC-7100) is single-receiver
+// with no antenna to choose, so every method here returns the same answer for
 // every configured model. That is deliberate: the lookups stay in one place so
 // that adding a model which differs is a change here and nowhere else, and so
 // the callers keep reading as "ask what this radio can do" rather than
@@ -33,8 +33,8 @@ public static class RadioCapabilities
     /// </summary>
     public static bool IsSingleReceiver(string radioModel) => !IsDualReceiver(radioModel);
 
-    // There is no HasAntennaSelector. Both supported models have one SO-239
-    // ANT jack, so the per-VFO antenna selector was removed outright rather
+    // There is no HasAntennaSelector. The 7300s have one ANT jack and the 7100's
+    // two follow the band, so the per-VFO antenna selector was removed outright rather
     // than gated behind a flag that could only ever answer "no".
 
     // There is no VfoP1 either. It returned the P1 *digit* of a Yaesu CAT
