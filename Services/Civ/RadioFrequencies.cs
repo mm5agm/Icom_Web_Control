@@ -17,7 +17,8 @@ namespace Icom_Web_Control.Services.Civ
         IReadOnlyList<ReceiveRange> Receive,
         IReadOnlyList<TransmitRange> Transmit,
         IReadOnlyList<string> ExtraBands,
-        IReadOnlyList<string> ExtraModes)
+        IReadOnlyList<string> ExtraModes,
+        long OnePreampFromHz = 0)
     {
         /// <summary>Modes that are not on every radio, so have to be on the radio's own list.</summary>
         public static readonly IReadOnlySet<string> ModesOnlySomeHave =
@@ -36,7 +37,8 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>
         /// IC-7100, from the specifications in section 21 of its manual. Receive stops
         /// at 199.999999 MHz and starts again at 400 MHz. What it can transmit on
-        /// depends on the radio's version; these are the widest ranges.
+        /// depends on the radio's version; these are the widest ranges. On 144 and
+        /// 430 MHz it has one preamp, not P.AMP1 and P.AMP2 (section 5).
         /// </summary>
         public static readonly RadioFrequencies Ic7100 = new(
             new[]
@@ -53,6 +55,7 @@ namespace Icom_Web_Control.Services.Civ
                 new TransmitRange(430_000_000, 450_000_000, 35),
             },
             new[] { "2m", "70cm" },
-            new[] { "WFM", "DV" });
+            new[] { "WFM", "DV" },
+            OnePreampFromHz: 144_000_000);
     }
 }

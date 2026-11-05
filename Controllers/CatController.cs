@@ -310,6 +310,10 @@ namespace Icom_Web_Control.Controllers
         // Limits come from the radio that answered, not from Settings.
         private RadioProfile Profile => RadioProfile.OrDefault(_radio.ModelId);
 
+        private long FrequencyOf(string receiver) =>
+            string.Equals(receiver, "b", StringComparison.OrdinalIgnoreCase)
+                ? _radioStateService.FrequencyB : _radioStateService.FrequencyA;
+
         private static readonly Dictionary<string, string> CatCodeToMode = new()
         {
             { "1", "LSB" },
@@ -611,9 +615,10 @@ namespace Icom_Web_Control.Controllers
 
             try
             {
-                // IC-7300 family is a 100 W radio; the slider's watts map 1:1 to
-                // the radio's 0–100 % RF-power level (CI-V 14 0A).
-                const int maxPower = 100;
+                // The radio's RF-power level (CI-V 14 0A) is 0–100 % of the most on
+                // the band, so on a 100 W band the slider's watts map 1:1 to it.
+                long hz = FrequencyOf(receiver);
+                int maxPower = Profile.MaxWattsAt(hz);
 
                 if (request.Watts < 5 || request.Watts > maxPower)
                     return BadRequest(new { error = $"Power out of range (5-{maxPower}W)" });
@@ -623,10 +628,10 @@ namespace Icom_Web_Control.Controllers
 
                 // Set RF power via the CI-V seam (command 14 0A),
                 // then read it back so the UI shows the level the radio landed on.
-                int percent = request.Watts;
+                int percent = Profile.PercentFor(hz, request.Watts);
                 await _radio.SetRfPowerPercentAsync(percent, CancellationToken.None);
                 int readback = await _radio.GetRfPowerPercentAsync(CancellationToken.None);
-                int actualPower = readback >= 0 ? readback : request.Watts;
+                int actualPower = readback >= 0 ? Profile.WattsFor(hz, readback) : request.Watts;
                 _radioStateService.Power = actualPower;
 
                 _logger.LogInformation("[Slider][CAT] RF power set via CI-V: requested={Watts}W, readback={Actual}W", request.Watts, actualPower);
@@ -747,6 +752,8 @@ namespace Icom_Web_Control.Controllers
             var validCodes = new[] { "0", "1", "2" };
             if (!validCodes.Contains(request.Code))
                 return BadRequest(new { error = $"Invalid preamp code: {request.Code}" });
+            if (request.Code == "2" && Profile.PreampSteps(FrequencyOf(receiver)) < 2)
+                return BadRequest(new { error = "This band has one preamp" });
 
             if (!await _requestSemaphore.WaitAsync(2000))
                 return StatusCode(503, new { error = "Radio busy" });
@@ -827,7 +834,8 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("attenuator/{receiver}")]
         public async Task<IActionResult> SetAttenuator(string receiver, [FromBody] AttenuatorRequest request)
         {
-            // IC-7300 has a single 20 dB attenuator (CI-V 11): OFF ("00") or 20 dB ("20").
+            // One attenuator, on or off (CI-V 11): "00" is off and "20" is on, whatever
+            // its size on this radio. The controller sends the radio's own value.
             var validCodes = new[] { "00", "20" };
             if (!validCodes.Contains(request.Code))
                 return BadRequest(new { error = $"Invalid attenuator code: {request.Code}" });
@@ -1040,6 +1048,8 @@ namespace Icom_Web_Control.Controllers
         {
             if (request.Width is < 0 or > 3)
                 return BadRequest(new { error = "APF width must be 0 (off), 1 (wide), 2 (mid) or 3 (narrow)" });
+            if (!Profile.HasApf)
+                return BadRequest(new { error = "This radio has no APF" });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio not connected" });
 
@@ -1079,7 +1089,9 @@ namespace Icom_Web_Control.Controllers
 
             await _radio.SetRitOffsetHzAsync(request.OffsetHz, CancellationToken.None);
             await _radio.SetRitEnabledAsync(request.RxOn, CancellationToken.None);
-            await _radio.SetDeltaTxEnabledAsync(request.TxOn, CancellationToken.None);
+            bool txOn = request.TxOn && Profile.HasDeltaTx;
+            if (Profile.HasDeltaTx)
+                await _radio.SetDeltaTxEnabledAsync(txOn, CancellationToken.None);
 
             // Mirror the rounding the seam applies rather than reading it back —
             // it is deterministic, and the scope shares this 19200 bus.
@@ -1088,7 +1100,7 @@ namespace Icom_Web_Control.Controllers
             _radioStateService.ClarifierOffsetA = stored;
             _radioStateService.ClarifierOffsetB = stored;
             _radioStateService.RxClarOn = request.RxOn;
-            _radioStateService.TxClarOn = request.TxOn;
+            _radioStateService.TxClarOn = txOn;
             return Ok(new { message = "Clarifier updated", offsetHz = stored });
         }
 

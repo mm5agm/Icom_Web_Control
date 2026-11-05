@@ -1060,7 +1060,7 @@
                                 <label class="vfo-control-label">ATT</label>
                                 <div class="dsp-seg-group" role="group" aria-label="VFO A attenuator" id="attGroupA" data-a11y-key="controls.attA">
                                     @Html.Raw(SegBtn("attGroupA", "00", "OFF",   Model.RadioState.AttA, "window.radioControl.setAttenuator('A','00')"))
-                                    @Html.Raw(SegBtn("attGroupA", "20", "20 dB", Model.RadioState.AttA, "window.radioControl.setAttenuator('A','20')"))
+                                    @Html.Raw(SegBtn("attGroupA", "20", $"{Model.Profile.AttenuatorDb} dB", Model.RadioState.AttA, "window.radioControl.setAttenuator('A','20')"))
                                 </div>
                             </div>
                             <div class="vfo-control-item">
@@ -1174,8 +1174,8 @@
                                 onchange="window.onSegmentChange && window.onSegmentChange('A', this.value)">
                             <option value="">--</option>
                         </select>
-                        <span class="fw-bold" style="font-size: 0.8rem; white-space: nowrap;">APF</span>
-                        <select class="form-select form-select-sm" id="apfSelectA"
+                        <span class="fw-bold" style="font-size: 0.8rem; white-space: nowrap;" hidden="@(!Model.Profile.HasApf)">APF</span>
+                        <select class="form-select form-select-sm" id="apfSelectA" hidden="@(!Model.Profile.HasApf)"
                                 style="width: auto; min-width: 68px;"
                                 aria-label="VFO A APF audio peak filter"
                                 title="APF audio peak filter width (CW)"
@@ -1359,7 +1359,7 @@
                                 <label class="vfo-control-label">ATT</label>
                                 <div class="dsp-seg-group" role="group" aria-label="VFO B attenuator" id="attGroupB" data-a11y-key="controls.attB">
                                     @Html.Raw(SegBtn("attGroupB", "00", "OFF",   Model.RadioState.AttB, "window.radioControl.setAttenuator('B','00')"))
-                                    @Html.Raw(SegBtn("attGroupB", "20", "20 dB", Model.RadioState.AttB, "window.radioControl.setAttenuator('B','20')"))
+                                    @Html.Raw(SegBtn("attGroupB", "20", $"{Model.Profile.AttenuatorDb} dB", Model.RadioState.AttB, "window.radioControl.setAttenuator('B','20')"))
                                 </div>
                             </div>
                             <div class="vfo-control-item">
@@ -1473,8 +1473,8 @@
                                 onchange="window.onSegmentChange && window.onSegmentChange('B', this.value)">
                             <option value="">--</option>
                         </select>
-                        <span class="fw-bold" style="font-size: 0.8rem; white-space: nowrap;">APF</span>
-                        <select class="form-select form-select-sm" id="apfSelectB"
+                        <span class="fw-bold" style="font-size: 0.8rem; white-space: nowrap;" hidden="@(!Model.Profile.HasApf)">APF</span>
+                        <select class="form-select form-select-sm" id="apfSelectB" hidden="@(!Model.Profile.HasApf)"
                                 style="width: auto; min-width: 68px;"
                                 aria-label="VFO B APF audio peak filter"
                                 title="APF audio peak filter width (CW)"
@@ -1572,8 +1572,11 @@
                             aria-labelledby="clarModeLabel" aria-label="Clarifier mode">
                         <option value="off"  selected="@(clarModeInit=="off"  ? "selected" : null)">OFF</option>
                         <option value="rx"   selected="@(clarModeInit=="rx"   ? "selected" : null)">RX</option>
-                        <option value="tx"   selected="@(clarModeInit=="tx"   ? "selected" : null)">TX</option>
-                        <option value="rxtx" selected="@(clarModeInit=="rxtx" ? "selected" : null)">RX+TX</option>
+                        @if (Model.Profile.HasDeltaTx)
+                        {
+                            <option value="tx"   selected="@(clarModeInit=="tx"   ? "selected" : null)">TX</option>
+                            <option value="rxtx" selected="@(clarModeInit=="rxtx" ? "selected" : null)">RX+TX</option>
+                        }
                     </select>
                     <label class="mb-0 fw-bold text-nowrap ms-1">Offset:
                         <span id="clarOffsetValue">@Model.RadioState.ClarifierOffsetA</span> Hz
@@ -3116,6 +3119,8 @@
             // no Yaesu-style IF width/shift, no Contour). See the clone-split plan.
             window._radioModel = '@Model.RadioModel';
             window._radioMaxHz = @Model.MaxHz;
+            window._radioTxRanges = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.Transmit));
+            window._radioOnePreampFromHz = @Model.Profile.Frequencies.OnePreampFromHz;
 
             // Hold button — toggles whether the panel updates from incoming
             // SDR frames. While held the spectrum + waterfall freeze at the

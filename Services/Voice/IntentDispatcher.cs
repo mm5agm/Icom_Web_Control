@@ -609,6 +609,9 @@ namespace Icom_Web_Control.Services.Voice
                 _     => null,
             };
             if (code == null) return new DispatchResult(false, "Preamp");
+            if (code == "2" && RadioProfile.OrDefault(_radio.ModelId)
+                    .PreampSteps(VfoIsB ? _state.FrequencyB : _state.FrequencyA) < 2)
+                return new DispatchResult(false, "Preamp");
 
             // code is "0"/"1"/"2" — IC-7300 preamp off / amp 1 / amp 2 (CI-V 16 02).
             await SetRadioPreamp(int.Parse(code), ct);
@@ -802,6 +805,8 @@ namespace Icom_Web_Control.Services.Voice
             IReadOnlyDictionary<string, object> args, CancellationToken ct)
         {
             if (!TryGetLevel(args, out var setting) || setting is < 0 or > 3)
+                return new DispatchResult(false, "A P F");
+            if (!RadioProfile.OrDefault(_radio.ModelId).HasApf)
                 return new DispatchResult(false, "A P F");
 
             await SetRadioLevel(_radio.SetApfAsync, (int)setting, "APF", ct);
