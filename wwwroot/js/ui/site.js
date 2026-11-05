@@ -251,6 +251,7 @@ const _ariaDebounceTimers = {};
 
 // Frequency display renderer (outer version, used by outer updateFrequencyDisplay)
 function updateFrequencyDisplay(receiver, freqHz) {
+    applyRadioBandLimits(receiver, freqHz);
     const display = document.getElementById('freq' + receiver);
     if (!display) {
         return;
@@ -271,6 +272,33 @@ function updateFrequencyDisplay(receiver, freqHz) {
             display.setAttribute('aria-label', `VFO ${receiver}: ${mhz} MHz`);
             display.setAttribute('title', `VFO ${receiver}: ${mhz} MHz`);
         }, 500);
+    }
+}
+
+// What changes with the band on some radios: the most power, and whether there
+// is one preamp or two. The page sets the figures (Pages/Index.cshtml).
+function applyRadioBandLimits(receiver, freqHz) {
+    const hz = Number(freqHz);
+    if (!hz) return;
+    const ranges = window._radioTxRanges;
+    const slider = document.getElementById('powerSlider');
+    if (ranges && slider && receiver === (window.txVfo === 1 ? 'B' : 'A')) {
+        const here = ranges.find(t => hz >= t.LoHz && hz <= t.HiHz);
+        const max = here ? here.MaxWatts : Math.max(...ranges.map(t => t.MaxWatts));
+        if (Number(slider.max) !== max) {
+            slider.max = max;
+            if (Number(slider.value) > max) slider.value = max;
+            if (typeof updateSliderFill === 'function') updateSliderFill(slider);
+        }
+    }
+    const from = window._radioOnePreampFromHz;
+    const group = document.getElementById('ipoGroup' + receiver);
+    if (from && group) {
+        const one = hz >= from;
+        const second = group.querySelector('[data-val="2"]');
+        const first = group.querySelector('[data-val="1"]');
+        if (second) second.hidden = one;
+        if (first) first.textContent = one ? 'P.AMP' : 'P.AMP1';
     }
 }
 
@@ -2343,6 +2371,7 @@ window.setApf = setApf;
     }
 
     function updateFrequencyDisplay(receiver, freqHz) {
+        applyRadioBandLimits(receiver, freqHz);
         const display = document.getElementById('freq' + receiver);
         if (!display) {
             // ...removed debug logging...

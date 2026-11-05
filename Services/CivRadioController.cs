@@ -1145,7 +1145,7 @@ namespace Icom_Web_Control.Services
                 // rather than the radio's. Percent maps 1:1 to watts on a 100 W
                 // radio, which is the same assumption CatController's slider
                 // endpoint makes.
-                case 16: { int v = await GetRfPowerPercentAsync(ct); if (v >= 0) _state.Power = v; break; }
+                case 16: { int v = await GetRfPowerPercentAsync(ct); if (v >= 0) _state.Power = RadioProfile.OrDefault(ModelId).WattsFor(_state.ActiveVfo == 1 ? _state.FrequencyB : _state.FrequencyA, v); break; }
                 // CW break-in (16 47): decides whether a keyed message goes to
                 // the antenna or only to the sidetone, so the CW panels show
                 // which. Slow-moving, front-panel changeable - same reasons.

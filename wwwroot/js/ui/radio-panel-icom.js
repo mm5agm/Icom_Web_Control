@@ -79,6 +79,17 @@ const widthLabel = hz => (hz < 1000 ? hz + ' Hz' : (hz / 1000).toFixed(hz % 1000
 export function startIcomRadioPanel(root, cfg) {
     const model = cfg.model;
     const maxPowerW = num(cfg.maxPowerW) || 100;
+    const txRanges = cfg.txRanges ?? [];
+    const attDb = num(cfg.attDb) || 20;
+    // The most power on the band the selected VFO is on.
+    function wattsHere() {
+        const hz = r.freq[r.sel];
+        return txRanges.find(t => hz >= t.LoHz && hz <= t.HiHz)?.MaxWatts ?? maxPowerW;
+    }
+    // Some bands on some radios have one preamp rather than two.
+    function onePreampHere() {
+        return num(cfg.onePreampFromHz) > 0 && r.freq[r.sel] >= num(cfg.onePreampFromHz);
+    }
     const maxHz = num(cfg.maxHz) || 74_800_000;
     const pseudoDual = !!cfg.pseudoDual;
     // band-plan.js reads this to decide whether a spectrum click may change mode.
@@ -120,14 +131,14 @@ export function startIcomRadioPanel(root, cfg) {
             ],
             keys: [
                 { id: 'preamp', label: 'P.AMP', title: 'Preamp: each press steps OFF, P.AMP1, P.AMP2' },
-                { id: 'att', label: 'ATT', title: 'Attenuator 20 dB on / off' },
+                { id: 'att', label: 'ATT', title: `Attenuator ${attDb} dB on / off` },
                 { id: 'agc', label: 'AGC', title: 'AGC: each press steps FAST, MID, SLOW' },
                 { id: 'fil', label: 'FILTER', title: 'Filter: each press steps FIL1, FIL2, FIL3' },
                 { id: 'nb', label: 'NB', title: 'Noise blanker on / off' },
                 { id: 'nr', label: 'NR', title: 'Noise reduction on / off; the NOTCH / NR outer ring sets its level' },
                 { id: 'anf', label: 'AN', title: 'Auto notch on / off' },
                 { id: 'notch', label: 'MN', title: 'Manual notch on / off; the NOTCH / NR knob sets its position. Each press while on steps its width' },
-                { id: 'apf', label: 'APF', title: 'CW audio peak filter: each press steps OFF, WIDE, MID, NAR' },
+                ...(cfg.hasApf === false ? [] : [{ id: 'apf', label: 'APF', title: 'CW audio peak filter: each press steps OFF, WIDE, MID, NAR' }]),
             ],
         },
         sharedKnobs: [
@@ -162,7 +173,7 @@ export function startIcomRadioPanel(root, cfg) {
         // CLR zeroes the offset and leaves RIT / ΔTX as they are.
         clarKeys: [
             { id: 'rxclar', label: 'RIT', title: 'RIT on / off: offsets the receive frequency' },
-            { id: 'txclar', label: 'ΔTX', title: 'ΔTX on / off: offsets the transmit frequency' },
+            ...(cfg.hasDeltaTx === false ? [] : [{ id: 'txclar', label: 'ΔTX', title: 'ΔTX on / off: offsets the transmit frequency' }]),
             { id: 'clrclar', label: 'CLR', title: 'Clear the RIT / ΔTX offset to zero' },
         ],
         bands: bands.map(b => ({ id: b, label: b.endsWith('cm') ? b : b.replace('m', '') })),
@@ -298,7 +309,7 @@ export function startIcomRadioPanel(root, cfg) {
             title: `Mic gain ${val(r.mic)} (inner) · compressor level ${val(r.procl)} (outer)` + U,
         });
         panel.setGroupKnob('shared', 'powermon', {
-            inner: frac(r.power, maxPowerW), outer: frac(r.mon, 100),
+            inner: frac(r.power, wattsHere()), outer: frac(r.mon, 100),
             text: (r.power == null ? '--' : r.power + ' W') + ' · ' + val(r.mon),
             title: `RF power ${r.power == null ? '--' : r.power + ' W'} (inner) · monitor ${val(r.mon)} (outer)` + U,
         });
@@ -330,8 +341,8 @@ export function startIcomRadioPanel(root, cfg) {
     }
 
     function refreshKeys() {
-        panel.setKey('preamp', { on: r.preamp !== '0', sub: PREAMP[r.preamp] ?? '' }, 'A');
-        panel.setKey('att', { on: on(r.att), sub: on(r.att) ? '20 dB' : 'OFF' }, 'A');
+        panel.setKey('preamp', { on: r.preamp !== '0', sub: onePreampHere() ? (r.preamp !== '0' ? 'P.AMP' : 'OFF') : PREAMP[r.preamp] ?? '' }, 'A');
+        panel.setKey('att', { on: on(r.att), sub: on(r.att) ? `${attDb} dB` : 'OFF' }, 'A');
         panel.setKey('agc', { on: !!r.agc, sub: r.agc }, 'A');
         panel.setKey('fil', { on: !!r.fil[r.sel], sub: filText(r.sel) }, 'A');
         panel.setKey('nb', { on: on(r.nb) }, 'A');
@@ -535,7 +546,7 @@ export function startIcomRadioPanel(root, cfg) {
                             run: () => post('/api/radio/crossband-watch', { enabled: true, intervalSeconds: sec }),
                         })),
                     ]);
-                    case 'preamp': return post(`/api/cat/ipo/${rx}`, { code: PREAMP_NEXT[r.preamp] ?? '0' });
+                    case 'preamp': return post(`/api/cat/ipo/${rx}`, { code: onePreampHere() ? (r.preamp === '0' ? '1' : '0') : PREAMP_NEXT[r.preamp] ?? '0' });
                     case 'att': return post(`/api/cat/attenuator/${rx}`, { code: on(r.att) ? '00' : '20' });
                     case 'agc': return post(`/api/cat/agc/${rx}`, { code: AGC_NEXT[r.agcCode] ?? '2' });
                     case 'fil': {
@@ -642,7 +653,7 @@ export function startIcomRadioPanel(root, cfg) {
                 return turn('procl', r.procl, 10, 0, 100, x => { r.procl = x; refreshSharedKnobs(); },
                     x => post('/api/cat/proclevel', { value: x }));
             case 'powermon:inner':
-                return turn('power', r.power, 1, 5, maxPowerW, x => { r.power = x; refreshSharedKnobs(); },
+                return turn('power', r.power, 1, 5, wattsHere(), x => { r.power = x; refreshSharedKnobs(); },
                     x => post(`/api/cat/power/${r.sel.toLowerCase()}`, { Watts: x }));
             case 'powermon:outer':
                 return turn('mon', r.mon, 1, 0, 100, x => { r.mon = x; refreshSharedKnobs(); },
@@ -767,11 +778,11 @@ export function startIcomRadioPanel(root, cfg) {
         panel.setKey('txclar', { on: r.txClar });
     }
 
-    // The IC-7300's own meter scales: 100 W, Id to 25 A, Vd 10-16 V.
+    // The radio's meter scales: the band's most power, Id to 25 A, Vd 10-16 V.
     function refreshTxMeters() {
         const raw = r.txMeterRaw;
         const clamp = x => Math.max(0, Math.min(1, x));
-        panel.setTxMeter('PO', clamp(calibrateNumeric('PWR', num(raw.PO)) / maxPowerW));
+        panel.setTxMeter('PO', clamp(calibrateNumeric('PWR', num(raw.PO)) / wattsHere()));
         panel.setTxMeter('SWR', txMeterFraction('SWR', calibrateNumeric('SWR', num(raw.SWR))));
         panel.setTxMeter('ALC', clamp(calibrateNumeric('ALC', num(raw.ALC)) / 100));
         panel.setTxMeter('COMP', txMeterFraction('COMP', Math.max(0, Math.min(20, calibrateNumeric('Compression', num(raw.COMP))))));

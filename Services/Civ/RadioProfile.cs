@@ -48,6 +48,45 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>The name and model number Hamlib knows this radio by, for rigctld clients.</summary>
         public (string Name, int Id) Hamlib => Model == "IC-7100" ? ("IC-7100", 3070) : ("IC-7300", 3073);
 
+        /// <summary>The attenuator's size. The CI-V value is the dB figure in BCD.</summary>
+        public int AttenuatorDb => (AttenuatorOn >> 4) * 10 + (AttenuatorOn & 0x0F);
+
+        /// <summary>True when the radio has the CW audio peak filter (16 32).</summary>
+        public bool HasApf => AllowsCommand(0x16, 0x32);
+
+        /// <summary>True when the radio can offset its transmit frequency (21 02).</summary>
+        public bool HasDeltaTx => AllowsCommand(0x21, 0x02);
+
+        /// <summary>How many preamps the radio has on this frequency.</summary>
+        public int PreampSteps(long hz) =>
+            Frequencies.OnePreampFromHz > 0 && hz >= Frequencies.OnePreampFromHz ? 1 : 2;
+
+        /// <summary>
+        /// The most power on this frequency. Off the transmit bands it is the
+        /// radio's highest, so the HF figure, as nothing goes out there anyway.
+        /// </summary>
+        public int MaxWattsAt(long hz)
+        {
+            int highest = 0;
+            foreach (var range in Frequencies.Transmit)
+            {
+                if (hz >= range.LoHz && hz <= range.HiHz) return range.MaxWatts;
+                highest = Math.Max(highest, range.MaxWatts);
+            }
+            return highest;
+        }
+
+        /// <summary>The radio's RF power level is a percentage of the most on that band.</summary>
+        public int PercentFor(long hz, int watts) =>
+            (int)Math.Round(watts * 100.0 / MaxWattsAt(hz), MidpointRounding.AwayFromZero);
+
+        /// <summary>The watts a percentage of RF power level means on this frequency.</summary>
+        public int WattsFor(long hz, int percent) =>
+            (int)Math.Round(percent * MaxWattsAt(hz) / 100.0, MidpointRounding.AwayFromZero);
+
+        private bool AllowsCommand(byte command, byte sub) =>
+            _allowed == null || (_allowed.TryGetValue(command, out var rule) && rule.Allows(true, sub));
+
         /// <summary>The lowest frequency the radio receives.</summary>
         public long MinHz => Frequencies.Receive[0].LoHz;
 
