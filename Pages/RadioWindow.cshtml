@@ -35,6 +35,7 @@
             group,
             maxPowerW: @Model.MaxPowerW,
             maxHz: @Model.MaxHz,
+            txRanges: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.Transmit)),
         });
     </script>
 </body>

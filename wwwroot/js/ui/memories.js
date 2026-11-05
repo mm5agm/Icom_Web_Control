@@ -586,7 +586,9 @@ window.importMemories = async function (mode) {
                 await _loadAndRender();
             }
         } else {
-            _setToolbarBusy(false, '✗ Load failed — is the radio connected?');
+            _setToolbarBusy(false, resp.status === 409
+                ? `✗ ${(await resp.json()).error}`
+                : '✗ Load failed — is the radio connected?');
         }
     } catch (e) {
         _setToolbarBusy(false, '✗ Error');
@@ -606,7 +608,9 @@ window.exportMemories = async function (mode) {
                 const data = await resp.json();
                 _setToolbarBusy(false, `✓ Saved ${data.written} to rig`);
             } else {
-                _setToolbarBusy(false, '✗ Save failed — is the radio connected?');
+                _setToolbarBusy(false, resp.status === 409
+                    ? `✗ ${(await resp.json()).error}`
+                    : '✗ Save failed — is the radio connected?');
             }
         } catch (e) {
             _setToolbarBusy(false, '✗ Error');
@@ -631,7 +635,9 @@ window.exportMemories = async function (mode) {
                     _setToolbarBusy(false, `✓ Saved ${data.written} to rig`);
                 }
             } else {
-                _setToolbarBusy(false, '✗ Save failed — is the radio connected?');
+                _setToolbarBusy(false, resp.status === 409
+                    ? `✗ ${(await resp.json()).error}`
+                    : '✗ Save failed — is the radio connected?');
             }
         } catch (e) {
             _setToolbarBusy(false, '✗ Error');

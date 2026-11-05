@@ -285,6 +285,7 @@ function applyRadioBandLimits(receiver, freqHz) {
     if (ranges && slider && receiver === (window.txVfo === 1 ? 'B' : 'A')) {
         const here = ranges.find(t => hz >= t.LoHz && hz <= t.HiHz);
         const max = here ? here.MaxWatts : Math.max(...ranges.map(t => t.MaxWatts));
+        window._radioWattsHere = max;   // the Power Out gauge reads a percent of this
         if (Number(slider.max) !== max) {
             slider.max = max;
             if (Number(slider.value) > max) slider.value = max;

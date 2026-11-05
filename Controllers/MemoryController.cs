@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Icom_Web_Control.Services;
+using Icom_Web_Control.Services.Civ;
 using RadioWebControl.Core.Models;
 using RadioWebControl.Core.Services;
 
@@ -34,6 +35,12 @@ namespace Icom_Web_Control.Controllers
         private readonly IWebHostEnvironment _env;
         private readonly MemoryBankService _bankService;
         private readonly IRadioController _radio;
+
+        // Reading nothing from a radio IWC can't read must not look like an empty
+        // radio: Load (Replace) would then clear the user's list.
+        private const string NoRadioMemoriesText =
+            "IWC can't read or write this radio's own memory channels yet. Your memory list in IWC still works.";
+        private bool NoRadioMemories => !RadioProfile.OrDefault(_radio.ModelId).HasRadioMemories;
 
         public MemoryController(
             MemoryService memoryService,
@@ -193,6 +200,7 @@ namespace Icom_Web_Control.Controllers
         [RequestSizeLimit(1_000_000)]
         public async Task<IActionResult> ImportFromRadio([FromBody] ImportRequest request)
         {
+            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
@@ -236,6 +244,7 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("export-radio")]
         public async Task<IActionResult> ExportToRadio()
         {
+            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
@@ -263,6 +272,7 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("export-radio-add")]
         public async Task<IActionResult> ExportToRadioAdd()
         {
+            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
@@ -294,6 +304,7 @@ namespace Icom_Web_Control.Controllers
         [HttpGet("radio-channels")]
         public async Task<IActionResult> RadioChannels()
         {
+            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
 
@@ -313,6 +324,7 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("radio-channel/{ch:int}/to-vfo/{vfo}")]
         public async Task<IActionResult> RadioChannelToVfo(int ch, string vfo)
         {
+            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (ch < 1 || ch > RadioChannelCount) return BadRequest(new { error = "No such channel." });
             if (!_radio.IsConnected)
                 return StatusCode(503, new { error = "Radio is not connected." });
@@ -346,6 +358,7 @@ namespace Icom_Web_Control.Controllers
         [HttpPost("radio-channel/{ch:int}/from-vfo/{vfo}")]
         public async Task<IActionResult> VfoToRadioChannel(int ch, string vfo, [FromBody] ChannelSeen? seen)
         {
+            if (NoRadioMemories) return Conflict(new { error = NoRadioMemoriesText });
             if (ch < 1 || ch > RadioChannelCount) return BadRequest(new { error = "No such channel." });
             if (seen == null) return BadRequest(new { error = "Say what the channel held when it was chosen." });
             if (!_radio.IsConnected)

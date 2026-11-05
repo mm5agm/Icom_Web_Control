@@ -1,0 +1,180 @@
+{
+  "meters": [
+    {
+      "name": "PWR",
+      "type": "numeric",
+      "points": [
+        {
+          "Radio": "0",
+          "raw": 0
+        },
+        {
+          "Radio": "50",
+          "raw": 143
+        },
+        {
+          "Radio": "100",
+          "raw": 213
+        }
+      ],
+      "isGauge": true,
+      "units": "W"
+    },
+    {
+      "name": "SWR",
+      "type": "numeric",
+      "points": [
+        {
+          "Radio": "1.0",
+          "raw": 0
+        },
+        {
+          "Radio": "1.5",
+          "raw": 48
+        },
+        {
+          "Radio": "2.0",
+          "raw": 80
+        },
+        {
+          "Radio": "3.0",
+          "raw": 120
+        },
+        {
+          "Radio": "5.0",
+          "raw": 173
+        },
+        {
+          "Radio": "9.9",
+          "raw": 242
+        }
+      ],
+      "isGauge": true,
+      "units": "ratio"
+    },
+    {
+      "name": "Compression",
+      "type": "numeric",
+      "points": [
+        {
+          "Radio": "0",
+          "raw": 0
+        },
+        {
+          "Radio": "15",
+          "raw": 130
+        },
+        {
+          "Radio": "30",
+          "raw": 241
+        }
+      ],
+      "isGauge": true,
+      "units": "dB"
+    },
+    {
+      "name": "ALC",
+      "type": "numeric",
+      "points": [
+        {
+          "Radio": "0",
+          "raw": 0
+        },
+        {
+          "Radio": "100",
+          "raw": 120
+        }
+      ],
+      "isGauge": true,
+      "units": "%"
+    },
+    {
+      "name": "IDD",
+      "type": "numeric",
+      "points": [
+        {
+          "Radio": "0",
+          "raw": 0
+        },
+        {
+          "Radio": "10",
+          "raw": 97
+        },
+        {
+          "Radio": "15",
+          "raw": 146
+        },
+        {
+          "Radio": "25",
+          "raw": 241
+        }
+      ],
+      "isGauge": true,
+      "units": "A"
+    },
+    {
+      "name": "VPA",
+      "type": "numeric",
+      "points": [
+        {
+          "Radio": "0",
+          "raw": 0
+        },
+        {
+          "Radio": "10",
+          "raw": 13
+        },
+        {
+          "Radio": "16",
+          "raw": 241
+        }
+      ],
+      "isGauge": true,
+      "units": "V"
+    },
+    {
+      "name": "S-Meter",
+      "type": "s_meter",
+      "points": [
+        {
+          "Radio": "S0",
+          "raw": 0
+        },
+        {
+          "Radio": "S1",
+          "raw": 13
+        },
+        {
+          "Radio": "S3",
+          "raw": 40
+        },
+        {
+          "Radio": "S5",
+          "raw": 67
+        },
+        {
+          "Radio": "S7",
+          "raw": 93
+        },
+        {
+          "Radio": "S9",
+          "raw": 120
+        },
+        {
+          "Radio": "+20",
+          "raw": 161
+        },
+        {
+          "Radio": "+40",
+          "raw": 201
+        },
+        {
+          "Radio": "+60",
+          "raw": 241
+        }
+      ],
+      "isGauge": true,
+      "units": "S"
+    }
+  ]
+}
