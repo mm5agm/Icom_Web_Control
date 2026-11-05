@@ -1459,6 +1459,12 @@ namespace Icom_Web_Control.Services
                 return;
             }
 
+            if (!RadioProfile.OrDefault(ModelId).HasMode(mode))
+            {
+                _logger.LogWarning("[CivRadioController] {Model} has no mode '{Mode}' — ignored", ModelId, mode);
+                return;
+            }
+
             byte sel = SelectorFor(vfo);
 
             // Preserve the VFO's current filter (FIL1/2/3); default FIL1 if it
@@ -1467,6 +1473,7 @@ namespace Icom_Web_Control.Services
             byte filter = 0x01;
             var cur = await ReadVfoModeRawAsync(sel, cancellationToken);
             if (cur.ok && cur.filter is >= 0x01 and <= 0x03) filter = cur.filter;
+            if (target.BaseByte == ModeByteWfm) filter = 0x01;  // WFM is always FIL1 (IC-7100 manual, p. 20-11)
 
             byte dataByte = target.Data ? (byte)0x01 : (byte)0x00;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
@@ -1504,6 +1511,9 @@ namespace Icom_Web_Control.Services
         private byte SelectorFor(RadioVfo vfo)
             => vfo == ActiveVfo ? CivProtocol.VfoSelected : CivProtocol.VfoUnselected;
 
+        private const byte ModeByteWfm = 0x06;  // receive only
+        private const byte ModeByteDv = 0x17;
+
         // CI-V base-mode byte (+ DATA flag) → the display strings already spoken
         // by RadioStateService, the web mode dropdown, voice, and rigctld. The
         // "-U"/"-L" suffix follows the existing UI vocabulary — CW normal is
@@ -1522,13 +1532,16 @@ namespace Icom_Web_Control.Services
             0x03 => "CW-U",
             0x04 => "RTTY-L",
             0x05 => data ? "DATA-FM" : "FM",
+            ModeByteWfm => "WFM",
             0x07 => "CW-L",
             0x08 => "RTTY-U",
+            ModeByteDv => "DV",
             _ => $"?{baseByte:X2}",
         };
 
         // Display string → (base-mode byte, DATA flag). Covers every mode the
-        // IC-7300 exposes over CI-V; Yaesu-only strings (PSK, FM-N, AM-N,
+        // IC-7300 exposes over CI-V, and the IC-7100's WFM and DV, which
+        // RadioProfile.HasMode stops going to any other radio; Yaesu-only strings (PSK, FM-N, AM-N,
         // DATA-FM-N) are intentionally absent and rejected by SetModeAsync.
         private static readonly Dictionary<string, (byte BaseByte, bool Data)> ModeNameToIcom =
             new(StringComparer.OrdinalIgnoreCase)
@@ -1544,6 +1557,8 @@ namespace Icom_Web_Control.Services
                 ["DATA-L"] = (0x00, true),
                 ["DATA-U"] = (0x01, true),
                 ["DATA-FM"] = (0x05, true),
+                ["WFM"] = (ModeByteWfm, false),
+                ["DV"] = (ModeByteDv, false),
             };
 
         // -- Meters (Phase 3 blocks 3–4) ---------------------------------------

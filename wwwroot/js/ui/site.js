@@ -274,16 +274,21 @@ function updateFrequencyDisplay(receiver, freqHz) {
     }
 }
 
+// The radio's top frequency, which the page sets (Pages/Index.cshtml).
+function radioMaxHz() {
+    return window._radioMaxHz || 74800000;
+}
+
 function renderFrequencyDigits(freq, selIdx) {
     // Show dashes if no valid frequency yet
     if (!freq || isNaN(freq) || freq < 100) {
         return '<span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span>.<span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span>.<span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span>';
     }
-    let s = freq.toString().padStart(8, "0");
+    const s = freq.toString().padStart(radioMaxHz() >= 100000000 ? 9 : 8, "0");
     let html = "";
     let digitIdx = 0;
-    for (let i = 0; i < 8; i++) {
-        if (i === 2 || i === 5) {
+    for (let i = 0; i < s.length; i++) {
+        if (i === s.length - 6 || i === s.length - 3) {
             html += '<span class="digit" aria-hidden="true">.</span>';
         }
         let selected = (selIdx === digitIdx) ? " selected" : "";
@@ -313,7 +318,7 @@ window.setBand = async function (receiver, band) {
 // Outer mode setter - called from Razor inline onchange on mode select
 window.setMode = async function (receiver, mode) {
     const modeToCatCode = {
-        "LSB": "1", "USB": "2", "CW-U": "3", "FM": "4", "AM": "5", "RTTY-L": "6", "CW-L": "7", "DATA-L": "8", "RTTY-U": "9", "DATA-FM": "A", "FM-N": "B", "DATA-U": "C", "AM-N": "D", "PSK": "E", "DATA-FM-N": "F"
+        "LSB": "1", "USB": "2", "CW-U": "3", "FM": "4", "AM": "5", "RTTY-L": "6", "CW-L": "7", "DATA-L": "8", "RTTY-U": "9", "DATA-FM": "A", "WFM": "G", "DV": "H", "FM-N": "B", "DATA-U": "C", "AM-N": "D", "PSK": "E", "DATA-FM-N": "F"
     };
     const catCode = modeToCatCode[mode];
     if (!catCode) {
@@ -2096,7 +2101,7 @@ function changeSelectedDigit(receiver, delta) {
     if (newVal < 0) newVal = 9;
     freqArr[idx] = newVal;
     let newFreq = parseInt(freqArr.join(''));
-    newFreq = Math.max(30000, Math.min(75000000, newFreq));
+    newFreq = Math.max(30000, Math.min(radioMaxHz(), newFreq));
     state.localFreq[receiver] = newFreq;
     updateFrequencyDisplay(receiver, newFreq);
     const displayElem = document.getElementById('freq' + receiver);
@@ -2323,11 +2328,11 @@ window.setApf = setApf;
         if (!freq || freq < 1000) {
             return '<span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span>.<span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span>.<span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span><span class="digit" aria-hidden="true">-</span>';
         }
-        let s = freq.toString().padStart(8, "0");
+        const s = freq.toString().padStart(radioMaxHz() >= 100000000 ? 9 : 8, "0");
         let html = "";
         let digitIdx = 0;
-        for (let i = 0; i < 8; i++) {
-            if (i === 2 || i === 5) {
+        for (let i = 0; i < s.length; i++) {
+            if (i === s.length - 6 || i === s.length - 3) {
                 html += '<span class="digit" aria-hidden="true">.</span>';
             }
             let selected = (selIdx === digitIdx) ? " selected" : "";
@@ -2442,7 +2447,7 @@ window.setApf = setApf;
                 }
             }
             let newFreq = parseInt(freqArr.join(''));
-            newFreq = Math.max(30000, Math.min(75000000, newFreq));
+            newFreq = Math.max(30000, Math.min(radioMaxHz(), newFreq));
             state.localFreq[receiver] = newFreq;
             state.editing[receiver] = true;
             updateFrequencyDisplay(receiver, newFreq);

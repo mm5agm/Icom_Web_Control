@@ -708,7 +708,9 @@ try
 
     lifetime.ApplicationStarted.Register(() =>
     {
-        browserLauncher.OpenOnce(Icom_Web_Control.Services.LaunchPage.At(portInfo.RootUrl));
+        // IWC_NO_BROWSER=1: for test runs, which should not open tabs in the operator's browser.
+        if (Environment.GetEnvironmentVariable("IWC_NO_BROWSER") != "1")
+            browserLauncher.OpenOnce(Icom_Web_Control.Services.LaunchPage.At(portInfo.RootUrl));
     });
 
     app.Run();

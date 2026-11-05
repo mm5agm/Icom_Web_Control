@@ -154,8 +154,8 @@ namespace Icom_Web_Control.Services.Voice
                 return new DispatchResult(false, "Set frequency");
             }
             var phrase = $"Move to {FormatFrequencyForSpeech(hz)}";
-            // 30 kHz - 75 MHz: same bounds as the HTTP SetFrequencyA endpoint.
-            if (hz < 30_000 || hz > 75_000_000)
+            // The same bounds as the HTTP SetFrequencyA endpoint.
+            if (!RadioProfile.OrDefault(_radio.ModelId).CanTune(hz))
             {
                 _logger.LogWarning("[Voice] SetFrequency {Hz} out of range", hz);
                 return new DispatchResult(false, phrase);
@@ -289,7 +289,7 @@ namespace Icom_Web_Control.Services.Voice
             var stepHz = stepHzSetting > 0 ? stepHzSetting : 10_000;
             var current = isB ? _state.FrequencyB : _state.FrequencyA;
             var next = current + direction * stepHz;
-            if (next < 30_000 || next > 75_000_000)
+            if (!RadioProfile.OrDefault(_radio.ModelId).CanTune(next))
             {
                 _logger.LogWarning("[Voice] NudgeFrequency would go out of range ({Next})", next);
                 return new DispatchResult(false, phrase);
@@ -1056,6 +1056,8 @@ namespace Icom_Web_Control.Services.Voice
             "DATA-FM"  => "data F M",
             "DATA-FM-N"=> "data F M narrow",
             "PSK"      => "P S K",
+            "WFM"      => "wide F M",
+            "DV"       => "D V",
             _          => mode
         };
     }

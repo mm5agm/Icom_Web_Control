@@ -31,9 +31,11 @@
         const conn = window.rwcHubConnection('/radioHub');
         startIcomRadioPanel(document.getElementById('radioPanel'), {
             conn,
-            model: '@Model.RadioModel',
+            model: '@Model.Profile.Model',
             maxPowerW: @Model.MaxPowerW,
             maxHz: @Model.MaxHz,
+            extraBands: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.ExtraBands)),
+            extraModes: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.ExtraModes)),
             bandPlan: '@Model.BandPlan',
             pseudoDual: @(Model.PseudoDualReceiverEnabled ? "true" : "false"),
             autoModeChangeOnTune: @(Model.AutoModeChangeOnTune ? "true" : "false"),

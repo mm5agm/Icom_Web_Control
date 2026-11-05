@@ -54,7 +54,8 @@ namespace Icom_Web_Control.Services
         public Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
         {
             IsConnected = true;
-            ModelId = "STUB";
+            ModelId = StubModel ?? "STUB";
+            if (StubModel != null) _state.RadioModel = StubModel;
             return Task.FromResult(true);
         }
 
@@ -529,6 +530,11 @@ namespace Icom_Web_Control.Services
         // SdrStatus before its spectrum panel is revealed, and the frame counter
         // runs from app start rather than from connect.
         private int _announceScopeStatus;
+
+        // IWC_STUB_MODEL=IC-7100: the stub answers as that radio, so the pages and
+        // API take its limits.
+        private static readonly string? StubModel =
+            Environment.GetEnvironmentVariable("IWC_STUB_MODEL");
 
         // IWC_STUB_NO_SCOPE=1: stand in for a radio with no scope, such as the
         // IC-7100, to check the pages without one.

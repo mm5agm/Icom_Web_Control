@@ -85,7 +85,8 @@ export function startIcomRadioPanel(root, cfg) {
     if (cfg.autoModeChangeOnTune === false) globalThis.iwcAutoModeChangeOnTune = false;
     const edges = () => BAND_EDGES[cfg.bandPlan] || BAND_EDGES.Region1;
     // 4 m only where the region has it.
-    const bands = BANDS.filter(b => b !== '4m' || edges().some(e => e.name === '4m'));
+    const bands = [...BANDS, ...(cfg.extraBands ?? [])].filter(b => b !== '4m' || edges().some(e => e.name === '4m'));
+    const modes = [...MODES, ...(cfg.extraModes ?? [])];
 
     let win = null;             // the windows; those restored from last time report during mount
     const windowShown = {};     // group -> panels of it shown on the board
@@ -164,8 +165,8 @@ export function startIcomRadioPanel(root, cfg) {
             { id: 'txclar', label: 'ΔTX', title: 'ΔTX on / off: offsets the transmit frequency' },
             { id: 'clrclar', label: 'CLR', title: 'Clear the RIT / ΔTX offset to zero' },
         ],
-        bands: bands.map(b => ({ id: b, label: b.replace('m', '') })),
-        modes: MODES.map(m => ({ id: m, label: MODE_LABEL[m] ?? m })),
+        bands: bands.map(b => ({ id: b, label: b.endsWith('cm') ? b : b.replace('m', '') })),
+        modes: modes.map(m => ({ id: m, label: MODE_LABEL[m] ?? m })),
         spectrumPanes: [{ id: 'A', tab: 'VFO-A', name: 'VFO-A · SCOPE' }, { id: 'B', tab: 'VFO-B', name: 'VFO-B · SCOPE' }],
         spectrumSpans: SPANS_HZ.map(hz => ({ hz })),
         frequencyEntry: true,
@@ -266,7 +267,7 @@ export function startIcomRadioPanel(root, cfg) {
         const sg = getSegments(cfg.bandPlan, r.band[vfo])?.[key];
         if (!sg) return;
         const rx = vfo.toLowerCase();
-        if (MODES.includes(sg.mode) && sg.mode !== r.mode[vfo]) await post(`/api/cat/mode/${rx}`, { mode: sg.mode });
+        if (modes.includes(sg.mode) && sg.mode !== r.mode[vfo]) await post(`/api/cat/mode/${rx}`, { mode: sg.mode });
         return post(`/api/cat/frequency/${rx}`, { frequencyHz: sg.freq });
     }
 
@@ -362,7 +363,7 @@ export function startIcomRadioPanel(root, cfg) {
         if (!boxLive(vfo)) return null;
         switch (kind) {
             case 'mode':
-                return MODES.map(m => ({ id: m, label: MODE_LABEL[m] ?? m, on: m === r.mode[vfo] }));
+                return modes.map(m => ({ id: m, label: MODE_LABEL[m] ?? m, on: m === r.mode[vfo] }));
             case 'width': {
                 const list = widthsForMode(r.mode[vfo]);
                 return list?.map(hz => ({ id: String(hz), label: widthLabel(hz), on: hz === r.widthHz[vfo] })) ?? null;
@@ -508,7 +509,7 @@ export function startIcomRadioPanel(root, cfg) {
             case 'band':
                 return post(`/api/cat/band/${rx}`, { band: id });
             case 'mode':
-                return MODES.includes(id) ? post(`/api/cat/mode/${rx}`, { mode: id }) : undefined;
+                return modes.includes(id) ? post(`/api/cat/mode/${rx}`, { mode: id }) : undefined;
             case 'step':
                 if (id === 'cycle') {
                     stepHz = STEPS_HZ[(STEPS_HZ.indexOf(stepHz) + 1) % STEPS_HZ.length];

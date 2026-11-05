@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Icom_Web_Control.Services.Civ;
 
 namespace Icom_Web_Control.Services
 {
@@ -68,6 +69,8 @@ namespace Icom_Web_Control.Services
                 { "PKTUSB", "DATA-U"  },
                 { "PKTLSB", "DATA-L"  },
                 { "PKTFM",  "DATA-FM" },
+                { "WFM",    "WFM"     },
+                { "D-STAR", "DV"      },
             };
 
         // IWC display string → Hamlib mode name (the get_mode direction).
@@ -85,6 +88,8 @@ namespace Icom_Web_Control.Services
                 { "DATA-U",  "PKTUSB" },
                 { "DATA-L",  "PKTLSB" },
                 { "DATA-FM", "PKTFM"  },
+                { "WFM",     "WFM"    },
+                { "DV",      "D-STAR" },
             };
 
         // Nominal RX passband (Hz) reported by get_mode. WSJT-X only displays
@@ -95,11 +100,13 @@ namespace Icom_Web_Control.Services
             "RTTY" or "RTTY-R" => 500,
             "AM"               => 6000,
             "FM" or "PKTFM"    => 12000,
+            "WFM"              => 230000,
+            "D-STAR"           => 6000,
             _                  => 3000, // USB/LSB/PKTUSB/PKTLSB
         };
 
-        private const long MinFrequency = 30000;
-        private const long MaxFrequency = 75000000;
+        // Limits come from the radio that answered, not from Settings.
+        private RadioProfile Profile => RadioProfile.OrDefault(_radio.ModelId);
 
         public RigctldServer(IRadioController radio, RadioStateService radioStateService, ILogger<RigctldServer> logger)
         {
@@ -313,7 +320,7 @@ namespace Icom_Web_Control.Services
                 return "RPRT -1";
 
             var freq = (long)Math.Round(freqDouble);
-            if (freq < MinFrequency || freq > MaxFrequency)
+            if (!Profile.CanTune(freq))
                 return "RPRT -1";
 
             await _radio.SetFrequencyHzAsync(RadioVfo.A, freq, CancellationToken.None);
@@ -515,7 +522,7 @@ namespace Icom_Web_Control.Services
                 return "RPRT -1";
 
             var freq = (long)Math.Round(freqDouble);
-            if (freq < MinFrequency || freq > MaxFrequency)
+            if (!Profile.CanTune(freq))
                 return "RPRT -1";
 
             // Split TX is VFO B on the IC-7300.
@@ -593,22 +600,30 @@ namespace Icom_Web_Control.Services
         private string GetInfo()
         {
             // Hamlib expects: "mfg;model;version;serial;id"
-            return "Icom;IC-7300;1.0.0;000000;3073";
+            var (name, id) = Profile.Hamlib;
+            return $"Icom;{name};1.0.0;000000;{id}";
         }
 
-        private static string GetDumpState()
+        private string GetDumpState() => DumpState(Profile);
+
+        internal static string DumpState(RadioProfile profile)
         {
-            // Minimal Hamlib dump_state response for a single-VFO IC-7300-class
-            // rig. RX 30 kHz–74.8 MHz continuous; TX HF ham bands + 6 m at 2–100 W.
+            // Minimal Hamlib dump_state response for a single-VFO rig, with the
+            // radio's own receive and transmit ranges.
             // Func masks are 0 (ATU not yet exposed); level masks left broad.
-            return string.Join("\n",
+            var lines = new List<string>
+            {
                 "0",            // protocol version
                 "2",            // rig model (2 = NET rigctl)
-                "30000.000000 74800000.000000 0x1ff -1 -1 0x10000003 0x3",     // RX range (full coverage)
-                "0 0 0 0 0 0 0",  // end of RX ranges
-                "1800000.000000 29700000.000000 0x1ff 2 100 0x10000003 0x3",   // HF TX range
-                "50000000.000000 54000000.000000 0x1ff 2 100 0x10000003 0x3",  // 6m TX range
-                "0 0 0 0 0 0 0",  // end of TX ranges
+            };
+            foreach (var r in profile.Frequencies.Receive)
+                lines.Add(FormattableString.Invariant($"{r.LoHz:F6} {r.HiHz:F6} 0x1ff -1 -1 0x10000003 0x3"));
+            lines.Add("0 0 0 0 0 0 0");  // end of RX ranges
+            foreach (var t in profile.Frequencies.Transmit)
+                lines.Add(FormattableString.Invariant($"{t.LoHz:F6} {t.HiHz:F6} 0x1ff 2 {t.MaxWatts} 0x10000003 0x3"));
+            lines.Add("0 0 0 0 0 0 0");  // end of TX ranges
+            lines.AddRange(new[]
+            {
                 "0 0",          // end of tuning steps
                 "0 0",          // end of filters
                 "0",            // max RIT
@@ -623,14 +638,15 @@ namespace Icom_Web_Control.Services
                 "0x000fffff",   // has_set_level
                 "0",            // has_get_parm
                 "0"             // has_set_parm
-            );
+            });
+            return string.Join("\n", lines);
         }
 
         private async Task<string> SetBandAsync(string band, string clientId)
         {
             // WSJT-X does not use set_band; Log4OM may. We have no CI-V "band"
             // command, so accept only a numeric Hz target and QSY VFO A to it.
-            if (long.TryParse(band, out var freqHz) && freqHz >= MinFrequency && freqHz <= MaxFrequency)
+            if (long.TryParse(band, out var freqHz) && Profile.CanTune(freqHz))
             {
                 await _radio.SetFrequencyHzAsync(RadioVfo.A, freqHz, CancellationToken.None);
                 _radioStateService.FrequencyA = freqHz;
