@@ -3,25 +3,34 @@
 # opened, and checks that every page and everything it links to loads. It only
 # reads: nothing is pressed or saved, and the simulated radio can't transmit.
 # Filenames are case-sensitive on Linux, which is what the link check is for.
+#
+# With IWC_SMOKE_BASE set it checks a copy that is already running there (the
+# Docker image, the Mac app) instead of building and starting one.
 set -u
 
 export IWC_USE_STUB_RADIO=1
 export IWC_NO_BROWSER=1
 work="$(mktemp -d)"
 export XDG_CONFIG_HOME="$work"
-base=http://localhost:8080
+base="${IWC_SMOKE_BASE:-http://localhost:8080}"
 log="$work/console.log"
+: >"$log"
+app=
 
-dotnet build Icom_Web_Control.csproj --framework net10.0 --configuration Release --nologo --verbosity quiet || exit 1
+if [ -z "${IWC_SMOKE_BASE:-}" ]; then
+    dotnet build Icom_Web_Control.csproj --framework net10.0 --configuration Release --nologo --verbosity quiet || exit 1
 
-(cd bin/Release/net10.0 && exec dotnet Icom_Web_Control.dll) >"$log" 2>&1 &
-app=$!
-trap 'kill "$app" 2>/dev/null' EXIT
+    # Started from an unrelated folder, as a Mac app opened from Finder is.
+    dll="$PWD/bin/Release/net10.0/Icom_Web_Control.dll"
+    (cd "$work" && exec dotnet "$dll") >"$log" 2>&1 &
+    app=$!
+    trap 'kill "$app" 2>/dev/null' EXIT
+fi
 
 up=0
 for _ in $(seq 1 60); do
     if curl -fs -o /dev/null "$base/api/status/init"; then up=1; break; fi
-    if ! kill -0 "$app" 2>/dev/null; then break; fi
+    if [ -n "$app" ] && ! kill -0 "$app" 2>/dev/null; then break; fi
     sleep 1
 done
 if [ "$up" != 1 ]; then

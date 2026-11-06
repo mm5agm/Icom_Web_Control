@@ -178,3 +178,136 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
+
+  # The Mac app, radio control only, unsigned. Built on every PR and checked by
+  # starting it. Published on pre-releases only while this is being tested: a full
+  # release stays Windows only until Fabio has approved it.
+  build-macos:
+    if: github.event_name != 'release' || github.event.release.prerelease
+    runs-on: macos-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [osx-arm64, osx-x64]
+    env:
+      MSBUILDDISABLENODEREUSE: 1
+      DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build macOS DMG (${{ matrix.rid }})
+        run: |
+          bash scripts/macos/build-dmg.sh "${{ matrix.rid }}"
+          ls -lh publish/dmg/*.dmg
+
+      # macos-latest is arm64, so only that app can run here. It starts from / as
+      # it does when opened from Finder, with the simulated radio, so no port opens.
+      - name: Start the app and load the pages
+        if: matrix.rid == 'osx-arm64'
+        run: |
+          exe="$PWD/publish/dmg/Icom Web Control-macos-arm64.app/Contents/MacOS/Icom_Web_Control"
+          (cd / && IWC_USE_STUB_RADIO=1 IWC_NO_BROWSER=1 exec "$exe") &
+          app=$!
+          trap 'kill "$app" 2>/dev/null' EXIT
+          IWC_SMOKE_BASE=http://localhost:8080 bash scripts/ci/off-windows-smoke.sh
+
+      - name: Upload DMG to the pre-release
+        if: github.event_name == 'release' && github.event.release.prerelease
+        run: gh release upload "$GITHUB_REF_NAME" publish/dmg/*.dmg --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The Linux image, radio control only. A PR builds both architectures, runs the
+  # amd64 one with the simulated radio and pushes nothing. A pre-release pushes both,
+  # tagged with the version and `testing`. `latest` is never moved, and a full release
+  # pushes nothing, until Fabio has approved it.
+  build-docker:
+    if: github.event_name != 'release' || github.event.release.prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      actions: write  # docker buildx GHA cache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name == 'release'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        if: github.event_name == 'release'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/mm5agm/icom_web_control
+          flavor: latest=false
+          tags: |
+            type=raw,value=${{ github.ref_name }}
+            type=raw,value=testing
+
+      - name: Build and push both architectures
+        if: github.event_name == 'release'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build arm64, as a Raspberry Pi would use
+        if: github.event_name != 'release'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build amd64 to run here
+        if: github.event_name != 'release'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: iwc:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run the image with the simulated radio and load the pages
+        if: github.event_name != 'release'
+        run: |
+          docker run -d --name iwc-smoke -e IWC_USE_STUB_RADIO=1 -p 8080:8080 iwc:smoke
+          status=0
+          IWC_SMOKE_BASE=http://localhost:8080 bash scripts/ci/off-windows-smoke.sh || status=$?
+          if [ "$status" != 0 ]; then docker logs iwc-smoke; fi
+          docker rm -f iwc-smoke
+          exit "$status"
