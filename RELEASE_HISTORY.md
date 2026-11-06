@@ -12,6 +12,19 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre4 (2026-11-06)
+
+> **A pre-release, and the first with Linux, Raspberry Pi and Mac builds.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build.
+>
+> **Off Windows these are for testing, and they have not yet been run against a real radio.** Follow [the step-by-step instructions](https://github.com/mm5agm/Icom_Web_Control/blob/develop/docs/pi-docker-testing.md), which start with setting USB SEND and USB Keying to OFF on the radio.
+
+- **Docker image for Linux and Raspberry Pi** (amd64 and arm64): `ghcr.io/mm5agm/icom_web_control:v1.7.0-pre4`, or `:testing` for the newest pre-release. A 64-bit OS is needed on a Pi.
+- **Mac apps** in this release's assets: `macos-arm64` for Apple silicon, `macos-x64` for Intel. They are unsigned. There is no Dock or menu bar icon, and the app quits with its last browser tab.
+- **Radio control only off Windows.** The Voice, CW and RTTY audio pages and Remote Audio are not in these builds, and neither is Find my radio.
+- **Off Windows, IWC opens no radio port until you confirm in Settings that the USB lines are off.** Opening a port there raises DTR and RTS and software can't stop it, so a radio set to key from those lines would transmit. After opening, IWC asks whether the radio is transmitting and reads the items back. If the radio is transmitting, or an item isn't OFF, or an answer doesn't come, it closes the port and says why. The IC-7100's manual lists no such items, so have an antenna or dummy load connected and watch the radio the first time.
+- **Nothing changes on Windows** from this work. The panel doesn't appear there and Find my radio stays.
+- Everything listed for v1.7.0-pre1, pre2 and pre3 below still needs testing.
+
 ### v1.7.0-pre3 (2026-11-05)
 
 > **A pre-release, for Windows.** Download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings, memories, calibration and voice phrases are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. Linux, macOS and Docker are not in this build.
