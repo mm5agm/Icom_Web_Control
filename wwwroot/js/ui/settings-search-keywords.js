@@ -12,6 +12,7 @@ window.RWC_SETTINGS_KEYWORDS = {
     'voice-active-locale': 'locale translation',
     'voice-input-device': 'mic input',
     'voice-output-device': 'output tts speech',
+    'voice-test-pack': 'dry run try commands',
     'radio-model': 'rig transceiver',
     'serial-port-select': 'com usb cat civ ci-v rig connection',
     'baud-rate': 'speed serial civ ci-v',
