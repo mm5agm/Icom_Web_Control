@@ -1916,6 +1916,70 @@
     <details class="settings-section" id="radio-cat" @(ViewContext.ModelState.IsValid && Model.RadioConnected ? "" : "open")>
         <summary><i class="bi bi-broadcast" aria-hidden="true"></i>&nbsp;Radio &amp; CAT</summary>
         <div class="section-body">
+                @if (!OperatingSystem.IsWindows())
+                {
+                    bool usbConfirmed = Model.Settings.UsbLinesOffConfirmedFor == Model.Settings.UsbLinesKey();
+                    var usbItems = Icom_Web_Control.Services.Civ.RadioProfile.ForModel(Model.Settings.RadioModel)?.UsbLineItems
+                                   ?? Array.Empty<(int Item, string Name)>();
+                    <div id="usbLinesPanel" class="alert @(usbConfirmed ? "alert-success" : "alert-warning") mb-3 py-2 px-3" role="status">
+                        <strong>Before IWC opens the radio's port</strong>
+                        <p class="mb-1 mt-1">
+                            On this system, opening a serial port can raise its DTR and RTS lines, and a radio
+                            set to use those lines transmits. IWC opens no port until you have checked.
+                        </p>
+                        @if (usbItems.Count > 0)
+                        {
+                            <p class="mb-1">On the radio, under <em>MENU &rarr; SET &rarr; Connectors</em>, set these to <strong>OFF</strong>:</p>
+                            <ul class="mb-1 ps-3">
+                                @foreach (var usbItem in usbItems)
+                                {
+                                    <li>@usbItem.Name</li>
+                                }
+                            </ul>
+                            <p class="mb-1">
+                                Each time it connects, IWC reads them and asks whether the radio is transmitting. If one
+                                isn't OFF, or the radio is transmitting, IWC closes the port. It never changes them itself.
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="mb-1">
+                                The IC-7100's manual lists no menu item for these lines, so there is nothing to set and
+                                IWC can't check how the radio treats them. <strong>Connect an antenna or dummy load
+                                first, and watch the radio the first time.</strong> If it transmits, switch it off.
+                                Each time it connects, IWC asks whether the radio is transmitting and closes the port if it is.
+                            </p>
+                        }
+                        @if (string.IsNullOrWhiteSpace(Model.Settings.SerialPort))
+                        {
+                            <p class="mb-0">Choose the radio's port below and save first.</p>
+                        }
+                        else if (usbConfirmed)
+                        {
+                            <p class="mb-0"><strong>Confirmed</strong> for @Model.Settings.SerialPort on the @Model.Settings.RadioModel.</p>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-warning btn-sm mt-1" id="usbLinesConfirmBtn"
+                                    data-port="@Model.Settings.SerialPort" data-model="@Model.Settings.RadioModel">
+                                I have checked: open @Model.Settings.SerialPort for the @Model.Settings.RadioModel
+                            </button>
+                            <div id="usbLinesConfirmResult" class="small mt-1" role="alert"></div>
+                            <script>
+                                document.getElementById('usbLinesConfirmBtn').addEventListener('click', async e => {
+                                    const r = await fetch('/api/cat/usb-lines-confirm', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ port: e.target.dataset.port, model: e.target.dataset.model }),
+                                    });
+                                    if (r.ok) { location.reload(); return; }
+                                    const body = await r.json().catch(() => ({}));
+                                    document.getElementById('usbLinesConfirmResult').textContent = body.error || 'That did not work.';
+                                });
+                            </script>
+                        }
+                    </div>
+                }
                 <h5 class="mb-3">Radio Connection</h5>
                         <div class="mb-3">
                             <label asp-for="Settings.RadioModel" class="form-label">Radio Model</label>
@@ -1991,18 +2055,28 @@
                                 <button type="button" class="btn btn-outline-secondary" id="serialPortRefresh" title="Refresh the list of ports">
                                     <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh
                                 </button>
-                                <button type="button" class="btn btn-outline-primary" id="findRadioBtn">
+                                @* Off Windows it stays in the page, hidden, because the script below needs it. It opens every port, so it does nothing there. *@
+                                <button type="button" class="btn btn-outline-primary" id="findRadioBtn" hidden="@(!OperatingSystem.IsWindows())">
                                     <i class="bi bi-search" aria-hidden="true"></i> Find my radio
                                 </button>
                             </div>
                             <input asp-for="Settings.SerialPort" class="form-control mt-2" style="max-width: 12rem;" placeholder="COM3" autocomplete="off" hidden />
                             <div id="findRadioResult" class="mt-2 mb-0" role="status" aria-live="polite" style="display:none;"></div>
                             <div class="form-text" id="serialPortHelp">
-                                The list shows every COM port this PC has right now. Not sure which is the radio?
-                                Switch the radio on, check the USB cable at both ends, and press <strong>Find my radio</strong>:
-                                it tries each port at each speed until an Icom answers, and fills in the model, port and baud rate for you.
-                                <br />If the radio&rsquo;s port is missing from the list, Windows has not created one: on the
-                                <strong>original IC-7300</strong> that means Icom&rsquo;s USB driver is not installed; on either radio, try another USB socket or cable.
+                                @if (OperatingSystem.IsWindows())
+                                {
+                                    <text>
+                                    The list shows every COM port this PC has right now. Not sure which is the radio?
+                                    Switch the radio on, check the USB cable at both ends, and press <strong>Find my radio</strong>:
+                                    it tries each port at each speed until an Icom answers, and fills in the model, port and baud rate for you.
+                                    <br />If the radio&rsquo;s port is missing from the list, Windows has not created one: on the
+                                    <strong>original IC-7300</strong> that means Icom&rsquo;s USB driver is not installed; on either radio, try another USB socket or cable.
+                                    </text>
+                                }
+                                else
+                                {
+                                    <text>The list shows every serial port this computer has right now. Choose the radio&rsquo;s by hand: on this system IWC doesn&rsquo;t try ports for you.</text>
+                                }
                             </div>
                             <span asp-validation-for="Settings.SerialPort" class="text-danger"></span>
                         </div>

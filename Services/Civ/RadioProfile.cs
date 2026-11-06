@@ -48,6 +48,18 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>The name and model number Hamlib knows this radio by, for rigctld clients.</summary>
         public (string Name, int Id) Hamlib => Model == "IC-7100" ? ("IC-7100", 3070) : ("IC-7300", 3073);
 
+        /// <summary>
+        /// The 1A 05 items that let the USB port's DTR and RTS lines transmit or key
+        /// the radio, each OFF when it reads 00. From each radio's own manual. The
+        /// IC-7100's manual lists no such item, so there is nothing to read on it.
+        /// </summary>
+        public IReadOnlyList<(int Item, string Name)> UsbLineItems => Model switch
+        {
+            "IC-7300MK2" => new[] { (96, "USB SEND"), (97, "USB Keying (CW)"), (98, "USB Keying (RTTY)") },
+            "IC-7300" => new[] { (78, "USB SEND"), (79, "USB Keying (CW)"), (80, "USB Keying (RTTY)") },
+            _ => Array.Empty<(int, string)>(),
+        };
+
         /// <summary>The attenuator's size. The CI-V value is the dB figure in BCD.</summary>
         public int AttenuatorDb => (AttenuatorOn >> 4) * 10 + (AttenuatorOn & 0x0F);
 

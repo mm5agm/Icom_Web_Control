@@ -39,6 +39,9 @@ internal static class TestHost
             state, bus, settings, hub,
             new RadioFinder(NullLogger<RadioFinder>.Instance),
             NullLogger<CivRadioController>.Instance);
+        // Otherwise every test that connects would need the operator's confirmation
+        // on the Linux and macOS runs. UsbLineCheckTests turns it on.
+        controller.CheckUsbLines = false;
         return (controller, state, settings, hub);
     }
 

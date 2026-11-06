@@ -392,6 +392,14 @@ namespace Icom_Web_Control.Services
         public bool IsConnected => _bus.IsOpen;
         public string? ModelId { get; private set; }
 
+        /// <summary>
+        /// Off Windows, opening a serial port may raise DTR and RTS, and a radio set
+        /// to use them transmits. So no port opens until the operator has confirmed
+        /// the radio's items are OFF, and each connect checks. Windows opens with both
+        /// lines low. A property so tests can run this on any system.
+        /// </summary>
+        internal bool CheckUsbLines { get; set; } = !OperatingSystem.IsWindows();
+
         /// <summary>The byte for attenuator on. "20" stays the app's own word for on, whatever the size.</summary>
         private byte AttenuatorOnCode => RadioProfile.ForModel(ModelId)?.AttenuatorOn ?? CivProtocol.AttOn20dB;
 
@@ -430,9 +438,21 @@ namespace Icom_Web_Control.Services
                         : "none";
                     _state.ConnectionStatusText =
                         $"No serial port has been chosen yet. Ports available now: {list}. " +
-                        "Open Settings → Radio & CAT and press Find my radio, or choose the port from the list.";
+                        (OperatingSystem.IsWindows()
+                            ? "Open Settings → Radio & CAT and press Find my radio, or choose the port from the list."
+                            : "Open Settings → Radio & CAT and choose the port from the list.");
                     return false;
                 }
+            }
+
+            if (CheckUsbLines && settings.UsbLinesOffConfirmedFor != settings.UsbLinesKey())
+            {
+                // Also lets go of a port the operator has just moved away from.
+                await _bus.CloseAsync();
+                _state.ConnectionStatusText =
+                    $"IWC hasn't opened {port}. Opening it could make the radio transmit unless its USB lines are switched off. " +
+                    "Open Settings → Radio & CAT and confirm.";
+                return false;
             }
 
             _logger.LogInformation("[CivRadioController] Connecting to {Port} @ {Baud} 8N1…", port, baud);
@@ -474,12 +494,31 @@ namespace Icom_Web_Control.Services
             bool firstOpen = !_startPowerOnTried;
             _startPowerOnTried = true;
             if (await ReadOperatingFrequencyAsync(cancellationToken) <= 0
-                && !(firstOpen && settings.PowerOnAtStart && await PowerOnAtStartAsync(cancellationToken)))
+                // Not off Windows: the radio would come up with the lines already raised,
+                // and a container restarting on its own could be doing it with nobody there.
+                && !(firstOpen && settings.PowerOnAtStart && !CheckUsbLines && await PowerOnAtStartAsync(cancellationToken)))
             {
                 await _bus.CloseAsync();
                 _state.ConnectionStatusText =
                     $"Serial port {port} opened, but the radio isn't responding — is it powered on?";
                 return false;
+            }
+
+            if (CheckUsbLines)
+            {
+                var problem = await FindUsbLineProblemAsync(cancellationToken);
+                if (problem != null)
+                {
+                    // Closing drops the lines, so this comes before anything else. The
+                    // confirmation goes too, or the retry would raise them every few seconds.
+                    await _bus.CloseAsync();
+                    settings.UsbLinesOffConfirmedFor = "";
+                    await _settings.SaveSettingsAsync(settings);
+                    _logger.LogWarning("[CivRadioController] Closed {Port}: {Problem}", port, problem);
+                    _state.ConnectionStatusText =
+                        $"IWC closed {port}: {problem} Fix that, then confirm again in Settings → Radio & CAT.";
+                    return false;
+                }
             }
 
             // Link is genuinely up — clear any earlier problem banner.
@@ -502,6 +541,41 @@ namespace Icom_Web_Control.Services
             AnnounceScopeStatus();
 
             return true;
+        }
+
+        /// <summary>
+        /// Why this radio must not stay connected off Windows, or null if it may. Only
+        /// a clear answer passes: a reply that doesn't come counts against. These only
+        /// read; IWC never changes the items itself.
+        /// </summary>
+        private async Task<string?> FindUsbLineProblemAsync(CancellationToken ct)
+        {
+            // First, because if the lines have keyed the radio this ends it.
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdTransmit, CivProtocol.SubTxStatus);
+            bool? transmitting = null;
+            for (int i = 0; i < 2 && transmitting == null; i++)
+            {
+                var reply = await TransactAsync(frame, CivProtocol.CmdTransmit, cancellationToken: ct);
+                if (reply != null && reply.Cmd == CivProtocol.CmdTransmit
+                    && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubTxStatus)
+                    transmitting = reply.Data[1] != 0;
+            }
+            if (transmitting == null) return "the radio didn't say whether it was transmitting.";
+            if (transmitting == true) return "the radio was transmitting when IWC connected.";
+
+            // Asked again because a model left from an earlier connect could be out of date.
+            if (!await IdentifyAsync(ct)) return "the radio didn't say which model it is.";
+            var profile = RadioProfile.ForModel(ModelId);
+            if (profile == null) return $"IWC doesn't know which items to check on this radio ({ModelId}).";
+
+            foreach (var (item, name) in profile.UsbLineItems)
+            {
+                var value = await ReadMenuItemAsync(item, ct) ?? await ReadMenuItemAsync(item, ct);
+                if (value == null) return $"IWC couldn't read {name} from the radio.";
+                if (value.Length != 1 || value[0] != 0) return $"{name} isn't OFF on the radio.";
+            }
+            return null;
         }
 
         // -- Spectrum scope (Phase 3 block 6) ----------------------------------
@@ -2817,6 +2891,12 @@ namespace Icom_Web_Control.Services
         private async Task PowerOnAsync(CancellationToken ct)
         {
             var settings = await _settings.GetSettingsAsync();
+
+            if (!_bus.IsOpen && CheckUsbLines && settings.UsbLinesOffConfirmedFor != settings.UsbLinesKey())
+            {
+                _logger.LogWarning("[CivRadioController] Power ON: the port stays shut until the USB lines are confirmed off in Settings");
+                return;
+            }
 
             if (!_bus.IsOpen && !await _bus.OpenAsync(settings.SerialPort, settings.BaudRate))
             {
