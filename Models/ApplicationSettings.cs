@@ -52,6 +52,14 @@
 
         public string RadioModel { get; set; } = "IC-7300MK2"; // Icom single-receiver HF+6m(+4m EU)
 
+        // Off Windows only: the port and model the operator has confirmed the
+        // radio's USB SEND and USB Keying items are OFF for. Changing either, or a
+        // connect finding an item not OFF, means confirming again.
+        public string UsbLinesOffConfirmedFor { get; set; } = "";
+
+        /// <summary>What <see cref="UsbLinesOffConfirmedFor"/> holds once this port and model are confirmed.</summary>
+        public string UsbLinesKey() => $"{SerialPort}|{RadioModel}";
+
 
         // External Applications - Command Lines.
         // RULE: paths containing spaces MUST be wrapped in double quotes; any

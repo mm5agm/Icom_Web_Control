@@ -56,6 +56,17 @@ for asset in $(sort -u "$seen"); do
 done
 echo "Checked $(sort -u "$seen" | wc -l) scripts and stylesheets."
 
+# No port is saved here, so the page must ask for one and a confirmation must fail.
+curl -s "$base/Settings" -o "$work/settings.html"
+if ! grep -q 'id="usbLinesPanel"' "$work/settings.html"; then
+    echo "Settings doesn't show the USB lines check"
+    fail=1
+fi
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+    -d '{"port":"","model":"IC-7300MK2"}' "$base/api/cat/usb-lines-confirm")
+echo "$code usb-lines-confirm with no port"
+[ "$code" = 400 ] || fail=1
+
 if [ "$fail" != 0 ]; then
     echo "--- console ---"
     tail -n 40 "$log"

@@ -1318,6 +1318,30 @@ namespace Icom_Web_Control.Controllers
             }
         }
 
+        /// <summary>The port and model the Settings page showed when the operator confirmed.</summary>
+        public sealed record UsbLinesConfirmation(string Port, string Model);
+
+        /// <summary>
+        /// Off Windows: the operator says the radio's USB SEND and USB Keying items are
+        /// OFF, which lets IWC open the port. The poll loop connects from there, and
+        /// that connect reads the items. Sends nothing to the radio itself.
+        /// </summary>
+        [HttpPost("usb-lines-confirm")]
+        public async Task<IActionResult> ConfirmUsbLines([FromBody] UsbLinesConfirmation confirmed)
+        {
+            var settings = await _settingsService.GetSettingsAsync();
+            if (string.IsNullOrWhiteSpace(settings.SerialPort))
+                return BadRequest(new { error = "Choose the radio's port and save first." });
+            // What they checked has to be what would be opened.
+            if (confirmed.Port != settings.SerialPort || confirmed.Model != settings.RadioModel)
+                return Conflict(new { error = "The saved port or model has changed. Reload the page and check again." });
+
+            settings.UsbLinesOffConfirmedFor = settings.UsbLinesKey();
+            await _settingsService.SaveSettingsAsync(settings);
+            _logger.LogInformation("Operator confirmed the USB lines are off for {Port} on {Model}", settings.SerialPort, settings.RadioModel);
+            return Ok(new { success = true });
+        }
+
         [HttpPost("reinitialize")]
         public async Task<IActionResult> Reinitialize()
         {
