@@ -156,6 +156,8 @@ docs/VoiceControl/*
 !docs/design/
 docs/design/*
 !docs/design/*.md
+# ...and the Raspberry Pi, Docker and Mac instructions.
+!docs/pi-docker-testing.md
 
 # Runtime logs
 *.log
@@ -194,3 +196,5 @@ pictures/Screenshot *.png
 # Generated at build time from the Radio_Web_Control_Core subtree (core/js is
 # the single source of truth). See core/js/README.md.
 /wwwroot/js/calibration/calibration-engine.js
+# The docker-compose.yml data folder.
+/data/

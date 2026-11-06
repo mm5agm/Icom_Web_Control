@@ -1,0 +1,43 @@
+# Icom Web Control, radio control only, on Linux (x64 PC or arm64 Raspberry Pi).
+# Step-by-step instructions: docs/pi-docker-testing.md
+#
+# READ THIS FIRST. Opening a USB serial port on Linux raises its DTR and RTS lines,
+# and nothing in software can stop that. If the radio's USB SEND or USB Keying menu
+# items use either line, the radio goes into transmit when the port opens.
+# Set them all to OFF on the radio before starting this.
+#
+# 1. Set IWC_SERIAL_DEVICE to the radio's port (ls /dev/ttyUSB* /dev/ttyACM*).
+# 2. docker compose pull && docker compose up -d --no-build
+# 3. Open http://<host>:8081, choose the port and radio in Settings, and confirm.
+#
+# Pre-releases only for now: the `testing` tag is the newest one. There is no
+# `latest` tag until this leaves testing.
+#
+# The host port is 8081 so this can run beside Yaesu Web Control, which uses 8080.
+#
+# Do not set `user:` here. The entrypoint has to start as root to fix ownership of
+# the data folder, then drops to `app` and keeps the group_add GID for the port.
+
+services:
+  iwc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/mm5agm/icom_web_control:testing
+    container_name: iwc
+    restart: unless-stopped
+    ports:
+      - "${IWC_HTTP_PORT:-8081}:8080"
+      - "${IWC_HTTPS_PORT:-8444}:8444"
+    environment:
+      TZ: ${TZ:-UTC}
+      DOTNET_RUNNING_IN_CONTAINER: "true"
+    volumes:
+      # Settings, radio state and logs go in this host folder.
+      - ${IWC_DATA_DIR:-./data/iwc}:/data
+    devices:
+      # The radio's USB serial port, at the same path inside the container.
+      - ${IWC_SERIAL_DEVICE:-/dev/ttyUSB0}:${IWC_SERIAL_DEVICE:-/dev/ttyUSB0}
+    group_add:
+      # Host "dialout" is usually GID 20 on Debian and Raspberry Pi OS.
+      - "${IWC_DIALOUT_GID:-20}"

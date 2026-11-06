@@ -276,7 +276,17 @@ Log.Information("Icom Web Control starting (v{Version})", Icom_Web_Control.AppVe
         targetWorker, minWorker, targetIo, minIo, Environment.ProcessorCount);
 }
 
-var builder = WebApplication.CreateBuilder(args);
+// The content root defaults to the current directory. A Mac app opened from Finder
+// starts in /, where there is no wwwroot, so use the program's own folder unless the
+// current directory has one (dotnet run does). From YWC.
+var contentRoot = Directory.Exists(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"))
+    ? Directory.GetCurrentDirectory()
+    : AppContext.BaseDirectory;
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = contentRoot,
+});
 
 // Cap the host's overall shutdown timeout. Default is 30 s (which we hit on
 // every tray Exit before adding this cap); 2 s is plenty for our user
