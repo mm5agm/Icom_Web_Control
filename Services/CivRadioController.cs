@@ -3163,7 +3163,9 @@ namespace Icom_Web_Control.Services
         /// Icoms — hence "read the ID, don't hard-code." The query is addressed to
         /// the CI-V broadcast address (0x00) so any Icom answers regardless of its
         /// address — otherwise a classic IC-7300 (94) would ignore a frame sent to
-        /// the B6 default and never connect. Returns false when the radio doesn't
+        /// the B6 default and never connect. Some radios ignore the broadcast
+        /// request all the same (IWC #128), so <see cref="IdentifyByAddressAsync"/>
+        /// then asks at each known address. Returns false when the radio doesn't
         /// answer at all: the port opened but nothing is on the bus (radio powered
         /// off or asleep), which is not a real connection.
         /// </summary>
@@ -3172,8 +3174,8 @@ namespace Icom_Web_Control.Services
             var frame = CivProtocol.BuildFrame(CivProtocol.BroadcastAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdReadId, CivProtocol.SubReadId);
             var reply = await TransactAsync(frame, CivProtocol.CmdReadId, cancellationToken: cancellationToken);
-            if (reply == null)
-                return false;
+            if (reply == null || reply.Cmd != CivProtocol.CmdReadId)
+                return await IdentifyByAddressAsync(cancellationToken);
 
             // Never take our own address off the wire. CivBusService drops echo
             // frames before they get here, so this should be unreachable — but
@@ -3203,6 +3205,57 @@ namespace Icom_Web_Control.Services
         }
 
         private static string MapModel(byte idByte) => RadioProfile.ModelNameForId(idByte);
+
+        // Per directed question when the broadcast one went unanswered. A radio at
+        // 19200 replies in a few ms; this keeps a powered-off radio's reconnect
+        // attempt to about two seconds of asking.
+        private const int DirectedIdTimeoutMs = 250;
+
+        /// <summary>
+        /// The fallback when nothing answered 19 00 on the broadcast address, as on
+        /// Paul VK2AHB's original IC-7300 (IWC #128): only our echo came back, yet
+        /// the radio answered 03 sent to 94. Ask 19 00 at each known model's address,
+        /// the one chosen in Settings first; if none answers that, a frequency read
+        /// (03) at each, taking the model from the address that answered. Both are
+        /// reads: nothing on the radio changes.
+        /// </summary>
+        private async Task<bool> IdentifyByAddressAsync(CancellationToken ct)
+        {
+            var settings = await _settings.GetSettingsAsync();
+            var addresses = RadioProfile.AddressesToTry(settings.RadioModel);
+
+            foreach (var address in addresses)
+            {
+                var frame = CivProtocol.BuildFrame(address, CivProtocol.ControllerAddress,
+                    CivProtocol.CmdReadId, CivProtocol.SubReadId);
+                var reply = await TransactAsync(frame, CivProtocol.CmdReadId, DirectedIdTimeoutMs, ct);
+                if (reply == null || reply.Cmd != CivProtocol.CmdReadId || reply.From != address)
+                    continue;
+                _radioAddress = address;
+                ModelId = MapModel(reply.Data.Length >= 2 ? reply.Data[^1] : address);
+                _state.RadioModel = ModelId;
+                _logger.LogInformation("[CivRadioController] Radio identified: {Model} (CI-V address {Addr:X2}); " +
+                                       "it answered the ID request at its own address, not on broadcast",
+                    ModelId, _radioAddress);
+                return true;
+            }
+
+            foreach (var address in addresses)
+            {
+                var frame = CivProtocol.BuildFrame(address, CivProtocol.ControllerAddress, CivProtocol.CmdReadFrequency);
+                var reply = await TransactAsync(frame, CivProtocol.CmdReadFrequency, DirectedIdTimeoutMs, ct);
+                if (reply == null || reply.Cmd != CivProtocol.CmdReadFrequency || reply.From != address)
+                    continue;
+                _radioAddress = address;
+                ModelId = MapModel(address);
+                _state.RadioModel = ModelId;
+                _logger.LogInformation("[CivRadioController] Radio identified: {Model} (CI-V address {Addr:X2}); " +
+                                       "it answered a frequency read but no ID request, so the model is taken from the address",
+                    ModelId, _radioAddress);
+                return true;
+            }
+            return false;
+        }
 
         public async Task<RadioDiscovery> FindRadioAsync(CancellationToken cancellationToken = default)
         {

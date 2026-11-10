@@ -17,8 +17,10 @@ namespace Icom_Web_Control.Services.Civ
     /// Each port present is opened in turn, 8N1 with DTR and RTS de-asserted
     /// (the same rules as <see cref="CivBusService"/> — on Icom's USB port those
     /// lines can be PTT), and sent the transceiver-ID request on the CI-V
-    /// broadcast address, so a classic IC-7300 at 94 answers as readily as a
-    /// MkII at B6. The first reply wins. Bauds are tried in the order they
+    /// broadcast address and at each known model's address, plus a frequency
+    /// read at each (see <see cref="ProbeBurst"/>), so a classic IC-7300 at 94
+    /// answers as readily as a MkII at B6, even one that ignores the broadcast.
+    /// An ID reply wins; a frequency reply alone counts if no ID reply comes. Bauds are tried in the order they
     /// are likely to be right: 19200 (IWC's default, and what an original
     /// IC-7300 on "Auto" follows), then 115200 (what the original needs for
     /// its scope), then the rest of the radio's menu.
@@ -123,16 +125,19 @@ namespace Icom_Web_Control.Services.Civ
         {
             var buffer = new CivFrameBuffer();
             var tcs = new TaskCompletionSource<CivFrame>(TaskCreationOptions.RunContinuationsAsynchronously);
+            CivFrame? frequencyReply = null;
             buffer.FrameReceived += (_, frame) =>
             {
                 // The same two echo rules as CivBusService.OnFrameReceived: our
                 // own bytes come back FROM the controller address, and the
                 // broadcast query's echo carries To == 00, so a reply is
-                // anything not from us whose command byte is the ID we asked for.
+                // anything not from us whose command byte is one we asked for.
                 if (frame.From == CivProtocol.ControllerAddress) return;
                 if (frame.To != CivProtocol.ControllerAddress && frame.To != CivProtocol.BroadcastAddress) return;
-                if (frame.Cmd != CivProtocol.CmdReadId) return;
-                tcs.TrySetResult(frame);
+                if (frame.Cmd == CivProtocol.CmdReadId)
+                    tcs.TrySetResult(frame);
+                else if (frame.Cmd == CivProtocol.CmdReadFrequency)
+                    Interlocked.CompareExchange(ref frequencyReply, frame, null);
             };
 
             SerialPort? sp = null;
@@ -169,17 +174,24 @@ namespace Icom_Web_Control.Services.Civ
                 sp.Open();
                 sp.DiscardInBuffer();
 
-                var frame = CivProtocol.BuildFrame(CivProtocol.BroadcastAddress, CivProtocol.ControllerAddress,
-                    CivProtocol.CmdReadId, CivProtocol.SubReadId);
-                sp.Write(frame, 0, frame.Length);
+                var burst = ProbeBurst();
+                sp.Write(burst, 0, burst.Length);
 
-                var reply = await Task.WhenAny(tcs.Task, Task.Delay(ReplyTimeoutMs, ct));
+                // The time the burst takes on the wire, so 4800 baud gets the same
+                // listening time as 19200.
+                int sendMs = burst.Length * 10 * 1000 / baud;
+                var reply = await Task.WhenAny(tcs.Task, Task.Delay(ReplyTimeoutMs + sendMs, ct));
                 if (reply == tcs.Task)
                 {
                     var f = tcs.Task.Result;
                     byte id = f.Data.Length >= 2 ? f.Data[^1] : f.From;
                     return (ProbeState.Answered, f.From, id);
                 }
+                // No ID reply to either question, but a frequency read was answered:
+                // a radio that won't identify itself. Its address is its model.
+                var freq = Volatile.Read(ref frequencyReply);
+                if (freq != null)
+                    return (ProbeState.Answered, freq.From, freq.From);
                 return (ProbeState.Silent, 0, 0);
             }
             catch (UnauthorizedAccessException)
@@ -200,6 +212,28 @@ namespace Icom_Web_Control.Services.Civ
                 try { sp?.Close(); } catch { }
                 sp?.Dispose();
             }
+        }
+
+        /// <summary>
+        /// What each port is sent, in one write: the ID request on the broadcast
+        /// address, then the ID request and a frequency read at every known model's
+        /// address. An original IC-7300 has been seen ignoring the broadcast one but
+        /// answering at 94 (IWC #128). A radio ignores frames for other addresses,
+        /// and all of these only read. Sent together so a silent port still costs a
+        /// single wait.
+        /// </summary>
+        internal static byte[] ProbeBurst()
+        {
+            var bytes = new List<byte>(CivProtocol.BuildFrame(CivProtocol.BroadcastAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdReadId, CivProtocol.SubReadId));
+            var addresses = RadioProfile.AddressesToTry(null);
+            foreach (var address in addresses)
+                bytes.AddRange(CivProtocol.BuildFrame(address, CivProtocol.ControllerAddress,
+                    CivProtocol.CmdReadId, CivProtocol.SubReadId));
+            foreach (var address in addresses)
+                bytes.AddRange(CivProtocol.BuildFrame(address, CivProtocol.ControllerAddress,
+                    CivProtocol.CmdReadFrequency));
+            return bytes.ToArray();
         }
 
         /// <summary>Same mapping as CivRadioController.MapModel, on the settings-page value.</summary>
