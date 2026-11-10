@@ -198,6 +198,23 @@ namespace Icom_Web_Control.Services.Civ
         /// </summary>
         public static RadioProfile OrDefault(string? model) => ForModel(model) ?? Ic7300Mk2;
 
+        /// <summary>
+        /// The CI-V addresses to ask directly when a radio ignores the broadcast ID
+        /// request: <paramref name="preferredModel"/>'s first (the one chosen in
+        /// Settings), then every other model IWC knows. An original IC-7300 has
+        /// been seen ignoring 19 00 on 00 while answering at 94 (IWC #128).
+        /// </summary>
+        public static IReadOnlyList<byte> AddressesToTry(string? preferredModel)
+        {
+            var list = new List<byte>(Known.Length);
+            var preferred = ForModel(preferredModel);
+            if (preferred != null) list.Add(preferred.CivAddress);
+            foreach (var profile in Known)
+                if (!list.Contains(profile.CivAddress))
+                    list.Add(profile.CivAddress);
+            return list;
+        }
+
         /// <summary>The model name for the ID byte in a radio's 19 00 reply.</summary>
         public static string ModelNameForId(byte idByte)
         {
