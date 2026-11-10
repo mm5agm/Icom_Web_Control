@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre5 (2026-11-10)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
+
+- **IWC finds radios that ignore the broadcast ID question (#128).** An original IC-7300 was seen answering nothing on the CI-V broadcast address while answering at its own address, 94, so IWC said "No radio answered" although other programs worked on the same COM port. If nothing answers on broadcast, connecting and Find my radio now ask at each model's default address (`B6`, `94`, `88`), and if there's still no identity reply, read the frequency there and take the model from the address that answered. All of these only read from the radio. Not yet tried on a radio that needs it: if you had "No radio answered" before, please try this build and say on #128 how it went.
+- **Settings search finds Dry run,** the box in the Test this pack window that stops voice commands reaching the radio.
+- Everything listed for v1.7.0-pre1 to pre4 below still needs testing.
+
 ### v1.7.0-pre4 (2026-11-06)
 
 > **A pre-release, and the first with Linux, Raspberry Pi and Mac builds.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build.
