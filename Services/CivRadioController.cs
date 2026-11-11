@@ -71,6 +71,7 @@ namespace Icom_Web_Control.Services
         // The radio's CI-V address. Starts at the IC-7300 MkII default and is
         // replaced with whatever actually answers (reply From byte) on connect.
         private byte _radioAddress = CivProtocol.DefaultRadioAddress;
+        private int _noAnswerCount; // connects in a row with no answer; see ConnectAsync
 
         // Spectrum scope (block 6): reassembles the unsolicited 27 00 waveform
         // stream and counts broadcasts so we can re-assert "streaming" as a
@@ -498,6 +499,13 @@ namespace Icom_Web_Control.Services
                 // and a container restarting on its own could be doing it with nobody there.
                 && !(firstOpen && settings.PowerOnAtStart && !CheckUsbLines && await PowerOnAtStartAsync(cancellationToken)))
             {
+                // Say what came back, on the first miss and about once a minute after,
+                // so a radio left off doesn't fill the log. Before this the log showed
+                // only "Connecting…" lines and nothing about why (IWC #128).
+                if (_noAnswerCount++ % 15 == 0)
+                    _logger.LogWarning("[CivRadioController] No answer on {Port} at {Baud} to a frequency read at CI-V address " +
+                                       "{Addr:X2} (model {Model}). Bytes received: {Bytes}",
+                        port, baud, _radioAddress, ModelId, _bus.RecentReceivedHex());
                 await _bus.CloseAsync();
                 _state.ConnectionStatusText =
                     $"Serial port {port} opened, but the radio isn't responding — is it powered on?";
@@ -523,6 +531,7 @@ namespace Icom_Web_Control.Services
 
             // Link is genuinely up — clear any earlier problem banner.
             _state.ConnectionStatusText = "";
+            _noAnswerCount = 0;
 
             // Seed the RX controls so every slider/dropdown shows the radio's
             // real position on first paint rather than a default. All are
@@ -3223,6 +3232,10 @@ namespace Icom_Web_Control.Services
         {
             var settings = await _settings.GetSettingsAsync();
             var addresses = RadioProfile.AddressesToTry(settings.RadioModel);
+            bool log = _noAnswerCount % 15 == 0; // the same rate as the no-answer warning
+            if (log)
+                _logger.LogInformation("[CivRadioController] No answer to the ID request on the broadcast address; " +
+                                       "asking at {Addresses}", string.Join(", ", addresses.Select(a => a.ToString("X2"))));
 
             foreach (var address in addresses)
             {
@@ -3254,6 +3267,10 @@ namespace Icom_Web_Control.Services
                     ModelId, _radioAddress);
                 return true;
             }
+            if (log)
+                _logger.LogWarning("[CivRadioController] Nothing answered the ID request or a frequency read at {Addresses}. " +
+                                   "Bytes received: {Bytes}", string.Join(", ", addresses.Select(a => a.ToString("X2"))),
+                    _bus.RecentReceivedHex());
             return false;
         }
 
