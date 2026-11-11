@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre6 (2026-11-11)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
+
+- **The log says why a radio isn't found (#128).** When connecting gets no answer, the log now gives the port, the speed, the CI-V address that was asked and the bytes that came back, on the first miss and then about once a minute. Find my radio logs one line for each port and speed it tries. Before this the log showed only "Connecting..." lines.
+- **Find my radio asks more slowly on a port that echoes (#128).** If bytes come back from a port but nothing answers, Find my radio asks again one question at a time. With CI-V USB Echo Back on, an IC-7300MK2 was seen throwing away anything that arrived while it was answering. A port that sends nothing back is skipped as before, so Find my radio takes no longer.
+- Everything listed for v1.7.0-pre1 to pre5 below still needs testing.
+
 ### v1.7.0-pre5 (2026-11-10)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
