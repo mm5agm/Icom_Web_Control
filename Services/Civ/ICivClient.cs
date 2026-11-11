@@ -19,6 +19,9 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>The CI-V port's name while it is open, else null.</summary>
         string? PortName => null;
 
+        /// <summary>The last bytes that came in off the wire, as hex, for the log when a radio doesn't answer (IWC #128).</summary>
+        string RecentReceivedHex() => "";
+
         /// <summary>
         /// Raises or drops DTR on the open CI-V port: the CW Paddle's key line
         /// on an original IC-7300, whose one USB port carries both CI-V and

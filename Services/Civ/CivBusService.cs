@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO.Ports;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,11 +35,21 @@ namespace Icom_Web_Control.Services.Civ
 
         private SerialPort? _port;
         private Pending? _pending;
+        // The last bytes received, so a connect that gets no answer can log what did come
+        // back: nothing, only our echo, or something else (IWC #128).
+        private const int RecentCapacity = 96;
+        private readonly Queue<byte> _recent = new();
 
         public CivBusService(ILogger<CivBusService> logger)
         {
             _logger = logger;
             _buffer.FrameReceived += OnFrameReceived;
+        }
+
+        public string RecentReceivedHex()
+        {
+            lock (_recent)
+                return _recent.Count == 0 ? "nothing" : BitConverter.ToString(_recent.ToArray()).Replace('-', ' ');
         }
 
         public bool IsOpen
@@ -84,6 +95,7 @@ namespace Icom_Web_Control.Services.Civ
                         CloseInternal();
                     }
 
+                    lock (_recent) _recent.Clear();
                     var available = SerialPort.GetPortNames();
                     if (Array.IndexOf(available, portName) < 0)
                     {
@@ -167,6 +179,14 @@ namespace Icom_Web_Control.Services.Civ
                     int read = _port.Read(chunk, 0, n);
                     if (read < n)
                         chunk = chunk[..read];
+                }
+                lock (_recent)
+                {
+                    foreach (var b in chunk)
+                    {
+                        _recent.Enqueue(b);
+                        if (_recent.Count > RecentCapacity) _recent.Dequeue();
+                    }
                 }
                 _buffer.Append(chunk);
             }

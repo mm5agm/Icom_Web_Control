@@ -40,6 +40,9 @@ namespace Icom_Web_Control.Services.Civ
         // and the full six-baud sweep of them stays inside ten.
         private const int ReplyTimeoutMs = 350;
 
+        // Per question in the slow pass. A radio at 4800 baud replies inside 60 ms.
+        private const int PacedReplyTimeoutMs = 150;
+
         private readonly ILogger<RadioFinder> _logger;
 
         public RadioFinder(ILogger<RadioFinder> logger)
@@ -126,6 +129,7 @@ namespace Icom_Web_Control.Services.Civ
             var buffer = new CivFrameBuffer();
             var tcs = new TaskCompletionSource<CivFrame>(TaskCreationOptions.RunContinuationsAsynchronously);
             CivFrame? frequencyReply = null;
+            var received = new List<byte>();
             buffer.FrameReceived += (_, frame) =>
             {
                 // The same two echo rules as CivBusService.OnFrameReceived: our
@@ -164,6 +168,7 @@ namespace Icom_Web_Control.Services.Civ
                         if (n <= 0) return;
                         var chunk = new byte[n];
                         int read = sp.Read(chunk, 0, n);
+                        lock (received) received.AddRange(chunk.AsSpan(0, read).ToArray());
                         buffer.Append(chunk.AsSpan(0, read));
                     }
                     catch
@@ -180,19 +185,55 @@ namespace Icom_Web_Control.Services.Civ
                 // The time the burst takes on the wire, so 4800 baud gets the same
                 // listening time as 19200.
                 int sendMs = burst.Length * 10 * 1000 / baud;
-                var reply = await Task.WhenAny(tcs.Task, Task.Delay(ReplyTimeoutMs + sendMs, ct));
-                if (reply == tcs.Task)
+                await Task.WhenAny(tcs.Task, Task.Delay(ReplyTimeoutMs + sendMs, ct));
+                var answer = Answer();
+                if (answer != null) return Log(answer.Value, "answered");
+
+                // Bytes came back but nothing answered: something is on this port,
+                // perhaps a radio echoing our frames (CI-V USB Echo Back on), as Paul
+                // VK2AHB's IC-7300 does (IWC #128). With echo on, an IC-7300MK2 drops
+                // whatever arrives while it is sending a reply, so ask again, one
+                // question at a time, waiting for each. A silent port skips this.
+                int before;
+                lock (received) before = received.Count;
+                if (before == 0) return Log((ProbeState.Silent, 0, 0), "nothing came back");
+                foreach (var frame in ProbeFrames())
                 {
-                    var f = tcs.Task.Result;
-                    byte id = f.Data.Length >= 2 ? f.Data[^1] : f.From;
-                    return (ProbeState.Answered, f.From, id);
+                    sp.Write(frame, 0, frame.Length);
+                    var deadline = Environment.TickCount64 + PacedReplyTimeoutMs + frame.Length * 10 * 1000 / baud;
+                    while (Environment.TickCount64 < deadline && !tcs.Task.IsCompleted && Volatile.Read(ref frequencyReply) == null)
+                        await Task.Delay(10, ct);
+                    answer = Answer();
+                    if (answer != null) return Log(answer.Value, "answered one question at a time");
                 }
-                // No ID reply to either question, but a frequency read was answered:
-                // a radio that won't identify itself. Its address is its model.
-                var freq = Volatile.Read(ref frequencyReply);
-                if (freq != null)
-                    return (ProbeState.Answered, freq.From, freq.From);
-                return (ProbeState.Silent, 0, 0);
+                return Log((ProbeState.Silent, 0, 0), "no answer, also one question at a time");
+
+                (ProbeState, byte, byte)? Answer()
+                {
+                    if (tcs.Task.IsCompleted)
+                    {
+                        var f = tcs.Task.Result;
+                        byte id = f.Data.Length >= 2 ? f.Data[^1] : f.From;
+                        return (ProbeState.Answered, f.From, id);
+                    }
+                    // No ID reply, but a frequency read was answered: a radio that
+                    // won't identify itself. Its address is its model.
+                    var freq = Volatile.Read(ref frequencyReply);
+                    return freq != null ? (ProbeState.Answered, freq.From, freq.From) : null;
+                }
+
+                // One line per port and baud, with what came back, so a log from a
+                // radio that isn't found shows whether it echoed, answered, or said nothing.
+                (ProbeState, byte, byte) Log((ProbeState, byte, byte) result, string outcome)
+                {
+                    byte[] bytes;
+                    lock (received) bytes = received.ToArray();
+                    string hex = bytes.Length == 0 ? "" : ": " + BitConverter.ToString(bytes, 0, Math.Min(bytes.Length, 64)).Replace('-', ' ')
+                                                          + (bytes.Length > 64 ? " …" : "");
+                    _logger.LogInformation("[RadioFinder] {Port} at {Baud}: {Outcome}; {Count} bytes back{Hex}",
+                        port, baud, outcome, bytes.Length, hex);
+                    return result;
+                }
             }
             catch (UnauthorizedAccessException)
             {
@@ -222,18 +263,20 @@ namespace Icom_Web_Control.Services.Civ
         /// and all of these only read. Sent together so a silent port still costs a
         /// single wait.
         /// </summary>
-        internal static byte[] ProbeBurst()
+        internal static byte[] ProbeBurst() => ProbeFrames().SelectMany(f => f).ToArray();
+
+        /// <summary>The questions in <see cref="ProbeBurst"/>, one frame each, in order.</summary>
+        internal static IEnumerable<byte[]> ProbeFrames()
         {
-            var bytes = new List<byte>(CivProtocol.BuildFrame(CivProtocol.BroadcastAddress, CivProtocol.ControllerAddress,
-                CivProtocol.CmdReadId, CivProtocol.SubReadId));
+            yield return CivProtocol.BuildFrame(CivProtocol.BroadcastAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdReadId, CivProtocol.SubReadId);
             var addresses = RadioProfile.AddressesToTry(null);
             foreach (var address in addresses)
-                bytes.AddRange(CivProtocol.BuildFrame(address, CivProtocol.ControllerAddress,
-                    CivProtocol.CmdReadId, CivProtocol.SubReadId));
+                yield return CivProtocol.BuildFrame(address, CivProtocol.ControllerAddress,
+                    CivProtocol.CmdReadId, CivProtocol.SubReadId);
             foreach (var address in addresses)
-                bytes.AddRange(CivProtocol.BuildFrame(address, CivProtocol.ControllerAddress,
-                    CivProtocol.CmdReadFrequency));
-            return bytes.ToArray();
+                yield return CivProtocol.BuildFrame(address, CivProtocol.ControllerAddress,
+                    CivProtocol.CmdReadFrequency);
         }
 
         /// <summary>Same mapping as CivRadioController.MapModel, on the settings-page value.</summary>

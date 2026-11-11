@@ -75,4 +75,16 @@ public class IdentifyFallbackTests
         }
         Assert.All(frames, f => Assert.Matches("^FE FE [0-9A-F]{2} E0 (19 00|03) FD$", f));
     }
+
+    [Fact]
+    public void TheSlowPassAsksTheSameQuestionsOneFrameAtATime()
+    {
+        // With CI-V USB Echo Back on, an IC-7300MK2 dropped every frame that arrived
+        // while it was sending a reply (tested 2026-11-11), so the slow pass writes
+        // these one by one. Each must be a whole frame, and together the burst.
+        var frames = RadioFinder.ProbeFrames().Select(CivRecording.Hex).ToList();
+        Assert.Equal(CivRecording.Hex(RadioFinder.ProbeBurst()), string.Join(" ", frames));
+        Assert.All(frames, f => Assert.Matches("^FE FE [0-9A-F]{2} E0 (19 00|03) FD$", f));
+        Assert.Equal(7, frames.Count);
+    }
 }

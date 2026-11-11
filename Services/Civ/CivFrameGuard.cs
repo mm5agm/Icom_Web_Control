@@ -32,6 +32,7 @@ namespace Icom_Web_Control.Services.Civ
 
         public bool IsOpen => _inner.IsOpen;
         public string? PortName => _inner.PortName;
+        public string RecentReceivedHex() => _inner.RecentReceivedHex();
         public void SetDtr(bool on) => _inner.SetDtr(on);
 
         public event EventHandler<CivFrame>? UnsolicitedFrame
