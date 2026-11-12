@@ -239,6 +239,13 @@
         // (≈4 brief dips/min). Clamped to 5–60 in the UI.
         public int PseudoDualPeekIntervalSeconds { get; set; } = 15;
 
+        // Refine: how much the radio's scope sweeps are averaged before any
+        // page draws them, as a step into ScopeRefine.Weights (0 = raw). Kept
+        // here rather than in the browser because the averaging happens before
+        // the sweeps reach any page. CivRadioController re-reads it on its slow
+        // poll. Default 3 (weight 0.5) measured best on the IC-7300 on 20m FT8.
+        public int ScopeRefineLevel { get; set; } = Services.Civ.ScopeRefine.DefaultLevel;
+
         // How the watch panel's (VFO B) span buttons behave. The radio has ONE
         // scope with ONE span (CI-V 27 15), and the watch panel is a crop of that
         // single sweep — so B can never be WIDER than A. Three modes:

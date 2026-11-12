@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Icom_Web_Control.Hubs;
 using Icom_Web_Control.Models;
 using Icom_Web_Control.Services.Civ;
+using RadioWebControl.Core.Services.Spectrum;
 
 namespace Icom_Web_Control.Services
 {
@@ -84,6 +85,18 @@ namespace Icom_Web_Control.Services
         // on record. The panel's Low/High/Gain sliders make the display itself
         // useless as evidence. See ScopeProbe.cs.
         private readonly ScopeProbe _scopeProbe = new();
+
+        // Refine: each sweep averaged with the last few before any page draws
+        // it, so the floor settles and weak signals stand out (ScopeRefine has
+        // the steps and the measurements). Both refiners are used only on the
+        // serial reader thread. The primary one sees the sweeps centred on the
+        // operating VFO, refined before the watch panel's crop is cut from
+        // them; a cross-band peek is another band, so it has its own. The step
+        // is read from settings on the slow poll, like the pseudo-dual flags.
+        // The scope probe and anything else that measures see the raw sweep.
+        private readonly SpectrumRefiner _refinePrimary = new(ScopeRefine.WeightFor(ScopeRefine.DefaultLevel));
+        private readonly SpectrumRefiner _refinePeek = new(ScopeRefine.WeightFor(ScopeRefine.DefaultLevel));
+        private volatile int _refineLevel = ScopeRefine.DefaultLevel;
 
         // TickCount64 of the last completed sweep, written on the serial-reader
         // thread and read by the poll loop to decide whether the scope is live.
@@ -857,6 +870,10 @@ namespace Icom_Web_Control.Services
             Volatile.Write(ref _reassertsSinceSweep, 0);
             AccumulateSweepRate(sweepTicks);
 
+            double refineWeight = ScopeRefine.WeightFor(_refineLevel);
+            _refinePrimary.Weight = refineWeight;
+            _refinePeek.Weight = refineWeight;
+
             // The radio's live scope mode (tracks front-panel changes), carried on
             // every SpectrumUpdate so the panel can label CENT / FIX etc.
             string mode = ScopeModeName(sweep.Mode);
@@ -874,6 +891,7 @@ namespace Icom_Web_Control.Services
 
             if (!_pseudoDual)
             {
+                sweep = Refine(_refinePrimary, sweep);
                 if (announce)
                     SendHub("SdrStatus", new { sdrId = "A", status = "streaming" });
                 SendHub("SpectrumUpdate", new
@@ -907,6 +925,7 @@ namespace Icom_Web_Control.Services
                     sweep.CentreHz, sweep.SpanHz, peekHz, onWatchBand ? "panel " + peek : "primary (not on the watch band)");
                 if (onWatchBand)
                 {
+                    sweep = Refine(_refinePeek, sweep);
                     if (announce)
                         SendHub("SdrStatus", new { sdrId = peek, status = "streaming" });
                     SendHub("SpectrumUpdate", new
@@ -933,6 +952,8 @@ namespace Icom_Web_Control.Services
             string watchId   = active == RadioVfo.A ? "B" : "A";
             long watchHz     = active == RadioVfo.A ? _state.FrequencyB : _state.FrequencyA;
 
+            // Refined before the crop, so the watch panel's slice is refined too.
+            sweep = Refine(_refinePrimary, sweep);
             if (announce)
                 SendHub("SdrStatus", new { sdrId = primaryId, status = "streaming" });
             SendHub("SpectrumUpdate", new
@@ -945,6 +966,28 @@ namespace Icom_Web_Control.Services
             });
 
             BroadcastWatchCrop(sweep, watchId, watchHz, announce, mode);
+        }
+
+        /// <summary>
+        /// The sweep as a page should draw it: averaged by <paramref name="refiner"/>.
+        /// A sweep the radio flags out of range is passed on
+        /// as it is and the average starts again after it.
+        /// </summary>
+        private static ScopeSweep Refine(SpectrumRefiner refiner, ScopeSweep sweep)
+        {
+            if (sweep.OutOfRange)
+            {
+                refiner.Reset();
+                return sweep;
+            }
+            return new ScopeSweep
+            {
+                BinsDb = refiner.Add(sweep.BinsDb, sweep.CentreHz, sweep.SpanHz),
+                CentreHz = sweep.CentreHz,
+                SpanHz = sweep.SpanHz,
+                OutOfRange = sweep.OutOfRange,
+                Mode = sweep.Mode,
+            };
         }
 
         /// <summary>
@@ -3504,6 +3547,7 @@ namespace Icom_Web_Control.Services
                         _crossBandPeek = _pseudoDual && s.PseudoDualCrossBandEnabled;
                         _peekIntervalMs = Math.Clamp(s.PseudoDualPeekIntervalSeconds, 5, 60) * 1000;
                         _watchZoomIn = string.Equals(s.PseudoDualWatchSpanMode, "ZoomIn", StringComparison.OrdinalIgnoreCase);
+                        _refineLevel = ScopeRefine.Clamp(s.ScopeRefineLevel);
                     }
 
                     // A couple of RX controls per loop, cycling through AGC/

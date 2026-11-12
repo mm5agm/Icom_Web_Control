@@ -20,6 +20,7 @@
 // accessibility layer: both were Colin's call on 2026-10-13. Classic keeps them.
 
 import { mountRadioPanel } from '/js/radio-panel/radio-panel.js';
+import { addRefineTo } from '/js/radio-panel/spectrum-refine.js';
 import { alignBins, txMeterFraction, rangeLegends } from '/js/radio-panel/panel-math.js';
 import { BAND_PLANS, BAND_EDGES, nearestBandForHz, loadBandPlanFromServer, getSegments, segmentForHz } from '/js/ui/band-plan.js';
 import { calibrateNumeric, loadFromBackend } from '/js/calibration/calibration-engine.js';
@@ -207,6 +208,8 @@ export function startIcomRadioPanel(root, cfg) {
         defaultSize: { width: 1100, height: 700 },
         onChange: open => { specAway = open; panel.setSpectrumAway(open); },
     }).start();
+    // REFINE beside SPAN: how much the scope is averaged (spectrum-refine.js).
+    for (const id of ['A', 'B']) addRefineTo(panel.spectrumTools(id), id, 'rp-select rp-spec-span', '.rp-spec-hold');
 
     // ---- the slice of radio state the panel derives things from ----------
     const r = {
