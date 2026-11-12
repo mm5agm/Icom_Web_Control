@@ -362,6 +362,17 @@ Re-run with -SkipVersionCheck to release without them.
             }
         }
     }
+
+    # --- links in the docs, a hard check ---------------------------------
+    # Unlike the staleness heuristic above, this one blocks: a link that goes
+    # nowhere, or a manual section the contents never reach, is a fact, not a
+    # judgement about prose. Both look normal while reading the file. Checks
+    # USER_MANUAL.md, README.md and RELEASE_HISTORY.md. -SkipVersionCheck
+    # bypasses this along with the rest.
+    & (Join-Path $PSScriptRoot 'check-manual-links.ps1')
+    if ($LASTEXITCODE -ne 0) {
+        throw "The docs have broken links or manual sections missing from the contents (listed above). Fix them, or re-run with -SkipVersionCheck."
+    }
 }
 
 # --- 1. commit pending work on develop -------------------------------------

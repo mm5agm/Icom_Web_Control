@@ -39,6 +39,7 @@ import { dialStepper } from '/js/radio-panel/dial-stepper.js';
 import { calibrateNumeric, loadFromBackend } from '/js/calibration/calibration-engine.js';
 import { afskMidpointAudioHz, loadRttySettings } from '/js/rtty/rtty-settings.js';
 import { post, startIcomSpectrumFeed } from '/js/ui/spectrum-feed-icom.js';
+import { addRefineTo } from '/js/radio-panel/spectrum-refine.js';
 import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
 import { BAND_EDGES, getSegments } from '/js/ui/band-plan.js';
 
@@ -129,6 +130,10 @@ export function startIcomRttyContest(root, cfg) {
             editHref: '/Memories',
         },
     });
+
+    // REFINE in each pane's bar: how much the scope is averaged
+    // (spectrum-refine.js). A window showing only the waterfall has no pane.
+    for (const r of receivers) addRefineTo(view.pane(r.id)?.tools, r.id, 'rc-step');
 
     // A click is the middle of the pair. In RTTY the dial goes on the higher
     // tone, half the shift up; in DATA on the carrier, the pair's audio

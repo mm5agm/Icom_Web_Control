@@ -13,6 +13,7 @@ import { spanText } from '/js/radio-panel/panel-math.js';
 import { reportSpectrumPanes } from '/js/ui/spectrum-panes-report.js';
 import { dialStepper } from '/js/radio-panel/dial-stepper.js';
 import { post, startIcomSpectrumFeed } from '/js/ui/spectrum-feed-icom.js';
+import { addRefineTo } from '/js/radio-panel/spectrum-refine.js';
 
 const SPANS_HZ = [5e3, 10e3, 20e3, 50e3, 100e3, 200e3, 500e3, 1e6];
 const XWATCH_OFF_TEXT = 'Cross-band watch is off: X-WATCH switches it on';
@@ -50,6 +51,9 @@ export function startIcomSpectrumPopout(root, cfg) {
         storagePrefix: 'iwc.radioPanel.',
         fontBase: '/lib/fonts',
     });
+
+    // REFINE beside SPAN: how much the scope is averaged (spectrum-refine.js).
+    for (const p of panes) addRefineTo(pop.pane(p.id)?.tools, p.id, 'rp-spop-span', '.rp-spop-hold');
 
     // The tab collapseWatch chose, and the one it replaced: { was, now }.
     let forcedView = null;
