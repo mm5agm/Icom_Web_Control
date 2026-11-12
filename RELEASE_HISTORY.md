@@ -12,6 +12,13 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre7 (2026-11-12)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
+
+- **Refine settles the scope's noise floor** so weak signals stand out. Each sweep the radio sends has a rough floor; Refine averages the last few, from **Raw** (as the radio sends them) to **5**. The default, **3**, follows a new signal in about two-thirds of a second, and **5** in about a second. Tuning doesn't smear the trace. On an IC-7300 MkII on 20m FT8, signals stood about half as high again above the floor at 3, and twice as high at 5. It is a slider beside Bright on Classic, and a **REFINE** list beside the span on Radio, its pop-out spectrum and RTTY Contest; all of them share one setting, kept on the server. [§5.4](USER_MANUAL.md#54-spectrum-display)
+- Everything listed for v1.7.0-pre1 to pre6 below still needs testing.
+
 ### v1.7.0-pre6 (2026-11-11)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
