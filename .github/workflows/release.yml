@@ -50,6 +50,12 @@ jobs:
       - name: Run unit tests
         run: dotnet test core/tests/RadioWebControl.Core.Tests/RadioWebControl.Core.Tests.csproj --configuration Release --verbosity normal
 
+      # Links in USER_MANUAL.md, README.md and RELEASE_HISTORY.md that go
+      # nowhere, and manual sections missing from the contents.
+      - name: Check the docs' links
+        shell: pwsh
+        run: ./scripts/check-manual-links.ps1
+
   # The Linux and macOS build, radio control only. Its tests are the same IWC
   # tests as the Windows job, including the golden frames and the checks that
   # nothing raises DTR or opens ports by itself off Windows. Nothing is published.
