@@ -361,6 +361,20 @@ each 475-bin sweep as `SpectrumUpdate`:
 Scope on/off is `27 10` / `27 11`; a manual scope-off is honoured across
 reconnects (`_operatorScopeOff`) so the app never switches it back on unasked.
 
+**Refine** averages the sweeps before they are broadcast: core
+`SpectrumRefiner` (per-bin EMA that follows the centre in whole bins and resets
+on a new span, bin count, or a jump of over half a span). `CivRadioController`
+runs two: `_refinePrimary` on every normal sweep, **before** the pseudo-dual
+crop is cut (so the watch panel's crop is refined too), and `_refinePeek` on
+cross-band peek sweeps, so a peek never resets the primary average. The scope
+probe sees raw sweeps. The step is one setting, `ScopeRefineLevel` (index into
+`ScopeRefine.Weights` = 1, .75, .6, .5, .4, .3; default 3), re-read on the slow
+poll, served by `ScopeRefineController` at `/api/sdr/refine` (same route and
+shape as YWC's; `sdrId` accepted and ignored). Every page that draws the
+spectrum must carry the control from core `js/radio-panel/spectrum-refine.js`;
+`RefineEveryViewTests` fails otherwise. Design note:
+[core/docs/design/spectrum-refine.md](core/docs/design/spectrum-refine.md).
+
 ### Settings
 
 `SettingsService` uses read-modify-write on `appsettings.user.json`.

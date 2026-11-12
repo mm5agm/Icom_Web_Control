@@ -28,7 +28,7 @@ I can't see my radio's controls without a magnifying glass, and Icom has tucked 
 
 **See the band**
 
-- **[The radio's scope and waterfall](USER_MANUAL.md#54-spectrum-display)** in the browser, for VFO A and VFO B even on different bands. X-Watch looks at the other band every few seconds, and one click turns it off during a QSO.
+- **[The radio's scope and waterfall](USER_MANUAL.md#54-spectrum-display)** in the browser, for VFO A and VFO B even on different bands. X-Watch looks at the other band every few seconds, and one click turns it off during a QSO. **[Refine](USER_MANUAL.md#54-spectrum-display)** averages the radio's sweeps so the noise floor settles and weak signals stand out.
 - **[DX spots](USER_MANUAL.md#517-dx-spots-list)** on the spectrum, and a [watch list](USER_MANUAL.md#514-dx-watch-panel) that alerts you when a callsign or prefix appears.
 
 **Operate**
