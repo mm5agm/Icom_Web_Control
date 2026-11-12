@@ -23,7 +23,7 @@
 # code` are not links on GitHub, so they are skipped, and so are headings
 # inside code blocks.
 #
-# Written 2026-11-12, modelled on Yaesu Web Control's script of the same name,
+# Written 2026-11-12 from Yaesu Web Control's script of the same name (keep the two copies the same),
 # with these added: links into other files, picture paths, GitHub's -1 / -2
 # suffix on repeated headings, underscores and accented letters kept in slugs
 # as GitHub keeps them, and code blocks skipped.
