@@ -12,6 +12,16 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre8 (2026-11-14)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
+
+- **IC-9700 support, under test (#137).** Choose **IC-9700 (under test)** in Settings. It is written from Icom's CI-V reference and has not been tried on a real radio, so please stay on receive. IWC works on the Main band only: when it connects it selects the Main band and the Main scope, and leaves the Sub band and satellite mode to the radio. The band buttons are 2m, 70cm and 23cm, and 23cm is in the band plans. The radio's own memories aren't read or written yet. On the radio, set **CI-V USB Port** to **Unlink from [REMOTE]** and **CI-V Baud Rate** to **115200**. [§15.10](USER_MANUAL.md#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid)
+- **RTTY Contest has a SPOTS button and WF BRIGHT.** SPOTS, beside DX SPOTS, opens IWC's DX Spots window. WF BRIGHT, in the scope row, brightens the waterfall only, from OFF to +60 dB in 6 dB steps, and is kept for each receiver with REF and RANGE. Both were asked for by Bruce VK2RT for YWC.
+- **A span list no longer shows a span the radio refused.** After you pick a span, the list goes back to the span the radio is actually sending.
+- **The update notice no longer ends with a line about notes "below"** that it doesn't show.
+- Changes from v1.7.0-pre1 to pre7 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre7-2026-11-12).
+
 ### v1.7.0-pre7 (2026-11-12)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.

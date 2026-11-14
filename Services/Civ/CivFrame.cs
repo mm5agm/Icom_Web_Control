@@ -343,6 +343,8 @@ namespace Icom_Web_Control.Services.Civ
         public const byte VfoSelectB = 0x01;
         public const byte VfoEqualize = 0xA0;
         public const byte VfoExchange = 0xB0;
+        // IC-9700 only: 07 D0 selects the Main band. (Its 07 B0 swaps Main and Sub.)
+        public const byte SelectMainBand = 0xD0;
 
         // Split (command 0F):
         //   0F        (no data) → reply 0F <00=OFF | 01=ON>   (read)
@@ -400,6 +402,9 @@ namespace Icom_Web_Control.Services.Civ
         // 100000, 250000 or 500000 (radio SPAN ±2.5k … ±500k). The reported
         // waveform-info span field reads back the same value.
         public const byte SubScopeSpan     = 0x15;  // 27 15
+        // 27 12 — which scope the radio shows and sends: 00 Main, 01 Sub. Only
+        // sent to a radio with a Sub band (IC-9700); the 7300 has Main only.
+        public const byte SubScopeMainSub  = 0x12;
 
         // Phase 3 block 7 — transceiver power on/off (command 18).
         //   18 00 = power OFF, 18 01 = power ON. The radio ACKs FB.

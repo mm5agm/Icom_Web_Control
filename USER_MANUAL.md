@@ -75,6 +75,7 @@
     - 15.7 [I have the original IC-7300, not the MkII — what do I need to set differently?](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently)
     - 15.8 [I set a 1 Hz tuning step and the radio's display doesn't change](#158-i-set-a-1-hz-tuning-step-and-the-radios-display-doesnt-change)
     - 15.9 [I have an IC-7100: what works, and what should I avoid?](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid)
+    - 15.10 [I have an IC-9700: what works, and what should I avoid?](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid)
 16. [Accessibility and Screen Readers](#16-accessibility-and-screen-readers)
     - 16.1 [Making Everything Bigger](#161-making-everything-bigger)
     - 16.2 [Windows High Contrast Mode](#162-windows-high-contrast-mode)
@@ -139,7 +140,7 @@
 
 ## 1. Introduction
 
-Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 and IC-7300 MkII HF/50 MHz transceivers. Support for the IC-7100 is being added and is under test: see [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid).
+Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 and IC-7300 MkII HF/50 MHz transceivers. Support for the IC-7100 and the IC-9700 is being added and is under test: see [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) and [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid).
 
 > **Windows only.** IWC runs on Windows 10 or 11 (64-bit). There is no Linux or macOS build, and none is planned. The app is hosted by a small WinForms process and uses a Windows serial-port driver to reach the radio. You can still access the browser interface itself from any device on your home network (tablet, phone, Linux laptop) — but the IWC server must be running on a Windows PC.
 
@@ -154,10 +155,11 @@ Supported radio:
 | IC-7300 MkII | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-C | `B6` (default) |
 | IC-7300 (original) | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-B | `94` |
 | IC-7100 (under test) | 100 W HF and 6m, 50 W 4m and 2m, 35 W 70cm | Single (VFO A / VFO B) | CI-V over USB | `88` |
+| IC-9700 (under test) | 100 W 2m, 75 W 70cm, 10 W 23cm | IWC uses the Main band only | CI-V over USB | `A2` |
 
 The MkII is the radio IWC is developed and bench-tested on. The original IC-7300 speaks near-identical CI-V and is **confirmed working by two owners independently** (most recently on v1.0.6); it needs a few settings the MkII does not, and they are collected in one place in [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently) — the short version is Icom's USB driver installed, **CI-V USB Port** unlinked from **[REMOTE]**, and the baud rate at **115200** — see also [§3](#3-first-time-setup) and [§6.1](#61-radio-connection). The CI-V address needs no setting on either radio; IWC detects it.
 
-The IC-7100 has **not yet been tried on a real radio**, and it has no band scope over CI-V, so it does not have everything the sentence below describes. Read [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) before using IWC with one.
+The IC-7100 has **not yet been tried on a real radio**, and it has no band scope over CI-V, so it does not have everything the sentence below describes. Read [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) before using IWC with one. The IC-9700 hasn't been tried on a real radio either: read [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid) first.
 
 IWC connects to the radio over its CI-V computer-control interface, carried on the radio's single USB cable. No extra hardware is required — the spectrum scope, meters, and all controls come over that one connection.
 
@@ -248,7 +250,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 
 1. Open a browser and go to **http://localhost:8080**. If port 8080 was already in use on your PC (e.g. Plex, Jenkins, MiniTool ShadowMaker), IWC will have automatically picked the next free port from 8081–8089. **Hover over the IWC tray icon** down by the Windows clock to see the actual URL — or simply double-click the tray icon to have IWC open the right URL in your default browser.
 2. Click the **Settings** link in the navigation bar.
-3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver. The third choice, **IC-7100 (under test)**, is explained in [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid).
+3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver. **IC-7100 (under test)** is explained in [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid), and **IC-9700 (under test)** in [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid).
 4. Set **Serial Port**. The box is a list of every COM port your PC has at that moment, so you choose rather than type. **If you don't know which one is the radio, switch the radio on and press "Find my radio"** — IWC tries each port at each speed until an Icom answers, then fills in the Radio Model, Serial Port and Baud Rate for you, and tells you what it found. It takes a couple of seconds, longer if the radio is on an unusual speed. Nothing is saved until you press **Save Settings**, so it is safe to press as often as you like.
 
    The port is the USB serial port the radio presents when you plug its USB cable in. **On the MkII that is the USB Type-C socket, and Windows creates the port by itself. On the original IC-7300 it is the USB Type-B socket, and you must install Icom's USB driver first** — until you do, Windows creates no port at all, so the list will not have it and Find my radio cannot see it either. The driver is on Icom's support site under the radio's downloads. **Diagnostics → COM Ports** shows the same list if you want to check it elsewhere.
@@ -259,6 +261,7 @@ Before the app can communicate with your radio you need to tell it which serial 
    | **IC-7300 MkII** | **19200** | Nothing to change. The MkII has no **CI-V USB Baud Rate** menu, and the **CI-V Baud Rate** item under **Menu → Set → Connectors → CI-V** governs the round **[REMOTE]** socket only — leave it on "Auto". IWC's box alone decides the rate. |
    | **IC-7300 (original)** | **115200** | **Menu → Set → Connectors → CI-V**: set **CI-V USB Port** to **Unlink from [REMOTE]** *first*, then **CI-V USB Baud Rate** to **115200**. The order matters — see the warning below. |
    | **IC-7100** | **19200** | **Menu → Set → Connectors → CI-V**: leave **CI-V Baud Rate** on **Auto**, its default. 19200 is the fastest it offers. |
+   | **IC-9700** | **115200** | **Menu → Set → Connectors → CI-V**: set **CI-V USB Port** to **Unlink from [REMOTE]**, and **CI-V Baud Rate** to **115200**. The radio sends its scope over USB only with both. |
 
    > **If the only speeds you are offered are 4800, 9600, 19200 and Auto, you are in the wrong menu item.** That one is **CI-V Baud Rate**, which belongs to the round **[REMOTE]** socket on the back panel and has no effect on a USB connection. Leave it alone. The item you want is **CI-V USB Baud Rate**, and it only becomes settable once **CI-V USB Port** is set to **Unlink from [REMOTE]** — which is why that has to be done first. This has caught a first-time user, who quite reasonably concluded their radio did not offer 115200 at all.
 
@@ -2439,7 +2442,7 @@ The radio is not answering on CI-V. IWC keeps retrying, so it clears itself the 
 - Check that the radio is powered on.
 - Check the COM port in Settings. The **Open Settings to choose the port or find the radio** link in the "Radio not connected" banner takes you straight to the port list; **Find my radio** there will locate the radio and correct the port and speed for you. **Diagnostics → COM Ports** shows the same list.
 - Check the baud rate in Settings. On the **original IC-7300** it must match the radio's **MENU → SET → Connectors → CI-V → CI-V USB Baud Rate** — that is the USB port's own setting, and the plain **CI-V Baud Rate** below it belongs to the round [REMOTE] socket and has no effect on a USB connection. (If that item offers you only 4800/9600/19200/Auto, it *is* the [REMOTE] one — see [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).) Easier: press **Find my radio**, which reports the speed the radio actually answered at. The **MkII has no CI-V USB Baud Rate menu at all**, so there is nothing to match: set Settings to **19200** and ignore the radio's **CI-V Baud Rate**, which is the [REMOTE] socket's.
-- **The CI-V address is not something to check** — IWC detects it, by asking on the CI-V broadcast address at connect and using whichever address replies. Some radios ignore the broadcast question, so if nothing answers IWC asks again at each model's default address (`B6` for the MkII, `94` for the original IC-7300, `88` for the IC-7100). There is no box for it in Settings.
+- **The CI-V address is not something to check** — IWC detects it, by asking on the CI-V broadcast address at connect and using whichever address replies. Some radios ignore the broadcast question, so if nothing answers IWC asks again at each model's default address (`B6` for the MkII, `94` for the original IC-7300, `88` for the IC-7100, `A2` for the IC-9700). There is no box for it in Settings.
 - Click **Test Connection** in Settings.
 - If IWC knows *why* it cannot connect — a COM port that is not present, for instance — the panel says so and offers a link to Settings instead of spinning.
 
@@ -2458,7 +2461,7 @@ When IWC cannot reach the radio it shows a yellow banner across the top of the m
 The port opened cleanly, so the driver, the cable and the port number are all correct. Something is stopping the radio from answering.
 
 - **If you are on v1.0.4-pre1 or earlier, check CI-V USB Echo Back first.** With that setting on, those versions cannot connect *at all* — the radio is answering perfectly and IWC is failing to listen. Switch it off at **MENU → SET → Connectors → CI-V** (the MkII has **CI-V USB (A) Echo Back** and **(B)** — switch both off; the original IC-7300 has one). **v1.0.4-pre2 and later work either way**, so on current versions you can skip this.
-- **Do not go hunting for a CI-V address setting** — there isn't one. IWC asks for the radio's identity on the CI-V broadcast address at connect and adopts whichever address answers. If nothing answers that, it asks at each model's default address: `B6` (MkII), `94` (original IC-7300) and `88` (IC-7100). The one case this can't cover is a radio that ignores the broadcast question *and* has had its address changed from the factory default, so if you have changed it, set it back.
+- **Do not go hunting for a CI-V address setting** — there isn't one. IWC asks for the radio's identity on the CI-V broadcast address at connect and adopts whichever address answers. If nothing answers that, it asks at each model's default address: `B6` (MkII), `94` (original IC-7300), `88` (IC-7100) and `A2` (IC-9700). The one case this can't cover is a radio that ignores the broadcast question *and* has had its address changed from the factory default, so if you have changed it, set it back.
 - Check the baud rate in Settings. On the **original IC-7300** it must match **CI-V USB Baud Rate** on the radio — not the plain **CI-V Baud Rate**, which is the [REMOTE] socket's setting; if that is on **Auto**, set both ends to **19200** while you are diagnosing. On the **MkII** there is no USB baud menu, so just set Settings to **19200**.
 - **On the IC-7300 MkII, make sure you are on the right port.** The radio presents *two* USB serial ports and only one of them carries CI-V — the one Windows names **"IC-7300MK2 Serial Port A (CI-V)"**. Port B will open happily and never answer.
 - A quick sanity check: if another program — N1MM, WSJT-X, Ham Radio Deluxe — can talk to the radio on that same port, then the port and radio are definitely fine and the fault is in how IWC is addressing it. Say so in your bug report (§14.1); it narrows things down enormously.
@@ -2766,6 +2769,29 @@ It is worth turning on whenever you are zero-beating CW or chasing a drifting RT
 - **Power, preamp and attenuator follow the radio** on each band, because the IC-7100's values vary across its bands.
 
 If you have an IC-7100 and would like to help, please open an issue on GitHub and say what worked and what didn't.
+
+### 15.10 I have an IC-9700: what works, and what should I avoid?
+
+**The IC-9700 is under test.** It is written from Icom's CI-V reference and has only been run against a simulated radio. Nothing has been tried on a real IC-9700 yet, so please treat every part of it as unproven.
+
+**Until an owner has confirmed it, stay on receive.** Tuning, changing band and mode, the band scope and the meters are the things to try first. **Don't press transmit, Tune, or the CW keys on an IC-9700, and don't use voice commands that transmit.**
+
+**To set it up:**
+
+1. Install Icom's USB driver from their support site before plugging the radio in.
+2. On the radio, under **Menu → Set → Connectors → CI-V**, set **CI-V USB Port** to **Unlink from [REMOTE]** and **CI-V Baud Rate** to **115200**. Leave **CI-V Address** on **A2h**, its default.
+3. In Settings, set **Radio Model** to **IC-9700 (under test)** and **Baud Rate** to **115200**, and save.
+
+**What is different from an IC-7300:**
+
+- **IWC works on the Main band only.** When it connects, IWC selects the Main band and the Main scope. Leave the Sub band, Dualwatch and satellite mode to the radio. VFO A and VFO B in IWC are the Main band's two VFOs.
+- **Bands are 2m, 70cm and 23cm.** The HF band buttons aren't shown.
+- **Memories aren't read or written yet.** The IC-9700 keeps its memories by band, a layout IWC doesn't read yet. IWC's own memory list works.
+- **Controls it lacks are hidden.** That includes APF, delta TX and the antenna tuner. Its attenuator is 10 dB, and it has one preamp. IWC leaves an external preamp alone.
+- **Power follows the band:** 100 W on 2m, 75 W on 70cm and 10 W on 23cm.
+- **The swap button doesn't swap.** On this radio the command for it swaps the Main and Sub bands, so IWC doesn't send it.
+
+If you have an IC-9700 and would like to help, please comment on [issue #137](https://github.com/mm5agm/Icom_Web_Control/issues/137) and say what worked and what didn't. The log file (Diagnostics) helps a lot.
 
 ---
 

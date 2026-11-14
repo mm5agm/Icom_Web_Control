@@ -37,7 +37,7 @@
             model: '@Model.Profile.Model',
             maxPowerW: @Model.MaxPowerW,
             maxHz: @Model.MaxHz,
-            extraBands: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.ExtraBands)),
+            bands: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.Bands)),
             extraModes: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.ExtraModes)),
             txRanges: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Profile.Frequencies.Transmit)),
             onePreampFromHz: @Model.Profile.Frequencies.OnePreampFromHz,
