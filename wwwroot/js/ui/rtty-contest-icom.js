@@ -109,6 +109,9 @@ export function startIcomRttyContest(root, cfg) {
         meters: [{ id: 'S', label: 'S' }, { id: 'PO', label: 'PO' }, { id: 'SWR', label: 'SWR' }, { id: 'ALC', label: 'ALC' }],
         views: cfg.views ?? [],
         menu: cfg.menu ?? [],
+        // SPOTS, beside DX SPOTS: the same window as the DX Spots pop-out
+        // elsewhere, as on YWC (Bruce VK2RT, YWC #250 2026-11-14).
+        spotsWindow: { name: 'dx-spots', url: '/DxSpots', size: { width: 760, height: 480 } },
         tuner: cfg.tuner,
         decode: cfg.decode,
         storagePrefix: 'iwc.rttyContest.',
