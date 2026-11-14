@@ -97,7 +97,7 @@ export function startIcomRadioPanel(root, cfg) {
     if (cfg.autoModeChangeOnTune === false) globalThis.iwcAutoModeChangeOnTune = false;
     const edges = () => BAND_EDGES[cfg.bandPlan] || BAND_EDGES.Region1;
     // 4 m only where the region has it.
-    const bands = [...BANDS, ...(cfg.extraBands ?? [])].filter(b => b !== '4m' || edges().some(e => e.name === '4m'));
+    const bands = (cfg.bands ?? BANDS).filter(b => b !== '4m' || edges().some(e => e.name === '4m'));
     const modes = [...MODES, ...(cfg.extraModes ?? [])];
 
     let win = null;             // the windows; those restored from last time report during mount
@@ -425,7 +425,7 @@ export function startIcomRadioPanel(root, cfg) {
         memKeySays(id, 'READING', true, 0);
         try {
             const res = await fetch('/api/memory/radio-channels');
-            if (!res.ok) { memKeySays(id, res.status === 503 ? 'NO RADIO' : 'FAILED'); return null; }
+            if (!res.ok) { memKeySays(id, res.status === 503 ? 'NO RADIO' : res.status === 409 ? 'NOT YET' : 'FAILED'); return null; }
             memKeySays(id, '');
             return (await res.json())?.channels ?? [];
         } catch {

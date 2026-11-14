@@ -24,6 +24,25 @@ namespace Icom_Web_Control.Services.Civ
         public static readonly IReadOnlySet<string> ModesOnlySomeHave =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "WFM", "DV" };
 
+        /// <summary>The HF and 6 and 4 m bands IWC has buttons for, which every HF radio has.</summary>
+        public static readonly IReadOnlyList<string> HfBands = new[]
+            { "160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "4m" };
+
+        /// <summary>
+        /// The band buttons for this radio: the HF set when it receives on 160 m,
+        /// then the bands it adds. A VHF/UHF radio like the IC-9700 gets only its own.
+        /// </summary>
+        public IReadOnlyList<string> Bands
+        {
+            get
+            {
+                var list = new List<string>();
+                if (Receive[0].LoHz <= 1_800_000) list.AddRange(HfBands);
+                list.AddRange(ExtraBands);
+                return list;
+            }
+        }
+
         public static readonly RadioFrequencies Ic7300Family = new(
             new[] { new ReceiveRange(30_000, 74_800_000) },
             new[]
@@ -56,6 +75,29 @@ namespace Icom_Web_Control.Services.Civ
             },
             new[] { "2m", "70cm" },
             new[] { "WFM", "DV" },
+            OnePreampFromHz: 144_000_000);
+
+        /// <summary>
+        /// IC-9700, from the specifications in its manual: 2 m, 70 cm and 23 cm,
+        /// receive and transmit alike. These are the widest ranges; what a radio
+        /// may transmit on depends on its version. It has one preamp on every
+        /// band (16 02 01; 02 and 03 are an external preamp, which IWC leaves alone).
+        /// </summary>
+        public static readonly RadioFrequencies Ic9700 = new(
+            new[]
+            {
+                new ReceiveRange(144_000_000, 148_000_000),
+                new ReceiveRange(430_000_000, 450_000_000),
+                new ReceiveRange(1_240_000_000, 1_300_000_000),
+            },
+            new[]
+            {
+                new TransmitRange(144_000_000, 148_000_000, 100),
+                new TransmitRange(430_000_000, 450_000_000, 75),
+                new TransmitRange(1_240_000_000, 1_300_000_000, 10),
+            },
+            new[] { "2m", "70cm", "23cm" },
+            new[] { "DV" },
             OnePreampFromHz: 144_000_000);
     }
 }

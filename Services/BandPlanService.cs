@@ -239,6 +239,7 @@ namespace Icom_Web_Control.Services
                 new() { Name =   "4m", Lo = 70000000, Hi = 70500000 },
                 new() { Name =   "2m", Lo = 144000000, Hi = 146000000 },
                 new() { Name = "70cm", Lo = 430000000, Hi = 440000000 },
+                new() { Name = "23cm", Lo = 1240000000, Hi = 1300000000 },
             },
             ["Region2"] = new()
             {
@@ -255,6 +256,7 @@ namespace Icom_Web_Control.Services
                 new() { Name =   "6m", Lo = 50000000, Hi = 54000000 },
                 new() { Name =   "2m", Lo = 144000000, Hi = 148000000 },
                 new() { Name = "70cm", Lo = 420000000, Hi = 450000000 },
+                new() { Name = "23cm", Lo = 1240000000, Hi = 1300000000 },
             },
             ["Region3"] = new()
             {
@@ -271,6 +273,7 @@ namespace Icom_Web_Control.Services
                 new() { Name =   "6m", Lo = 50000000, Hi = 54000000 },
                 new() { Name =   "2m", Lo = 144000000, Hi = 148000000 },
                 new() { Name = "70cm", Lo = 430000000, Hi = 440000000 },
+                new() { Name = "23cm", Lo = 1240000000, Hi = 1300000000 },
             },
             ["Japan"] = new()
             {
@@ -288,6 +291,7 @@ namespace Icom_Web_Control.Services
                 new() { Name =   "6m", Lo = 50000000, Hi = 54000000 },
                 new() { Name =   "2m", Lo = 144000000, Hi = 146000000 },
                 new() { Name = "70cm", Lo = 430000000, Hi = 440000000 },
+                new() { Name = "23cm", Lo = 1240000000, Hi = 1300000000 },
             },
         };
     }

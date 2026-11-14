@@ -546,6 +546,11 @@ namespace Icom_Web_Control.Services
             _state.ConnectionStatusText = "";
             _noAnswerCount = 0;
 
+            // A radio with a Sub band (IC-9700): IWC drives Main, so select it,
+            // so the frequency and mode commands and the scope are all Main's.
+            if (RadioProfile.ForModel(ModelId)?.HasSubBand == true)
+                await SelectMainBandAsync(cancellationToken);
+
             // Seed the RX controls so every slider/dropdown shows the radio's
             // real position on first paint rather than a default. All are
             // receiver-wide, so both panels mirror the one value. Best-effort —
@@ -598,6 +603,21 @@ namespace Icom_Web_Control.Services
                 if (value.Length != 1 || value[0] != 0) return $"{name} isn't OFF on the radio.";
             }
             return null;
+        }
+
+        /// <summary>
+        /// Select the Main band (07 D0) and the Main scope (27 12 00) on a radio
+        /// with a Sub band. Best-effort: a miss is logged, and IWC carries on.
+        /// </summary>
+        private async Task SelectMainBandAsync(CancellationToken ct)
+        {
+            var band = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                CivProtocol.CmdSelectVfo, CivProtocol.SelectMainBand);
+            var reply = await TransactAsync(band, CivProtocol.AckOk, cancellationToken: ct);
+            if (reply == null || reply.Cmd != CivProtocol.AckOk)
+                _logger.LogWarning("[CivRadioController] selecting the Main band was not acknowledged");
+            if (HasScope)
+                await SendScopeSetAsync(CivProtocol.SubScopeMainSub, CivProtocol.ScopeMain, "Main scope", ct);
         }
 
         // -- Spectrum scope (Phase 3 block 6) ----------------------------------

@@ -3,7 +3,9 @@ namespace Icom_Web_Control.Services;
 // Capability lookup for per-model behaviour differences.
 //
 // Every model IWC offers (IC-7300, IC-7300 MkII, IC-7100) is single-receiver
-// with no antenna to choose, so every method here returns the same answer for
+// with no antenna to choose. The IC-9700 has a Sub band, but IWC drives its Main
+// band only (RadioProfile.HasSubBand), so to IWC it is single-receiver too. Every
+// method here returns the same answer for
 // every configured model. That is deliberate: the lookups stay in one place so
 // that adding a model which differs is a change here and nowhere else, and so
 // the callers keep reading as "ask what this radio can do" rather than

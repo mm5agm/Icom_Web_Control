@@ -997,7 +997,7 @@
                         </div>
                         <!-- Middle: Band buttons + Mode/Antenna below + filter scope -->
                         <div class="flex-grow-1 d-flex flex-column gap-1">
-                            @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create(string.Join(",", Model.Profile.Frequencies.ExtraBands), "A", Model.SelectedBandA))
+                            @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create(string.Join(",", Model.Profile.Frequencies.Bands), "A", Model.SelectedBandA))
                             <div class="d-flex align-items-center gap-2 mt-1">
                                 <label class="vfo-control-label" for="modeSelectA">Mode</label>
                                 <select class="form-select form-select-sm vfo-mode-select" id="modeSelectA" data-a11y-key="vfo.a.mode"
@@ -1295,7 +1295,7 @@
                         </div>
                         <!-- Middle: Band buttons + Mode/Antenna below -->
                         <div class="flex-grow-1 band-buttons-shifted d-flex flex-column gap-1">
-                            @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create(string.Join(",", Model.Profile.Frequencies.ExtraBands), "B", Model.SelectedBandB))
+                            @await Html.PartialAsync("_BandButtonsPartial", Tuple.Create(string.Join(",", Model.Profile.Frequencies.Bands), "B", Model.SelectedBandB))
                             <div class="d-flex align-items-center gap-2 mt-1">
                                 <label class="vfo-control-label" for="modeSelectB">Mode</label>
                                 <select class="form-select form-select-sm vfo-mode-select" id="modeSelectB" data-a11y-key="vfo.b.mode"

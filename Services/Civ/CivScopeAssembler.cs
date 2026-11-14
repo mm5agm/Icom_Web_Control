@@ -97,6 +97,10 @@ namespace Icom_Web_Control.Services.Civ
             var d = frame.Data;   // [00 sub, VFO, order, div, …]
             if (d.Length < 4 || d[0] != CivProtocol.SubScopeWaveform)
                 return null;
+            // d[1] is the scope: 00 Main, 01 Sub. The 7300 only sends Main; an
+            // IC-9700 showing both scopes sends both, and IWC draws Main's.
+            if (d[1] != CivProtocol.ScopeMain)
+                return null;
 
             int order = CivProtocol.BcdByte(d[2]);
             int div   = CivProtocol.BcdByte(d[3]);

@@ -1,9 +1,8 @@
-﻿@* The model is the bands this radio adds to the list (comma-separated, may be
-   empty), the receiver, and the band selected now. *@
+﻿@* The model is this radio's bands (comma-separated, from RadioFrequencies.Bands),
+   the receiver, and the band selected now. *@
 @model Tuple<string, string, string>
 @{
-    var bands = new[] { "160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "4m" }
-        .Concat(Model.Item1.Split(',', StringSplitOptions.RemoveEmptyEntries)).ToArray();
+    var bands = Model.Item1.Split(',', StringSplitOptions.RemoveEmptyEntries);
     var bandLabels = new Dictionary<string, string>
     {
         ["160m"] = "160 metres",
@@ -19,7 +18,8 @@
         ["6m"]   = "6 metres",
         ["4m"]   = "4 metres",
         ["2m"]   = "2 metres",
-        ["70cm"] = "70 centimetres"
+        ["70cm"] = "70 centimetres",
+        ["23cm"] = "23 centimetres"
     };
     var receiver = Model.Item2;
     var selectedBand = (Model.Item3 ?? "").Trim().ToLowerInvariant();

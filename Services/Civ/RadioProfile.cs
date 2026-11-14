@@ -15,9 +15,11 @@ namespace Icom_Web_Control.Services.Civ
     public sealed class RadioProfile
     {
         private readonly IReadOnlyDictionary<byte, CommandRule>? _allowed;
+        private readonly IReadOnlySet<int> _menuItems;
 
         private RadioProfile(string model, byte civAddress, byte attenuatorOn, bool hasScope,
-            RadioFrequencies frequencies, IReadOnlyDictionary<byte, CommandRule>? allowed)
+            RadioFrequencies frequencies, IReadOnlyDictionary<byte, CommandRule>? allowed,
+            IReadOnlySet<int>? menuItems = null)
         {
             Model = model;
             CivAddress = civAddress;
@@ -25,6 +27,7 @@ namespace Icom_Web_Control.Services.Civ
             HasScope = hasScope;
             Frequencies = frequencies;
             _allowed = allowed;
+            _menuItems = menuItems ?? new HashSet<int>();
         }
 
         public string Model { get; }
@@ -46,7 +49,18 @@ namespace Icom_Web_Control.Services.Civ
         public RadioFrequencies Frequencies { get; }
 
         /// <summary>The name and model number Hamlib knows this radio by, for rigctld clients.</summary>
-        public (string Name, int Id) Hamlib => Model == "IC-7100" ? ("IC-7100", 3070) : ("IC-7300", 3073);
+        public (string Name, int Id) Hamlib => Model switch
+        {
+            "IC-7100" => ("IC-7100", 3070),
+            "IC-9700" => ("IC-9700", 3081),
+            _ => ("IC-7300", 3073),
+        };
+
+        /// <summary>
+        /// True for a radio with a Main and a Sub band (the IC-9700). IWC drives
+        /// only the Main band: it selects Main at connect, and reads Main's scope.
+        /// </summary>
+        public bool HasSubBand => Model == "IC-9700";
 
         /// <summary>
         /// The 1A 05 items that let the USB port's DTR and RTS lines transmit or key
@@ -57,6 +71,7 @@ namespace Icom_Web_Control.Services.Civ
         {
             "IC-7300MK2" => new[] { (96, "USB SEND"), (97, "USB Keying (CW)"), (98, "USB Keying (RTTY)") },
             "IC-7300" => new[] { (78, "USB SEND"), (79, "USB Keying (CW)"), (80, "USB Keying (RTTY)") },
+            "IC-9700" => new[] { (120, "USB SEND"), (121, "USB Keying (CW)"), (122, "USB Keying (RTTY)") },
             _ => Array.Empty<(int, string)>(),
         };
 
@@ -72,8 +87,11 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>How many memory channels IWC can read, numbered from 1 through the banks.</summary>
         public int MemoryChannels => MemoryBanks > 0 ? MemoryBanks * Ic7100MemoryCodec.ChannelsPerBank : 99;
 
+        /// <summary>True when IWC can read this radio's own memory channels (1A 00).</summary>
+        public bool HasRadioMemories => AllowsCommand(0x1A, 0x00);
+
         /// <summary>True when IWC knows how to write this radio's memory channels.</summary>
-        public bool CanWriteMemories => MemoryBanks == 0;
+        public bool CanWriteMemories => HasRadioMemories && MemoryBanks == 0;
 
         /// <summary>A channel's name when it has none of its own: "CH 001", or "A-01" on a radio with banks.</summary>
         public string ChannelLabel(int channel) =>
@@ -149,6 +167,43 @@ namespace Icom_Web_Control.Services.Civ
         public static readonly RadioProfile Ic7300 = new("IC-7300", 0x94, CivProtocol.AttOn20dB, true, RadioFrequencies.Ic7300Family, null);
 
         /// <summary>
+        /// IC-9700, from its CI-V reference (IC-9700_ENG_CI-V_4). It has a Main and a
+        /// Sub band; IWC drives Main only (<see cref="HasSubBand"/>). Its scope takes
+        /// the 7300's commands with the Main scope selected. Its 1A 05 table differs
+        /// from the 7300's, so only the USB SEND and keying items are allowed, which
+        /// IWC only reads. Memories (1A 00) start with a band byte, a layout IWC
+        /// doesn't read yet, so they are not allowed. 07 B0 swaps Main and Sub on
+        /// this radio, not VFO A and B, so it is left out. No APF (16 32), no delta
+        /// TX (21 02), no tuner (1C 01), no voice keyer frames (28) until tested.
+        /// </summary>
+        public static readonly RadioProfile Ic9700 = new("IC-9700", 0xA2, 0x10, true, RadioFrequencies.Ic9700,
+            new Dictionary<byte, CommandRule>
+            {
+                [0x03] = CommandRule.Any,                                   // read frequency
+                [0x04] = CommandRule.Any,                                   // read mode
+                [0x05] = CommandRule.Any,                                   // set frequency
+                [0x06] = CommandRule.Any,                                   // set mode
+                [0x07] = CommandRule.Subs(0x00, 0x01, 0xA0, 0xD0),          // VFO A, B, A=B, select Main band
+                [0x0F] = CommandRule.ReadOrSubs(0x00, 0x01),                // split
+                [0x11] = CommandRule.ReadOrSubs(0x00, 0x10),                // attenuator: off, 10 dB
+                [0x14] = CommandRule.Subs(0x01, 0x02, 0x03, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C,
+                                          0x0D, 0x0E, 0x0F, 0x12, 0x15, 0x16, 0x17),   // levels
+                [0x15] = CommandRule.Subs(0x01, 0x02, 0x05, 0x07, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16), // meters
+                [0x16] = CommandRule.Subs(0x02, 0x12, 0x22, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
+                                          0x46, 0x47, 0x48, 0x4F, 0x50, 0x56, 0x57, 0x58), // functions (no APF, 32)
+                [0x17] = CommandRule.Any,                                   // CW send
+                [0x18] = CommandRule.Subs(0x00, 0x01),                      // power off, on
+                [0x19] = CommandRule.Subs(0x00),                            // read ID
+                [0x1A] = CommandRule.Subs(0x03, 0x04, 0x05, 0x06),          // filter width, AGC time, menu (items below), data mode
+                [0x1C] = CommandRule.Subs(0x00),                            // TX status (no tuner)
+                [0x21] = CommandRule.Subs(0x00, 0x01),                      // RIT (no delta TX, 02)
+                [0x25] = CommandRule.Any,                                   // VFO frequency
+                [0x26] = CommandRule.Any,                                   // VFO mode
+                [0x27] = CommandRule.Subs(0x00, 0x10, 0x11, 0x12, 0x14, 0x15), // scope: data, on, output, Main/Sub, mode, span
+            },
+            new HashSet<int> { 120, 121, 122 });
+
+        /// <summary>
         /// IC-7100, from section 20 of its manual. It has no scope commands (27) and
         /// no voice keyer (28). Its whole 1A 05 table differs from the 7300's, so no
         /// item is allowed until it has been mapped; features that use one read as
@@ -181,7 +236,7 @@ namespace Icom_Web_Control.Services.Civ
                 [0x26] = CommandRule.Any,                                   // VFO mode
             });
 
-        private static readonly RadioProfile[] Known = { Ic7300Mk2, Ic7300, Ic7100 };
+        private static readonly RadioProfile[] Known = { Ic7300Mk2, Ic7300, Ic7100, Ic9700 };
 
         /// <summary>The profile for a model name, or null for a radio IWC has no table for.</summary>
         public static RadioProfile? ForModel(string? model)
@@ -245,6 +300,13 @@ namespace Icom_Web_Control.Services.Civ
                 && frame[cmdAt + 1] == CivProtocol.SubMemoryChannel
                 && !Ic7100MemoryCodec.IsRead(frame.AsSpan(cmdAt + 1, frame.Length - 1 - (cmdAt + 1))))
                 return false;
+            // A 1A 05 frame names its item in two BCD bytes; only listed items pass.
+            if (hasData && frame[cmdAt] == CivProtocol.CmdMenu && frame[cmdAt + 1] == 0x05)
+            {
+                if (cmdAt + 3 >= frame.Length - 1) return false;
+                int item = CivProtocol.BcdByte(frame[cmdAt + 2]) * 100 + CivProtocol.BcdByte(frame[cmdAt + 3]);
+                if (!_menuItems.Contains(item)) return false;
+            }
             return rule.Allows(hasData, hasData ? frame[cmdAt + 1] : (byte)0);
         }
 

@@ -85,6 +85,6 @@ public class IdentifyFallbackTests
         var frames = RadioFinder.ProbeFrames().Select(CivRecording.Hex).ToList();
         Assert.Equal(CivRecording.Hex(RadioFinder.ProbeBurst()), string.Join(" ", frames));
         Assert.All(frames, f => Assert.Matches("^FE FE [0-9A-F]{2} E0 (19 00|03) FD$", f));
-        Assert.Equal(7, frames.Count);
+        Assert.Equal(9, frames.Count);   // 19 00 on 00, then 19 00 and 03 at B6, 94, 88 and A2
     }
 }
