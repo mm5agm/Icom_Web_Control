@@ -12,6 +12,16 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre9 (2026-11-15)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
+
+- **IC-9700: transmit is allowed (#137).** An owner has confirmed receive works on a real IC-9700, so IWC now sends it TX, CW text and keyer memories, voice commands that transmit and DTR paddle keying, as it does an IC-7300. Transmit hasn't been tried on a real radio yet: the first time, use a dummy load or an antenna you know is good, start at low power, and check that the radio goes back to receive when you release TX. The IC-7100 still doesn't transmit. [§15.10](USER_MANUAL.md#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid)
+- **IC-9700: P.AMP is the internal preamp only (#137).** The radio reports both preamps in one value, and IWC was reading it as the IC-7300's P.AMP1 and P.AMP2. Now P.AMP shows and switches the internal preamp, and leaves an external preamp on or off as the radio has it.
+- **A JS8Call button.** In **Application Setup**, a sixth card, **Application 6**, starts JS8Call from the top bar and turns green while it's running. It's off until you tick **Show**. Asked for by Paul VK2AHB. [§9.5](USER_MANUAL.md#95-js8call)
+- **Settings says when changes aren't saved.** Change anything and a yellow bar at the bottom says so, with its own Save button. Leaving the page before saving asks first. [§6](USER_MANUAL.md#6-settings-page)
+- Changes from v1.7.0-pre1 to pre8 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre8-2026-11-14).
+
 ### v1.7.0-pre8 (2026-11-14)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.

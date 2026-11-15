@@ -203,7 +203,7 @@ namespace Icom_Web_Control.Services
         private void OnExit(object? sender, EventArgs e)
         {
             var ok = MessageBox.Show(
-                "Stop Icom Web Control?\n\nWSJT-X / Log4OM / JTAlert / GridTracker / Fldigi " +
+                "Stop Icom Web Control?\n\nWSJT-X / Log4OM / JTAlert / GridTracker / Fldigi / JS8Call " +
                 "will lose their CAT connection until IWC is restarted.",
                 "Exit Icom Web Control",
                 MessageBoxButtons.OKCancel,

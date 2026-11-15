@@ -1661,6 +1661,36 @@ test('Saving during a settings search shows every section again', async () => {
     }
 });
 
+// The unsaved-changes bar. Nothing is posted: the setting is changed back.
+test('Settings shows a bar while a change is not saved, and hides it when changed back', async () => {
+    const page = await open('/Settings');
+    try {
+        await page.waitFor(`window.SettingsUnsaved && window.SettingsUnsaved.ready()`, { what: 'the unsaved-changes check to start' });
+        const bar = `(b => !!b && !b.hidden)(document.getElementById('settingsUnsavedBar'))`;
+        expect(!(await page.eval(bar)), 'the bar shows before anything changed');
+        const flip = `(c => { c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); })(document.getElementById('Settings_AutoModeChangeOnTune'))`;
+        await page.eval(flip);
+        expect(await page.eval(bar), 'no bar after a change');
+        expect(await page.eval(`window.SettingsUnsaved.isDirty()`), 'not marked unsaved');
+        await page.eval(flip);
+        expect(!(await page.eval(bar)), 'the bar stayed after the change was undone');
+        expect(page.exceptions.length === 0, `uncaught exceptions:\n${page.exceptions.join('\n')}`);
+    } finally {
+        await page.close();
+    }
+});
+
+test('Application Setup has the JS8Call card, and its status answers', async () => {
+    const page = await open('/ApplicationSetup');
+    try {
+        expect(await page.eval(`!!document.getElementById('showApp6') && document.getElementById('App6Name').value === 'JS8Call'`), 'no Application 6 card for JS8Call');
+        const status = await page.eval(`fetch('/api/js8call/status').then(r => r.json()).then(j => typeof j.running)`);
+        expect(status === 'boolean', `js8call status gave ${status}`);
+    } finally {
+        await page.close();
+    }
+});
+
 // Voice "Test this pack". The harness stubs the writes, so the recogniser never
 // starts and nothing can reach the radio.
 test('Test this pack: holding the button starts a dry run, letting go stops it', async () => {
