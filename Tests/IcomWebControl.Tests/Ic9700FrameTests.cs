@@ -140,6 +140,50 @@ public class Ic9700FrameTests
         Assert.Equal(1, RadioProfile.Ic9700.PreampSteps(1_296_174_000));
     }
 
+    [Theory]
+    [InlineData(0x00, 0)]   // both off
+    [InlineData(0x01, 1)]   // internal on
+    [InlineData(0x02, 0)]   // external only: the internal preamp is off
+    [InlineData(0x03, 1)]   // both on
+    public async Task ThePreampReadIsTheInternalOne(byte radio, int shown)
+    {
+        var bus = new SimulatedRadioClient(Address);
+        var (controller, _) = TestHost.NewController(bus);
+        await controller.ConnectAsync();
+        bus.Replies["16 02 FD"] = new byte[] { 0x16, 0x02, radio };
+        Assert.Equal(shown, await controller.GetPreampAsync());
+    }
+
+    [Theory]
+    [InlineData(0x00, 1, "16 02 01 FD")]
+    [InlineData(0x02, 1, "16 02 03 FD")]   // external stays on
+    [InlineData(0x03, 0, "16 02 02 FD")]   // external stays on
+    [InlineData(0x01, 0, "16 02 00 FD")]
+    [InlineData(0x00, 2, "16 02 01 FD")]   // there is no P.AMP2: 2 means on
+    public async Task ThePreampKeyLeavesTheExternalOneAlone(byte radio, int set, string sent)
+    {
+        var bus = new SimulatedRadioClient(Address);
+        var (controller, _) = TestHost.NewController(bus);
+        await controller.ConnectAsync();
+        bus.Replies["16 02 FD"] = new byte[] { 0x16, 0x02, radio };
+        bus.Sent.Clear();
+        await controller.SetPreampAsync(set);
+        Assert.Equal("FE FE A2 E0 " + sent, bus.SentHex.Last());
+    }
+
+    [Fact]
+    public async Task A7300PreampIsWrittenAsBefore()
+    {
+        var bus = new SimulatedRadioClient(0xB6);
+        var (controller, _) = TestHost.NewController(bus);
+        await controller.ConnectAsync();
+        bus.Sent.Clear();
+        await controller.SetPreampAsync(2);
+        Assert.Equal("FE FE B6 E0 16 02 02 FD", Assert.Single(bus.SentHex));
+        Assert.False(RadioProfile.Ic7300Mk2.HasExternalPreamp);
+        Assert.True(RadioProfile.Ic9700.HasExternalPreamp);
+    }
+
     [Fact]
     public void ItsBandButtonsAreItsOwn()
     {

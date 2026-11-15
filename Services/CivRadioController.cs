@@ -1274,7 +1274,7 @@ namespace Icom_Web_Control.Services
             switch (_rxPollIndex % RxControlCount)
             {
                 case 0:  { int v = await ReadFunc16Async(CivProtocol.SubAgc, ct);    if (v >= 0) { _state.AgcA = v.ToString(); _state.AgcB = _state.AgcA; } break; }
-                case 1:  { int v = await ReadFunc16Async(CivProtocol.SubPreamp, ct); if (v >= 0) { _state.IpoA = v.ToString(); _state.IpoB = _state.IpoA; } break; }
+                case 1:  { int v = await GetPreampAsync(ct); if (v >= 0) { _state.IpoA = v.ToString(); _state.IpoB = _state.IpoA; } break; }
                 case 2:  { int v = await ReadFunc16Async(CivProtocol.SubNoiseBlanker, ct);   if (v >= 0) { _state.NbA = v == 1 ? "1" : "0"; _state.NbB = _state.NbA; } break; }
                 case 3:  { int v = await ReadFunc16Async(CivProtocol.SubNoiseReduction, ct); if (v >= 0) { _state.NrA = v == 1 ? "1" : "0"; _state.NrB = _state.NrA; } break; }
                 case 4:  { int v = await ReadFunc16Async(CivProtocol.SubAutoNotch, ct);   if (v >= 0) { _state.AutoNotchA = v == 1 ? "1" : "0"; _state.AutoNotchB = _state.AutoNotchA; } break; }
@@ -1934,8 +1934,37 @@ namespace Icom_Web_Control.Services
         public Task<int> GetNotchPositionAsync(CancellationToken ct = default) => ReadLevel14Async(CivProtocol.SubNotchPos, ct);
         public Task SetNotchPositionAsync(int value, CancellationToken ct = default) => WriteLevel14Async(CivProtocol.SubNotchPos, value, "notch position", ct);
 
-        public Task<int> GetPreampAsync(CancellationToken ct = default) => ReadFunc16Async(CivProtocol.SubPreamp, ct);
-        public Task SetPreampAsync(int value, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubPreamp, Math.Clamp(value, 0, 2), "preamp", ct);
+        private bool HasExternalPreamp => RadioProfile.ForModel(ModelId)?.HasExternalPreamp == true;
+
+        // The external preamp bit (0 or 2) as last read from 16 02 on a radio
+        // that has one, so a write that can't read first still keeps it.
+        private int _externalPreampBit;
+
+        /// <summary>
+        /// The internal preamp: 0 OFF, 1 P.AMP1, 2 P.AMP2. On a radio with an
+        /// external preamp in the same command (IC-9700) only bit 0 is the
+        /// internal one, so 02 (external only) reads as OFF and 03 as on.
+        /// </summary>
+        public async Task<int> GetPreampAsync(CancellationToken ct = default)
+        {
+            int raw = await ReadFunc16Async(CivProtocol.SubPreamp, ct);
+            if (raw < 0 || !HasExternalPreamp) return raw;
+            _externalPreampBit = raw & 0x02;
+            return raw & 0x01;
+        }
+
+        public async Task SetPreampAsync(int value, CancellationToken ct = default)
+        {
+            if (!HasExternalPreamp)
+            {
+                await WriteFunc16Async(CivProtocol.SubPreamp, Math.Clamp(value, 0, 2), "preamp", ct);
+                return;
+            }
+            // Read first, so an external preamp switched on at the radio since
+            // the last poll stays on.
+            await GetPreampAsync(ct);
+            await WriteFunc16Async(CivProtocol.SubPreamp, (value > 0 ? 0x01 : 0x00) | _externalPreampBit, "preamp", ct);
+        }
         public Task<int> GetAgcAsync(CancellationToken ct = default) => ReadFunc16Async(CivProtocol.SubAgc, ct);
         public Task SetAgcAsync(int value, CancellationToken ct = default) => WriteFunc16Async(CivProtocol.SubAgc, Math.Clamp(value, 1, 3), "AGC", ct);
 

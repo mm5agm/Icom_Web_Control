@@ -36,6 +36,12 @@ internal sealed class SimulatedRadioClient : ICivClient
     }
 
     public List<byte[]> Sent { get; } = new();
+
+    /// <summary>
+    /// Replies that stand in for the recording's, keyed by the body sent (from
+    /// the command byte, with FD), e.g. "16 02 FD". The value is the reply body.
+    /// </summary>
+    public Dictionary<string, byte[]> Replies { get; } = new();
     public IEnumerable<string> SentHex => Sent.Select(CivRecording.Hex);
     public bool IsOpen => _inner.IsOpen;
 
@@ -55,6 +61,9 @@ internal sealed class SimulatedRadioClient : ICivClient
             return null;
         if (frame[3] == CivProtocol.ControllerAddress && frame[4] == CivProtocol.CmdReadId)
             return new CivFrame { To = CivProtocol.ControllerAddress, From = _address, Body = new byte[] { CivProtocol.CmdReadId, 0x00, _address } };
+
+        if (Replies.TryGetValue(CivRecording.Hex(frame[4..]), out var body))
+            return new CivFrame { To = CivProtocol.ControllerAddress, From = _address, Body = body };
 
         if (_plainUsb && CivRecording.Hex(frame[4..]) == "26 00 FD")
             return new CivFrame { To = CivProtocol.ControllerAddress, From = _address, Body = new byte[] { 0x26, 0x00, 0x01, 0x00, 0x01 } };
