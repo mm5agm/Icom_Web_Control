@@ -495,12 +495,12 @@ if ($PreRelease) {
 
 Do not install unless you're prepared for bugs and will report them on GitHub. IWC's in-app auto-updater ignores pre-releases, so existing users will not be prompted to upgrade to this build.
 
-Please send feedback via GitHub Issues (or mm5agm@outlook.com). Mention the ``$Version`` tag when reporting.
+Please report problems with the **Report a bug** button on the **About** page; it fills in your diagnostics. Mention the ``$Version`` tag when reporting.
 "@
 }
 else {
     Write-Step "Creating GitHub release $Version..."
-    $notesBody = "Please send bug reports to mm5agm@outlook.com"
+    $notesBody = "Found a bug? Open the **About** page and press **Report a bug**. It opens a bug report with your diagnostics already filled in."
 }
 
 # The notes go under whichever preamble applies. It is passed in a
