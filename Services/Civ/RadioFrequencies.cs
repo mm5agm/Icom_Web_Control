@@ -81,7 +81,8 @@ namespace Icom_Web_Control.Services.Civ
         /// IC-9700, from the specifications in its manual: 2 m, 70 cm and 23 cm,
         /// receive and transmit alike. These are the widest ranges; what a radio
         /// may transmit on depends on its version. It has one preamp on every
-        /// band (16 02 01; 02 and 03 are an external preamp, which IWC leaves alone).
+        /// band (16 02 bit 0; bit 1 is an external preamp, which IWC keeps as the
+        /// radio has it: see RadioProfile.HasExternalPreamp).
         /// </summary>
         public static readonly RadioFrequencies Ic9700 = new(
             new[]

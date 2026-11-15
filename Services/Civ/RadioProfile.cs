@@ -130,6 +130,14 @@ namespace Icom_Web_Control.Services.Civ
         /// <summary>True when the radio can offset its transmit frequency (21 02).</summary>
         public bool HasDeltaTx => AllowsCommand(0x21, 0x02);
 
+        /// <summary>
+        /// True when 16 02 also carries an external (mast-head) preamp, as on the
+        /// IC-9700: 00 both off, 01 internal on, 02 external on, 03 both on. IWC's
+        /// P.AMP key drives only the internal one (bit 0) and leaves the external
+        /// one (bit 1) as the radio has it.
+        /// </summary>
+        public bool HasExternalPreamp => Model == "IC-9700";
+
         /// <summary>How many preamps the radio has on this frequency.</summary>
         public int PreampSteps(long hz) =>
             Frequencies.OnePreampFromHz > 0 && hz >= Frequencies.OnePreampFromHz ? 1 : 2;

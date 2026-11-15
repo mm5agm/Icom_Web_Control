@@ -2787,7 +2787,7 @@ If you have an IC-7100 and would like to help, please open an issue on GitHub an
 - **IWC works on the Main band only.** When it connects, IWC selects the Main band and the Main scope. Leave the Sub band, Dualwatch and satellite mode to the radio. VFO A and VFO B in IWC are the Main band's two VFOs.
 - **Bands are 2m, 70cm and 23cm.** The HF band buttons aren't shown.
 - **Memories aren't read or written yet.** The IC-9700 keeps its memories by band, a layout IWC doesn't read yet. IWC's own memory list works.
-- **Controls it lacks are hidden.** That includes APF, delta TX and the antenna tuner. Its attenuator is 10 dB, and it has one preamp. IWC leaves an external preamp alone.
+- **Controls it lacks are hidden.** That includes APF, delta TX and the antenna tuner. Its attenuator is 10 dB, and it has one preamp. **P.AMP** switches only the radio's internal preamp. It shows whether the internal preamp is on, and it leaves an external (mast-head) preamp on or off as the radio has it. Switch the external preamp at the radio.
 - **Power follows the band:** 100 W on 2m, 75 W on 70cm and 10 W on 23cm.
 - **The swap button doesn't swap.** On this radio the command for it swaps the Main and Sub bands, so IWC doesn't send it.
 
