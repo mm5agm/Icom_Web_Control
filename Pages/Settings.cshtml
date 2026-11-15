@@ -2000,7 +2000,7 @@
                                 <br />
                                 <strong>IC-7100 (under test):</strong> 100W on HF and 6m, 50W on 4m and 2m, 35W on 70cm. Single receiver, no scope over CI-V. Not yet tried on a real radio, so IWC doesn't transmit on it yet.
                                 <br />
-                                <strong>IC-9700 (under test):</strong> 100W on 2m, 75W on 70cm, 10W on 23cm, real-time scope over CI-V. IWC controls the Main band only. Not yet tried on a real radio, so IWC doesn't transmit on it yet.
+                                <strong>IC-9700 (under test):</strong> 100W on 2m, 75W on 70cm, 10W on 23cm, real-time scope over CI-V. IWC controls the Main band only. Receive is confirmed on a real radio; transmit is new, so try it first into a dummy load at low power.
                             </div>
                             <span asp-validation-for="Settings.RadioModel" class="text-danger"></span>
                             <div id="ic7100MenuChecklist" class="alert alert-info mt-2 mb-0 py-2 px-3" style="display:none;" role="status">
@@ -3732,6 +3732,7 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/ui/settings-search-keywords.js" asp-append-version="true"></script>
     <script src="~/js/settings/settings-search.js" asp-append-version="true"></script>
+    <script src="~/js/settings/settings-unsaved.js" asp-append-version="true"></script>
     <script>
         // Per-section "Save Settings" buttons. Colin: scrolling to the single
         // Save button at the bottom of a long page is tedious, so give every

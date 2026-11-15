@@ -90,6 +90,23 @@ namespace Icom_Web_Control.Controllers
             return Ok(new { running });
         }
 
+        [HttpPost("js8call/launch")]
+        public async Task<IActionResult> LaunchJs8call()
+        {
+            return await LaunchExternalApp("JS8Call", "js8call", async () =>
+            {
+                var settings = await _settingsService.GetSettingsAsync();
+                return settings.Js8callCommandLine;
+            });
+        }
+
+        [HttpGet("js8call/status")]
+        public IActionResult Js8callStatus()
+        {
+            var running = _processStatusCache.IsProcessRunning("js8call");
+            return Ok(new { running });
+        }
+
         private async Task<IActionResult> LaunchExternalApp(string appName, string processName, Func<Task<string>> getCommandLine)
         {
             if (!OperatingSystem.IsWindows())

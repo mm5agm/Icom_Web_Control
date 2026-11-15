@@ -68,9 +68,10 @@ namespace Icom_Web_Control.Services.Civ
         /// (1C 00 01), no tuner tune (1C 01 02), no CW text (17, except 17 FF which
         /// stops keying). PTT off and the reads still go, so IWC can always let go.
         /// Paddle keying by DTR is refused too (CwKeyingService). Lift it per model
-        /// once a tester has confirmed transmit on a real radio.
+        /// once a tester has confirmed receive on a real radio. The IC-9700's was
+        /// lifted in v1.7.0-pre9 after a tester confirmed receive (IWC #137).
         /// </summary>
-        public bool TransmitBlocked => Model is "IC-7100" or "IC-9700";
+        public bool TransmitBlocked => Model is "IC-7100";
 
         /// <summary>True when the model named here is <see cref="TransmitBlocked"/>.</summary>
         public static bool TransmitBlockedFor(string? model) => ForModel(model)?.TransmitBlocked == true;

@@ -60,11 +60,13 @@ namespace Icom_Web_Control.Pages
         public bool ShowApp3Button { get; set; } = true;
         public bool ShowApp4Button { get; set; } = false;
         public bool ShowApp5Button { get; set; } = false;
+        public bool ShowApp6Button { get; set; } = false;
         public string App1Name { get; set; } = "WSJT-X";
         public string App2Name { get; set; } = "JTAlert";
         public string App3Name { get; set; } = "Log4OM";
         public string App4Name { get; set; } = "GridTracker";
         public string App5Name { get; set; } = "Fldigi";
+        public string App6Name { get; set; } = "JS8Call";
 
         // MIC Gain persisted value
         public int MicGain { get; set; } = 50;
@@ -193,6 +195,7 @@ namespace Icom_Web_Control.Pages
             ShowApp3Button = settings.ShowLog4omButton;
             ShowApp4Button = settings.ShowGridtrackerButton;
             ShowApp5Button = settings.ShowFldigiButton;
+            ShowApp6Button = settings.ShowJs8callButton;
             ShowFrequencyArrowButtons = settings.ShowFrequencyArrowButtons;
             TxToggleKey = settings.TxToggleKey == " " ? "Space" : (settings.TxToggleKey ?? string.Empty);
             App1Name = settings.App1Name;
@@ -200,6 +203,7 @@ namespace Icom_Web_Control.Pages
             App3Name = settings.App3Name;
             App4Name = settings.App4Name;
             App5Name = settings.App5Name;
+            App6Name = settings.App6Name;
             SdrSampleRateHz  = settings.SdrSampleRateHzA;     // legacy single value, used by old code paths
             SdrSampleRateHzA = settings.SdrSampleRateHzA;
             SdrSampleRateHzB = settings.SdrSampleRateHzB;

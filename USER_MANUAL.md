@@ -55,6 +55,7 @@
    - 9.2 [JTAlert](#92-jtalert)
    - 9.3 [Log4OM](#93-log4om)
    - 9.4 [GridTracker](#94-gridtracker)
+   - 9.5 [JS8Call](#95-js8call)
 10. [Meter Calibration](#10-meter-calibration)
     - 10.1 [Calibrating the S-Meter (receive)](#101-calibrating-the-s-meter-receive)
     - 10.2 [Calibrating the Power meter (transmit)](#102-calibrating-the-power-meter-transmit)
@@ -159,7 +160,7 @@ Supported radio:
 
 The MkII is the radio IWC is developed and bench-tested on. The original IC-7300 speaks near-identical CI-V and is **confirmed working by two owners independently** (most recently on v1.0.6); it needs a few settings the MkII does not, and they are collected in one place in [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently) — the short version is Icom's USB driver installed, **CI-V USB Port** unlinked from **[REMOTE]**, and the baud rate at **115200** — see also [§3](#3-first-time-setup) and [§6.1](#61-radio-connection). The CI-V address needs no setting on either radio; IWC detects it.
 
-The IC-7100 has **not yet been tried on a real radio**, and it has no band scope over CI-V, so it does not have everything the sentence below describes. Read [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) before using IWC with one. The IC-9700 hasn't been tried on a real radio either: read [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid) first.
+The IC-7100 has **not yet been tried on a real radio**, and it has no band scope over CI-V, so it does not have everything the sentence below describes. Read [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) before using IWC with one. The IC-9700 has had receive confirmed on a real radio, and transmit is new: read [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid) first.
 
 IWC connects to the radio over its CI-V computer-control interface, carried on the radio's single USB cable. No extra hardware is required — the spectrum scope, meters, and all controls come over that one connection.
 
@@ -1299,6 +1300,8 @@ Drag the right edge, the bottom edge or the bottom-right corner of the spectrum,
 
 Access Settings from the navigation bar or by clicking the settings icon. Changes take effect only after clicking **Save Settings**.
 
+**Unsaved changes.** Once you change anything on the page, a yellow bar at the bottom says the changes are not saved yet, with its own **Save Settings** button. If you try to leave the page before saving, the browser asks first. Changing a setting back to what it was makes the bar go away. A page that was already open in another tab (the main page, for example) keeps the old setting until you reload it.
+
 **Finding a setting.** The search box at the top of the page finds a setting by its name, by words in its help text, or by a word you might try for it, such as *sideband* or *PTT*. Matching settings are listed under the box and the sections with no match are hidden while you search. Choose a result to open its section and jump to it; press Esc to clear the search and put the page back as it was. Each setting also has its own link, such as `/Settings#band-plan` added to your IWC address, which you can bookmark or send to someone.
 
 At the top of the page, the **Network Access URLs** card lists the addresses you can use to reach IWC from this PC and from other devices on the LAN; the **Current Configuration** card on the right shows a one-line summary of what IWC is using right now (radio model, serial port, baud rate, network interface, web port, SDR device). The web port shown here is whichever port IWC actually managed to bind — usually 8080 but possibly 8081–8089 if 8080 was already in use on your PC.
@@ -1683,7 +1686,7 @@ Access Application Setup from the navigation bar. This page configures the exter
 
 ### 7.1 External App Buttons
 
-Up to five buttons can appear in the top bar to launch external applications. For each button you can set:
+Up to six buttons can appear in the top bar to launch external applications. For each button you can set:
 
 - **Show / Hide** — whether the button appears on the main page
 - **Button Name** — the label shown on the button (e.g., "WSJT-X")
@@ -1698,8 +1701,9 @@ Default command lines:
 | Log4OM | `"C:\Program Files (x86)\Log4OM 2\Log4OM.exe"` |
 | GridTracker | `"C:\Program Files\GridTracker2\GridTracker2.exe"` |
 | Fldigi | `"C:\Program Files\Fldigi-4.2.11\fldigi.exe"` (version may differ) |
+| JS8Call | `"C:\Program Files\js8call\bin\js8call.exe"` |
 
-Adjust these to match where you have installed each program. GridTracker and Fldigi are **off by default** — tick the **Show** box for each once you've installed it and confirmed the command line is correct. The Fldigi process detection uses the `fldigi.exe` task-manager name.
+Adjust these to match where you have installed each program. GridTracker, Fldigi and JS8Call are **off by default** — tick the **Show** box for each once you've installed it and confirmed the command line is correct. The Fldigi process detection uses the `fldigi.exe` task-manager name, and JS8Call's uses `js8call.exe`. A button turns green only for the program its slot is made for, so if you put a different program in a slot, the button starts it but doesn't turn green.
 
 #### Path quoting — important
 
@@ -2139,6 +2143,20 @@ GridTracker is a separate desktop app that draws a live world map of WSJT-X grid
 **GridTracker Logging settings** — the **Logging** tab shows where GridTracker forwards finished QSOs. The default *App Log(s)* feed (`wsjtx_log.adi`) is enough for the WSJT-X → Log4OM ADIF path documented in §9.3 — no additional logger needs to be configured here unless you also want GridTracker to push QSOs to QRZ, ClubLog, HRDLOG, etc.
 
 ![GridTracker Logging tab](pictures/Gridtracker_Logging.png)
+
+### 9.5 JS8Call
+
+JS8Call controls the radio through IWC the same way WSJT-X does, so IWC keeps the COM port and JS8Call goes through it.
+
+**Setup:**
+
+1. Install JS8Call from [js8call.com](http://js8call.com/).
+2. In IWC, open **Application Setup**. In the **Application 6** card, check the **Command Line** matches where JS8Call is installed (default: `"C:\Program Files\js8call\bin\js8call.exe"`), tick **Show** and click **Save**.
+3. A **JS8Call** button appears in the top bar. Green = running, red = not running. Click it to launch.
+4. In JS8Call, open **File → Settings → Radio** and set **Rig: Hamlib NET rigctl**, **Network Server: localhost:4532** and **PTT Method: CAT**. Click **Test CAT**; it should go green.
+5. Under **Settings → Audio**, set **Input** and **Output** to the radio's **USB Audio CODEC**. IWC doesn't carry the audio: JS8Call sends it straight to the radio.
+
+**No transmit audio?** Check that JS8Call's **Output** is still the USB Audio CODEC (a reinstall or a Windows update can change it), that the CODEC isn't muted or at zero in Windows **Sound settings**, and on the radio that **DATA MOD** is **USB** and **USB MOD Level** is above 0. Watch the ALC meter while transmitting.
 
 ---
 
@@ -2772,9 +2790,9 @@ If you have an IC-7100 and would like to help, please open an issue on GitHub an
 
 ### 15.10 I have an IC-9700: what works, and what should I avoid?
 
-**The IC-9700 is under test.** It is written from Icom's CI-V reference and has only been run against a simulated radio. Nothing has been tried on a real IC-9700 yet, so please treat every part of it as unproven.
+**The IC-9700 is under test.** It is written from Icom's CI-V reference. An owner has confirmed that on a real IC-9700 receive works: frequency, mode, tuning, the band scope on all three bands, ATT, filter and AGC (issue #137). Everything else is still unproven.
 
-**IWC doesn't transmit on an IC-9700 yet.** Until an owner has confirmed receive works, IWC refuses TX, Tune, CW text from CW Send and keyer memories, voice commands that transmit, and paddle keying by DTR. The radio's own PTT, mic and key still work as normal. The log says "Transmit refused" each time. Tuning, changing band and mode, the band scope and the meters are the things to try.
+**Transmit is new on the IC-9700.** From v1.7.0-pre9 IWC sends TX, CW text from CW Send and keyer memories, voice commands that transmit, and paddle keying by DTR, as it does for an IC-7300. It has not yet been tried on a real radio, so for the first time use a dummy load or an antenna you know is good, start at low power, and check that the radio goes back to receive when you release TX. The 9700 has no antenna tuner, so there is no Tune.
 
 **To set it up:**
 

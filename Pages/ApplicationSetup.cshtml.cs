@@ -63,6 +63,16 @@ namespace Icom_Web_Control.Pages
         [BindProperty]
         public string App5CommandLine { get; set; } = string.Empty;
 
+        // App 6 (default: JS8Call)
+        [BindProperty]
+        public bool ShowApp6Button { get; set; }
+
+        [BindProperty]
+        public string App6Name { get; set; } = "JS8Call";
+
+        [BindProperty]
+        public string App6CommandLine { get; set; } = string.Empty;
+
         // WSJT-X UDP Settings
         [BindProperty]
         public string WsjtxUdpAddress { get; set; } = "127.0.0.1";
@@ -99,6 +109,11 @@ namespace Icom_Web_Control.Pages
             App5Name = settings.App5Name;
             App5CommandLine = settings.FldigiCommandLine;
 
+            // App 6
+            ShowApp6Button = settings.ShowJs8callButton;
+            App6Name = settings.App6Name;
+            App6CommandLine = settings.Js8callCommandLine;
+
             // UDP Settings
             WsjtxUdpAddress = settings.WsjtxUdpAddress;
             WsjtxUdpPort = settings.WsjtxUdpPort;
@@ -132,6 +147,11 @@ namespace Icom_Web_Control.Pages
             settings.ShowFldigiButton = ShowApp5Button;
             settings.App5Name = App5Name;
             settings.FldigiCommandLine = App5CommandLine;
+
+            // App 6
+            settings.ShowJs8callButton = ShowApp6Button;
+            settings.App6Name = App6Name;
+            settings.Js8callCommandLine = App6CommandLine;
 
             // UDP Settings
             settings.WsjtxUdpAddress = WsjtxUdpAddress;

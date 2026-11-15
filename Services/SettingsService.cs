@@ -169,6 +169,7 @@ namespace Icom_Web_Control.Services
             s.Log4omCommandLine      = AutoQuote(s.Log4omCommandLine);
             s.GridtrackerCommandLine = AutoQuote(s.GridtrackerCommandLine);
             s.FldigiCommandLine      = AutoQuote(s.FldigiCommandLine);
+            s.Js8callCommandLine     = AutoQuote(s.Js8callCommandLine);
         }
 
         private static string AutoQuote(string value)
@@ -256,16 +257,19 @@ namespace Icom_Web_Control.Services
             to.Log4omCommandLine      = from.Log4omCommandLine;
             to.GridtrackerCommandLine = from.GridtrackerCommandLine;
             to.FldigiCommandLine      = from.FldigiCommandLine;
+            to.Js8callCommandLine     = from.Js8callCommandLine;
             to.App1Name = from.App1Name;
             to.App2Name = from.App2Name;
             to.App3Name = from.App3Name;
             to.App4Name = from.App4Name;
             to.App5Name = from.App5Name;
+            to.App6Name = from.App6Name;
             to.ShowWsjtxButton       = from.ShowWsjtxButton;
             to.ShowJtalertButton     = from.ShowJtalertButton;
             to.ShowLog4omButton      = from.ShowLog4omButton;
             to.ShowGridtrackerButton = from.ShowGridtrackerButton;
             to.ShowFldigiButton      = from.ShowFldigiButton;
+            to.ShowJs8callButton     = from.ShowJs8callButton;
 
             // WSJT-X UDP link
             to.WsjtxUdpAddress = from.WsjtxUdpAddress;

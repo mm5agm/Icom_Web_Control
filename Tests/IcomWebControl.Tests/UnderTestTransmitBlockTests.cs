@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace IcomWebControl.Tests;
 
 /// <summary>
-/// The under-test radios (IC-7100, IC-9700) are never sent a frame that
-/// transmits: no PTT on, no tuner tune, no CW text. PTT off and CW stop still
-/// go, so IWC can always let go. The IC-7300s are unchanged.
+/// The under-test IC-7100 is never sent a frame that transmits: no PTT on, no
+/// tuner tune, no CW text. PTT off and CW stop still go, so IWC can always let
+/// go. The IC-7300s and the IC-9700 (receive confirmed, IWC #137) transmit.
 /// </summary>
 public class UnderTestTransmitBlockTests
 {
@@ -16,12 +16,10 @@ public class UnderTestTransmitBlockTests
         body.StartsWith("1C 00 01") || body.StartsWith("1C 01 02")
         || (body.StartsWith("17 ") && body != "17 FF FD");
 
-    [Theory]
-    [InlineData(0xA2)] // IC-9700
-    [InlineData(0x88)] // IC-7100
-    public async Task NoActionSendsAFrameThatTransmits(byte address)
+    [Fact]
+    public async Task NoActionSendsTheIc7100AFrameThatTransmits()
     {
-        var actions = await RadioActionRecorder.RecordAll(address);
+        var actions = await RadioActionRecorder.RecordAll(0x88);
         foreach (var action in actions)
             foreach (var frame in action.Frames)
                 Assert.False(Transmits(Body(frame)), $"{action.Label} sent {frame}");
@@ -29,10 +27,12 @@ public class UnderTestTransmitBlockTests
         Assert.Contains(actions, a => a.Frames.Any(f => Body(f) == "1C 00 00 FD"));
     }
 
-    [Fact]
-    public async Task TheMkIIIsStillSentTransmitFrames()
+    [Theory]
+    [InlineData(0xB6)] // IC-7300 MkII
+    [InlineData(0xA2)] // IC-9700
+    public async Task TheseRadiosAreSentTransmitFrames(byte address)
     {
-        var actions = await RadioActionRecorder.RecordAll(0xB6);
+        var actions = await RadioActionRecorder.RecordAll(address);
         Assert.Contains(actions, a => a.Frames.Any(f => Body(f) == "1C 00 01 FD"));
         Assert.Contains(actions, a => a.Frames.Any(f => Body(f).StartsWith("17 ") && Body(f) != "17 FF FD"));
     }
@@ -52,17 +52,19 @@ public class UnderTestTransmitBlockTests
     [Fact]
     public void OnlyTheUnderTestModelsAreBlocked()
     {
-        Assert.True(RadioProfile.Ic9700.TransmitBlocked);
+        Assert.False(RadioProfile.Ic9700.TransmitBlocked);
         Assert.True(RadioProfile.Ic7100.TransmitBlocked);
         Assert.False(RadioProfile.Ic7300Mk2.TransmitBlocked);
         Assert.False(RadioProfile.Ic7300.TransmitBlocked);
     }
 
     [Theory]
-    [InlineData(null, "IC-9700", false)]          // not identified yet: Settings decides
-    [InlineData("Icom(A4)", "IC-9700", false)]    // a changed CI-V address: Settings decides
-    [InlineData("IC-7300MK2", "IC-9700", true)]   // a recognised radio decides
-    [InlineData("IC-9700", "IC-7300MK2", false)]
+    [InlineData(null, "IC-7100", false)]          // not identified yet: Settings decides
+    [InlineData("Icom(A4)", "IC-7100", false)]    // a changed CI-V address: Settings decides
+    [InlineData("IC-7300MK2", "IC-7100", true)]   // a recognised radio decides
+    [InlineData("IC-7100", "IC-7300MK2", false)]
+    [InlineData("IC-9700", "IC-7100", true)]      // the IC-9700 transmits now
+    [InlineData(null, "IC-9700", true)]
     [InlineData(null, "IC-7300MK2", true)]
     public async Task TheGuardRefusesPttOnByModel(string? answered, string chosen, bool sent)
     {
