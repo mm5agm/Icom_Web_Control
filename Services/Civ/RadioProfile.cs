@@ -63,6 +63,36 @@ namespace Icom_Web_Control.Services.Civ
         public bool HasSubBand => Model == "IC-9700";
 
         /// <summary>
+        /// True for a model whose transmit commands have never reached a real radio
+        /// (the "under test" ones). IWC sends it no frame that transmits: no PTT on
+        /// (1C 00 01), no tuner tune (1C 01 02), no CW text (17, except 17 FF which
+        /// stops keying). PTT off and the reads still go, so IWC can always let go.
+        /// Paddle keying by DTR is refused too (CwKeyingService). Lift it per model
+        /// once a tester has confirmed transmit on a real radio.
+        /// </summary>
+        public bool TransmitBlocked => Model is "IC-7100" or "IC-9700";
+
+        /// <summary>True when the model named here is <see cref="TransmitBlocked"/>.</summary>
+        public static bool TransmitBlockedFor(string? model) => ForModel(model)?.TransmitBlocked == true;
+
+        /// <summary>
+        /// True when this frame body (from the command byte, without FD) makes the
+        /// radio transmit: PTT on, a tuner tune cycle, or CW text to send.
+        /// </summary>
+        public static bool IsTransmitBody(ReadOnlySpan<byte> body)
+        {
+            if (body.Length == 0) return false;
+            if (body[0] == CivProtocol.CmdCwSend)
+                return !(body.Length == 2 && body[1] == CivProtocol.CwStop) && body.Length > 1;
+            if (body[0] == CivProtocol.CmdTransmit && body.Length >= 3)
+            {
+                if (body[1] == CivProtocol.SubTxStatus) return body[2] != 0x00;
+                if (body[1] == CivProtocol.SubTuner) return body[2] == CivProtocol.TunerTune;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// The 1A 05 items that let the USB port's DTR and RTS lines transmit or key
         /// the radio, each OFF when it reads 00. From each radio's own manual. The
         /// IC-7100's manual lists no such item, so there is nothing to read on it.
@@ -292,6 +322,7 @@ namespace Icom_Web_Control.Services.Civ
             while (preamble < frame.Length && frame[preamble] == CivProtocol.Preamble) preamble++;
             int cmdAt = preamble + 2;  // past To and From
             if (preamble < 2 || cmdAt >= frame.Length - 1 || frame[^1] != CivProtocol.End) return false;
+            if (TransmitBlocked && IsTransmitFrame(frame)) return false;
 
             if (!_allowed.TryGetValue(frame[cmdAt], out var rule)) return false;
             bool hasData = cmdAt + 1 < frame.Length - 1;
@@ -308,6 +339,16 @@ namespace Icom_Web_Control.Services.Civ
                 if (!_menuItems.Contains(item)) return false;
             }
             return rule.Allows(hasData, hasData ? frame[cmdAt + 1] : (byte)0);
+        }
+
+        /// <summary>True when this whole frame (FE FE to from cmd ... FD) makes the radio transmit.</summary>
+        public static bool IsTransmitFrame(byte[] frame)
+        {
+            int preamble = 0;
+            while (preamble < frame.Length && frame[preamble] == CivProtocol.Preamble) preamble++;
+            int cmdAt = preamble + 2;
+            if (preamble < 2 || cmdAt >= frame.Length - 1 || frame[^1] != CivProtocol.End) return false;
+            return IsTransmitBody(frame.AsSpan(cmdAt, frame.Length - 1 - cmdAt));
         }
 
         private sealed class CommandRule
