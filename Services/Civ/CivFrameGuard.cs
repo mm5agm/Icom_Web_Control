@@ -21,13 +21,21 @@ namespace Icom_Web_Control.Services.Civ
         private readonly ICivClient _inner;
         private readonly Func<string?> _model;
         private readonly ILogger _logger;
+        private readonly Func<string?> _chosenModel;
         private readonly HashSet<string> _logged = new();
 
-        public CivFrameGuard(ICivClient inner, Func<string?> model, ILogger logger)
+        /// <param name="chosenModel">
+        /// The model chosen in Settings. A frame that transmits is refused when
+        /// the radio that answered is under test (<see cref="RadioProfile.TransmitBlocked"/>),
+        /// or, when IWC didn't recognise it, this one is: an IC-9700 whose CI-V
+        /// address has been changed still can't be keyed.
+        /// </param>
+        public CivFrameGuard(ICivClient inner, Func<string?> model, ILogger logger, Func<string?>? chosenModel = null)
         {
             _inner = inner;
             _model = model;
             _logger = logger;
+            _chosenModel = chosenModel ?? (() => null);
         }
 
         public bool IsOpen => _inner.IsOpen;
@@ -56,6 +64,15 @@ namespace Icom_Web_Control.Services.Civ
         {
             var model = _model();
             var profile = RadioProfile.ForModel(model);
+            // A radio IWC recognised decides; one it didn't (a changed CI-V
+            // address) falls back to the model chosen in Settings.
+            var blockedModel = profile != null ? model : _chosenModel();
+            if (RadioProfile.TransmitBlockedFor(blockedModel) && RadioProfile.IsTransmitFrame(frame))
+            {
+                _logger.LogWarning("[CivFrameGuard] Transmit refused: {Model} is under test, and IWC doesn't transmit on it yet: {Frame}",
+                    blockedModel, Convert.ToHexString(frame));
+                return false;
+            }
             if (profile == null || profile.Allows(frame)) return true;
 
             // Say so once per frame, not on every poll.

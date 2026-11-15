@@ -2753,7 +2753,7 @@ It is worth turning on whenever you are zero-beating CW or chasing a drifting RT
 
 **The IC-7100 is under test.** It is written from Icom's manual and has only been run against a simulated radio. Nothing has been tried on a real IC-7100 yet, so please treat every part of it as unproven.
 
-**Until an owner has confirmed it, stay on receive.** Tuning, changing band and mode, reading the meters and reading memories are the things to try first. **Don't press transmit, Tune, or the CW keys on an IC-7100, and don't use voice commands that transmit.** Those commands have never reached a real radio, so nobody knows yet that they do only what they should.
+**IWC doesn't transmit on an IC-7100 yet.** Those commands have never reached a real radio, so nobody knows yet that they do only what they should. Until an owner has confirmed receive works, IWC refuses them: TX, Tune, CW text from CW Send and keyer memories, voice commands that transmit, and paddle keying by DTR. The radio's own PTT, mic and key still work as normal. The log says "Transmit refused" each time. Tuning, changing band and mode, reading the meters and reading memories are the things to try.
 
 **To set it up:**
 
@@ -2774,7 +2774,7 @@ If you have an IC-7100 and would like to help, please open an issue on GitHub an
 
 **The IC-9700 is under test.** It is written from Icom's CI-V reference and has only been run against a simulated radio. Nothing has been tried on a real IC-9700 yet, so please treat every part of it as unproven.
 
-**Until an owner has confirmed it, stay on receive.** Tuning, changing band and mode, the band scope and the meters are the things to try first. **Don't press transmit, Tune, or the CW keys on an IC-9700, and don't use voice commands that transmit.**
+**IWC doesn't transmit on an IC-9700 yet.** Until an owner has confirmed receive works, IWC refuses TX, Tune, CW text from CW Send and keyer memories, voice commands that transmit, and paddle keying by DTR. The radio's own PTT, mic and key still work as normal. The log says "Transmit refused" each time. Tuning, changing band and mode, the band scope and the meters are the things to try.
 
 **To set it up:**
 

@@ -74,11 +74,19 @@ namespace Icom_Web_Control.Services.Cw
         // Set by the line when the port failed mid-keying; acted on after the player returns.
         private Exception? _lineFailed;
 
-        public CwKeyingService(IHubContext<RadioHub> hub, ILogger<CwKeyingService> logger, ICivClient civ)
+        private readonly RadioStateService? _radioState;
+        private readonly ISettingsService? _settings;
+        // The model chosen in Settings, read when a key port is chosen.
+        private volatile string? _chosenModel;
+
+        public CwKeyingService(IHubContext<RadioHub> hub, ILogger<CwKeyingService> logger, ICivClient civ,
+                               RadioStateService? radioState = null, ISettingsService? settings = null)
         {
             _hub = hub;
             _logger = logger;
             _civ = civ;
+            _radioState = radioState;
+            _settings = settings;
             _dryRun = new DryRunCwKeyLine(logger);
             _player = new CwKeyingPlayer(new SwitchLine(this));
             _player.Report += OnReport;
@@ -86,6 +94,18 @@ namespace Icom_Web_Control.Services.Cw
         }
 
         private double NowMs => _clock.Elapsed.TotalMilliseconds;
+
+        /// <summary>
+        /// The under-test model (RadioProfile.TransmitBlocked) the key would go to,
+        /// or null when keying is allowed. The radio that answered decides; before
+        /// one has, or if IWC didn't recognise it, the model chosen in Settings.
+        /// </summary>
+        private string? TransmitBlockedModel()
+        {
+            var answered = _radioState?.RadioModel;
+            var model = RadioProfile.ForModel(answered) != null ? answered : _chosenModel;
+            return RadioProfile.TransmitBlockedFor(model) ? model : null;
+        }
 
         private string Mode => _serial is null ? "dry run" : $"DTR on {_serial.PortName}";
 
@@ -97,6 +117,13 @@ namespace Icom_Web_Control.Services.Cw
                 if (s._serial is null)
                 {
                     s._dryRun.SetKey(down);
+                    return;
+                }
+                if (down && s.TransmitBlockedModel() is { } blocked)
+                {
+                    // The radio changed to an under-test one after the port was chosen.
+                    s._lineFailed = new InvalidOperationException($"{blocked} is under test, and IWC doesn't key it yet");
+                    s.CloseSerial();
                     return;
                 }
                 try
@@ -166,6 +193,13 @@ namespace Icom_Web_Control.Services.Cw
                 {
                     _logger.LogInformation("CW keying: key line is the dry run.");
                     return null;
+                }
+                try { _chosenModel = _settings?.GetSettingsAsync().GetAwaiter().GetResult().RadioModel; }
+                catch (Exception ex) { _logger.LogDebug(ex, "CW keying: settings not read."); }
+                if (TransmitBlockedModel() is { } blocked)
+                {
+                    _logger.LogWarning("CW keying: key port refused, {Model} is under test.", blocked);
+                    return $"The {blocked} is under test, and IWC doesn't transmit on it yet. The dry run still works.";
                 }
                 if (!OperatingSystem.IsWindows())
                     return "Keying by DTR isn't available on this system yet. The dry run still works.";

@@ -389,7 +389,7 @@ namespace Icom_Web_Control.Services
             IHostApplicationLifetime? lifetime = null)
         {
             _state = state;
-            _bus = new CivFrameGuard(bus, () => ModelId, logger);
+            _bus = new CivFrameGuard(bus, () => ModelId, logger, () => _chosenModel);
             _settings = settings;
             _hubContext = hubContext;
             _finder = finder;
@@ -405,6 +405,11 @@ namespace Icom_Web_Control.Services
 
         public bool IsConnected => _bus.IsOpen;
         public string? ModelId { get; private set; }
+
+        // The model chosen in Settings, for the frame guard's transmit block: an
+        // under-test radio whose CI-V address was changed isn't recognised from
+        // its ID, so the choice in Settings is honoured as well.
+        private volatile string? _chosenModel;
 
         /// <summary>
         /// Off Windows, opening a serial port may raise DTR and RTS, and a radio set
@@ -425,6 +430,7 @@ namespace Icom_Web_Control.Services
         public async Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
         {
             var settings = await _settings.GetSettingsAsync();
+            _chosenModel = settings.RadioModel;
             var port = settings.SerialPort;
             var baud = settings.BaudRate;
 

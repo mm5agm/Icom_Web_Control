@@ -655,8 +655,9 @@
                            same toggleAtuTune(). *@
                         <button id="atuTuneBtn" data-a11y-key="controls.atuTune"
                                 class="btn btn-sm btn-outline-secondary ms-1"
-                                aria-label="Start an antenna tuner auto-tune cycle"
-                                title="Start an auto-tune cycle; press again to stop it early"
+                                aria-label="@(Model.Profile.TransmitBlocked ? $"Tune is off: the {Model.Profile.Model} is under test, and IWC doesn't transmit on it yet" : "Start an antenna tuner auto-tune cycle")"
+                                title="@(Model.Profile.TransmitBlocked ? $"Off: the {Model.Profile.Model} is under test, and IWC doesn't transmit on it yet" : "Start an auto-tune cycle; press again to stop it early")"
+                                disabled="@Model.Profile.TransmitBlocked"
                                 onclick="toggleAtuTune()">Tune</button>
                         <button id="monitorOnBtn"
                                 class="btn btn-sm ms-2 @(Model.MonitorOn ? "btn-warning" : "btn-outline-secondary")"
