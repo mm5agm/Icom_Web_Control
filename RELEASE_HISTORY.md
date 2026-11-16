@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre10 (2026-11-16)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
+
+- **Out of band in your own region, not Region 1 (#137).** IWC never read the **Band Plan / IARU Region** setting when deciding which band you're on, so it always used Region 1. Outside Region 1 that showed OOB on frequencies you're allowed: above 146 MHz on 2 m and outside 430–440 MHz on 70 cm in Region 2, or above 3.8 MHz on 80 m. The band buttons and Segment list now follow your region. Found by an IC-9700 owner in Region 2.
+- **pre9 called itself pre8.** The title bar, About page and logs of v1.7.0-pre9 said v1.7.0-pre8, although it was pre9. This one says pre10.
+- Changes from v1.7.0-pre1 to pre9 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre9-2026-11-15).
+
 ### v1.7.0-pre9 (2026-11-15)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
