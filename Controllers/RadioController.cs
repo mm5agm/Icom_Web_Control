@@ -108,6 +108,46 @@ namespace Icom_Web_Control.Controllers
             return Ok(CrossBandWatchState(s));
         }
 
+        // -- MOD input: DATA OFF MOD and DATA MOD (1A 05, IWC #144) ------------
+        // Where transmit audio comes from. Reading and choosing a source never
+        // keys the radio; the items and choices come from the radio's profile.
+
+        public sealed class ModInputRequest
+        {
+            public bool Data { get; set; }
+            public int Choice { get; set; }
+        }
+
+        [HttpGet("mod-input")]
+        public async Task<IActionResult> GetModInput(CancellationToken ct)
+        {
+            var items = Services.Civ.RadioProfile.ForModel(_radio.ModelId)?.ModInput;
+            if (items is null) return Ok(new { available = false });
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio not connected" });
+            var state = await Services.Civ.ModInput.ReadAsync(_radio, items, ct);
+            return Ok(new { available = true, choices = items.Choices, dataOff = state.DataOff, data = state.Data });
+        }
+
+        [HttpPost("mod-input")]
+        public async Task<IActionResult> SetModInput([FromBody] ModInputRequest request, CancellationToken ct)
+        {
+            var items = Services.Civ.RadioProfile.ForModel(_radio.ModelId)?.ModInput;
+            if (items is null) return BadRequest(new { error = "This radio has no MOD input items" });
+            if (request.Choice < 0 || request.Choice >= items.Choices.Count)
+                return BadRequest(new { error = "No such choice" });
+            if (!_radio.IsConnected)
+                return StatusCode(503, new { error = "Radio not connected" });
+            var now = await Services.Civ.ModInput.SetAsync(_radio, items, request.Data, request.Choice, ct);
+            if (now != request.Choice)
+            {
+                _logger.LogWarning("MOD input: {Item} to {Choice} not taken (read back {Now})",
+                    request.Data ? "DATA MOD" : "DATA OFF MOD", items.Choices[request.Choice], now);
+                return StatusCode(502, new { error = "The radio didn't take it" });
+            }
+            return Ok(new { data = request.Data, choice = now });
+        }
+
         // CrossBandWatch's value, here and in RadioHub's replay on connect.
         public static object CrossBandWatchState(Models.ApplicationSettings s)
             => new { enabled = s.PseudoDualCrossBandEnabled, intervalSeconds = Math.Clamp(s.PseudoDualPeekIntervalSeconds, 5, 60) };

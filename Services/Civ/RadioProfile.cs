@@ -12,6 +12,12 @@ namespace Icom_Web_Control.Services.Civ
     /// on another radio. That matters most for 1A 05: the item numbers are different
     /// on every model, and a radio accepts an item number it reads differently.
     /// </summary>
+    /// <summary>
+    /// A radio's MOD input items: DATA OFF MOD and DATA MOD, and the choices
+    /// each takes, indexed by the value the radio stores (00, 01, ...).
+    /// </summary>
+    public sealed record ModInputItems(int DataOffItem, int DataItem, IReadOnlyList<string> Choices);
+
     public sealed class RadioProfile
     {
         private readonly IReadOnlyDictionary<byte, CommandRule>? _allowed;
@@ -104,6 +110,22 @@ namespace Icom_Web_Control.Services.Civ
             "IC-7300" => new[] { (78, "USB SEND"), (79, "USB Keying (CW)"), (80, "USB Keying (RTTY)") },
             "IC-9700" => new[] { (120, "USB SEND"), (121, "USB Keying (CW)"), (122, "USB Keying (RTTY)") },
             _ => Array.Empty<(int, string)>(),
+        };
+
+        /// <summary>
+        /// The two 1A 05 items that choose where transmit audio comes from: DATA OFF
+        /// MOD (used outside the data modes) and DATA MOD (in them), and the choices
+        /// in the order the radio numbers them, 00 first. From each radio's own
+        /// manual: the MkII and the IC-9700 have the same six choices in a different
+        /// order, and the original IC-7300 has no LAN. Null for a radio with no
+        /// mapped items (IWC #144). Changing them never keys the radio.
+        /// </summary>
+        public ModInputItems? ModInput => Model switch
+        {
+            "IC-7300MK2" => new(84, 85, new[] { "MIC", "USB", "ACC", "MIC,USB", "MIC,ACC", "LAN" }),
+            "IC-7300" => new(66, 67, new[] { "MIC", "ACC", "MIC,ACC", "USB", "MIC,USB" }),
+            "IC-9700" => new(115, 116, new[] { "MIC", "ACC", "MIC,ACC", "USB", "MIC,USB", "LAN" }),
+            _ => null,
         };
 
         /// <summary>The attenuator's size. The CI-V value is the dB figure in BCD.</summary>
@@ -209,8 +231,8 @@ namespace Icom_Web_Control.Services.Civ
         /// IC-9700, from its CI-V reference (IC-9700_ENG_CI-V_4). It has a Main and a
         /// Sub band; IWC drives Main only (<see cref="HasSubBand"/>). Its scope takes
         /// the 7300's commands with the Main scope selected. Its 1A 05 table differs
-        /// from the 7300's, so only the USB SEND and keying items are allowed, which
-        /// IWC only reads. Memories (1A 00) start with a band byte, a layout IWC
+        /// from the 7300's, so only the MOD input items (115, 116) and the USB SEND and
+        /// keying items, which IWC only reads, are allowed. Memories (1A 00) start with a band byte, a layout IWC
         /// doesn't read yet, so they are not allowed. 07 B0 swaps Main and Sub on
         /// this radio, not VFO A and B, so it is left out. No APF (16 32), no delta
         /// TX (21 02), no tuner (1C 01), no voice keyer frames (28) until tested.
@@ -240,7 +262,7 @@ namespace Icom_Web_Control.Services.Civ
                 [0x26] = CommandRule.Any,                                   // VFO mode
                 [0x27] = CommandRule.Subs(0x00, 0x10, 0x11, 0x12, 0x14, 0x15), // scope: data, on, output, Main/Sub, mode, span
             },
-            new HashSet<int> { 120, 121, 122 });
+            new HashSet<int> { 115, 116, 120, 121, 122 });
 
         /// <summary>
         /// IC-7100, from section 20 of its manual. It has no scope commands (27) and
