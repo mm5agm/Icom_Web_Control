@@ -12,6 +12,13 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre11 (2026-11-16)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
+
+- **MOD IN on the Radio panel (#144).** Choose where transmit audio comes from without going into the radio's menu. A press reads **DATA OFF MOD** (used in SSB, AM and FM) and **DATA MOD** (used in USB-D and LSB-D) from the radio and lists them; the one in use now says **(IN USE NOW)** and each current choice has a ✓. Pick MIC, USB, ACC, MIC,USB, MIC,ACC or LAN, and IWC sets it and reads it back to check. The source in use shows under the key. On the IC-7300MK2, the original IC-7300 (no LAN choice) and the IC-9700. It doesn't transmit. See section 5.20 of the [user manual](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#520-radio-panel).
+- Changes from v1.7.0-pre1 to pre10 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre10-2026-11-16).
+
 ### v1.7.0-pre10 (2026-11-16)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
