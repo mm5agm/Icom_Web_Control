@@ -46,6 +46,7 @@
             canWriteMemories: @(Model.Profile.CanWriteMemories ? "true" : "false"),
             hasApf: @(Model.Profile.HasApf ? "true" : "false"),
             hasDeltaTx: @(Model.Profile.HasDeltaTx ? "true" : "false"),
+            hasModInput: @(Model.Profile.ModInput is not null ? "true" : "false"),
             bandPlan: '@Model.BandPlan',
             pseudoDual: @(Model.PseudoDualReceiverEnabled ? "true" : "false"),
             autoModeChangeOnTune: @(Model.AutoModeChangeOnTune ? "true" : "false"),

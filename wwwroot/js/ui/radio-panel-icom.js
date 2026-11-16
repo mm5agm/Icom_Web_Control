@@ -71,11 +71,12 @@ const VOICE_TITLE = 'Voice control: hold while you speak a command, release when
 const XWATCH_TITLE = 'Cross-band watch: a press lists Off and how often to peek. On, the watch VFO on another band is refreshed by briefly retuning the receiver, which dips your audio. Switch it off for a QSO';
 const XWATCH_SECONDS = [5, 10, 15, 20, 30, 45, 60];
 const XWATCH_OFF_TEXT = 'Cross-band watch is off: X-WATCH switches it on';
+const MODIN_TITLE = 'MOD input: where transmit audio comes from (MIC, USB, ACC...). A press lists DATA OFF MOD, used in the voice modes, and DATA MOD, used in USB-D and LSB-D. Choosing one does not transmit';
 const widthLabel = hz => (hz < 1000 ? hz + ' Hz' : (hz / 1000).toFixed(hz % 1000 ? (hz % 100 ? 2 : 1) : 1) + ' kHz');
 
 /**
  * @param {HTMLElement} root
- * @param {object} cfg  { conn, model, maxPowerW, maxHz, bandPlan, pseudoDual, autoModeChangeOnTune, voice, views, menu }
+ * @param {object} cfg  { conn, model, maxPowerW, maxHz, bandPlan, pseudoDual, autoModeChangeOnTune, voice, hasModInput, views, menu }
  */
 export function startIcomRadioPanel(root, cfg) {
     const model = cfg.model;
@@ -123,6 +124,7 @@ export function startIcomRadioPanel(root, cfg) {
             // end the command. Only with Settings > Voice Control on.
             ...(cfg.voice ? [{ id: 'voice', label: 'VOICE', hold: true, title: VOICE_TITLE }] : []),
             ...(pseudoDual ? [{ id: 'xwatch', label: 'X-WATCH', title: XWATCH_TITLE }] : []),
+            ...(cfg.hasModInput ? [{ id: 'modin', label: 'MOD IN', title: MODIN_TITLE }] : []),
         ],
         rxGroups: {
             knobs: [
@@ -444,6 +446,46 @@ export function startIcomRadioPanel(root, cfg) {
         return true;
     }
 
+    // ---- MOD input: DATA OFF MOD and DATA MOD (IWC #144) ------------------
+    // Two SET-menu items, read when the list opens. The one in use is DATA MOD
+    // when the transmit VFO is in a data mode. The key's second line shows the
+    // source in use.
+    const modIn = { choices: null, dataOff: null, data: null };
+    const txVfo = () => (r.split ? (r.sel === 'A' ? 'B' : 'A') : r.sel);
+    const modInDataNow = () => /^DATA/.test(r.mode[txVfo()]);
+    function showModIn() {
+        if (!cfg.hasModInput || !modIn.choices) return;
+        const v = modInDataNow() ? modIn.data : modIn.dataOff;
+        panel.setKey('modin', { sub: v == null ? '' : modIn.choices[v] });
+    }
+    async function readModIn() {
+        if (!cfg.hasModInput) return false;
+        const res = await fetch('/api/radio/mod-input').catch(() => null);
+        if (!res?.ok) return false;
+        const j = await res.json().catch(() => null);
+        if (!j?.available) return false;
+        Object.assign(modIn, { choices: j.choices, dataOff: j.dataOff, data: j.data });
+        showModIn();
+        return true;
+    }
+    async function modInList() {
+        const kl = root.querySelector('.rp-keylist');
+        if (kl && !kl.hidden && kl.dataset.for === ':modin') return panel.closeKeyList();
+        if (!await readModIn()) return panel.setKey('modin', { sub: 'NO READ' });
+        const inData = modInDataNow();
+        const items = [];
+        for (const [data, name, where] of [[false, 'DATA OFF MOD', 'the voice modes'], [true, 'DATA MOD', 'USB-D and LSB-D']]) {
+            items.push({ group: name + (data === inData ? ' (IN USE NOW)' : '') });
+            const now = data ? modIn.data : modIn.dataOff;
+            modIn.choices.forEach((c, i) => items.push({
+                label: (i === now ? '✓ ' : '') + c, on: i === now,
+                title: `${name}: transmit audio from ${c} in ${where}. It does not transmit`,
+                run: () => post('/api/radio/mod-input', { data, choice: i }).then(readModIn),
+            }));
+        }
+        panel.openKeyList('modin', items);
+    }
+
     async function memoryToVfo(rx) {
         if (closeIfListed('mtovfo')) return;
         const list = await radioChannels('mtovfo');
@@ -572,6 +614,7 @@ export function startIcomRadioPanel(root, cfg) {
                     case 'apf': return post(`/api/cat/apf/${rx}`, { width: (r.apf + 1) % 4 });
                     case 'proc': return post('/api/cat/proc', { enabled: !r.proc });
                     case 'moni': return post('/api/cat/monitoron', { on: !r.moni });
+                    case 'modin': return modInList();
                 }
                 return;
             case 'lamp':
@@ -898,13 +941,13 @@ export function startIcomRadioPanel(root, cfg) {
             // arrive after it.
             for (const id of ['A', 'B']) if (scopeState[id] === 'outofrange') scopeStatus(id, 'outofrange');
         },
-        IsConnected: v => { r.catOn = on(v); panel.setLamp('cat', r.catOn ? 'on' : 'bad'); if (r.catOn) readPbt(); },
+        IsConnected: v => { r.catOn = on(v); panel.setLamp('cat', r.catOn ? 'on' : 'bad'); if (r.catOn) { readPbt(); readModIn(); } },
         FrequencyA: v => { if (wheelHolds('A')) return; r.freq.A = num(v); panel.setFrequency('A', r.freq.A); checkBand('A'); refreshSeg('A'); },
         FrequencyB: v => { if (wheelHolds('B')) return; r.freq.B = num(v); panel.setFrequency('B', r.freq.B); checkBand('B'); refreshSeg('B'); },
         BandA: v => { if (v !== r.band.A) { r.band.A = v; panel.clearSpectrum('A'); } panel.setBand(r.band[r.sel]); refreshSeg('A'); collapseWatch(); },
         BandB: v => { if (v !== r.band.B) { r.band.B = v; panel.clearSpectrum('B'); } panel.setBand(r.band[r.sel]); refreshSeg('B'); collapseWatch(); },
-        ModeA: v => { const m = String(v ?? ''); if (m !== r.mode.A && r.sel === 'A') readPbt(); r.mode.A = m; panel.setMode('A', MODE_LABEL[m] ?? m); refreshWidth('A'); },
-        ModeB: v => { const m = String(v ?? ''); if (m !== r.mode.B && r.sel === 'B') readPbt(); r.mode.B = m; panel.setMode('B', MODE_LABEL[m] ?? m); refreshWidth('B'); },
+        ModeA: v => { const m = String(v ?? ''); if (m !== r.mode.A && r.sel === 'A') readPbt(); r.mode.A = m; panel.setMode('A', MODE_LABEL[m] ?? m); refreshWidth('A'); showModIn(); },
+        ModeB: v => { const m = String(v ?? ''); if (m !== r.mode.B && r.sel === 'B') readPbt(); r.mode.B = m; panel.setMode('B', MODE_LABEL[m] ?? m); refreshWidth('B'); showModIn(); },
         IfWidthA: v => { r.widthHz.A = v === '' || v == null ? null : num(v); refreshWidth('A'); },
         IfWidthB: v => { r.widthHz.B = v === '' || v == null ? null : num(v); refreshWidth('B'); },
         SelectedFilterA: v => { r.fil.A = String(v ?? ''); refreshKeys(); },
@@ -915,6 +958,7 @@ export function startIcomRadioPanel(root, cfg) {
             panel.setSelected(r.sel);
             panel.setBand(r.band[r.sel]);
             refreshFlags();
+            showModIn();
             refreshClar();
             showIdlePane();
             collapseWatch();
@@ -930,7 +974,7 @@ export function startIcomRadioPanel(root, cfg) {
         ManualNotchFreqA: v => { r.notchPos = num(v); refreshRxKnobs(); },
         ManualNotchWidthA: v => { r.notchWidth = num(v); refreshKeys(); refreshRxKnobs(); },
         ApfWidthA: v => { r.apf = num(v); refreshFlags(); },
-        SplitMode: v => { r.split = num(v); panel.setSplit(r.split !== 0); panel.setKey('split', { on: r.split !== 0 }); },
+        SplitMode: v => { r.split = num(v); panel.setSplit(r.split !== 0); panel.setKey('split', { on: r.split !== 0 }); showModIn(); },
         RxClarOn: v => { r.rxClar = on(v); refreshClar(); },
         TxClarOn: v => { r.txClar = on(v); refreshClar(); },
         ClarifierOffsetA: v => { r.clarHz.A = num(v); refreshClar(); },
