@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre12 (2026-11-17)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **Slow starts and "Waiting for data" until the radio was switched off and on (#128).** When IWC connects it tells the radio to send its scope picture to the PC, and it never told the radio to stop. After IWC was closed from Task Manager, the radio carried on sending until it was switched off. On a radio with **CI-V USB Port** set to **Link to [REMOTE]**, which ignores commands that arrive while it is sending, the next start lost most of its questions. Now IWC stops any scope data that is already flowing before it does anything else, and stops it when it closes. It doesn't transmit.
+- **The IC-9700 is no longer marked "under test" (#137).** An owner has confirmed receive and transmit on 2m and 70cm. IWC controls the Main band only. See section 15.10 of the [user manual](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid).
+- Changes from v1.7.0-pre1 to pre11 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre11-2026-11-16).
+
 ### v1.7.0-pre11 (2026-11-16)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0, which is the current full release, so you have to come to the releases page for this build. The Docker image and Mac apps are rebuilt with the same changes.
