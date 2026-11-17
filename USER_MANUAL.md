@@ -145,7 +145,7 @@
 
 ## 1. Introduction
 
-Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 and IC-7300 MkII HF/50 MHz transceivers. Support for the IC-7100 and the IC-9700 is being added and is under test: see [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) and [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid).
+Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 and IC-7300 MkII HF/50 MHz transceivers and the IC-9700 VHF/UHF transceiver. On the IC-9700 IWC controls the Main band: see [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid). Support for the IC-7100 is being added and is under test: see [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid).
 
 > **Windows, with test builds for Mac, Linux and Raspberry Pi.** The full releases run on Windows 10 or 11 (64-bit). Since v1.7.0-pre4 each pre-release also has a Mac app, for Intel and for Apple silicon, and a Docker image for Linux and a 64-bit Raspberry Pi. Those builds do radio control only, without the Voice, CW and RTTY audio pages or Remote Audio, and they haven't been tried on a real radio yet. See [§2.2](#22-mac-test-build) and [§2.3](#23-linux-and-raspberry-pi-with-docker-test-build). Whichever computer runs IWC, you can use the page from any device on your home network: a tablet, a phone or another computer.
 
@@ -153,18 +153,18 @@ Icom Web Control — **IWC** for short — is a web-based control panel for the 
 >
 > **This was not quite true up to and including v1.0.3.** The page fetched three files — the meter-gauge library, the icon font and the library that carries live updates from the radio to the browser — from public servers on the internet instead of from your PC. Almost nobody noticed, because a browser that had loaded them once kept its own copy for a year afterwards. On a PC that had never been online they never arrived at all, and the page opened with no meters and no value that ever changed. All three now ship inside IWC. **If your shack PC has no internet, use v1.0.4 or later — the v1.0.4 pre-releases carry the fix too.**
 
-Supported radio:
+Supported radios:
 
 | Model | Power | Receiver | Interface | CI-V address |
 |-------|-------|----------|-----------|--------------|
 | IC-7300 MkII | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-C | `B6` (default) |
 | IC-7300 (original) | 100 W | Single (VFO A / VFO B) | CI-V over USB Type-B | `94` |
 | IC-7100 (under test) | 100 W HF and 6m, 50 W 4m and 2m, 35 W 70cm | Single (VFO A / VFO B) | CI-V over USB | `88` |
-| IC-9700 (under test) | 100 W 2m, 75 W 70cm, 10 W 23cm | IWC uses the Main band only | CI-V over USB | `A2` |
+| IC-9700 | 100 W 2m, 75 W 70cm, 10 W 23cm | IWC uses the Main band only | CI-V over USB | `A2` |
 
 The MkII is the radio IWC is developed and bench-tested on. The original IC-7300 speaks near-identical CI-V and is **confirmed working by two owners independently** (most recently on v1.0.6); it needs a few settings the MkII does not, and they are collected in one place in [§15.7](#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently) — the short version is Icom's USB driver installed, **CI-V USB Port** unlinked from **[REMOTE]**, and the baud rate at **115200** — see also [§3](#3-first-time-setup) and [§6.1](#61-radio-connection). The CI-V address needs no setting on either radio; IWC detects it.
 
-The IC-7100 has **not yet been tried on a real radio**, and it has no band scope over CI-V, so it does not have everything the sentence below describes. Read [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) before using IWC with one. The IC-9700 has had receive confirmed on a real radio, and transmit is new: read [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid) first.
+The IC-7100 has **not yet been tried on a real radio**, and it has no band scope over CI-V, so it does not have everything the sentence below describes. Read [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) before using IWC with one. The IC-9700 is confirmed on a real radio, receive and transmit, on 2m and 70cm. IWC controls its Main band only: read [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid) for what is different.
 
 IWC connects to the radio over its CI-V computer-control interface, carried on the radio's single USB cable. No extra hardware is required — the spectrum scope, meters, and all controls come over that one connection.
 
@@ -253,13 +253,15 @@ The Mac app comes with each pre-release, not with the full releases, while it is
 
 1. Open the newest pre-release on the [GitHub Releases page](https://github.com/mm5agm/Icom_Web_Control/releases) and download the DMG for your Mac: `macos-x64` for an Intel Mac, `macos-arm64` for Apple silicon (M1 and later). If you aren't sure, Apple menu → **About This Mac** shows **Chip: Apple** or **Processor: Intel**.
 2. Open the DMG and drag **Icom Web Control** to **Applications**.
-3. The app isn't signed, so macOS blocks it the first time. Open **Terminal** and type:
+3. Open the app. It isn't signed by Apple, so macOS blocks it the first time and says it couldn't check it for malware. Open **System Settings → Privacy & Security**, scroll down to the message about Icom Web Control, and click **Open Anyway**. You only do this once.
+
+   If macOS says instead that the app **is damaged and can't be opened**, or there is no **Open Anyway** button, open **Terminal** and type the line below, then open the app again:
 
    ```
    xattr -dr com.apple.quarantine "/Applications/Icom Web Control.app"
    ```
 
-4. Open the app. Your browser opens IWC's page. There is no Dock or menu bar icon, and the app quits when you close its last browser tab. If you have turned that off in Settings, quit it from Activity Monitor.
+4. Your browser opens IWC's page. There is no Dock or menu bar icon, and the app quits when you close its last browser tab. If you have turned that off in Settings, quit it from Activity Monitor.
 5. In **Settings**, choose the radio's port (the `/dev/cu.` one) and your radio model, and save. Then follow the **USB lines** panel ([§2.4](#24-mac-linux-and-pi-the-usb-lines)).
 
 Logs are in `~/Library/Application Support/MM5AGM/Icom Web Control`.
@@ -319,7 +321,7 @@ Before the app can communicate with your radio you need to tell it which serial 
 
 1. Open a browser and go to **http://localhost:8080**. If port 8080 was already in use on your PC (e.g. Plex, Jenkins, MiniTool ShadowMaker), IWC will have automatically picked the next free port from 8081–8089. **Hover over the IWC tray icon** down by the Windows clock to see the actual URL — or simply double-click the tray icon to have IWC open the right URL in your default browser.
 2. Click the **Settings** link in the navigation bar.
-3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver. **IC-7100 (under test)** is explained in [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid), and **IC-9700 (under test)** in [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid).
+3. Set **Radio Model** to your transceiver: **IC-7300 MkII** (HF + 6m + 4m EU) or **IC-7300** (HF + 6m). Both are 100 W, single-receiver. **IC-9700** (2m, 70cm and 23cm, Main band only) is explained in [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid), and **IC-7100 (under test)** in [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid).
 4. Set **Serial Port**. The box is a list of every COM port your PC has at that moment, so you choose rather than type. **If you don't know which one is the radio, switch the radio on and press "Find my radio"** — IWC tries each port at each speed until an Icom answers, then fills in the Radio Model, Serial Port and Baud Rate for you, and tells you what it found. It takes a couple of seconds, longer if the radio is on an unusual speed. Nothing is saved until you press **Save Settings**, so it is safe to press as often as you like.
 
    The port is the USB serial port the radio presents when you plug its USB cable in. **On the MkII that is the USB Type-C socket, and Windows creates the port by itself. On the original IC-7300 it is the USB Type-B socket, and you must install Icom's USB driver first** — until you do, Windows creates no port at all, so the list will not have it and Find my radio cannot see it either. The driver is on Icom's support site under the radio's downloads. **Diagnostics → COM Ports** shows the same list if you want to check it elsewhere.
@@ -2859,15 +2861,15 @@ If you have an IC-7100 and would like to help, please open an issue on GitHub an
 
 ### 15.10 I have an IC-9700: what works, and what should I avoid?
 
-**The IC-9700 is under test.** It is written from Icom's CI-V reference. An owner has confirmed that on a real IC-9700 receive works: frequency, mode, tuning, the band scope on all three bands, ATT, filter and AGC (issue #137). Everything else is still unproven.
+**The IC-9700 is supported from v1.7.0.** It is written from Icom's CI-V reference, and an owner has confirmed it on a real IC-9700 (issue #137): frequency, mode, tuning, the band scope on all three bands, ATT, filter and AGC, and transmit on 2m and 70cm with the PWR, SWR and ALC meters reading correctly. Transmit on 23cm hasn't been tried yet.
 
-**Transmit is new on the IC-9700.** From v1.7.0-pre9 IWC sends TX, CW text from CW Send and keyer memories, voice commands that transmit, and paddle keying by DTR, as it does for an IC-7300. It has not yet been tried on a real radio, so for the first time use a dummy load or an antenna you know is good, start at low power, and check that the radio goes back to receive when you release TX. The 9700 has no antenna tuner, so there is no Tune.
+IWC sends TX, CW text from CW Send and keyer memories, voice commands that transmit, and paddle keying by DTR, as it does for an IC-7300. CW Send and paddle keying haven't yet been tried on an IC-9700, so the first time, use a dummy load or an antenna you know is good. The 9700 has no antenna tuner, so there is no Tune.
 
 **To set it up:**
 
 1. Install Icom's USB driver from their support site before plugging the radio in.
 2. On the radio, under **Menu → Set → Connectors → CI-V**, set **CI-V USB Port** to **Unlink from [REMOTE]** and **CI-V Baud Rate** to **115200**. Leave **CI-V Address** on **A2h**, its default.
-3. In Settings, set **Radio Model** to **IC-9700 (under test)** and **Baud Rate** to **115200**, and save.
+3. In Settings, set **Radio Model** to **IC-9700** and **Baud Rate** to **115200**, and save.
 
 **What is different from an IC-7300:**
 
@@ -2878,7 +2880,7 @@ If you have an IC-7100 and would like to help, please open an issue on GitHub an
 - **Power follows the band:** 100 W on 2m, 75 W on 70cm and 10 W on 23cm.
 - **The swap button doesn't swap.** On this radio the command for it swaps the Main and Sub bands, so IWC doesn't send it.
 
-If you have an IC-9700 and would like to help, please comment on [issue #137](https://github.com/mm5agm/Icom_Web_Control/issues/137) and say what worked and what didn't. The log file (Diagnostics) helps a lot.
+If you have an IC-9700 and something doesn't work, or you've tried 23cm or CW, please comment on [issue #137](https://github.com/mm5agm/Icom_Web_Control/issues/137) and say what worked and what didn't. The log file (Diagnostics) helps a lot.
 
 ---
 

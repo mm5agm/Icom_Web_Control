@@ -53,7 +53,9 @@ I can't see my radio's controls without a magnifying glass, and Icom has tucked 
 - **IC-7300 MkII**: CI-V over USB Type-C, default address `B6`.
 - **IC-7300** (original): CI-V over USB Type-B, default address `94`. It only streams its scope with **CI-V USB Port** set to **Unlink from [REMOTE]** and **CI-V USB Baud Rate** at **115200**. Confirmed by Gerry M9YKD ([#5](https://github.com/mm5agm/Icom_Web_Control/issues/5)). See [§15.7](USER_MANUAL.md#157-i-have-the-original-ic-7300-not-the-mkii--what-do-i-need-to-set-differently).
 
-Other Icom CI-V radios (IC-705, IC-7610, IC-9700 and so on) share the same protocol family, and I'll add one if someone with the radio will test it. That means operating it and telling me what happens, not programming.
+**IC-9700** support is in the v1.7.0 pre-releases: IWC controls the Main band, and an owner has confirmed receive and transmit on 2 m and 70 cm. See [§15.10 of the manual](USER_MANUAL.md#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid).
+
+Other Icom CI-V radios (IC-705, IC-7610 and so on) share the same protocol family, and I'll add one if someone with the radio will test it. That means operating it and telling me what happens, not programming.
 
 ## Feedback and updates
 

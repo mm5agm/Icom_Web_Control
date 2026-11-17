@@ -66,13 +66,15 @@ Docker on a Mac can't reach USB, so use the DMG from the pre-release's assets:
 `macos-arm64` for Apple silicon, `macos-x64` for Intel.
 
 1. Open the DMG and drag Icom Web Control to Applications.
-2. The app isn't signed, so macOS blocks it the first time. In Terminal:
+2. Open it. It isn't signed by Apple, so macOS blocks it the first time. In System Settings →
+   Privacy & Security, click Open Anyway. If macOS says the app is damaged, or there is no
+   Open Anyway button, type this in Terminal and open it again:
 
    ```
    xattr -dr com.apple.quarantine "/Applications/Icom Web Control.app"
    ```
 
-3. Open it. Your browser opens the app's page. There is no Dock or menu bar icon, and
+3. Your browser opens the app's page. There is no Dock or menu bar icon, and
    it quits when you close its last browser tab.
 4. In Settings choose the port (the `/dev/cu.` one) and your radio, save, then read
    the USB lines panel and press the button if the items are OFF.
