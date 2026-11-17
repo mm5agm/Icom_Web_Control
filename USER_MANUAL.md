@@ -6,6 +6,10 @@
 
 1. [Introduction](#1-introduction)
 2. [Installation](#2-installation)
+   - 2.1 [Windows](#21-windows)
+   - 2.2 [Mac (test build)](#22-mac-test-build)
+   - 2.3 [Linux and Raspberry Pi with Docker (test build)](#23-linux-and-raspberry-pi-with-docker-test-build)
+   - 2.4 [Mac, Linux and Pi: the USB lines](#24-mac-linux-and-pi-the-usb-lines)
 3. [First-Time Setup](#3-first-time-setup)
 4. [Starting the Application](#4-starting-the-application)
 5. [Main Control Panel](#5-main-control-panel)
@@ -143,7 +147,7 @@
 
 Icom Web Control — **IWC** for short — is a web-based control panel for the Icom IC-7300 and IC-7300 MkII HF/50 MHz transceivers. Support for the IC-7100 and the IC-9700 is being added and is under test: see [§15.9](#159-i-have-an-ic-7100-what-works-and-what-should-i-avoid) and [§15.10](#1510-i-have-an-ic-9700-what-works-and-what-should-i-avoid).
 
-> **Windows only.** IWC runs on Windows 10 or 11 (64-bit). There is no Linux or macOS build, and none is planned. The app is hosted by a small WinForms process and uses a Windows serial-port driver to reach the radio. You can still access the browser interface itself from any device on your home network (tablet, phone, Linux laptop) — but the IWC server must be running on a Windows PC.
+> **Windows, with test builds for Mac, Linux and Raspberry Pi.** The full releases run on Windows 10 or 11 (64-bit). Since v1.7.0-pre4 each pre-release also has a Mac app, for Intel and for Apple silicon, and a Docker image for Linux and a 64-bit Raspberry Pi. Those builds do radio control only, without the Voice, CW and RTTY audio pages or Remote Audio, and they haven't been tried on a real radio yet. See [§2.2](#22-mac-test-build) and [§2.3](#23-linux-and-raspberry-pi-with-docker-test-build). Whichever computer runs IWC, you can use the page from any device on your home network: a tablet, a phone or another computer.
 
 > **No internet connection needed.** IWC reaches the radio over a serial cable and serves its own web page from your own PC, so the whole of it works on a shack computer that has never been online. Only two things reach out to the internet, and neither is required: the **DX cluster** spot feed (Section 6.5), which is off until you switch it on, and the **update check** that tells you when a new version is available. With no connection the cluster badge simply reads *Disconnected* and the update banner never appears. Everything else — meters, spectrum, tuning, voice control, WSJT-X and the rest — is entirely local.
 >
@@ -202,6 +206,8 @@ The application was written for operators who want a large, clean, touchscreen-f
 
 ## 2. Installation
 
+### 2.1 Windows
+
 1. Download the installer from the [GitHub Releases page](https://github.com/mm5agm/Icom_Web_Control/releases).
    > **Edge or Chrome leaves an "Unconfirmed 123456.crdownload" file instead of the installer?** The browser has held the download because the installer is not signed with a commercial certificate and a new release has not been downloaded by many people yet. You do not need to turn off the browser's download protection. Press **Ctrl+J** to open the Downloads list, choose **Keep** on the installer (hover over it, or use the **...** next to it), and if it warns again choose **Show more → Keep anyway**. The file is then renamed to the proper `.exe` and will run.
 
@@ -240,6 +246,68 @@ The screenshot below shows the Smart App Control setting:
 ![Smart App Control Screenshot](pictures/SmartAppControl.png)
 
 These are one-time steps — once the app is installed you won't see them again.
+
+### 2.2 Mac (test build)
+
+The Mac app comes with each pre-release, not with the full releases, while it is being tested. It needs macOS on an Intel or an Apple silicon Mac. **Read [§2.4](#24-mac-linux-and-pi-the-usb-lines) first**: it explains the radio settings to make before IWC opens the radio's USB port.
+
+1. Open the newest pre-release on the [GitHub Releases page](https://github.com/mm5agm/Icom_Web_Control/releases) and download the DMG for your Mac: `macos-x64` for an Intel Mac, `macos-arm64` for Apple silicon (M1 and later). If you aren't sure, Apple menu → **About This Mac** shows **Chip: Apple** or **Processor: Intel**.
+2. Open the DMG and drag **Icom Web Control** to **Applications**.
+3. The app isn't signed, so macOS blocks it the first time. Open **Terminal** and type:
+
+   ```
+   xattr -dr com.apple.quarantine "/Applications/Icom Web Control.app"
+   ```
+
+4. Open the app. Your browser opens IWC's page. There is no Dock or menu bar icon, and the app quits when you close its last browser tab. If you have turned that off in Settings, quit it from Activity Monitor.
+5. In **Settings**, choose the radio's port (the `/dev/cu.` one) and your radio model, and save. Then follow the **USB lines** panel ([§2.4](#24-mac-linux-and-pi-the-usb-lines)).
+
+Logs are in `~/Library/Application Support/MM5AGM/Icom Web Control`.
+
+### 2.3 Linux and Raspberry Pi with Docker (test build)
+
+The Docker image comes with each pre-release, for 64-bit Intel/AMD Linux and a Raspberry Pi with a 64-bit OS. You need Docker with the compose plugin. **Read [§2.4](#24-mac-linux-and-pi-the-usb-lines) first.**
+
+1. Plug in the radio and turn it on. Find its port:
+
+   ```
+   ls -l /dev/serial/by-id/ /dev/ttyUSB* /dev/ttyACM*
+   ```
+
+   A radio with two USB serial ports shows two. CI-V is normally the first (`ttyUSB0`).
+
+2. Get the compose file and start IWC, using your port:
+
+   ```
+   mkdir -p ~/iwc && cd ~/iwc
+   curl -fsSLO https://raw.githubusercontent.com/mm5agm/Icom_Web_Control/develop/docker-compose.yml
+   export IWC_SERIAL_DEVICE=/dev/ttyUSB0
+   docker compose pull
+   docker compose up -d --no-build
+   ```
+
+3. From any computer on your network, open `http://<address of the Linux PC or Pi>:8081`.
+4. In **Settings**, choose the serial port and your radio, and save. Then follow the **USB lines** panel ([§2.4](#24-mac-linux-and-pi-the-usb-lines)).
+
+To watch what it is doing: `docker logs -f iwc`. Settings and logs are in `./data/iwc`. To stop it: `docker compose down`. If the log says permission denied on the port, find the number with `getent group dialout` and start it with `IWC_DIALOUT_GID` set to that number. The port is 8081 so IWC can run beside Yaesu Web Control; set `IWC_HTTP_PORT` to use another.
+
+Docker on a Mac can't reach USB devices, so use the Mac app there instead.
+
+### 2.4 Mac, Linux and Pi: the USB lines
+
+On a Mac and on Linux, opening a USB serial port raises its DTR and RTS lines, and no software can stop that. If the radio is set to key from either line, it goes into transmit the moment IWC opens the port, and stays there. Windows doesn't have this problem.
+
+So before you start, set these to **OFF** on the radio (Menu → SET → Connectors):
+
+| Radio | Items that must be OFF |
+| --- | --- |
+| IC-7300 and IC-7300 MkII | USB SEND, USB Keying (CW), USB Keying (RTTY) |
+| IC-9700 | USB SEND, USB Keying (CW), USB Keying (RTTY) |
+| IC-7100 | Its manual lists no such items. Have an antenna or dummy load connected and watch the radio the first time. |
+
+IWC won't open the port until you confirm in Settings that you've done this. Once the port is open, it asks the radio whether it is transmitting and reads those items back. If the radio is transmitting, an item isn't OFF, or an item can't be read, IWC closes the port and tells you why. That check can only happen after the port has opened, so it doesn't replace setting the items yourself.
+
+**If you try one of these builds, please say how it went** in a [Discussion](https://github.com/mm5agm/Icom_Web_Control/discussions) or an issue: which radio, which computer and which build (the version is on the About page), whether the frequency and mode follow the radio, and whether changing them works.
 
 ---
 

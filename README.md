@@ -61,6 +61,8 @@ Please post anything you find, or a look you'd like to see, on [Discussions](htt
 
 The [Download link](https://github.com/mm5agm/Icom_Web_Control/releases/latest) always gives you the newest full release, and IWC shows a banner the first time you run it after one. Pre-releases on the [releases page](https://github.com/mm5agm/Icom_Web_Control/releases) have had less testing, and your feedback is what turns one into a full release. The banner only offers a pre-release if you are already running one.
 
+**Mac, Linux and Raspberry Pi (test builds).** Each pre-release also has a Mac app, for Intel and Apple silicon, and a Docker image for Linux and a 64-bit Pi. They do radio control only, and they haven't been tried on a real radio yet. **Before you use one, set the radio's USB SEND and USB Keying items to OFF**, or the radio may go into transmit when the port opens. Steps are in [the manual, §2.2 to §2.4](USER_MANUAL.md#22-mac-test-build).
+
 To hear about a release outside the app, pre-releases included, choose **Watch**, **Custom**, **Releases** on [the repository page](https://github.com/mm5agm/Icom_Web_Control), or subscribe to [the releases feed](https://github.com/mm5agm/Icom_Web_Control/releases.atom).
 
 ## ⚠️ Windows Security Warnings on First Install
