@@ -419,6 +419,19 @@ namespace Icom_Web_Control.Services
         /// </summary>
         internal bool CheckUsbLines { get; set; } = !OperatingSystem.IsWindows();
 
+        /// <summary>
+        /// How long to listen, once the port opens, for scope data left flowing by
+        /// an earlier session (see <see cref="StopLeftoverScopeStreamAsync"/>). Zero
+        /// skips the check; the tests set it so a connect doesn't wait.
+        /// </summary>
+        internal int LeftoverScopeListenMs { get; set; } = 300;
+
+        // TickCount64 of the last 27 00 frame of any kind, and who sent it. Unlike
+        // _lastSweepTicks this counts part-sweeps too, so a stream the assembler
+        // can't make sense of yet (address unknown, mid-sweep) is still seen.
+        private long _lastScopeFrameTicks;
+        private volatile byte _lastScopeFrameFrom;
+
         /// <summary>The byte for attenuator on. "20" stays the app's own word for on, whatever the size.</summary>
         private byte AttenuatorOnCode => RadioProfile.ForModel(ModelId)?.AttenuatorOn ?? CivProtocol.AttOn20dB;
 
@@ -510,6 +523,10 @@ namespace Icom_Web_Control.Services
             // link — so a powered-off radio reads as disconnected (steady red)
             // instead of flashing the power button green↔red as each reconnect
             // flags "connected" only to drop on the very next read miss.
+            // Before asking anything: a radio still streaming scope data from an
+            // earlier session can drop most of what we send (IWC #128).
+            await StopLeftoverScopeStreamAsync(cancellationToken);
+
             await IdentifyAsync(cancellationToken); // learn address/model if it answers; best-effort
             bool firstOpen = !_startPowerOnTried;
             _startPowerOnTried = true;
@@ -656,6 +673,48 @@ namespace Icom_Web_Control.Services
             bool center = !_operatorFixedMode;
             await SetScopeModeAsync(center ? CivProtocol.ScopeModeCenter : CivProtocol.ScopeModeFixed,
                 center ? "scope center mode" : "scope fixed mode", ct);
+        }
+
+        private const int LeftoverScopeQuietMs = 250;
+        private const int LeftoverScopeTries = 8;
+
+        /// <summary>
+        /// Stop scope data that is already flowing when the port opens. IWC turns
+        /// on the radio's waveform output (27 11 01) when it connects, and the radio
+        /// keeps sending until it is told to stop or switched off. After IWC was
+        /// killed, or closed without a clean stop, the next start found it still
+        /// pouring out. On a radio set to CI-V USB Port = Link to [REMOTE], which
+        /// echoes and drops what arrives while it is sending, most of the start-up
+        /// questions were lost: a start that took minutes, "Waiting for data", and
+        /// everything fine after the radio was switched off and on (IWC #128, an
+        /// original IC-7300). So send 27 11 00 to whoever is streaming, and repeat
+        /// until the stream goes quiet. EnableScopeAsync turns it back on once the
+        /// radio is identified and read. Only a scope setting: nothing transmits.
+        /// </summary>
+        private async Task StopLeftoverScopeStreamAsync(CancellationToken ct)
+        {
+            if (LeftoverScopeListenMs <= 0) return;
+            long opened = Environment.TickCount64;
+            await Task.Delay(LeftoverScopeListenMs, ct);
+            if (Volatile.Read(ref _lastScopeFrameTicks) < opened) return;
+
+            byte from = _lastScopeFrameFrom;
+            _logger.LogWarning("[CivRadioController] Scope data from {Addr:X2} was already flowing when the port opened, " +
+                               "left on by an earlier session. Stopping it before talking to the radio.", from);
+            var off = CivProtocol.BuildFrame(from, CivProtocol.ControllerAddress,
+                CivProtocol.CmdScope, CivProtocol.SubScopeOutput, 0x00);
+            for (int i = 1; i <= LeftoverScopeTries; i++)
+            {
+                await _bus.SendRawAsync(off, ct);
+                await Task.Delay(LeftoverScopeQuietMs * 2, ct);
+                if (Environment.TickCount64 - Volatile.Read(ref _lastScopeFrameTicks) >= LeftoverScopeQuietMs)
+                {
+                    _logger.LogInformation("[CivRadioController] Scope data stopped after {Count} request(s).", i);
+                    return;
+                }
+            }
+            _logger.LogWarning("[CivRadioController] Scope data still flowing after {Count} requests to stop it. " +
+                               "Carrying on; switching the radio off and on stops it.", LeftoverScopeTries);
         }
 
         /// <summary>
@@ -880,6 +939,11 @@ namespace Icom_Web_Control.Services
         {
             if (frame.Cmd != CivProtocol.CmdScope)
                 return;
+            if (frame.Data.Length > 0 && frame.Data[0] == CivProtocol.SubScopeWaveform)
+            {
+                _lastScopeFrameFrom = frame.From;
+                Volatile.Write(ref _lastScopeFrameTicks, Environment.TickCount64);
+            }
             var sweep = _scope.Add(frame);
             if (sweep == null)
                 return;
@@ -3050,6 +3114,28 @@ namespace Icom_Web_Control.Services
         }
 
         /// <summary>
+        /// Leave the radio quiet: stop its waveform output (27 11 00) as IWC exits,
+        /// so the next start, IWC's or another program's, doesn't open the port into
+        /// a stream of scope data (IWC #128). One raw write, no wait for the ack, so
+        /// it can't hold shutdown up. The scope on the radio's own screen stays on.
+        /// A kill from Task Manager skips this; StopLeftoverScopeStreamAsync covers that.
+        /// </summary>
+        private async Task StopScopeOutputAtExitAsync()
+        {
+            try
+            {
+                if (!_bus.IsOpen || !HasScope) return;
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+                await _bus.SendRawAsync(CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
+                    CivProtocol.CmdScope, CivProtocol.SubScopeOutput, 0x00), cts.Token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[CivRadioController] Scope output off at exit failed (non-fatal)");
+            }
+        }
+
+        /// <summary>
         /// PowerOffAtExit: switch the radio off as the host starts stopping,
         /// while the poll loop and port are still up. Skipped for Settings'
         /// Restart Now, and best-effort with its own short timeout so a silent
@@ -3076,6 +3162,7 @@ namespace Icom_Web_Control.Services
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
             if (_exitPowerOff != null) await _exitPowerOff;
+            await StopScopeOutputAtExitAsync();
             await base.StopAsync(cancellationToken);
         }
 
