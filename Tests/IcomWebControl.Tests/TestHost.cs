@@ -42,6 +42,9 @@ internal static class TestHost
         // Otherwise every test that connects would need the operator's confirmation
         // on the Linux and macOS runs. UsbLineCheckTests turns it on.
         controller.CheckUsbLines = false;
+        // Or every connect would wait to see whether scope data is already flowing.
+        // LeftoverScopeStreamTests turns it on.
+        controller.LeftoverScopeListenMs = 0;
         return (controller, state, settings, hub);
     }
 
