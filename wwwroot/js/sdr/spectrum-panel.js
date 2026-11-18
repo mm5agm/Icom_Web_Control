@@ -625,7 +625,7 @@ export class SpectrumPanel {
             const v = localStorage.getItem('iwc.spectrumLook.' + this._vfo);
             if (SpectrumPanel.LOOKS.includes(v)) return v;
         } catch (e) { /* localStorage may be unavailable */ }
-        return 'classic';
+        return 'audio';   // Sharp is the default; Classic stays a choice
     }
 
     /** 'classic' or 'audio'; anything else is ignored. Saved per VFO. */

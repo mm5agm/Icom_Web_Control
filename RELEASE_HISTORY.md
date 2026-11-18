@@ -14,7 +14,7 @@ a different and much older format.
 
 ### Unreleased
 
-- **Spectrum: a Sharp look.** Pick how the spectrum is drawn. **Classic** (the default) is the smoothed trace with a shaded area under it. **Sharp** draws it the way the audio waterfall does: a thin line with no smoothing, and a black, blue, yellow, red and white waterfall whose colours cover the same levels as the trace. On the Classic page it is **Look** beside Bright, for each VFO. On the Radio panel it is **Look** in each spectrum's SCOPE panel. The RTTY Contest page has a **SHARP** key on its scope row.
+- **Spectrum: a Sharp look.** Pick how the spectrum is drawn. **Sharp**, now the default, draws it the way the audio waterfall does: a thin line with no smoothing, and a black, blue, yellow, red and white waterfall whose colours cover the same levels as the trace. On the Classic page it is **Look** beside Bright, for each VFO. On the Radio panel it is **Look** in each spectrum's SCOPE panel. The RTTY Contest page has a **SHARP** key on its scope row. **Classic** is the smoothed trace with a shaded area under it, still there to pick. **When to use Classic:** Sharp shows each signal crisply, and strong and medium signals stand out far more. Classic smooths the noise and keeps it nearly black, so the very faintest traces stand out a little better there. If you're hunting a weak DX station that could be in the noise, try Classic. Its smoothed trace is also calmer for watching SSB.
 
 ### v1.7.0-pre12 (2026-11-17)
 
