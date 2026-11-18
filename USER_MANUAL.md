@@ -564,6 +564,8 @@ Every change is announced to screen readers. 1 Hz is offered everywhere, includi
 
 **A 1 Hz step works, but the radio's own display will not show it.** The IC-7300's front panel normally reads seven digits, down to 10 Hz, so a 1 Hz step moves IWC's frequency display and leaves the radio's looking untouched. The radio has taken the command — IWC reads the frequency back from the rig rather than assuming it, so the eighth digit on screen is the VFO's real setting. To see that digit on the radio too, **touch the Hz digits on the radio's screen and hold for one second** to turn on its **1 Hz step Fine Tuning function**; hold them again to turn it back off. On the **original IC-7300** that function is offered in SSB, CW and RTTY only; the **MkII** sets no such restriction.
 
+**Look** — beside Bright. **Classic** (the default) is the smoothed trace with a shaded area under it. **Sharp** draws the spectrum the way the audio waterfall does: a thin line with no smoothing and no shading, and a black, blue, yellow, red and white waterfall whose colours cover the same levels as the trace, so a signal's colour matches its height. Set per VFO and remembered by the browser.
+
 **Frequency crosshair** — Move the mouse over the spectrum to see the exact RF frequency at the cursor position displayed above the waterfall.
 
 **Panel height** — the whole spectrum panel can be made taller. There are two ways, and they set the same thing:

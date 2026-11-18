@@ -835,6 +835,11 @@
                         <label class="text-nowrap mb-0 ms-2" title="Brighten the waterfall — lifts weak signals up the colour scale. Does not affect the spectrum trace above it.">Bright</label>
                         <input type="range" class="spectrum-bright-slider" data-vfo="A" data-server-bright="@Model.SdrWaterfallBrightDbA" min="0" max="60" step="1" value="0" aria-label="VFO A waterfall brightness" style="flex:0 0 70px; width:70px; height:16px;">
                         <span class="text-monospace spectrum-bright-label" data-vfo="A" style="min-width:3.5em; text-align:right;">Off</span>
+                        <label class="text-nowrap mb-0 ms-2" title="Classic: a smoothed trace with a shaded area under it. Sharp: a thin line with no smoothing, and the audio waterfall colours, spread over the same levels as the trace.">Look</label>
+                        <select class="form-select form-select-sm spectrum-look-select" data-vfo="A" aria-label="VFO A spectrum look" style="width:auto; padding-top:0; padding-bottom:0;">
+                            <option value="classic">Classic</option>
+                            <option value="audio">Sharp</option>
+                        </select>
                         <span class="spectrum-refine-group" data-vfo="A" style="display:none;">
                             <label class="text-nowrap mb-0 ms-2" title="Refine - how much the radio's own scope is averaged before it is drawn. Each sweep from the radio is a separate snapshot with a rough floor; averaging a few lets the floor settle into a thin line and weak signals stand out of it. Raw is the sweeps as they come; higher is calmer but slower to follow a signal that comes and goes.">Refine</label>
                             <input type="range" class="spectrum-refine-slider" data-vfo="A" min="0" max="5" step="1" value="3" aria-label="VFO A scope averaging. Zero is the radio's raw sweeps; higher is a calmer trace that is slower to follow." style="flex:0 0 70px; width:70px; height:16px;">
@@ -926,6 +931,11 @@
                         <label class="text-nowrap mb-0 ms-2" title="Brighten the waterfall — lifts weak signals up the colour scale. Does not affect the spectrum trace above it.">Bright</label>
                         <input type="range" class="spectrum-bright-slider" data-vfo="B" data-server-bright="@Model.SdrWaterfallBrightDbB" min="0" max="60" step="1" value="0" aria-label="VFO B waterfall brightness" style="flex:0 0 70px; width:70px; height:16px;">
                         <span class="text-monospace spectrum-bright-label" data-vfo="B" style="min-width:3.5em; text-align:right;">Off</span>
+                        <label class="text-nowrap mb-0 ms-2" title="Classic: a smoothed trace with a shaded area under it. Sharp: a thin line with no smoothing, and the audio waterfall colours, spread over the same levels as the trace.">Look</label>
+                        <select class="form-select form-select-sm spectrum-look-select" data-vfo="B" aria-label="VFO B spectrum look" style="width:auto; padding-top:0; padding-bottom:0;">
+                            <option value="classic">Classic</option>
+                            <option value="audio">Sharp</option>
+                        </select>
                         <span class="spectrum-refine-group" data-vfo="B" style="display:none;">
                             <label class="text-nowrap mb-0 ms-2" title="Refine - how much the radio's own scope is averaged before it is drawn. Each sweep from the radio is a separate snapshot with a rough floor; averaging a few lets the floor settle into a thin line and weak signals stand out of it. Raw is the sweeps as they come; higher is calmer but slower to follow a signal that comes and goes.">Refine</label>
                             <input type="range" class="spectrum-refine-slider" data-vfo="B" min="0" max="5" step="1" value="3" aria-label="VFO B scope averaging. Zero is the radio's raw sweeps; higher is a calmer trace that is slower to follow." style="flex:0 0 70px; width:70px; height:16px;">
@@ -3460,6 +3470,15 @@
                     panel.setWaterfallBrightness(db);
                     persistSpectrumDisplay(vfo, { bright: db });
                 });
+            });
+
+            // Look: Classic or Sharp, kept per VFO in this browser.
+            ['A', 'B'].forEach(vfo => {
+                const look  = document.querySelector(`.spectrum-look-select[data-vfo="${vfo}"]`);
+                const panel = vfo === 'B' ? spectrumPanelB : spectrumPanelA;
+                if (!look || !panel) return;
+                look.value = panel.getLook();
+                look.addEventListener('change', () => { panel.setLook(look.value); look.value = panel.getLook(); });
             });
 
             // Refine - how much the radio's scope sweeps are averaged before any

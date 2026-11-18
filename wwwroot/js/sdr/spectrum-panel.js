@@ -66,6 +66,7 @@ export class SpectrumPanel {
         // dedicated slider, independent of the spectrum trace. Persisted
         // per-VFO like the scroll speed and split ratio.
         this._wfBrightDb = this._loadWaterfallBrightness();
+        this._look = this._loadLook();   // 'classic' or 'sharp' look (value 'audio'; see setLook)
 
         this._errorDetail = null;
 
@@ -613,6 +614,30 @@ export class SpectrumPanel {
     // signal sitting on the noise floor can be pushed near full colour.
     static WATERFALL_BRIGHT_MAX = 60;
 
+    // Look: 'classic' (the default) is the filled, smoothed trace. 'audio'
+    // draws like the audio waterfall: a thin line with no spatial smoothing
+    // and no fill, and a waterfall in the audio waterfall's black, blue,
+    // yellow, red and white whose colours span the trace's own window.
+    static LOOKS = ['classic', 'audio'];
+
+    _loadLook() {
+        try {
+            const v = localStorage.getItem('iwc.spectrumLook.' + this._vfo);
+            if (SpectrumPanel.LOOKS.includes(v)) return v;
+        } catch (e) { /* localStorage may be unavailable */ }
+        return 'classic';
+    }
+
+    /** 'classic' or 'audio'; anything else is ignored. Saved per VFO. */
+    setLook(look) {
+        if (!SpectrumPanel.LOOKS.includes(look)) return;
+        this._look = look;
+        try { localStorage.setItem('iwc.spectrumLook.' + this._vfo, look); } catch (e) { /* unavailable */ }
+        if (this._lastBins) this._render();
+    }
+
+    getLook() { return this._look; }
+
     _loadWaterfallBrightness() {
         try {
             const v = parseInt(localStorage.getItem('iwc.waterfallBright.' + this._vfo), 10);
@@ -723,7 +748,7 @@ export class SpectrumPanel {
         // see the span change *before* _lastSpanHz is updated, to detect a retune.
         const retuned  = (spanHz !== this._lastSpanHz);
         const averaged = this._applyAveraging(bins, spanHz);   // temporal (EMA)
-        this._lastBins    = this._spatialSmooth(averaged);     // spatial (moving avg)
+        this._lastBins    = this._look === 'audio' ? averaged : this._spatialSmooth(averaged);     // spatial (moving avg)
         // Auto noise-floor: recompute the vertical window from the tracked floor.
         // Snap (don't drift) to the new band's floor on a retune.
         if (retuned) this._autoFloorDb = null;
@@ -2059,8 +2084,11 @@ export class SpectrumPanel {
         ctx.lineTo(0, H);
         ctx.closePath();
 
-        ctx.fillStyle = 'rgba(0, 140, 255, 0.18)';
-        ctx.fill();
+        const audio = this._look === 'audio';
+        if (!audio) {
+            ctx.fillStyle = 'rgba(0, 140, 255, 0.18)';
+            ctx.fill();
+        }
 
         // Redraw the outline on top of the fill
         ctx.beginPath();
@@ -2070,8 +2098,8 @@ export class SpectrumPanel {
             if (i === 0) ctx.moveTo(x, y);
             else         ctx.lineTo(x, y);
         }
-        ctx.strokeStyle = '#00aaff';
-        ctx.lineWidth   = 1.5;
+        ctx.strokeStyle = audio ? '#4fc3f7' : '#00aaff';
+        ctx.lineWidth   = audio ? 1 : 1.5;
         ctx.stroke();
 
         // dB scale down the right edge — shows the exact values the Range window
@@ -2421,6 +2449,12 @@ export class SpectrumPanel {
      * static) so it can read the per-panel brightness.
      */
     _dbToColor(db) {
+        // The Sharp look: the audio waterfall's colours over the trace's window.
+        if (this._look === 'audio') {
+            const span = Math.max(1, this._dbMax - this._dbMin);
+            const v = Math.max(0, Math.min(255, Math.round((db - this._dbMin + this._wfBrightDb) / span * 255)));
+            return SpectrumPanel.audioColour(v);
+        }
         // Bright slider adds _wfBrightDb of lift before mapping into the fixed
         // 120 dB window; at Off (0) the mapping is the original dark baseline.
         const t = Math.max(0, Math.min(1, (db + this._wfBrightDb + 120) / 120));
@@ -2431,6 +2465,18 @@ export class SpectrumPanel {
         return               [255,                 Math.round(200 - (t - 0.8) * 5 * 200), 0];
     }
 }
+
+// The audio waterfall's colours (radio-audio-waterfall.js), by level 0-255.
+SpectrumPanel.AUDIO_STOPS = [[0, 0x000000], [60, 0x00008C], [120, 0x00AADC], [170, 0xF0E600], [215, 0xE61E00], [255, 0xFFFFFF]];
+SpectrumPanel.audioColour = (v) => {
+    const s = SpectrumPanel.AUDIO_STOPS;
+    let i = 1;
+    while (i < s.length - 1 && v > s[i][0]) i++;
+    const [p0, c0] = s[i - 1], [p1, c1] = s[i];
+    const f = (v - p0) / (p1 - p0);
+    const ch = (c, k) => (c >> k) & 255;
+    return [16, 8, 0].map(k => Math.round(ch(c0, k) + (ch(c1, k) - ch(c0, k)) * f));
+};
 
 // Amateur band envelopes in Hz — the broadest worldwide limits, used to draw
 // red guard-rail lines at the edges of each band on the spectrum. These are
