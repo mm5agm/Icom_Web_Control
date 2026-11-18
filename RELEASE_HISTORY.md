@@ -12,9 +12,12 @@ a different and much older format.
 
 ---
 
-### Unreleased
+### v1.7.0-pre13 (2026-11-18)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
 
 - **Spectrum: a Sharp look.** Pick how the spectrum is drawn. **Sharp**, now the default, draws it the way the audio waterfall does: a thin line with no smoothing, and a black, blue, yellow, red and white waterfall whose colours cover the same levels as the trace. On the Classic page it is **Look** beside Bright, for each VFO. On the Radio panel it is **Look** in each spectrum's SCOPE panel. The RTTY Contest page has a **SHARP** key on its scope row. **Classic** is the smoothed trace with a shaded area under it, still there to pick. **When to use Classic:** Sharp shows each signal crisply, and strong and medium signals stand out far more. Classic smooths the noise and keeps it nearly black, so the very faintest traces stand out a little better there. If you're hunting a weak DX station that could be in the noise, try Classic. Its smoothed trace is also calmer for watching SSB.
+- Changes from v1.7.0-pre1 to pre12 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre12-2026-11-17).
 
 ### v1.7.0-pre12 (2026-11-17)
 
