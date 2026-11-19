@@ -35,6 +35,17 @@ namespace Icom_Web_Control.Services.Civ
 
         private SerialPort? _port;
         private Pending? _pending;
+
+        // The close of a port this bus has let go of, still running if a
+        // driver is slow to give the handle back. See CloseDetachedAsync.
+        private Task _closing = Task.CompletedTask;
+        private string? _closingPortName;
+
+        /// <summary>
+        /// How long a close may take before the bus stops waiting for it.
+        /// See <see cref="CloseDetachedAsync"/>.
+        /// </summary>
+        internal const int CloseTimeoutMs = 2000;
         // The last bytes received, so a connect that gets no answer can log what did come
         // back: nothing, only our echo, or something else (IWC #128).
         private const int RecentCapacity = 96;
@@ -79,29 +90,47 @@ namespace Icom_Web_Control.Services.Civ
 
         public event EventHandler<CivFrame>? UnsolicitedFrame;
 
-        public Task<bool> OpenAsync(string portName, int baudRate)
+        public async Task<bool> OpenAsync(string portName, int baudRate)
         {
+            // Already open on another port or speed: let that go first, outside
+            // the lock (see CloseDetachedAsync).
+            SerialPort? previous = null;
+            lock (_portLock)
+            {
+                if (_port?.IsOpen == true)
+                {
+                    if (string.Equals(_port.PortName, portName, StringComparison.OrdinalIgnoreCase)
+                        && _port.BaudRate == baudRate)
+                    {
+                        return true;
+                    }
+                    previous = Detach();
+                }
+            }
+            if (previous != null)
+                await CloseDetachedAsync(previous);
+
+            // A close of this same port that hasn't finished still holds its
+            // handle, so opening it now would only fail. Try again next time.
+            if (!_closing.IsCompleted
+                && string.Equals(_closingPortName, portName, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogDebug("CI-V port {Port} is still closing; not reopening it yet", portName);
+                return false;
+            }
+
+            SerialPort? failed = null;
             lock (_portLock)
             {
                 try
                 {
-                    if (_port?.IsOpen == true)
-                    {
-                        if (string.Equals(_port.PortName, portName, StringComparison.OrdinalIgnoreCase)
-                            && _port.BaudRate == baudRate)
-                        {
-                            return Task.FromResult(true);
-                        }
-                        CloseInternal();
-                    }
-
                     lock (_recent) _recent.Clear();
                     var available = SerialPort.GetPortNames();
                     if (Array.IndexOf(available, portName) < 0)
                     {
                         _logger.LogWarning("CI-V port {Port} not present. Available: {Ports}",
                             portName, string.Join(", ", available));
-                        return Task.FromResult(false);
+                        return false;
                     }
 
                     _port = new SerialPort
@@ -123,34 +152,83 @@ namespace Icom_Web_Control.Services.Civ
                     _port.Open();
 
                     _logger.LogInformation("✓ CI-V port {Port} open at {Baud} 8N1", portName, baudRate);
-                    return Task.FromResult(true);
+                    return true;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to open CI-V port {Port}", portName);
-                    CloseInternal();
-                    return Task.FromResult(false);
+                    failed = Detach();
                 }
             }
+            if (failed != null)
+                await CloseDetachedAsync(failed);
+            return false;
         }
 
-        public Task CloseAsync()
+        public async Task CloseAsync()
         {
+            SerialPort? port;
             lock (_portLock)
             {
-                CloseInternal();
+                port = Detach();
             }
-            return Task.CompletedTask;
+            if (port != null)
+                await CloseDetachedAsync(port);
         }
 
-        private void CloseInternal()
+        /// <summary>
+        /// Lets go of the port: from here on nothing reads from it, writes to it
+        /// or waits on it. Called under <see cref="_portLock"/>; the port itself
+        /// is closed afterwards, outside the lock, by
+        /// <see cref="CloseDetachedAsync"/>.
+        /// </summary>
+        private SerialPort? Detach()
         {
-            if (_port == null) return;
+            var port = _port;
+            if (port == null) return null;
+            port.DataReceived -= OnDataReceived;
+            _port = null;
+            _pending?.Tcs.TrySetResult(null);
+            _pending = null;
+            return port;
+        }
+
+        /// <summary>
+        /// Closes a port the bus has already let go of, without ever holding up
+        /// the caller for more than <see cref="CloseTimeoutMs"/>.
+        ///
+        /// <para><b>Why (IWC #128, D#51).</b> The close used to run inside
+        /// <see cref="_portLock"/>, which the DataReceived handler also takes, and
+        /// <c>SerialPort.Close</c> can wait on the serial event thread, or on a
+        /// USB driver that has stopped answering. When the radio went quiet and
+        /// the poll loop dropped the link, that close never came back. The loop
+        /// stopped there: no reconnect attempt ever logged, 0% CPU, and every exit
+        /// forced after 10 s. The close now runs with no lock held, on a worker,
+        /// and the loop moves on after the timeout whether or not it has finished.
+        /// A close still running keeps the port's handle, so
+        /// <see cref="OpenAsync"/> won't try that port again until it ends.</para>
+        /// </summary>
+        private async Task CloseDetachedAsync(SerialPort port)
+        {
+            string name;
+            try { name = port.PortName; } catch { name = "?"; }
+
+            var closing = Task.Run(() => CloseQuietly(port));
+            _closingPortName = name;
+            _closing = closing;
+
+            if (!await FinishesWithinAsync(closing, CloseTimeoutMs))
+                _logger.LogWarning(
+                    "CI-V port {Port} didn't close within {Ms} ms; carrying on and leaving it to finish in the background",
+                    name, CloseTimeoutMs);
+        }
+
+        private void CloseQuietly(SerialPort port)
+        {
             try
             {
-                _port.DataReceived -= OnDataReceived;
-                if (_port.IsOpen)
-                    _port.Close();
+                if (port.IsOpen)
+                    port.Close();
             }
             catch (Exception ex)
             {
@@ -158,11 +236,15 @@ namespace Icom_Web_Control.Services.Civ
             }
             finally
             {
-                _port.Dispose();
-                _port = null;
-                _pending?.Tcs.TrySetResult(null);
-                _pending = null;
+                try { port.Dispose(); } catch { /* already reported above */ }
             }
+        }
+
+        /// <summary>Whether <paramref name="work"/> ends within <paramref name="timeoutMs"/>.</summary>
+        internal static async Task<bool> FinishesWithinAsync(Task work, int timeoutMs)
+        {
+            var winner = await Task.WhenAny(work, Task.Delay(timeoutMs));
+            return winner == work;
         }
 
         private void OnDataReceived(object sender, SerialDataReceivedEventArgs e)
@@ -172,7 +254,9 @@ namespace Icom_Web_Control.Services.Civ
                 byte[] chunk;
                 lock (_portLock)
                 {
-                    if (_port?.IsOpen != true) return;
+                    // Only the current port: one already let go of may still
+                    // raise an event or two while it closes.
+                    if (!ReferenceEquals(sender, _port) || _port?.IsOpen != true) return;
                     int n = _port.BytesToRead;
                     if (n <= 0) return;
                     chunk = new byte[n];
@@ -321,10 +405,13 @@ namespace Icom_Web_Control.Services.Civ
 
         public void Dispose()
         {
+            SerialPort? port;
             lock (_portLock)
             {
-                CloseInternal();
+                port = Detach();
             }
+            if (port != null)
+                CloseDetachedAsync(port).GetAwaiter().GetResult();
             _txLock.Dispose();
         }
 

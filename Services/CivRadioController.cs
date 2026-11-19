@@ -57,6 +57,13 @@ namespace Icom_Web_Control.Services
         // reads "in use" and the answer is wrong either way.
         private volatile bool _findInProgress;
 
+        // The poll loop's heartbeat, for the watchdog in ExecuteAsync: when the
+        // loop last started a step, and which step. IWC #128 / D#51: the loop
+        // stopped after dropping the link and nothing in the log said where.
+        private long _loopBeatMs = Environment.TickCount64;
+        private volatile string _loopStage = "starting";
+        private const int LoopStallWarnMs = 20000;
+
         // PowerOnAtStart is tried once per run, the first time the port opens:
         // after that a radio that stops answering was switched off on purpose.
         private bool _startPowerOnTried;
@@ -3498,9 +3505,11 @@ namespace Icom_Web_Control.Services
             _logger.LogInformation("[CivRadioController] Phase-3 CI-V link starting.");
             int misses = 0;
             long loop = 0;
+            _ = WatchLoopAsync(stoppingToken);
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                Beat("checking the port");
                 if (!_bus.IsOpen)
                 {
                     if (_findInProgress)
@@ -3512,6 +3521,7 @@ namespace Icom_Web_Control.Services
                     bool ok;
                     try
                     {
+                        Beat("connecting");
                         ok = await ConnectAsync(stoppingToken);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -3551,6 +3561,7 @@ namespace Icom_Web_Control.Services
 
                     // Operating frequency (command 03) is the liveness signal —
                     // the only read that counts misses and can drop the link.
+                    Beat("polling");
                     long hz = await ReadOperatingFrequencyAsync(stoppingToken);
                     if (hz > 0)
                     {
@@ -3569,8 +3580,11 @@ namespace Icom_Web_Control.Services
                     else if (++misses >= MaxConsecutiveReadMisses)
                     {
                         _logger.LogWarning("[CivRadioController] {Misses} consecutive frequency-read misses — dropping link", misses);
+                        Beat("closing the port after the link dropped");
                         await _bus.CloseAsync();
+                        Beat("reporting the link down");
                         await SetConnectedAsync(false);
+                        _logger.LogInformation("[CivRadioController] Link dropped; trying to reconnect every {Seconds} s", ReconnectDelayMs / 1000);
                         continue; // link is down — don't chase further reads
                     }
 
@@ -3734,6 +3748,47 @@ namespace Icom_Web_Control.Services
             }
 
             await _bus.CloseAsync();
+        }
+
+        private void Beat(string stage)
+        {
+            _loopStage = stage;
+            Interlocked.Exchange(ref _loopBeatMs, Environment.TickCount64);
+        }
+
+        /// <summary>
+        /// Logs when the poll loop stops making progress, and which step it
+        /// stopped in, then again when it moves on. Nothing else in the log can
+        /// say where a stuck loop is (IWC #128, D#51).
+        /// </summary>
+        private async Task WatchLoopAsync(CancellationToken stoppingToken)
+        {
+            long reportedBeat = -1;
+            try
+            {
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    await Task.Delay(5000, stoppingToken);
+                    long beat = Interlocked.Read(ref _loopBeatMs);
+                    long stalledMs = Environment.TickCount64 - beat;
+                    if (stalledMs >= LoopStallWarnMs && reportedBeat != beat)
+                    {
+                        reportedBeat = beat;
+                        _logger.LogWarning("[CivRadioController] Poll loop has made no progress for {Seconds} s; stuck while {Stage}",
+                            stalledMs / 1000, _loopStage);
+                    }
+                    else if (reportedBeat >= 0 && reportedBeat != beat)
+                    {
+                        reportedBeat = -1;
+                        _logger.LogInformation("[CivRadioController] Poll loop moving again ({Stage})", _loopStage);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[CivRadioController] Poll loop watchdog stopped");
+            }
         }
 
         private async Task SetConnectedAsync(bool connected)
