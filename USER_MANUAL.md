@@ -792,6 +792,7 @@ Things the radio does that the dialog cannot show you:
 - **The radio memorises PBT per band**, so a setting you leave on 40 m is still there when you come back to it.
 - **Changing IF Width resets both PBT shifts to centre.** That is the radio's behaviour, not the app's. If the dialog happens to be open when you change the width, close and reopen it to see the reset — it reads the radio when it opens.
 - On the radio's own display, a dot **·** appears on the passband indicator whenever PBT is shifting the width.
+- **The spectrum's passband shading follows PBT** on the Radio panel, the pop-out spectrum and the RTTY Contest page, for the selected VFO. Turn both knobs the same way and the shading slides; turn them opposite ways and it narrows. It follows the radio's own knobs too, within a couple of seconds. Each knob can move its edge by up to half the filter width, in the radio's own steps, so on a 250 Hz CW filter a small turn may not move it at all.
 
 The sliders are read from the radio when you open the dialog, and again whenever you come back to it - click on the dialog, or switch back to the browser window - rather than polled continuously. So a change made at the radio's knobs shows up as soon as you return to the dialog.
 

@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre15 (2026-11-19)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **The passband shading follows Twin PBT.** On the Radio panel, the pop-out spectrum and the RTTY Contest page, the shaded passband now moves with the radio's Twin PBT. Turn both knobs the same way and it slides; turn them opposite ways and it narrows to the part you still hear. It follows the radio's own knobs as well as IWC's, within a couple of seconds, and the Radio panel's TWIN PBT knob now follows the radio's knobs too. Tested on an IC-7300MK2. See Twin PBT in section 5.7 of the [user manual](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#57-receiver-controls).
+- **RTTY Auto says when it ticks Rev.** When **Auto** finds a station sending with mark and space swapped and ticks **Rev**, it now says so in a sentence of its own, and suggests checking the Rev setting in your sending program if it's your own signal. When it unticks Rev, it says the station is sending the normal way round. Asked for by Bruce VK2RT in YWC.
+- Changes from v1.7.0-pre1 to pre14 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre14-2026-11-19).
+
 ### v1.7.0-pre14 (2026-11-19)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0

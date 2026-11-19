@@ -507,6 +507,15 @@ namespace Icom_Web_Control.Services
         private bool _atuTuning = false;
         public bool AtuTuning { get => _atuTuning; set => SetField(ref _atuTuning, value); }
 
+        // Twin PBT inner and outer (CI-V 14 07 / 14 08), 0-255, 128 = no
+        // shift. One pair for the receiver, polled with the RX controls so
+        // the spectrum's passband box follows the knobs, the radio's own
+        // included. Not saved: the radio is the record.
+        private int _pbtInner = 128;
+        public int PbtInner { get => _pbtInner; set => SetField(ref _pbtInner, value); }
+        private int _pbtOuter = 128;
+        public int PbtOuter { get => _pbtOuter; set => SetField(ref _pbtOuter, value); }
+
         // NB Level per VFO: 1–20
         private int _nbLevelA = 10;
         public int NbLevelA { get => _nbLevelA; set => SetField(ref _nbLevelA, value); }
@@ -678,6 +687,8 @@ namespace Icom_Web_Control.Services
                 new("MicGain", MicGain),
                 new("AtuEnabled", AtuEnabled),
                 new("AtuTuning", AtuTuning),
+                new("PbtInner", PbtInner),
+                new("PbtOuter", PbtOuter),
                 new("MonitorOn", MonitorOn),
                 new("MonitorLevelA", MonitorLevelA),
                 new("MonitorLevelB", MonitorLevelB),

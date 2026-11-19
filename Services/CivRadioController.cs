@@ -1337,8 +1337,8 @@ namespace Icom_Web_Control.Services
         // control to OFF. The state setters broadcast only on change, so a
         // steady radio produces no SignalR traffic here.
         private int _rxPollIndex;
-        private const int RxControlCount = 18;
-        private const int RxControlsPerLoop = 2;   // ~1.3 s to sweep all 17
+        private const int RxControlCount = 20;
+        private const int RxControlsPerLoop = 2;   // ~1.5 s to sweep all 20
 
         private async Task PollNextRxControlAsync(CancellationToken ct)
         {
@@ -1375,6 +1375,10 @@ namespace Icom_Web_Control.Services
                 // the antenna or only to the sidetone, so the CW panels show
                 // which. Slow-moving, front-panel changeable - same reasons.
                 case 17: { int v = await GetCwBreakInAsync(ct); if (v >= 0) _state.CwBreakIn = v.ToString(); break; }
+                // Twin PBT (14 07 / 14 08): the spectrum's passband box
+                // follows it, so a turn of the radio's own knobs shows too.
+                case 18: { int v = await GetPbtInnerAsync(ct); if (v >= 0) _state.PbtInner = v; break; }
+                case 19: { int v = await GetPbtOuterAsync(ct); if (v >= 0) _state.PbtOuter = v; break; }
             }
             _rxPollIndex++;
         }
@@ -1948,14 +1952,22 @@ namespace Icom_Web_Control.Services
         public Task<int> GetPbtInnerAsync(CancellationToken cancellationToken = default)
             => ReadLevel14Async(CivProtocol.SubPbtInner, cancellationToken);
 
-        public Task SetPbtInnerAsync(int value, CancellationToken cancellationToken = default)
-            => WriteLevel14Async(CivProtocol.SubPbtInner, value, "PBT inner", cancellationToken);
+        // The state follows a set at once, so the passband box moves with
+        // the knob rather than at the next poll.
+        public async Task SetPbtInnerAsync(int value, CancellationToken cancellationToken = default)
+        {
+            await WriteLevel14Async(CivProtocol.SubPbtInner, value, "PBT inner", cancellationToken);
+            _state.PbtInner = Math.Clamp(value, 0, 255);
+        }
 
         public Task<int> GetPbtOuterAsync(CancellationToken cancellationToken = default)
             => ReadLevel14Async(CivProtocol.SubPbtOuter, cancellationToken);
 
-        public Task SetPbtOuterAsync(int value, CancellationToken cancellationToken = default)
-            => WriteLevel14Async(CivProtocol.SubPbtOuter, value, "PBT outer", cancellationToken);
+        public async Task SetPbtOuterAsync(int value, CancellationToken cancellationToken = default)
+        {
+            await WriteLevel14Async(CivProtocol.SubPbtOuter, value, "PBT outer", cancellationToken);
+            _state.PbtOuter = Math.Clamp(value, 0, 255);
+        }
 
         /// <summary>
         /// Read a 14-family level (command 14 &lt;sub&gt;). The reply carries a
