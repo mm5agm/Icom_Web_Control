@@ -21,7 +21,7 @@
 
 import { mountRadioPanel } from '/js/radio-panel/radio-panel.js';
 import { addRefineTo } from '/js/radio-panel/spectrum-refine.js';
-import { alignBins, txMeterFraction, rangeLegends } from '/js/radio-panel/panel-math.js';
+import { alignBins, txMeterFraction, rangeLegends, pbtShiftHz } from '/js/radio-panel/panel-math.js';
 import { BAND_PLANS, BAND_EDGES, nearestBandForHz, loadBandPlanFromServer, getSegments, segmentForHz } from '/js/ui/band-plan.js';
 import { calibrateNumeric, loadFromBackend } from '/js/calibration/calibration-engine.js';
 import { ICOM_WINDOWS, startIcomWindows } from '/js/ui/radio-panel-icom-windows.js';
@@ -297,6 +297,7 @@ export function startIcomRadioPanel(root, cfg) {
             inner: frac(r.af, 255), outer: frac(r.rf, 255), text: pct(r.af) + ' · ' + pct(r.rf),
             title: `AF ${pct(r.af)} (inner) · RF ${pct(r.rf)} (outer) · SQL ${pct(r.sql)}` + U,
         });
+        refreshEdges();
         panel.setGroupKnob('A', 'pbt', {
             inner: frac(r.pbtIn, 255), outer: frac(r.pbtOut, 255), text: pbtText(r.pbtIn) + ' · ' + pbtText(r.pbtOut),
             title: `PBT inner ${pbtText(r.pbtIn)} · outer ${pbtText(r.pbtOut)} (steps from centre)` + U,
@@ -360,7 +361,15 @@ export function startIcomRadioPanel(root, cfg) {
 
     function refreshWidth(vfo) {
         panel.setWidth(vfo, r.widthHz[vfo]);
+        refreshEdges();
         if (vfo === r.sel) refreshKeys();
+    }
+
+    // The passband box follows Twin PBT on the selected VFO, the one the
+    // knobs act on; the other VFO's box is drawn unshifted.
+    function refreshEdges() {
+        for (const v of ['A', 'B'])
+            panel.setPassbandEdges(v, v === r.sel ? pbtShiftHz(r.pbtIn, r.pbtOut, r.widthHz[v], r.mode[v]) : null);
     }
 
     // The slot and the width it holds, so a press shows which width it chose.
@@ -720,8 +729,9 @@ export function startIcomRadioPanel(root, cfg) {
         }
     }
 
-    // Twin PBT is read on request rather than carried by the hub: at start,
-    // and when the mode (and with it the radio's passband) changes.
+    // Twin PBT is read at start and when the mode (and with it the radio's
+    // passband) changes, so the knobs show it at once; the hub's PbtInner
+    // and PbtOuter keep it up to date between, the radio's own knobs too.
     let pbtTimer = 0;
     function readPbt() {
         clearTimeout(pbtTimer);
@@ -984,6 +994,8 @@ export function startIcomRadioPanel(root, cfg) {
         MonitorOn: v => { r.moni = on(v); panel.setKey('moni', { on: r.moni }); },
         AfGainA: v => { r.af = num(v); refreshRxKnobs(); },
         RfGainA: v => { r.rf = num(v); refreshRxKnobs(); },
+        PbtInner: v => { r.pbtIn = knobFrom('pbtin', num(v)); refreshRxKnobs(); },
+        PbtOuter: v => { r.pbtOut = knobFrom('pbtout', num(v)); refreshRxKnobs(); },
         SquelchA: v => { r.sql = num(v); refreshRxKnobs(); },
         CwPitch: v => { r.pitch = num(v); refreshSharedKnobs(); },
         CwSpeed: v => { r.speed = num(v); refreshSharedKnobs(); },

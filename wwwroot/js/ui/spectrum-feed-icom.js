@@ -13,7 +13,7 @@
 // It listens on the page's hub connection but does not start it: the page
 // may have handlers of its own to add first.
 
-import { alignBins } from '/js/radio-panel/panel-math.js';
+import { alignBins, pbtShiftHz } from '/js/radio-panel/panel-math.js';
 import { loadBandPlanFromServer } from '/js/ui/band-plan.js';
 import { spectrumTarget } from '/js/ui/spectrum-tune-icom.js';
 
@@ -63,9 +63,12 @@ export function startIcomSpectrumFeed(cfg) {
         xwatch: true,          // until the hub says (it does on connect)
         scope: { A: '', B: '' },   // the last SdrStatus for each
         noScope: false,        // the radio has none, so both panes say that
+        pbt: { inner: null, outer: null },   // Twin PBT, until the hub says
     };
     const paneFor = id => (pseudoDual ? id : r.sel);
-    const refreshPassband = vfo => pane(vfo)?.setPassband(r.mode[vfo], r.widthHz[vfo]);
+    // The box follows Twin PBT on the selected VFO, the one the knobs act on.
+    const edgesFor = vfo => (vfo === r.sel ? pbtShiftHz(r.pbt.inner, r.pbt.outer, r.widthHz[vfo], r.mode[vfo]) : null);
+    const refreshPassband = vfo => pane(vfo)?.setPassband(r.mode[vfo], r.widthHz[vfo], 0, edgesFor(vfo));
 
     function showIdlePane() {
         if (pseudoDual || r.noScope) return;
@@ -113,7 +116,9 @@ export function startIcomSpectrumFeed(cfg) {
     const handlers = {
         ...perVfo('A'),
         ...perVfo('B'),
-        ActiveVfo: v => { r.sel = num(v) === 1 ? 'B' : 'A'; showIdlePane(); changed('ActiveVfo'); },
+        ActiveVfo: v => { r.sel = num(v) === 1 ? 'B' : 'A'; showIdlePane(); refreshPassband('A'); refreshPassband('B'); changed('ActiveVfo'); },
+        PbtInner: v => { r.pbt.inner = num(v); refreshPassband(r.sel); },
+        PbtOuter: v => { r.pbt.outer = num(v); refreshPassband(r.sel); },
         CrossBandWatch: v => {
             r.xwatch = !!v?.enabled;
             changed('CrossBandWatch');
