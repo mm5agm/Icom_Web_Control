@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace Icom_Web_Control;
 
 public static class AppVersion
@@ -13,21 +15,53 @@ public static class AppVersion
 
     /// <summary>
     /// Pre-release suffix without the leading hyphen ("pre4"), or empty for a
-    /// full release. Set by finish-release.ps1 from the tag, so it cannot drift
-    /// from what was actually shipped.
+    /// full release. Set by finish-release.ps1 from the tag. Only a local build
+    /// shows it now: a CI build shows <see cref="BuildTag"/> instead, because
+    /// v1.7.0-pre13, -pre14 and -pre15 were released without the script and
+    /// all said "pre12", and the update check kept offering them pre15.
     ///
     /// This exists because v1.0.6-pre1, -pre2 and -pre3 all reported themselves
     /// as plain "v1.0.6": a tester could not tell which build they were running,
     /// and neither could we when reading their bug report.
     /// </summary>
-    public const string PreRelease = "pre12";
+    public const string PreRelease = "pre16";
+
+    /// <summary>
+    /// The git tag CI built from ("v1.7.0-pre16", "v1.7.0"), or "" for a local
+    /// build. The workflow passes it as <c>-p:IwcBuildTag=</c> and the csproj
+    /// bakes it in as assembly metadata, so nothing has to be edited by hand.
+    /// </summary>
+    public static readonly string BuildTag =
+        typeof(AppVersion).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(a => a.Key == "IwcBuildTag")?.Value?.Trim() ?? "";
 
     /// <summary>
     /// What the user is shown, and the only version string that should appear in
     /// the UI, the tray, the logs or a bug report: "1.0.6" or "1.0.6-pre4".
     /// </summary>
-    public static string Display =>
-        PreRelease.Length == 0 ? Current : $"{Current}-{PreRelease}";
+    public static readonly string Display = ComputeDisplay(Current, PreRelease, BuildTag);
+
+    /// <summary>
+    /// With no tag (a local build): Current plus the PreRelease constant. With a
+    /// tag: "1.7.0" for v1.7.0, "1.7.0-pre16" for v1.7.0-pre16, and a tag that
+    /// does not belong to Current at all shown beside it ("1.7.0 (v1.8.0)")
+    /// rather than hidden, because that is a release-prep mistake worth seeing.
+    /// </summary>
+    internal static string ComputeDisplay(string current, string preRelease, string buildTag)
+    {
+        if (string.IsNullOrWhiteSpace(buildTag))
+            return preRelease.Length == 0 ? current : $"{current}-{preRelease}";
+
+        string tag = buildTag.Trim();
+        string bare = tag.StartsWith('v') || tag.StartsWith('V') ? tag[1..] : tag;
+
+        if (bare == current)
+            return current;
+        if (bare.StartsWith(current + "-", StringComparison.Ordinal))
+            return bare;
+        return $"{current} ({tag})";
+    }
 
     /// <summary>Date this version was released, ISO format.
     /// Bump on actual release; current value reflects the planned ship date.</summary>

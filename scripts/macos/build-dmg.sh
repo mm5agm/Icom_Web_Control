@@ -154,7 +154,8 @@ build_one() {
     --self-contained true \
     -o "$publish_dir" \
     /p:UseAppHost=true \
-    /p:UseSharedCompilation=false
+    /p:UseSharedCompilation=false \
+    "/p:IwcBuildTag=${IWC_BUILD_TAG:-}"
 
   if [[ ! -x "$publish_dir/$EXEC_NAME" && ! -f "$publish_dir/$EXEC_NAME" ]]; then
     echo "error: apphost missing after publish: $publish_dir/$EXEC_NAME" >&2
