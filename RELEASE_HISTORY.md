@@ -12,6 +12,13 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre14 (2026-11-19)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **IWC now reconnects by itself after it loses the radio (#128).** When the radio stopped answering, IWC dropped the link and then got stuck closing the serial port. It never tried to reconnect, sat at 0% CPU with the display frozen, and took 10 seconds to exit. Now the port is closed in the background, and IWC tries to reconnect every 3 seconds until the radio answers again. The log says "Link dropped; trying to reconnect". If IWC ever stops making progress for 20 seconds, the log now says so and names the step it is stuck on. Tested by unplugging an IC-7300MK2's USB cable while IWC was running: IWC picked the radio up again a second after the cable went back in.
+- Changes from v1.7.0-pre1 to pre13 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre13-2026-11-18).
+
 ### v1.7.0-pre13 (2026-11-18)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
