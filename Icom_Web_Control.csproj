@@ -133,12 +133,20 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup Condition="'$(IwcBuildTag)' != ''">
+    <AssemblyMetadata Include="IwcBuildTag" Value="$(IwcBuildTag)" />
+  </ItemGroup>
+
   <PropertyGroup>
     <!-- Fresh IWC version line starting at 1.0.0; keep in step with Models/AppVersion.cs.
          AssemblyVersion/FileVersion must stay numeric; Version carries any label. -->
     <Version>1.7.0</Version>
     <FileVersion>1.7.0.0</FileVersion>
     <AssemblyVersion>1.7.0.0</AssemblyVersion>
+    <!-- The git tag CI is building (v1.7.0-pre16), passed as -p:IwcBuildTag=...
+         by release.yml, build-dmg.sh and the Dockerfile. Empty on a local build.
+         AppVersion.Display reads the metadata below so a pre-release names itself. -->
+    <IwcBuildTag Condition="'$(IwcBuildTag)' == ''"></IwcBuildTag>
     <AssemblyTitle>Icom Web Control</AssemblyTitle>
     <Product>Icom Web Control</Product>
     <Description>Browser-based CI-V controller for Icom HF transceivers</Description>

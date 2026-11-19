@@ -27,6 +27,8 @@ RUN arch="$TARGETARCH"; \
     dotnet restore Icom_Web_Control.csproj -r "linux-$arch"
 
 COPY . .
+# The git tag CI built from, baked in as AppVersion.BuildTag; empty locally.
+ARG IWC_BUILD_TAG=
 # The radio-control target only.
 RUN arch="$TARGETARCH"; \
     if [ "$arch" = "amd64" ]; then arch=x64; fi; \
@@ -38,6 +40,7 @@ RUN arch="$TARGETARCH"; \
       --no-restore \
       -o /app/publish \
       /p:UseAppHost=true \
+      "/p:IwcBuildTag=$IWC_BUILD_TAG" \
     && test -f /app/publish/wwwroot/favicon.ico \
     && test -f /app/publish/USER_MANUAL.md
 

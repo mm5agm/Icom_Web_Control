@@ -22,6 +22,14 @@ on:
         required: false
         type: string
 
+# The tag being built, baked into the app as AppVersion.BuildTag so a
+# pre-release names itself ("1.7.0-pre16") on its About page, in the tray and
+# to the update check. Before this the suffix was a constant that only
+# finish-release.ps1 updated, so v1.7.0-pre13 to -pre15 all said "pre12" and
+# kept offering themselves as an update. Empty on PR builds.
+env:
+  IWC_BUILD_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.tag || '' }}
+
 jobs:
   # The core tests, and the only CI that runs them from this repo.
   #
@@ -124,7 +132,8 @@ jobs:
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
-            --output publish
+            --output publish `
+            "-p:IwcBuildTag=$env:IWC_BUILD_TAG"
         shell: pwsh
 
       - name: List publish output
@@ -282,6 +291,8 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            IWC_BUILD_TAG=${{ env.IWC_BUILD_TAG }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

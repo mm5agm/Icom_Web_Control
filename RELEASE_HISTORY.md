@@ -12,6 +12,13 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre16 (2026-11-19)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **The version number is right again.** v1.7.0-pre13, pre14 and pre15 all called themselves "pre12" on the About page, in the tray and in the log, and the update notice kept offering pre15 to people who already had it. The version now comes from the release itself, so it can't fall behind. Found by Paul VK2AHB.
+- Nothing else has changed since pre15. Changes from v1.7.0-pre1 to pre15 still need testing: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre15-2026-11-19).
+
 ### v1.7.0-pre15 (2026-11-19)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
