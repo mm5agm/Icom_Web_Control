@@ -115,6 +115,17 @@ namespace Icom_Web_Control.Hubs
                     return;
                 }
 
+                // A connection the server timed out is a tab that is still open
+                // but went quiet: the PC stalled, the network blinked, or IWC
+                // itself was held up. It reconnects when it can, so shutting
+                // down here only takes IWC away from under it.
+                if (exception is not null)
+                {
+                    _logger.LogInformation(
+                        "The last browser timed out rather than closing; IWC keeps running for it to reconnect.");
+                    return;
+                }
+
                 // This fires on every page change too: the page being left
                 // drops its connection a moment before the new page opens its
                 // own, and the cancel in OnConnectedAsync follows at once.

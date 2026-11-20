@@ -12,6 +12,15 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre17 (2026-11-20)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **IWC says why fldigi won't connect.** If fldigi, or any program that uses Hamlib, has the radio's own model (IC-7300 and so on) as its Rig with `localhost:4532` as the device, it sends raw CI-V to IWC's rigctld port, gets no answer and hangs up after about 4 seconds with "not responding". IWC's log now says so and names the fix: choose **NET rigctl** as the Rig. Found from Paul VK2AHB's log. See "fldigi (or another program) says not responding" in section 14 of the [user manual](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#14-troubleshooting).
+- **rigctld follows Hamlib's layout exactly.** IWC's answer to Hamlib's `dump_state` was missing the ITU region line, so Hamlib read the radio's first receive range as the region and left it out of the radio's list. Programs connected anyway; now Hamlib sees the radio's full receive range. A command that arrives split across two network packets is now put back together instead of being misread.
+- **IWC no longer exits while a browser is still open.** With **Automatically exit when no browser is connected** on, IWC shut down 30 seconds after the last browser connection ended. That included a browser that was still open but went quiet for a while, for example while the PC stalled over a USB dropout. Now only a tab that is really closed starts the countdown. You can still quit at any time from the tray icon: right-click it and choose **Exit Icom Web Control**.
+- Changes from v1.7.0-pre1 to pre16 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre16-2026-11-19).
+
 ### v1.7.0-pre16 (2026-11-19)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0

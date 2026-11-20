@@ -89,12 +89,12 @@ public class RadioFrequenciesTests
     public void Ic7300RigctldRangesAreUnchanged()
     {
         var lines = RigctldServer.DumpState(RadioProfile.Ic7300Mk2).Split('\n');
-        Assert.Equal("30000.000000 74800000.000000 0x1ff -1 -1 0x10000003 0x3", lines[2]);
-        Assert.Equal("0 0 0 0 0 0 0", lines[3]);
-        Assert.Equal("1800000.000000 29700000.000000 0x1ff 2 100 0x10000003 0x3", lines[4]);
-        Assert.Equal("50000000.000000 54000000.000000 0x1ff 2 100 0x10000003 0x3", lines[5]);
-        Assert.Equal("0 0 0 0 0 0 0", lines[6]);
-        Assert.Equal("0 0", lines[7]);
+        Assert.Equal("30000.000000 74800000.000000 0x1ff -1 -1 0x10000003 0x3", lines[3]);
+        Assert.Equal("0 0 0 0 0 0 0", lines[4]);
+        Assert.Equal("1800000.000000 29700000.000000 0x1ff 2 100 0x10000003 0x3", lines[5]);
+        Assert.Equal("50000000.000000 54000000.000000 0x1ff 2 100 0x10000003 0x3", lines[6]);
+        Assert.Equal("0 0 0 0 0 0 0", lines[7]);
+        Assert.Equal("0 0", lines[8]);
     }
 
     [Fact]
