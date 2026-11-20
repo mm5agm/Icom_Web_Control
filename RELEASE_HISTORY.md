@@ -17,6 +17,7 @@ a different and much older format.
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
 
 - **Segments on 2 m and 70 cm.** On the IC-9700 the Segment drop-down now works on 2 m and 70 cm. It offers CW, FT8, SSB and FM at your region's calling frequencies. Before, it showed "--" on those bands. Japan has CW and FM only for now. See [Band and Segment Selection](USER_MANUAL.md#59-band-and-segment-selection).
+- **Linux and Docker: `/dev/serial/by-id` ports work.** IWC turned a `/dev/serial/by-id/...` CI-V port away as "not present", because Linux's port list only has `ttyUSB` names. In Docker, with only the by-id path passed in, the list was empty. IWC now accepts any by-id path that exists, and the Settings port list shows them. Not yet tried on a real Linux radio.
 - Changes from v1.7.0-pre1 to pre17 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre17-2026-11-20).
 
 ### v1.7.0-pre17 (2026-11-20)

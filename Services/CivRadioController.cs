@@ -504,7 +504,7 @@ namespace Icom_Web_Control.Services
                 // the configured port and the list actually present so the fix
                 // is obvious without digging through logs or Device Manager.
                 var available = System.IO.Ports.SerialPort.GetPortNames();
-                if (Array.IndexOf(available, port) < 0)
+                if (!RadioWebControl.Core.Services.SerialPortPaths.IsPresent(port, available))
                 {
                     var list = available.Length > 0
                         ? string.Join(", ", available.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))

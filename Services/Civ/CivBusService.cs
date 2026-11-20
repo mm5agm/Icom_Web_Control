@@ -126,7 +126,7 @@ namespace Icom_Web_Control.Services.Civ
                 {
                     lock (_recent) _recent.Clear();
                     var available = SerialPort.GetPortNames();
-                    if (Array.IndexOf(available, portName) < 0)
+                    if (!RadioWebControl.Core.Services.SerialPortPaths.IsPresent(portName, available))
                     {
                         _logger.LogWarning("CI-V port {Port} not present. Available: {Ports}",
                             portName, string.Join(", ", available));

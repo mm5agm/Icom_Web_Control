@@ -680,9 +680,13 @@ try
 
     app.MapGet("/api/ports", async (Icom_Web_Control.Services.ISettingsService settingsService) =>
     {
-        var ports = System.IO.Ports.SerialPort.GetPortNames();
+        // On Linux the stable /dev/serial/by-id names are offered as well.
+        var listed = System.IO.Ports.SerialPort.GetPortNames();
+        var byIdDir = RadioWebControl.Core.Services.SerialPortPaths.ByIdDir;
+        var ports = RadioWebControl.Core.Services.SerialPortPaths.WithById(listed,
+            OperatingSystem.IsLinux() && Directory.Exists(byIdDir) ? Directory.GetFiles(byIdDir) : Array.Empty<string>(), p => p);
         var configured = (await settingsService.GetSettingsAsync()).SerialPort;
-        return new { ports, configuredPort = configured, configuredPresent = ports.Contains(configured) };
+        return new { ports, configuredPort = configured, configuredPresent = RadioWebControl.Core.Services.SerialPortPaths.IsPresent(configured ?? "", listed) };
     });
 
     // Serve accessible labels from AppData — copy default on first run so users can find and edit it.
