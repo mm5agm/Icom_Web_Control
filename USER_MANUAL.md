@@ -2628,6 +2628,12 @@ Up to and including v1.0.3, the page fetched three files from public servers on 
   - Network Server: localhost, port 4532
 - The rigctld server starts automatically when this app starts. Check the app is running.
 
+**fldigi (or another program) says "not responding" and won't stay connected**
+
+- The program's **Rig** must be **NET rigctl** from the Hamlib list, not your radio's own model. In fldigi that is **Configure → Config dialog → Rig Control → Hamlib**: Rig **NET rigctl**, Device `localhost:4532`, then tick **Use Hamlib** and click **Initialize**. Leave RigCAT and flrig unticked.
+- If the Rig is left on **IC-7300** (or any Icom model) with `localhost:4532` as the device, the program talks raw CI-V to IWC instead of rigctl. IWC can't answer that, so the program gives up after about 4 seconds and says the radio is not responding. IWC's log then says "This program is sending Icom CI-V, not rigctl commands".
+- The audio is separate: fldigi's **Soundcard** stays on the radio's **USB Audio CODEC**. IWC only carries the CAT side.
+
 **Spectrum display is blank or never appears**
 
 The scope comes from the radio over CI-V, so there is no SDR, driver or device setting to check — if the rest of the app is talking to the radio, the scope should follow.

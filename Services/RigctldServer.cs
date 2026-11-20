@@ -160,6 +160,8 @@ namespace Icom_Web_Control.Services
                 : "rigctld-unknown";
             var stream = client.GetStream();
             var buffer = new byte[1024];
+            var pending = new StringBuilder();
+            var civWarned = false;
 
             try
             {
@@ -168,9 +170,23 @@ namespace Icom_Web_Control.Services
                     var bytesRead = await stream.ReadAsync(buffer, cancellationToken);
                     if (bytesRead == 0) break;
 
-                    // Split on newlines — Hamlib may pipeline multiple commands in one TCP write
-                    var data = Encoding.ASCII.GetString(buffer, 0, bytesRead);
-                    var commands = data.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    // A program set to the radio's own Hamlib model (IC-7300 and
+                    // so on) with this port as its device sends binary CI-V, not
+                    // rigctl text. Nothing here can answer it, so the program
+                    // times out and hangs up after a few seconds. Say why.
+                    if (!civWarned && LooksLikeCiv(buffer.AsSpan(0, bytesRead)))
+                    {
+                        civWarned = true;
+                        _logger.LogWarning(
+                            "[{ClientId}] This program is sending Icom CI-V, not rigctl commands. " +
+                            "In its rig settings choose Hamlib NET rigctl (model 2), not the radio's own model, " +
+                            "with localhost:{Port} as the device.", clientId, RigctldPort);
+                    }
+
+                    // Split on newlines. Hamlib may send several commands in one
+                    // TCP write, or one command across two; keep any tail with no
+                    // newline yet until the rest arrives.
+                    var commands = TakeLines(pending, Encoding.ASCII.GetString(buffer, 0, bytesRead));
 
                     foreach (var rawCmd in commands)
                     {
@@ -209,6 +225,27 @@ namespace Icom_Web_Control.Services
                 _logger.LogInformation("[{ClientId}] Client disconnected", clientId);
             }
         }
+
+        // Appends a chunk read from the socket and returns every complete
+        // line in it; whatever follows the last newline stays in pending.
+        internal static List<string> TakeLines(StringBuilder pending, string chunk)
+        {
+            pending.Append(chunk);
+            var text = pending.ToString();
+            var end = text.LastIndexOf('\n');
+            if (end < 0)
+            {
+                // A client that never sends a newline mustn't grow this forever.
+                if (pending.Length > 4096) pending.Clear();
+                return new List<string>();
+            }
+            pending.Clear().Append(text, end + 1, text.Length - end - 1);
+            return text[..end].Split('\n', StringSplitOptions.RemoveEmptyEntries).ToList();
+        }
+
+        // Icom CI-V frames start FE FE. rigctl text never contains 0xFE.
+        internal static bool LooksLikeCiv(ReadOnlySpan<byte> data)
+            => data.IndexOf(new byte[] { 0xFE, 0xFE }) >= 0;
 
         private async Task<string> ProcessRigctldCommandAsync(string command, string clientId)
         {
@@ -615,6 +652,9 @@ namespace Icom_Web_Control.Services
             {
                 "0",            // protocol version
                 "2",            // rig model (2 = NET rigctl)
+                "0",            // ITU region. Hamlib reads this line before the
+                                // ranges; without it the first RX range is taken
+                                // as the region and every line after is one off.
             };
             foreach (var r in profile.Frequencies.Receive)
                 lines.Add(FormattableString.Invariant($"{r.LoHz:F6} {r.HiHz:F6} 0x1ff -1 -1 0x10000003 0x3"));
