@@ -46,6 +46,14 @@ namespace Icom_Web_Control.Services.Civ
         /// See <see cref="CloseDetachedAsync"/>.
         /// </summary>
         internal const int CloseTimeoutMs = 2000;
+
+        /// <summary>
+        /// How long a write may take before the bus decides the driver has
+        /// stopped taking data. The port's own WriteTimeout is 500 ms, so a
+        /// driver that honours it throws long before this. See
+        /// <see cref="WriteWithinAsync"/>.
+        /// </summary>
+        internal const int WriteStuckMs = 2000;
         // The last bytes received, so a connect that gets no answer can log what did come
         // back: nothing, only our echo, or something else (IWC #128).
         private const int RecentCapacity = 96;
@@ -65,12 +73,16 @@ namespace Icom_Web_Control.Services.Civ
 
         public bool IsOpen
         {
-            get { lock (_portLock) { return _port?.IsOpen ?? false; } }
+            // No lock: this is asked by every transaction, from the poll loop,
+            // every browser request and every rigctld client. Waiting on the
+            // port lock here let one stuck serial call hold up all of them
+            // (D#51, see WriteWithinAsync).
+            get { return Volatile.Read(ref _port)?.IsOpen ?? false; }
         }
 
         public string? PortName
         {
-            get { lock (_portLock) { return _port?.IsOpen == true ? _port.PortName : null; } }
+            get { var port = Volatile.Read(ref _port); return port?.IsOpen == true ? port.PortName : null; }
         }
 
         // Only the CW Paddle's key line calls this, and only once the operator
@@ -240,6 +252,61 @@ namespace Icom_Web_Control.Services.Civ
             }
         }
 
+        /// <summary>
+        /// Writes to the port, giving up after <see cref="WriteStuckMs"/>. Returns
+        /// whether the write finished; a write that fails throws as before.
+        ///
+        /// <para><b>Why (D#51).</b> The write used to run inside the port lock,
+        /// which <see cref="IsOpen"/>, the reader and every transaction also
+        /// took. A USB serial driver that stops taking data and ignores the
+        /// port's WriteTimeout left that write, and the lock, held for good.
+        /// Every browser request and rigctld command that touched the radio then
+        /// waited on the lock with a thread each, until the thread pool ran dry:
+        /// the page froze, the browsers timed out, and only pulling the USB
+        /// cable (which makes the write fail) brought IWC back. Now the write
+        /// holds no lock, and one that has not finished in time lets go of the
+        /// port. The radio shows as disconnected and IWC keeps answering; the
+        /// poll loop reconnects once the stuck port has let go of its handle.</para>
+        /// </summary>
+        private async Task<bool> WriteWithinAsync(SerialPort port, byte[] bytes)
+        {
+            if (await WriteFinishesWithinAsync(() => port.Write(bytes, 0, bytes.Length), WriteStuckMs))
+                return true;
+
+            string name;
+            try { name = port.PortName; } catch { name = "?"; }
+            _logger.LogWarning(
+                "CI-V write to {Port} didn't finish within {Ms} ms: the USB serial driver has stopped taking data. Letting go of the port so IWC keeps answering; it reconnects when the port comes back",
+                name, WriteStuckMs);
+
+            SerialPort? stuck;
+            lock (_portLock)
+            {
+                stuck = ReferenceEquals(_port, port) ? Detach() : null;
+            }
+            if (stuck != null)
+                _ = CloseDetachedAsync(stuck);
+            return false;
+        }
+
+        /// <summary>
+        /// Runs <paramref name="write"/> on a worker and waits at most
+        /// <paramref name="timeoutMs"/> for it. True if it finished; an exception
+        /// it threw comes back out. A write still running after the timeout is
+        /// left to finish (or fail) on its own, its error observed.
+        /// </summary>
+        internal static async Task<bool> WriteFinishesWithinAsync(Action write, int timeoutMs)
+        {
+            var work = Task.Run(write);
+            if (await FinishesWithinAsync(work, timeoutMs))
+            {
+                await work; // rethrows a failed write to the caller
+                return true;
+            }
+            _ = work.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            return false;
+        }
+
         /// <summary>Whether <paramref name="work"/> ends within <paramref name="timeoutMs"/>.</summary>
         internal static async Task<bool> FinishesWithinAsync(Task work, int timeoutMs)
         {
@@ -251,19 +318,19 @@ namespace Icom_Web_Control.Services.Civ
         {
             try
             {
-                byte[] chunk;
-                lock (_portLock)
-                {
-                    // Only the current port: one already let go of may still
-                    // raise an event or two while it closes.
-                    if (!ReferenceEquals(sender, _port) || _port?.IsOpen != true) return;
-                    int n = _port.BytesToRead;
-                    if (n <= 0) return;
-                    chunk = new byte[n];
-                    int read = _port.Read(chunk, 0, n);
-                    if (read < n)
-                        chunk = chunk[..read];
-                }
+                // Only the current port: one already let go of may still raise
+                // an event or two while it closes. Read with no lock held, so a
+                // write the driver is slow over never holds up the reader (and
+                // a port closed under us just throws, caught below).
+                var port = Volatile.Read(ref _port);
+                if (!ReferenceEquals(sender, port) || port?.IsOpen != true) return;
+                int n = port.BytesToRead;
+                if (n <= 0) return;
+                byte[] chunk = new byte[n];
+                int read = port.Read(chunk, 0, n);
+                if (read <= 0) return;
+                if (read < n)
+                    chunk = chunk[..read];
                 lock (_recent)
                 {
                     foreach (var b in chunk)
@@ -339,11 +406,9 @@ namespace Icom_Web_Control.Services.Civ
                 var tcs = new TaskCompletionSource<CivFrame?>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _pending = new Pending { ExpectedCmd = expectedCmd, Tcs = tcs };
 
-                lock (_portLock)
-                {
-                    if (_port?.IsOpen != true) return null;
-                    _port.Write(frame, 0, frame.Length);
-                }
+                var port = Volatile.Read(ref _port);
+                if (port?.IsOpen != true) return null;
+                if (!await WriteWithinAsync(port, frame)) return null;
 
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 var completed = await Task.WhenAny(tcs.Task, Task.Delay(timeoutMs, timeoutCts.Token));
@@ -383,11 +448,9 @@ namespace Icom_Web_Control.Services.Civ
             await _txLock.WaitAsync(cancellationToken);
             try
             {
-                lock (_portLock)
-                {
-                    if (_port?.IsOpen != true) return;
-                    _port.Write(bytes, 0, bytes.Length);
-                }
+                var port = Volatile.Read(ref _port);
+                if (port?.IsOpen != true) return;
+                await WriteWithinAsync(port, bytes);
             }
             catch (OperationCanceledException)
             {

@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre19 (2026-11-21)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **IWC no longer freezes until you pull the USB cable.** On some PCs IWC could lock up, often just after changing the View: the page stopped answering, the radio stopped updating, and only unplugging the radio's USB cable brought it back. If the USB serial driver stopped taking data, one write to the radio held a lock that every page request and rigctld command waited on. Those waits used up all of IWC's worker threads. Now nothing waits on that lock, and a write the driver hasn't finished after 2 seconds is abandoned. IWC then shows the radio as disconnected and keeps answering, and the log says "CI-V write to COMx didn't finish". Found from Paul VK2AHB's logs.
+- **The log says where the radio poll got stuck.** "Poll loop has made no progress" now names the step: reading the meters, the RX controls, the scope stream and so on, not just "polling".
+- Changes from v1.7.0-pre1 to pre18 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre18-2026-11-20).
+
 ### v1.7.0-pre18 (2026-11-20)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
