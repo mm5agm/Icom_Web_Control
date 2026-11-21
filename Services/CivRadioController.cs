@@ -3603,6 +3603,7 @@ namespace Icom_Web_Control.Services
                     // Watch VFO frequency (command 25 01) — best-effort, every
                     // other loop. A miss (or an unsupported 25) just leaves the
                     // last value; it never affects liveness.
+                    Beat("reading the watch VFO, TX state and meters");
                     if (loop % 2 == 1)
                     {
                         long otherHz = await ReadFrequencyBySelectorAsync(CivProtocol.VfoUnselected, stoppingToken);
@@ -3654,6 +3655,7 @@ namespace Icom_Web_Control.Services
                         if (vd >= 0) _state.VDDMeter = vd;
                     }
 
+                    Beat("reading mode, split and AF");
                     // Mode (command 26) changes rarely, so poll it less often to
                     // keep the bus free for the meter, and interleave the two
                     // VFOs onto different phases. Skip "?XX" (unmapped) values.
@@ -3721,6 +3723,7 @@ namespace Icom_Web_Control.Services
                     // A couple of RX controls per loop, cycling through AGC/
                     // preamp/NB/NR/notch/att/levels so front-panel changes to any
                     // of them make it back to the app within about a second.
+                    Beat("reading the RX controls");
                     for (int i = 0; i < RxControlsPerLoop; i++)
                         await PollNextRxControlAsync(stoppingToken);
 
@@ -3729,6 +3732,7 @@ namespace Icom_Web_Control.Services
                     // no-op unless the operator enabled it; never during TX.
                     if (!transmitting)
                     {
+                        Beat("peeking at the watch VFO");
                         await MaybePeekWatchBandAsync(stoppingToken);
                         await MaybeBorrowWatchWidthAsync(stoppingToken);
                     }
@@ -3751,11 +3755,13 @@ namespace Icom_Web_Control.Services
 
                 // …and the stream itself, which the status watchdog above can only
                 // report on, never restart.
+                Beat("checking the scope stream");
                 try { await MaybeReassertScopeOutputAsync(stoppingToken); }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
                 catch (Exception ex) { _logger.LogWarning(ex, "[CivRadioController] Scope re-assert failed"); }
 
                 loop++;
+                Beat("pausing between polls");
                 await DelayQuiet(ScopeAwarePollIntervalMs(), stoppingToken);
             }
 
@@ -3803,7 +3809,7 @@ namespace Icom_Web_Control.Services
             }
         }
 
-        private async Task SetConnectedAsync(bool connected)
+        private Task SetConnectedAsync(bool connected)
         {
             _state.IsConnected = connected;
             _state.RadioPowerOn = connected;
@@ -3811,15 +3817,15 @@ namespace Icom_Web_Control.Services
             // Leave the frontend's "connecting…" overlay once we have a link, in
             // the same way the Phase 1 stub did.
             AppStatus.InitializationStatus = connected ? "complete" : "initializing";
-            try
-            {
-                await _hubContext.Clients.All.SendAsync("InitializationStatus", AppStatus.InitializationStatus);
-            }
-            catch
-            {
-                // No clients connected yet — the value is also polled via
-                // /api/cat/status/init.
-            }
+
+            // Sent, not awaited, like every other broadcast here: a send to all
+            // browsers finishes only when the slowest has taken it, and a frozen
+            // browser takes nothing until SignalR gives up on it, minutes later.
+            // The poll loop must never wait on a browser (D#51). The value is
+            // also polled via /api/cat/status/init.
+            _ = _hubContext.Clients.All.SendAsync("InitializationStatus", AppStatus.InitializationStatus)
+                .ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            return Task.CompletedTask;
         }
 
         /// <summary>
