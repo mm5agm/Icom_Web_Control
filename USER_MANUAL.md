@@ -2095,6 +2095,8 @@ Log4OM can receive QSO data from WSJT-X and JTAlert via UDP multicast, log QSOs 
 
 **Live frequency in Log4OM (since v1.7.0-pre20):** with the Hamlib settings in Step 3, Log4OM's **CAT Status** goes green and its frequency and mode follow the radio. Before v1.7.0-pre20 it stayed **OFFLINE**: Log4OM asks rigctld in Hamlib's *extended* format (`;V ?`, then `+\get_vfo_info VFOA` and `VFOB` every 0.6 s), and IWC answered those with an error, so Log4OM gave up. If yours still says OFFLINE, update IWC and restart Log4OM. Only VFO A can be tuned from Log4OM; it can read VFO B. ([#18](https://github.com/mm5agm/Icom_Web_Control/issues/18); the same fix as Yaesu Web Control [#387](https://github.com/mm5agm/Yaesu_Web_Control/issues/387))
 
+![Log4OM 2 connected to IWC through the rigctld bridge: CAT is green in the bottom bar, VFO A shows 10.137.820 CW and VFO B 7.110.400, read from the IC-7300 MkII](pictures/Log4OM_CAT_IWC.png)
+
 ![Log4OM Hamlib settings (taken before v1.7.0-pre20, so CAT Status still shows OFFLINE)](pictures/Log4OM_Hamlib.png)
 
 To make this concrete, here is the full logging chain end-to-end. At the end of a QSO, WSJT-X pops up its **Log QSO** confirmation dialog with all the QSO details (callsign, mode, band, grid, reports, start/end times) — clicking OK is the only manual step the operator takes:
