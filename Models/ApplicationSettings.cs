@@ -50,6 +50,14 @@
         public bool PowerOnAtStart { get; set; } = true;
         public bool PowerOffAtExit { get; set; } = false;
 
+        // High SWR / high ALC pop-up on every page (YWC Discussion #257).
+        // Read by TxAlertService; read-only, it never stops a transmission.
+        // SWR in every mode; ALC only in DATA modes, as % of the meter.
+        public bool TxAlertEnabled { get; set; } = true;
+        public double TxAlertSwrLimit { get; set; } = 2.5;
+        public bool TxAlertAlcEnabled { get; set; } = true;
+        public double TxAlertAlcPercent { get; set; } = 50;
+
         public string RadioModel { get; set; } = "IC-7300MK2"; // Icom single-receiver HF+6m(+4m EU)
 
         // Off Windows only: the port and model the operator has confirmed the

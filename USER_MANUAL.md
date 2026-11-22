@@ -43,6 +43,7 @@
    - 6.6 [Backup &amp; Restore](#66-backup--restore)
    - 6.7 [CW Reader](#67-cw-reader)
    - 6.8 [RTTY Tuner](#68-rtty-tuner)
+   - 6.9 [Transmit alerts (high SWR, high ALC)](#69-transmit-alerts-high-swr-high-alc)
 7. [Application Setup](#7-application-setup)
    - 7.1 [External App Buttons](#71-external-app-buttons)
    - 7.2 [WSJT-X UDP Settings](#72-wsjt-x-udp-settings)
@@ -1754,6 +1755,25 @@ Turning either off leaves the tuner exactly as it behaved before: it draws the
 figure, it follows the radio's mode, and the dial is yours.
 [§20.9](#209-what-the-tuner-changes-on-your-radio) is the operating side of the
 same ground.
+
+---
+
+### 6.9 Transmit alerts (high SWR, high ALC)
+
+A large red box at the top of the page when you transmit into a high SWR, or overdrive a data mode. It is there for the times when another program is keying the radio (N1MM, WSJT-X, a logger) and you are not watching the meters. It shows on every Icom Web Control page and pop-out window, whichever program put the radio into transmit, as long as one of those pages is open.
+
+While the reading is over your limit the box pulses and shows the reading. When it drops back, or you stop transmitting, the box stays with the peak and the time, so you can still see what happened if you were looking away. **Dismiss** closes it in every open tab; the next high reading opens a new one. An alert you don't dismiss goes by itself after five minutes. Each alert is also written to the log as a warning.
+
+Icom Web Control only reads the meters. It never stops the transmission or changes the power: what to do about the alert is up to you.
+
+| Setting | Description |
+|---------|-------------|
+| Show transmit alerts | Default **on**. Turns both alerts off together. |
+| SWR alert above | Default **2.5 : 1**, from 1.5 to 5.0. In every mode. IWC reads the SWR meter through your meter calibration ([§10](#10-meter-calibration)), so the figure in the box is the one on the SWR gauge. |
+| Alert on high ALC in DATA modes | Default **on**. Only in the DATA modes (USB-D, LSB-D, FM-D, AM-D), where the PC's audio drives the radio and ALC means the audio is too high. Not in RTTY, where the radio makes the tones itself, and not in SSB, where some ALC on voice peaks is normal. |
+| ALC alert above | Default **50%** of the meter, from 10 to 100. For a clean data signal, turn the audio from the PC down until the ALC barely moves. |
+
+The reading has to stay over the limit for 0.4 seconds before the box appears, so the brief kick an amplifier or tuner can give at the start of a transmission doesn't set it off.
 
 ---
 
