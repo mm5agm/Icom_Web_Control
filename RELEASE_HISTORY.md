@@ -12,6 +12,15 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre21 (2026-11-22)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **Pages keep loading when the radio half-answers.** IWC talks to the radio one request at a time. When the radio was slow or answered only some requests, each one could hold the line for up to half a second, so requests from the browser and from rigctld programs queued behind each other. A browser opens only a few connections to one address, so a long enough queue left pages that wouldn't load at all. Now a request from the browser or rigctld waits at most 1.5 seconds for its turn. If it can't get one, it's treated as a radio that didn't answer. Only IWC's own radio poll still waits as long as it takes. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51))
+- **No queue while the radio isn't answering.** When the radio's last 4 requests went unanswered and it has sent nothing for 2 seconds, requests from the browser and rigctld get "no reply" straight away, without queueing. IWC's radio poll keeps asking, and the first answer lets everything through again. Switching the radio on from the page still works, because that request is always sent. The log says "The radio hasn't answered" when this starts and "answering again" when it ends.
+- **The log shows the queue.** When a request waits a second or more for the radio, or gives up, the log says "Slow bus" with how many were waiting and the longest wait, at most once every 10 seconds. This shows whether a slow page was waiting for the radio.
+- Changes from v1.7.0-pre1 to pre20 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre20-2026-11-22).
+
 ### v1.7.0-pre20 (2026-11-22)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0

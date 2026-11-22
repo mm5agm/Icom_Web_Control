@@ -31,7 +31,7 @@ namespace Icom_Web_Control.Services.Civ
         private readonly ILogger<CivBusService> _logger;
         private readonly CivFrameBuffer _buffer = new();
         private readonly object _portLock = new();
-        private readonly SemaphoreSlim _txLock = new(1, 1);
+        private readonly CivBusGate _gate;
 
         private SerialPort? _port;
         private Pending? _pending;
@@ -62,6 +62,7 @@ namespace Icom_Web_Control.Services.Civ
         public CivBusService(ILogger<CivBusService> logger)
         {
             _logger = logger;
+            _gate = new CivBusGate(logger);
             _buffer.FrameReceived += OnFrameReceived;
         }
 
@@ -162,6 +163,7 @@ namespace Icom_Web_Control.Services.Civ
                     _buffer.Clear();
                     _port.DataReceived += OnDataReceived;
                     _port.Open();
+                    _gate.Reset();
 
                     _logger.LogInformation("✓ CI-V port {Port} open at {Baud} 8N1", portName, baudRate);
                     return true;
@@ -400,7 +402,9 @@ namespace Icom_Web_Control.Services.Civ
         {
             if (!IsOpen) return null;
 
-            await _txLock.WaitAsync(cancellationToken);
+            // The poll loop waits for the bus; the browser and rigctld give up
+            // after 1.5 s, or straight away while the radio isn't answering (D#51).
+            if (!await _gate.EnterAsync(mayBeSkipped: true, cancellationToken)) return null;
             try
             {
                 var tcs = new TaskCompletionSource<CivFrame?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -415,8 +419,12 @@ namespace Icom_Web_Control.Services.Civ
                 timeoutCts.Cancel(); // stop the delay task if the reply won
 
                 if (completed == tcs.Task)
+                {
+                    _gate.Answered();
                     return await tcs.Task;
+                }
 
+                if (!cancellationToken.IsCancellationRequested) _gate.TimedOut();
                 return null; // timed out
             }
             catch (OperationCanceledException)
@@ -437,7 +445,7 @@ namespace Icom_Web_Control.Services.Civ
             finally
             {
                 _pending = null;
-                _txLock.Release();
+                _gate.Release();
             }
         }
 
@@ -445,7 +453,8 @@ namespace Icom_Web_Control.Services.Civ
         {
             if (!IsOpen) return;
 
-            await _txLock.WaitAsync(cancellationToken);
+            // Never skipped: the power-on wake-up is for a radio that isn't answering.
+            if (!await _gate.EnterAsync(mayBeSkipped: false, cancellationToken)) return;
             try
             {
                 var port = Volatile.Read(ref _port);
@@ -462,7 +471,7 @@ namespace Icom_Web_Control.Services.Civ
             }
             finally
             {
-                _txLock.Release();
+                _gate.Release();
             }
         }
 
@@ -475,7 +484,7 @@ namespace Icom_Web_Control.Services.Civ
             }
             if (port != null)
                 CloseDetachedAsync(port).GetAwaiter().GetResult();
-            _txLock.Dispose();
+            _gate.Dispose();
         }
 
         private sealed class Pending

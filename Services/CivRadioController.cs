@@ -3515,6 +3515,8 @@ namespace Icom_Web_Control.Services
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("[CivRadioController] Phase-3 CI-V link starting.");
+            // Only this loop waits for the bus as long as it takes (IWC D#51).
+            CivBusGate.MarkPollLoop();
             int misses = 0;
             long loop = 0;
             _ = WatchLoopAsync(stoppingToken);
