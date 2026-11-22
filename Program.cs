@@ -381,6 +381,10 @@ else
 // Register the rigctld server as a background service
 builder.Services.AddHostedService<RigctldServer>();
 
+// High SWR / high ALC alert for every page (YWC Discussion #257); GET /api/txalert.
+builder.Services.AddSingleton<TxAlertService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<TxAlertService>());
+
 // Register your settings service
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 

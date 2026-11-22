@@ -1,3 +1,4 @@
+using RadioWebControl.Core.Services.TxAlert;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.SignalR;
@@ -205,6 +206,10 @@ namespace Icom_Web_Control.Pages
                 // Read at connect and at stop, so these apply without a restart too.
                 current.PowerOnAtStart    = Settings.PowerOnAtStart;
                 current.PowerOffAtExit    = Settings.PowerOffAtExit;
+                current.TxAlertEnabled    = Settings.TxAlertEnabled;
+                current.TxAlertSwrLimit   = TxAlertLimits.ClampSwr(Settings.TxAlertSwrLimit);
+                current.TxAlertAlcEnabled = Settings.TxAlertAlcEnabled;
+                current.TxAlertAlcPercent = TxAlertLimits.ClampAlcPercent(Settings.TxAlertAlcPercent);
                 // External-SDR spectrum config was removed from the Settings page
                 // (the IC-7300's scope comes over CI-V, not an IF-tapped SDR).
                 // The Sdr* fields are left untouched here so their persisted
