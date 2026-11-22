@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre20 (2026-11-22)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **Log4OM shows the radio's frequency.** Log4OM's CAT Status stayed OFFLINE with IWC's rigctld, so it never showed the radio's frequency. Log4OM asks in Hamlib's extended format: `;V ?` once, then `+\get_vfo_info` for VFO A and VFO B every 0.6 s. IWC answered all of them with an error, so Log4OM stopped asking. IWC now answers the extended format exactly as Hamlib's own rigctld does, and takes the VFO off the front of commands when the program uses VFO mode, as Log4OM does. Log4OM shows the frequency and mode and can tune VFO A. A command aimed at VFO B is refused rather than applied to A. The same fix as Yaesu Web Control v2.5.6-pre19. See [Log4OM](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#93-log4om) in the user manual. ([#18](https://github.com/mm5agm/Icom_Web_Control/issues/18))
+- **rigctld's one-letter commands match Hamlib.** Some of IWC's one-letter rigctld commands meant something different from Hamlib's: `x`, `z`, `r` and `c` were split, split frequency, RIT and XIT here, and `s`, `S`, `i`, `I`, `j` and `J` were missing. Programs using Hamlib's NET rigctl send the Hamlib letters, so split and RIT commands from them failed. They now mean what they mean in Hamlib.
+- Changes from v1.7.0-pre1 to pre19 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre19-2026-11-21).
+
 ### v1.7.0-pre19 (2026-11-21)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
