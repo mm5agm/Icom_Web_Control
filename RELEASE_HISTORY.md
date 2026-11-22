@@ -12,6 +12,16 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre22 (2026-11-22)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **High SWR alert.** When the SWR stays over your limit for 0.4 s while the radio is transmitting, a large red box appears at the top centre of every IWC page, pop-out windows included, with the reading in big numbers. It pulses while the reading is over the limit. After the transmission it stays, showing the peak and the time, until you click **Dismiss** or five minutes pass. Dismissing closes it in every tab. See [Transmit alerts](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#69-transmit-alerts-high-swr-high-alc) in the user manual. ([YWC Discussion #257](https://github.com/mm5agm/Yaesu_Web_Control/discussions/257))
+- **High ALC alert.** The same box for ALC, but only in the DATA modes (USB-D, LSB-D, FM-D, AM-D), where the audio comes from the PC and too much of it makes a wide signal. Not in RTTY, SSB or CW.
+- It works when N1MM, WSJT-X or any other program keys the radio, because IWC reads the meters itself. It only reads; it never transmits or changes the power. The log has a line when an alert starts and when it ends.
+- **Settings → Transmit alerts** switches each alert on or off and sets the limits: SWR 2.5 : 1 and ALC 50% to start with. The same alert as Yaesu Web Control v2.5.6-pre20.
+- Changes from v1.7.0-pre1 to pre21 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre21-2026-11-22).
+
 ### v1.7.0-pre21 (2026-11-22)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
