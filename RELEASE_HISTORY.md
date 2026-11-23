@@ -12,6 +12,15 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre23 (2026-11-23)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **The log says why IWC froze.** In one log the Radio page froze for 17 minutes with no radio or USB errors at all: IWC itself wasn't getting time to run. IWC now checks every second, from a thread of its own, how long its work has to wait. When the wait passes 2 seconds the log says "thread pool is starved", with how busy the whole PC was, how much of that was IWC, and how many jobs were waiting. It says "running again" when it recovers, with how long it lasted. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51))
+- **The log says when the PC was busy or asleep.** "The PC has been busy" when the whole PC has been over 90% for 10 seconds, and "calm again" when it drops. "IWC didn't run at all for N s" when the PC was asleep or paused.
+- **The poll-loop watchdog runs on its own thread.** It used to stop reporting when IWC was starved, which is when it was needed. Its "Poll loop has made no progress" line now also gives the thread-pool figures.
+- Nothing else changes; this release only adds log lines. Changes from v1.7.0-pre1 to pre22 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre22-2026-11-22).
+
 ### v1.7.0-pre22 (2026-11-22)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0

@@ -378,6 +378,9 @@ else
     builder.Services.AddHostedService(sp => sp.GetRequiredService<CivRadioController>());
 }
 
+// Logs when IWC itself is starved of time, or the PC is busy or asleep (IWC D#51).
+builder.Services.AddHostedService<StarvationMonitor>();
+
 // Register the rigctld server as a background service
 builder.Services.AddHostedService<RigctldServer>();
 
