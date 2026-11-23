@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre25 (2026-11-23)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **A launch button can't lose its name.** On Application Setup, an empty Button Name box shows the default name in grey, so it looked filled in, and saving it gave a Home button with no text: a thin red line. An empty name now means the default (WSJT-X, JTAlert, Log4OM, GridTracker, Fldigi, JS8Call), and settings already saved that way are mended when IWC starts. (Found in YWC: [YWC #420](https://github.com/mm5agm/Yaesu_Web_Control/issues/420))
+- **The release date is the day the build was made.** About and Diagnostics showed a date set by hand (2026-11-05) on every pre-release since then.
+- Changes from v1.7.0-pre1 to pre24 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre24-2026-11-23).
+
 ### v1.7.0-pre24 (2026-11-23)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
