@@ -379,7 +379,8 @@ else
 }
 
 // Logs when IWC itself is starved of time, or the PC is busy or asleep (IWC D#51).
-builder.Services.AddHostedService<StarvationMonitor>();
+builder.Services.AddSingleton<StarvationMonitor>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<StarvationMonitor>());
 
 // Register the rigctld server as a background service
 builder.Services.AddHostedService<RigctldServer>();

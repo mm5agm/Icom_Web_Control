@@ -73,6 +73,22 @@ public class StarvationMonitorTests
     }
 
     [Fact]
+    public void Events_are_kept_for_the_diagnostics_page_newest_last_and_capped()
+    {
+        var m = new StarvationMonitor(Microsoft.Extensions.Logging.Abstractions.NullLogger<StarvationMonitor>.Instance);
+        Assert.Empty(m.Snapshot().Events);
+
+        for (int i = 0; i < StarvationMonitor.EventsKept + 5; i++)
+            m.Record(i % 2 == 0, "Test", $"event {i}");
+
+        var s = m.Snapshot();
+        Assert.Equal(StarvationMonitor.EventsKept, s.Events.Length);
+        Assert.Equal("event 5", s.Events[0].Text);
+        Assert.Equal($"event {StarvationMonitor.EventsKept + 4}", s.Events[^1].Text);
+        Assert.Equal(Environment.ProcessorCount, s.Processors);
+    }
+
+    [Fact]
     public void Thread_pool_snapshot_names_the_numbers()
     {
         string s = ThreadPoolSnapshot.Describe();

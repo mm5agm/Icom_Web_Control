@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -28,11 +29,19 @@ namespace Icom_Web_Control.Services
         internal const int PcCalmPercent = 70;
         internal const int PcCalmAfterSamples = 5;
         internal const int AsleepGapMs = 10000;
+        internal const int EventsKept = 50;
 
         private readonly ILogger<StarvationMonitor> _logger;
         private readonly CancellationTokenSource _stop = new();
+        private readonly object _lock = new();
+        private readonly Queue<LoadEvent> _events = new();
+        private readonly DateTime _startedAt = DateTime.Now;
         private Thread? _thread;
         private long _probeDoneAt;
+        private double? _pcPercent;
+        private double? _iwcPercent;
+        private long _poolWaitMs;
+        private long _longestWaitMs;
 
         public StarvationMonitor(ILogger<StarvationMonitor> logger) => _logger = logger;
 
@@ -50,6 +59,35 @@ namespace Icom_Web_Control.Services
         }
 
         public void Dispose() => _stop.Dispose();
+
+        /// <summary>
+        /// Logs a load event and keeps it for the Diagnostics page, so a user
+        /// can copy the freezes without finding the log (IWC D#51).
+        /// </summary>
+        public void Record(bool warning, string source, string text)
+        {
+            if (warning) _logger.LogWarning("[{Source}] {Text}", source, text);
+            else _logger.LogInformation("[{Source}] {Text}", source, text);
+            lock (_lock)
+            {
+                _events.Enqueue(new LoadEvent(DateTime.Now, warning, text));
+                while (_events.Count > EventsKept) _events.Dequeue();
+            }
+        }
+
+        /// <summary>The figures and events the Diagnostics page shows.</summary>
+        public LoadSnapshot Snapshot()
+        {
+            ThreadPool.GetAvailableThreads(out int freeWorkers, out _);
+            ThreadPool.GetMaxThreads(out int maxWorkers, out _);
+            lock (_lock)
+            {
+                return new LoadSnapshot(
+                    Environment.ProcessorCount, _pcPercent, _iwcPercent, _poolWaitMs, _longestWaitMs,
+                    ThreadPool.ThreadCount, maxWorkers - freeWorkers, ThreadPool.PendingWorkItemCount,
+                    _startedAt, _events.ToArray());
+            }
+        }
 
         private void Run()
         {
@@ -72,11 +110,12 @@ namespace Icom_Web_Control.Services
                     long gap = now - lastTick;
                     lastTick = now;
                     cpu.Sample();
+                    lock (_lock) { _pcPercent = cpu.PcPercent; _iwcPercent = cpu.IwcPercent; }
 
                     if (gap >= AsleepGapMs)
                     {
                         // Even this thread didn't run: the PC was asleep or paused.
-                        _logger.LogWarning("[Starvation] IWC didn't run at all for {Seconds} s; the PC was asleep or paused", gap / 1000);
+                        Record(true, "Starvation", $"IWC didn't run at all for {gap / 1000} s; the PC was asleep or paused");
                         probeQueuedAt = 0;
                         continue;
                     }
@@ -105,16 +144,15 @@ namespace Icom_Web_Control.Services
 
                     if (lagMs >= 0)
                     {
+                        lock (_lock) { _poolWaitMs = lagMs; _longestWaitMs = Math.Max(_longestWaitMs, lagMs); }
                         worstLag = lag.Active ? Math.Max(worstLag, lagMs) : lagMs;
                         switch (lag.Observe(lagMs >= LagWarnMs, now))
                         {
                             case EpisodeChange.Started:
-                                _logger.LogWarning("[Starvation] IWC's thread pool is starved: a job has waited {Lag} ms. {Pool}. {Cpu}",
-                                    lagMs, ThreadPoolSnapshot.Describe(), cpu.Describe());
+                                Record(true, "Starvation", $"IWC's thread pool is starved: a job has waited {lagMs} ms. {ThreadPoolSnapshot.Describe()}. {cpu.Describe()}");
                                 break;
                             case EpisodeChange.Ended:
-                                _logger.LogInformation("[Starvation] Thread pool running again after {Seconds} s (longest wait {Worst} ms). {Pool}. {Cpu}",
-                                    lag.LastDurationMs / 1000, worstLag, ThreadPoolSnapshot.Describe(), cpu.Describe());
+                                Record(false, "Starvation", $"Thread pool running again after {lag.LastDurationMs / 1000} s (longest wait {worstLag} ms). {ThreadPoolSnapshot.Describe()}. {cpu.Describe()}");
                                 break;
                         }
                     }
@@ -125,10 +163,10 @@ namespace Icom_Web_Control.Services
                         switch (busy.Observe(high, now))
                         {
                             case EpisodeChange.Started:
-                                _logger.LogWarning("[Starvation] The PC has been busy for {Seconds} s. {Cpu}", PcBusyAfterSamples, cpu.Describe());
+                                Record(true, "Starvation", $"The PC has been busy for {PcBusyAfterSamples} s. {cpu.Describe()}");
                                 break;
                             case EpisodeChange.Ended:
-                                _logger.LogInformation("[Starvation] The PC is calm again after {Seconds} s. {Cpu}", busy.LastDurationMs / 1000, cpu.Describe());
+                                Record(false, "Starvation", $"The PC is calm again after {busy.LastDurationMs / 1000} s. {cpu.Describe()}");
                                 break;
                         }
                     }
@@ -141,6 +179,13 @@ namespace Icom_Web_Control.Services
             }
         }
     }
+
+    public sealed record LoadEvent(DateTime Time, bool Warning, string Text);
+
+    public sealed record LoadSnapshot(
+        int Processors, double? PcPercent, double? IwcPercent, long PoolWaitMs, long LongestWaitMs,
+        int PoolThreads, int BusyWorkers, long JobsWaiting, DateTime StartedAt, LoadEvent[] Events);
+
 
     internal enum EpisodeChange { None, Started, Ended }
 
