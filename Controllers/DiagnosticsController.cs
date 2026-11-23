@@ -13,6 +13,7 @@ namespace Icom_Web_Control.Controllers
     public class DiagnosticsController : ControllerBase
     {
         private readonly ILogger<DiagnosticsController> _logger;
+        private readonly Services.StarvationMonitor? _load;
 
         // Written verbatim into the Serilog file by MarkFreshLog and searched for
         // by DownloadTodayLog. Serilog holds today's log open for writing, so we
@@ -20,7 +21,21 @@ namespace Icom_Web_Control.Controllers
         // marker and let the download return only the lines after the last one.
         internal const string Marker = "===== NEW TEST CAPTURE";
 
-        public DiagnosticsController(ILogger<DiagnosticsController> logger) => _logger = logger;
+        public DiagnosticsController(ILogger<DiagnosticsController> logger, Services.StarvationMonitor? load = null)
+        {
+            _logger = logger;
+            _load = load;
+        }
+
+        // The PC and IWC load card on the Diagnostics page: live CPU and
+        // thread-pool figures, and the freezes, busy spells and sleeps since IWC
+        // started, so a user can copy them without finding the log (IWC D#51).
+        [HttpGet("load")]
+        public IActionResult Load()
+        {
+            if (_load == null) return NotFound();
+            return Ok(_load.Snapshot());
+        }
 
         private static string? TodayLogPath()
         {

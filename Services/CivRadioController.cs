@@ -63,6 +63,8 @@ namespace Icom_Web_Control.Services
         private long _loopBeatMs = Environment.TickCount64;
         private volatile string _loopStage = "starting";
         private const int LoopStallWarnMs = 20000;
+        // Keeps the watchdog's lines for the Diagnostics page (IWC D#51).
+        private readonly StarvationMonitor? _load;
 
         // PowerOnAtStart is tried once per run, the first time the port opens:
         // after that a radio that stops answering was switched off on purpose.
@@ -393,8 +395,10 @@ namespace Icom_Web_Control.Services
             IHubContext<RadioHub> hubContext,
             RadioFinder finder,
             ILogger<CivRadioController> logger,
-            IHostApplicationLifetime? lifetime = null)
+            IHostApplicationLifetime? lifetime = null,
+            StarvationMonitor? load = null)
         {
+            _load = load;
             _state = state;
             _bus = new CivFrameGuard(bus, () => ModelId, logger, () => _chosenModel);
             _settings = settings;
@@ -3803,13 +3807,12 @@ namespace Icom_Web_Control.Services
                     if (stalledMs >= LoopStallWarnMs && reportedBeat != beat)
                     {
                         reportedBeat = beat;
-                        _logger.LogWarning("[CivRadioController] Poll loop has made no progress for {Seconds} s; stuck while {Stage}. {Pool}",
-                            stalledMs / 1000, _loopStage, ThreadPoolSnapshot.Describe());
+                        WatchdogLine(true, $"Poll loop has made no progress for {stalledMs / 1000} s; stuck while {_loopStage}. {ThreadPoolSnapshot.Describe()}");
                     }
                     else if (reportedBeat >= 0 && reportedBeat != beat)
                     {
                         reportedBeat = -1;
-                        _logger.LogInformation("[CivRadioController] Poll loop moving again ({Stage})", _loopStage);
+                        WatchdogLine(false, $"Poll loop moving again ({_loopStage})");
                     }
                 }
             }
@@ -3818,6 +3821,13 @@ namespace Icom_Web_Control.Services
             {
                 _logger.LogDebug(ex, "[CivRadioController] Poll loop watchdog stopped");
             }
+        }
+
+        private void WatchdogLine(bool warning, string text)
+        {
+            if (_load != null) { _load.Record(warning, "CivRadioController", text); return; }
+            if (warning) _logger.LogWarning("[CivRadioController] {Text}", text);
+            else _logger.LogInformation("[CivRadioController] {Text}", text);
         }
 
         private Task SetConnectedAsync(bool connected)

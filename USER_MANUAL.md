@@ -2384,6 +2384,8 @@ That figure is the answer to a question operators ask often: **why the radio's o
 
 A rate well below 4/sec, or a discard count climbing steadily, is worth reporting — that is bus contention rather than the normal pacing.
 
+**PC and IWC load** — the panel under Band scope delivery, always visible. **PC** is how busy the whole computer is, and **IWC** is IWC's own share. **Wait** is how long IWC's work waits for its turn to run: a few milliseconds is normal. Over 2 seconds means IWC isn't getting time to run, and pages freeze, even though the radio and the cable are fine. Underneath is a list of every freeze, busy spell (the PC over 90% for 10 seconds) and sleep since IWC started, with the time of each, and every time IWC's radio poll got stuck. **If IWC froze or went slow, click Copy to clipboard and paste it into the GitHub issue or discussion.** The same lines are in the log. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51))
+
 **COM Ports button** — Opens a list of all serial ports currently detected on your PC. Use this if you are unsure which port the radio is connected to.
 
 **CAT Status JSON button** — Opens a live JSON view of every radio parameter the app knows about. Useful when reporting a bug.
