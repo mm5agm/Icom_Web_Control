@@ -3519,7 +3519,9 @@ namespace Icom_Web_Control.Services
             CivBusGate.MarkPollLoop();
             int misses = 0;
             long loop = 0;
-            _ = WatchLoopAsync(stoppingToken);
+            // Its own thread, not the pool, so it still reports when every
+            // pool thread is stuck (IWC D#51, Paul's 17-minute freeze).
+            new Thread(() => WatchLoop(stoppingToken)) { IsBackground = true, Name = "IWC poll-loop watchdog" }.Start();
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -3781,21 +3783,28 @@ namespace Icom_Web_Control.Services
         /// stopped in, then again when it moves on. Nothing else in the log can
         /// say where a stuck loop is (IWC #128, D#51).
         /// </summary>
-        private async Task WatchLoopAsync(CancellationToken stoppingToken)
+        private void WatchLoop(CancellationToken stoppingToken)
         {
             long reportedBeat = -1;
+            long lastTick = Environment.TickCount64;
             try
             {
-                while (!stoppingToken.IsCancellationRequested)
+                while (!stoppingToken.WaitHandle.WaitOne(5000))
                 {
-                    await Task.Delay(5000, stoppingToken);
+                    long now = Environment.TickCount64;
+                    long gap = now - lastTick;
+                    lastTick = now;
+                    // This thread didn't run either: the PC was asleep. The
+                    // starvation monitor logs that; give the loop a moment.
+                    if (gap >= StarvationMonitor.AsleepGapMs) continue;
+
                     long beat = Interlocked.Read(ref _loopBeatMs);
-                    long stalledMs = Environment.TickCount64 - beat;
+                    long stalledMs = now - beat;
                     if (stalledMs >= LoopStallWarnMs && reportedBeat != beat)
                     {
                         reportedBeat = beat;
-                        _logger.LogWarning("[CivRadioController] Poll loop has made no progress for {Seconds} s; stuck while {Stage}",
-                            stalledMs / 1000, _loopStage);
+                        _logger.LogWarning("[CivRadioController] Poll loop has made no progress for {Seconds} s; stuck while {Stage}. {Pool}",
+                            stalledMs / 1000, _loopStage, ThreadPoolSnapshot.Describe());
                     }
                     else if (reportedBeat >= 0 && reportedBeat != beat)
                     {
@@ -3804,7 +3813,7 @@ namespace Icom_Web_Control.Services
                     }
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
             catch (Exception ex)
             {
                 _logger.LogDebug(ex, "[CivRadioController] Poll loop watchdog stopped");
