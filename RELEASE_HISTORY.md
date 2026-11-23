@@ -12,6 +12,14 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre24 (2026-11-23)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **PC and IWC load on the Diagnostics page.** A new panel under Band scope delivery shows how busy the PC is, IWC's own share, and how long IWC's work waits for its turn to run, every 2 seconds. Underneath is a list of every freeze, busy spell and sleep since IWC started, the same lines pre23 added to the log. **If IWC froze or went slow, click Copy to clipboard and paste it into the GitHub issue or discussion**, so there's no need to find the log. See [Diagnostics](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#11-diagnostics) in the user manual. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51))
+- **A stuck USB serial driver can't freeze IWC.** Opening the radio's COM port used to hold IWC's lock on the port for as long as Windows took, with no time limit, and a driver that didn't answer could also tie up threads IWC needs for everything else. Now opening and closing the port each run on a thread of their own, and if the port hasn't opened within 3 seconds IWC gives up, says so in the log ("the USB serial driver isn't answering") and tries again later. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51))
+- Changes from v1.7.0-pre1 to pre23 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre23-2026-11-23).
+
 ### v1.7.0-pre23 (2026-11-23)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
