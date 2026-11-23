@@ -41,6 +41,16 @@ namespace Icom_Web_Control.Services.Civ
         private Task _closing = Task.CompletedTask;
         private string? _closingPortName;
 
+        // An open still running because the driver hasn't answered. See OpenAsync.
+        private Task _opening = Task.CompletedTask;
+        private string? _openingPortName;
+
+        /// <summary>
+        /// How long opening the port may take before the bus gives up on it.
+        /// A healthy open takes milliseconds. See <see cref="OpenAsync"/>.
+        /// </summary>
+        internal const int OpenTimeoutMs = 3000;
+
         /// <summary>
         /// How long a close may take before the bus stops waiting for it.
         /// See <see cref="CloseDetachedAsync"/>.
@@ -132,51 +142,91 @@ namespace Icom_Web_Control.Services.Civ
                 return false;
             }
 
-            SerialPort? failed = null;
+            // An open of this port that never came back still has the driver's
+            // attention; don't pile another on top of it.
+            if (!_opening.IsCompleted
+                && string.Equals(_openingPortName, portName, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogDebug("CI-V port {Port} is still opening from an earlier try; not trying again yet", portName);
+                return false;
+            }
+
+            var available = SerialPort.GetPortNames();
+            if (!RadioWebControl.Core.Services.SerialPortPaths.IsPresent(portName, available))
+            {
+                _logger.LogWarning("CI-V port {Port} not present. Available: {Ports}",
+                    portName, string.Join(", ", available));
+                return false;
+            }
+
+            var port = new SerialPort
+            {
+                PortName = portName,
+                BaudRate = baudRate,
+                DataBits = 8,
+                Parity = Parity.None,
+                StopBits = StopBits.One,
+                Handshake = Handshake.None,
+                ReadTimeout = 500,
+                WriteTimeout = 500,
+                DtrEnable = false,
+                RtsEnable = false,
+            };
+
+            // The open runs on its own thread, with no lock held and a time
+            // limit (D#51). It used to run inside the port lock, which the
+            // reader, SetDtr and every close also take, so a USB driver that
+            // never answered the open would have held all of them, and a pool
+            // thread, for good. An open that doesn't come back in time is left
+            // to finish on its own thread, and the port is let go when it does.
+            var opening = RunOnOwnThread(port.Open);
+            _openingPortName = portName;
+            _opening = opening;
+            bool finished;
+            try
+            {
+                finished = await FinishesWithinAsync(opening, OpenTimeoutMs);
+                if (finished) await opening;   // rethrows a failed open
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to open CI-V port {Port}", portName);
+                CloseQuietly(port);
+                return false;
+            }
+            if (!finished)
+            {
+                _logger.LogWarning(
+                    "CI-V port {Port} didn't open within {Ms} ms: the USB serial driver isn't answering. Trying again later",
+                    portName, OpenTimeoutMs);
+                _ = opening.ContinueWith(t => { _ = t.Exception; CloseQuietly(port); }, TaskScheduler.Default);
+                return false;
+            }
+
+            SerialPort? extra = null;
             lock (_portLock)
             {
-                try
+                if (_port != null)
+                {
+                    extra = port;   // another open got there first: keep that one
+                }
+                else
                 {
                     lock (_recent) _recent.Clear();
-                    var available = SerialPort.GetPortNames();
-                    if (!RadioWebControl.Core.Services.SerialPortPaths.IsPresent(portName, available))
-                    {
-                        _logger.LogWarning("CI-V port {Port} not present. Available: {Ports}",
-                            portName, string.Join(", ", available));
-                        return false;
-                    }
-
-                    _port = new SerialPort
-                    {
-                        PortName = portName,
-                        BaudRate = baudRate,
-                        DataBits = 8,
-                        Parity = Parity.None,
-                        StopBits = StopBits.One,
-                        Handshake = Handshake.None,
-                        ReadTimeout = 500,
-                        WriteTimeout = 500,
-                        DtrEnable = false,
-                        RtsEnable = false,
-                    };
-
                     _buffer.Clear();
-                    _port.DataReceived += OnDataReceived;
-                    _port.Open();
+                    port.DataReceived += OnDataReceived;
+                    _port = port;
                     _gate.Reset();
-
-                    _logger.LogInformation("✓ CI-V port {Port} open at {Baud} 8N1", portName, baudRate);
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to open CI-V port {Port}", portName);
-                    failed = Detach();
                 }
             }
-            if (failed != null)
-                await CloseDetachedAsync(failed);
-            return false;
+            if (extra != null)
+            {
+                await CloseDetachedAsync(extra);
+                return IsOpen;
+            }
+
+            _logger.LogInformation("✓ CI-V port {Port} open at {Baud} 8N1", portName, baudRate);
+            return true;
         }
 
         public async Task CloseAsync()
@@ -227,7 +277,7 @@ namespace Icom_Web_Control.Services.Civ
             string name;
             try { name = port.PortName; } catch { name = "?"; }
 
-            var closing = Task.Run(() => CloseQuietly(port));
+            var closing = RunOnOwnThread(() => CloseQuietly(port));
             _closingPortName = name;
             _closing = closing;
 
@@ -308,6 +358,15 @@ namespace Icom_Web_Control.Services.Civ
             _ = work.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
             return false;
         }
+
+        /// <summary>
+        /// Runs a serial call that a stuck USB driver can hold forever (open,
+        /// close) on a thread of its own, not the thread pool's. A call that
+        /// never comes back then costs one idle thread, never a pool thread
+        /// that the web pages, rigctld and the poll loop need (D#51).
+        /// </summary>
+        internal static Task RunOnOwnThread(Action call)
+            => Task.Factory.StartNew(call, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
         /// <summary>Whether <paramref name="work"/> ends within <paramref name="timeoutMs"/>.</summary>
         internal static async Task<bool> FinishesWithinAsync(Task work, int timeoutMs)
