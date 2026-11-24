@@ -12,6 +12,15 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre27 (2026-11-24)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **IWC starts faster on a busy PC.** IWC read its settings file from disk every time any part of it needed a setting, about twice a second and more while pages loaded, one read at a time. Some parts waited for the read to finish. On a PC already at full load those reads queued up, and IWC could take minutes to start and to open pages. IWC now keeps the settings in memory and reads the file again only when it changes. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51))
+- Changes from v1.7.0-pre1 to pre26 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre26-2026-11-24).
+
+---
+
 ### v1.7.0-pre26 (2026-11-24)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
