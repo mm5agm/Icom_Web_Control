@@ -8,7 +8,17 @@ namespace Icom_Web_Control.Services
         private readonly string _settingsFilePath;
         private readonly ILogger<SettingsService> _logger;
         private readonly SemaphoreSlim _semaphore = new(1, 1);
-        private ApplicationSettings? _cachedSettings;
+        // The settings as last read or saved, with the file's write time and
+        // length at that moment. GetSettingsAsync used to read and deserialize
+        // the file from disk on every call, one caller at a time behind the
+        // semaphore, and it is called about twice a second plus by many
+        // controllers. On a PC already at 100% CPU those reads queued up and
+        // starved the thread pool at startup (Paul VK2AHB, D#51, pre26).
+        // Now the file is read only when its write time or length changes.
+        // Each caller still gets its own copy, deserialized from the cached
+        // JSON, because callers change the object they get and then save it.
+        private sealed record Snapshot(string Json, bool Exists, DateTime WriteUtc, long Length);
+        private volatile Snapshot? _snapshot;
 
         public SettingsService(IWebHostEnvironment environment, ILogger<SettingsService> logger)
         {
@@ -22,42 +32,57 @@ namespace Icom_Web_Control.Services
             _logger.LogInformation("SettingsService initialized. File path: {Path}", _settingsFilePath);
         }
 
-        public async Task<ApplicationSettings> GetSettingsAsync()
+        // Tests: a settings file somewhere other than %APPDATA%.
+        internal SettingsService(string settingsFilePath, ILogger<SettingsService> logger)
+        {
+            _logger = logger;
+            _settingsFilePath = settingsFilePath;
+        }
+
+        // Completes synchronously while the file is unchanged, so the few
+        // callers that wait on it (.GetAwaiter().GetResult()) don't block.
+        public Task<ApplicationSettings> GetSettingsAsync()
+        {
+            var snap = _snapshot;
+            if (snap != null && Matches(snap, Stamp()))
+                return Task.FromResult(Copy(snap));
+            return LoadAsync();
+        }
+
+        private async Task<ApplicationSettings> LoadAsync()
         {
             await _semaphore.WaitAsync();
             try
             {
-                // These fire on every meter-poll cycle (GetSettingsAsync is
-                // called ~2 Hz). At Information level — and especially dumping
-                // the entire settings JSON — they were a major contributor to
-                // the synchronous-logging flood that starved the thread pool
-                // during startup (issue #73). Kept at Debug so they're still
-                // available when explicitly troubleshooting settings.
-                _logger.LogDebug("GetSettingsAsync called. File exists: {Exists}", File.Exists(_settingsFilePath));
+                // Another caller may have loaded it while this one waited.
+                var stamp = Stamp();
+                var snap = _snapshot;
+                if (snap != null && Matches(snap, stamp)) return Copy(snap);
 
-                if (File.Exists(_settingsFilePath))
+                ApplicationSettings settings;
+                if (stamp.Exists)
                 {
                     var json = await File.ReadAllTextAsync(_settingsFilePath);
-                    _logger.LogDebug("Raw JSON read: {Json}", json);
+                    settings = JsonSerializer.Deserialize<ApplicationSettings>(json) ?? new ApplicationSettings();
+                    _logger.LogDebug("Settings read from disk: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
+                        settings.SerialPort, settings.BaudRate, settings.WebAddress, settings.HttpPort);
 
-                    _cachedSettings = JsonSerializer.Deserialize<ApplicationSettings>(json) ?? new ApplicationSettings();
-
-                    _logger.LogDebug("Settings deserialized: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
-                        _cachedSettings.SerialPort, _cachedSettings.BaudRate, _cachedSettings.WebAddress, _cachedSettings.HttpPort);
-
-                    MigrateSdrDeviceKey(_cachedSettings);
-                    MigrateSdrSampleRate(_cachedSettings);
-                    AutoQuoteCommandLinePaths(_cachedSettings);
+                    MigrateSdrDeviceKey(settings);
+                    MigrateSdrSampleRate(settings);
+                    AutoQuoteCommandLinePaths(settings);
                 }
                 else
                 {
-                    _cachedSettings = new ApplicationSettings();
-                    MigrateSdrSampleRate(_cachedSettings);   // fills A/B from defaults when file is brand new
+                    settings = new ApplicationSettings();
+                    MigrateSdrSampleRate(settings);   // fills A/B from defaults when file is brand new
                     _logger.LogWarning("Settings file does not exist at {Path}. Using defaults: SerialPort={SerialPort}, WebAddress={WebAddress}, HttpPort={HttpPort}",
-                        _settingsFilePath, _cachedSettings.SerialPort, _cachedSettings.WebAddress, _cachedSettings.HttpPort);
+                        _settingsFilePath, settings.SerialPort, settings.WebAddress, settings.HttpPort);
                 }
 
-                return _cachedSettings;
+                // The stamp was taken before the read, so a write during the
+                // read changes the file's stamp and the next call reads again.
+                _snapshot = new Snapshot(JsonSerializer.Serialize(settings), stamp.Exists, stamp.WriteUtc, stamp.Length);
+                return settings;
             }
             catch (Exception ex)
             {
@@ -78,25 +103,13 @@ namespace Icom_Web_Control.Services
                 _logger.LogInformation("SaveSettingsAsync called with: SerialPort={SerialPort}, BaudRate={BaudRate}, WebAddress={WebAddress}, HttpPort={HttpPort}",
                     settings.SerialPort, settings.BaudRate, settings.WebAddress, settings.HttpPort);
 
-                var options = new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                };
-
-                var json = JsonSerializer.Serialize(settings, options);
-                _logger.LogInformation("Serialized to JSON: {Json}", json);
-
+                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(_settingsFilePath, json);
-                _cachedSettings = settings;
 
-                _logger.LogInformation("Settings saved successfully to {Path}", _settingsFilePath);
+                var stamp = Stamp();
+                _snapshot = new Snapshot(JsonSerializer.Serialize(settings), stamp.Exists, stamp.WriteUtc, stamp.Length);
 
-                // Verify
-                if (File.Exists(_settingsFilePath))
-                {
-                    var verify = await File.ReadAllTextAsync(_settingsFilePath);
-                    _logger.LogInformation("Verification: File content after save: {Content}", verify);
-                }
+                _logger.LogInformation("Settings saved to {Path} ({Bytes} bytes)", _settingsFilePath, stamp.Length);
             }
             catch (Exception ex)
             {
@@ -111,12 +124,27 @@ namespace Icom_Web_Control.Services
 
         public string GetSettingsFilePath() => _settingsFilePath;
 
-        public void InvalidateCache()
+        // A backup restore writes the file directly; the next call reads it.
+        public void InvalidateCache() => _snapshot = null;
+
+        private (bool Exists, DateTime WriteUtc, long Length) Stamp()
         {
-            _semaphore.Wait();
-            try { _cachedSettings = null; }
-            finally { _semaphore.Release(); }
+            try
+            {
+                var fi = new FileInfo(_settingsFilePath);
+                return fi.Exists ? (true, fi.LastWriteTimeUtc, fi.Length) : (false, default, 0);
+            }
+            catch (Exception)
+            {
+                return (false, DateTime.MinValue, -1);   // never matches: read again
+            }
         }
+
+        private static bool Matches(Snapshot snap, (bool Exists, DateTime WriteUtc, long Length) stamp) =>
+            snap.Exists == stamp.Exists && snap.WriteUtc == stamp.WriteUtc && snap.Length == stamp.Length;
+
+        private static ApplicationSettings Copy(Snapshot snap) =>
+            JsonSerializer.Deserialize<ApplicationSettings>(snap.Json) ?? new ApplicationSettings();
 
         // v2.2.x → v2.3.0 migration: the SDR settings split from a single
         // SdrDeviceKey into per-VFO SdrDeviceKeyA / SdrDeviceKeyB. On read,
