@@ -12,6 +12,13 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre26 (2026-11-24)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **IWC no longer freezes while the scope is streaming.** Each burst of data from the radio started its own little job to read it. When several jobs started together, all but the first found nothing left to read and sat waiting half a second for bytes that never came. With the band scope sending fast, those waiting jobs piled up until IWC had none free for anything else: the spectrum and the controls stopped until the radio went quiet. Now only one job reads the radio at a time, and the others leave straight away. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51))
+- Changes from v1.7.0-pre1 to pre25 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre25-2026-11-23).
+
 ### v1.7.0-pre25 (2026-11-23)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
