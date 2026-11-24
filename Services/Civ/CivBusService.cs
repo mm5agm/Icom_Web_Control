@@ -30,6 +30,7 @@ namespace Icom_Web_Control.Services.Civ
     {
         private readonly ILogger<CivBusService> _logger;
         private readonly CivFrameBuffer _buffer = new();
+        private readonly SingleDrain _drain = new();
         private readonly object _portLock = new();
         private readonly CivBusGate _gate;
 
@@ -385,22 +386,28 @@ namespace Icom_Web_Control.Services.Civ
                 // a port closed under us just throws, caught below).
                 var port = Volatile.Read(ref _port);
                 if (!ReferenceEquals(sender, port) || port?.IsOpen != true) return;
-                int n = port.BytesToRead;
-                if (n <= 0) return;
-                byte[] chunk = new byte[n];
-                int read = port.Read(chunk, 0, n);
-                if (read <= 0) return;
-                if (read < n)
-                    chunk = chunk[..read];
-                lock (_recent)
-                {
-                    foreach (var b in chunk)
+                // One handler drains at a time; the others return at once
+                // (see SingleDrain, D#51).
+                _drain.Run(
+                    () => port.IsOpen ? port.BytesToRead : 0,
+                    n =>
                     {
-                        _recent.Enqueue(b);
-                        if (_recent.Count > RecentCapacity) _recent.Dequeue();
-                    }
-                }
-                _buffer.Append(chunk);
+                        byte[] chunk = new byte[n];
+                        int read = port.Read(chunk, 0, n);
+                        return read <= 0 ? null : read < n ? chunk[..read] : chunk;
+                    },
+                    chunk =>
+                    {
+                        lock (_recent)
+                        {
+                            foreach (var b in chunk)
+                            {
+                                _recent.Enqueue(b);
+                                if (_recent.Count > RecentCapacity) _recent.Dequeue();
+                            }
+                        }
+                        _buffer.Append(chunk);
+                    });
             }
             catch (Exception ex)
             {
