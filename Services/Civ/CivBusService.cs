@@ -30,7 +30,6 @@ namespace Icom_Web_Control.Services.Civ
     {
         private readonly ILogger<CivBusService> _logger;
         private readonly CivFrameBuffer _buffer = new();
-        private readonly SingleDrain _drain = new();
         private readonly object _portLock = new();
         private readonly CivBusGate _gate;
 
@@ -215,11 +214,11 @@ namespace Icom_Web_Control.Services.Civ
                 {
                     lock (_recent) _recent.Clear();
                     _buffer.Clear();
-                    port.DataReceived += OnDataReceived;
                     _port = port;
                     _gate.Reset();
                 }
             }
+            if (extra == null) StartReader(port, portName);
             if (extra != null)
             {
                 await CloseDetachedAsync(extra);
@@ -251,8 +250,7 @@ namespace Icom_Web_Control.Services.Civ
         {
             var port = _port;
             if (port == null) return null;
-            port.DataReceived -= OnDataReceived;
-            _port = null;
+            _port = null;   // its reader thread sees this and stops
             _pending?.Tcs.TrySetResult(null);
             _pending = null;
             return port;
@@ -263,7 +261,7 @@ namespace Icom_Web_Control.Services.Civ
         /// the caller for more than <see cref="CloseTimeoutMs"/>.
         ///
         /// <para><b>Why (IWC #128, D#51).</b> The close used to run inside
-        /// <see cref="_portLock"/>, which the DataReceived handler also takes, and
+        /// <see cref="_portLock"/>, which the reader also took then, and
         /// <c>SerialPort.Close</c> can wait on the serial event thread, or on a
         /// USB driver that has stopped answering. When the radio went quiet and
         /// the poll loop dropped the link, that close never came back. The loop
@@ -376,43 +374,36 @@ namespace Icom_Web_Control.Services.Civ
             return winner == work;
         }
 
-        private void OnDataReceived(object sender, SerialDataReceivedEventArgs e)
+        /// <summary>
+        /// Starts the port's reader on a thread of its own, so incoming bytes
+        /// never put work on the thread pool (see <see cref="CivPortReader"/>, D#51).
+        /// </summary>
+        private void StartReader(SerialPort port, string portName)
         {
-            try
+            var thread = new Thread(() => CivPortReader.Run(
+                port.Read,
+                () => ReferenceEquals(Volatile.Read(ref _port), port),
+                Deliver,
+                ex => _logger.LogDebug(ex, "Error handling CI-V bytes"),
+                ex => _logger.LogDebug(ex, "CI-V reader on {Port} stopped", portName)))
             {
-                // Only the current port: one already let go of may still raise
-                // an event or two while it closes. Read with no lock held, so a
-                // write the driver is slow over never holds up the reader (and
-                // a port closed under us just throws, caught below).
-                var port = Volatile.Read(ref _port);
-                if (!ReferenceEquals(sender, port) || port?.IsOpen != true) return;
-                // One handler drains at a time; the others return at once
-                // (see SingleDrain, D#51).
-                _drain.Run(
-                    () => port.IsOpen ? port.BytesToRead : 0,
-                    n =>
-                    {
-                        byte[] chunk = new byte[n];
-                        int read = port.Read(chunk, 0, n);
-                        return read <= 0 ? null : read < n ? chunk[..read] : chunk;
-                    },
-                    chunk =>
-                    {
-                        lock (_recent)
-                        {
-                            foreach (var b in chunk)
-                            {
-                                _recent.Enqueue(b);
-                                if (_recent.Count > RecentCapacity) _recent.Dequeue();
-                            }
-                        }
-                        _buffer.Append(chunk);
-                    });
-            }
-            catch (Exception ex)
+                IsBackground = true,
+                Name = "IWC CI-V reader " + portName,
+            };
+            thread.Start();
+        }
+
+        private void Deliver(byte[] chunk)
+        {
+            lock (_recent)
             {
-                _logger.LogDebug(ex, "Error reading CI-V bytes");
+                foreach (var b in chunk)
+                {
+                    _recent.Enqueue(b);
+                    if (_recent.Count > RecentCapacity) _recent.Dequeue();
+                }
             }
+            _buffer.Append(chunk);
         }
 
         private void OnFrameReceived(object? sender, CivFrame frame)
