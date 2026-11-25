@@ -12,6 +12,15 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre28 (2026-11-25)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **IWC no longer freezes while the radio is on.** Each time the radio sent something, Windows set aside a worker thread to hand it to IWC, and those threads took turns, one at a time. When the radio sent faster than they could finish, they piled up. Over a few hours more than a thousand could be waiting, so web pages, the poll loop and rigctld clients such as JS8Call had no threads left, and IWC froze with the PC idle. Turning the radio off cleared it. IWC now reads the radio on one thread of its own, which never queues. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51), [#183](https://github.com/mm5agm/Icom_Web_Control/pull/183))
+- Changes from v1.7.0-pre1 to pre27 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre27-2026-11-24).
+
+---
+
 ### v1.7.0-pre27 (2026-11-24)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
