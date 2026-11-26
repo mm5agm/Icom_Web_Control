@@ -172,5 +172,16 @@ namespace Icom_Web_Control.Controllers
                 mode = _udpService.WsjtxMode
             });
         }
+
+        // GET api/wsjtx/station: the operator's callsign and grid as WSJT-X/WS
+        // reports them in its Status, for the Spot Map page. Read-only.
+        // Empty strings until WSJT-X has sent a Status.
+        [HttpGet("station")]
+        public IActionResult Station() => Ok(new
+        {
+            connected = _udpService.IsConnected,
+            call = _udpService.DeCall,
+            grid = _udpService.DeGrid,
+        });
     }
 }

@@ -1,0 +1,45 @@
+@page "/spot-map"
+@model Icom_Web_Control.Pages.SpotMapModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Spot Map";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="x-app-version" content="@Icom_Web_Control.AppVersion.Display">
+    <title>Spot Map - Icom Web Control</title>
+    @* Leaflet and mqtt.js are served from wwwroot/lib, never a CDN. *@
+    <link rel="stylesheet" href="~/lib/leaflet/leaflet.css" />
+</head>
+<body>
+    <div id="spotMap"></div>
+
+    <script src="~/lib/leaflet/leaflet.js"></script>
+    <script src="~/lib/mqtt/mqtt.min.js"></script>
+    <script src="~/lib/microsoft-signalr/signalr.min.js"></script>
+    <script src="~/js/hub/hub-connection.js" asp-append-version="true"></script>
+    <script>
+        // IWC's host shuts down when no page sends the heartbeat. This page has
+        // no site.js, so it sends its own: the Spot Map left open on its own
+        // on a second monitor keeps the host running, as the main page does.
+        (function () {
+            const conn = window.rwcHubConnection('/radioHub');
+            const heartbeat = () => conn.invoke('Heartbeat').catch(() => { });
+            setInterval(heartbeat, 5000);
+            conn.start().then(heartbeat).catch(err => console.error('[spot-map]', err));
+        })();
+    </script>
+    <script type="module">
+        import { startSpotMap } from "/js/spotmap/spot-map-page.js?v=@Icom_Web_Control.AppVersion.Display";
+        startSpotMap(document.getElementById('spotMap'), {
+            app: 'iwc',
+            stationUrl: '/api/wsjtx/station',
+            programName: 'WSJT-X',
+        });
+    </script>
+    <script type="module" src="~/js/txalert/tx-alert.js" asp-append-version="true"></script>
+</body>
+</html>

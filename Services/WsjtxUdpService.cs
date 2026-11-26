@@ -29,11 +29,17 @@ namespace Icom_Web_Control.Services
         private bool _isTransmitting;
         private string _wsjtxMode = "";
         private string _wsjtxId = "";
+        private string _deCall = "";
+        private string _deGrid = "";
 
         public bool IsConnected { get { lock (_lock) return (DateTime.UtcNow - _lastSeen).TotalSeconds < 30; } }
         public bool IsTransmitting { get { lock (_lock) return _isTransmitting; } }
         public string WsjtxMode { get { lock (_lock) return _wsjtxMode; } }
         public string WsjtxId { get { lock (_lock) return _wsjtxId; } }
+        /// <summary>The operator's callsign from WSJT-X's last Status (Settings, My Call). Empty until a Status arrives.</summary>
+        public string DeCall { get { lock (_lock) return _deCall; } }
+        /// <summary>The operator's grid from WSJT-X's last Status (Settings, My Grid), for the Spot Map. Empty until a Status arrives.</summary>
+        public string DeGrid { get { lock (_lock) return _deGrid; } }
 
         public WsjtxUdpService(
             IRadioController radio,
@@ -164,6 +170,9 @@ namespace Icom_Web_Control.Services
                     {
                         _isTransmitting = msg.Transmitting;
                         _wsjtxMode = msg.Mode;
+                        // A short Status (older versions) has no DE fields: keep what we had.
+                        if (msg.DeCall.Length > 0) _deCall = msg.DeCall;
+                        if (msg.DeGrid.Length > 0) _deGrid = msg.DeGrid;
                     }
 
                     // Log every status message with frequency info for debugging
@@ -212,9 +221,10 @@ namespace Icom_Web_Control.Services
 
         // --- Message parsing (all synchronous — spans are safe here) ---
 
-        private record ParsedMessage(uint Type, string Id, long DialFrequency, bool Transmitting, string Mode);
+        internal record ParsedMessage(uint Type, string Id, long DialFrequency, bool Transmitting, string Mode,
+            string DeCall = "", string DeGrid = "");
 
-        private static ParsedMessage? TryParseMessage(byte[] data)
+        internal static ParsedMessage? TryParseMessage(byte[] data)
         {
             if (data.Length < 8) return null;
             try
@@ -232,6 +242,8 @@ namespace Icom_Web_Control.Services
                 long dialFrequency = 0;
                 bool transmitting = false;
                 string mode = "";
+                string deCall = "";
+                string deGrid = "";
 
                 if (type == MessageTypeStatus)
                 {
@@ -242,9 +254,21 @@ namespace Icom_Web_Control.Services
                     ReadQString(span, ref offset); // TX Mode
                     ReadBool(span, ref offset);    // TX Enabled
                     transmitting = ReadBool(span, ref offset);
+
+                    // The rest is optional: a short Status still gives the fields above.
+                    try
+                    {
+                        ReadBool(span, ref offset);    // Decoding
+                        ReadUInt32(span, ref offset);  // Rx DF
+                        ReadUInt32(span, ref offset);  // Tx DF
+                        deCall = (ReadQString(span, ref offset) ?? "").Trim();   // DE call: the operator's own (Spot Map)
+                        deGrid = (ReadQString(span, ref offset) ?? "").Trim();   // DE grid: the operator's own (Spot Map)
+                    }
+                    catch (ArgumentOutOfRangeException) { }
+                    catch (IndexOutOfRangeException) { }
                 }
 
-                return new ParsedMessage(type, id, dialFrequency, transmitting, mode);
+                return new ParsedMessage(type, id, dialFrequency, transmitting, mode, deCall, deGrid);
             }
             catch
             {

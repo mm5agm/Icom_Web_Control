@@ -61,6 +61,7 @@
    - 9.3 [Log4OM](#93-log4om)
    - 9.4 [GridTracker](#94-gridtracker)
    - 9.5 [JS8Call](#95-js8call)
+   - 9.6 [Spot Map (PSK Reporter)](#96-spot-map-psk-reporter)
 10. [Meter Calibration](#10-meter-calibration)
     - 10.1 [Calibrating the S-Meter (receive)](#101-calibrating-the-s-meter-receive)
     - 10.2 [Calibrating the Power meter (transmit)](#102-calibrating-the-power-meter-transmit)
@@ -2256,6 +2257,34 @@ JS8Call controls the radio through IWC the same way WSJT-X does, so IWC keeps th
 5. Under **Settings → Audio**, set **Input** and **Output** to the radio's **USB Audio CODEC**. IWC doesn't carry the audio: JS8Call sends it straight to the radio.
 
 **No transmit audio?** Check that JS8Call's **Output** is still the USB Audio CODEC (a reinstall or a Windows update can change it), that the CODEC isn't muted or at zero in Windows **Sound settings**, and on the radio that **DATA MOD** is **USB** and **USB MOD Level** is above 0. Watch the ALC meter while transmitting.
+
+### 9.6 Spot Map (PSK Reporter)
+
+*New in v1.7.0-pre29.*
+
+The Spot Map shows who hears you, and who you hear, on a world map and in a list, live from [PSK Reporter](https://pskreporter.info). It is made for a second monitor. Open it from **Menu → Receive → Spot Map** in any view, or **Spot Map** in the Classic page's menu bar; it opens in a new window.
+
+**Your callsign and grid** come from WSJT-X (or WS, JTDX) over the UDP link in [9.1](#91-wsjt-x), so there is nothing to set up. If WSJT-X isn't running, the page asks for them once and remembers them in that browser. **Change callsign** at the top changes them. If you start WSJT-X after opening the page, or change its callsign, the page follows within 15 seconds.
+
+**Your program must send spots to PSK Reporter.** In WSJT-X that is **Settings, Reporting, Enable PSK Reporter Spotting**. The map can show only what PSK Reporter has been told.
+
+**The map:**
+
+- **Orange**: stations that heard you. **Blue**: stations you heard. **Yellow**: you.
+- Each station shows once, at its latest spot, with a line from you. Spots from the last 3 minutes are drawn bigger.
+- Hold the mouse over a dot for the callsign, band, mode, SNR and how long ago.
+
+**The list** (right-hand side): **Who**, **Band**, **SNR**, **Distance** and **Time UTC**, newest first. Click a column heading to sort by it, and again to reverse it. Click a row to go to that station on the map. Drag the bar between the map and the list to resize them; **List** at the top hides or shows it.
+
+**At the top:** **Show** picks both kinds, or only one. **Last** picks how far back (5 minutes to 24 hours). **km**/**miles** sets the distance units. All of these are remembered.
+
+**Notes:**
+
+- **Spots can be up to 5 minutes late.** WSJT-X and WS send their spots to PSK Reporter in batches, about every 5 minutes. That's normal.
+- **History:** when the page opens it loads the last 24 hours. PSK Reporter allows one query about every 5 minutes, so "heard me" loads at once and "I heard" about 5½ minutes later.
+- The page needs the internet for the map and the spots. It never touches the radio.
+- Left open on its own, the Spot Map keeps IWC running, like the main page does.
+- Data from PSK Reporter by Philip Gladstone. Live spots come from mqtt.pskreporter.info, run by Tom Fanning M0LTE.
 
 ---
 
