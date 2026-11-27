@@ -305,6 +305,8 @@ SetTransmitAsync(True)
   FE FE 94 E0 1C 00 01 FD
 SetTransmitAsync(False)
   FE FE 94 E0 1C 00 00 FD
+  FE FE 94 E0 1C 00 00 FD
+  FE FE 94 E0 1C 00 00 FD
 SetTunerAsync(1)
   FE FE 94 E0 1C 01 01 FD
 SetVoxAsync(True)
