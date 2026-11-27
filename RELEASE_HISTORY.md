@@ -12,6 +12,27 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre30 (2026-11-27)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **The radio menu file now saves the front panel too.** **Save radio menu to file** (Settings, IC-7300MK2) also saves every front panel setting IWC can read except the volume (AF GAIN) and the frequency. That's 27 settings:
+  - receive: RF GAIN, SQL, AGC, PREAMP, ATT, IP+, NB, NR, the notches, TWIN PEAK;
+  - transmit: RF POWER, MIC GAIN, COMP, MONITOR, VOX GAIN, ANTI VOX;
+  - CW: KEY SPEED, CW PITCH, BK-IN, BK-IN DELAY.
+
+  AGC is saved for the mode you are in, and PREAMP, ATT and IP+ for the band you are on. A save never changes mode or band. After a save the page says how many front panel settings were saved, and names any the radio didn't answer. See [Radio Menu](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#radio-menu) in the manual. ([#188](https://github.com/mm5agm/Icom_Web_Control/pull/188), [#189](https://github.com/mm5agm/Icom_Web_Control/pull/189), [#190](https://github.com/mm5agm/Icom_Web_Control/pull/190))
+- **Loading a file.** Front panel settings are listed with the rest. Receive settings start ticked. Transmit and CW settings are marked TX and start unticked. AGC, PREAMP, ATT and IP+ load only when the radio is on the mode or band they were saved for. Files from an older IWC still load as before.
+- **Reminder to save.** When IWC starts, a banner asks you to save if:
+  - there is no saved file yet;
+  - the newest file is 30 days old;
+  - a front panel setting differs from it, for example *MONITOR LEVEL changed from 50% to 40%*.
+
+  **Save now** saves straight away. The tray's **Exit** offers to save first if a setting changed while IWC was running.
+- Changes from v1.7.0-pre1 to pre29 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre29-2026-11-27).
+
+---
+
 ### v1.7.0-pre29 (2026-11-27)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
