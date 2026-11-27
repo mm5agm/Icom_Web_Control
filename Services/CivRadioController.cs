@@ -1826,32 +1826,125 @@ namespace Icom_Web_Control.Services
 
         // -- PTT / TX status + TX meters (Phase 3 block 4) ---------------------
 
-        // The poll loop keeps _state.IsTransmitting live (via ReadTransmitAsync),
+        // The poll loop keeps _state.IsTransmitting live (via PollTransmitAsync),
         // so on-demand callers (rigctld, voice) get the cached value cheaply
         // rather than firing another bus transaction at ~7 Hz.
         public Task<bool> GetTransmitAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(_state.IsTransmitting);
 
+        /// <summary>
+        /// How long after an acknowledged PTT command a poll reading that
+        /// disagrees with it is ignored (IWC D#51). A 1C 00 read queued just
+        /// before the command can answer with the old state; written straight
+        /// into the cache it made get_ptt say "RX" while JS8Call's Tune was on,
+        /// and JS8Call then sent set_ptt 0 about 150 ms after set_ptt 3.
+        /// </summary>
+        internal const int PttHoldMs = 1000;
+
+        /// <summary>How many times "PTT off" is sent straight away before the poll loop takes over.</summary>
+        internal const int RxImmediateTries = 3;
+
+        // The last acknowledged PTT command: -1 none, 0 RX, 1 TX; and when (TickCount64).
+        private int _pttCommanded = -1;
+        private long _pttCommandedAt;
+        // "PTT off" was asked for but the radio never acknowledged it (IWC D#51).
+        // The poll loop keeps sending it, first thing each loop and first thing
+        // after a reconnect, until the radio says RX.
+        private volatile bool _rxReleasePending;
+        internal Func<long> PttClock { get; set; } = () => Environment.TickCount64;
+
+        /// <summary>Whether IWC is still trying to get the radio back to receive.</summary>
+        internal bool RxReleasePending => _rxReleasePending;
+
         public async Task SetTransmitAsync(bool transmit, CancellationToken cancellationToken = default)
+        {
+            if (transmit) _rxReleasePending = false; // a new key-up replaces an unfinished release
+
+            int tries = transmit ? 1 : RxImmediateTries;
+            for (int i = 0; i < tries; i++)
+            {
+                if (await SendPttAsync(transmit, cancellationToken))
+                {
+                    if (!transmit && i > 0)
+                        _logger.LogInformation("[CivRadioController] Set PTT RX acknowledged on try {Try}", i + 1);
+                    return;
+                }
+                if (cancellationToken.IsCancellationRequested) break;
+            }
+
+            if (transmit)
+            {
+                _logger.LogWarning("[CivRadioController] Set PTT TX was not acknowledged");
+            }
+            else
+            {
+                _rxReleasePending = true;
+                _logger.LogWarning("[CivRadioController] Set PTT RX was not acknowledged; IWC will keep sending RX until the radio answers");
+            }
+        }
+
+        /// <summary>
+        /// Send 1C 00 01/00 once. True if the radio acknowledged it, and then
+        /// the cache follows the command and the hold starts.
+        /// </summary>
+        private async Task<bool> SendPttAsync(bool transmit, CancellationToken cancellationToken)
         {
             // Software PTT: command 1C 00 with a data byte (01=TX, 00=RX).
             byte v = transmit ? (byte)0x01 : (byte)0x00;
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdTransmit, CivProtocol.SubTxStatus, v);
             var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: cancellationToken);
-            if (reply != null && reply.Cmd == CivProtocol.AckOk)
-                _state.IsTransmitting = transmit;
-            else
-                _logger.LogWarning("[CivRadioController] Set PTT {State} was not acknowledged",
-                    transmit ? "TX" : "RX");
+            if (reply == null || reply.Cmd != CivProtocol.AckOk) return false;
+
+            Volatile.Write(ref _pttCommandedAt, PttClock());
+            Volatile.Write(ref _pttCommanded, transmit ? 1 : 0);
+            if (!transmit) _rxReleasePending = false;
+            _state.IsTransmitting = transmit;
+            return true;
         }
 
         /// <summary>
-        /// Read the transmit state (command 1C 00, no data byte). Returns the
-        /// last known state on a miss so a dropped frame never spuriously
-        /// flips TX/RX.
+        /// The poll loop's first step each loop: if "PTT off" is still owed,
+        /// send it once more. Runs on the poll loop, so the bus never skips it
+        /// while the radio is silent.
         /// </summary>
-        private async Task<bool> ReadTransmitAsync(CancellationToken cancellationToken)
+        internal async Task SendPendingRxAsync(CancellationToken cancellationToken)
+        {
+            if (!_rxReleasePending) return;
+            if (await SendPttAsync(false, cancellationToken))
+                _logger.LogInformation("[CivRadioController] Set PTT RX acknowledged after retrying; the radio is back on receive");
+        }
+
+        /// <summary>
+        /// The poll loop's TX/RX step: read 1C 00 and update the cache, unless
+        /// the reading disagrees with a PTT command acknowledged in the last
+        /// <see cref="PttHoldMs"/>. Returns the state the cache now holds.
+        /// </summary>
+        internal async Task<bool> PollTransmitAsync(CancellationToken cancellationToken)
+        {
+            bool? read = await ReadTransmitRawAsync(cancellationToken);
+            if (read is not bool transmitting) return _state.IsTransmitting; // a miss keeps the last state
+
+            // The radio says RX: nothing is owed any more.
+            if (!transmitting && _rxReleasePending)
+            {
+                _rxReleasePending = false;
+                _logger.LogInformation("[CivRadioController] The radio reports RX; PTT release done");
+            }
+
+            int commanded = Volatile.Read(ref _pttCommanded);
+            bool held = commanded >= 0
+                && (transmitting ? 1 : 0) != commanded
+                && PttClock() - Volatile.Read(ref _pttCommandedAt) < PttHoldMs;
+            if (!held) _state.IsTransmitting = transmitting; // broadcasts on change
+            return _state.IsTransmitting;
+        }
+
+        /// <summary>
+        /// Read the transmit state (command 1C 00, no data byte). Null on a
+        /// miss so a dropped frame never spuriously flips TX/RX.
+        /// </summary>
+        private async Task<bool?> ReadTransmitRawAsync(CancellationToken cancellationToken)
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress,
                 CivProtocol.CmdTransmit, CivProtocol.SubTxStatus);
@@ -1860,7 +1953,7 @@ namespace Icom_Web_Control.Services
             if (reply != null && reply.Cmd == CivProtocol.CmdTransmit
                 && reply.Data.Length >= 2 && reply.Data[0] == CivProtocol.SubTxStatus)
                 return reply.Data[1] != 0;
-            return _state.IsTransmitting;
+            return null;
         }
 
         // -- Antenna tuner (CI-V 1C 01) ----------------------------------------
@@ -3579,6 +3672,12 @@ namespace Icom_Web_Control.Services
                     RadioVfo active = ActiveVfo;
                     RadioVfo other = active == RadioVfo.A ? RadioVfo.B : RadioVfo.A;
 
+                    // "PTT off" still owed from a release the radio didn't
+                    // acknowledge: send it before anything else, every loop and
+                    // first thing after a reconnect (IWC D#51).
+                    Beat("sending PTT off");
+                    await SendPendingRxAsync(stoppingToken);
+
                     // Operating frequency (command 03) is the liveness signal —
                     // the only read that counts misses and can drop the link.
                     Beat("polling");
@@ -3621,8 +3720,8 @@ namespace Icom_Web_Control.Services
                     // TX/RX status (command 1C 00) every loop — cheap, and it
                     // decides which meters are worth reading. Best-effort: a miss
                     // keeps the last state and never drops the link.
-                    bool transmitting = await ReadTransmitAsync(stoppingToken);
-                    _state.IsTransmitting = transmitting; // broadcasts on change
+                    // A recent PTT command wins over a stale reading (IWC D#51).
+                    bool transmitting = await PollTransmitAsync(stoppingToken);
 
                     if (transmitting)
                     {

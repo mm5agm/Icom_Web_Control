@@ -510,6 +510,10 @@ namespace Icom_Web_Control.Services
 
             if (keyed)
                 ArmTxWatchdog(clientId);
+            else if (_radioStateService.IsTransmitting)
+                // The radio didn't acknowledge RX (IWC D#51). The controller keeps
+                // sending it; keep the safety timer running as a backstop.
+                _logger.LogWarning("Rigctld set_ptt 0 not confirmed by the radio; keeping the TX safety timer running (client: {ClientId})", clientId);
             else
                 DisarmTxWatchdog();
 
