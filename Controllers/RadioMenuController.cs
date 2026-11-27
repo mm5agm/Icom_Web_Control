@@ -89,7 +89,13 @@ namespace Icom_Web_Control.Controllers
                 return StatusCode(500, new { error = $"Could not write {path}: {ex.Message}" });
             }
             _reminderCache = null;
-            return Ok(new { name, path, missing, unanswered, knobs = knobReadings.Count(k => k.Value is not null) });
+            return Ok(new
+            {
+                name, path, missing, unanswered,
+                knobs = knobReadings.Count(k => k.Value is not null),
+                knobsTotal = knobReadings.Count,
+                knobsUnanswered = knobReadings.Where(k => k.Value is null).Select(k => k.Knob.Name).ToList(),
+            });
         }
 
         /// <summary>GET /api/radiomenu/files — the copies IWC kept, newest first.</summary>

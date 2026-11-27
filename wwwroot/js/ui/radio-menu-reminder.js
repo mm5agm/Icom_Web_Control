@@ -48,7 +48,8 @@
                 const d = await r.json().catch(() => ({}));
                 if (!r.ok) throw new Error(d.error || r.statusText);
                 box.className = 'alert alert-success d-flex flex-wrap align-items-center gap-2 mt-2 mb-2';
-                text.textContent = `Saved to ${d.path}.`;
+                text.textContent = window.radioMenuSavedText ? window.radioMenuSavedText(d)
+                    : `Saved the menu and ${d.knobs ?? 0} front panel levels to ${d.path}.`;
                 status.textContent = '';
                 save.remove();
                 later.textContent = 'Close';
