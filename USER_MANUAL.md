@@ -374,7 +374,7 @@ A small **IWC tray icon** appears in the Windows system tray (down by the clock,
 | Open Icom Web Control | Opens IWC in your default browser. |
 | About — version vX.Y.Z | Shows version, release date, and licence. The browser About page (top nav bar) has full details and a Copy diagnostics button. |
 | Open user data folder | Opens `%APPDATA%\MM5AGM\Icom Web Control\` in File Explorer — handy for grabbing the backup zip after export, or inspecting/editing JSON files. |
-| Exit Icom Web Control | Confirms then shuts the app down cleanly. WSJT-X / Log4OM / JTAlert / GridTracker / Fldigi lose their CAT connection until you restart IWC. If a front panel level (MIC GAIN, COMP and so on) has changed since you last saved the radio's settings, it offers to save them first: **Yes** saves then stops, **No** stops without saving, **Cancel** keeps IWC running. See [Radio Menu](#radio-menu). |
+| Exit Icom Web Control | Confirms then shuts the app down cleanly. WSJT-X / Log4OM / JTAlert / GridTracker / Fldigi lose their CAT connection until you restart IWC. If a front panel setting (MIC GAIN, NB, AGC and so on) has changed since you last saved the radio's settings, it offers to save them first: **Yes** saves then stops, **No** stops without saving, **Cancel** keeps IWC running. See [Radio Menu](#radio-menu). |
 
 ![IWC tray icon with right-click menu open, showing Open / About / Open user data folder / Exit](pictures/SystemTrayIcon.png)
 
@@ -1633,7 +1633,7 @@ The quickest way to change one of the radio's menu items is **Change radio setti
 
 **Save radio menu to file**
 
-Click **Save radio menu to file** in the **Radio Menu** section of the Settings page. IWC reads every item of the radio's menu, 270 items, then the front panel levels the menu does not hold, several seconds in all, and writes the file. Available for the IC-7300MK2.
+Click **Save radio menu to file** in the **Radio Menu** section of the Settings page. IWC reads every item of the radio's menu, 270 items, then the front panel settings the menu does not hold, about ten seconds in all, and writes the file. Available for the IC-7300MK2.
 
 The file goes in `%APPDATA%\MM5AGM\Icom Web Control\Radio menus`, with IWC's other files, on the PC that runs IWC. The page shows the full path after each save, and **Open that folder** opens it in Explorer. If you use IWC from a browser on another PC, pick the file under **Saved files** and click **Download a copy** to get it on that PC.
 
@@ -1651,14 +1651,26 @@ Beep Level = 50%                         ; 00 22 = 01 28
 - **`(no answer)`** means the radio did not reply for that item, usually because it does not apply to the radio's current setup. On the IC-7300MK2, *Display Language* and *Japanese Morse Decode* may show this.
 - Save as many files as you like and rename them for how you use the radio, for example `IWC radio menu contest.ini`.
 
-At the end of the file, a **Front panel** section holds the levels you set with the knobs and buttons rather than in the SET menu: MIC GAIN, COMP (on or off), COMP LEVEL, RF POWER, MONITOR and VOX GAIN. The IC-7300MK2 keeps one of each for every mode, so one reading covers them all:
+At the end of the file, a **Front panel** section holds the settings you make with the knobs and buttons rather than in the SET menu. That is every one IWC can read, 27 in all, except the volume (AF gain) and the frequency:
+
+- **Receive:** RF GAIN, SQL, AGC, PREAMP, ATT, IP+, NB and NB LEVEL, NR and NR LEVEL, AUTO NOTCH, MANUAL NOTCH with its NOTCH POSITION and NOTCH WIDTH, and TWIN PEAK.
+- **Transmit:** RF POWER, MIC GAIN, COMP and COMP LEVEL, MONITOR and MONITOR LEVEL, VOX GAIN and ANTI VOX. VOX itself (on or off) is never saved or loaded.
+- **CW:** KEY SPEED, CW PITCH, BK-IN (OFF, SEMI or FULL) and BK-IN DELAY.
+
+The IC-7300MK2 keeps most of these as one setting for every mode and band. Four it keeps separately: **AGC for each mode** (USB, LSB and FM share one; CW, AM and the others have their own), and **PREAMP, ATT and IP+ for each band**. IWC saves those for the mode and band the radio is on when you save, and shows which in brackets:
 
 ```ini
 [Front panel]
-MIC GAIN = 50%                           ; CI-V 14 0B  [TX]
-COMP = OFF                               ; CI-V 16 44  [TX]
+RF GAIN = 100%                           ; CI-V 14 02
+AGC (USB) = MID                          ; CI-V 16 12
+PREAMP (20m) = P.AMP1                    ; CI-V 16 02
+NB = OFF                                 ; CI-V 16 22
 RF POWER = 25%                           ; CI-V 14 0A  [TX]
+MIC GAIN = 50%                           ; CI-V 14 0B  [TX]
+KEY SPEED = 20 WPM                       ; CI-V 14 0C  [TX]
 ```
+
+To keep AGC for another mode, or PREAMP for another band, put the radio on it and save another file.
 
 Saving only reads the radio. Nothing on the radio changes.
 
@@ -1667,13 +1679,13 @@ Saving only reads the radio. Nothing on the radio changes.
 IWC reminds you to save when it looks worth doing. When IWC starts, a banner at the top of the page says so if:
 
 - the radio's settings have never been saved;
-- a front panel level is not what your newest file holds, for example *MIC GAIN changed from 50% to 30%*;
+- a front panel setting is not what your newest file holds, for example *MIC GAIN changed from 50% to 30%*. AGC, PREAMP, ATT and IP+ are only compared when the radio is on the mode or band they were saved for;
 - your newest file is 30 days old or more;
-- your newest file was saved before IWC saved the front panel levels.
+- your newest file was saved before IWC saved the front panel settings.
 
 **Save now** saves straight away. **Not now** hides the banner for 7 days. The same line always shows under **Save radio menu to file** on the Settings page, whatever you chose in the banner. Changes made in the radio's own SET menu are not checked, because reading the whole menu takes several seconds; the 30-day reminder covers them.
 
-When you stop IWC from the tray icon, it reads the front panel levels again. If one has changed since your newest file, it asks whether to save first.
+When you stop IWC from the tray icon, it reads the front panel settings again. If one has changed since your newest file, it asks whether to save first.
 
 **Loading a file**
 
@@ -1683,8 +1695,9 @@ Pick a file from **Saved files** and click **Load this one**, or click **Load fr
 - Items already the same are hidden. Tick **Show items that are already the same** to see them.
 - Items that cannot be loaded say why in the Note column, for example a value the radio does not offer.
 - **The CI-V and network items are never loaded**, because a wrong one would cut IWC off from the radio, and nor are the date and time. Change them on the radio if you need to.
-- The **front panel levels** are listed first. They are all marked **TX**, so they start unticked.
-- **A file saved before IWC saved the front panel levels still loads.** It puts the menu back as before, and the page notes that the file has no front panel levels.
+- The **front panel settings** are listed first. The receive ones start ticked; the transmit and CW ones are marked **TX** and start unticked.
+- **AGC, PREAMP, ATT and IP+ load only on the mode or band they were saved for.** On any other, the Note column says where they were saved, for example *Saved for 20m; the radio is on 40m now*. Go there and load the file again to set them.
+- **A file saved by an older IWC still loads**, with whatever front panel settings it has. A file saved before IWC saved any puts the menu back as before, and the page notes that the file has no front panel settings.
 
 Press **Send ticked items to the radio** and confirm. IWC sends each ticked item, reads it back, and shows **Sent and read back** or what went wrong.
 

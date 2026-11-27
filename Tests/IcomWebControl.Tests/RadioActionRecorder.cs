@@ -100,6 +100,8 @@ internal static class RadioActionRecorder
             "lpfHz" => 2500,
             _ => 1,  // levels, and the small codes: filter 1, preamp 1, tuner on (2 would start a tune)
         };
+        // The front panel save: RF GAIN, 14 02, which every radio has.
+        if (t == typeof(byte)) return p.Name == "sub" ? (byte)0x02 : (byte)0x14;
         if (t == typeof(long)) return 14_074_000L;
         if (t == typeof(double)) return 7.5;
         if (t == typeof(string)) return p.Name == "message" ? "CQ" : "USB";

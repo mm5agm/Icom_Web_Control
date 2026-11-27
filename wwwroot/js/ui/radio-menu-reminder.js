@@ -42,14 +42,14 @@
         save.addEventListener('click', async () => {
             save.disabled = later.disabled = true;
             status.className = 'small w-100 text-muted';
-            status.textContent = 'Saving: reading the menu, then the front panel levels (a few seconds). Nothing on the radio is changed.';
+            status.textContent = 'Saving: reading the menu, then the front panel settings (about ten seconds). Nothing on the radio is changed.';
             try {
                 const r = await fetch('/api/radiomenu/save', { method: 'POST' });
                 const d = await r.json().catch(() => ({}));
                 if (!r.ok) throw new Error(d.error || r.statusText);
                 box.className = 'alert alert-success d-flex flex-wrap align-items-center gap-2 mt-2 mb-2';
                 text.textContent = window.radioMenuSavedText ? window.radioMenuSavedText(d)
-                    : `Saved the menu and ${d.knobs ?? 0} front panel levels to ${d.path}.`;
+                    : `Saved the menu and ${d.knobs ?? 0} front panel settings to ${d.path}.`;
                 status.textContent = '';
                 save.remove();
                 later.textContent = 'Close';
