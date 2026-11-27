@@ -3083,6 +3083,16 @@
             (names.length ? `: ${names.join(', ')}.` : '.') +
             ' That usually means they do not apply to this radio or how it is set up.';
     };
+    // "Saved the menu and 6 front panel levels to C:\...ini." plus a note for any level that did not answer.
+    window.radioMenuSavedText = function (data) {
+        const total = Number(data.knobsTotal || 0), read = Number(data.knobs || 0);
+        if (!total) return `Saved to ${data.path}.`;
+        let text = `Saved the menu and ${read} front panel level${read === 1 ? '' : 's'} to ${data.path}.`;
+        const quiet = Array.isArray(data.knobsUnanswered) ? data.knobsUnanswered : [];
+        if (quiet.length)
+            text += ` Front panel level${quiet.length === 1 ? '' : 's'} that did not answer: ${quiet.join(', ')}. The file marks ${quiet.length === 1 ? 'it' : 'them'} (no answer); save again to include ${quiet.length === 1 ? 'it' : 'them'}.`;
+        return text;
+    };
 </script>
 <script>
     (function () {
@@ -3101,7 +3111,7 @@
                     statusEl.className = 'ms-2 small text-danger';
                     return;
                 }
-                statusEl.textContent = `Saved to ${data.path}.` +
+                statusEl.textContent = window.radioMenuSavedText(data) +
                     (data.missing ? ` ${window.radioMenuUnanswered(data)} The file marks them (no answer).` : '');
                 document.dispatchEvent(new CustomEvent('radiomenu-saved', { detail: data.name }));
                 statusEl.className = 'ms-2 small text-success';
