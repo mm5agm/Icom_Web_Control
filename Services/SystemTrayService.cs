@@ -202,13 +202,7 @@ namespace Icom_Web_Control.Services
 
         private void OnExit(object? sender, EventArgs e)
         {
-            var ok = MessageBox.Show(
-                "Stop Icom Web Control?\n\nWSJT-X / Log4OM / JTAlert / GridTracker / Fldigi / JS8Call " +
-                "will lose their CAT connection until IWC is restarted.",
-                "Exit Icom Web Control",
-                MessageBoxButtons.OKCancel,
-                MessageBoxIcon.Question);
-            if (ok != DialogResult.OK) return;
+            if (!ConfirmExit()) return;
 
             _logger.LogInformation("[TrayExit] User confirmed exit");
 
@@ -256,6 +250,39 @@ namespace Icom_Web_Control.Services
                 _lifetime.StopApplication();
                 _logger.LogInformation("[TrayExit] (worker) _lifetime.StopApplication() returned");
             });
+        }
+    
+
+        /// <summary>
+        /// Asks before exiting. If a front-panel level changed since the last
+        /// save of the radio's settings, offers to save first (Yes/No/Cancel).
+        /// </summary>
+        private bool ConfirmExit()
+        {
+            const string title = "Exit Icom Web Control";
+            const string lose = "WSJT-X / Log4OM / JTAlert / GridTracker / Fldigi / JS8Call " +
+                "will lose their CAT connection until IWC is restarted.";
+
+            var changed = Services.RadioMenu.TrayExitSave.Check(_portInfo.RootUrl);
+            if (changed is null)
+            {
+                return MessageBox.Show("Stop Icom Web Control?\n\n" + lose, title,
+                    MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == DialogResult.OK;
+            }
+
+            var answer = MessageBox.Show(
+                changed + "\n\nSave the radio's settings before stopping Icom Web Control?\n\n" +
+                "Yes: save, then stop.   No: stop without saving.   Cancel: keep IWC running.\n\n" + lose,
+                title, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            if (answer == DialogResult.Cancel) return false;
+            if (answer == DialogResult.No) return true;
+
+            _logger.LogInformation("[TrayExit] Saving the radio menu before exit");
+            var error = Services.RadioMenu.TrayExitSave.Save(_portInfo.RootUrl);
+            if (error is null) return true;
+            _logger.LogWarning("[TrayExit] Radio menu save failed: {Error}", error);
+            return MessageBox.Show($"The radio's settings could not be saved: {error}\n\nStop Icom Web Control anyway?",
+                title, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
         }
     }
 }
