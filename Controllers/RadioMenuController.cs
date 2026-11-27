@@ -12,6 +12,11 @@ namespace Icom_Web_Control.Controllers
     /// writing nothing; apply writes only the items the user ticked, each
     /// checked again against the menu table and read back. Phase 8 of
     /// docs/design/iwc-clone-split-plan.md.
+    ///
+    /// The save also holds the front panel levels the SET menu does not
+    /// (MIC GAIN, COMP, RF POWER and so on, see <see cref="RadioKnobs"/>), and
+    /// the reminder and exit-check endpoints ask the user to save when those
+    /// have changed or the last save is old.
     /// </summary>
     [ApiController]
     [Route("api/radiomenu")]
@@ -63,8 +68,12 @@ namespace Icom_Web_Control.Controllers
             if (missing == readings.Count)
                 return StatusCode(504, new { error = "The radio did not answer any menu reads." });
 
+            // The front panel levels: the same in every mode on the IC-7300MK2, so one read each.
+            var knobs = RadioKnobs.TableFor(model);
+            var knobReadings = knobs is null ? new List<RadioKnobReading>() : await RadioKnobs.ReadAllAsync(_radio, knobs, ct);
+
             var now = DateTime.Now;
-            var ini = RadioMenuFile.ToIni(model, now, readings);
+            var ini = RadioMenuFile.ToIni(model, now, readings) + (knobs is null ? "" : RadioKnobs.ToIni(knobReadings));
             var name = $"IWC radio menu {model} {now:yyyy-MM-dd HHmm}.ini";
             // UTF-8 with BOM so older Notepad shows [▲] and [▼] properly.
             var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(ini)).ToArray();
@@ -79,7 +88,8 @@ namespace Icom_Web_Control.Controllers
                 _logger.LogError(ex, "Radio menu save: could not write {Path}", path);
                 return StatusCode(500, new { error = $"Could not write {path}: {ex.Message}" });
             }
-            return Ok(new { name, path, missing, unanswered });
+            _reminderCache = null;
+            return Ok(new { name, path, missing, unanswered, knobs = knobReadings.Count(k => k.Value is not null) });
         }
 
         /// <summary>GET /api/radiomenu/files — the copies IWC kept, newest first.</summary>
@@ -201,7 +211,7 @@ namespace Icom_Web_Control.Controllers
             var rows = new List<object>();
             var seen = new HashSet<string>();
             int changes = 0;
-            foreach (var line in file.Items)
+            foreach (var line in file.Items.Where(l => !RadioKnobs.IsKnobAddress(l.Address)))
             {
                 var item = RadioMenuLoad.Find(table!, line);
                 if (item is null)
@@ -249,12 +259,80 @@ namespace Icom_Web_Control.Controllers
                 }
             }
 
+            changes += await PreviewKnobsAsync(file.Items.Where(l => RadioKnobs.IsKnobAddress(l.Address)).ToList(), model, rows, ct);
+
             string? warning = file.Radio is not null && !string.Equals(file.Radio, model, StringComparison.OrdinalIgnoreCase)
                 ? $"This file was saved from a {file.Radio}; the radio now is a {model}. Check each change."
                 : null;
+            // An older file still loads; it just has no levels to put back.
+            if (RadioKnobs.TableFor(model) is not null && !file.Items.Any(l => RadioKnobs.IsKnobAddress(l.Address)))
+            {
+                const string old = "This file was saved before IWC saved the front panel levels (MIC GAIN, COMP, RF POWER), so only the menu is loaded. Save a new file to include them.";
+                warning = warning is null ? old : $"{warning} {old}";
+            }
             _logger.LogInformation("Radio menu load preview: {Rows} lines, {Changes} changes", rows.Count, changes);
             return Ok(new { model, fileRadio = file.Radio, warning, rows });
         }
+
+        /// <summary>
+        /// The front panel lines of a preview: each checked, then compared with
+        /// what the radio has now. Every level counts as TX (it changes what
+        /// goes out), so the page leaves them unticked.
+        /// </summary>
+        private async Task<int> PreviewKnobsAsync(List<RadioMenuFileItem> lines, string model, List<object> rows, CancellationToken ct)
+        {
+            int changes = 0;
+            var seen = new HashSet<string>();
+            foreach (var line in lines)
+            {
+                var knob = RadioKnobs.ByAddress(line.Address, model);
+                if (knob is null)
+                {
+                    rows.Add(KnobRow(null, line, "unknown", null, null, $"Line {line.Line}: not a front panel level IWC loads on the {model}."));
+                    continue;
+                }
+                if (!seen.Add(line.Address!))
+                {
+                    rows.Add(KnobRow(knob, line, "unknown", null, null, $"Line {line.Line}: this level is already in the file; the first one is used."));
+                    continue;
+                }
+                if (line.Value.Equals(RadioMenuLoad.NoAnswer, StringComparison.OrdinalIgnoreCase))
+                {
+                    rows.Add(KnobRow(knob, line, "skipped", null, null, "The radio did not answer this level when the file was saved."));
+                    continue;
+                }
+                var value = RadioKnobs.Encode(knob, line.Value, out var error);
+                if (value is null)
+                {
+                    rows.Add(KnobRow(knob, line, "error", null, null, error));
+                    continue;
+                }
+                var current = await RadioKnobs.ReadAsync(_radio, knob, ct);
+                if (current is null)
+                    rows.Add(KnobRow(knob, line, "noanswer", null, null, "The radio did not answer, so this cannot be checked."));
+                else if (current == value)
+                    rows.Add(KnobRow(knob, line, "same", current, value, null));
+                else
+                {
+                    rows.Add(KnobRow(knob, line, "change", current, value, null));
+                    changes++;
+                }
+            }
+            return changes;
+        }
+
+        private static object KnobRow(RadioKnob? knob, RadioMenuFileItem line, string status, int? current, int? wanted, string? message) => new
+        {
+            address = knob is null ? line.Address : RadioKnobs.Address(knob),
+            section = line.Section,
+            function = knob?.Name ?? line.Name,
+            current = current is int c && knob is not null ? knob.Show(c) : null,
+            wanted = wanted is int v && knob is not null ? knob.Show(v) : line.Value,
+            raw = wanted?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            status,
+            message,
+            tx = true,
+        };
 
         public sealed record ApplyItem(string Address, string Raw);
         public sealed record ApplyRequest(List<ApplyItem>? Items);
@@ -272,10 +350,14 @@ namespace Icom_Web_Control.Controllers
                 return BadRequest(new { error = "Nothing was ticked." });
             if (!await LoadGate.WaitAsync(0, ct))
                 return Conflict(new { error = "A radio menu load is already running." });
+            _reminderCache = null;
             try
             {
                 var results = new List<object>();
-                foreach (var want in request.Items.DistinctBy(i => i.Address))
+                var items = request.Items.DistinctBy(i => i.Address).ToList();
+                foreach (var want in items.Where(i => RadioKnobs.IsKnobAddress(i.Address)))
+                    results.Add(await ApplyKnobAsync(want, model, ct));
+                foreach (var want in items.Where(i => !RadioKnobs.IsKnobAddress(i.Address)))
                 {
                     var item = table!.FirstOrDefault(i => i.Address == want.Address);
                     if (item is null || string.IsNullOrEmpty(want.Raw))
@@ -319,6 +401,205 @@ namespace Icom_Web_Control.Controllers
             {
                 LoadGate.Release();
             }
+        }
+
+        /// <summary>One front panel level from Load: checked, set only if it differs, and read back.</summary>
+        private async Task<object> ApplyKnobAsync(ApplyItem want, string model, CancellationToken ct)
+        {
+            var knob = RadioKnobs.ByAddress(want.Address, model);
+            if (knob is null)
+                return new { address = want.Address, function = (string?)null, now = (string?)null,
+                    status = "error", message = "Not a front panel level on this radio." };
+            if (!int.TryParse(want.Raw, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
+                || value < 0 || value > (knob.OnOff ? 1 : 100))
+                return KnobResult(knob, "error", null, knob.OnOff ? $"{knob.Name} takes ON or OFF." : $"{knob.Name} takes 0% to 100%.");
+            var current = await RadioKnobs.ReadAsync(_radio, knob, ct);
+            if (current is null)
+                return KnobResult(knob, "error", null, "The radio did not answer, so nothing was sent.");
+            if (current == value)
+                return KnobResult(knob, "same", current, null);
+            _logger.LogInformation("Radio menu load: {Knob} {From} -> {To}", knob.Name, knob.Show(current.Value), knob.Show(value));
+            await RadioKnobs.WriteAsync(_radio, knob, value, ct);
+            var after = await RadioKnobs.ReadAsync(_radio, knob, ct);
+            // A 0-100% level goes to the radio as 0-255, so the read back may round by one.
+            bool ok = after is int a && (knob.OnOff ? a == value : Math.Abs(a - value) <= 1);
+            return ok ? KnobResult(knob, "ok", after, null)
+                : KnobResult(knob, "mismatch", after, after is null
+                    ? "Sent, but the radio did not answer the read back."
+                    : $"Sent, but the radio now shows {knob.Show(after.Value)}.");
+        }
+
+        private static object KnobResult(RadioKnob knob, string status, int? now, string? message) => new
+        {
+            address = RadioKnobs.Address(knob),
+            function = (string?)knob.Name,
+            now = now is int v ? knob.Show(v) : null,
+            status,
+            message,
+        };
+
+        /// <summary>"Not now" on the reminder: hides it until IWC starts again.</summary>
+        private static bool _reminderDismissedThisRun;
+
+        /// <summary>The last check, so a page change does not read the radio again.</summary>
+        private static (DateTime At, RadioMenuReminderResult Result)? _reminderCache;
+
+        private static readonly TimeSpan ReminderCacheFor = TimeSpan.FromSeconds(60);
+
+        /// <summary>"Not now" on an old or changed reminder also keeps it away for this long.</summary>
+        public const int ReminderSnoozeDays = 7;
+
+        private static string SnoozeFile => Path.Combine(SavesFolder, "reminder-snooze.txt");
+
+        /// <summary>The newest file IWC saved for this radio model, or null.</summary>
+        private static RadioMenuSaveInfo? NewestSave(string model)
+        {
+            var dir = new DirectoryInfo(SavesFolder);
+            if (!dir.Exists) return null;
+            // Newest first; a few only, so a folder of hundreds stays quick.
+            foreach (var f in dir.GetFiles("*.ini").OrderByDescending(f => f.LastWriteTime).Take(20))
+            {
+                string text;
+                try { text = System.IO.File.ReadAllText(f.FullName); }
+                catch (IOException) { continue; }
+                catch (UnauthorizedAccessException) { continue; }
+                if (string.Equals(RadioMenuLoad.Parse(text).Radio, model, StringComparison.OrdinalIgnoreCase))
+                    return new RadioMenuSaveInfo(f.Name, f.LastWriteTime, text);
+            }
+            return null;
+        }
+
+        private static DateTime? SnoozedUntil()
+        {
+            try
+            {
+                return System.IO.File.Exists(SnoozeFile)
+                    && DateTime.TryParse(System.IO.File.ReadAllText(SnoozeFile).Trim(), System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var until)
+                    ? until : null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// The front panel levels read now, by knob key. Reads only. Null if a
+        /// load is running (the gate is busy).
+        /// </summary>
+        private async Task<Dictionary<string, int?>?> ReadLevelsNowAsync(IReadOnlyList<RadioKnob> knobs, CancellationToken ct)
+        {
+            if (!await LoadGate.WaitAsync(0, ct)) return null;
+            try
+            {
+                return (await RadioKnobs.ReadAllAsync(_radio, knobs, ct)).ToDictionary(r => r.Knob.Key, r => r.Value);
+            }
+            finally
+            {
+                LoadGate.Release();
+            }
+        }
+
+        /// <summary>
+        /// GET /api/radiomenu/reminder — should IWC remind the user to save the
+        /// radio menu? Reads only the front panel levels, never a mode change.
+        /// The banner on every page asks when IWC starts; the Settings page
+        /// shows the same line. pending means ask again shortly (radio not
+        /// connected, or a load is running).
+        /// </summary>
+        [HttpGet("reminder")]
+        public async Task<IActionResult> Reminder(CancellationToken ct)
+        {
+            var model = (await _settings.GetSettingsAsync()).RadioModel;
+            if (RadioMenuFile.TableFor(model) is null)
+                return Ok(new { supported = false });
+            if (!_radio.IsConnected)
+                return Ok(new { supported = true, pending = true });
+
+            RadioMenuReminderResult result;
+            if (_reminderCache is { } cached && DateTime.Now - cached.At < ReminderCacheFor)
+                result = cached.Result;
+            else
+            {
+                var newest = NewestSave(model);
+                var live = new Dictionary<string, int?>();
+                var knobs = RadioKnobs.TableFor(model);
+                if (newest is not null && knobs is not null)
+                {
+                    if (await ReadLevelsNowAsync(knobs, ct) is not { } read)
+                        return Ok(new { supported = true, pending = true });
+                    live = read;
+                }
+                result = RadioMenuReminder.Check(newest, DateTime.Now, model, live);
+                _reminderCache = (DateTime.Now, result);
+            }
+
+            // No save at all is asked at every start; the others wait out a "Not now".
+            bool snoozed = _reminderDismissedThisRun
+                || (result.Kind != "none" && SnoozedUntil() is DateTime until && until > DateTime.Now);
+            return Ok(new
+            {
+                supported = true,
+                pending = false,
+                kind = result.Kind,
+                show = result.Kind != "ok" && !snoozed,
+                message = RadioMenuReminder.Message(result),
+                days = result.Days,
+                file = result.File,
+                changes = result.Changes,
+            });
+        }
+
+        /// <summary>
+        /// GET /api/radiomenu/exit-check — closing IWC from the tray: should it
+        /// ask to save the radio menu first? Asks when a front panel level read
+        /// now differs from the newest file. Reads only.
+        /// </summary>
+        [HttpGet("exit-check")]
+        public async Task<IActionResult> ExitCheck(CancellationToken ct)
+        {
+            var model = (await _settings.GetSettingsAsync()).RadioModel;
+            var knobs = RadioKnobs.TableFor(model);
+            if (RadioMenuFile.TableFor(model) is null || knobs is null || !_radio.IsConnected)
+                return Ok(new { ask = false, connected = _radio.IsConnected });
+
+            IReadOnlyDictionary<string, int?> live = new Dictionary<string, int?>();
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(TimeSpan.FromSeconds(4));
+                if (await ReadLevelsNowAsync(knobs, cts.Token) is { } read)
+                    live = read;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // Slow radio: nothing to compare, so do not ask.
+            }
+
+            var (ask, message, changes) = RadioMenuReminder.ExitCheck(NewestSave(model), DateTime.Now, model, live);
+            return Ok(new { ask, message, changes, connected = true });
+        }
+
+        /// <summary>
+        /// POST /api/radiomenu/reminder/later — "Not now": no banner until IWC
+        /// starts again, and no old/changed reminder for a week. A missing save
+        /// is still asked at the next start.
+        /// </summary>
+        [HttpPost("reminder/later")]
+        public IActionResult ReminderLater()
+        {
+            _reminderDismissedThisRun = true;
+            try
+            {
+                Directory.CreateDirectory(SavesFolder);
+                System.IO.File.WriteAllText(SnoozeFile, DateTime.Now.AddDays(ReminderSnoozeDays).ToString("o"));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(ex, "Radio menu reminder: could not write {Path}", SnoozeFile);
+            }
+            return Ok(new { snoozeDays = ReminderSnoozeDays });
         }
 
         /// <summary>The model and its menu table, or the reason there is none to use.</summary>

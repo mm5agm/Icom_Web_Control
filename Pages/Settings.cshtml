@@ -3013,8 +3013,10 @@
                 </button>
                 <span id="radioMenuSaveStatus" class="ms-2 small" role="status"></span>
             </div>
+            <div id="radioMenuReminderLine" class="small mt-1" hidden></div>
             <p class="text-muted small mt-2">
-                Saving only reads from the radio; nothing on the radio is changed. It takes several seconds.
+                Saving reads the menu, then the front panel levels the menu does not hold (MIC GAIN, COMP, COMP LEVEL,
+                RF POWER, MONITOR and VOX GAIN). It only reads; nothing on the radio is changed. It takes several seconds.
                 The file goes in <code id="radioMenuFolder">%APPDATA%\MM5AGM\Icom Web Control\Radio menus</code>,
                 with IWC's other files.
                 <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="radioMenuOpenFolderBtn">Open that folder</button>
@@ -3037,6 +3039,7 @@
             <p class="text-muted small mt-2 mb-0">
                 Loading first shows what would change, and sends nothing. Tick the items you want and press
                 <strong>Send ticked items to the radio</strong>. Items marked TX change how the radio transmits and start unticked.
+                The front panel levels are all marked TX.
                 The CI-V and network items are never loaded, because a wrong one would cut IWC off from the radio, and nor are the date and time.
                 You can edit the file in Notepad first: change the value after <code>=</code>, as the radio shows it.
             </p>
@@ -3088,7 +3091,7 @@
         if (!btn) return;
         btn.addEventListener('click', async () => {
             btn.disabled = true;
-            statusEl.textContent = 'Reading the radio menu…';
+            statusEl.textContent = 'Reading the radio menu, then the front panel levels…';
             statusEl.className = 'ms-2 small text-muted';
             try {
                 const r = await fetch('/api/radiomenu/save', { method: 'POST' });
@@ -3222,6 +3225,20 @@
         }
         listSaved();
         document.addEventListener('radiomenu-saved', listSaved);
+
+        // The same check as the start-up banner, always shown here (a "Not now" only hides the banner).
+        const reminderLine = document.getElementById('radioMenuReminderLine');
+        async function showReminder() {
+            try {
+                const r = await fetch('/api/radiomenu/reminder');
+                const d = await r.json();
+                reminderLine.hidden = !(d.supported && !d.pending && d.kind && d.kind !== 'ok');
+                reminderLine.textContent = d.message || '';
+                reminderLine.className = `small mt-1 text-${d.kind === 'changed' || d.kind === 'none' ? 'warning-emphasis' : 'muted'}`;
+            } catch { reminderLine.hidden = true; }
+        }
+        showReminder();
+        document.addEventListener('radiomenu-saved', () => setTimeout(showReminder, 500));
 
         document.getElementById('radioMenuOpenFolderBtn').addEventListener('click', async () => {
             const r = await fetch('/api/radiomenu/open-folder', { method: 'POST' });
