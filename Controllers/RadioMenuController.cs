@@ -35,14 +35,20 @@ namespace Icom_Web_Control.Controllers
 
         private readonly IRadioController _radio;
         private readonly ISettingsService _settings;
+        private readonly RadioStateService _state;
         private readonly ILogger<RadioMenuController> _logger;
 
-        public RadioMenuController(IRadioController radio, ISettingsService settings, ILogger<RadioMenuController> logger)
+        public RadioMenuController(IRadioController radio, ISettingsService settings, RadioStateService state, ILogger<RadioMenuController> logger)
         {
             _radio = radio;
             _settings = settings;
+            _state = state;
             _logger = logger;
         }
+
+        /// <summary>The mode and band of the VFO in use, for AGC (per mode) and PREAMP, ATT, IP+ (per band).</summary>
+        private Task<RadioKnobPlace?> PlaceAsync(CancellationToken ct) =>
+            RadioKnobs.ReadPlaceAsync(_radio, _state.ActiveVfo == 1 ? RadioVfo.B : RadioVfo.A, ct);
 
         /// <summary>
         /// POST /api/radiomenu/save — reads every menu item and writes an .ini file
@@ -68,9 +74,10 @@ namespace Icom_Web_Control.Controllers
             if (missing == readings.Count)
                 return StatusCode(504, new { error = "The radio did not answer any menu reads." });
 
-            // The front panel levels: the same in every mode on the IC-7300MK2, so one read each.
+            // The front panel settings: one read each, for the mode and band the radio is on.
             var knobs = RadioKnobs.TableFor(model);
-            var knobReadings = knobs is null ? new List<RadioKnobReading>() : await RadioKnobs.ReadAllAsync(_radio, knobs, ct);
+            var knobReadings = knobs is null ? new List<RadioKnobReading>()
+                : await RadioKnobs.ReadAllAsync(_radio, knobs, await PlaceAsync(ct), ct);
 
             var now = DateTime.Now;
             var ini = RadioMenuFile.ToIni(model, now, readings) + (knobs is null ? "" : RadioKnobs.ToIni(knobReadings));
@@ -94,7 +101,7 @@ namespace Icom_Web_Control.Controllers
                 name, path, missing, unanswered,
                 knobs = knobReadings.Count(k => k.Value is not null),
                 knobsTotal = knobReadings.Count,
-                knobsUnanswered = knobReadings.Where(k => k.Value is null).Select(k => k.Knob.Name).ToList(),
+                knobsUnanswered = knobReadings.Where(k => k.Value is null).Select(k => k.Label).ToList(),
             });
         }
 
@@ -273,7 +280,7 @@ namespace Icom_Web_Control.Controllers
             // An older file still loads; it just has no levels to put back.
             if (RadioKnobs.TableFor(model) is not null && !file.Items.Any(l => RadioKnobs.IsKnobAddress(l.Address)))
             {
-                const string old = "This file was saved before IWC saved the front panel levels (MIC GAIN, COMP, RF POWER), so only the menu is loaded. Save a new file to include them.";
+                const string old = "This file was saved before IWC saved the front panel settings (RF GAIN, NB, MIC GAIN, RF POWER and so on), so only the menu is loaded. Save a new file to include them.";
                 warning = warning is null ? old : $"{warning} {old}";
             }
             _logger.LogInformation("Radio menu load preview: {Rows} lines, {Changes} changes", rows.Count, changes);
@@ -282,62 +289,69 @@ namespace Icom_Web_Control.Controllers
 
         /// <summary>
         /// The front panel lines of a preview: each checked, then compared with
-        /// what the radio has now. Every level counts as TX (it changes what
-        /// goes out), so the page leaves them unticked.
+        /// what the radio has now. The transmit ones (RF POWER, MIC GAIN, ...)
+        /// count as TX, so the page leaves them unticked. A per-mode or per-band
+        /// line for another mode or band than the radio is on is skipped.
         /// </summary>
         private async Task<int> PreviewKnobsAsync(List<RadioMenuFileItem> lines, string model, List<object> rows, CancellationToken ct)
         {
             int changes = 0;
             var seen = new HashSet<string>();
+            var place = lines.Count > 0 ? await PlaceAsync(ct) : null;
             foreach (var line in lines)
             {
-                var knob = RadioKnobs.ByAddress(line.Address, model);
+                var knob = RadioKnobs.ByAddress(line.Address, model, out var where);
                 if (knob is null)
                 {
-                    rows.Add(KnobRow(null, line, "unknown", null, null, $"Line {line.Line}: not a front panel level IWC loads on the {model}."));
+                    rows.Add(KnobRow(null, null, line, "unknown", null, null, $"Line {line.Line}: not a front panel setting IWC loads on the {model}."));
                     continue;
                 }
                 if (!seen.Add(line.Address!))
                 {
-                    rows.Add(KnobRow(knob, line, "unknown", null, null, $"Line {line.Line}: this level is already in the file; the first one is used."));
+                    rows.Add(KnobRow(knob, where, line, "unknown", null, null, $"Line {line.Line}: this setting is already in the file; the first one is used."));
                     continue;
                 }
                 if (line.Value.Equals(RadioMenuLoad.NoAnswer, StringComparison.OrdinalIgnoreCase))
                 {
-                    rows.Add(KnobRow(knob, line, "skipped", null, null, "The radio did not answer this level when the file was saved."));
+                    rows.Add(KnobRow(knob, where, line, "skipped", null, null, "The radio did not answer this setting when the file was saved."));
                     continue;
                 }
                 var value = RadioKnobs.Encode(knob, line.Value, out var error);
                 if (value is null)
                 {
-                    rows.Add(KnobRow(knob, line, "error", null, null, error));
+                    rows.Add(KnobRow(knob, where, line, "error", null, null, error));
+                    continue;
+                }
+                if (RadioKnobs.NotHere(knob, where, place) is { } elsewhere)
+                {
+                    rows.Add(KnobRow(knob, where, line, "skipped", null, null, elsewhere));
                     continue;
                 }
                 var current = await RadioKnobs.ReadAsync(_radio, knob, ct);
                 if (current is null)
-                    rows.Add(KnobRow(knob, line, "noanswer", null, null, "The radio did not answer, so this cannot be checked."));
-                else if (current == value)
-                    rows.Add(KnobRow(knob, line, "same", current, value, null));
+                    rows.Add(KnobRow(knob, where, line, "noanswer", null, null, "The radio did not answer, so this cannot be checked."));
+                else if (knob.Same(current.Value, value.Value))
+                    rows.Add(KnobRow(knob, where, line, "same", current, value, null));
                 else
                 {
-                    rows.Add(KnobRow(knob, line, "change", current, value, null));
+                    rows.Add(KnobRow(knob, where, line, "change", current, value, null));
                     changes++;
                 }
             }
             return changes;
         }
 
-        private static object KnobRow(RadioKnob? knob, RadioMenuFileItem line, string status, int? current, int? wanted, string? message) => new
+        private static object KnobRow(RadioKnob? knob, string? where, RadioMenuFileItem line, string status, int? current, int? wanted, string? message) => new
         {
-            address = knob is null ? line.Address : RadioKnobs.Address(knob),
+            address = knob is null ? line.Address : RadioKnobs.Address(knob, where),
             section = line.Section,
-            function = knob?.Name ?? line.Name,
+            function = knob is null ? line.Name : RadioKnobs.Label(knob, where),
             current = current is int c && knob is not null ? knob.Show(c) : null,
             wanted = wanted is int v && knob is not null ? knob.Show(v) : line.Value,
             raw = wanted?.ToString(System.Globalization.CultureInfo.InvariantCulture),
             status,
             message,
-            tx = true,
+            tx = knob?.Tx ?? true,
         };
 
         public sealed record ApplyItem(string Address, string Raw);
@@ -361,8 +375,10 @@ namespace Icom_Web_Control.Controllers
             {
                 var results = new List<object>();
                 var items = request.Items.DistinctBy(i => i.Address).ToList();
-                foreach (var want in items.Where(i => RadioKnobs.IsKnobAddress(i.Address)))
-                    results.Add(await ApplyKnobAsync(want, model, ct));
+                var knobItems = items.Where(i => RadioKnobs.IsKnobAddress(i.Address)).ToList();
+                var place = knobItems.Count > 0 ? await PlaceAsync(ct) : null;
+                foreach (var want in knobItems)
+                    results.Add(await ApplyKnobAsync(want, model, place, ct));
                 foreach (var want in items.Where(i => !RadioKnobs.IsKnobAddress(i.Address)))
                 {
                     var item = table!.FirstOrDefault(i => i.Address == want.Address);
@@ -409,36 +425,39 @@ namespace Icom_Web_Control.Controllers
             }
         }
 
-        /// <summary>One front panel level from Load: checked, set only if it differs, and read back.</summary>
-        private async Task<object> ApplyKnobAsync(ApplyItem want, string model, CancellationToken ct)
+        /// <summary>One front panel setting from Load: checked, set only if it differs, and read back.</summary>
+        private async Task<object> ApplyKnobAsync(ApplyItem want, string model, RadioKnobPlace? place, CancellationToken ct)
         {
-            var knob = RadioKnobs.ByAddress(want.Address, model);
+            var knob = RadioKnobs.ByAddress(want.Address, model, out var where);
             if (knob is null)
                 return new { address = want.Address, function = (string?)null, now = (string?)null,
-                    status = "error", message = "Not a front panel level on this radio." };
+                    status = "error", message = "Not a front panel setting on this radio." };
             if (!int.TryParse(want.Raw, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
-                || value < 0 || value > (knob.OnOff ? 1 : 100))
-                return KnobResult(knob, "error", null, knob.OnOff ? $"{knob.Name} takes ON or OFF." : $"{knob.Name} takes 0% to 100%.");
+                || !RadioKnobs.IsValue(knob, value))
+                return KnobResult(knob, where, "error", null, $"That is not a {knob.Name} setting.");
+            if (RadioKnobs.NotHere(knob, where, place) is { } elsewhere)
+                return KnobResult(knob, where, "error", null, elsewhere + " Nothing was sent.");
             var current = await RadioKnobs.ReadAsync(_radio, knob, ct);
             if (current is null)
-                return KnobResult(knob, "error", null, "The radio did not answer, so nothing was sent.");
-            if (current == value)
-                return KnobResult(knob, "same", current, null);
-            _logger.LogInformation("Radio menu load: {Knob} {From} -> {To}", knob.Name, knob.Show(current.Value), knob.Show(value));
-            await RadioKnobs.WriteAsync(_radio, knob, value, ct);
+                return KnobResult(knob, where, "error", null, "The radio did not answer, so nothing was sent.");
+            if (knob.Same(current.Value, value))
+                return KnobResult(knob, where, "same", current, null);
+            _logger.LogInformation("Radio menu load: {Knob} {From} -> {To}", RadioKnobs.Label(knob, where), knob.Show(current.Value), knob.Show(value));
+            bool acked = await RadioKnobs.WriteAsync(_radio, knob, value, ct);
             var after = await RadioKnobs.ReadAsync(_radio, knob, ct);
-            // A 0-100% level goes to the radio as 0-255, so the read back may round by one.
-            bool ok = after is int a && (knob.OnOff ? a == value : Math.Abs(a - value) <= 1);
-            return ok ? KnobResult(knob, "ok", after, null)
-                : KnobResult(knob, "mismatch", after, after is null
-                    ? "Sent, but the radio did not answer the read back."
+            // A level shown as % or Hz goes to the radio as 0-255, and some only take certain steps.
+            bool ok = after is int a && knob.Same(a, value);
+            return ok ? KnobResult(knob, where, "ok", after, null)
+                : KnobResult(knob, where, "mismatch", after, !acked && after is int same && same == current
+                    ? "The radio refused this value."
+                    : after is null ? "Sent, but the radio did not answer the read back."
                     : $"Sent, but the radio now shows {knob.Show(after.Value)}.");
         }
 
-        private static object KnobResult(RadioKnob knob, string status, int? now, string? message) => new
+        private static object KnobResult(RadioKnob knob, string? where, string status, int? now, string? message) => new
         {
-            address = RadioKnobs.Address(knob),
-            function = (string?)knob.Name,
+            address = RadioKnobs.Address(knob, where),
+            function = (string?)RadioKnobs.Label(knob, where),
             now = now is int v ? knob.Show(v) : null,
             status,
             message,
@@ -491,15 +510,16 @@ namespace Icom_Web_Control.Controllers
         }
 
         /// <summary>
-        /// The front panel levels read now, by knob key. Reads only. Null if a
-        /// load is running (the gate is busy).
+        /// The front panel settings read now, by knob address (knob:MIC,
+        /// knob:AGC@USB). Reads only. Null if a load is running (the gate is busy).
         /// </summary>
         private async Task<Dictionary<string, int?>?> ReadLevelsNowAsync(IReadOnlyList<RadioKnob> knobs, CancellationToken ct)
         {
             if (!await LoadGate.WaitAsync(0, ct)) return null;
             try
             {
-                return (await RadioKnobs.ReadAllAsync(_radio, knobs, ct)).ToDictionary(r => r.Knob.Key, r => r.Value);
+                var readings = await RadioKnobs.ReadAllAsync(_radio, knobs, await PlaceAsync(ct), ct);
+                return readings.GroupBy(r => r.Address).ToDictionary(g => g.Key, g => g.First().Value);
             }
             finally
             {
@@ -574,7 +594,7 @@ namespace Icom_Web_Control.Controllers
             try
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(TimeSpan.FromSeconds(4));
+                cts.CancelAfter(TimeSpan.FromSeconds(6));
                 if (await ReadLevelsNowAsync(knobs, cts.Token) is { } read)
                     live = read;
             }

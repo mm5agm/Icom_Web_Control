@@ -626,6 +626,29 @@ namespace Icom_Web_Control.Services
         Task<bool?> WriteMenuItemAsync(int number, byte[] data, CancellationToken cancellationToken = default)
             => Task.FromResult<bool?>(null);
 
+        // -- Front panel save (Settings > Radio menu) ---------------------------
+        // The radio menu save keeps the front panel settings too: about thirty
+        // knobs and buttons (RF GAIN, NB, AGC, PREAMP, MIC GAIN and so on), each
+        // read and set as the radio's own raw value. Only commands in
+        // RadioMenu.RadioKnobs' tables are sent; anything else (VOX on, PTT)
+        // is refused, so this can never transmit.
+
+        /// <summary>
+        /// Read one front panel setting: 14 &lt;sub&gt; (a 0–255 level),
+        /// 16 &lt;sub&gt; (a function code) or 11 (the attenuator byte). -1 if
+        /// the radio does not answer or the command is not a front panel one.
+        /// </summary>
+        Task<int> ReadPanelSettingAsync(byte command, byte sub, CancellationToken cancellationToken = default)
+            => Task.FromResult(-1);
+
+        /// <summary>
+        /// Set one front panel setting (see <see cref="ReadPanelSettingAsync"/>).
+        /// True if the radio acknowledged it; false if it did not, or the
+        /// command is not a front panel one.
+        /// </summary>
+        Task<bool> WritePanelSettingAsync(byte command, byte sub, int value, CancellationToken cancellationToken = default)
+            => Task.FromResult(false);
+
         // -- Raw command escape hatch ------------------------------------------
         // Every other member above is semantic by design. This one is not, and
         // it exists for exactly one caller: user-defined voice macros (Settings →

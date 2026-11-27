@@ -30,7 +30,7 @@ public static class RadioMenuReminder
     public const int OldAfterDays = 30;
 
     /// <param name="newest">The newest file for this radio, or null if there is none.</param>
-    /// <param name="live">The levels read now, by knob key (MIC, COMP, ...); null where the radio did not answer.</param>
+    /// <param name="live">The levels read now, by knob address (knob:MIC, knob:AGC@USB, ...); null where the radio did not answer.</param>
     public static RadioMenuReminderResult Check(RadioMenuSaveInfo? newest, DateTime now, string? model,
         IReadOnlyDictionary<string, int?> live)
     {
@@ -52,22 +52,23 @@ public static class RadioMenuReminder
 
     /// <summary>
     /// The levels that differ from the file. A level the file has no line
-    /// for, or the radio did not answer, is not a change.
+    /// for, or the radio did not answer, is not a change. A per-mode or
+    /// per-band level is only compared on the mode or band it was saved for:
+    /// the live reading's address says where it was read.
     /// </summary>
     public static List<RadioMenuChange> Compare(RadioMenuParsedFile file, string? model, IReadOnlyDictionary<string, int?> live)
     {
         var changes = new List<RadioMenuChange>();
-        var table = RadioKnobs.TableFor(model);
-        if (table is null) return changes;
+        if (RadioKnobs.TableFor(model) is null) return changes;
         var saved = file.Items.Where(i => RadioKnobs.IsKnobAddress(i.Address))
-            .GroupBy(i => i.Address!).ToDictionary(g => g.Key, g => g.First());
-        foreach (var knob in table)
+            .GroupBy(i => i.Address!).Select(g => g.First());
+        foreach (var line in saved)
         {
-            if (!live.TryGetValue(knob.Key, out var value) || value is not int now) continue;
-            if (!saved.TryGetValue(RadioKnobs.Address(knob), out var line)) continue;
+            if (RadioKnobs.ByAddress(line.Address, model, out var where) is not { } knob) continue;
+            if (!live.TryGetValue(line.Address!, out var value) || value is not int now) continue;
             // The value as the file shows it: what Load would set, even if edited by hand.
-            if (RadioKnobs.Encode(knob, line.Value, out _) is not int was || was == now) continue;
-            changes.Add(new(knob.Name, knob.Show(now), knob.Show(was)));
+            if (RadioKnobs.Encode(knob, line.Value, out _) is not int was || knob.Same(was, now)) continue;
+            changes.Add(new(RadioKnobs.Label(knob, where), knob.Show(now), knob.Show(was)));
         }
         return changes;
     }
@@ -96,10 +97,10 @@ public static class RadioMenuReminder
     /// <summary>One line for the banner and the Settings page.</summary>
     public static string Message(RadioMenuReminderResult r) => r.Kind switch
     {
-        "none" => "Your radio's settings have not been saved yet. A saved copy lets you put the menu and the front panel levels back if they get changed.",
+        "none" => "Your radio's settings have not been saved yet. A saved copy lets you put the menu and the front panel settings back if they get changed.",
         "changed" => $"Since your last save ({Ago(r.Days ?? 0)}), {Describe(r.Changes)}.",
         "old" => $"Your last save of the radio's settings was {r.Days} days ago.",
-        "noknobs" => "Your last save was made before IWC saved the front panel levels (MIC GAIN, COMP, RF POWER). Save again to include them.",
+        "noknobs" => "Your last save was made before IWC saved the front panel settings (RF GAIN, NB, MIC GAIN, RF POWER and so on). Save again to include them.",
         _ => "",
     };
 

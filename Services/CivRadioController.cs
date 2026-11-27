@@ -2550,6 +2550,44 @@ namespace Icom_Web_Control.Services
                 _logger.LogWarning("[CivRadioController] Set {What} to {Value} was not acknowledged", what, value);
         }
 
+        // -- Front panel save --------------------------------------------------
+        // Only the commands in the radio menu's front panel tables pass; the
+        // check is here, at the port, as well as in the callers.
+
+        public async Task<int> ReadPanelSettingAsync(byte command, byte sub, CancellationToken ct = default)
+        {
+            if (!Services.RadioMenu.RadioKnobs.IsPanelCommand(command, sub)) return -1;
+            return command switch
+            {
+                CivProtocol.CmdSetLevel => await ReadLevel14Async(sub, ct),
+                CivProtocol.CmdSetFunc => await ReadFunc16Async(sub, ct),
+                CivProtocol.CmdAttenuator => await ReadAttenuatorRawAsync(ct),
+                _ => -1,
+            };
+        }
+
+        public async Task<bool> WritePanelSettingAsync(byte command, byte sub, int value, CancellationToken ct = default)
+        {
+            if (!Services.RadioMenu.RadioKnobs.IsPanelCommand(command, sub))
+            {
+                _logger.LogWarning("[CivRadioController] Front panel write {Cmd:X2} {Sub:X2} refused: not a front panel setting", command, sub);
+                return false;
+            }
+            byte[] body = command switch
+            {
+                CivProtocol.CmdSetLevel => [sub, (byte)(Math.Clamp(value, 0, 255) / 100),
+                    (byte)((((Math.Clamp(value, 0, 255) % 100) / 10) << 4) | (Math.Clamp(value, 0, 255) % 10))],
+                CivProtocol.CmdSetFunc => [sub, (byte)Math.Clamp(value, 0, 255)],
+                _ => [(byte)Math.Clamp(value, 0, 255)],
+            };
+            var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, [command, .. body]);
+            var reply = await TransactAsync(frame, CivProtocol.AckOk, cancellationToken: ct);
+            bool ok = reply != null && reply.Cmd == CivProtocol.AckOk;
+            if (!ok)
+                _logger.LogWarning("[CivRadioController] Front panel write {Cmd:X2} {Sub:X2} = {Value} was not acknowledged", command, sub, value);
+            return ok;
+        }
+
         public async Task<bool> GetAttenuatorAsync(CancellationToken ct = default)
         {
             var frame = CivProtocol.BuildFrame(_radioAddress, CivProtocol.ControllerAddress, CivProtocol.CmdAttenuator);

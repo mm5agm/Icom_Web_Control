@@ -69,7 +69,7 @@ public static class RadioMenuLoad
             string? address = note.Success ? note.Groups[1].Value : null;
             // A [Front panel] line has no item number; its name says which level it is.
             if (RadioKnobs.IsKnobSection(section))
-                address = RadioKnobs.ByName(name) is { } knob ? RadioKnobs.Address(knob) : RadioKnobs.AddressPrefix + name;
+                address = RadioKnobs.AddressForName(name);
             string? raw = note.Success && note.Groups[2].Success && note.Groups[2].Value.Length > 0
                 ? note.Groups[2].Value.ToUpperInvariant() : null;
             items.Add(new RadioMenuFileItem(n + 1, section, name, value, address, raw));

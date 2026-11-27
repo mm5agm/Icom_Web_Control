@@ -144,6 +144,8 @@ ReadMemoryChannelAsync(5)
   FE FE 94 E0 1A 00 00 05 FD
 ReadMenuItemAsync(5)
   FE FE 94 E0 1A 05 00 05 FD
+ReadPanelSettingAsync(20, 2)
+  FE FE 94 E0 14 02 FD
 ReadSMeterAsync(A)
   FE FE 94 E0 15 02 FD
 SelectVfoAsync(A)
@@ -324,3 +326,5 @@ WriteMemoryChannelAsync(memory 5)
   FE FE 94 E0 1A 00 00 05 00 00 40 07 14 00 01 01 00 00 08 85 00 08 85 00 40 07 14 00 01 01 00 00 08 85 00 08 85 54 45 53 54 20 20 20 20 20 20 20 20 20 20 20 20 FD
 WriteMenuItemAsync(5, 01)
   FE FE 94 E0 1A 05 00 05 01 FD
+WritePanelSettingAsync(20, 2, 1)
+  FE FE 94 E0 14 02 00 01 FD
