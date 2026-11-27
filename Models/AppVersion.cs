@@ -24,7 +24,7 @@ public static class AppVersion
     /// as plain "v1.0.6": a tester could not tell which build they were running,
     /// and neither could we when reading their bug report.
     /// </summary>
-    public const string PreRelease = "pre27";
+    public const string PreRelease = "pre29";
 
     /// <summary>
     /// The git tag CI built from ("v1.7.0-pre16", "v1.7.0"), or "" for a local

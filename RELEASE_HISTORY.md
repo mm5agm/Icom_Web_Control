@@ -12,6 +12,17 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre29 (2026-11-27)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **Tune from JS8Call or WSJT-X no longer drops out straight away.** When a program keyed the radio through rigctld, IWC could answer its next "are you transmitting?" with a reading taken a split second before the key-up. The program took that as "not keyed" and released about 0.15 seconds later, so the Tune button went red with no power out. For a second after a program keys or releases the radio, IWC now ignores readings that disagree with what was asked. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51), [#186](https://github.com/mm5agm/Icom_Web_Control/pull/186))
+- **IWC keeps trying to take the radio off transmit.** If the radio doesn't answer "stop transmitting", IWC now keeps sending it until the radio answers, and sends it first when the connection comes back. Before, it tried once and gave up, and rigctld's three-minute safety timer was stopped as well. Now the timer keeps running until the radio is back on receive. ([Discussion #51](https://github.com/mm5agm/Icom_Web_Control/discussions/51), [#186](https://github.com/mm5agm/Icom_Web_Control/pull/186))
+- **New: Spot Map.** Who hears you and who you hear, on a world map and in a list, live from PSK Reporter. Made for a second monitor. Open it from **Menu → Receive → Spot Map**. See [Spot Map](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#96-spot-map-psk-reporter) in the manual. ([#185](https://github.com/mm5agm/Icom_Web_Control/pull/185))
+- Changes from v1.7.0-pre1 to pre28 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre28-2026-11-25).
+
+---
+
 ### v1.7.0-pre28 (2026-11-25)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
