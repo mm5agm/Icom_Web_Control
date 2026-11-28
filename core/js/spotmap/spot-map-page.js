@@ -38,6 +38,11 @@ const WINDOWS = [[300, '5 minutes'], [600, '10 minutes'], [900, '15 minutes'], [
                  [3600, '1 hour'], [10800, '3 hours'], [21600, '6 hours'], [86400, '24 hours']];
 const FRESH_SECS = 180;          // spots from the last 3 minutes are drawn bigger
 const HISTORY_GAP_MS = 5.5 * 60 * 1000;
+// World always shows this much: 80 N clears all of Svalbard (Longyearbyen 78 N, Ny-Alesund 79 N),
+// 57 S Cape Horn and South Georgia.
+const WORLD_NORTH = 80, WORLD_SOUTH = -57;
+// The map repeats sideways, so spots go on the copies either side too.
+const COPIES = [-360, 0, 360];
 const STATION_POLL_MS = 15000;
 const GREY_LINE_MS = 60000;      // the grey line moves a quarter of a degree a minute
 const KEY = 'spotmap.';
@@ -110,6 +115,10 @@ const CSS = `
 .sm-list tbody tr.sm-fresh td { font-weight: 600; color: #fff; }
 .sm-list tbody tr.sm-old td { color: #aab; }
 .sm-empty { padding: 14px; color: #9aa; }
+.sm-nospots { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 600;
+  width: max-content; max-width: min(760px, calc(100% - 120px)); padding: 10px 14px; border: 1px solid #555;
+  border-radius: 6px; background: rgba(22, 24, 28, .93); color: #eee; font-size: 14px; line-height: 1.45; }
+.sm-nospots[hidden] { display: none; }
 .sm-credit { position: absolute; bottom: 18px; left: 10px; z-index: 500; color: #889; font-size: 12px;
   background: rgba(17,17,17,.6); padding: 1px 4px; border-radius: 3px; pointer-events: none; }
 .sm-setup { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.75); display: flex;
@@ -183,7 +192,7 @@ export async function startSpotMap(root, { app = 'rwc', stationUrl = '', program
           ${WINDOWS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}
         </select></label>
         <label><select data-sm="units" aria-label="Distance units"><option value="km">km</option><option value="mi">miles</option></select></label>
-        <button type="button" data-sm="worldBtn" title="Fit one whole world across the window, centred on you">World</button>
+        <button type="button" data-sm="worldBtn" aria-pressed="false" title="Fit one whole world across the window, centred on you. Lit while the whole world is showing; pan or zoom and it goes out.">World</button>
         <button type="button" data-sm="greyBtn" aria-pressed="true" title="Show or hide the grey line: the night side of the Earth, shaded">Grey line</button>
         <button type="button" data-sm="bestBtn" aria-pressed="true" title="Show or hide the furthest station each way">Best DX</button>
         <button type="button" data-sm="bandsBtn" aria-pressed="true" title="Show or hide the stations per band">Bands</button>
@@ -194,6 +203,7 @@ export async function startSpotMap(root, { app = 'rwc', stationUrl = '', program
       </div>
       <div class="sm-body">
         <div class="sm-map" data-sm="map">
+          <div class="sm-nospots" data-sm="nospots" role="status" hidden></div>
           <div class="sm-credit">Data from PSK Reporter by Philip Gladstone. Live spots from mqtt.pskreporter.info by Tom Fanning M0LTE.</div>
         </div>
         <div class="sm-grip" data-sm="grip" role="separator" aria-orientation="vertical" aria-label="Drag to resize the side panel" tabindex="0"></div>
@@ -383,24 +393,30 @@ export async function startSpotMap(root, { app = 'rwc', stationUrl = '', program
     let home = gridToLatLon(station.grid);
     let homeMarker = null;
 
-    // ---- The view: one whole world across the window, or where you left it ----
+    // ---- The view: the whole world, or where you left it ----
     let worldMode = false, worldLon = null, settingView = false;
+    // World lights up while the whole world is showing, like the other buttons.
+    const setWorldMode = on => { worldMode = on; $('worldBtn').setAttribute('aria-pressed', String(on)); };
     const setViewQuietly = (centre, zoom) => {
         settingView = true;
         try { map.setView(centre, zoom, { animate: false }); } finally { settingView = false; }
     };
     function fitWorld() {
-        worldMode = true;
+        setWorldMode(true);
         save('view', { world: true });
         const size = map.getSize();
         if (!size.x || !size.y) return;          // not laid out yet: the resize watcher calls again
-        const zoom = Math.log2(size.x / 256);    // the world is 256 px wide at zoom 0
+        // One world across the window, unless that is taller than the window and would
+        // cut off land between WORLD_NORTH and WORLD_SOUTH (Svalbard to Cape Horn). Then
+        // zoom out until that fits; the map repeats at the sides, spots and all.
+        const band = lat => map.project([lat, 0], 0).y;
+        const bandPx = band(WORLD_SOUTH) - band(WORLD_NORTH);   // at zoom 0
+        const zoom = Math.min(Math.log2(size.x / 256), Math.log2(size.y / bandPx));
         worldLon = home ? home[1] : 0;
-        // The world is as tall as it is wide. If that is taller than the window, keep the
-        // top at 80 N, so it is the empty far south that gets cut off.
         const x = map.project([0, worldLon], zoom).x;
-        const top = map.project([80, worldLon], zoom).y;
-        const y = Math.min(Math.max(top + size.y / 2, size.y / 2), size.x - size.y / 2);
+        const mid = (map.project([WORLD_NORTH, 0], zoom).y + map.project([WORLD_SOUTH, 0], zoom).y) / 2;
+        const worldPx = 256 * Math.pow(2, zoom);
+        const y = Math.min(Math.max(mid, size.y / 2), worldPx - size.y / 2);
         setViewQuietly(map.unproject([x, y], zoom), zoom);
     }
     const view = load('view', null);
@@ -410,7 +426,7 @@ export async function startSpotMap(root, { app = 'rwc', stationUrl = '', program
         fitWorld();
     }
     // Pan or zoom by hand and the page remembers that view instead.
-    map.on('dragstart zoomstart', () => { if (!settingView) worldMode = false; });
+    map.on('dragstart zoomstart', () => { if (!settingView) setWorldMode(false); });
     map.on('moveend', () => {
         if (settingView || worldMode) return;
         const c = map.getCenter();
@@ -467,16 +483,39 @@ export async function startSpotMap(root, { app = 'rwc', stationUrl = '', program
         setTimeout(() => { drawPending = false; draw(); }, 300);
     };
 
+    // ---- "No spots yet" notice ----
+    // Shown once the history has been asked for and nothing at all is on the
+    // map, so an empty map is explained instead of looking broken. PSK Reporter
+    // can know a callsign was heard (its search answer) yet send no reports.
+    const empty = { asked: 0, heardAt: {} };
+    function showEmpty(now) {
+        const el = $('nospots');
+        if (!empty.asked || store.within(now, 86400, KINDS).length) { el.hidden = true; return; }
+        const hhmm = s => new Date(s * 1000).toISOString().slice(11, 16);
+        const known = KINDS.map(k => empty.heardAt[k]).filter(t => t && now - t < 86400);
+        let html = `<b>No spots yet for ${esc(CALL)}.</b> `;
+        html += known.length
+            ? `PSK Reporter says ${esc(CALL)} was last spotted at ${hhmm(Math.max(...known))} UTC, but it sent no reports for the last 24 hours. Its history service is probably running behind. `
+            : 'PSK Reporter has nothing for the last 24 hours. ';
+        html += `New spots appear here as soon as they arrive: <b>Heard me</b> when someone hears you transmit, `
+            + `and <b>I heard</b> when ${esc(programName)} reports what you decode to PSK Reporter `
+            + `(${esc(programName)} Settings, Reporting tab: tick Enable PSK Reporter Spotting).`;
+        el.innerHTML = html;
+        el.hidden = false;
+    }
+
     function draw() {
         const now = Date.now() / 1000;
         const windowSecs = Number(windowSel.value);
         if (!home && store.gridFromSpots) home = gridToLatLon(store.gridFromSpots);
         if (home && !homeMarker) {
-            homeMarker = L.circleMarker(home, { radius: 9, color: '#fff', weight: 2, fillColor: '#ffd23d', fillOpacity: 1 })
-                .bindTooltip(esc(CALL)).addTo(map);
+            homeMarker = L.layerGroup(COPIES.map(shift =>
+                L.circleMarker([home[0], home[1] + shift], { radius: 9, color: '#fff', weight: 2, fillColor: '#ffd23d', fillOpacity: 1 })
+                    .bindTooltip(esc(CALL)))).addTo(map);
         }
         // Home found after the start: centre the whole-world view on it.
         if (worldMode && home && worldLon !== home[1]) fitWorld();
+        showEmpty(now);
         const shown = kindsShown();
         markers.clear();
         for (const kind of KINDS) {
@@ -487,19 +526,21 @@ export async function startSpotMap(root, { app = 'rwc', stationUrl = '', program
             for (const s of spots) {
                 const ll = gridToLatLon(s.grid);
                 const fresh = now - s.t < FRESH_SECS;
-                if (home) {
-                    L.polyline([home, ll], { color: COLOURS[kind], weight: fresh ? 2 : 1, opacity: fresh ? 0.8 : 0.3 })
-                        .addTo(layers[kind]);
-                }
-                const m = L.circleMarker(ll, {
-                    radius: fresh ? 11 : 7, color: fresh ? '#fff' : '#111', weight: fresh ? 2 : 1,
-                    fillColor: COLOURS[kind], fillOpacity: 0.9,
-                });
                 const line = kind === 'heardMe' ? `${s.call} heard ${CALL}` : `${CALL} heard ${s.call}`;
                 const snr = s.snr !== null ? ` · ${s.snr} dB` : '';
-                m.bindTooltip(`<b>${esc(line)}</b><br>${esc(s.band)} ${esc(s.mode)}${snr}<br>${esc(s.grid)} · ${ago(s.t)}`);
-                m.addTo(layers[kind]);
-                markers.set(kind + ':' + s.call, m);
+                const tip = `<b>${esc(line)}</b><br>${esc(s.band)} ${esc(s.mode)}${snr}<br>${esc(s.grid)} · ${ago(s.t)}`;
+                for (const shift of COPIES) {
+                    const at = [ll[0], ll[1] + shift];
+                    if (home) {
+                        L.polyline([[home[0], home[1] + shift], at], { color: COLOURS[kind], weight: fresh ? 2 : 1, opacity: fresh ? 0.8 : 0.3 })
+                            .addTo(layers[kind]);
+                    }
+                    const m = L.circleMarker(at, {
+                        radius: fresh ? 11 : 7, color: fresh ? '#fff' : '#111', weight: fresh ? 2 : 1,
+                        fillColor: COLOURS[kind], fillOpacity: 0.9,
+                    }).bindTooltip(tip).addTo(layers[kind]);
+                    if (shift === 0) markers.set(kind + ':' + s.call, m);
+                }
             }
         }
         drawList(now, windowSecs, shown);
@@ -682,6 +723,12 @@ export async function startSpotMap(root, { app = 'rwc', stationUrl = '', program
             if (data?.message && !data.receptionReport) {
                 done[kind] = `${label} not loaded (PSK Reporter: ${data.message})`;
             } else {
+                // The search part says when PSK Reporter last saw the callsign, even
+                // when it sends no reports: used by the "No spots yet" notice.
+                let search = data?.[kind === 'heardMe' ? 'senderSearch' : 'receiverSearch'];
+                if (search && !Array.isArray(search)) search = [search];
+                const seen = Number(search?.[0]?.recentFlowStartSeconds);
+                if (seen) empty.heardAt[kind] = seen;
                 let reports = data?.receptionReport ?? [];
                 if (!Array.isArray(reports)) reports = [reports];
                 for (const r of reports) addSpot(kind, fromReceptionReport(r));
@@ -690,8 +737,10 @@ export async function startSpotMap(root, { app = 'rwc', stationUrl = '', program
         } catch (e) {
             done[kind] = `${label} not loaded (${e.message})`;
         }
-        historyEl.textContent = 'History 24 h: ' + Object.values(done).join(', ')
+        historyEl.textContent = 'Earlier spots from PSK Reporter history (24 h, live ones not counted): ' + Object.values(done).join(', ')
             + (done.iHeard ? '' : '; "I heard" loads in a few minutes');
+        empty.asked++;
+        showEmpty(Date.now() / 1000);
         historyEl.title = 'PSK Reporter allows about one history query every 5 minutes, so the two halves load 5.5 minutes apart.';
     }
     historyEl.textContent = 'History: loading…';
