@@ -12,6 +12,16 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre31 (2026-11-28)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **Spot Map: band panel.** A panel above the spot list shows, for each band, how many stations **heard you** (orange bar) and how many **you heard** (blue bar), over the **Last** time you picked. The busiest band stands out at a glance. ([#192](https://github.com/mm5agm/Icom_Web_Control/pull/192), [manual](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#96-spot-map-psk-reporter))
+  - A station heard on two bands counts on both, so the bands can add up to more than the totals at the top.
+  - **Click a band** to show only that band on the map, in the list and in the totals. Click it again, or **All bands**, to see every band.
+  - **Bands** at the top hides or shows the panel, and is remembered like **List**. Drag the bar beside the map to resize the right-hand side.
+- Changes from v1.7.0-pre1 to pre30 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre30-2026-11-27).
+
 ### v1.7.0-pre30 (2026-11-27)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
