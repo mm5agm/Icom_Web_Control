@@ -12,6 +12,16 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre32 (2026-11-28)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **Spot Map: clock, grey line and Best DX.** ([#194](https://github.com/mm5agm/Icom_Web_Control/pull/194), [manual](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#96-spot-map-psk-reporter))
+  - A **UTC clock** in the top bar.
+  - **The grey line:** the night side of the Earth is shaded on the map, with a thin yellow line where the sun is rising or setting, and a sun where it is overhead. It moves with the time. **Grey line** at the top hides or shows it.
+  - **Best DX** at the top of the right-hand side: your furthest station each way, the one that heard you and the one you heard, with band, time and distance. It follows **Last** and a band picked in the band panel. Click one to go to it on the map. **Best DX** at the top hides or shows it.
+- Changes from v1.7.0-pre1 to pre31 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre31-2026-11-28).
+
 ### v1.7.0-pre31 (2026-11-28)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
