@@ -12,6 +12,24 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre34 (2026-11-28)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **Spot Map: stations you decode appear within seconds.** ([manual](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#96-spot-map-psk-reporter))
+  - IWC takes every decode straight from WSJT-X (or WS, JTDX) over the UDP link, so a station you decode lands on the map a second or two after the period ends. Before, "I heard" waited for PSK Reporter, minutes later.
+  - The top bar shows **WSJT-X decodes:** and a count.
+- **Spot Map: what each station is doing.** A station you decoded is coloured by its last message for 2 minutes: yellow **CQ**, white **Calling you**, grey **In QSO**, turquoise **73 sent**. The list shows a tag too, so nothing depends on colour alone.
+  - **Colours** at the top changes the colour of any kind of spot. **Standard colours** puts them back.
+- **Spot Map: double-click a station to call it.** Double-click a station you decoded, on the map or in the list, and WSJT-X answers it, exactly as a double-click on its decode in WSJT-X would. WSJT-X may then transmit. A single click opens a popup with a **Call** button.
+  - WSJT-X needs **File → Settings → Reporting → Accept UDP requests** ticked. Plain WSJT-X only answers stations calling CQ or QRZ this way.
+- **Spot Map: states, provinces and grid squares.** Zoom in and state and province borders appear, with their abbreviations, then their names. **Grid** at the top shows the Maidenhead grid: FN, then FN31, then FN31pr as you zoom in.
+- **Spot Map fixes.** ([#198](https://github.com/mm5agm/Icom_Web_Control/pull/198))
+  - On a wide window, **World** now shows the whole world, south included.
+  - With no spots in the last 24 hours, a **No spots yet** notice says so, instead of an empty world.
+  - The Spot Map link opens **one** Spot Map window: clicking it again goes back to that window instead of opening another.
+- Changes from v1.7.0-pre1 to pre33 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre33-2026-11-28).
+
 ### v1.7.0-pre33 (2026-11-28)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0

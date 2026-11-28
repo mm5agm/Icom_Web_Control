@@ -32,7 +32,9 @@ export function dropKey(label, title, groups, { newTab = false, alignLeft = fals
         for (const it of g.items ?? []) {
             const a = h('a', 'rp-menu-item' + (it.on ? ' on' : ''), it.label);
             a.href = it.href;
-            if (newTab) { a.target = '_blank'; a.rel = 'noopener'; }
+            // A named target (e.g. the Spot Map) reuses its window instead of opening another.
+            if (it.target) a.target = it.target;
+            else if (newTab) { a.target = '_blank'; a.rel = 'noopener'; }
             if (it.on) a.setAttribute('aria-current', 'page');
             if (it.title) a.title = it.title;
             a.addEventListener('click', () => show(false));
