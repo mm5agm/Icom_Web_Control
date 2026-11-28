@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Icom_Web_Control.Services.Wsjtx;
 
 namespace Icom_Web_Control.Services
 {
@@ -17,6 +18,7 @@ namespace Icom_Web_Control.Services
         private const uint MagicNumber = 0xADBCCBDA;
         private const uint MessageTypeHeartbeat = 0;
         private const uint MessageTypeStatus = 1;
+        private const uint MessageTypeDecode = 2;
         private const uint MessageTypeClose = 6;
 
         private readonly IRadioController _radio;
@@ -31,6 +33,63 @@ namespace Icom_Web_Control.Services
         private string _wsjtxId = "";
         private string _deCall = "";
         private string _deGrid = "";
+        private long _dialFrequency;
+        private IPEndPoint? _wsjtxEndPoint;
+        private UdpClient? _udpClient;
+
+        /// <summary>Every station WSJT-X decodes, for the Spot Map's instant "I heard".</summary>
+        public WsjtxHeardList HeardList { get; } = new();
+
+        /// <summary>WSJT-X's dial frequency from its last Status, in Hz. 0 until a Status arrives.</summary>
+        public long DialFrequency { get { lock (_lock) return _dialFrequency; } }
+
+        /// <summary>
+        /// A decode's mode: WSJT-X marks FT8 "~" and FT4 "+"; anything else
+        /// takes the mode from its last Status.
+        /// </summary>
+        public static string DecodeModeName(string symbol, string statusMode) => symbol switch
+        {
+            "~" => "FT8",
+            "+" => "FT4",
+            _ => string.IsNullOrWhiteSpace(statusMode) ? "WSJT-X" : statusMode.Trim(),
+        };
+
+        /// <summary>How old a decode the Spot Map's Call button will still answer.</summary>
+        public static readonly TimeSpan HeardReplyMaxAge = TimeSpan.FromMinutes(30);
+
+        /// <summary>
+        /// The Spot Map's Call button: asks WSJT-X/WS to answer a station's
+        /// latest decode, as a double-click would. WSJT-X ignores it if that
+        /// decode is no longer in its Band Activity window, and needs
+        /// "Accept UDP requests" ticked.
+        /// </summary>
+        public async Task<(bool Ok, string? Error)> SendHeardReplyAsync(string call)
+        {
+            if (!HeardList.TryGetLatest(call, out var decode, out var at) || decode is null)
+                return (false, $"{call} hasn't been decoded since IWC started");
+            if (DateTime.UtcNow - at > HeardReplyMaxAge)
+                return (false, $"{call} was last decoded over {HeardReplyMaxAge.TotalMinutes:0} minutes ago");
+            return await SendAsync(id => WsjtxProtocol.BuildReply(decode, id), $"Reply to {call} (Spot Map)");
+        }
+
+        private async Task<(bool Ok, string? Error)> SendAsync(Func<string, byte[]> build, string what)
+        {
+            UdpClient? udp;
+            IPEndPoint? target;
+            string id;
+            lock (_lock)
+            {
+                udp = _udpClient;
+                target = _wsjtxEndPoint;
+                id = _wsjtxId;
+            }
+            if (udp is null) return (false, "IWC isn't listening for WSJT-X");
+            if (target is null || !IsConnected) return (false, "WSJT-X is not sending to IWC");
+            var bytes = build(id);
+            await udp.SendAsync(bytes, bytes.Length, target);
+            _logger.LogInformation("[WSJT-X UDP] Sent {What} to '{Id}' at {EndPoint}", what, id, target);
+            return (true, null);
+        }
 
         public bool IsConnected { get { lock (_lock) return (DateTime.UtcNow - _lastSeen).TotalSeconds < 30; } }
         public bool IsTransmitting { get { lock (_lock) return _isTransmitting; } }
@@ -64,6 +123,7 @@ namespace Icom_Web_Control.Services
                 var settings = await _settingsService.GetSettingsAsync();
                 _logger.LogWarning("WSJT-X UDP Settings: Address={Address}, Port={Port}", settings.WsjtxUdpAddress, settings.WsjtxUdpPort);
                 udpClient = CreateUdpListener(settings.WsjtxUdpAddress, settings.WsjtxUdpPort);
+                lock (_lock) _udpClient = udpClient;
                 _logger.LogWarning("WSJT-X UDP listener ACTIVE on port {Port} (address filter: {Address})", settings.WsjtxUdpPort, settings.WsjtxUdpAddress);
 
                 while (!stoppingToken.IsCancellationRequested)
@@ -72,7 +132,7 @@ namespace Icom_Web_Control.Services
                     {
                         var result = await udpClient.ReceiveAsync(stoppingToken);
                         _logger.LogWarning("[WSJT-X UDP] Packet received: {Length} bytes from {RemoteEndPoint}", result.Buffer.Length, result.RemoteEndPoint);
-                        await ProcessMessageAsync(result.Buffer, stoppingToken);
+                        await ProcessMessageAsync(result.Buffer, result.RemoteEndPoint, stoppingToken);
                     }
                     catch (OperationCanceledException) { break; }
                     catch (Exception ex)
@@ -87,6 +147,7 @@ namespace Icom_Web_Control.Services
             }
             finally
             {
+                lock (_lock) _udpClient = null;
                 udpClient?.Close();
                 _logger.LogInformation("WSJT-X UDP listener stopped");
                 _logger.LogWarning("WsjtxUdpService ExecuteAsync has exited. Service should be stopped.");
@@ -140,7 +201,7 @@ namespace Icom_Web_Control.Services
             return udp;
         }
 
-        private async Task ProcessMessageAsync(byte[] data, CancellationToken ct)
+        private async Task ProcessMessageAsync(byte[] data, IPEndPoint sender, CancellationToken ct)
         {
             // Parse synchronously (no spans across await boundaries)
 
@@ -153,10 +214,14 @@ namespace Icom_Web_Control.Services
                 return;
             }
 
+            // Our own requests (Reply 4, HaltTx 8, Configure 15) come back to us when WSJT-X uses multicast.
+            if (msg.Type is 4 or 8 or 15) return;
+
             lock (_lock)
             {
                 _lastSeen = DateTime.UtcNow;
                 _wsjtxId = msg.Id;
+                _wsjtxEndPoint = sender;
             }
 
             switch (msg.Type)
@@ -165,9 +230,16 @@ namespace Icom_Web_Control.Services
                     _logger.LogDebug("WSJT-X Heartbeat from '{Id}'", msg.Id);
                     break;
 
+                case MessageTypeDecode:
+                    var decode = WsjtxProtocol.TryParseDecode(data);
+                    if (decode is not null)
+                        HeardList.Add(decode, DialFrequency, WsjtxMode, DeCall, DateTime.UtcNow);
+                    break;
+
                 case MessageTypeStatus:
                     lock (_lock)
                     {
+                        if (msg.DialFrequency > 0) _dialFrequency = msg.DialFrequency;
                         _isTransmitting = msg.Transmitting;
                         _wsjtxMode = msg.Mode;
                         // A short Status (older versions) has no DE fields: keep what we had.
