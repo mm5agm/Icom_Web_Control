@@ -12,6 +12,17 @@ a different and much older format.
 
 ---
 
+### v1.7.0-pre33 (2026-11-28)
+
+> **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
+
+- **Spot Map: one whole world.** ([#196](https://github.com/mm5agm/Icom_Web_Control/pull/196), [manual](https://github.com/mm5agm/Icom_Web_Control/blob/develop/USER_MANUAL.md#96-spot-map-psk-reporter))
+  - The map opens with exactly **one world across the window**, centred on you, and keeps it fitted when you resize the window or the right-hand side.
+  - The mouse wheel and the **+** and **−** buttons zoom in **small steps**, so you can get the view just right.
+  - Pan or zoom, and the page **opens on that view** next time.
+  - **World** at the top brings back the whole world.
+- Changes from v1.7.0-pre1 to pre32 still need testing too: see the [release history](https://github.com/mm5agm/Icom_Web_Control/blob/develop/RELEASE_HISTORY.md#v170-pre32-2026-11-28).
+
 ### v1.7.0-pre32 (2026-11-28)
 
 > **A pre-release.** On Windows, download `Icom_Web_Control_Setup.exe` from this release and install it over the top. You don't need to uninstall first, and your settings are all kept. The Download link at the top of the README still points at v1.6.0
